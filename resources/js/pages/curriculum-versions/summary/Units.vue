@@ -45,6 +45,7 @@ interface Props {
             id: number;
             name: string;
             code: string;
+            start_date?: string;
         } | null;
     };
     data: {
@@ -87,6 +88,15 @@ const curriculumUnitToEdit = ref<CurriculumUnit | null>(null);
 const isDeleting = ref(false);
 
 const permission = usePermissions();
+const canEditOrDelete = computed(() => {
+    if (!props.curriculumVersion.effective_from_semester?.start_date) {
+        return true;
+    }
+    const startDate = new Date(props.curriculumVersion.effective_from_semester.start_date);
+    const now = new Date();
+    return now < startDate;
+});
+
 // Form schemas
 interface AddUnitFormData {
     unit_id: string;
@@ -235,25 +245,29 @@ const baseColumns: ColumnDef<CurriculumUnit>[] = [
                 [
                     permission.can('edit_curriculum_unit')
                         ? h(
-                              Button,
-                              {
-                                  variant: 'ghost',
-                                  size: 'sm',
-                                  onClick: () => editCurriculumUnit(curriculumUnit),
-                              },
-                              () => h(Edit, { class: 'h-4 w-4' }),
-                          )
+                            Button,
+                            {
+                                variant: 'ghost',
+                                size: 'sm',
+                                disabled: !canEditOrDelete.value,
+                                title: canEditOrDelete.value ? 'Edit' : 'Cannot modify for an active or past semester version',
+                                onClick: () => editCurriculumUnit(curriculumUnit),
+                            },
+                            () => h(Edit, { class: 'h-4 w-4' }),
+                        )
                         : null,
                     permission.can('delete_curriculum_unit')
                         ? h(
-                              Button,
-                              {
-                                  variant: 'ghost',
-                                  size: 'sm',
-                                  onClick: () => deleteCurriculumUnit(curriculumUnit),
-                              },
-                              () => h(Trash2, { class: 'h-4 w-4' }),
-                          )
+                            Button,
+                            {
+                                variant: 'ghost',
+                                size: 'sm',
+                                disabled: !canEditOrDelete.value,
+                                title: canEditOrDelete.value ? 'Delete' : 'Cannot modify for an active or past semester version',
+                                onClick: () => deleteCurriculumUnit(curriculumUnit),
+                            },
+                            () => h(Trash2, { class: 'h-4 w-4' }),
+                        )
                         : null,
                 ].filter(Boolean),
             );
@@ -424,6 +438,7 @@ const organizedUnits = computed(() => {
 </script>
 
 <template>
+
     <Head :title="`${curriculumVersion.version_code} - Units`" />
 
     <CurriculumVersionSummaryLayout :curriculum-version="curriculumVersion">
@@ -435,10 +450,12 @@ const organizedUnits = computed(() => {
                         <div class="flex items-center gap-2">
                             <Info class="h-4 w-4 text-blue-600" />
                             <span class="text-sm">
-                                This curriculum also has <strong>{{ data.modulesCount }} module(s)</strong> containing structured unit groups (modular system for Finland campus).
+                                This curriculum also has <strong>{{ data.modulesCount }} module(s)</strong> containing
+                                structured unit groups (modular system for Finland campus).
                             </span>
                         </div>
-                        <Link :href="route('curriculum_versions.summary.modules', { curriculum_version: curriculumVersion.id })">
+                        <Link
+                            :href="route('curriculum_versions.summary.modules', { curriculum_version: curriculumVersion.id })">
                             <Button variant="outline" size="sm">View Modules</Button>
                         </Link>
                     </div>
@@ -502,11 +519,15 @@ const organizedUnits = computed(() => {
                         </CardTitle>
 
                         <div v-if="permission.can('create_curriculum_unit')" class="flex items-center gap-2">
-                            <Button variant="outline" size="sm" :disabled="availableUnits.length === 0" @click="handleAddUnitClick">
+                            <Button variant="outline" size="sm"
+                                :disabled="availableUnits.length === 0 || !canEditOrDelete"
+                                :title="!canEditOrDelete ? 'Cannot modify for an active or past semester version' : ''"
+                                @click="handleAddUnitClick">
                                 <Plus class="mr-2 h-4 w-4" />
                                 Add Unit
                             </Button>
-                            <span v-if="availableUnits.length === 0" class="text-muted-foreground text-xs"> All units added </span>
+                            <span v-if="availableUnits.length === 0" class="text-muted-foreground text-xs"> All units
+                                added </span>
                         </div>
                     </div>
                 </CardHeader>
@@ -525,22 +546,30 @@ const organizedUnits = computed(() => {
                                         <div class="space-y-2">
                                             <div class="flex items-start justify-between">
                                                 <div>
-                                                    <Link :href="curriculumRoutes.units.show(unit.unit?.id)" class="text-sm font-medium">
+                                                    <Link :href="curriculumRoutes.units.show(unit.unit?.id)"
+                                                        class="text-sm font-medium">
                                                         {{ unit.unit?.code }}
                                                     </Link>
                                                     <p class="text-xs text-gray-600">{{ unit.unit?.name }}</p>
                                                 </div>
-                                                <Badge :class="getUnitScopeColor(unit.unit_scope || 'unknown')" class="text-xs">
+                                                <Badge :class="getUnitScopeColor(unit.unit_scope || 'unknown')"
+                                                    class="text-xs">
                                                     {{ unit.unit_scope?.toUpperCase() || 'UNKNOWN' }}
                                                 </Badge>
                                             </div>
                                             <div class="flex items-center justify-between text-xs">
                                                 <span class="text-gray-500">{{ unit.unit?.credit_points }} CP</span>
                                                 <div class="flex items-center gap-1">
-                                                    <Button v-if="permission.can('edit_curriculum_unit')" variant="ghost" size="sm" @click="editCurriculumUnit(unit)">
+                                                    <Button v-if="permission.can('edit_curriculum_unit')"
+                                                        variant="ghost" size="sm" :disabled="!canEditOrDelete"
+                                                        :title="!canEditOrDelete ? 'Cannot modify for an active or past semester version' : 'Edit'"
+                                                        @click="editCurriculumUnit(unit)">
                                                         <Edit class="h-3 w-3" />
                                                     </Button>
-                                                    <Button v-if="permission.can('delete_curriculum_unit')" variant="ghost" size="sm" @click="deleteCurriculumUnit(unit)">
+                                                    <Button v-if="permission.can('delete_curriculum_unit')"
+                                                        variant="ghost" size="sm" :disabled="!canEditOrDelete"
+                                                        :title="!canEditOrDelete ? 'Cannot modify for an active or past semester version' : 'Delete'"
+                                                        @click="deleteCurriculumUnit(unit)">
                                                         <Trash2 class="h-3 w-3" />
                                                     </Button>
                                                 </div>
@@ -566,7 +595,8 @@ const organizedUnits = computed(() => {
 
                     <!-- Filters -->
                     <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4">
-                        <DebouncedInput v-model="filters.search" @debounced="handleSearch" placeholder="Search units..." class="w-full" />
+                        <DebouncedInput v-model="filters.search" @debounced="handleSearch" placeholder="Search units..."
+                            class="w-full" />
 
                         <Select v-model="filters.unit_scope">
                             <SelectTrigger>
@@ -587,7 +617,8 @@ const organizedUnits = computed(() => {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All years</SelectItem>
-                                <SelectItem v-for="year in [1, 2, 3, 4, 5]" :key="year" :value="year.toString()"> Year {{ year }} </SelectItem>
+                                <SelectItem v-for="year in [1, 2, 3, 4, 5]" :key="year" :value="year.toString()"> Year
+                                    {{ year }} </SelectItem>
                             </SelectContent>
                         </Select>
 
@@ -597,7 +628,9 @@ const organizedUnits = computed(() => {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All semesters</SelectItem>
-                                <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }}) </SelectItem>
+                                <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester"
+                                    :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester /
+                                        3) }}) </SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -607,20 +640,26 @@ const organizedUnits = computed(() => {
                     <div v-if="data.units.length === 0" class="py-8 text-center">
                         <Book class="mx-auto h-12 w-12 text-gray-400" />
                         <h3 class="mt-4 text-sm font-medium">No curriculum units found</h3>
-                        <p class="text-muted-foreground mt-2 text-sm">
-                            {{ Object.values(filters).some((f) => f && f !== 'all') ? 'Try adjusting your search filters.' : "This curriculum version doesn't have any units yet." }}
-                        </p>
+                        <div class="text-muted-foreground mt-2 text-sm">
+                            <span v-if="Object.values(filters).some((f) => f && f !== 'all')">Try adjusting your search
+                                filters.</span>
+                            <span v-else>This curriculum version doesn't have any units yet.</span>
+                        </div>
                         <div v-if="permission.can('create_curriculum_unit')" class="mt-6">
-                            <Button :disabled="availableUnits.length === 0" @click="handleAddUnitClick">
+                            <Button :disabled="availableUnits.length === 0 || !canEditOrDelete"
+                                :title="!canEditOrDelete ? 'Cannot modify for an active or past semester version' : ''"
+                                @click="handleAddUnitClick">
                                 <Plus class="mr-2 h-4 w-4" />
                                 Add First Unit
                             </Button>
-                            <p v-if="availableUnits.length === 0" class="text-muted-foreground mt-2 text-xs">All available units have been added to this curriculum version.</p>
+                            <p v-if="availableUnits.length === 0" class="text-muted-foreground mt-2 text-xs">All
+                                available units have been added to this curriculum version.</p>
                         </div>
                     </div>
 
                     <div v-else>
-                        <DataTable :data="data.units" :columns="columns" :loading="false" :enable-row-selection="false" class="border-0" />
+                        <DataTable :data="data.units" :columns="columns" :loading="false" :enable-row-selection="false"
+                            class="border-0" />
                     </div>
                 </CardContent>
             </Card>
@@ -633,7 +672,8 @@ const organizedUnits = computed(() => {
                     <DialogTitle>Add Curriculum Unit</DialogTitle>
                     <DialogDescription>
                         Add a new unit to this curriculum version.
-                        <span v-if="availableUnits.length > 0" class="mt-1 block text-sm text-green-600"> {{ availableUnits.length }} unit(s) available to add </span>
+                        <span v-if="availableUnits.length > 0" class="mt-1 block text-sm text-green-600"> {{
+                            availableUnits.length }} unit(s) available to add </span>
                         <span v-else class="mt-1 block text-sm text-amber-600"> No units available to add </span>
                     </DialogDescription>
                 </DialogHeader>
@@ -647,27 +687,29 @@ const organizedUnits = computed(() => {
                                     <Combobox v-bind="componentField">
                                         <ComboboxAnchor>
                                             <div class="relative w-full items-center">
-                                                <ComboboxInput
-                                                    v-model="addUnitSearch"
-                                                    placeholder="Search for a unit..."
-                                                    :display-value="
-                                                        (value) => {
-                                                            const unit = availableUnits.find((u) => u.id.toString() === value?.toString());
-                                                            return unit ? `${unit.code} - ${unit.name} (${unit.credit_points} CP)` : '';
-                                                        }
-                                                    "
-                                                />
-                                                <ComboboxTrigger class="absolute inset-y-0 end-0 flex items-center justify-center px-3">
+                                                <ComboboxInput v-model="addUnitSearch"
+                                                    placeholder="Search for a unit..." :display-value="(value) => {
+                                                        const unit = availableUnits.find((u) => u.id.toString() === value?.toString());
+                                                        return unit ? `${unit.code} - ${unit.name} (${unit.credit_points} CP)` : '';
+                                                    }
+                                                        " />
+                                                <ComboboxTrigger
+                                                    class="absolute inset-y-0 end-0 flex items-center justify-center px-3">
                                                     <ChevronsUpDown class="text-muted-foreground size-4" />
                                                 </ComboboxTrigger>
                                             </div>
                                         </ComboboxAnchor>
-                                        <ComboboxList class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
+                                        <ComboboxList
+                                            class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
                                             <ComboboxViewport>
                                                 <ComboboxEmpty v-if="filteredAvailableUnits.length === 0">
-                                                    {{ availableUnits.length === 0 ? 'No available units to add' : 'No units found' }}
+                                                    <span v-if="availableUnits.length === 0">No available units to
+                                                        add</span>
+                                                    <span v-else>No units found</span>
                                                 </ComboboxEmpty>
-                                                <ComboboxItem v-for="unit in filteredAvailableUnits" :key="unit.id" :value="unit.id.toString()" class="cursor-pointer"> {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} CP) </ComboboxItem>
+                                                <ComboboxItem v-for="unit in filteredAvailableUnits" :key="unit.id"
+                                                    :value="unit.id.toString()" class="cursor-pointer"> {{ unit.code }}
+                                                    - {{ unit.name }} ({{ unit.credit_points }} CP) </ComboboxItem>
                                             </ComboboxViewport>
                                         </ComboboxList>
                                     </Combobox>
@@ -687,7 +729,8 @@ const organizedUnits = computed(() => {
                                         <SelectContent>
                                             <SelectItem value="program">Program</SelectItem>
                                             <SelectItem value="common">Common</SelectItem>
-                                            <SelectItem value="specialization_specific">Specialization Specific</SelectItem>
+                                            <SelectItem value="specialization_specific">Specialization Specific
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </FormControl>
@@ -705,7 +748,9 @@ const organizedUnits = computed(() => {
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="none">None</SelectItem>
-                                            <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }}) </SelectItem>
+                                            <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester"
+                                                :value="semester.toString()"> Semester {{ semester }} (Year {{
+                                                    Math.ceil(semester / 3) }}) </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </FormControl>
@@ -718,7 +763,8 @@ const organizedUnits = computed(() => {
                         <FormItem>
                             <FormLabel>Notes</FormLabel>
                             <FormControl>
-                                <Textarea v-bind="componentField" placeholder="Additional notes..." rows="3" :maxlength="ValidationRules.curriculumUnit.note.maxLength" />
+                                <Textarea v-bind="componentField" placeholder="Additional notes..." rows="3"
+                                    :maxlength="ValidationRules.curriculumUnit.note.maxLength" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -742,19 +788,13 @@ const organizedUnits = computed(() => {
                     <DialogDescription>Update curriculum unit information.</DialogDescription>
                 </DialogHeader>
 
-                <Form
-                    v-if="curriculumUnitToEdit"
-                    :key="curriculumUnitToEdit.id"
-                    :validation-schema="editUnitFormSchema"
+                <Form v-if="curriculumUnitToEdit" :key="curriculumUnitToEdit.id" :validation-schema="editUnitFormSchema"
                     :initial-values="{
                         unit_id: curriculumUnitToEdit.unit_id?.toString() || '',
                         unit_scope: curriculumUnitToEdit.unit_scope || null,
                         semester_number: curriculumUnitToEdit.semester_number?.toString() || '',
                         note: curriculumUnitToEdit.note || '',
-                    }"
-                    @submit="onEditUnitSubmit"
-                    class="space-y-4"
-                >
+                    }" @submit="onEditUnitSubmit" class="space-y-4">
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <FormField v-slot="{ componentField }" name="unit_id">
                             <FormItem>
@@ -762,22 +802,22 @@ const organizedUnits = computed(() => {
                                 <FormControl>
                                     <Combobox v-bind="componentField">
                                         <ComboboxAnchor>
-                                            <ComboboxInput
-                                                v-model="editUnitSearch"
-                                                placeholder="Search for a unit..."
-                                                :display-value="
-                                                    (value) => {
-                                                        const unit = editableUnits.find((u) => u.id.toString() === value?.toString());
-                                                        return unit ? `${unit.code} - ${unit.name} (${unit.credit_points} CP)` : '';
-                                                    }
-                                                "
-                                            />
+                                            <ComboboxInput v-model="editUnitSearch" placeholder="Search for a unit..."
+                                                :display-value="(value) => {
+                                                    const unit = editableUnits.find((u) => u.id.toString() === value?.toString());
+                                                    return unit ? `${unit.code} - ${unit.name} (${unit.credit_points} CP)` : '';
+                                                }
+                                                    " />
                                             <ComboboxTrigger />
                                         </ComboboxAnchor>
-                                        <ComboboxList class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
+                                        <ComboboxList
+                                            class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
                                             <ComboboxViewport>
-                                                <ComboboxEmpty v-if="filteredEditableUnits.length === 0"> No units found </ComboboxEmpty>
-                                                <ComboboxItem v-for="unit in filteredEditableUnits" :key="unit.id" :value="unit.id.toString()" class="cursor-pointer"> {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} CP) </ComboboxItem>
+                                                <ComboboxEmpty v-if="filteredEditableUnits.length === 0"> No units found
+                                                </ComboboxEmpty>
+                                                <ComboboxItem v-for="unit in filteredEditableUnits" :key="unit.id"
+                                                    :value="unit.id.toString()" class="cursor-pointer"> {{ unit.code }}
+                                                    - {{ unit.name }} ({{ unit.credit_points }} CP) </ComboboxItem>
                                             </ComboboxViewport>
                                         </ComboboxList>
                                     </Combobox>
@@ -797,7 +837,8 @@ const organizedUnits = computed(() => {
                                         <SelectContent>
                                             <SelectItem value="program">Program</SelectItem>
                                             <SelectItem value="common">Common</SelectItem>
-                                            <SelectItem value="specialization_specific">Specialization Specific</SelectItem>
+                                            <SelectItem value="specialization_specific">Specialization Specific
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </FormControl>
@@ -815,7 +856,9 @@ const organizedUnits = computed(() => {
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="none">None</SelectItem>
-                                            <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }}) </SelectItem>
+                                            <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester"
+                                                :value="semester.toString()"> Semester {{ semester }} (Year {{
+                                                    Math.ceil(semester / 3) }}) </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </FormControl>
@@ -828,22 +871,18 @@ const organizedUnits = computed(() => {
                         <FormItem>
                             <FormLabel>Notes</FormLabel>
                             <FormControl>
-                                <Textarea v-bind="componentField" placeholder="Additional notes..." rows="3" :maxlength="ValidationRules.curriculumUnit.note.maxLength" />
+                                <Textarea v-bind="componentField" placeholder="Additional notes..." rows="3"
+                                    :maxlength="ValidationRules.curriculumUnit.note.maxLength" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
                     </FormField>
 
                     <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            @click="
-                                showEditUnitModal = false;
-                                curriculumUnitToEdit = null;
-                            "
-                            >Cancel</Button
-                        >
+                        <Button type="button" variant="outline" @click="
+                            showEditUnitModal = false;
+                        curriculumUnitToEdit = null;
+                        ">Cancel</Button>
                         <Button type="submit" :disabled="isEditSubmitting">
                             {{ isEditSubmitting ? 'Updating...' : 'Update Unit' }}
                         </Button>

@@ -47,6 +47,7 @@ interface CurriculumVersion {
         id: number;
         name: string;
         code: string;
+        start_date?: string;
     };
     curriculum_units_count: number;
     created_at: string;
@@ -230,6 +231,15 @@ const editFilteredSpecializations = computed(() => {
 });
 
 const permission = usePermissions();
+
+const canEditOrDelete = (curriculumVersion: CurriculumVersion) => {
+    if (!curriculumVersion.effective_from_semester?.start_date) {
+        return true;
+    }
+    const startDate = new Date(curriculumVersion.effective_from_semester.start_date);
+    const now = new Date();
+    return now < startDate;
+};
 
 // Action functions
 const editCurriculumVersion = (curriculumVersion: CurriculumVersion) => {
@@ -477,15 +487,15 @@ const columns: ColumnDef<CurriculumVersion>[] = [
                 [
                     program
                         ? h('div', { class: 'space-y-1' }, [
-                              h('div', { class: 'font-medium' }, program.name),
-                              h(
-                                  Badge,
-                                  {
-                                      variant: 'default',
-                                  },
-                                  () => program.code, // Function slot to fix warning
-                              ),
-                          ])
+                            h('div', { class: 'font-medium' }, program.name),
+                            h(
+                                Badge,
+                                {
+                                    variant: 'default',
+                                },
+                                () => program.code, // Function slot to fix warning
+                            ),
+                        ])
                         : null,
                     specialization ? h(Badge, { variant: 'outline', class: 'bg-blue-50 text-blue-600' }, () => [h('span', { class: 'font-mono' }, specialization.code), ' - ', specialization.name]) : null,
                 ].filter(Boolean),
@@ -555,6 +565,7 @@ const navigateToCreate = () => {
 </script>
 
 <template>
+
     <Head title="Curriculum Versions" />
     <!-- Statistics Cards -->
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -612,7 +623,8 @@ const navigateToCreate = () => {
         <div class="min-w-[200px] flex-1">
             <div class="relative">
                 <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                <DebouncedInput v-model="filtersState.search" @debounced="handleSearch" placeholder="Search curriculum versions..." class="pl-9" :debounce="300" />
+                <DebouncedInput v-model="filtersState.search" @debounced="handleSearch"
+                    placeholder="Search curriculum versions..." class="pl-9" :debounce="300" />
             </div>
         </div>
 
@@ -636,13 +648,16 @@ const navigateToCreate = () => {
 
         <!-- Specialization Filter - Enhanced with better UX -->
         <div class="min-w-[200px]">
-            <Select :model-value="displaySpecializationId" @update:model-value="updateSpecializationFilter" :disabled="!filtersState.program_id">
+            <Select :model-value="displaySpecializationId" @update:model-value="updateSpecializationFilter"
+                :disabled="!filtersState.program_id">
                 <SelectTrigger :class="{ 'opacity-50': !filtersState.program_id }">
-                    <SelectValue :placeholder="filtersState.program_id ? 'All specializations' : 'Select program first'" />
+                    <SelectValue
+                        :placeholder="filtersState.program_id ? 'All specializations' : 'Select program first'" />
                 </SelectTrigger>
                 <SelectContent>
                     <SelectItem value="all">All specializations</SelectItem>
-                    <SelectItem v-for="specialization in filteredSpecializations" :key="specialization.id" :value="specialization.id.toString()">
+                    <SelectItem v-for="specialization in filteredSpecializations" :key="specialization.id"
+                        :value="specialization.id.toString()">
                         <div class="flex items-center gap-2">
                             <Badge variant="outline" class="font-mono text-xs">{{ specialization.code }}</Badge>
                             <span>{{ specialization.name }}</span>
@@ -659,7 +674,8 @@ const navigateToCreate = () => {
         </Button>
 
         <!-- Active Filters Indicator -->
-        <div v-if="hasActiveFilters" class="text-muted-foreground text-sm">{{ Object.values(filtersState).filter(Boolean).length }} filter(s) active</div>
+        <div v-if="hasActiveFilters" class="text-muted-foreground text-sm">{{
+            Object.values(filtersState).filter(Boolean).length }} filter(s) active</div>
     </div>
 
     <!-- Data Table -->
@@ -670,7 +686,8 @@ const navigateToCreate = () => {
                     <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
                         <Tooltip>
                             <TooltipTrigger as-child>
-                                <Button variant="ghost" size="sm" @click="viewCurriculumVersion(row.original)" title="View curriculum version">
+                                <Button variant="ghost" size="sm" @click="viewCurriculumVersion(row.original)"
+                                    title="View curriculum version">
                                     <Eye class="h-4 w-4" />
                                 </Button>
                             </TooltipTrigger>
@@ -680,23 +697,31 @@ const navigateToCreate = () => {
                         </Tooltip>
                     </TooltipProvider>
 
-                    <TooltipProvider v-if="permission.can('edit_curriculum_version')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                    <TooltipProvider v-if="permission.can('edit_curriculum_version')" :delay-duration="0"
+                        ignore-non-keyboard-focus disable-hoverable-content>
                         <Tooltip>
                             <TooltipTrigger as-child>
-                                <Button variant="ghost" size="sm" @click="editCurriculumVersion(row.original)" title="Edit curriculum version">
-                                    <Edit class="h-4 w-4" />
-                                </Button>
+                                <div>
+                                    <Button variant="ghost" size="sm" @click="editCurriculumVersion(row.original)"
+                                        :disabled="!canEditOrDelete(row.original)" title="Edit curriculum version">
+                                        <Edit class="h-4 w-4" />
+                                    </Button>
+                                </div>
                             </TooltipTrigger>
                             <TooltipContent>
-                                <p>Edit curriculum version</p>
+                                <p v-if="canEditOrDelete(row.original)">Edit curriculum version</p>
+                                <p v-else>Cannot edit curriculum version already assigned to a running/started semester
+                                </p>
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
 
-                    <TooltipProvider v-if="permission.can('create_curriculum_version')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                    <TooltipProvider v-if="permission.can('create_curriculum_version')" :delay-duration="0"
+                        ignore-non-keyboard-focus disable-hoverable-content>
                         <Tooltip>
                             <TooltipTrigger as-child>
-                                <Button variant="ghost" size="sm" @click="duplicateCurriculumVersion(row.original)" title="Duplicate curriculum version">
+                                <Button variant="ghost" size="sm" @click="duplicateCurriculumVersion(row.original)"
+                                    title="Duplicate curriculum version">
                                     <Copy class="h-4 w-4" />
                                 </Button>
                             </TooltipTrigger>
@@ -706,15 +731,21 @@ const navigateToCreate = () => {
                         </Tooltip>
                     </TooltipProvider>
 
-                    <TooltipProvider v-if="permission.can('delete_curriculum_version')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                    <TooltipProvider v-if="permission.can('delete_curriculum_version')" :delay-duration="0"
+                        ignore-non-keyboard-focus disable-hoverable-content>
                         <Tooltip>
                             <TooltipTrigger as-child>
-                                <Button variant="ghost" size="sm" @click="deleteCurriculumVersion(row.original)" title="Delete curriculum version">
-                                    <Trash2 class="h-4 w-4" />
-                                </Button>
+                                <div>
+                                    <Button variant="ghost" size="sm" @click="deleteCurriculumVersion(row.original)"
+                                        :disabled="!canEditOrDelete(row.original)" title="Delete curriculum version">
+                                        <Trash2 class="h-4 w-4" />
+                                    </Button>
+                                </div>
                             </TooltipTrigger>
                             <TooltipContent>
-                                <p>Delete curriculum version</p>
+                                <p v-if="canEditOrDelete(row.original)">Delete curriculum version</p>
+                                <p v-else>Cannot delete curriculum version already assigned to a running/started
+                                    semester</p>
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
@@ -724,7 +755,8 @@ const navigateToCreate = () => {
     </div>
 
     <!-- Pagination -->
-    <DataPagination :pagination-data="curriculumVersions" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+    <DataPagination :pagination-data="curriculumVersions" @navigate="handlePaginationNavigate"
+        @page-size-change="handlePageSizeChange" />
 
     <!-- Delete Confirmation Dialog -->
     <AlertDialog :open="deleteDialogOpen" @update:open="deleteDialogOpen = $event">
@@ -732,13 +764,17 @@ const navigateToCreate = () => {
             <AlertDialogHeader>
                 <AlertDialogTitle>Delete Curriculum Version</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Are you sure you want to delete curriculum version <strong>{{ curriculumVersionToDelete?.version_code }}</strong
-                    >? This action cannot be undone and will permanently remove the curriculum version and all its associated units.
+                    Are you sure you want to delete curriculum version <strong>{{
+                        curriculumVersionToDelete?.version_code
+                        }}</strong>? This action cannot be undone and will permanently remove the curriculum version and
+                    all
+                    its associated units.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel @click="deleteDialogOpen = false">Cancel</AlertDialogCancel>
-                <AlertDialogAction @click="confirmDelete" class="bg-red-600 hover:bg-red-700">Delete Curriculum Version</AlertDialogAction>
+                <AlertDialogAction @click="confirmDelete" class="bg-red-600 hover:bg-red-700">Delete Curriculum Version
+                </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
@@ -751,18 +787,13 @@ const navigateToCreate = () => {
                 <DialogDescription>Update curriculum version information.</DialogDescription>
             </DialogHeader>
 
-            <Form
-                v-if="curriculumVersionToEdit"
-                :validation-schema="editFormSchema"
-                :initial-values="{
-                    program_id: curriculumVersionToEdit.program_id.toString(),
-                    specialization_id: curriculumVersionToEdit.specialization_id?.toString() || '',
-                    version_code: curriculumVersionToEdit.version_code,
-                    semester_id: curriculumVersionToEdit.semester_id?.toString() || '',
-                    notes: curriculumVersionToEdit.notes || '',
-                }"
-                @submit="onEditSubmit"
-            >
+            <Form v-if="curriculumVersionToEdit" :validation-schema="editFormSchema" :initial-values="{
+                program_id: curriculumVersionToEdit.program_id.toString(),
+                specialization_id: curriculumVersionToEdit.specialization_id?.toString() || '',
+                version_code: curriculumVersionToEdit.version_code,
+                semester_id: curriculumVersionToEdit.semester_id?.toString() || '',
+                notes: curriculumVersionToEdit.notes || '',
+            }" @submit="onEditSubmit">
                 <div class="grid grid-cols-1 gap-4">
                     <FormField v-slot="{ componentField }" name="program_id">
                         <FormItem>
@@ -773,7 +804,8 @@ const navigateToCreate = () => {
                                         <SelectValue placeholder="Select a program" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
+                                        <SelectItem v-for="program in programs" :key="program.id"
+                                            :value="program.id.toString()">
                                             {{ program.name }}
                                         </SelectItem>
                                     </SelectContent>
@@ -792,7 +824,8 @@ const navigateToCreate = () => {
                                         <SelectValue placeholder="Select a specialization" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="specialization in editFilteredSpecializations" :key="specialization.id" :value="specialization.id.toString()">
+                                        <SelectItem v-for="specialization in editFilteredSpecializations"
+                                            :key="specialization.id" :value="specialization.id.toString()">
                                             {{ specialization.name }}
                                         </SelectItem>
                                     </SelectContent>
@@ -806,7 +839,8 @@ const navigateToCreate = () => {
                         <FormItem>
                             <FormLabel>Version Code *</FormLabel>
                             <FormControl>
-                                <Input v-bind="componentField" placeholder="e.g., v1.0, 2023-S1" :maxlength="ValidationRules.curriculumVersion.versionCode.maxLength" />
+                                <Input v-bind="componentField" placeholder="e.g., v1.0, 2023-S1"
+                                    :maxlength="ValidationRules.curriculumVersion.versionCode.maxLength" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -821,7 +855,9 @@ const navigateToCreate = () => {
                                         <SelectValue placeholder="Select semester" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()"> {{ semester.name }} ({{ semester.code }}) </SelectItem>
+                                        <SelectItem v-for="semester in semesters" :key="semester.id"
+                                            :value="semester.id.toString()"> {{ semester.name }} ({{ semester.code }})
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FormControl>
@@ -833,7 +869,8 @@ const navigateToCreate = () => {
                         <FormItem>
                             <FormLabel>Notes</FormLabel>
                             <FormControl>
-                                <Textarea v-bind="componentField" placeholder="Enter any additional notes..." rows="4" :maxlength="ValidationRules.curriculumVersion.notes.maxLength" />
+                                <Textarea v-bind="componentField" placeholder="Enter any additional notes..." rows="4"
+                                    :maxlength="ValidationRules.curriculumVersion.notes.maxLength" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -856,20 +893,17 @@ const navigateToCreate = () => {
             <DialogHeader>
                 <DialogTitle>Duplicate Curriculum Version</DialogTitle>
                 <DialogDescription>
-                    Create a copy of curriculum version <strong>{{ curriculumVersionToDuplicate?.version_code }}</strong> with a new version code.
+                    Create a copy of curriculum version <strong>{{ curriculumVersionToDuplicate?.version_code
+                        }}</strong>
+                    with a new version code.
                 </DialogDescription>
             </DialogHeader>
 
-            <Form
-                v-if="curriculumVersionToDuplicate"
-                :validation-schema="duplicateFormSchema"
-                :initial-values="{
-                    version_code: generateSuggestedVersionCode(curriculumVersionToDuplicate.version_code),
-                    notes: curriculumVersionToDuplicate.notes || '',
-                    include_curriculum_units: true,
-                }"
-                @submit="onDuplicateSubmit"
-            >
+            <Form v-if="curriculumVersionToDuplicate" :validation-schema="duplicateFormSchema" :initial-values="{
+                version_code: generateSuggestedVersionCode(curriculumVersionToDuplicate.version_code),
+                notes: curriculumVersionToDuplicate.notes || '',
+                include_curriculum_units: true,
+            }" @submit="onDuplicateSubmit">
                 <div class="grid grid-cols-1 gap-4">
                     <FormField v-slot="{ componentField }" name="version_code">
                         <FormItem>
@@ -885,7 +919,9 @@ const navigateToCreate = () => {
                         <FormItem>
                             <FormLabel>Notes</FormLabel>
                             <FormControl>
-                                <Textarea v-bind="componentField" placeholder="Enter any additional notes for the duplicate..." rows="4" :maxlength="ValidationRules.curriculumVersion.notes.maxLength" />
+                                <Textarea v-bind="componentField"
+                                    placeholder="Enter any additional notes for the duplicate..." rows="4"
+                                    :maxlength="ValidationRules.curriculumVersion.notes.maxLength" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -898,7 +934,9 @@ const navigateToCreate = () => {
                             </FormControl>
                             <div class="space-y-1 leading-none">
                                 <FormLabel>Include Curriculum Units</FormLabel>
-                                <p class="text-muted-foreground text-[0.8rem]">Copy all {{ curriculumVersionToDuplicate.curriculum_units_count }} curriculum units from the original version to the duplicate.</p>
+                                <p class="text-muted-foreground text-[0.8rem]">Copy all {{
+                                    curriculumVersionToDuplicate.curriculum_units_count }} curriculum units from the
+                                    original version to the duplicate.</p>
                             </div>
                         </FormItem>
                     </FormField>
@@ -907,10 +945,16 @@ const navigateToCreate = () => {
                     <div class="bg-muted/50 rounded-lg border p-4">
                         <h4 class="mb-2 font-medium">Original Version Details</h4>
                         <div class="text-muted-foreground space-y-1 text-sm">
-                            <div><strong>Program:</strong> {{ curriculumVersionToDuplicate.program?.name }} ({{ curriculumVersionToDuplicate.program?.code }})</div>
-                            <div v-if="curriculumVersionToDuplicate.specialization"><strong>Specialization:</strong> {{ curriculumVersionToDuplicate.specialization.name }} ({{ curriculumVersionToDuplicate.specialization.code }})</div>
-                            <div><strong>Effective From:</strong> {{ curriculumVersionToDuplicate.effective_from_semester?.name }}</div>
-                            <div><strong>Curriculum Units:</strong> {{ curriculumVersionToDuplicate.curriculum_units_count }} units</div>
+                            <div><strong>Program:</strong> {{ curriculumVersionToDuplicate.program?.name }} ({{
+                                curriculumVersionToDuplicate.program?.code }})</div>
+                            <div v-if="curriculumVersionToDuplicate.specialization"><strong>Specialization:</strong> {{
+                                curriculumVersionToDuplicate.specialization.name }} ({{
+                                curriculumVersionToDuplicate.specialization.code }})</div>
+                            <div><strong>Effective From:</strong> {{
+                                curriculumVersionToDuplicate.effective_from_semester?.name }}</div>
+                            <div><strong>Curriculum Units:</strong> {{
+                                curriculumVersionToDuplicate.curriculum_units_count
+                                }} units</div>
                         </div>
                     </div>
                 </div>

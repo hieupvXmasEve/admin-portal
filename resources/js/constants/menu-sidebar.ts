@@ -132,6 +132,7 @@ export const mainNavItems: NavItem[] = [
             {
                 title: 'Programs',
                 href: curriculumRoutes.programs.index(),
+                icon: GraduationCap,
                 requiredPermissions: ['view_program'],
             },
             // {

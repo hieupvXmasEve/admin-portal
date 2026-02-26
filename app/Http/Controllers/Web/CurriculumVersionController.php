@@ -631,9 +631,14 @@ class CurriculumVersionController extends Controller
     /**
      * Show the form for editing the specified curriculum version.
      */
-    public function edit(CurriculumVersion $curriculumVersion): Response
+    public function edit(CurriculumVersion $curriculumVersion): Response|RedirectResponse
     {
         $curriculumVersion->load(['program', 'specialization', 'effectiveFromSemester']);
+
+        if ($curriculumVersion->effectiveFromSemester && $curriculumVersion->effectiveFromSemester->start_date && now()->greaterThanOrEqualTo($curriculumVersion->effectiveFromSemester->start_date)) {
+            return redirect()->route(CurriculumRoutes::VERSION_INDEX)
+                ->with('error', 'Cannot edit a curriculum version that is already active or has passed.');
+        }
 
         return Inertia::render('curriculum-versions/Edit', [
             'curriculumVersion' => $curriculumVersion,
@@ -648,6 +653,13 @@ class CurriculumVersionController extends Controller
      */
     public function update(UpdateCurriculumVersionRequest $request, CurriculumVersion $curriculumVersion): RedirectResponse
     {
+        $curriculumVersion->load('effectiveFromSemester');
+        
+        if ($curriculumVersion->effectiveFromSemester && $curriculumVersion->effectiveFromSemester->start_date && now()->greaterThanOrEqualTo($curriculumVersion->effectiveFromSemester->start_date)) {
+            return redirect()->route(CurriculumRoutes::VERSION_INDEX)
+                ->with('error', 'Cannot edit a curriculum version that is already active or has passed.');
+        }
+
         $curriculumVersion->update($request->validated());
 
         return redirect()->route(CurriculumRoutes::VERSION_INDEX, $curriculumVersion)
@@ -659,6 +671,13 @@ class CurriculumVersionController extends Controller
      */
     public function destroy(CurriculumVersion $curriculumVersion): RedirectResponse
     {
+        $curriculumVersion->load('effectiveFromSemester');
+        
+        if ($curriculumVersion->effectiveFromSemester && $curriculumVersion->effectiveFromSemester->start_date && now()->greaterThanOrEqualTo($curriculumVersion->effectiveFromSemester->start_date)) {
+            return redirect()->route(CurriculumRoutes::VERSION_INDEX)
+                ->with('error', 'Cannot delete a curriculum version that is already active or has passed.');
+        }
+
         $curriculumVersion->delete();
 
         return redirect()->route(CurriculumRoutes::VERSION_INDEX)
@@ -765,7 +784,7 @@ class CurriculumVersionController extends Controller
         $curriculumVersion->load([
             'program:id,name,code',
             'specialization:id,name,code',
-            'effectiveFromSemester:id,name,code',
+            'effectiveFromSemester:id,name,code,start_date',
         ]);
 
         // Query curriculum units with filters
@@ -837,7 +856,7 @@ class CurriculumVersionController extends Controller
         $curriculumVersion->load([
             'program:id,name,code',
             'specialization:id,name,code',
-            'effectiveFromSemester:id,name,code',
+            'effectiveFromSemester:id,name,code,start_date',
             'curriculumModules.module.units',
         ]);
 

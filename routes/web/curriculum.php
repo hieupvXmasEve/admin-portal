@@ -20,10 +20,7 @@ Route::middleware('auth')->group(function () {
         Route::post('', [CurriculumVersionController::class, 'store'])
             ->middleware('can:create_curriculum_version')
             ->name(CurriculumRoutes::VERSION_STORE);
-        // Route::get('/{curriculum_version}', [CurriculumVersionController::class, 'show'])
-        //     ->middleware('can:view_curriculum_version')
-        //     ->name(CurriculumRoutes::VERSION_SHOW);
-
+  
         // Tab-based detail routes
         Route::get('/{curriculum_version}/overview', [CurriculumVersionController::class, 'summaryOverview'])
             ->middleware('can:view_curriculum_version')

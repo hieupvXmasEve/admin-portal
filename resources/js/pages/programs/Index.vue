@@ -322,6 +322,7 @@ const handlePageSizeChange = (pageSize: number) => {
 };
 </script>
 <template>
+
     <Head title="Programs" />
     <!-- Header with Add Program Button -->
     <div class="flex items-center justify-between">
@@ -379,7 +380,8 @@ const handlePageSizeChange = (pageSize: number) => {
                 <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
                     <Tooltip>
                         <TooltipTrigger as-child>
-                            <Button variant="ghost" size="sm" @click="openDeleteModal(row.original)" title="Delete program">
+                            <Button variant="ghost" size="sm" @click="openDeleteModal(row.original)"
+                                title="Delete program">
                                 <Trash2 class="h-4 w-4" />
                             </Button>
                         </TooltipTrigger>
@@ -393,7 +395,8 @@ const handlePageSizeChange = (pageSize: number) => {
     </DataTable>
 
     <!-- Pagination -->
-    <DataPagination :pagination-data="programs" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+    <DataPagination :pagination-data="programs" @navigate="handlePaginationNavigate"
+        @page-size-change="handlePageSizeChange" />
 
     <!-- Create Modal -->
     <Dialog v-model:open="showCreateModal">
@@ -430,7 +433,8 @@ const handlePageSizeChange = (pageSize: number) => {
                             <FormItem>
                                 <FormLabel for="create-description">Description</FormLabel>
                                 <FormControl>
-                                    <Textarea id="create-description" placeholder="Program description (optional)" rows="3" v-bind="componentField" />
+                                    <Textarea id="create-description" placeholder="Program description (optional)"
+                                        rows="3" v-bind="componentField" />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -456,21 +460,18 @@ const handlePageSizeChange = (pageSize: number) => {
                 <DialogDescription>Update program information.</DialogDescription>
             </DialogHeader>
 
-            <Form
-                :validation-schema="programSchema"
-                :initial-values="{
-                    name: selectedProgram?.name || '',
-                    code: selectedProgram?.code || '',
-                    description: selectedProgram?.description || '',
-                }"
-                @submit="onEditSubmit"
-            >
+            <Form :validation-schema="programSchema" :initial-values="{
+                name: selectedProgram?.name || '',
+                code: selectedProgram?.code || '',
+                description: selectedProgram?.description || '',
+            }" @submit="onEditSubmit">
                 <div class="grid grid-cols-2 gap-4">
                     <FormField v-slot="{ componentField }" name="code">
                         <FormItem>
                             <FormLabel for="edit-code">Program Code *</FormLabel>
                             <FormControl>
-                                <Input id="edit-code" placeholder="e.g., CS, ENG, BUS" v-bind="componentField" />
+                                <Input id="edit-code" disabled placeholder="e.g., CS, ENG, BUS"
+                                    v-bind="componentField" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -491,7 +492,8 @@ const handlePageSizeChange = (pageSize: number) => {
                             <FormItem>
                                 <FormLabel for="edit-description">Description</FormLabel>
                                 <FormControl>
-                                    <Textarea id="edit-description" placeholder="Program description (optional)" rows="3" v-bind="componentField" />
+                                    <Textarea id="edit-description" placeholder="Program description (optional)"
+                                        rows="3" v-bind="componentField" />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -515,13 +517,15 @@ const handlePageSizeChange = (pageSize: number) => {
             <AlertDialogHeader>
                 <AlertDialogTitle>Delete Program</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Are you sure you want to delete program <strong>{{ selectedProgram?.name }}</strong
-                    >? This action cannot be undone and will permanently remove the program from the system.
+                    Are you sure you want to delete program <strong>{{ selectedProgram?.name }}</strong>? This action
+                    cannot
+                    be undone and will permanently remove the program from the system.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel @click="closeModals">Cancel</AlertDialogCancel>
-                <AlertDialogAction @click="submitDelete" :disabled="deleteForm.processing" class="bg-red-600 hover:bg-red-700">
+                <AlertDialogAction @click="submitDelete" :disabled="deleteForm.processing"
+                    class="bg-red-600 hover:bg-red-700">
                     {{ deleteForm.processing ? 'Deleting...' : 'Delete Program' }}
                 </AlertDialogAction>
             </AlertDialogFooter>
