@@ -34,7 +34,7 @@ Route::name('uploads.')->group(function () {
 });
 
 // Authenticated routes (API token required)
-Route::middleware(['web', 'admin'])->name('uploads.')->group(function () {
+Route::middleware(['web', 'admin', 'auth'])->name('uploads.')->group(function () {
     // Upload operations with rate limiting
     Route::post('/', [ImageUploadController::class, 'upload'])
         ->name('upload')

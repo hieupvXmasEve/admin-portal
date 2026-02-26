@@ -4,7 +4,6 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AdminScheduleController;
 use App\Http\Controllers\Api\AdminStudentImpersonationController;
 use App\Http\Controllers\Api\AdminLecturerImpersonationController;
-use App\Http\Controllers\Api\StudentApplicationController;
 use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\V1\Admin\EmailConfigurationController;
 use App\Http\Controllers\Api\V1\Admin\EmailController;
@@ -23,7 +22,7 @@ Route::name('api.')->group(function () {
 });
 
 // Admin API routes (for internal use)
-Route::middleware(['web'])->name('api.admin.')->group(function () {
+Route::middleware(['web', 'auth'])->name('api.admin.')->group(function () {
     // Student Management
     Route::get('/students', [StudentController::class, 'index'])->name('students.index');
     Route::get('/students/stats', [StudentController::class, 'stats'])->name('students.stats');
@@ -155,18 +154,8 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
     require __DIR__ . '/admin/academic.php';
 });
 
-// Admin API routes (for external use)
-Route::middleware(['auth:sanctum', 'admin'])->group(function () {
-    // Student Applications
-    Route::get('/student-applications', [StudentApplicationController::class, 'index']);
-    Route::get('/student-applications/{studentApplication}', [StudentApplicationController::class, 'show']);
-    Route::put('/student-applications/{studentApplication}', [StudentApplicationController::class, 'update']);
-    Route::patch('/student-applications/{studentApplication}/status', [StudentApplicationController::class, 'updateStatus']);
-    Route::post('/student-applications', [StudentApplicationController::class, 'store']);
-});
-
 // Dashboard API routes - Separated for performance
-Route::middleware(['web'])->prefix('dashboard')->name('api.admin.dashboard.')->group(function () {
+Route::middleware(['web', 'auth'])->prefix('dashboard')->name('api.admin.dashboard.')->group(function () {
     // Chart 1: Student distribution by campus/program
     Route::get('/student-distribution', [\App\Http\Controllers\Web\DashboardController::class, 'studentDistribution'])->name('student-distribution');
 
@@ -183,6 +172,6 @@ Route::middleware(['web'])->prefix('dashboard')->name('api.admin.dashboard.')->g
     Route::get('/recent-activities', [\App\Http\Controllers\Web\DashboardController::class, 'recentActivities'])->name('recent-activities');
 });
 
-Route::middleware(['web'])->prefix('admin')->name('api.admin.')->group(function () {
+Route::middleware(['web', 'auth'])->prefix('admin')->name('api.admin.')->group(function () {
     require __DIR__ . '/admin/notification.php';
 });

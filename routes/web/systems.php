@@ -23,6 +23,6 @@ Route::middleware(['auth', 'campus.selected'])->group(function () {
 });
 
 // Api web routes
-Route::middleware(['web'])->name('api.systems.email-history.')->group(function () {
+Route::middleware(['web', 'auth'])->name('api.systems.email-history.')->group(function () {
     Route::get('/systems/email-history/{emailLog}', [EmailLogController::class, 'show'])->name('system.email-history.show');
 });
