@@ -10,7 +10,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class GetStudentDecisionDetailQuery
 {
-    public function linkedActions(StudentDecision $decision, int $perPage = 10, ?int $campusId = null): LengthAwarePaginator
+    public function linkedActions(StudentDecision $decision, int $perPage = 10, ?int $campusId = null, int $page = 1): LengthAwarePaginator
     {
         return StudentActionLog::query()
             ->with([
@@ -22,7 +22,7 @@ class GetStudentDecisionDetailQuery
             ->where('decision_id', $decision->id)
             ->when($campusId, fn ($query) => $query->whereHas('student', fn ($studentQuery) => $studentQuery->where('campus_id', $campusId)))
             ->orderByDesc('created_at')
-            ->paginate($perPage, ['*'], 'linked_page')
+            ->paginate($perPage, ['*'], 'page', $page)
             ->withQueryString();
     }
 }

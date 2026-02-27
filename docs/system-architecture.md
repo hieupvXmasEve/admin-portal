@@ -120,6 +120,7 @@ Query behavior baseline:
 - Decision index contract supports `search`, `issued_from`, `issued_to`, `per_page`, `page`, `sort`, and `direction`.
 - Decision index sort columns are allowlisted to `decision_number`, `decision_signer`, `issued_at`, and `expires_at` with sanitized defaults (`issued_at` + `desc`).
 - Decision detail view paginates linked student action logs.
+- Decision detail pagination now follows shared server-table keys (`per_page`, `page`) and still accepts legacy aliases (`linked_per_page`, `linked_page`) for compatibility.
 - Student action list/history/detail queries eager-load linked decision identity fields.
 
 Frontend list workflow baseline:

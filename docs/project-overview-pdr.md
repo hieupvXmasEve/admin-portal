@@ -90,6 +90,7 @@ Code baseline:
 - Student action read paths and decision registry queries include decision linkage metadata.
 - Student decision index query contract accepts `search`, `issued_from`, `issued_to`, `per_page`, `page`, `sort`, and `direction`.
 - Sorting is allowlisted to `decision_number`, `decision_signer`, `issued_at`, and `expires_at` with sanitized defaults (`sort=issued_at`, `direction=desc`, `page=1`).
+- Student decision detail linked-actions pagination follows shared server-table keys (`per_page`, `page`) with compatibility aliases (`linked_per_page`, `linked_page`).
 
 Acceptance criteria:
 
@@ -150,6 +151,7 @@ Acceptance criteria:
 
 - 2026-02-26: Added Student Decisions registry + `student_action_logs.decision_id` linkage baseline and acceptance criteria.
 - 2026-02-27: Documented student decision index sort/direction/page contract and sanitized sort allowlist defaults.
+- 2026-02-27: Documented student decision detail pagination migration to shared server-table query keys with backward-compatible aliases.
 - 2026-02-25: Updated with Phase 1 + 1.5 scout/doc-reader context; aligned auth hardening and open risk statements.
 - 2026-02-23: Initial baseline version.
 

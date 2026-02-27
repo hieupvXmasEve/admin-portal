@@ -82,7 +82,10 @@ class StudentDecisionController extends Controller
     public function show(Request $request, StudentDecision $studentDecision): Response
     {
         $validated = $request->validate([
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
             'linked_per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'linked_page' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $campusId = session('current_campus_id');
@@ -104,14 +107,18 @@ class StudentDecisionController extends Controller
             ->selectSub($totalLinkedStudentsSub, 'total_linked_students')
             ->findOrFail($studentDecision->id);
 
-        $linkedPerPage = (int) ($validated['linked_per_page'] ?? 10);
-        $linkedActions = $this->detailQuery->linkedActions($decision, $linkedPerPage, $campusId);
+        $linkedPerPage = (int) ($validated['per_page'] ?? $validated['linked_per_page'] ?? 10);
+        $linkedPage = (int) ($validated['page'] ?? $validated['linked_page'] ?? 1);
+        $linkedActions = $this->detailQuery->linkedActions($decision, $linkedPerPage, $campusId, $linkedPage);
 
         return Inertia::render('Admin/Reports/StudentDecisions/Show', [
             'decision' => $decision,
             'linkedActions' => $linkedActions,
             'filters' => [
+                'per_page' => $linkedPerPage,
+                'page' => $linkedPage,
                 'linked_per_page' => $linkedPerPage,
+                'linked_page' => $linkedPage,
             ],
         ]);
     }

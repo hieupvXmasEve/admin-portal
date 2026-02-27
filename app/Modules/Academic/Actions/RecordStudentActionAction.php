@@ -141,7 +141,8 @@ class RecordStudentActionAction
         self::validateStatusTransitionPolicy($student, $actionType);
 
         match ($actionType) {
-            StudentActionType::NE_ENROLLMENT => null, // No special validation
+            StudentActionType::STUDENT_ENROLLMENT_NE => null, // No special validation
+            StudentActionType::STUDENT_MAJOR_ENROLLMENT => null, // No special validation
             StudentActionType::ACADEMIC_DEFER => self::validateDeferAction($student, $data),
             StudentActionType::ACADEMIC_RESUME => self::validateResumeAction($student, $data),
             StudentActionType::ADMISSION_DEFERRAL => null, // No special validation
@@ -179,9 +180,15 @@ class RecordStudentActionAction
             ]);
         }
 
-        if ($actionType === StudentActionType::NE_ENROLLMENT && $currentStatus !== 'pending') {
+        if ($actionType === StudentActionType::STUDENT_ENROLLMENT_NE && $currentStatus !== 'pending') {
             throw ValidationException::withMessages([
-                'action_type' => 'NE_ENROLLMENT is only allowed when current status is pending.',
+                'action_type' => 'STUDENT_ENROLLMENT_NE is only allowed when current status is pending.',
+            ]);
+        }
+
+        if ($actionType === StudentActionType::STUDENT_MAJOR_ENROLLMENT && $currentStatus !== 'intake_pre_uni_gc') {
+            throw ValidationException::withMessages([
+                'action_type' => 'STUDENT_MAJOR_ENROLLMENT is only allowed when current status is intake_pre_uni_gc.',
             ]);
         }
     }

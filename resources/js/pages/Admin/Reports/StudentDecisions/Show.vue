@@ -1,42 +1,77 @@
 <script setup lang="ts">
+import ServerPaginatedDataTable from '@/components/tables/ServerPaginatedDataTable.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useServerTableQuery } from '@/composables/useServerTableQuery';
+import type { PaginatedResponse } from '@/types';
 import type { StudentActionLog } from '@/types/student-action';
 import type { StudentDecision } from '@/types/student-decision';
 import { studentRoutes } from '@/utils/routes';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
+import type { ColumnDef } from '@tanstack/vue-table';
 import { ExternalLink } from 'lucide-vue-next';
-import { ref } from 'vue';
+
+interface LinkedActionFilters {
+    per_page?: number;
+    page?: number;
+}
 
 interface Props {
     decision: StudentDecision;
-    linkedActions: {
-        data: StudentActionLog[];
-        links: any;
-        meta: any;
-    };
-    filters: {
-        linked_per_page: number;
-    };
+    linkedActions: PaginatedResponse<StudentActionLog>;
+    filters: LinkedActionFilters;
 }
 
 const props = defineProps<Props>();
 
-const linkedPerPage = ref(props.filters.linked_per_page ?? 10);
+const { handlePageChange, handlePageSizeChange } = useServerTableQuery<LinkedActionFilters>({
+    baseUrl: studentRoutes.studentDecisionsShow(props.decision.id),
+    initialFilters: {
+        page: props.filters.page ?? 1,
+        per_page: props.filters.per_page ?? 10,
+    },
+    emptyFilters: {
+        page: 1,
+        per_page: 10,
+    },
+    defaultValues: {
+        page: 1,
+        per_page: 10,
+    },
+    only: ['linkedActions', 'filters'],
+});
 
 const formatDateOnly = (dateStr: string | null | undefined): string => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleDateString('vi-VN');
 };
 
-const reloadWithPerPage = () => {
-    router.get(
-        studentRoutes.studentDecisionsShow(props.decision.id),
-        { linked_per_page: linkedPerPage.value },
-        { preserveState: true, preserveScroll: true },
-    );
-};
+const columns: ColumnDef<StudentActionLog>[] = [
+    {
+        header: 'Student',
+        id: 'student',
+        cell: ({ row }) => `${row.original.student?.student_id || '-'} - ${row.original.student?.full_name || '-'}`,
+    },
+    {
+        header: 'Action Type',
+        accessorKey: 'action_type',
+    },
+    {
+        header: 'Changed At',
+        accessorKey: 'created_at',
+        cell: ({ row }) => formatDateOnly(row.original.created_at),
+    },
+    {
+        header: 'Reason',
+        accessorKey: 'reason',
+    },
+    {
+        header: 'Details',
+        id: 'details',
+        cell: 'details',
+    },
+];
 </script>
 
 <template>
@@ -90,62 +125,17 @@ const reloadWithPerPage = () => {
 
         <Card>
             <CardHeader>
-                <div class="flex items-center justify-between">
-                    <div>
-                        <CardTitle>Linked Student Actions</CardTitle>
-                        <CardDescription>Open action detail from each row.</CardDescription>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-muted-foreground text-sm">Per page</span>
-                        <select v-model.number="linkedPerPage" class="rounded border px-2 py-1 text-sm" @change="reloadWithPerPage">
-                            <option :value="10">10</option>
-                            <option :value="25">25</option>
-                            <option :value="50">50</option>
-                        </select>
-                    </div>
-                </div>
+                <CardTitle>Linked Student Actions</CardTitle>
+                <CardDescription>Open action detail from each row.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div class="overflow-x-auto">
-                    <table class="w-full min-w-[900px] text-sm">
-                        <thead>
-                            <tr class="border-b text-left">
-                                <th class="py-2">Student</th>
-                                <th class="py-2">Action Type</th>
-                                <th class="py-2">Changed At</th>
-                                <th class="py-2">Reason</th>
-                                <th class="py-2">Details</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="row in linkedActions.data" :key="row.id" class="border-b">
-                                <td class="py-2">{{ row.student?.student_id }} - {{ row.student?.full_name }}</td>
-                                <td class="py-2">{{ row.action_type }}</td>
-                                <td class="py-2">{{ formatDateOnly(row.created_at) }}</td>
-                                <td class="py-2">{{ row.reason }}</td>
-                                <td class="py-2">
-                                    <Link :href="studentRoutes.studentStatusActionShow(row.id)">
-                                        <Button size="sm" variant="outline">View Action</Button>
-                                    </Link>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="mt-4 flex flex-wrap items-center gap-2">
-                    <Link
-                        v-for="link in linkedActions.links"
-                        :key="link.label"
-                        :href="link.url || '#'"
-                        :class="[
-                            'rounded border px-2 py-1 text-sm',
-                            link.active ? 'bg-primary text-primary-foreground' : 'bg-background',
-                            !link.url ? 'pointer-events-none opacity-50' : '',
-                        ]"
-                        v-html="link.label"
-                    />
-                </div>
+                <ServerPaginatedDataTable :data="linkedActions.data" :columns="columns" :pagination-data="linkedActions" item-name="actions" @page-change="handlePageChange" @page-size-change="handlePageSizeChange">
+                    <template #cell-details="{ row }">
+                        <Link :href="studentRoutes.studentStatusActionShow(row.original.id)">
+                            <Button size="sm" variant="outline">View Action</Button>
+                        </Link>
+                    </template>
+                </ServerPaginatedDataTable>
             </CardContent>
         </Card>
     </div>

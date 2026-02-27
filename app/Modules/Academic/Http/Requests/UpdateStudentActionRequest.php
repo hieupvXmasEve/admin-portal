@@ -35,7 +35,8 @@ class UpdateStudentActionRequest extends FormRequest
         ];
 
         return match ($actionType->value) {
-            StudentActionType::NE_ENROLLMENT->value => array_merge($baseRules, $this->neEnrollmentRules()),
+            StudentActionType::STUDENT_ENROLLMENT_NE->value => array_merge($baseRules, $this->neEnrollmentRules()),
+            StudentActionType::STUDENT_MAJOR_ENROLLMENT->value => array_merge($baseRules, $this->majorEnrollmentRules()),
             StudentActionType::ACADEMIC_DEFER->value => array_merge($baseRules, $this->deferRules()),
             StudentActionType::ACADEMIC_RESUME->value => array_merge($baseRules, $this->resumeRules()),
             StudentActionType::ADMISSION_DEFERRAL->value => array_merge($baseRules, $this->admissionDeferralRules()),
@@ -69,6 +70,13 @@ class UpdateStudentActionRequest extends FormRequest
     }
 
     protected function neEnrollmentRules(): array
+    {
+        return [
+            'from_semester_id' => ['required', 'integer', 'exists:semesters,id'],
+        ];
+    }
+
+    protected function majorEnrollmentRules(): array
     {
         return [
             'from_semester_id' => ['required', 'integer', 'exists:semesters,id'],

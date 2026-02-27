@@ -220,7 +220,8 @@ class StudentActionLog extends Model
     public function getRelevantSemester(): ?Semester
     {
         return match ($this->action_type) {
-            StudentActionType::NE_ENROLLMENT => $this->fromSemester,
+            StudentActionType::STUDENT_ENROLLMENT_NE => $this->fromSemester,
+            StudentActionType::STUDENT_MAJOR_ENROLLMENT => $this->fromSemester,
             StudentActionType::ACADEMIC_DEFER => $this->fromSemester,
             StudentActionType::ACADEMIC_RESUME => $this->returnSemester,
             StudentActionType::ADMISSION_DEFERRAL => $this->intendedIntakeSemester,
@@ -235,8 +236,12 @@ class StudentActionLog extends Model
     public function getSummaryAttribute(): string
     {
         return match ($this->action_type) {
-            StudentActionType::NE_ENROLLMENT => sprintf(
+            StudentActionType::STUDENT_ENROLLMENT_NE => sprintf(
                 'NE enrollment in %s',
+                $this->fromSemester?->name ?? 'N/A'
+            ),
+            StudentActionType::STUDENT_MAJOR_ENROLLMENT => sprintf(
+                'Major enrollment in %s',
                 $this->fromSemester?->name ?? 'N/A'
             ),
             StudentActionType::ACADEMIC_DEFER => sprintf(
