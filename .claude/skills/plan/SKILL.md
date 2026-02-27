@@ -1,6 +1,6 @@
 ---
-name: plan
-description: "[CK] Plan implementations, design architectures, create technical roadmaps with detailed phases. Use for feature planning, system design, solution architecture, implementation strategy, phase documentation."
+name: ck:plan
+description: "Plan implementations, design architectures, create technical roadmaps with detailed phases. Use for feature planning, system design, solution architecture, implementation strategy, phase documentation."
 argument-hint: "[task] OR archive|red-team|validate"
 license: MIT
 ---
@@ -75,8 +75,8 @@ Load: `references/output-standards.md`
 3. **Research Phase** → Spawn researchers (skip in fast mode)
 4. **Codebase Analysis** → Read docs, scout if needed
 5. **Plan Documentation** → Write comprehensive plan via planner subagent
-6. **Red Team Review** → Use `Skill` tool: `plan:red-team {plan-path}` (hard/parallel/two modes)
-7. **Post-Plan Validation** → Use `Skill` tool: `plan:validate {plan-path}` (hard/parallel/two modes)
+6. **Red Team Review** → Run `/ck:plan red-team {plan-path}` (hard/parallel/two modes)
+7. **Post-Plan Validation** → Run `/ck:plan validate {plan-path}` (hard/parallel/two modes)
 8. **Hydrate Tasks** → Create Claude Tasks from phases (default on, `--no-tasks` to skip)
 9. **Context Reminder** → Output cook command with absolute path (MANDATORY)
 
@@ -122,9 +122,9 @@ ALWAYS create plans or reports in CURRENT WORKING PROJECT DIRECTORY.
 
 | Subcommand | Reference | Purpose |
 |------------|-----------|---------|
-| `/plan archive` | `references/archive-workflow.md` | Archive plans + write journal entries |
-| `/plan red-team` | `references/red-team-workflow.md` | Adversarial plan review with hostile reviewers |
-| `/plan validate` | `references/validate-workflow.md` | Validate plan with critical questions interview |
+| `/ck:plan archive` | `references/archive-workflow.md` | Archive plans + write journal entries |
+| `/ck:plan red-team` | `references/red-team-workflow.md` | Adversarial plan review with hostile reviewers |
+| `/ck:plan validate` | `references/validate-workflow.md` | Validate plan with critical questions interview |
 
 ## Quality Standards
 

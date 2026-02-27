@@ -1,9 +1,9 @@
 # Codebase Summary
 
-Last updated: 2026-02-25  
+Last updated: 2026-02-26  
 Owner: Platform Team  
 Status: Current-state snapshot  
-Primary source: `repomix-output.xml` (generated 2026-02-25)
+Primary source: `repomix-output.xml` (generated 2026-02-26)
 
 ## 1) Snapshot Method
 
@@ -14,8 +14,8 @@ repomix -o repomix-output.xml
 ```
 
 Latest repomix summary:
-- Total files packed: `2,010`
-- Total tokens: `3,135,998`
+- Total files packed: `2,020`
+- Total tokens: `3,144,616`
 - Output file: `repomix-output.xml`
 
 Top token-heavy files include large artifacts (`release-manifest.json`, static html, large data JSON), so architectural interpretation should prioritize app/runtime code paths.
@@ -23,10 +23,10 @@ Top token-heavy files include large artifacts (`release-manifest.json`, static h
 ## 2) Repository Shape (File Counts)
 
 Current counts:
-- `app`: 826
-- `resources`: 739
-- `database`: 233
-- `docs`: 108
+- `app`: 832
+- `resources`: 741
+- `database`: 235
+- `docs`: 102
 - `routes`: 49
 - `config`: 21
 - `scripts`: 12
@@ -37,6 +37,7 @@ Current counts:
   - module domains in `app/Modules/*`
   - large shared layer in `app/Services/*`, `app/Models/*`, and shared HTTP layers
 - Vue 3 + Inertia frontend in `resources/js/*`
+- Academic admin now includes a Student Decisions registry with nullable linkage from `student_action_logs.decision_id` to `student_decisions.id`.
 
 Verified entry points:
 - `bootstrap/app.php`

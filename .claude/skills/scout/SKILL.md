@@ -1,7 +1,8 @@
 ---
-name: scout
-description: "[CK] Fast codebase scouting using parallel agents. Use for file discovery, task context gathering, quick searches across directories. Supports internal (Explore) and external (Gemini/OpenCode) agents."
+name: ck:scout
+description: "Fast codebase scouting using parallel agents. Use for file discovery, task context gathering, quick searches across directories. Supports internal (Explore) and external (Gemini/OpenCode) agents."
 version: 1.0.0
+argument-hint: "[search-target] [ext]"
 ---
 
 # Scout

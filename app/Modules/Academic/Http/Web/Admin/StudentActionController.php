@@ -11,6 +11,7 @@ use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentActionLog;
+use App\Models\StudentDecision;
 use App\Modules\Academic\Actions\RecordStudentActionAction;
 use App\Modules\Academic\Actions\UpdateStudentActionAction;
 use App\Modules\Academic\Actions\UploadActionAttachmentAction;
@@ -77,6 +78,7 @@ class StudentActionController extends Controller
             'fromCampus',
             'toCampus',
             'attachments',
+            'decision:id,decision_name,decision_number,decision_signer,issued_at,expires_at,upload_record_id',
             'deferCase:id,student_action_log_id,scope_type',
         ]);
 
@@ -140,6 +142,11 @@ class StudentActionController extends Controller
                 ['value' => 'FORFEIT', 'label' => 'Mất học phí (Forfeit Fee)'],
                 ['value' => 'PARTIAL', 'label' => 'Bảo lưu một phần (Partial Preserve)'],
             ],
+            'studentDecisions' => StudentDecision::query()
+                ->select('id', 'decision_name', 'decision_number', 'issued_at', 'expires_at')
+                ->orderByDesc('issued_at')
+                ->orderByDesc('id')
+                ->get(),
         ];
 
         // Add course registrations for the student (for COURSES scope selection)

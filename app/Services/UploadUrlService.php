@@ -43,6 +43,10 @@ class UploadUrlService
     public function generatePublicUrl(UploadRecord $uploadRecord, array $options = []): string
     {
         try {
+            if (empty($uploadRecord->disk) || empty($uploadRecord->path)) {
+                return '';
+            }
+
             $baseUrl = Storage::disk($uploadRecord->disk)->url($uploadRecord->path);
 
             // Apply CDN transformation if configured and requested
@@ -217,8 +221,12 @@ class UploadUrlService
     /**
      * Check if CDN configuration exists for the disk.
      */
-    protected function hasCdnConfiguration(string $disk): bool
+    protected function hasCdnConfiguration(?string $disk): bool
     {
+        if (! $disk) {
+            return false;
+        }
+
         $config = config("filesystems.disks.{$disk}");
         return isset($config['cdn_url']) || isset($config['url_transformer']);
     }

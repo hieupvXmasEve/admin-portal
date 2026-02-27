@@ -26,6 +26,7 @@ class ListStudentActionLogsQuery
                 'fromCampus:id,name,code',
                 'toCampus:id,name,code',
                 'attachments',
+                'decision:id,decision_name,decision_number',
             ])
             // Filter by action type
             ->when($filters['action_type'] ?? null, function (Builder $query, $actionType) {

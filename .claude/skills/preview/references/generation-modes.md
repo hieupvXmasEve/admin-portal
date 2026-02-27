@@ -10,7 +10,7 @@
 ## Step 2: Generate Content
 
 **Mermaid Diagram Syntax:**
-When generating mermaid code blocks, use `/mermaidjs-v11` skill for v11 syntax rules.
+When generating mermaid code blocks, use `/ck:mermaidjs-v11` skill for v11 syntax rules.
 
 **Essential rules (always apply):**
 - Quote node text with special characters: `A["text with /slashes"]`

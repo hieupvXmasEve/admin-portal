@@ -1,6 +1,6 @@
 ---
-name: use-mcp
-description: "[CK] Utilize MCP server tools with intelligent discovery and execution."
+name: ck:use-mcp
+description: "Utilize MCP server tools with intelligent discovery and execution."
 argument-hint: "[task]"
 ---
 
@@ -19,7 +19,7 @@ Execute MCP operations via **Gemini CLI** to preserve context budget.
 
 2. **Fallback to mcp-manager subagent** (if Gemini CLI unavailable):
    - Use `mcp-manager` subagent to discover and execute tools
-   - If the subagent got issues with the scripts of `mcp-management` skill, use `mcp-builder` skill to fix them
+   - If the subagent got issues with the scripts of `ck:mcp-management` skill, use `ck:mcp-builder` skill to fix them
    - **DO NOT** create ANY new scripts
    - The subagent can only use MCP tools if any to achieve this task
    - If the subagent can't find any suitable tools, just report it back to the main agent to move on to the next step

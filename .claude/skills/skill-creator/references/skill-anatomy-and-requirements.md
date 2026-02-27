@@ -27,7 +27,7 @@
 
 ```yaml
 ---
-name: kebab-case-name
+name: kebab-case-name  # optional namespace: ck:kebab-case-name
 description: Under 200 chars, specific triggers and use cases
 license: Optional
 version: Optional

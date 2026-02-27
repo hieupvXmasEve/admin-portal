@@ -1,6 +1,6 @@
 # System Architecture
 
-Last updated: 2026-02-25  
+Last updated: 2026-02-27  
 Owner: Platform Team  
 Status: Current-state architecture map  
 Source of truth: route files, middleware, module providers, runtime entrypoints
@@ -79,20 +79,54 @@ Client (Web SPA / API)
 ## 5) Student Action Import Sub-Architecture
 
 Route cluster (`app/Modules/Academic/routes/web.php`):
+
 - import page
 - template download
 - preview import
 - execute import
 
 Flow:
+
 1. Preview parses and validates uploaded rows.
 2. Preview returns token and stores anti-tamper context (hash + optional attachment id).
 3. Execute verifies preview token and anti-tamper data.
 4. Execute writes row-by-row with DB transaction boundaries.
 
 Constraints:
+
 - `ADMISSION_DEFERRAL` excluded from import path.
 - append is limited to same student + same type + same period.
+
+### Student Decisions Registry and Link Model
+
+Route cluster (`app/Modules/Academic/routes/web.php`):
+
+- `GET /reports/student-decisions`
+- `GET /reports/student-decisions/{studentDecision}`
+- `POST /reports/student-decisions`
+- `PUT /reports/student-decisions/{studentDecision}`
+
+Data and relation baseline:
+
+- Registry table: `student_decisions`
+- Link column: `student_action_logs.decision_id` (nullable FK to `student_decisions.id`, `nullOnDelete`)
+- Model relations:
+    - `StudentDecision::actionLogs()`
+    - `StudentActionLog::decision()`
+
+Query behavior baseline:
+
+- Decision listing computes `linked_actions_count` and `linked_students_count`.
+- Decision index contract supports `search`, `issued_from`, `issued_to`, `per_page`, `page`, `sort`, and `direction`.
+- Decision index sort columns are allowlisted to `decision_number`, `decision_signer`, `issued_at`, and `expires_at` with sanitized defaults (`issued_at` + `desc`).
+- Decision detail view paginates linked student action logs.
+- Student action list/history/detail queries eager-load linked decision identity fields.
+
+Frontend list workflow baseline:
+
+- `resources/js/pages/Admin/Reports/StudentDecisions/Index.vue` now uses shared server-table primitives.
+- Query/pagination orchestration uses `resources/js/composables/useServerTableQuery.ts`.
+- Shared UI primitives are `resources/js/components/filters/ServerDateRangeFilters.vue` and `resources/js/components/tables/ServerPaginatedDataTable.vue`.
 
 ## 6) Operational Architecture Status
 

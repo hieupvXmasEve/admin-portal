@@ -196,6 +196,10 @@ export const studentRoutes = {
     academicProgressionExport: () => route('reports.academic-progression.export'),
     studentLifecycleYearlyAnalysis: () => route('reports.student-lifecycle-yearly.index'),
     studentLifecycleYearlyAnalysisExport: () => route('reports.student-lifecycle-yearly.export'),
+    studentDecisionsIndex: () => route('reports.student-decisions.index'),
+    studentDecisionsShow: (id: number) => route('reports.student-decisions.show', { studentDecision: id }),
+    studentDecisionsStore: () => route('reports.student-decisions.store'),
+    studentDecisionsUpdate: (id: number) => route('reports.student-decisions.update', { studentDecision: id }),
 } as const;
 
 // Lecturer Management Routes

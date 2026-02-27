@@ -25,6 +25,7 @@ class StudentActionLog extends Model
         'decision_number',
         'decision_signed_at',
         'decision_signer',
+        'decision_id',
         'missing_documents',
         'changed_by_user_id',
         'from_semester_id',
@@ -112,6 +113,11 @@ class StudentActionLog extends Model
             'student_action_log_id',
             'upload_record_id'
         )->withTimestamps();
+    }
+
+    public function decision(): BelongsTo
+    {
+        return $this->belongsTo(StudentDecision::class, 'decision_id');
     }
 
     /**
@@ -214,6 +220,7 @@ class StudentActionLog extends Model
     public function getRelevantSemester(): ?Semester
     {
         return match ($this->action_type) {
+            StudentActionType::NE_ENROLLMENT => $this->fromSemester,
             StudentActionType::ACADEMIC_DEFER => $this->fromSemester,
             StudentActionType::ACADEMIC_RESUME => $this->returnSemester,
             StudentActionType::ADMISSION_DEFERRAL => $this->intendedIntakeSemester,
@@ -228,6 +235,10 @@ class StudentActionLog extends Model
     public function getSummaryAttribute(): string
     {
         return match ($this->action_type) {
+            StudentActionType::NE_ENROLLMENT => sprintf(
+                'NE enrollment in %s',
+                $this->fromSemester?->name ?? 'N/A'
+            ),
             StudentActionType::ACADEMIC_DEFER => sprintf(
                 'Defer from %s to %s',
                 $this->fromSemester?->name ?? 'N/A',

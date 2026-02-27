@@ -92,6 +92,7 @@ export interface StudentActionLog {
     decision_number?: string;
     decision_signed_at?: string;
     decision_signer?: string;
+    decision_id?: number | null;
     missing_documents: boolean;
     changed_by_user_id: number;
 
@@ -127,6 +128,14 @@ export interface StudentActionLog {
     from_campus?: Campus;
     to_campus?: Campus;
     attachments?: UploadRecord[];
+    decision?: {
+        id: number;
+        decision_name: string;
+        decision_number: string;
+        decision_signer?: string;
+        issued_at?: string;
+        expires_at?: string | null;
+    } | null;
     defer_case?: {
         scope_type?: 'FULL' | 'COURSES';
     };
@@ -148,6 +157,7 @@ export interface StoreStudentActionForm {
     decision_number?: string;
     decision_signed_at?: string;
     decision_signer?: string;
+    decision_id?: number | null;
     missing_documents: boolean;
     attachment_ids?: number[];
 

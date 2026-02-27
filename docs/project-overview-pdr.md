@@ -1,6 +1,6 @@
 # Project Overview and PDR
 
-Last updated: 2026-02-25  
+Last updated: 2026-02-27  
 Owner: Platform Team  
 Status: Current-state baseline (evidence-first)  
 Source of truth: code in `app/`, `routes/`, `resources/` + scout reports in `plans/reports/`
@@ -8,12 +8,14 @@ Source of truth: code in `app/`, `routes/`, `resources/` + scout reports in `pla
 ## 1) Product Summary
 
 Swinx is a multi-role university operations system delivered as:
+
 - Web admin/staff app (Laravel + Inertia)
 - Student API surface (`/api/v1/student/*`)
 - Lecturer API surface (`/api/v1/lecturer/*`)
 - Parent-linked access to selected student API routes
 
 Core active domains:
+
 - Identity
 - Academic
 - Finance
@@ -29,70 +31,97 @@ Core active domains:
 ### FR-01 Authentication and Actor Segmentation
 
 Code baseline:
+
 - Sanctum token auth is active for student/lecturer v1 APIs.
 - Actor policies are enforced via `api.actor` middleware for:
-  - `student_or_parent`
-  - `parent`
-  - `lecturer`
+    - `student_or_parent`
+    - `parent`
+    - `lecturer`
 - Parent proxy access uses `either:parent.student.access,student.api.auth` on student routes.
 
 Acceptance criteria:
+
 - Protected student and lecturer route groups reject unauthenticated requests.
 - Actor mismatch fails authorization.
 
 ### FR-02 Token Lifecycle Hardening
 
 Code baseline:
+
 - Identity login/refresh actions issue 8-hour tokens (`now()->addHours(8)`).
 - Lecturer refresh endpoint is in protected middleware group.
 - Parent refresh endpoint exists in protected group.
 - Refresh flow in current controllers issues new token then deletes current token.
 
 Acceptance criteria:
+
 - `/api/v1/student/auth/refresh`, `/api/v1/lecturer/auth/refresh`, `/api/v1/student/parent/auth/refresh` require auth.
 - Refresh returns a new token and revokes the old one.
 
 ### FR-03 Student Action Import (Academic)
 
 Code baseline (`app/Modules/Academic/routes/web.php`):
+
 - Import page
 - Template download
 - Preview import
 - Execute import
 
 Behavior baseline:
+
 - Anti-tamper preview/execute token + file hash + `shared_upload_record_id` matching.
 - `ADMISSION_DEFERRAL` excluded from import flow.
 - Append rules limited to same student + same action type + same period.
 - Per-row transaction on execution.
 
 Acceptance criteria:
+
 - Tampered payloads are rejected at execute step.
 - Unsupported action type is blocked from import path.
 
-### FR-04 API Surface Consistency
+### FR-04 Student Decisions Registry and Action Linking
 
 Code baseline:
+
+- Web registry routes exist under `/reports/student-decisions` in `app/Modules/Academic/routes/web.php` (`index`, `show`, `store`, `update`).
+- Decision records are stored in `student_decisions` (`decision_name`, `decision_number`, `decision_signer`, `issued_at`, `expires_at`, `upload_record_id`, `changed_by_user_id`).
+- `student_action_logs.decision_id` is a nullable FK to `student_decisions.id` with `nullOnDelete`.
+- Student action create/update requests validate `decision_id` with `exists:student_decisions,id`.
+- Student action read paths and decision registry queries include decision linkage metadata.
+- Student decision index query contract accepts `search`, `issued_from`, `issued_to`, `per_page`, `page`, `sort`, and `direction`.
+- Sorting is allowlisted to `decision_number`, `decision_signer`, `issued_at`, and `expires_at` with sanitized defaults (`sort=issued_at`, `direction=desc`, `page=1`).
+
+Acceptance criteria:
+
+- Staff can register and update student decisions from the Academic report surface.
+- Student action logs can be linked to a registry decision via optional `decision_id`.
+- Registry screens show linked action and linked student counts per decision.
+
+### FR-05 API Surface Consistency
+
+Code baseline:
+
 - Student and lecturer v1 routes are mostly consistent with sanctum + actor + logging.
 - Finance module API routes currently use `web` + `auth` middleware.
 - Root `/api/system-config*` routes are public in `routes/api.php`.
 
 Acceptance criteria:
+
 - Document auth behavior by route group as implemented.
 - Do not claim unified API auth model while drift remains.
 
 ## 4) Non-Functional Requirements
 
 - Security:
-  - middleware/policy-based authorization
-  - explicit actor segregation for major public API surfaces
+    - middleware/policy-based authorization
+    - explicit actor segregation for major public API surfaces
 - Maintainability:
-  - modular + shared-layer hybrid architecture documented and enforced by standards
+    - modular + shared-layer hybrid architecture documented and enforced by standards
 - Reliability:
-  - deployment and CI risks tracked as current-state gaps
+    - deployment and CI risks tracked as current-state gaps
 - Documentation quality:
-  - evidence-first claims only
-  - explicit owner/status/last-updated discipline
+    - evidence-first claims only
+    - explicit owner/status/last-updated discipline
 
 ## 5) Technical Constraints
 
@@ -119,6 +148,8 @@ Acceptance criteria:
 
 ## 8) Version History
 
+- 2026-02-26: Added Student Decisions registry + `student_action_logs.decision_id` linkage baseline and acceptance criteria.
+- 2026-02-27: Documented student decision index sort/direction/page contract and sanitized sort allowlist defaults.
 - 2026-02-25: Updated with Phase 1 + 1.5 scout/doc-reader context; aligned auth hardening and open risk statements.
 - 2026-02-23: Initial baseline version.
 

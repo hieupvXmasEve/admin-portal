@@ -68,6 +68,7 @@ class RecordStudentActionAction
                 'decision_number' => $data['decision_number'] ?? null,
                 'decision_signed_at' => $data['decision_signed_at'] ?? null,
                 'decision_signer' => $data['decision_signer'] ?? null,
+                'decision_id' => $data['decision_id'] ?? null,
                 'missing_documents' => $data['missing_documents'] ?? false,
                 'changed_by_user_id' => $userId,
 
@@ -125,7 +126,7 @@ class RecordStudentActionAction
                 'changed_by' => $userId,
             ]);
 
-            return $actionLog->load(['student', 'changedBy', 'attachments', 'deferCase']);
+            return $actionLog->load(['student', 'changedBy', 'attachments', 'deferCase', 'decision']);
         });
     }
 
@@ -140,6 +141,7 @@ class RecordStudentActionAction
         self::validateStatusTransitionPolicy($student, $actionType);
 
         match ($actionType) {
+            StudentActionType::NE_ENROLLMENT => null, // No special validation
             StudentActionType::ACADEMIC_DEFER => self::validateDeferAction($student, $data),
             StudentActionType::ACADEMIC_RESUME => self::validateResumeAction($student, $data),
             StudentActionType::ADMISSION_DEFERRAL => null, // No special validation
@@ -174,6 +176,12 @@ class RecordStudentActionAction
         if ($actionType === StudentActionType::ADMISSION_DEFERRAL && $currentStatus !== 'pending') {
             throw ValidationException::withMessages([
                 'action_type' => 'ADMISSION_DEFERRAL is only allowed when current status is pending.',
+            ]);
+        }
+
+        if ($actionType === StudentActionType::NE_ENROLLMENT && $currentStatus !== 'pending') {
+            throw ValidationException::withMessages([
+                'action_type' => 'NE_ENROLLMENT is only allowed when current status is pending.',
             ]);
         }
     }

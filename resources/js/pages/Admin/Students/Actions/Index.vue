@@ -57,6 +57,13 @@ interface Props {
         deferFeePolicies?: { value: string; label: string }[];
         courseRegistrations?: CourseRegistrationPreview[];
         egcCharges?: EgcChargePreview[];
+        studentDecisions?: Array<{
+            id: number;
+            decision_name: string;
+            decision_number: string;
+            issued_at?: string;
+            expires_at?: string | null;
+        }>;
     };
 }
 
@@ -72,6 +79,7 @@ const form = useForm<StoreStudentActionForm>({
     decision_number: '',
     decision_signed_at: '',
     decision_signer: '',
+    decision_id: null,
     missing_documents: true,
     attachment_ids: [],
     from_semester_id: props.options.activeSemesterId ?? null,
@@ -108,6 +116,7 @@ watch(
         form.decision_number = '';
         form.decision_signed_at = '';
         form.decision_signer = '';
+        form.decision_id = null;
         // Keep from_campus_id as student's current campus
         form.from_campus_id = props.student.campus_id;
         // Reset defer case fields
@@ -560,6 +569,27 @@ const getSummary = (log: StudentActionLog): string => {
 
                         <div class="grid grid-cols-2 gap-4">
                             <div class="space-y-2">
+                                <Label for="decision_id">Linked Decision (Optional)</Label>
+                                <Select
+                                    :model-value="form.decision_id ? String(form.decision_id) : 'none'"
+                                    @update:model-value="(value) => (form.decision_id = value === 'none' ? null : Number(value))"
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select decision" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">No linked decision</SelectItem>
+                                        <SelectItem
+                                            v-for="decision in options.studentDecisions ?? []"
+                                            :key="decision.id"
+                                            :value="String(decision.id)"
+                                        >
+                                            {{ decision.decision_number }} - {{ decision.decision_name }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div class="space-y-2">
                                 <Label for="decision_signed_at">Decision Signed Date (Optional)</Label>
                                 <Input type="date" v-model="form.decision_signed_at" />
                             </div>
@@ -639,6 +669,9 @@ const getSummary = (log: StudentActionLog): string => {
                                     </span>
                                     <span v-if="log.decision_signer" class="flex items-center">
                                         Signer: {{ log.decision_signer }}
+                                    </span>
+                                    <span v-if="log.decision" class="flex items-center">
+                                        Linked: {{ log.decision.decision_number }}
                                     </span>
                                     <span v-if="log.attachments && log.attachments.length > 0" class="flex items-center">
                                         <Paperclip class="mr-1 h-3 w-3" />

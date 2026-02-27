@@ -206,6 +206,7 @@ class GetStudentStatusBySemesterQuery
         }
 
         return match ($this->actionTypeValue($action)) {
+            StudentActionType::NE_ENROLLMENT->value => $action->fromSemester,
             StudentActionType::ACADEMIC_DEFER->value => $action->fromSemester,
             StudentActionType::ACADEMIC_RESUME->value => $action->returnSemester,
             StudentActionType::ADMISSION_DEFERRAL->value => $action->intendedIntakeSemester,

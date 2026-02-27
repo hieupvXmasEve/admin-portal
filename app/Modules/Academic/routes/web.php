@@ -9,6 +9,7 @@ use App\Modules\Academic\Http\Web\Admin\StudentStatusController;
 use App\Modules\Academic\Http\Web\Admin\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\Admin\AcademicProgressionAuditController;
 use App\Modules\Academic\Http\Web\Admin\StudentLifecycleYearlyAnalysisController;
+use App\Modules\Academic\Http\Web\Admin\StudentDecisionController;
 use App\Modules\Academic\Http\Web\Admin\StudentActionAuditController;
 use App\Modules\Academic\Http\Web\Admin\StudentActionController;
 use Illuminate\Support\Facades\Route;
@@ -226,5 +227,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/export', [StudentLifecycleYearlyAnalysisController::class, 'export'])
             ->middleware('can:view_student_action')
             ->name('export');
+    });
+
+    Route::prefix('reports/student-decisions')->name('reports.student-decisions.')->group(function () {
+        Route::get('/', [StudentDecisionController::class, 'index'])
+            ->middleware('can:view_student_action')
+            ->name('index');
+
+        Route::get('/{studentDecision}', [StudentDecisionController::class, 'show'])
+            ->middleware('can:view_student_action')
+            ->name('show');
+
+        Route::post('/', [StudentDecisionController::class, 'store'])
+            ->middleware('can:change_student_status')
+            ->name('store');
+
+        Route::put('/{studentDecision}', [StudentDecisionController::class, 'update'])
+            ->middleware('can:change_student_status')
+            ->name('update');
     });
 });

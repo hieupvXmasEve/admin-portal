@@ -1,6 +1,6 @@
 # Code Standards
 
-Last updated: 2026-02-25  
+Last updated: 2026-02-27  
 Owner: Platform Team  
 Status: Active baseline (enforced by convention; CI currently inactive)  
 Source of truth: repository code and route/contracts in this workspace
@@ -38,9 +38,11 @@ Source of truth: repository code and route/contracts in this workspace
 - URL segments: kebab-case
 
 For student action logs/import contracts keep exact fields:
+
 - `decision_number`
 - `decision_signed_at`
 - `decision_signer`
+- `decision_id`
 - `missing_documents`
 - `shared_upload_record_id`
 
@@ -55,10 +57,12 @@ For student action logs/import contracts keep exact fields:
 ## 5) API Security and Auth Standards
 
 Current enforced baseline:
+
 - Student/Lecturer v1 APIs: Sanctum + actor middleware chain.
 - Parent access to student APIs: explicit parent proxy middleware path.
 
 Current known exceptions (must be documented, not ignored):
+
 - Public `system-config` API routes.
 - Finance API route groups using `web` + `auth`.
 
@@ -67,15 +71,18 @@ Current known exceptions (must be documented, not ignored):
 - Prefer `route(...)` helpers and typed route constants.
 - Avoid introducing new literal endpoint strings when a helper exists.
 - Prefer shared API wrappers/composables for consistent envelope/error handling.
+- For server-driven list pages, prefer shared table workflow primitives (`useServerTableQuery`, `ServerPaginatedDataTable`, `ServerDateRangeFilters`) instead of page-local query/pagination glue.
 - Keep auth-sensitive calls aligned with backend middleware expectations.
 
 ## 7) Testing and Quality Gates
 
 Current status:
+
 - Local quality scripts exist.
 - GitHub workflow enforcement is disabled (commented workflow files).
 
 Minimum expected checks before merge:
+
 - `php artisan test`
 - `npm run type-check`
 - `npm run lint`
@@ -86,15 +93,16 @@ If checks cannot be run, record the gap in the change summary.
 
 - `docs/` is the source-of-truth directory for engineering docs.
 - Core docs must include:
-  - last updated date
-  - owner
-  - status
-  - unresolved questions (if decisions pending)
+    - last updated date
+    - owner
+    - status
+    - unresolved questions (if decisions pending)
 - Keep docs under 800 LOC and remove stale claims quickly.
 
 ## 9) Definition of Done
 
 A change is complete when:
+
 - implementation behavior is correct
 - auth/validation/error paths are handled
 - quality checks are run or explicitly tracked as not-run

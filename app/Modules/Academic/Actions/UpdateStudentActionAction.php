@@ -28,6 +28,7 @@ class UpdateStudentActionAction
                 'decision_number',
                 'decision_signed_at',
                 'decision_signer',
+                'decision_id',
                 'missing_documents',
                 // Semester fields
                 'from_semester_id',
@@ -57,7 +58,7 @@ class UpdateStudentActionAction
                 'updated_by' => auth()->id(),
             ]);
 
-            return $actionLog->load(['student', 'changedBy', 'attachments']);
+            return $actionLog->load(['student', 'changedBy', 'attachments', 'decision']);
         });
     }
 }

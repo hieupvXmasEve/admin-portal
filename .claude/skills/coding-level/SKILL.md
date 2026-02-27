@@ -1,6 +1,6 @@
 ---
-name: coding-level
-description: "[CK] Set coding experience level for tailored explanations and output format."
+name: ck:coding-level
+description: "Set coding experience level for tailored explanations and output format."
 argument-hint: "[0-5]"
 ---
 
@@ -10,7 +10,7 @@ Set your coding experience level for tailored explanations and output format.
 
 ## Usage
 
-`/coding-level [0-5]`
+`/ck:coding-level [0-5]`
 
 ## Levels
 

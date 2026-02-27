@@ -31,6 +31,7 @@ class GetStudentActionHistoryQuery
                 'toCampus:id,name,code',
                 'attachments',
                 'deferCase:id,student_action_log_id,scope_type',
+                'decision:id,decision_name,decision_number',
             ])
             ->where('student_id', $studentId)
             // Filter by action type if provided
@@ -64,6 +65,7 @@ class GetStudentActionHistoryQuery
                 'effectiveSemester:id,name,code',
                 'fromCampus:id,name,code',
                 'toCampus:id,name,code',
+                'decision:id,decision_name,decision_number',
             ])
             ->where('student_id', $studentId)
             ->latest()

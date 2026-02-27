@@ -32,6 +32,7 @@ class StoreStudentActionRequest extends FormRequest
             'decision_number' => ['nullable', 'string', 'max:255'],
             'decision_signed_at' => ['nullable', 'date'],
             'decision_signer' => ['nullable', 'string', 'max:255'],
+            'decision_id' => ['nullable', 'integer', 'exists:student_decisions,id'],
             'missing_documents' => ['nullable', 'boolean'],
             'attachment_ids' => ['nullable', 'array'],
             'attachment_ids.*' => ['integer', 'exists:upload_records,id'],
@@ -41,6 +42,7 @@ class StoreStudentActionRequest extends FormRequest
         $actionType = $this->input('action_type');
 
         return match ($actionType) {
+            StudentActionType::NE_ENROLLMENT->value => array_merge($baseRules, $this->neEnrollmentRules()),
             StudentActionType::ACADEMIC_DEFER->value => array_merge($baseRules, $this->deferRules()),
             StudentActionType::ACADEMIC_RESUME->value => array_merge($baseRules, $this->resumeRules()),
             StudentActionType::ADMISSION_DEFERRAL->value => array_merge($baseRules, $this->admissionDeferralRules()),
@@ -155,6 +157,13 @@ class StoreStudentActionRequest extends FormRequest
         ];
     }
 
+    protected function neEnrollmentRules(): array
+    {
+        return [
+            'from_semester_id' => ['required', 'integer', 'exists:semesters,id'],
+        ];
+    }
+
     protected function resumeRules(): array
     {
         return [
@@ -200,7 +209,7 @@ class StoreStudentActionRequest extends FormRequest
             'action_type.Illuminate\Validation\Rules\Enum' => 'Invalid action type.',
             'reason.required' => 'Reason is required.',
             'reason.max' => 'Reason cannot exceed 5000 characters.',
-            'from_semester_id.required' => 'From semester is required for defer action.',
+            'from_semester_id.required' => 'From semester is required for this action.',
             'from_semester_id.exists' => 'The selected from semester does not exist.',
             'return_semester_id.required' => 'Return semester is required.',
             'return_semester_id.exists' => 'The selected return semester does not exist.',

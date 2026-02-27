@@ -1,6 +1,6 @@
 ---
-name: ck-help
-description: "[CK] ClaudeKit usage guide — discover commands, skills, workflows naturally."
+name: ck:ck-help
+description: "ClaudeKit usage guide — discover commands, skills, workflows naturally."
 argument-hint: "[category|command|task description]"
 ---
 
@@ -97,6 +97,6 @@ Never replace or summarize the script output. Always show it fully, then enhance
 
 ## Important: Correct Workflows
 
-- **`/plan` → `/cook`**: Best for high-risk or complex changes
-- **`/cook`**: Standalone for straightforward implementation
-- **NEVER** claim `/plan` is mandatory before `/cook`
+- **`/ck:plan` → `/ck:cook`**: Best for high-risk or complex changes
+- **`/ck:cook`**: Standalone for straightforward implementation
+- **NEVER** claim `/ck:plan` is mandatory before `/ck:cook`

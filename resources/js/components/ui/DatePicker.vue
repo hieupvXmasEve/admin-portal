@@ -72,6 +72,11 @@ const displayValue = computed(() => {
         return props.placeholder;
     }
 });
+
+const clearDate = () => {
+    emit('update:modelValue', '');
+    open.value = false;
+};
 </script>
 
 <template>
@@ -96,7 +101,9 @@ const displayValue = computed(() => {
                 :locale="'en-US'"
                 class="rounded-md border"
             />
+            <div class="border-t p-2">
+                <Button v-if="modelValue" type="button" variant="ghost" class="w-full" @click="clearDate">Clear date</Button>
+            </div>
         </PopoverContent>
     </Popover>
 </template>
-

@@ -338,6 +338,12 @@ export const mainNavItems: NavItem[] = [
                         icon: TrendingUp,
                         requiredPermissions: ['view_student_action'],
                     },
+                    {
+                        title: 'Student Decisions',
+                        href: studentRoutes.studentDecisionsIndex(),
+                        icon: FileText,
+                        requiredPermissions: ['view_student_action'],
+                    },
                 ],
             },
             // Group menu Progression Audit

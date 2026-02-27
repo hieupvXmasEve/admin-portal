@@ -23,6 +23,13 @@ interface Props {
         actionTypes: ActionTypeOption[];
         semesters: Semester[];
         campuses: Campus[];
+        studentDecisions?: Array<{
+            id: number;
+            decision_name: string;
+            decision_number: string;
+            issued_at?: string;
+            expires_at?: string | null;
+        }>;
     };
 }
 
@@ -127,6 +134,7 @@ const editForm = useForm({
     decision_number: '',
     decision_signed_at: '',
     decision_signer: '',
+    decision_id: null as number | null,
     missing_documents: false,
     from_semester_id: null as number | null,
     return_semester_id: null as number | null,
@@ -157,6 +165,7 @@ const openEdit = () => {
     editForm.decision_number = props.actionLog.decision_number || '';
     editForm.decision_signed_at = props.actionLog.decision_signed_at ? props.actionLog.decision_signed_at.toString().substring(0, 10) : '';
     editForm.decision_signer = props.actionLog.decision_signer || '';
+    editForm.decision_id = props.actionLog.decision_id ?? null;
     editForm.missing_documents = !!props.actionLog.missing_documents;
     editForm.from_semester_id = props.actionLog.from_semester_id;
     editForm.return_semester_id = props.actionLog.return_semester_id;
@@ -256,6 +265,11 @@ const handleUpdate = () => {
                     <div v-if="actionLog.decision_signer">
                         <p class="text-muted-foreground text-sm">Decision Signer</p>
                         <p class="font-medium">{{ actionLog.decision_signer }}</p>
+                    </div>
+
+                    <div v-if="actionLog.decision">
+                        <p class="text-muted-foreground text-sm">Linked Decision</p>
+                        <p class="font-medium">{{ actionLog.decision.decision_number }} - {{ actionLog.decision.decision_name }}</p>
                     </div>
 
                     <div>
@@ -579,6 +593,27 @@ const handleUpdate = () => {
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                        <Label for="decision_id">Linked Decision (Optional)</Label>
+                        <Select
+                            :model-value="editForm.decision_id ? String(editForm.decision_id) : 'none'"
+                            @update:model-value="(value) => (editForm.decision_id = value === 'none' ? null : Number(value))"
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select decision" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">No linked decision</SelectItem>
+                                <SelectItem
+                                    v-for="decision in options.studentDecisions ?? []"
+                                    :key="decision.id"
+                                    :value="String(decision.id)"
+                                >
+                                    {{ decision.decision_number }} - {{ decision.decision_name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <div class="space-y-2">
                         <Label for="decision_signed_at">Decision Signed Date (Optional)</Label>
                         <Input type="date" v-model="editForm.decision_signed_at" />

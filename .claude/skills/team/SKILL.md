@@ -1,7 +1,8 @@
 ---
-name: team
-description: "[CK] Orchestrate Agent Teams for parallel multi-session collaboration. Use for research, implementation, review, and debug workflows requiring independent teammates."
+name: ck:team
+description: "Orchestrate Agent Teams for parallel multi-session collaboration. Use for research, implementation, review, and debug workflows requiring independent teammates."
 version: 2.1.0
+argument-hint: "<template> <context> [--devs|--researchers|--reviewers N] [--delegate]"
 ---
 
 # Agent Teams - CK-Native Orchestration Engine
@@ -13,10 +14,10 @@ Coordinate multiple independent Claude Code sessions. Each teammate has own cont
 ## Usage
 
 ```
-/team <template> <context> [flags]
+/ck:team <template> <context> [flags]
 ```
 
-**Templates:** `research`, `cook`, `review`, `debug`
+**Templates:** `ck:research`, `ck:cook`, `ck:code-review`, `ck:debug`
 
 **Flags:**
 - `--devs N` | `--researchers N` | `--reviewers N` | `--debuggers N` — team size
@@ -29,7 +30,7 @@ Coordinate multiple independent Claude Code sessions. Each teammate has own cont
 1. Step 2 of every template calls `TeamCreate(team_name: "...", ...)`. Do NOT check whether the tool exists first — just call it.
 2. If the call SUCCEEDS: continue with the template.
 3. If the call returns an ERROR or is unrecognized: **STOP. Tell user:** "Agent Teams requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json. Team mode is not available."
-4. Do NOT fall back to subagents. `/team` MUST use Agent Teams or abort.
+4. Do NOT fall back to subagents. `/ck:team` MUST use Agent Teams or abort.
 5. All teammate spawns MUST include `team_name` parameter — never spawn Task without it.
 
 When activated, IMMEDIATELY execute the matching template sequence below.
@@ -56,9 +57,9 @@ CK Context:
 
 ---
 
-## ON `/team research <topic>` [--researchers N]:
+## ON `/ck:team research <topic>` [--researchers N]:
 
-*Wraps /research skill — scope, gather, analyze, report.*
+*Wraps /ck:research skill — scope, gather, analyze, report.*
 
 IMMEDIATELY execute in order:
 
@@ -97,9 +98,9 @@ IMMEDIATELY execute in order:
 
 ---
 
-## ON `/team cook <plan-path-or-description>` [--devs N]:
+## ON `/ck:team cook <plan-path-or-description>` [--devs N]:
 
-*Wraps /cook skill — plan, code, test, review, finalize.*
+*Wraps /ck:cook skill — plan, code, test, review, finalize.*
 
 IMMEDIATELY execute in order:
 
@@ -128,7 +129,7 @@ IMMEDIATELY execute in order:
    - `Task(subagent_type: "tester", model: "haiku", name: "tester")`
    - Tester runs full test suite, reports pass/fail
 
-6. **DOCS SYNC EVAL** (MANDATORY for cook — from /cook finalize):
+6. **DOCS SYNC EVAL** (MANDATORY for cook — from /ck:cook finalize):
    ```
    Docs impact: [none|minor|major]
    Action: [no update needed — <reason>] | [updated <page>] | [needs separate PR]
@@ -141,9 +142,9 @@ IMMEDIATELY execute in order:
 
 ---
 
-## ON `/team review <scope>` [--reviewers N]:
+## ON `/ck:team review <scope>` [--reviewers N]:
 
-*Wraps /code-review skill — scout, review, synthesize with evidence gates.*
+*Wraps /ck:code-review skill — scout, review, synthesize with evidence gates.*
 
 IMMEDIATELY execute in order:
 
@@ -179,9 +180,9 @@ IMMEDIATELY execute in order:
 
 ---
 
-## ON `/team debug <issue>` [--debuggers N]:
+## ON `/ck:team debug <issue>` [--debuggers N]:
 
-*Wraps /fix skill — root-cause-first, adversarial hypotheses, disprove to converge.*
+*Wraps /ck:fix skill — root-cause-first, adversarial hypotheses, disprove to converge.*
 
 IMMEDIATELY execute in order:
 

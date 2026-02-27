@@ -107,14 +107,21 @@ def scan_skills(base_path: Path) -> List[Dict]:
             # Categorize based on content/name
             category = categorize_skill(skill_name, description, content)
 
-            skills.append({
+            skill_entry = {
                 'name': skill_name,
                 'path': str(skill_file.relative_to(Path('.claude/skills'))),
                 'description': description,
                 'category': category,
                 'has_scripts': (skill_dir / 'scripts').exists(),
                 'has_references': (skill_dir / 'references').exists()
-            })
+            }
+
+            # Include argument-hint if present in frontmatter
+            argument_hint = frontmatter.get('argument-hint', '')
+            if argument_hint:
+                skill_entry['argument_hint'] = str(argument_hint)
+
+            skills.append(skill_entry)
         except Exception as e:
             print(f"Error processing {skill_file}: {e}")
 
