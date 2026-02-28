@@ -34,7 +34,8 @@ public/.user.ini
 /tasks
 # /prd
 # .augment
-# .claude
+.claude
+.opencode
 # .kiro
 # docs
 public/.user.ini
