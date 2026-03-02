@@ -71,8 +71,14 @@ class StudentDecisionController extends Controller
 
     public function update(UpdateStudentDecisionRequest $request, StudentDecision $studentDecision): RedirectResponse
     {
+        $validated = $request->validated();
+
+        if (($validated['upload_record_id'] ?? null) === null && $studentDecision->upload_record_id !== null) {
+            unset($validated['upload_record_id']);
+        }
+
         $studentDecision->update([
-            ...$request->validated(),
+            ...$validated,
             'changed_by_user_id' => (int) $request->user()->id,
         ]);
 

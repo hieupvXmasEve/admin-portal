@@ -4,6 +4,7 @@ import ServerDateRangeFilters from '@/components/filters/ServerDateRangeFilters.
 import ServerPaginatedDataTable from '@/components/tables/ServerPaginatedDataTable.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import DatePicker from '@/components/ui/DatePicker.vue';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -89,6 +90,11 @@ watch(decisionUploadFiles, (files) => {
         return;
     }
 
+    if (editingDecision.value?.upload_record_id) {
+        form.upload_record_id = editingDecision.value.upload_record_id;
+        return;
+    }
+
     form.upload_record_id = null;
 });
 
@@ -141,8 +147,8 @@ const openEdit = (decision: StudentDecision) => {
     form.decision_name = decision.decision_name;
     form.decision_number = decision.decision_number;
     form.decision_signer = decision.decision_signer;
-    form.issued_at = decision.issued_at;
-    form.expires_at = decision.expires_at ?? '';
+    form.issued_at = decision.issued_at ? decision.issued_at.slice(0, 10) : '';
+    form.expires_at = decision.expires_at ? decision.expires_at.slice(0, 10) : '';
     form.upload_record_id = decision.upload_record_id;
     decisionUploadFiles.value = [];
 
@@ -294,7 +300,7 @@ const columns: ColumnDef<StudentDecision>[] = [
                             </div>
                             <div class="space-y-2">
                                 <Label>Issued Date *</Label>
-                                <Input type="date" v-model="form.issued_at" />
+                                <DatePicker v-model="form.issued_at" placeholder="Select issued date" />
                                 <p v-if="form.errors.issued_at" class="text-sm text-red-500">{{ form.errors.issued_at }}</p>
                             </div>
                         </div>
@@ -302,11 +308,18 @@ const columns: ColumnDef<StudentDecision>[] = [
                         <div class="grid grid-cols-2 gap-4">
                             <div class="space-y-2">
                                 <Label>Expiry Date (Optional)</Label>
-                                <Input type="date" v-model="form.expires_at" />
+                                <DatePicker v-model="form.expires_at" placeholder="Select expiry date" />
                                 <p v-if="form.errors.expires_at" class="text-sm text-red-500">{{ form.errors.expires_at }}</p>
                             </div>
                             <div class="space-y-2">
                                 <Label>Decision File (Optional)</Label>
+                                <div v-if="editingDecision?.upload_record?.url && decisionUploadFiles.length === 0" class="rounded-md border border-dashed p-3 text-sm">
+                                    <a :href="editingDecision.upload_record.url" target="_blank" rel="noopener noreferrer" class="text-primary inline-flex items-center gap-1 hover:underline">
+                                        <ExternalLink class="h-3 w-3" />
+                                        {{ editingDecision.upload_record.original_name || 'Current file' }}
+                                    </a>
+                                    <p class="text-muted-foreground mt-1">Upload a new file to replace the current one.</p>
+                                </div>
                                 <FileUpload
                                     context="action_attachment"
                                     :multiple="false"
