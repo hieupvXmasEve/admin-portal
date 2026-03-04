@@ -70,25 +70,24 @@ class UploadUrlService
      */
     public function generateTemporaryUrl(UploadRecord $uploadRecord, int $expirationMinutes = 60): string
     {
-        try {
-            $expiration = now()->addMinutes($expirationMinutes);
-            $disk = Storage::disk($uploadRecord->disk);
+        $expiration = now()->addMinutes($expirationMinutes);
+        $disk = Storage::disk($uploadRecord->disk);
 
-            // Use native temporary URL if supported
-            if (method_exists($disk, 'temporaryUrl')) {
+        // Try native temporary URL if disk supports it (e.g., S3)
+        if (method_exists($disk, 'temporaryUrl')) {
+            try {
                 return $disk->temporaryUrl($uploadRecord->path, $expiration);
+            } catch (\Exception $e) {
+                // Driver doesn't actually support temporary URLs, fallback to signed route
+                Log::debug('Disk temporaryUrl not supported, using signed route', [
+                    'upload_id' => $uploadRecord->id,
+                    'disk' => $uploadRecord->disk,
+                ]);
             }
-
-            // Fallback to signed URL
-            return $this->generateSignedUrl($uploadRecord, $expirationMinutes);
-        } catch (\Exception $e) {
-            Log::error('Failed to generate temporary URL', [
-                'upload_id' => $uploadRecord->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            return '';
         }
+
+        // Fallback to signed URL via uploads.serve route
+        return $this->generateSignedUrl($uploadRecord, $expirationMinutes);
     }
 
     /**
@@ -102,7 +101,7 @@ class UploadUrlService
             return URL::temporarySignedRoute(
                 'uploads.serve',
                 $expiration,
-                ['upload' => $uploadRecord->id]
+                ['id' => $uploadRecord->id]
             );
         } catch (\Exception $e) {
             Log::error('Failed to generate signed URL', [

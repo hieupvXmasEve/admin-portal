@@ -8,6 +8,7 @@ use App\Services\UploadUrlService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Support\Arr;
 use InvalidArgumentException;
@@ -357,26 +358,24 @@ class ImageUploadService
      */
     public function generateTemporaryUrl(UploadRecord $uploadRecord, int $expirationMinutes = 60): string
     {
-        try {
-            $expiration = now()->addMinutes($expirationMinutes);
+        $expiration = now()->addMinutes($expirationMinutes);
+        $disk = Storage::disk($uploadRecord->disk);
 
-            // Check if the storage driver supports temporary URLs
-            if (method_exists(Storage::disk($uploadRecord->disk), 'temporaryUrl')) {
-                return Storage::disk($uploadRecord->disk)->temporaryUrl($uploadRecord->path, $expiration);
+        // Try native temporary URL if disk supports it (e.g., S3)
+        if (method_exists($disk, 'temporaryUrl')) {
+            try {
+                return $disk->temporaryUrl($uploadRecord->path, $expiration);
+            } catch (\Exception $e) {
+                // Driver doesn't actually support temporary URLs, fallback to signed route
+                Log::debug('Disk temporaryUrl not supported, using signed route', [
+                    'upload_id' => $uploadRecord->id,
+                    'disk' => $uploadRecord->disk,
+                ]);
             }
-
-            // Fallback for drivers that don't support temporary URLs
-            return $this->generateSignedUrl($uploadRecord, $expirationMinutes);
-        } catch (\Exception $e) {
-            Log::error('Failed to generate temporary URL', [
-                'upload_id' => $uploadRecord->id,
-                'path' => $uploadRecord->path,
-                'disk' => $uploadRecord->disk,
-                'error' => $e->getMessage(),
-            ]);
-
-            return '';
         }
+
+        // Fallback to signed URL via uploads.serve route
+        return $this->generateSignedUrl($uploadRecord, $expirationMinutes);
     }
 
     /**
@@ -385,14 +384,13 @@ class ImageUploadService
     public function generateSignedUrl(UploadRecord $uploadRecord, int $expirationMinutes = 60): string
     {
         try {
-            $expiration = now()->addMinutes($expirationMinutes)->timestamp;
-            $signature = hash_hmac('sha256', $uploadRecord->id . $uploadRecord->path . $expiration, config('app.key'));
+            $expiration = now()->addMinutes($expirationMinutes);
 
-            return route('uploads.serve', [
-                'id' => $uploadRecord->id,
-                'expires' => $expiration,
-                'signature' => $signature,
-            ]);
+            return URL::temporarySignedRoute(
+                'uploads.serve',
+                $expiration,
+                ['id' => $uploadRecord->id]
+            );
         } catch (\Exception $e) {
             Log::error('Failed to generate signed URL', [
                 'upload_id' => $uploadRecord->id,

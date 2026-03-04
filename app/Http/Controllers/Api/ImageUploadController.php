@@ -346,18 +346,8 @@ class ImageUploadController extends Controller
     public function serve(Request $request, int $id): Response
     {
         try {
-            $expires = $request->query('expires');
-            $signature = $request->query('signature');
-
-            if (!$expires || !$signature) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid or missing signature parameters',
-                ], Response::HTTP_BAD_REQUEST);
-            }
-
-            // Verify the signed URL
-            if (!$this->uploadService->verifySignedUrl($id, (int) $expires, $signature)) {
+            // Verify using Laravel's signed URL validation
+            if (!$request->hasValidSignature()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid or expired signature',
