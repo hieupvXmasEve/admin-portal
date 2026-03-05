@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { useApi } from '@/composables';
 import { useRealtimeNotifications } from '@/composables/useRealtimeNotifications';
 import type { SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { useApi } from '@/composables';
 import { Bell, Check, Loader2 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
@@ -16,11 +16,12 @@ import NotificationItem from './NotificationItem.vue';
 const page = usePage<SharedData>();
 // safely access user.id
 const userId = computed(() => page.props.auth?.user?.id);
-
+const campusId = computed(() => page.props.auth?.current_campus_id ?? 0);
+console.log('campusId', campusId.value)
 const api = useApi();
 
 // Use the realtime composable to get new notifications and show toasts
-const { notifications: realtimeNotifications } = useRealtimeNotifications(userId.value);
+const { notifications: realtimeNotifications } = useRealtimeNotifications(userId.value, campusId.value);
 
 const notifications = ref<any[]>([]);
 const isLoading = ref(false);
@@ -120,11 +121,11 @@ onMounted(() => {
             <div class="relative cursor-pointer">
                 <slot>
                     <Button variant="outline" size="icon">
-                        <Bell class="h-5 w-5 text-muted-foreground transition-colors hover:text-foreground" />
+                        <Bell class="text-muted-foreground hover:text-foreground h-5 w-5 transition-colors" />
                     </Button>
                 </slot>
                 <Badge v-if="hasUnread" variant="destructive"
-                    class="absolute -right-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px]">
+                    class="absolute -top-1 -right-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px]">
                     {{ unreadCount > 99 ? '99+' : unreadCount }}
                 </Badge>
             </div>
@@ -133,9 +134,7 @@ onMounted(() => {
             <div class="flex items-center justify-between p-4">
                 <div class="flex items-center gap-2">
                     <h3 class="font-semibold">Notifications</h3>
-                    <Badge variant="secondary" class="rounded-full px-2 py-0.5 text-xs">
-                        {{ unreadCount }} New
-                    </Badge>
+                    <Badge variant="secondary" class="rounded-full px-2 py-0.5 text-xs"> {{ unreadCount }} New </Badge>
                 </div>
                 <Button v-if="hasUnread" variant="ghost" size="sm" class="h-auto px-2 text-xs" :disabled="isMarkingAll"
                     @click="handleMarkAllAsRead">
@@ -147,12 +146,12 @@ onMounted(() => {
             <Separator />
 
             <ScrollArea class="h-80">
-                <div v-if="isLoading" class="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                <div v-if="isLoading" class="text-muted-foreground flex flex-col items-center justify-center py-8">
                     <Loader2 class="h-6 w-6 animate-spin" />
                     <span class="mt-2 text-sm">Loading...</span>
                 </div>
                 <div v-else-if="notifications.length === 0"
-                    class="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                    class="text-muted-foreground flex flex-col items-center justify-center py-8">
                     <Bell class="h-8 w-8 opacity-20" />
                     <p class="mt-2 text-sm">No notifications yet</p>
                 </div>

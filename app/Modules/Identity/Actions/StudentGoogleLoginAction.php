@@ -56,7 +56,6 @@ class StudentGoogleLoginAction
 
             // 3. Retrieve Associated Student Profile
             $student = $user->student;
-
             if (!$student) {
                 throw new Exception('This account is not associated with a student profile.');
             }
@@ -99,11 +98,12 @@ class StudentGoogleLoginAction
             return [
                 'student' => [
                     'id' => $student->id,
+                    'user_id' => $user->id,
                     'student_id' => $student->student_id,
                     'full_name' => $student->full_name,
                     'email' => $student->email,
                     'status' => $student->status,
-                    'campus' => $student->campus?->name,
+                    'campus' => $student->campus,
                     'program' => $student->program?->name,
                     'specialization' => $student->specialization?->name,
                     'avatar_url' => $student->avatar_url,
@@ -112,7 +112,6 @@ class StudentGoogleLoginAction
                 'token_type' => 'Bearer',
                 'expires_at' => $expiresAt->toISOString(),
             ];
-
         } catch (\Google\Exception $e) {
             throw new Exception('Google authentication failed: ' . $e->getMessage());
         }

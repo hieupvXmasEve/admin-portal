@@ -41,6 +41,7 @@ class ProfileResource extends JsonResource
         return [
             'id' => $personalInfo['id'],
             'student_id' => $personalInfo['student_id'],
+            'user_id' => $personalInfo['user_id'],
             'first_name' => $personalInfo['first_name'],
             'last_name' => $personalInfo['last_name'],
             'full_name' => $personalInfo['full_name'],

@@ -140,6 +140,7 @@ class ProfileService
         return [
             'id' => $student->id,
             'student_id' => $student->student_id,
+            'user_id' => $student->user_id,
             'first_name' => $firstName,
             'last_name' => $lastName,
             'full_name' => $student->full_name,

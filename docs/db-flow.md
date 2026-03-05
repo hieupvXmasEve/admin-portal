@@ -2,7 +2,11 @@
 
 Tài liệu này mô tả chi tiết luồng tạo dữ liệu tuần tự và logic cho hệ thống SwinX, dựa trên cấu trúc database được định nghĩa trong migrations. Việc tuân thủ luồng này đảm bảo tính toàn vẹn dữ liệu (data integrity) và tránh các lỗi liên quan đến khóa ngoại (foreign key constraints).
 
-> **Cập nhật lần cuối**: Tháng 01/2026
+> **Cập nhật lần cuối**: 2026-03-02
+>
+> **Lưu ý trạng thái**: Tài liệu này là luồng tham chiếu mức cao và có phần drift theo thời gian.
+> Các phần có xác suất stale cao: giai đoạn Finance (mục 46+), Forms/Surveys, và một số tên bảng/model phụ trợ.
+> Trước khi dùng làm spec triển khai, cần đối chiếu trực tiếp migration hiện tại trong `database/migrations/`.
 
 ---
 
@@ -18,7 +22,7 @@ Tài liệu này mô tả chi tiết luồng tạo dữ liệu tuần tự và l
 
 ### 2. `buildings` (Tòa nhà) & `rooms` (Phòng học)
 
-- **Lý do**: Các phòng học thuộc về các tòa nhà, và các tòa nhà thuộc về một cơ sở. Cần tạo tuần tự: `Campuses` -> `Buildings` -> `Rooms`.
+- **Lý do**: Các phòng học thuộc về các tòa nhà, và các tòa nhà thuộc về một cơ sở. Cần tạo tuần tự: `campuses` -> `buildings` -> `rooms`.
 - **Bảng liên quan**: `buildings`, `rooms`
 - **Model**: `App\Models\Building`, `App\Models\Room`
 - **Phụ thuộc**: `buildings.campus_id` -> `campuses.id`; `rooms.building_id` -> `buildings.id`; `rooms.campus_id` -> `campuses.id`
@@ -522,7 +526,7 @@ users
 │   ├── student_invoices
 │   ├── club_members
 │   ├── event_participants
-│   ├── query_tickets
+│   ├── queries_tickets
 │   └── form_responses
 └── parents -> parent_student
 

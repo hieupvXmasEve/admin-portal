@@ -138,10 +138,14 @@ export const systemRoutes = {
         logs: () => route(ROOM_BOOKING_ROUTE_NAMES.LOGS),
     },
     notifications: {
-        index: () => route(NOTIFICATION_ROUTE_NAMES.INDEX),
         send: () => route(NOTIFICATION_ROUTE_NAMES.SEND),
         store: () => route(NOTIFICATION_ROUTE_NAMES.STORE),
         searchStudents: () => route(NOTIFICATION_ROUTE_NAMES.SEARCH_TARGETS),
+        ops: {
+            outbox: () => route(NOTIFICATION_ROUTE_NAMES.OPS_OUTBOX),
+            messages: () => route(NOTIFICATION_ROUTE_NAMES.OPS_MESSAGES),
+            deliveries: () => route(NOTIFICATION_ROUTE_NAMES.OPS_DELIVERIES),
+        },
     },
 } as const;
 

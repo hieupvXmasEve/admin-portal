@@ -73,6 +73,7 @@ class StudentLoginAction
             'student' => [
                 'id' => $student->id,
                 'student_id' => $student->student_id,
+                'user_id' => $user->id,
                 'full_name' => $student->full_name,
                 'email' => $student->email,
                 'status' => $student->status,

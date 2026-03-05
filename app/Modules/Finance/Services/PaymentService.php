@@ -7,14 +7,21 @@ namespace App\Modules\Finance\Services;
 use App\Models\FinanceCharge;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Models\Student;
 use App\Modules\Finance\Queries\GetStudentBalanceQuery;
+use App\Modules\Notification\Actions\PublishDomainEventAction;
+use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class PaymentService
 {
     public function __construct(
-        protected GetStudentBalanceQuery $getStudentBalanceQuery
+        protected GetStudentBalanceQuery $getStudentBalanceQuery,
+        protected PublishDomainEventAction $publishDomainEventAction,
     ) {}
 
     /**
@@ -22,7 +29,7 @@ class PaymentService
      */
     public function recordPayment(array $data): Payment
     {
-        return Payment::create([
+        $payment = Payment::create([
             'student_id' => $data['student_id'],
             'amount' => $data['amount'],
             'method' => $data['method'] ?? Payment::METHOD_OTHER,
@@ -30,17 +37,66 @@ class PaymentService
             'external_ref' => $data['external_ref'] ?? null,
             'paid_at' => $data['paid_at'] ?? now(),
             'status' => $data['status'] ?? Payment::STATUS_COMPLETED,
-            'received_by_user_id' => $data['received_by_user_id'] ?? auth()->id(),
+            'received_by_user_id' => $data['received_by_user_id'] ?? $this->currentUserId(),
             'raw_payload' => $data['raw_payload'] ?? null,
             'notes' => $data['notes'] ?? null,
         ]);
+
+        $this->publishInvoicePaidDomainEvent($payment);
+
+        return $payment;
+    }
+
+    protected function publishInvoicePaidDomainEvent(Payment $payment): void
+    {
+        if (! (bool) config('notification.v2_enabled', false)) {
+            return;
+        }
+
+        $writeMode = (string) config('notification.write_mode', 'off');
+        if (! in_array($writeMode, ['dual', 'v2_only'], true)) {
+            return;
+        }
+
+        $student = Student::query()->find($payment->student_id);
+        if (! $student) {
+            return;
+        }
+
+        $envelope = new DomainEventEnvelope(
+            eventId: (string) Str::uuid(),
+            eventName: 'finance.invoice_paid',
+            eventVersion: 1,
+            occurredAt: CarbonImmutable::now(),
+            aggregateType: 'payment',
+            aggregateId: (string) $payment->id,
+            campusId: (int) $student->campus_id,
+            actorUserId: $this->currentUserId(),
+            payload: [
+                'type_key' => 'invoice_paid',
+                'student_id' => (int) $student->id,
+                'channels' => ['email', 'realtime'],
+                'recipient_targets' => [
+                    ['type' => 'student', 'id' => (int) $student->id],
+                ],
+                'data' => [
+                    'title' => 'Payment received',
+                    'body' => 'Your payment has been recorded successfully.',
+                    'payment_id' => (int) $payment->id,
+                    'amount' => (float) $payment->amount,
+                    'paid_at' => $payment->paid_at?->toDateTimeString(),
+                    'method' => (string) $payment->method,
+                ],
+            ],
+        );
+
+        $this->publishDomainEventAction->runAfterCommit($envelope);
     }
 
     /**
      * Allocate a payment to specific charges.
      *
-     * @param int $paymentId
-     * @param array $allocations Array of ['charge_id' => amount]
+     * @param  array  $allocations  Array of ['charge_id' => amount]
      * @return Collection<PaymentAllocation>
      */
     public function allocatePayment(int $paymentId, array $allocations, ?int $userId = null): Collection
@@ -62,7 +118,7 @@ class PaymentService
                     [
                         'allocated_amount' => $amount,
                         'allocated_at' => now(),
-                        'allocated_by_user_id' => $userId ?? auth()->id(),
+                        'allocated_by_user_id' => $userId ?? $this->currentUserId(),
                     ]
                 );
 
@@ -88,8 +144,8 @@ class PaymentService
         // Get outstanding charges (positive amount, with remaining balance)
         $charges = $this->getOutstandingCharges($payment->student_id)
             ->sortBy(function ($charge) use ($strategy) {
-                return $strategy === 'oldest_first' 
-                    ? $charge->effective_at 
+                return $strategy === 'oldest_first'
+                    ? $charge->effective_at
                     : -$charge->effective_at->timestamp;
             });
 
@@ -186,6 +242,17 @@ class PaymentService
     public function isFullyPaid(int $studentId, int $semesterId): bool
     {
         $balance = $this->getStudentBalance($studentId, $semesterId);
+
         return $balance['balance'] <= 0;
+    }
+
+    protected function currentUserId(): ?int
+    {
+        $actor = Auth::user();
+        if (! $actor) {
+            return null;
+        }
+
+        return (int) $actor->getAuthIdentifier();
     }
 }

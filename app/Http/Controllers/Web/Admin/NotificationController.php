@@ -1,14 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Web\Admin;
 
 use App\Actions\Notification\SendManualNotificationAction;
+use App\Enums\NotificationCategory;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Notification\SendManualNotificationRequest;
-use App\Models\Notification;
+use App\Http\Responses\ApiResponse;
+use App\Models\Lecture;
 use App\Models\Program;
 use App\Models\Student;
-use App\Enums\NotificationCategory;
+use App\Models\User;
+use App\Modules\Notification\Actions\SendManualNotificationV2Action;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -16,80 +21,63 @@ use Inertia\Response;
 
 class NotificationController extends Controller
 {
-    /**
-     * Display a listing of the notification history.
-     */
-    public function index(Request $request): Response
-    {
-        $this->authorize('view_any_notification');
-
-        $notifications = Notification::query()
-            ->with(['notifiable'])
-            ->when($request->input('search'), function ($query, $search) {
-                $query->where('title', 'like', "%{$search}%")
-                    ->orWhere('message', 'like', "%{$search}%");
-            })
-            ->when($request->input('category'), function ($query, $category) {
-                $query->where('category', $category);
-            })
-            ->orderBy($request->input('sort', 'created_at'), $request->input('direction', 'desc'))
-            ->paginate($request->input('per_page', 15))
-            ->withQueryString();
-
-        return Inertia::render('Admin/Notifications/Index', [
-            'notifications' => $notifications,
-            'filters' => [
-                'search' => $request->input('search'),
-                'category' => $request->input('category'),
-                'sort' => $request->input('sort'),
-                'direction' => $request->input('direction'),
-                'per_page' => $request->input('per_page'),
-            ],
-            'categories' => NotificationCategory::options(),
-        ]);
-    }
-
-    /**
-     * Show the form for sending a manual notification.
-     */
     public function sendForm(): Response
     {
         $this->authorize('send_manual_notification');
 
-        $programs = Program::query()->select('id', 'name')->get();
+        $campusId = session('current_campus_id');
+
+        $programs = Program::query()
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
 
         return Inertia::render('Admin/Notifications/Send', [
             'categories' => NotificationCategory::options(),
             'programs' => $programs,
+            'currentCampusId' => $campusId,
         ]);
     }
 
-    /**
-     * Send a manual notification.
-     */
     public function send(
         SendManualNotificationRequest $request,
-        SendManualNotificationAction $action
-    ) {
-        $action->execute($request->validated());
+        SendManualNotificationAction $legacyAction,
+        SendManualNotificationV2Action $v2Action
+    ): \Illuminate\Http\JsonResponse {
+        $data = $request->validated();
 
-        return \App\Http\Responses\ApiResponse::success(null, [], 'Notification sent successfully.');
+        if (config('notification.write_mode') === 'v2') {
+            $eventId = $v2Action->run($data);
+
+            return ApiResponse::success(
+                ['event_id' => $eventId],
+                [],
+                'Notification queued for delivery.'
+            );
+        }
+
+        $legacyAction->execute($data);
+
+        return ApiResponse::success(
+            null,
+            [],
+            'Notification sent successfully.'
+        );
     }
 
-    /**
-     * API to search recipients for the notification form.
-     */
-    public function searchTargets(Request $request)
+    public function searchTargets(Request $request): \Illuminate\Http\JsonResponse
     {
         $this->authorize('send_manual_notification');
 
         $type = $request->input('type', 'student');
         $search = $request->input('search');
+        $campusId = $request->input('campus_id', session('current_campus_id'));
 
         switch ($type) {
             case 'student':
                 $results = Student::query()
                     ->active()
+                    ->when($campusId, fn($q) => $q->where('campus_id', $campusId))
                     ->when($search, function ($query, $search) {
                         $query->where(function ($q) use ($search) {
                             $q->where('full_name', 'like', "%{$search}%")
@@ -105,8 +93,12 @@ class NotificationController extends Controller
                 break;
 
             case 'user':
-                $results = \App\Models\User::query()
+                $results = User::query()
                     ->where('status', 'active')
+                    ->when($campusId, fn($q) => $q->whereHas(
+                        'campusUserRoles',
+                        fn($sub) => $sub->where('campus_id', $campusId)
+                    ))
                     ->when($search, function ($query, $search) {
                         $query->where(function ($q) use ($search) {
                             $q->where('name', 'like', "%{$search}%")
@@ -118,8 +110,9 @@ class NotificationController extends Controller
                 break;
 
             case 'lecturer':
-                $results = \App\Models\Lecture::query()
+                $results = Lecture::query()
                     ->active()
+                    ->when($campusId, fn($q) => $q->where('campus_id', $campusId))
                     ->when($search, function ($query, $search) {
                         $query->where(function ($q) use ($search) {
                             $q->where('first_name', 'like', "%{$search}%")
@@ -133,9 +126,9 @@ class NotificationController extends Controller
                 break;
 
             default:
-                return \App\Http\Responses\ApiResponse::businessLogicError('Invalid target type');
+                return ApiResponse::businessLogicError('Invalid target type');
         }
 
-        return \App\Http\Responses\ApiResponse::success($results);
+        return ApiResponse::success($results);
     }
 }

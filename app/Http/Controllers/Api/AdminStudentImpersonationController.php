@@ -23,7 +23,7 @@ class AdminStudentImpersonationController extends Controller
         try {
             // Get the authenticated admin user
             $admin = Auth::user();
-            
+
             // Find the student
             $student = Student::where('email', $request->email)
                 ->orWhere('student_id', $request->email) // Allow lookup by student_id as well
@@ -55,7 +55,7 @@ class AdminStudentImpersonationController extends Controller
             // Create impersonation token
             $deviceName = $request->device_name ?? 'Admin Impersonation';
             $expiresAt = now()->addHours(2); // Shorter expiration for impersonation tokens
-            
+
             $token = $student->createToken($deviceName, ['student'], $expiresAt)->plainTextToken;
 
             // Log the impersonation activity
@@ -76,6 +76,7 @@ class AdminStudentImpersonationController extends Controller
                     'student' => [
                         'id' => $student->id,
                         'student_id' => $student->student_id,
+                        'user_id' => $student->user_id,
                         'full_name' => $student->full_name,
                         'email' => $student->email,
                         'status' => $student->status,
@@ -119,11 +120,11 @@ class AdminStudentImpersonationController extends Controller
     {
         try {
             $admin = Auth::user();
-            
+
             // Get recent impersonation activities for this admin
             // This would typically query a dedicated impersonation log table
             // For now, we'll return a placeholder response
-            
+
             return ApiResponse::success(
                 data: [
                     'active_sessions' => [],

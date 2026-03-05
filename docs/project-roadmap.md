@@ -1,8 +1,8 @@
 # Project Roadmap
 
-Last updated: 2026-02-25  
+Last updated: 2026-03-04  
 Owner: Platform Team  
-Status: Active planning baseline  
+Status: Active execution baseline  
 Horizon: next 2-3 quarters
 
 ## 1) Objectives
@@ -15,13 +15,22 @@ Horizon: next 2-3 quarters
 ## 2) Current Baseline
 
 - Platform is operational with hybrid architecture (`app/Modules/*` + `app/Services/*`).
+- Frontend filter stack remains hybrid (`useInertiaFilters`, legacy `useFilters`/`useTableFilters`, and `useServerTableQuery`).
 - Auth hardening landed for student/parent/lecturer actor middleware and protected refresh routes.
 - Token TTL is aligned to 8 hours across current Identity login/refresh actions.
 - Critical unresolved risks remain:
-  - public `/api/system-config*`
-  - finance API auth model drift
-  - disabled CI workflows
-  - deployment/script/security drift
+    - public `/api/system-config*`
+    - finance API auth model drift
+    - disabled CI workflows
+    - deployment/script/security drift
+
+Recent activity through 2026-03-04:
+
+- repomix snapshot regenerated and core docs re-synced to current repository shape
+- deployment drift now tracked with concrete root-vs-`docker/` script mismatch examples
+- frontend form/filter guidance updated to mark exception paths explicitly
+- Notification V2 Phase 1 foundation completed: domain event + outbox architecture, ops monitoring pages, retry capabilities
+- `inertia-filter-table` skill documented as canonical pattern for server-filtered tables
 
 ## 3) Phase Plan
 
@@ -31,20 +40,23 @@ Status: Completed
 Completed date: 2026-02-25
 
 Outcome:
+
 - Core docs aligned to current code-verified state.
 - Removed aspirational phrasing from quality/security posture.
 
 ### Phase 1: Deploy/Script Normalization
 
-Status: Planned  
+Status: In progress  
 Target: 1-2 sprints
 
 Scope:
+
 - choose one canonical deploy entrypoint
 - align script references to actual `docker/*` layout
 - remove references to missing helper scripts
 
 Exit criteria:
+
 - no broken script references in normal dev/deploy paths
 - deployment guide maps exactly to runnable script flow
 
@@ -54,15 +66,18 @@ Status: Planned
 Target: after Phase 1
 
 Scope:
+
 - uncomment and modernize `.github/workflows/*`
 - enforce minimum checks on PRs
 
 Minimum gate target:
+
 - lint
 - type-check
 - backend tests
 
 Exit criteria:
+
 - required checks run automatically and block on failure
 
 ### Phase 3: API Security Hardening
@@ -71,11 +86,13 @@ Status: Planned
 Target: overlaps with Phase 2 when feasible
 
 Scope:
+
 - secure or relocate public `system-config` routes
 - resolve finance API auth drift (`web` + `auth` vs Sanctum actor model)
 - document stable auth matrix by route group
 
 Exit criteria:
+
 - no high-risk public config mutation/read routes without explicit approval rationale
 - finance API auth model decision implemented and documented
 
@@ -85,10 +102,12 @@ Status: Planned
 Target: ongoing
 
 Scope:
+
 - reduce literal URL pockets in frontend pages/composables
 - standardize route helper usage and API wrapper usage in high-churn pages
 
 Exit criteria:
+
 - measurable reduction in literal path usage on critical flows
 - route contract changes require single-source updates
 
@@ -98,10 +117,12 @@ Status: Planned
 Target: ongoing
 
 Scope:
-- define explicit policy for `Modules` vs `Services`
+
+- define explicit policy for module-domain folders vs shared service layer
 - apply policy incrementally on touched hotspots
 
 Exit criteria:
+
 - reduced placement ambiguity for new domain logic
 - documented ownership by domain/module
 

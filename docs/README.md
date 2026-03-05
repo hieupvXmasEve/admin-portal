@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-02-25
+Last updated: 2026-03-02
 Source of truth: `docs/`
 
 ## Core Baseline
@@ -26,12 +26,16 @@ Source of truth: `docs/`
 ## Domain Documentation (Folders)
 
 - API docs: `docs/api/`
-- Notification docs: `docs/notification/`
-- Canvas docs: `docs/canvas/`
-- Upload docs: `docs/upload/`
-- Logging docs: `docs/logs/`
+- Notification docs: `docs/features/notification/`
+- Canvas docs: `docs/features/canvas/`
+- Upload docs: `docs/features/upload/`
+- Logging docs: `docs/features/logs/`
 - Rules docs: `docs/rules/`
-- Requirements docs: `docs/requirements/`
+
+## Naming Consistency Notes
+
+- Some docs still use legacy uppercase file names (for example `COURSE_COMPLETION_AND_EGC_PROGRESSION.md`, `EXAMPLE_useInertiaFilters.md`, `RULES_vue-form-useApi.md`).
+- Prefer kebab-case for new docs; keep existing names stable unless a coordinated rename plan updates all links.
 
 ## Maintenance Rules
 

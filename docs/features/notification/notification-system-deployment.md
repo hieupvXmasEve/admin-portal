@@ -1,147 +1,87 @@
-# Notification System Deployment & Configuration Guide
+# Notification System Deployment Guide (V2)
 
-This guide covers environment configuration, deployment steps, monitoring, and scaling for the Notification System (REST + WebSockets + Web Push).
+## 1) Scope
 
-## Components
+Deploy vận hành Notification V2 gồm:
 
-- REST API (Laravel)
-- Laravel Reverb WebSocket server (real-time broadcasting)
-- Web Push (VAPID keys)
-- Laravel Queue workers (for retries/logging as applicable)
+- DB tables mới
+- outbox processor
+- queue workers
+- realtime broadcasting
 
-## Environment Variables
+## 2) Preconditions
 
-Add/update the following in `.env` (see `.env.example`):
+- Migrate xong DB.
+- Queue infra hoạt động (`database` hoặc provider khác).
+- Broadcast provider configured (Ably/Pusher/Reverb).
 
-### Broadcasting & Reverb
-```
-BROADCAST_CONNECTION=reverb
+## 3) Env checklist
 
-REVERB_APP_ID=swinx-app
-REVERB_APP_KEY=swinx-key
-REVERB_APP_SECRET=swinx-secret
-REVERB_HOST=localhost
-REVERB_PORT=8080
-REVERB_SCHEME=http
+```env
+NOTIFICATION_V2_ENABLED=true
+NOTIFICATION_V2_WRITE_MODE=dual
+NOTIFICATION_V2_READ_MODE=legacy
 
-REVERB_SERVER_HOST=0.0.0.0
-REVERB_SERVER_PORT=8080
-REVERB_ALLOWED_ORIGINS=*
-REVERB_SCALING_ENABLED=true
-REVERB_MAX_CONNECTIONS=1000
-REVERB_ENABLE_STATISTICS=true
-REVERB_ENABLE_LOGGING=true
+QUEUE_CONNECTION=database
+BROADCAST_CONNECTION=ably
+ABLY_KEY=xxxx
 
-VITE_REVERB_APP_KEY="${REVERB_APP_KEY}"
-VITE_REVERB_HOST="${REVERB_HOST}"
-VITE_REVERB_PORT="${REVERB_PORT}"
-VITE_REVERB_SCHEME="${REVERB_SCHEME}"
+VITE_BROADCASTER=${BROADCAST_CONNECTION}
+VITE_BROADCAST_KEY=${ABLY_KEY}
 ```
 
-### Web Push (VAPID)
-```
-WEBPUSH_VAPID_SUBJECT=mailto:admin@example.com
-WEBPUSH_VAPID_PUBLIC_KEY=
-WEBPUSH_VAPID_PRIVATE_KEY=
+## 4) Release sequence (recommended)
+
+1. Deploy code + run migrate.
+2. Start queue workers.
+3. Ensure scheduler cron active.
+4. Enable `NOTIFICATION_V2_ENABLED=true`, `WRITE_MODE=dual`.
+5. Monitor metrics/logs.
+6. Khi ổn định, chuyển `READ_MODE=dual_compare` rồi `v2`.
+
+## 5) Runtime processes
+
+- Queue worker:
+
+```bash
+php artisan queue:work --sleep=1 --tries=3
 ```
 
-Generate VAPID keys (choose one):
-- PHP package CLI, or
-- Node-based `web-push` CLI: `npx web-push generate-vapid-keys`
+- Scheduler cron:
 
-## Deployment Steps
-
-1) Build frontend assets
-```
-npm ci
-npm run build
-```
-
-2) Migrate & cache
-```
-php artisan migrate --force
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-```
-
-3) Start Reverb server
-```
-php artisan reverb:start --host=${REVERB_SERVER_HOST} --port=${REVERB_SERVER_PORT}
-```
-
-4) Run queue workers (if used)
-```
-php artisan queue:work --queue=default --sleep=1 --tries=3 --max-time=3600
-```
-
-5) Scheduler (for maintenance/cleanup when enabled)
-```
+```bash
 * * * * * php /path/to/artisan schedule:run >> /dev/null 2>&1
 ```
 
-## Process Management
+- Manual outbox run (debug):
 
-### systemd (Reverb)
-```
-[Unit]
-Description=Laravel Reverb WebSocket Server
-After=network.target
-
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=/var/www/app
-ExecStart=/usr/bin/php artisan reverb:start --host=0.0.0.0 --port=8080
-Restart=always
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
+```bash
+php artisan notifications:process-outbox --limit=100
 ```
 
-### Supervisor (Queue)
+## 6) Health & monitoring
+
+Theo dõi tối thiểu:
+
+- số row `pending` trong outbox
+- số `notification_deliveries.status=failed`
+- metric `notification_recipient_unresolved_total`
+- độ trễ từ `occurred_at` tới `sent_at`
+
+## 7) Rollback
+
+Rollback nhanh không cần rollback schema:
+
+```env
+NOTIFICATION_V2_WRITE_MODE=off
+NOTIFICATION_V2_READ_MODE=legacy
 ```
-[program:laravel-worker]
-process_name=%(program_name)s_%(process_num)02d
-command=php /var/www/app/artisan queue:work --sleep=1 --tries=3
-autostart=true
-autorestart=true
-user=www-data
-numprocs=2
-redirect_stderr=true
-stdout_logfile=/var/www/app/storage/logs/worker.log
-```
 
-## Monitoring & Troubleshooting
+Sau đó kiểm tra queue drain + event duplication.
 
-- Reverb health: `http://REVERB_HOST:REVERB_PORT/health`
-- Reverb stats: `http://REVERB_HOST:REVERB_PORT/stats` (if enabled)
-- Laravel logs: `storage/logs/laravel.log`
-- Reverb logs (if redirected): `storage/logs/reverb.log`
-- Verify broadcasting config: `php artisan config:show broadcasting`
+## 8) Security hardening
 
-Common issues:
-- Connection refused: Ensure Reverb is running; host/port reachable; firewalls allow traffic.
-- Auth failures: Ensure Sanctum token present on Echo `auth.headers`.
-- CORS/origins: Set `REVERB_ALLOWED_ORIGINS` to permit frontend origins.
-- Port in use: Change `REVERB_SERVER_PORT` or stop conflicting service.
-- Web Push unsupported: Ensure VAPID keys configured and HTTPS in production.
-
-## Scaling & Performance
-
-- Enable Redis-backed scaling: `REVERB_SCALING_ENABLED=true` and configure Redis (host, port, auth).
-- Horizontal scale Reverb behind a load balancer; sticky sessions usually not required for WebSockets with Reverb.
-- Tune limits: `REVERB_MAX_CONNECTIONS`, `REVERB_APP_MAX_MESSAGE_SIZE`.
-- Observe metrics: enable statistics; add external monitoring/alerts for connection count and error rates.
-
-## Security Notes
-
-- Keep `REVERB_APP_SECRET` and VAPID private key secret.
-- Use TLS (`REVERB_SCHEME=https`) in production with valid certs.
-- Scope admin-only analytics and send endpoints via Laravel Gates/Policies.
-
----
-
-For local setup and testing, see `docs/notification-broadcasting-setup.md` for end-to-end connection checks and sample Echo configuration.
-
+- Bảo vệ secret broadcast key.
+- Enforce TLS production.
+- Không expose payload nhạy cảm qua realtime.
+- Kiểm tra channel auth theo campus boundary.

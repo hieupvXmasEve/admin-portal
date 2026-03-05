@@ -63,3 +63,9 @@ Schedule::command('academic-records:aggregate-manual')
     ->withoutOverlapping()
     ->onOneServer()
     ->runInBackground();
+
+Schedule::command('notifications:process-outbox --limit=100')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->runInBackground();

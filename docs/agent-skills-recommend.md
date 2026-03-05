@@ -1,44 +1,42 @@
-# Project Agent Skills Catalog
+# Agent Skills Recommendation (Current)
 
-This project includes a suite of custom **Claude Agent Skills** designed to enforce our **Modular Monolith** architecture and automate repetitive tasks.
+Last updated: 2026-03-04  
+Owner: Platform Team  
+Status: Current workflow snapshot
 
-> **How to use**: Simply ask Claude to perform the task (e.g., "Create an action to register students"). Claude will automatically detect and use the appropriate skill.
+This file reflects skills currently available in this repository's OpenCode/ClaudeKit setup. It replaces older references to non-existent scaffold skills.
 
-## 🏗 Scaffolding & Architecture
+## Primary Delivery Skills
 
-| Skill Name | Description | Trigger Example |
-| :--- | :--- | :--- |
-| **`scaffold-module`** | Creates a new Domain Module structure (`app/Modules/{Name}`). | "Scaffold a new Inventory module" |
-| **`scaffold-crud`** | Orchestrates a full CRUD feature (Backend + Frontend). | "Scaffold CRUD for Events in Academic module" |
-| **`create-contract`** | Generates a Shared Contract/Interface for cross-module communication. | "Create a contract for checking student GPA" |
+| Skill            | Use case                                        |
+| ---------------- | ----------------------------------------------- |
+| `ck:scout`       | Fast codebase/doc scouting before edits         |
+| `ck:plan`        | Build implementation plans in `plans/`          |
+| `ck:cook`        | Required pre-implementation workflow guard      |
+| `ck:fix`         | Required pre-fix workflow guard                 |
+| `ck:test`        | Run targeted test suites and summarize failures |
+| `ck:code-review` | Post-implementation review pass                 |
+| `ck:docs`        | Update and synchronize docs in `docs/`          |
 
-## 🔧 Backend Components
+## Supporting Skills Often Used Here
 
-| Skill Name | Description | Trigger Example |
-| :--- | :--- | :--- |
-| **`create-action`** | Generates a Business Action class (`run()` method). | "Create an action to update user profile" |
-| **`create-query`** | Generates a Read-only Query class (`handle()` method). | "Create a query to list all active courses" |
-| **`create-controller`** | Generates a thin Controller (Web or API). | "Create a controller for managing students" |
-| **`create-request`** | Generates a FormRequest for validation. | "Create a request to validate course creation" |
-| **`create-dto`** | Generates a Data Transfer Object. | "Create a DTO for student registration data" |
-| **`generate-policy`** | Generates a Policy for authorization. | "Generate a policy for the Event model" |
+| Skill                     | Use case                                                                    |
+| ------------------------- | --------------------------------------------------------------------------- |
+| `ck:repomix`              | Generate `repomix-output.xml` for repo snapshots                            |
+| `ck:git`                  | Structured staging/commit/PR flow                                           |
+| `ck:debug`                | Root-cause analysis for regressions                                         |
+| `ck:web-testing`          | Browser-level checks when needed                                            |
+| `ck:frontend-development` | Vue/TS implementation support                                               |
+| `ck:backend-development`  | Laravel/PHP implementation support                                          |
+| `inertia-filter-table`    | Build server-side filtered/sorted/paginated tables (Laravel + Vue + Inertia) |
 
-## 🎨 Frontend Components
+## Orchestration Reality
 
-| Skill Name | Description | Trigger Example |
-| :--- | :--- | :--- |
-| **`create-inertia-page`** | Generates a Vue 3 + Inertia page (Index, Create, Edit). | "Create a student list page" |
+- Planning/research/testing/review are often delegated as role-specific subagent steps.
+- Team mode is optional; default sessions usually run single-agent with skill activation.
+- Docs updates are expected when code contracts/routes/runtime behavior change.
 
-## ✅ Quality & Security
+## Notes
 
-| Skill Name | Description | Trigger Example |
-| :--- | :--- | :--- |
-| **`create-test`** | Generates Pest/PHPUnit tests. | "Create a unit test for the RegisterAction" |
-| **`review-architecture`** | Checks for Modular Monolith violations (e.g., cross-module imports). | "Review this code for architecture violations" |
-| **`review-security-rules`** | Audits code for Gate/Policy authorization security gaps. | "Check the security of these routes" |
-
----
-
-## Installation
-
-These skills are located in `.claude/skills/`. They should be committed to the repository so all team members using Claude Code have access to them.
+- Older doc references like `scaffold-module`, `scaffold-crud`, `create-action`, `create-query` are not the active catalog in this repo.
+- Always check the live skill registry in the current agent session when in doubt.

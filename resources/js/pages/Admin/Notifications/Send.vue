@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { Head, router } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
 import {
     Check,
-    Clock,
     Info,
     Loader2,
     Search,
@@ -44,6 +43,7 @@ interface Recipient {
 interface Props {
     categories: Array<{ value: string; label: string; description: string }>;
     programs: Program[];
+    currentCampusId: number | null;
 }
 
 const props = defineProps<Props>();
@@ -75,7 +75,8 @@ const searchTargets = async () => {
         const { data: apiData } = await api.get<Recipient[]>(route(NOTIFICATION_ROUTE_NAMES.SEARCH_TARGETS), {
             search: search.value,
             type: notifiableType.value,
-            program_id: notifiableType.value === 'student' && programId.value !== 'all' ? programId.value : null
+            program_id: notifiableType.value === 'student' && programId.value !== 'all' ? programId.value : null,
+            campus_id: props.currentCampusId,
         });
 
         if (apiData.value?.success && apiData.value?.data) {
@@ -130,26 +131,18 @@ const formSchema = toTypedSchema(z.object({
     message: z.string().min(1, 'Message is required'),
     is_important: z.boolean().default(false),
     action_url: z.string().optional().or(z.literal('')).refine((val) => {
-        // Nếu không có giá trị (undefined hoặc rỗng), bỏ qua validate này
         if (!val) return true;
-
-        // 1. Kiểm tra nếu bắt đầu bằng '/' (Path nội bộ)
         if (val.startsWith('/')) {
-            // Regex kiểm tra định dạng path đơn giản (không chứa khoảng trắng)
             return /^\/[^\s]*$/.test(val);
         }
-
-        // 2. Kiểm tra nếu bắt đầu bằng 'h' (Có thể là http/https)
         if (val.startsWith('h')) {
             try {
-                new URL(val); // Sử dụng constructor URL chuẩn của JS để check
+                new URL(val);
                 return true;
             } catch (_) {
                 return false;
             }
         }
-
-        // Nếu có nhập nhưng không bắt đầu bằng / hoặc h
         return false;
     }, {
         message: "URL phải bắt đầu bằng '/' hoặc là một liên kết (http/https) hợp lệ"
@@ -185,17 +178,17 @@ const onSubmit = handleSubmit(async (values) => {
     const payload = {
         ...values,
         notifiable_type: notifiableType.value,
-        notifiable_ids: selectedRecipients.value.map(r => r.id)
+        notifiable_ids: selectedRecipients.value.map(r => r.id),
+        campus_id: props.currentCampusId,
     };
 
     try {
         const { data: apiData } = await api.post(route(NOTIFICATION_ROUTE_NAMES.STORE), payload);
 
         if (apiData.value?.success) {
-            toast.success(`Notification sent to ${selectedRecipients.value.length} recipients`);
+            toast.success(`Notification queued for ${selectedRecipients.value.length} recipients`);
             resetForm();
             selectedRecipients.value = [];
-            router.visit(route(NOTIFICATION_ROUTE_NAMES.INDEX));
         } else {
             toast.error(apiData.value?.message || 'Failed to send notification');
         }
@@ -214,13 +207,9 @@ const onSubmit = handleSubmit(async (values) => {
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-3xl font-bold tracking-tight">Send Notification</h1>
-                <p class="text-muted-foreground text-sm">Send a manual notification to selected students via DB and
-                    Realtime.</p>
+                <p class="text-muted-foreground text-sm">Send a manual notification to selected recipients via Realtime.
+                </p>
             </div>
-            <Button variant="outline" @click="router.visit(route(NOTIFICATION_ROUTE_NAMES.INDEX))">
-                <Clock class="mr-2 h-4 w-4" />
-                View History
-            </Button>
         </div>
 
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -382,8 +371,9 @@ const onSubmit = handleSubmit(async (values) => {
                         <div class="md:col-span-2 bg-blue-50 border border-blue-100 rounded-md p-3 flex gap-3">
                             <Info class="h-5 w-5 text-blue-500 shrink-0" />
                             <div class="text-xs text-blue-700 leading-relaxed">
-                                This notification will be delivered instantly to the recipient's portal if they are
-                                online, and stored in their inbox database for later viewing.
+                                This notification will be queued for delivery to the recipient's portal.
+                                Recipients online will receive it instantly; others will see it in their inbox.
+                                Only recipients belonging to your current campus will be notified.
                             </div>
                         </div>
                     </CardContent>

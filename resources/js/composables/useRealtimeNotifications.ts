@@ -10,18 +10,25 @@ import { toast } from 'vue-sonner';
  * - Uses Laravel Echo via @laravel/echo-vue (Rule 4.1)
  * - Uses standard Listening Syntax (Rule 4.3)
  */
-export function useRealtimeNotifications(notifiableId: number | string | undefined) {
+export function useRealtimeNotifications(notifiableId: number | string | undefined, campusId?: number | null) {
     const notifications = ref<any[]>([]);
+    const seenNotificationIds = new Set<string>();
 
     if (!notifiableId) {
         return { notifications };
     }
 
-    // Automatically connects and listens
-    useEcho(`notifications.${notifiableId}`, '.NotificationCreated', (data: any) => {
+    const resolvedCampusId = campusId == null ? null : Number(campusId);
+
+    const onNotification = (data: any) => {
+        const id = String(data?.id ?? `${Date.now()}-${Math.random()}`);
+        if (seenNotificationIds.has(id)) {
+            return;
+        }
+
+        seenNotificationIds.add(id);
         notifications.value.unshift(data);
 
-        // Visual feedback (Rule 3 in Design Aesthetics)
         toast('New Notification', {
             description: 'You have a new notification from the system.',
             position: 'top-right',
@@ -33,7 +40,13 @@ export function useRealtimeNotifications(notifiableId: number | string | undefin
                 description: 'my-toast-description',
             },
         });
-    });
+    };
+
+    // New canonical channel: notify.{campusId}.{recipient_user_id}
+    // Allow campusId = 0 for global notifications (see broadcasting docs)
+    if (resolvedCampusId !== null && Number.isFinite(resolvedCampusId) && resolvedCampusId >= 0) {
+        useEcho(`notify.${resolvedCampusId}.${notifiableId}`, '.NotificationCreated', onNotification);
+    }
 
     return {
         notifications,

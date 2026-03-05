@@ -4,117 +4,98 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Api\V1\Student;
 
+use App\Modules\Notification\Models\NotificationMessage;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * Student Notification Resource V2.
+ * Transforms NotificationMessage for API; includes category and compact UI hints for FE.
+ *
+ * @mixin NotificationMessage
+ */
 class NotificationResource extends JsonResource
 {
     /**
      * Transform the resource into an array.
+     *
+     * @return array<string, mixed>
      */
     public function toArray(Request $request): array
     {
+        $data = $this->data ?? [];
+        $categoryKey = (string) ($data['category'] ?? 'system');
+        $isImportant = (bool) ($data['is_important'] ?? false);
+        $readAt = $this->read_at;
+        $isRead = $readAt !== null;
+        $expiresAt = $this->expires_at;
+        $isExpired = $expiresAt !== null && $expiresAt->isPast();
+
         return [
             'id' => $this->id,
             'title' => $this->title,
-            'message' => $this->message,
+            'message' => $this->body,
             'category' => [
-                'key' => $this->category->value,
-                'display' => $this->category->label(),
-//                'icon' => $this->getCategoryIcon($this->category->value),
-                'color' => $this->getCategoryColor($this->category->value),
+                'key' => $categoryKey,
+                'display' => $this->getCategoryDisplay($categoryKey),
             ],
-//            'type' => $this->type,
-//            'importance' => [
-//                'level' => $this->is_important ? 'high' : 'normal',
-//                'display' => $this->is_important ? 'Important' : 'Normal',
-//                'color' => $this->is_important ? '#ef4444' : '#6b7280',
-//            ],
-            'is_read' => $this->is_read,
-            'is_important' => $this->is_important,
-//            'status' => [
-//                'is_expired' => $this->is_expired,
-//            ],
-            'time_ago' => $this->created_at->diffForHumans(),
-//            'timestamps' => [
-//                'created_at' => $this->created_at->toISOString(),
-//                'read_at' => $this->read_at?->toISOString(),
-//                'expires_at' => $this->expires_at?->toISOString(),
-
-//            ],
-            'data' => $this->data ?? [],
-//            'channels' => $this->channels ?? [],
-//            'display' => [
-//                'icon' => $this->getNotificationIcon($this->category->value, $this->type),
-//                'color' => $this->is_important ? '#ef4444' : '#6b7280',
-//                'badge' => $this->getNotificationBadge(),
-//            ],
+            'type_key' => $this->type_key,
+            'event_name' => $this->event_name,
+            'is_read' => $isRead,
+            'is_important' => $isImportant,
+            'time_ago' => $this->created_at?->diffForHumans(),
+            'timestamps' => [
+                'created_at' => $this->created_at?->toISOString(),
+                'read_at' => $readAt?->toISOString(),
+                'expires_at' => $expiresAt?->toISOString(),
+            ],
+            'data' => $data,
+            'ui' => [
+                'icon' => $this->getNotificationIcon($categoryKey, $this->type_key ?? ''),
+                'color' => $isImportant ? '#ef4444' : $this->getCategoryColor($categoryKey),
+                'badges' => $this->getNotificationBadges($isRead, $isImportant, $isExpired, $data),
+            ],
         ];
     }
 
-
-    /**
-     * Get notification badge information
-     */
-    protected function getNotificationBadge(): array
+    protected function getCategoryDisplay(string $category): string
     {
-        $badges = [];
-
-        if ($this->is_important) {
-            $badges[] = [
-                'type' => 'important',
-                'text' => 'Important',
-                'color' => '#ef4444',
-            ];
-        }
-
-        if (!$this->is_read) {
-            $badges[] = [
-                'type' => 'unread',
-                'text' => 'New',
-                'color' => '#3b82f6',
-            ];
-        }
-
-        if ($this->is_expired) {
-            $badges[] = [
-                'type' => 'expired',
-                'text' => 'Expired',
-                'color' => '#6b7280',
-            ];
-        }
-
-        // Add category-specific badges
-        switch ($this->category->value) {
-            case 'academic':
-                if (isset($this->data['days_until_due'])) {
-                    $days = $this->data['days_until_due'];
-                    if ($days <= 1) {
-                        $badges[] = [
-                            'type' => 'deadline',
-                            'text' => $days === 0 ? 'Due Today' : 'Due Tomorrow',
-                            'color' => '#ef4444',
-                        ];
-                    }
-                }
-                break;
-
-            case 'finance':
-                $badges[] = [
-                    'type' => 'finance',
-                    'text' => 'Financial',
-                    'color' => '#22c55e',
-                ];
-                break;
-        }
-
-        return $badges;
+        return match ($category) {
+            'academic' => 'Academic',
+            'system' => 'System',
+            'finance' => 'Finance',
+            'personal' => 'Personal',
+            'event' => 'Event',
+            'club' => 'Club',
+            'administrative' => 'Administrative',
+            'assessment' => 'Assessment',
+            'grade' => 'Grade',
+            'attendance' => 'Attendance',
+            'enrollment' => 'Enrollment',
+            'announcement' => 'Announcement',
+            default => 'System',
+        };
     }
 
+    protected function getCategoryColor(string $category): string
+    {
+        return match ($category) {
+            'academic' => '#06b6d4',
+            'system' => '#6b7280',
+            'finance' => '#22c55e',
+            'personal' => '#8b5cf6',
+            'event' => '#f59e0b',
+            'club' => '#3b82f6',
+            'administrative' => '#ef4444',
+            'assessment' => '#06b6d4',
+            'grade' => '#22c55e',
+            'attendance' => '#8b5cf6',
+            'enrollment' => '#3b82f6',
+            'announcement' => '#f59e0b',
+            default => '#6b7280',
+        };
+    }
 
-    /**
-     * Get category icon
-     */
     protected function getCategoryIcon(string $category): string
     {
         return match ($category) {
@@ -125,41 +106,58 @@ class NotificationResource extends JsonResource
             'event' => 'calendar-days',
             'club' => 'user-group',
             'administrative' => 'building-office',
+            'assessment' => 'clipboard-list',
+            'grade' => 'star',
+            'attendance' => 'check-square',
+            'enrollment' => 'user-plus',
+            'announcement' => 'megaphone',
             default => 'bell',
         };
     }
 
     /**
-     * Get category color
+     * @return array<int, array{type: string, text: string, color: string}>
      */
-    protected function getCategoryColor(string $category): string
+    protected function getNotificationBadges(bool $isRead, bool $isImportant, bool $isExpired, array $data): array
     {
-        return match ($category) {
-            'academic' => '#06b6d4',   // Cyan
-            'system' => '#6b7280',     // Gray
-            'finance' => '#22c55e',    // Green
-            'personal' => '#8b5cf6',   // Purple
-            'event' => '#f59e0b',      // Amber
-            'club' => '#3b82f6',       // Blue
-            'administrative' => '#ef4444', // Red
-            default => '#6b7280',      // Gray
-        };
+        $badges = [];
+
+        if ($isImportant) {
+            $badges[] = ['type' => 'important', 'text' => 'Important', 'color' => '#ef4444'];
+        }
+        if (! $isRead) {
+            $badges[] = ['type' => 'unread', 'text' => 'New', 'color' => '#3b82f6'];
+        }
+        if ($isExpired) {
+            $badges[] = ['type' => 'expired', 'text' => 'Expired', 'color' => '#6b7280'];
+        }
+        if (isset($data['days_until_due'])) {
+            $days = (int) $data['days_until_due'];
+            if ($days <= 1) {
+                $badges[] = [
+                    'type' => 'deadline',
+                    'text' => $days === 0 ? 'Due Today' : 'Due Tomorrow',
+                    'color' => '#ef4444',
+                ];
+            }
+        }
+        if (($data['category'] ?? '') === 'finance') {
+            $badges[] = ['type' => 'finance', 'text' => 'Financial', 'color' => '#22c55e'];
+        }
+
+        return $badges;
     }
 
-
-    /**
-     * Get notification icon
-     */
-    protected function getNotificationIcon(string $category, string $type): string
+    protected function getNotificationIcon(string $category, string $typeKey): string
     {
-        return match ($type) {
+        return match ($typeKey) {
             'deadline' => 'clock',
             'grade_release' => 'star',
             'payment_due' => 'credit-card',
             'system_update' => 'arrow-path',
             'event_reminder' => 'calendar',
+            'manual_notification' => $this->getCategoryIcon($category),
             default => $this->getCategoryIcon($category),
         };
     }
-
 }

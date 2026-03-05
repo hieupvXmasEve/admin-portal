@@ -4,54 +4,82 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Actions\Notification\GetNotificationsAction;
-use App\Actions\Notification\MarkAllNotificationsAsReadAction;
-use App\Actions\Notification\MarkNotificationAsReadAction;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\Notification\NotificationResource;
 use App\Http\Responses\ApiResponse;
+use App\Modules\Notification\Models\NotificationMessage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class NotificationController extends Controller
 {
     /**
-     * Display a listing of notifications for the authenticated user.
+     * Display a listing of notifications for the authenticated user (V2).
      */
-    public function index(Request $request, GetNotificationsAction $action): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        /** @var \Illuminate\Pagination\LengthAwarePaginator $notifications */
-        $notifications = $action->execute($request->user());
-        
-        $notifications->through(fn ($notification) => new NotificationResource($notification));
-        
+        $user = $request->user();
+        $campusId = Auth::guard('web')->check()
+            ? (int) session('current_campus_id', 0)
+            : ($user->campus_id ?? 0);
+
+        $notifications = NotificationMessage::query()
+            ->where('recipient_user_id', $user->id)
+            ->when($campusId > 0, fn ($q) => $q->where('campus_id', $campusId))
+            ->where('status', 'active')
+            ->orderByDesc('created_at')
+            ->paginate((int) $request->input('per_page', 20));
+
+        $notifications->through(fn (NotificationMessage $msg) => [
+            'id' => $msg->id,
+            'title' => $msg->title,
+            'message' => $msg->body,
+            'data' => $msg->data,
+            'type_key' => $msg->type_key,
+            'event_name' => $msg->event_name,
+            'read_at' => $msg->read_at?->toISOString(),
+            'created_at' => $msg->created_at?->toISOString(),
+        ]);
+
         return ApiResponse::paginated($notifications);
     }
 
     /**
      * Mark a specific notification as read.
      */
-    public function markAsRead(
-        Request $request, 
-        string $notification, 
-        MarkNotificationAsReadAction $action
-    ): JsonResponse {
-        $success = $action->execute($request->user(), $notification);
-        
-        if ($success) {
+    public function markAsRead(Request $request, int $notification): JsonResponse
+    {
+        $user = $request->user();
+
+        $updated = NotificationMessage::query()
+            ->where('id', $notification)
+            ->where('recipient_user_id', $user->id)
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        if ($updated > 0) {
             return ApiResponse::success(null, [], 'Notification marked as read');
         }
-        
+
         return ApiResponse::businessLogicError('Failed to mark notification as read');
     }
 
     /**
      * Mark all notifications as read for the authenticated user.
      */
-    public function markAllAsRead(Request $request, MarkAllNotificationsAsReadAction $action): JsonResponse
+    public function markAllAsRead(Request $request): JsonResponse
     {
-        $count = $action->execute($request->user());
-        
+        $user = $request->user();
+        $campusId = Auth::guard('web')->check()
+            ? (int) session('current_campus_id', 0)
+            : ($user->campus_id ?? 0);
+
+        $count = NotificationMessage::query()
+            ->where('recipient_user_id', $user->id)
+            ->when($campusId > 0, fn ($q) => $q->where('campus_id', $campusId))
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
         return ApiResponse::success(['count' => $count], [], 'All notifications marked as read');
     }
 }

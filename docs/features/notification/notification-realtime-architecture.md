@@ -1,241 +1,70 @@
-# Realtime Notifications Architecture
+# Notification Realtime Architecture (V2)
 
-**Laravel 12 + Ably Realtime (Pusher Compatibility) + Nuxt / Vue 3**
+## 1) Kiến trúc tổng thể
 
-## 1. Mục tiêu của kiến trúc
-
-Hệ thống realtime notifications được thiết kế để:
-
-- Cập nhật UI realtime cho:
-    - Admin Portal (Laravel + InertiaJS + Vue 3)
-    - Student Portal (Nuxt / Vue 3 SPA)
-
-- Không lock-in vendor (Ably → soketi / self-host sau này)
-- Tách biệt **business logic** và **realtime transport**
-- Có thể scale và migrate mà **không rewrite code FE / BE**
-
-## 2. Tổng quan kiến trúc (High-level)
-
-```
-Laravel Backend
-(Event + Broadcasting)
-        ↓
-Laravel Broadcasting (Pusher protocol)
-        ↓
-Ably Realtime (Pusher Compatibility Mode)
-        ↓
-Laravel Echo
-        ↓
-Frontend (Admin + Student portals)
+```text
+Business Action
+  -> after-commit write notification_event_outbox
+  -> notifications:process-outbox
+  -> map Event -> Intent
+  -> policy + recipient resolver
+  -> persist notification_messages / notification_deliveries
+  -> channel jobs (email/realtime)
+  -> realtime broadcast to private channel
 ```
 
-**Key idea:**
+## 2) Thành phần chính
 
-> Realtime chỉ là _transport layer_, không phải business logic.
+- **Outbox**: `notification_event_outbox`
+- **Message store**: `notification_messages`
+- **Delivery store**: `notification_deliveries`
+- **Canonical recipient**: `recipient_user_id`
+- **Source actor metadata**: `recipient_meta`
 
-## 3. Các thành phần chính
+## 3) Security boundaries
 
-### 3.1 Backend – Laravel 12
+- Mặc định strict campus isolation theo `event.campus_id`.
+- Global exception chỉ cho:
+    - `system.security*`
+    - `system.announcement.global*`
+- Channel auth bắt buộc validate user + campus.
 
-#### a. Polymorphic Relationships
+## 4) Channel design
 
-Hệ thống sử dụng **Polymorphic Relationships** để gửi thông báo cho nhiều loại đối tượng (`Student`, `User`, `Lecturer`) thông qua một quan hệ duy nhất.
+- Legacy: `notifications.{userId}`
+- V2 canonical: `notify.{campusId}.{recipientUserId}`
 
-- **Morph Map**: Bắt buộc đăng ký alias trong `AppServiceProvider` để tránh lộ namespace và đảm bảo tính nhất quán của dữ liệu database.
-- **HasNotifications Trait**: Mọi model có thể nhận thông báo đều phải sử dụng `App\Traits\HasNotifications` để override mặc định của Laravel và sử dụng custom `Notification` model của dự án.
+## 5) Idempotency levels
 
-```php
-// app/Models/User.php
-class User extends Model {
-    use Notifiable, HasNotifications {
-        HasNotifications::notifications insteadof Notifiable;
-    }
-}
-```
+- Event-level: unique `notification_event_outbox.event_id`
+- Message-level: unique `(event_id, type_key, recipient_user_id)`
+- Delivery-level: unique `(message_id, channel)`
 
-#### b. Event Broadcasting
+## 6) Unresolved recipients
 
-- Mọi realtime message **PHẢI đi qua Laravel Broadcasting**
-- Event implement `ShouldBroadcast`
+Khi target không resolve được về `user_id`:
 
-```php
-// app/Events/NotificationBroadcast.php
-class NotificationBroadcast implements ShouldBroadcast
-{
-    public function broadcastOn()
-    {
-        // Channel ID là ID của notifiable (Student/User/Lecturer)
-        return new PrivateChannel('notifications.' . $this->notification->notifiable_id);
-    }
+- skip delivery
+- audit log `notification.recipient_unresolved`
+- metric `notification_recipient_unresolved_total`
+- không fallback legacy
 
-    public function broadcastAs(): string
-    {
-        return 'NotificationCreated';
-    }
-}
-```
+## 7) Gating/cutover
 
-**Quy tắc bắt buộc**
+Config ở `config/notification.php`:
 
-- Không gọi Ably / WebSocket SDK trực tiếp
-- Không push realtime trong controller
-- Realtime luôn xuất phát từ Event (thường là từ model hook `created`)
+- `v2_enabled`
+- `write_mode`: `off|dual|v2_only`
+- `read_mode`: `legacy|dual_compare|v2`
 
-#### c. Channel Authorization
+## 8) Realtime payload contract
 
-- Private / presence channel được authorize trong `routes/channels.php`
+Event `.NotificationCreated` nên giữ payload ổn định:
 
-```php
-Broadcast::channel('notifications.{id}', function ($user, $id) {
-    // Chỉ cho phép user nghe channel của chính mình
-    return (int) $user->id === (int) $id;
-});
-```
+- `id`, `title`, `message`, `data`, `type_key`, `event_name`, `created_at`
 
-#### d. Broadcasting Driver
+## 9) Operational points
 
-Backend **luôn dùng Pusher driver**, kể cả khi dùng Ably (thông qua protocol adapter):
-
-```env
-BROADCAST_CONNECTION=pusher
-```
-
-### 3.2 Realtime Transport – Ably
-
-- Ably được dùng như **WebSocket infrastructure**
-- **Pusher Compatibility Mode BẮT BUỘC bật** trong Ably Dashboard.
-
-### 3.3 Frontend – Vue 3 / Inertia
-
-#### a. Laravel Echo Integration (Modern Pattern)
-
-Frontend sử dụng thư viện `@laravel/echo-vue` để quản lý Echo instance dưới dạng Singleton và cung cấp các composables mạnh mẽ.
-
-**Khởi tạo tại `resources/js/lib/echo.ts`:**
-
-```ts
-import { configureEcho } from '@laravel/echo-vue';
-import Pusher from 'pusher-js';
-
-export function setupEcho() {
-    // Tự động detect Ably/Pusher configuration từ ENV
-    configureEcho({
-        broadcaster: 'pusher',
-        key: import.meta.env.VITE_BROADCAST_KEY,
-        wsHost: 'realtime-pusher.ably.io',
-        wsPort: 443,
-        forceTLS: true,
-        disableStats: true,
-    });
-}
-```
-
-**Đăng ký trong `app.ts`:**
-
-```ts
-import { setupEcho } from './lib/echo';
-
-setupEcho(); // Khởi tạo Echo Singleton
-```
-
-#### b. Realtime Composable
-
-Sử dụng hook `useEcho` từ `@laravel/echo-vue` để tự động sub/unsub channel theo lifecycle của component.
-
-```ts
-import { useEcho } from '@laravel/echo-vue';
-
-// Trong component hoặc composable
-useEcho(`notifications.${userId}`, '.NotificationCreated', (payload) => {
-    console.log('Received notification:', payload);
-});
-```
-
-#### c. Event name rules
-
-| Laravel                  | Frontend                   |
-| ------------------------ | -------------------------- |
-| Không có `broadcastAs()` | `listen('EventClassName')` |
-| Có `broadcastAs()`       | `listen('.custom.event')`  |
-
-⚠️ **Luôn có dấu `.` trước event name khi dùng `broadcastAs()`** (VD: `.NotificationCreated`)
-
-## 4. Debug & Monitoring chuẩn
-
-### 4.1 WebSocket Connection
-
-Thành công khi thấy:
-
-```json
-{
-    "event": "pusher:connection_established"
-}
-```
-
-→ chứng tỏ:
-
-- WebSocket OK
-- Protocol đúng
-- Ably adapter hoạt động
-
-### 4.2 Ably Dev Console
-
-Nếu thấy:
-
-```
-You're not attached to any channels yet
-```
-
-→ FE **chưa subscribe thành công**, không phải Ably lỗi.
-
-Nguyên nhân thường gặp:
-
-- Subscribe chạy trong SSR
-- Sai channel name
-- Auth private channel fail
-- Sai event name
-
-### 4.3 Test cứu hỏa (public channel)
-
-Luôn test bằng public channel trước:
-
-```php
-return new Channel('test');
-```
-
-```ts
-Echo.channel('test').listen('TestEvent', ...)
-```
-
-Nếu public OK → lỗi nằm ở private / auth.
-
-## 5. Anti-patterns (DEV MỚI PHẢI TRÁNH)
-
-❌ Import Ably SDK trong FE
-❌ Push realtime trực tiếp trong controller
-❌ Hard-code channel name
-❌ Gắn realtime logic vào UI component
-❌ Viết code phụ thuộc vendor
-
-## 6. Chiến lược dài hạn (đã được chuẩn bị)
-
-### Hiện tại
-
-- Ably Realtime (hosted, ổn định, nhanh setup)
-
-### Tương lai
-
-- Migrate sang **soketi (self-host)**:
-    - Không rewrite FE
-    - Không rewrite Event
-    - Chỉ đổi `.env` + infra
-
-👉 Kiến trúc hiện tại **đã sẵn sàng migrate**
-
-## 7. Kết luận cho dev mới
-
-> Nếu bạn hiểu 3 điều sau, bạn sẽ làm realtime đúng:
->
-> 1. **Realtime = Event + Broadcasting**
-> 2. **Echo là cổng duy nhất ở frontend**
-> 3. **Vendor chỉ là transport, có thể thay**
+- Queue worker bắt buộc chạy.
+- Scheduler phải chạy để trigger `notifications:process-outbox`.
+- Theo dõi backlog/failed để rollback sớm nếu cần.

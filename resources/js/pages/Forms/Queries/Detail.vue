@@ -10,20 +10,16 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { format, formatDistanceToNow } from 'date-fns';
-import { 
-    ArrowLeft, 
-    Calendar, 
-    CheckCircle2, 
-    Clock, 
-    FileText, 
-    MessageSquare, 
-    Paperclip, 
-    Send, 
-    User as UserIcon,
+import {
+    ArrowLeft,
+    FileText,
+    MessageSquare,
+    Paperclip,
+    Send,
     History,
     UserCheck
 } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { route } from 'ziggy-js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'vue-sonner';
@@ -74,7 +70,7 @@ const formatDate = (date: string) => format(new Date(date), 'dd/MM/yyyy HH:mm');
 const formatRelative = (date: string) => formatDistanceToNow(new Date(date), { addSuffix: true });
 
 const onAssign = () => {
-    assignForm.post(route('forms.admin.inbox.assign', props.ticket.id), { 
+    assignForm.post(route('forms.admin.inbox.assign', props.ticket.id), {
         preserveScroll: true,
         onSuccess: () => {
             toast.success('Assignment updated successfully');
@@ -85,9 +81,9 @@ const onAssign = () => {
 };
 
 const onUpdateStatus = (val: string) => {
-    router.post(route('forms.admin.inbox.status.update', props.ticket.id), 
-        { status: val }, 
-        { 
+    router.post(route('forms.admin.inbox.status.update', props.ticket.id),
+        { status: val },
+        {
             preserveScroll: true,
             onSuccess: () => toast.success(`Status updated to ${val}`),
             onError: () => toast.error('Failed to update status')
@@ -124,6 +120,7 @@ const getActionBadge = (action: string) => {
 </script>
 
 <template>
+
     <Head :title="`Query #${ticket.id}`" />
 
     <div class="space-y-6">
@@ -136,14 +133,17 @@ const getActionBadge = (action: string) => {
                 <div>
                     <div class="flex items-center gap-3">
                         <h1 class="text-2xl font-bold tracking-tight">Query #{{ ticket.id }}</h1>
-                        <Badge :variant="statusVariantMap[ticket.query_status]">{{ statusLabelMap[ticket.query_status] }}</Badge>
+                        <Badge :variant="statusVariantMap[ticket.query_status]">{{ statusLabelMap[ticket.query_status]
+                        }}</Badge>
                     </div>
-                    <p class="text-muted-foreground text-sm mt-1">Submitted {{ formatRelative(ticket.created_at) }} &middot; {{ ticket.form.title }}</p>
+                    <p class="text-muted-foreground text-sm mt-1">Submitted {{ formatRelative(ticket.created_at) }}
+                        &middot; {{ ticket.form.title }}</p>
                 </div>
             </div>
 
             <div class="flex items-center gap-3">
-                <Select :model-value="ticket.query_status" @update:model-value="(v: any) => onUpdateStatus(v as string)">
+                <Select :model-value="ticket.query_status"
+                    @update:model-value="(v: any) => onUpdateStatus(v as string)">
                     <SelectTrigger class="w-[140px]">
                         <SelectValue placeholder="Status" />
                     </SelectTrigger>
@@ -155,7 +155,8 @@ const getActionBadge = (action: string) => {
                         </template>
                     </SelectContent>
                 </Select>
-                <Button variant="destructive" size="sm" @click="onUpdateStatus('closed')" :disabled="isClosed">Close Ticket</Button>
+                <Button variant="destructive" size="sm" @click="onUpdateStatus('closed')" :disabled="isClosed">Close
+                    Ticket</Button>
             </div>
         </div>
 
@@ -167,7 +168,7 @@ const getActionBadge = (action: string) => {
                         <TabsTrigger value="conversation">Conversation</TabsTrigger>
                         <TabsTrigger value="history">Audit History</TabsTrigger>
                     </TabsList>
-                    
+
                     <TabsContent value="conversation" class="space-y-6">
                         <!-- Original Submission -->
                         <Card>
@@ -180,9 +181,12 @@ const getActionBadge = (action: string) => {
                             <CardContent class="space-y-6">
                                 <!-- Topic -->
                                 <div v-if="ticket.query_ticket" class="pb-4 border-b">
-                                    <label class="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Support Topic</label>
+                                    <label
+                                        class="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Support
+                                        Topic</label>
                                     <div class="text-sm font-bold">
-                                        {{ ticket.query_ticket.topic?.title || ticket.query_ticket.custom_topic_text || 'General Inquiry' }}
+                                        {{ ticket.query_ticket.topic?.title || ticket.query_ticket.custom_topic_text ||
+                                            'General Inquiry' }}
                                     </div>
                                 </div>
 
@@ -190,33 +194,47 @@ const getActionBadge = (action: string) => {
                                 <div v-if="ticket.answers?.length" class="space-y-6">
                                     <div v-for="ans in ticket.answers" :key="ans.id" class="space-y-2">
                                         <div>
-                                            <label class="text-[14px] font-bold text-muted-foreground uppercase tracking-wider">{{ ans.question?.text || 'Question' }}</label>
-                                            <div v-if="ans.question?.code" class="text-[11px] text-muted-foreground font-mono">Code: {{ ans.question.code }}</div>
+                                            <label
+                                                class="text-[14px] font-bold text-muted-foreground uppercase tracking-wider">{{
+                                                    ans.question?.text || 'Question' }}</label>
+                                            <div v-if="ans.question?.code"
+                                                class="text-[11px] text-muted-foreground font-mono">
+                                                Code: {{ ans.question.code }}</div>
                                         </div>
-                                        
+
                                         <div class="text-sm leading-relaxed">
                                             <div v-if="ans.selected_options?.length" class="space-y-1">
                                                 <div v-for="opt in ans.selected_options" :key="opt.id">
-                                                    <Badge variant="secondary" class="h-5 text-[14px] font-medium">{{ opt.label }}</Badge>
-                                                    <div v-if="opt.pivot?.free_text || opt.free_text" class="text-muted-foreground italic text-sm mt-1 ml-2">
+                                                    <Badge variant="secondary" class="h-5 text-[14px] font-medium">{{
+                                                        opt.label
+                                                    }}</Badge>
+                                                    <div v-if="opt.pivot?.free_text || opt.free_text"
+                                                        class="text-muted-foreground italic text-sm mt-1 ml-2">
                                                         — {{ opt.pivot?.free_text || opt.free_text }}
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div v-else-if="ans.answer_text" class="whitespace-pre-wrap">{{ ans.answer_text }}</div>
+                                            <div v-else-if="ans.answer_text" class="whitespace-pre-wrap">{{
+                                                ans.answer_text }}
+                                            </div>
                                             <div v-else-if="ans.formatted_value">{{ ans.formatted_value }}</div>
-                                            <div v-else-if="ans.answer_number !== null && ans.answer_number !== undefined">{{ ans.answer_number }}</div>
+                                            <div
+                                                v-else-if="ans.answer_number !== null && ans.answer_number !== undefined">
+                                                {{
+                                                    ans.answer_number }}</div>
                                             <div v-else-if="ans.answer_date">{{ formatDate(ans.answer_date) }}</div>
                                             <div v-else class="text-muted-foreground italic">—</div>
-                                            
-                                            <div v-if="ans.comment" class="mt-2 text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+
+                                            <div v-if="ans.comment"
+                                                class="mt-2 text-sm text-muted-foreground bg-muted/50 p-2 rounded">
                                                 Note: {{ ans.comment }}
                                             </div>
                                         </div>
 
                                         <div v-if="ans.attachments?.length" class="flex flex-wrap gap-2 mt-2">
-                                            <a v-for="file in ans.attachments" :key="file.id" :href="file.url" target="_blank"
-                                               class="text-[14px] text-primary hover:underline flex items-center gap-1 p-1 bg-primary/5 rounded border border-primary/20">
+                                            <a v-for="file in ans.attachments" :key="file.id" :href="file.url"
+                                                target="_blank"
+                                                class="text-[14px] text-primary hover:underline flex items-center gap-1 p-1 bg-primary/5 rounded border border-primary/20">
                                                 <Paperclip class="h-3 w-3" /> {{ file.original_name }}
                                             </a>
                                         </div>
@@ -225,10 +243,13 @@ const getActionBadge = (action: string) => {
 
                                 <!-- General Attachments -->
                                 <div v-if="ticket.attachments?.length" class="pt-4 border-t">
-                                    <label class="text-[14px] font-bold text-muted-foreground uppercase tracking-wider block mb-2">Additional Files</label>
+                                    <label
+                                        class="text-[14px] font-bold text-muted-foreground uppercase tracking-wider block mb-2">Additional
+                                        Files</label>
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                        <a v-for="file in ticket.attachments" :key="file.id" :href="file.url" target="_blank"
-                                           class="text-sm border p-2 rounded-md flex items-center gap-2 hover:bg-muted/50 transition-colors">
+                                        <a v-for="file in ticket.attachments" :key="file.id" :href="file.url"
+                                            target="_blank"
+                                            class="text-sm border p-2 rounded-md flex items-center gap-2 hover:bg-muted/50 transition-colors">
                                             <Paperclip class="h-3.5 w-3.5 text-muted-foreground" />
                                             <span class="truncate">{{ file.original_name }}</span>
                                         </a>
@@ -244,25 +265,33 @@ const getActionBadge = (action: string) => {
                             </h3>
 
                             <div v-if="replies.length" class="space-y-4">
-                                <div v-for="reply in replies" :key="reply.id" 
-                                     class="flex gap-4 p-4 rounded-xl border group transition-all"
-                                     :class="reply.is_official_answer ? 'bg-primary/5 border-primary/10 ml-6' : 'bg-card mr-6 shadow-sm'">
+                                <div v-for="reply in replies" :key="reply.id"
+                                    class="flex gap-4 p-4 rounded-xl border group transition-all"
+                                    :class="reply.is_official_answer ? 'bg-primary/5 border-primary/10 ml-6' : 'bg-card mr-6 shadow-sm'">
                                     <Avatar class="h-9 w-9 border">
                                         <AvatarFallback class="text-sm font-bold">
-                                            {{ reply.author?.name ? reply.author.name[0] : (reply.author_student?.full_name ? reply.author_student.full_name[0] : 'U') }}
+                                            {{ reply.author?.name ? reply.author.name[0] :
+                                                (reply.author_student?.full_name ?
+                                                    reply.author_student.full_name[0] : 'U') }}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div class="flex-1 space-y-2">
                                         <div class="flex items-center justify-between">
                                             <div class="flex items-center gap-2">
-                                                <span class="font-semibold text-sm">{{ reply.author?.name || reply.author_student?.full_name || 'System' }}</span>
-                                                <span class="text-[12px] text-muted-foreground">{{ formatDate(reply.created_at) }}</span>
+                                                <span class="font-semibold text-sm">{{ reply.author?.name ||
+                                                    reply.author_student?.full_name || 'System' }}</span>
+                                                <span class="text-[12px] text-muted-foreground">{{
+                                                    formatDate(reply.created_at)
+                                                }}</span>
                                             </div>
-                                            <Badge v-if="reply.is_official_answer" variant="secondary" class="text-[11px] px-1.5 h-4">OFFICIAL</Badge>
+                                            <Badge v-if="reply.is_official_answer" variant="secondary"
+                                                class="text-[11px] px-1.5 h-4">OFFICIAL</Badge>
                                         </div>
-                                        <div class="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">{{ reply.message }}</div>
+                                        <div class="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">{{
+                                            reply.message }}</div>
                                         <div v-if="reply.upload_record" class="pt-2 border-t mt-2">
-                                            <a :href="reply.upload_record.url" target="_blank" class="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1.5">
+                                            <a :href="reply.upload_record.url" target="_blank"
+                                                class="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1.5">
                                                 <Paperclip class="h-3 w-3" /> {{ reply.upload_record.original_name }}
                                             </a>
                                         </div>
@@ -273,26 +302,38 @@ const getActionBadge = (action: string) => {
                             <!-- Reply Box -->
                             <Card class="border-2 border-primary/10 shadow-lg" v-if="!isClosed">
                                 <CardContent class="p-4 space-y-4">
-                                    <Textarea v-model="replyForm.message" placeholder="Type your response to the student..." class="min-h-[120px] shadow-none border-none focus-visible:ring-0 text-sm" :disabled="isClosed" />
-                                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                                    <Textarea v-model="replyForm.message"
+                                        placeholder="Type your response to the student..."
+                                        class="min-h-[120px] shadow-none border-none focus-visible:ring-0 text-sm"
+                                        :disabled="isClosed" />
+                                    <div
+                                        class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
                                         <div class="flex items-center gap-4">
                                             <div class="relative group">
-                                                <input type="file" id="reply-attachment" @change="onFileChange" class="absolute inset-0 opacity-0 cursor-pointer z-10" :disabled="isClosed" />
+                                                <input type="file" id="reply-attachment" @change="onFileChange"
+                                                    class="absolute inset-0 opacity-0 cursor-pointer z-10"
+                                                    :disabled="isClosed" />
                                                 <Button type="button" variant="outline" size="sm" class="h-8">
                                                     <Paperclip class="h-3.5 w-3.5 mr-2" />
-                                                    <span class="max-w-[100px] truncate">{{ replyForm.attachment ? replyForm.attachment.name : 'Attach File' }}</span>
+                                                    <span class="max-w-[100px] truncate">{{ replyForm.attachment ?
+                                                        replyForm.attachment.name : 'Attach File' }}</span>
                                                 </Button>
                                             </div>
                                             <div class="flex items-center space-x-2">
-                                                <Checkbox id="official" v-model:checked="replyForm.is_official_answer" :disabled="isClosed" @update:checked="(v: any) => { if(v) replyForm.set_pending = false }" />
-                                                <Label for="official" class="text-sm cursor-pointer">Official Answer</Label>
+                                                <Checkbox id="official" v-model:checked="replyForm.is_official_answer"
+                                                    :disabled="isClosed"
+                                                    @update:checked="(v: any) => { if (v) replyForm.set_pending = false }" />
+                                                <Label for="official" class="text-sm cursor-pointer">Official
+                                                    Answer</Label>
                                             </div>
                                             <div class="flex items-center space-x-2">
-                                                <Checkbox id="pending" v-model:checked="replyForm.set_pending" :disabled="isClosed || replyForm.is_official_answer" />
+                                                <Checkbox id="pending" v-model:checked="replyForm.set_pending"
+                                                    :disabled="isClosed || replyForm.is_official_answer" />
                                                 <Label for="pending" class="text-sm cursor-pointer">Pending</Label>
                                             </div>
                                         </div>
-                                        <Button size="sm" class="px-6" @click="onReply" :disabled="isClosed || !replyForm.message || replyForm.processing">
+                                        <Button size="sm" class="px-6" @click="onReply"
+                                            :disabled="isClosed || !replyForm.message || replyForm.processing">
                                             <Send class="h-4 w-4 mr-2" /> Post Reply
                                         </Button>
                                     </div>
@@ -315,23 +356,33 @@ const getActionBadge = (action: string) => {
                                     <div v-for="log in auditHistory" :key="log.id" class="p-4 space-y-2">
                                         <div class="flex items-center justify-between">
                                             <div class="flex items-center gap-2">
-                                                <Badge :variant="getActionBadge(log.action)" class="capitalize text-[10px]">{{ log.action }}</Badge>
-                                                <span class="text-sm font-medium">By: {{ log.assigned_by?.name || 'System' }}</span>
+                                                <Badge :variant="getActionBadge(log.action)"
+                                                    class="capitalize text-[10px]">{{
+                                                        log.action }}</Badge>
+                                                <span class="text-sm font-medium">By: {{ log.assigned_by?.name ||
+                                                    'System'
+                                                }}</span>
                                             </div>
-                                            <span class="text-xs text-muted-foreground">{{ formatDate(log.created_at) }}</span>
+                                            <span class="text-xs text-muted-foreground">{{ formatDate(log.created_at)
+                                            }}</span>
                                         </div>
                                         <div class="text-sm">
                                             <span v-if="log.action === 'assign'">
                                                 Assigned to <span class="font-bold">{{ log.to_assignee?.name }}</span>
                                             </span>
                                             <span v-else-if="log.action === 'reassign'">
-                                                Reassigned from <span class="font-bold">{{ log.from_assignee?.name || 'None' }}</span> to <span class="font-bold">{{ log.to_assignee?.name }}</span>
+                                                Reassigned from <span class="font-bold">{{ log.from_assignee?.name ||
+                                                    'None'
+                                                }}</span> to <span class="font-bold">{{ log.to_assignee?.name
+                                                    }}</span>
                                             </span>
                                             <span v-else-if="log.action === 'unassign'">
-                                                Unassigned from <span class="font-bold">{{ log.from_assignee?.name }}</span>
+                                                Unassigned from <span class="font-bold">{{ log.from_assignee?.name
+                                                }}</span>
                                             </span>
                                         </div>
-                                        <div v-if="log.note" class="text-xs text-muted-foreground bg-muted p-2 rounded italic">
+                                        <div v-if="log.note"
+                                            class="text-xs text-muted-foreground bg-muted p-2 rounded italic">
                                             "{{ log.note }}"
                                         </div>
                                     </div>
@@ -350,12 +401,15 @@ const getActionBadge = (action: string) => {
                 <!-- Student Info -->
                 <Card>
                     <CardHeader class="pb-3 border-b bg-muted/5">
-                        <CardTitle class="text-sm font-bold uppercase tracking-wider text-muted-foreground">Student Information</CardTitle>
+                        <CardTitle class="text-sm font-bold uppercase tracking-wider text-muted-foreground">Student
+                            Information
+                        </CardTitle>
                     </CardHeader>
                     <CardContent class="pt-4 space-y-4">
                         <div v-if="ticket.student" class="flex gap-4 items-center">
                             <Avatar class="h-10 w-10">
-                                <AvatarFallback class="bg-primary/5 text-primary">{{ ticket.student.full_name[0] }}</AvatarFallback>
+                                <AvatarFallback class="bg-primary/5 text-primary">{{ ticket.student.full_name[0] }}
+                                </AvatarFallback>
                             </Avatar>
                             <div>
                                 <h4 class="font-bold text-sm">{{ ticket.student.full_name }}</h4>
@@ -363,12 +417,15 @@ const getActionBadge = (action: string) => {
                             </div>
                         </div>
                         <div v-else class="text-sm italic text-muted-foreground">Anonymous Submission</div>
-                        
+
                         <Separator />
-                        
+
                         <div class="space-y-2 text-sm">
-                            <div class="flex justify-between"><span class="text-muted-foreground">Campus:</span> <span class="font-medium">{{ ticket.campus?.name || '—' }}</span></div>
-                            <div class="flex justify-between"><span class="text-muted-foreground">Date Submitted:</span> <span class="font-medium">{{ formatDate(ticket.created_at) }}</span></div>
+                            <div class="flex justify-between"><span class="text-muted-foreground">Campus:</span> <span
+                                    class="font-medium">{{ ticket.campus?.name || '—' }}</span></div>
+                            <div class="flex justify-between"><span class="text-muted-foreground">Date Submitted:</span>
+                                <span class="font-medium">{{ formatDate(ticket.created_at) }}</span>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -376,16 +433,19 @@ const getActionBadge = (action: string) => {
                 <!-- Assignment -->
                 <Card v-if="canAssign">
                     <CardHeader class="pb-3 border-b bg-muted/5">
-                        <CardTitle class="text-sm font-bold uppercase tracking-wider text-muted-foreground flex justify-between items-center">
-                             <span>Ticket Assignment</span>
-                             <UserCheck class="h-4 w-4 opacity-50" />
+                        <CardTitle
+                            class="text-sm font-bold uppercase tracking-wider text-muted-foreground flex justify-between items-center">
+                            <span>Ticket Assignment</span>
+                            <UserCheck class="h-4 w-4 opacity-50" />
                         </CardTitle>
                     </CardHeader>
                     <CardContent class="pt-4 space-y-4">
                         <div class="space-y-2">
                             <Label class="text-[12px] uppercase font-bold text-muted-foreground">Assigned To</Label>
                             <Select v-model="assignForm.assigned_to_user_id">
-                                <SelectTrigger class="w-full h-9"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                                <SelectTrigger class="w-full h-9">
+                                    <SelectValue placeholder="Unassigned" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="none">Unassigned</SelectItem>
                                     <template v-for="staff in staffs" :key="staff.id">
@@ -397,25 +457,29 @@ const getActionBadge = (action: string) => {
                             </Select>
                         </div>
                         <div class="space-y-2">
-                             <Label class="text-[12px] uppercase font-bold text-muted-foreground">Internal Note</Label>
-                             <Textarea v-model="assignForm.note" placeholder="Why are you assigning this?" class="text-xs min-h-[60px]" />
+                            <Label class="text-[12px] uppercase font-bold text-muted-foreground">Internal Note</Label>
+                            <Textarea v-model="assignForm.note" placeholder="Why are you assigning this?"
+                                class="text-xs min-h-[60px]" />
                         </div>
-                        <Button variant="secondary" size="sm" class="w-full" @click="onAssign" :disabled="assignForm.processing">
+                        <Button variant="secondary" size="sm" class="w-full" @click="onAssign"
+                            :disabled="assignForm.processing">
                             Update Assignment
                         </Button>
                     </CardContent>
                 </Card>
                 <Card v-else-if="ticket.assigned_to">
                     <CardHeader class="pb-3 border-b bg-muted/5">
-                        <CardTitle class="text-sm font-bold uppercase tracking-wider text-muted-foreground">Assigned To</CardTitle>
+                        <CardTitle class="text-sm font-bold uppercase tracking-wider text-muted-foreground">Assigned To
+                        </CardTitle>
                     </CardHeader>
                     <CardContent class="pt-4">
-                         <div class="flex items-center gap-3">
-                            <div class="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
                                 {{ ticket.assigned_to.name[0] }}
                             </div>
                             <span class="text-sm font-medium">{{ ticket.assigned_to.name }}</span>
-                         </div>
+                        </div>
                     </CardContent>
                 </Card>
             </div>

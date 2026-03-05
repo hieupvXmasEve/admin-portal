@@ -1,6 +1,6 @@
 # Code Standards
 
-Last updated: 2026-02-27  
+Last updated: 2026-03-04  
 Owner: Platform Team  
 Status: Active baseline (enforced by convention; CI currently inactive)  
 Source of truth: repository code and route/contracts in this workspace
@@ -46,6 +46,12 @@ For student action logs/import contracts keep exact fields:
 - `missing_documents`
 - `shared_upload_record_id`
 
+For Notification V2 Phase 1 contracts keep exact fields:
+
+- `notification_event_outbox.campus_id`
+- `notification_messages.recipient_user_id`
+- `notification_messages.campus_id`
+
 ## 4) Backend Implementation Rules
 
 - Controllers orchestrate; they do not contain heavy business logic.
@@ -53,6 +59,7 @@ For student action logs/import contracts keep exact fields:
 - Use transactions for multi-write flows.
 - Keep auth/authorization explicit in middleware/policies.
 - For token refresh, keep current rotation pattern consistent unless intentionally migrated.
+- For Notification V2 operations, use `notifications:process-outbox` for outbox dispatch; do not bypass pipeline with direct delivery writes.
 
 ## 5) API Security and Auth Standards
 
@@ -71,8 +78,41 @@ Current known exceptions (must be documented, not ignored):
 - Prefer `route(...)` helpers and typed route constants.
 - Avoid introducing new literal endpoint strings when a helper exists.
 - Prefer shared API wrappers/composables for consistent envelope/error handling.
-- For server-driven list pages, prefer shared table workflow primitives (`useServerTableQuery`, `ServerPaginatedDataTable`, `ServerDateRangeFilters`) instead of page-local query/pagination glue.
+- Current filter stack is hybrid during migration:
+    - preferred for new server tables: `useServerTableQuery`
+    - broadly used baseline: `useInertiaFilters`
+    - legacy still present: `useFilters` / `useTableFilters` from `resources/js/composables/useFilters.ts`
+- For server-driven list pages, prefer shared table workflow primitives (for example `useServerTableQuery` and shared server-table components) instead of page-local query/pagination glue.
+- **Canonical Pattern**: For new server-filtered/sorted/paginated pages, follow the `inertia-filter-table` skill at `custom-skills/inertia-filter-table/SKILL.md`. This skill documents the 5-step workflow: Query Class → Controller → Frontend Composable → Filter Panel → Data Table.
+- **Reusable Filter Components** (`resources/js/components/filters/`):
+    - `FilterPanel.vue` — grid container with configurable columns (2-6) and clear button
+    - `FilterSearchInput.vue` — debounced search input (300ms default)
+    - `FilterDateRange.vue` — date range picker (occupies 2 grid cells)
+    - `FilterSelect.vue` — select dropdown for enum/status filters
+
+    Usage pattern:
+    ```vue
+    <FilterPanel :has-active-filters="hasActiveFilters" :columns="4" @clear="clearFilters">
+        <FilterSearchInput :model-value="filters.search ?? ''" @search="applySearch" />
+        <FilterSelect
+            :model-value="filters.status ?? ''"
+            :options="statusOptions"
+            placeholder="All statuses"
+            @change="(v) => applyFilter('status', v)"
+        />
+        <FilterDateRange
+            :from-value="filters.issued_from ?? ''"
+            :to-value="filters.issued_to ?? ''"
+            @change="handleDateChange"
+        />
+    </FilterPanel>
+    ```
 - Keep auth-sensitive calls aligned with backend middleware expectations.
+
+Form submission default and exception path:
+
+- Default for Inertia pages: use Inertia `useForm` and server-driven redirects/validation.
+- Exception path: use `vee-validate` + Zod + `useApi`/`useApiRequest` only for non-navigating JSON interactions (modal/drawer/inline flows).
 
 ## 7) Testing and Quality Gates
 
@@ -86,6 +126,12 @@ Minimum expected checks before merge:
 - `php artisan test`
 - `npm run type-check`
 - `npm run lint`
+
+Transition policy while CI is inactive:
+
+- local checks are the active quality gate
+- PR reviewers treat missing local-check evidence as a release risk
+- no "green CI" assumption is valid until workflows are re-enabled
 
 If checks cannot be run, record the gap in the change summary.
 

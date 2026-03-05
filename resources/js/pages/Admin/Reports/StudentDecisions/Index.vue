@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import FileUpload from '@/components/FileUpload.vue';
-import ServerDateRangeFilters from '@/components/filters/ServerDateRangeFilters.vue';
+import FilterDateRange from '@/components/filters/FilterDateRange.vue';
+import FilterPanel from '@/components/filters/FilterPanel.vue';
+import FilterSearchInput from '@/components/filters/FilterSearchInput.vue';
 import ServerPaginatedDataTable from '@/components/tables/ServerPaginatedDataTable.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +18,7 @@ import { studentRoutes } from '@/utils/routes';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { ExternalLink, Eye, Pencil, Plus } from 'lucide-vue-next';
-import { h, reactive, ref, watch } from 'vue';
+import { h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
 interface StudentDecisionFilters {
@@ -65,11 +67,13 @@ const { filters, hasActiveFilters, clearFilters, apply, applySearch, handleSortC
     only: ['decisions', 'filters'],
 });
 
-const filterForm = reactive({
-    search: String(filters.search ?? ''),
-    issued_from: String(filters.issued_from ?? ''),
-    issued_to: String(filters.issued_to ?? ''),
-});
+const handleDateChange = (from: string, to: string) => {
+    apply({
+        issued_from: from || '',
+        issued_to: to || '',
+        page: 1,
+    });
+};
 
 const isDialogOpen = ref(false);
 const editingDecision = ref<StudentDecision | null>(null);
@@ -97,43 +101,6 @@ watch(decisionUploadFiles, (files) => {
 
     form.upload_record_id = null;
 });
-
-watch(
-    () => [filters.search, filters.issued_from, filters.issued_to] as const,
-    ([search, issuedFrom, issuedTo]) => {
-        filterForm.search = String(search ?? '');
-        filterForm.issued_from = String(issuedFrom ?? '');
-        filterForm.issued_to = String(issuedTo ?? '');
-    },
-);
-
-const handleSearchInput = (value: string) => {
-    filterForm.search = value;
-    applySearch(value);
-};
-
-const updateFilterForm = (value: { search: string; issued_from: string; issued_to: string }) => {
-    filterForm.search = value.search;
-    filterForm.issued_from = value.issued_from;
-    filterForm.issued_to = value.issued_to;
-};
-
-const handleDateChange = (value: { issued_from: string; issued_to: string }) => {
-    filterForm.issued_from = value.issued_from;
-    filterForm.issued_to = value.issued_to;
-    apply({
-        issued_from: value.issued_from || '',
-        issued_to: value.issued_to || '',
-        page: 1,
-    });
-};
-
-const clearFilterForm = () => {
-    filterForm.search = '';
-    filterForm.issued_from = '';
-    filterForm.issued_to = '';
-    clearFilters();
-};
 
 const openCreate = () => {
     editingDecision.value = null;
@@ -349,7 +316,16 @@ const columns: ColumnDef<StudentDecision>[] = [
                 <CardDescription>Search by name, number, signer or issued date range.</CardDescription>
             </CardHeader>
             <CardContent>
-                <ServerDateRangeFilters :model-value="filterForm" :has-active-filters="hasActiveFilters" @update:model-value="updateFilterForm" @search="handleSearchInput" @date-change="handleDateChange" @clear="clearFilterForm" />
+                <FilterPanel :has-active-filters="hasActiveFilters" :columns="4" @clear="clearFilters">
+                    <FilterSearchInput :model-value="filters.search ?? ''" placeholder="Search decisions..." @update:model-value="(v) => (filters.search = v)" @search="applySearch" />
+                    <FilterDateRange
+                        :from-value="filters.issued_from ?? ''"
+                        :to-value="filters.issued_to ?? ''"
+                        from-placeholder="Issued from"
+                        to-placeholder="Issued to"
+                        @change="handleDateChange"
+                    />
+                </FilterPanel>
             </CardContent>
         </Card>
 

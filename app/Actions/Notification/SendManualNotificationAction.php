@@ -2,8 +2,6 @@
 
 namespace App\Actions\Notification;
 
-use App\Models\Notification;
-use App\Models\Student;
 use App\Enums\NotificationCategory;
 use Illuminate\Support\Facades\DB;
 

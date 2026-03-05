@@ -1,109 +1,92 @@
-# Hướng dẫn Kết nối Realtime cho Student Portal (Nuxt SPA)
+# Hướng dẫn Realtime Notification cho Nuxt SPA
 
-Vì Student Portal là một ứng dụng Nuxt riêng biệt (Standalone SPA), việc kết nối với hệ thống Realtime của Backend (Laravel) cần lưu ý về cấu hình CORS và Authentication (Sanctum/JWT).
+Tài liệu này dành cho portal Nuxt tách riêng backend Laravel.
 
-## 1. Cài đặt thư viện (Client-side)
-
-Trong dự án Nuxt của bạn, hãy cài đặt các thư viện cần thiết:
+## 1) Cài thư viện
 
 ```bash
-pnpm add laravel-echo ably
+pnpm add laravel-echo pusher-js
 ```
 
-## 2. Cấu hình Biến môi trường (`.env` của Nuxt)
+> Dùng `pusher-js` vì cả Reverb/Pusher/Ably compatibility đều nói protocol Pusher.
 
-Bạn cần cung cấp URL của Backend Laravel để Echo có thể thực hiện việc "Authorization" cho các Private Channel.
+## 2) Biến môi trường Nuxt
 
 ```env
-# URL của Backend Laravel (Swinx Admin)
-NUXT_PUBLIC_BACKEND_URL=https://api.swinx.edu.vn
-
-# Cấu hình Ably
+NUXT_PUBLIC_BACKEND_URL=https://api.your-domain.com
 NUXT_PUBLIC_BROADCASTER=ably
-NUXT_PUBLIC_ABLY_KEY=your-ably-key-here
+NUXT_PUBLIC_BROADCAST_KEY=xxxx
+NUXT_PUBLIC_SOCKET_HOST=
+NUXT_PUBLIC_SOCKET_PORT=
 ```
 
-## 3. Tạo Plugin Echo cho Nuxt (`plugins/echo.client.ts`)
-
-Trong Nuxt, chúng ta khởi tạo Echo như một plugin để sử dụng toàn cục.
+## 3) Plugin Echo (`plugins/echo.client.ts`)
 
 ```ts
 import Echo from 'laravel-echo';
-import * as Ably from 'ably';
+import Pusher from 'pusher-js';
 
-export default defineNuxtPlugin(async (nuxtApp) => {
+export default defineNuxtPlugin(() => {
     const config = useRuntimeConfig();
-    const token = useCookie('auth_token'); // Giả sử bạn lưu token trong cookie
+    const token = useCookie('auth_token');
 
-    if (!config.public.NUXT_PUBLIC_ABLY_KEY) return;
-
-    // Cần đưa Ably vào global window cho Echo
-    window.Ably = Ably;
+    (window as any).Pusher = Pusher;
 
     const echo = new Echo({
-        broadcaster: 'ably',
-        key: config.public.NUXT_PUBLIC_ABLY_KEY,
-        // URL để Echo thực hiện phân quyền (Authorization) cho Private Channel
+        broadcaster: config.public.NUXT_PUBLIC_BROADCASTER === 'ably' ? 'pusher' : config.public.NUXT_PUBLIC_BROADCASTER,
+        key: String(config.public.NUXT_PUBLIC_BROADCAST_KEY || ''),
+        forceTLS: true,
         authEndpoint: `${config.public.NUXT_PUBLIC_BACKEND_URL}/broadcasting/auth`,
         auth: {
             headers: {
-                Authorization: `Bearer ${token.value}`,
+                Authorization: `Bearer ${token.value || ''}`,
                 Accept: 'application/json',
             },
         },
     });
 
-    return {
-        provide: {
-            echo,
-        },
-    };
+    return { provide: { echo } };
 });
 ```
 
-## 4. Sử dụng trong Component/Composable (`composables/useRealtime.ts`)
+## 4) Subscribe channel trong Nuxt composable
 
 ```ts
-export const useRealtimeNotification = (userId: number) => {
+export const useRealtimeNotification = (userId: number, campusId: number | null) => {
     const { $echo } = useNuxtApp();
-    const notifications = ref([]);
 
     onMounted(() => {
         if (!$echo) return;
 
-        $echo.private(`notifications.${userId}`).listen('.NotificationCreated', (data: any) => {
-            notifications.value.unshift(data);
-            // Hiển thị notification (ví dụ dùng thư viện ui của Nuxt)
-            // pushNotification(data.title, data.message);
+        if (campusId) {
+            $echo.private(`notify.${campusId}.${userId}`).listen('.NotificationCreated', (payload: any) => {
+                console.log('notification', payload);
+            });
+        }
+
+        $echo.private(`notifications.${userId}`).listen('.NotificationCreated', (payload: any) => {
+            console.log('legacy-notification', payload);
         });
     });
 
     onUnmounted(() => {
-        if ($echo) {
-            $echo.leave(`notifications.${userId}`);
+        if (!$echo) return;
+        if (campusId) {
+            $echo.leave(`notify.${campusId}.${userId}`);
         }
+        $echo.leave(`notifications.${userId}`);
     });
-
-    return { notifications };
 };
 ```
 
-## 5. Cấu hình Backend (Laravel) cần lưu ý
+## 5) Backend requirements
 
-Để ứng dụng Nuxt có thể kết nối được, bạn cần đảm bảo các mục sau trên Backend (Swinx Admin):
+- `routes/channels.php` phải authorize đúng guard + campus.
+- API auth cho `/broadcasting/auth` phải chấp nhận token của SPA.
+- CORS phải allow origin của Nuxt app.
 
-1.  **CORS**: File `config/cors.php` phải cho phép nguồn (Origin) của ứng dụng Nuxt.
-    ```php
-    'allowed_origins' => [env('STUDENT_PORTAL_URL', 'http://localhost:3000')],
-    'supports_credentials' => true,
-    ```
-2.  **Broadcasting Routes**: Đảm bảo route `/broadcasting/auth` đã được đăng ký và sử dụng middleware phù hợp (thông thường là `auth:sanctum` hoặc middleware bạn dùng cho API).
-    - Kiểm tra trong `bootstrap/app.php` phần `channels` đã được đăng ký.
-    - Kiểm tra `routes/channels.php` đã định nghĩa logic authorization.
+## 6) Lỗi thường gặp
 
-## 6. Luồng kết nối khi dùng SPA
-
-1.  Nuxt bắt đầu kết nối tới hạ tầng Ably bằng API Key.
-2.  Vì là `PrivateChannel`, Echo sẽ gửi một request POST tới `Backend_URL/broadcasting/auth` kèm theo Token của người dùng.
-3.  Backend kiểm tra Token, nếu hợp lệ sẽ trả về mã bí mật để Echo hoàn tất việc đăng ký lắng nghe kênh đó trên Ably.
-4.  Khi Backend phát tin, Ably sẽ chuyển tin nhắn về đúng Client đã được xác thực thành công.
+- `403 broadcasting/auth`: token/guard sai.
+- connect được nhưng không có event: subscribe sai channel key.
+- chỉ nhận legacy channel: campusId null hoặc auth campus mismatch.

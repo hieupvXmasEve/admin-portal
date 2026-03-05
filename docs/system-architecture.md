@@ -1,6 +1,6 @@
 # System Architecture
 
-Last updated: 2026-02-27  
+Last updated: 2026-03-04  
 Owner: Platform Team  
 Status: Current-state architecture map  
 Source of truth: route files, middleware, module providers, runtime entrypoints
@@ -36,6 +36,12 @@ Client (Web SPA / API)
 - Identity: `app/Modules/Identity`
 - Academic: `app/Modules/Academic`
 - Finance: `app/Modules/Finance`
+- Notification: `app/Modules/Notification` (V2 domain event + outbox architecture)
+    - Actions: `PublishDomainEventAction`, `DispatchOutboxBatchAction`, `PersistIntentAction`, `SendManualNotificationV2Action`, `RetryDeliveryAction`, `RetryOutboxAction`, `HandleOutboxEventAction`
+    - Channels: `EmailChannelAdapter`, `RealtimeChannelAdapter` (contracts: `ChannelAdapter`)
+    - Models: `NotificationDelivery`, `NotificationEventOutbox`, `NotificationMessage`
+    - Queries: `ListMessagesQuery`, `ListOutboxQuery`, `ListDeliveriesQuery`
+    - Support: `EventIntentMapper`, `RecipientResolver`, `NotificationAuditLogger`, `NotificationMetrics`, `PolicyResolver`
 
 ### 2.3 Shared Layer
 
@@ -48,6 +54,12 @@ Client (Web SPA / API)
 - App entry: `resources/js/app.ts`
 - SSR entry: `resources/js/ssr.ts`
 - pages/components/composables/types under `resources/js/*`
+- current list/filter stack is hybrid (`useInertiaFilters`, legacy `useFilters`/`useTableFilters`, and newer `useServerTableQuery` wrapper)
+- Reusable filter components (`resources/js/components/filters/`):
+    - `FilterPanel.vue` — grid container with configurable columns and clear button
+    - `FilterSearchInput.vue` — debounced search input (300ms default)
+    - `FilterDateRange.vue` — date range picker (2 grid cells)
+    - `FilterSelect.vue` — select dropdown for enum/status filters
 
 ## 3) Auth and Middleware Surface Map
 
@@ -94,7 +106,7 @@ Flow:
 
 Constraints:
 
-- `ADMISSION_DEFERRAL` excluded from import path.
+- admission-deferral action type is excluded from import path.
 - append is limited to same student + same type + same period.
 
 ### Student Decisions Registry and Link Model
@@ -129,25 +141,69 @@ Frontend list workflow baseline:
 - Query/pagination orchestration uses `resources/js/composables/useServerTableQuery.ts`.
 - Shared UI primitives are `resources/js/components/filters/ServerDateRangeFilters.vue` and `resources/js/components/tables/ServerPaginatedDataTable.vue`.
 
-## 6) Operational Architecture Status
+## 6) Notification V2 Foundation (Phase 1)
+
+Code baseline (`app/Modules/Notification/*` + `database/migrations/2026_03_03_120*.php`):
+
+- Domain events are published to `notification_event_outbox` (pending/dispatch lifecycle).
+- Outbox dispatch pipeline is run by `notifications:process-outbox` (`app/Modules/Notification/Console/ProcessNotificationOutboxCommand.php`) and scheduled every minute in `routes/console.php`.
+- Dispatch flow persists `notification_messages` and `notification_deliveries`, then queues per-delivery jobs.
+
+Pipeline flow:
+
+```text
+Event -> Intent (EventIntentMapper) -> Policy (PolicyResolver) -> Persist (PersistIntentAction) -> Dispatch (DispatchOutboxBatchAction) -> Track (NotificationDelivery)
+```
+
+DB tables:
+
+- `notification_event_outbox` — outbox pattern for domain events
+- `notification_messages` — canonical recipient notification records
+- `notification_deliveries` — per-channel delivery tracking
+
+Ops monitoring routes (`routes/web/notifications.php`):
+
+- `admin.notifications.ops.outbox` — outbox list with status/date filters
+- `admin.notifications.ops.outbox.detail` — single outbox record detail
+- `admin.notifications.ops.outbox.retry` — retry failed outbox records
+- `admin.notifications.ops.deliveries` — delivery list with channel/status filters
+- `admin.notifications.ops.deliveries.retry` — retry failed deliveries
+- `admin.notifications.ops.messages` — message list with recipient/status filters
+
+Frontend ops pages (`resources/js/pages/Admin/Notifications/Ops/`):
+
+- `Outbox.vue`, `OutboxDetail.vue`, `Deliveries.vue`, `Messages.vue`
+
+Phase 1 guardrails:
+
+- Strict campus isolation: recipient resolution rejects cross-campus targets (`RecipientResolver` checks campus for User/Student/Lecture targets).
+- Canonical recipient identity is `recipient_user_id` in `notification_messages`; non-user targets are resolved to user ids before message/delivery persist.
+- No legacy backfill in Phase 1: new tables are clean-slate and legacy `notifications` history is not migrated.
+
+## 7) Operational Architecture Status
 
 - Docker assets are maintained in `docker/`.
-- Scripts in `scripts/` still contain path and runtime drift.
+- Scripts in `scripts/` still contain path and runtime drift:
+    - multiple scripts reference root compose names (for example `docker-compose.production.yml`) while actual files live under `docker/`
+    - setup/validation flows reference missing helpers (`scripts/docker-compose-dev.sh`, `scripts/test-local.sh`)
+    - deployment scripts are duplicated with overlapping intent (`scripts/prod.sh`, `scripts/deploy.sh`, `scripts/deploy-production.sh`)
 - CI workflow YAML files exist but are disabled.
 
-## 7) Architecture Risks
+## 8) Architecture Risks
 
-- Hybrid layering (`Modules` + large shared `Services`) creates ownership ambiguity.
+- Hybrid layering (module-domain folders plus a large shared service layer) creates ownership ambiguity.
 - API auth model is not fully uniform across all route groups.
 - Public config endpoints create configuration exposure/tampering risk.
 - CI disabled + script drift increases deployment and regression risk.
+- Notification read history is split between legacy and V2 data until later cutover/backfill phases.
 
-## 8) Near-Term Decisions Required
+## 9) Near-Term Decisions Required
 
 1. Standardize API auth model for finance and other mixed groups.
 2. Resolve public `system-config` exposure strategy.
 3. Select canonical deployment workflow and align scripts.
 4. Reactivate CI with minimum required gates.
+5. Define Notification V2 cutover/backfill plan beyond Phase 1 clean-slate tables.
 
 ## Unresolved Questions
 

@@ -356,6 +356,9 @@ return [
         'notifications' => [
             'send_manual_notification' => 'send_manual_notification',
             'view_any_notification' => 'view_any_notification',
+            'view_email_system' => 'view_email_system',
+            'manage_email_system' => 'manage_email_system',
+            'view_notification_ops' => 'view_notification_ops'
         ],
     ],
 
