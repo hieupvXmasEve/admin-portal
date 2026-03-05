@@ -1,8 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api\V1\Student;
 
+use App\Actions\Query\CreateStudentQueryReplyAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Query\StoreQueryReplyRequest;
 use App\Http\Resources\QueryReplyResource;
 use App\Http\Resources\QueryTicketResource;
 use App\Http\Responses\ApiResponse;
@@ -13,7 +17,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\File;
+use Illuminate\Validation\ValidationException;
 
 class QueryTicketController extends Controller
 {
@@ -88,59 +92,26 @@ class QueryTicketController extends Controller
         );
     }
 
-    public function storeReply(Request $request, QueryTicket $ticket): JsonResponse
-    {
-        $contextConfig = config('uploads.contexts.form_attachment', config('uploads.defaults'));
-        $maxSize = (int) ($contextConfig['max_size'] ?? config('uploads.defaults.max_size', 10240));
-        $allowedExtensions = array_values(array_unique($contextConfig['allowed_extensions'] ?? []));
-        $allowedMimeTypes = array_values(array_unique($contextConfig['allowed_types'] ?? []));
-
-        if (empty($allowedExtensions)) {
-            $allowedExtensions = array_values(array_unique(config('uploads.defaults.allowed_extensions', [])));
-        }
-
-        if (empty($allowedMimeTypes)) {
-            $allowedMimeTypes = array_values(array_unique(config('uploads.defaults.allowed_types', [])));
-        }
-
-        $fileRule = !empty($allowedExtensions)
-            ? File::types($allowedExtensions)->max($maxSize)
-            : File::default()->max($maxSize);
-
-        $attachmentRules = ['nullable', 'file', $fileRule];
-
-        if (!empty($allowedExtensions)) {
-            $attachmentRules[] = 'mimes:' . implode(',', $allowedExtensions);
-        }
-
-        if (!empty($allowedMimeTypes)) {
-            $attachmentRules[] = 'mimetypes:' . implode(',', $allowedMimeTypes);
-        }
-
-        $request->validate([
-            'message' => ['required', 'string'],
-            'attachment' => $attachmentRules,
-        ]);
-
+    public function storeReply(
+        StoreQueryReplyRequest $request,
+        QueryTicket $ticket,
+        CreateStudentQueryReplyAction $action
+    ): JsonResponse {
         $student = $request->user();
 
         $ticket = $this->queryTicketService->getStudentTicket($student, $ticket);
 
-        if ($ticket->status === QueryTicket::STATUS_CLOSED) {
-            return ApiResponse::businessLogicError('This query has been closed and cannot be updated.');
+        try {
+            $reply = $action->execute($ticket, $student, $request->validated());
+
+            return ApiResponse::success(
+                new QueryReplyResource($reply),
+                [],
+                'Reply submitted successfully.'
+            );
+        } catch (ValidationException $e) {
+            return ApiResponse::businessLogicError($e->getMessage());
         }
-
-        $reply = $this->queryTicketService->createStudentReply(
-            $ticket,
-            $student,
-            $request->only(['message', 'attachment'])
-        );
-
-        return ApiResponse::success(
-            new QueryReplyResource($reply),
-            [],
-            'Reply submitted successfully.'
-        );
     }
 
     private function resolveStudent(Request $request): ?Student

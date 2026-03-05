@@ -7,12 +7,23 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Modules\Notification\Models\NotificationMessage;
+use App\Modules\Notification\Support\NotificationCategoryRegistry;
+use App\Modules\Notification\Support\NotificationPayloadBuilder;
+use App\Modules\Notification\Support\NotificationTypeRegistry;
+use App\Modules\Notification\Support\NotificationUrlRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class NotificationController extends Controller
 {
+    public function __construct(
+        private NotificationPayloadBuilder $payloadBuilder,
+        private NotificationUrlRegistry $urlRegistry,
+        private NotificationCategoryRegistry $categoryRegistry,
+        private NotificationTypeRegistry $typeRegistry
+    ) {}
+
     /**
      * Display a listing of notifications for the authenticated user (V2).
      */
@@ -22,6 +33,8 @@ class NotificationController extends Controller
         $campusId = Auth::guard('web')->check()
             ? (int) session('current_campus_id', 0)
             : ($user->campus_id ?? 0);
+
+        $platform = $request->header('X-Platform', 'web');
 
         $notifications = NotificationMessage::query()
             ->where('recipient_user_id', $user->id)
@@ -34,7 +47,7 @@ class NotificationController extends Controller
             'id' => $msg->id,
             'title' => $msg->title,
             'message' => $msg->body,
-            'data' => $msg->data,
+            'data' => $this->payloadBuilder->enrichForApi($msg->data ?? [], $platform),
             'type_key' => $msg->type_key,
             'event_name' => $msg->event_name,
             'read_at' => $msg->read_at?->toISOString(),
@@ -76,10 +89,23 @@ class NotificationController extends Controller
 
         $count = NotificationMessage::query()
             ->where('recipient_user_id', $user->id)
-            ->when($campusId > 0, fn ($q) => $q->where('campus_id', $campusId))
+            ->when($campusId > 0, fn($q) => $q->where('campus_id', $campusId))
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
 
         return ApiResponse::success(['count' => $count], [], 'All notifications marked as read');
+    }
+
+    /**
+     * Get all notification registries for mobile/third-party apps.
+     */
+    public function registries(): JsonResponse
+    {
+        return ApiResponse::success([
+            'urls' => $this->urlRegistry->all(),
+            'categories' => $this->categoryRegistry->all(),
+            'types' => $this->typeRegistry->all(),
+            'platforms' => $this->urlRegistry->availablePlatforms(),
+        ]);
     }
 }

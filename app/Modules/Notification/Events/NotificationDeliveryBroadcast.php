@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Notification\Events;
 
 use App\Modules\Notification\Models\NotificationMessage;
+use App\Modules\Notification\Support\NotificationPayloadBuilder;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
@@ -33,11 +34,14 @@ class NotificationDeliveryBroadcast implements ShouldBroadcast
 
     public function broadcastWith(): array
     {
+        $payloadBuilder = app(NotificationPayloadBuilder::class);
+        $enrichedData = $payloadBuilder->enrichForApi($this->message->data ?? [], 'web');
+
         return [
             'id' => $this->message->id,
             'title' => $this->message->title,
             'message' => $this->message->body,
-            'data' => $this->message->data,
+            'data' => $enrichedData,
             'type_key' => $this->message->type_key,
             'event_name' => $this->message->event_name,
             'created_at' => $this->message->created_at?->toISOString(),

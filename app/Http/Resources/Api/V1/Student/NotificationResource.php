@@ -24,7 +24,11 @@ class NotificationResource extends JsonResource
     public function toArray(Request $request): array
     {
         $data = $this->data ?? [];
-        $categoryKey = (string) ($data['category'] ?? 'system');
+
+        // Handle category as either string or array (enriched object)
+        $rawCategory = $data['category'] ?? 'system';
+        $categoryKey = is_array($rawCategory) ? ($rawCategory['key'] ?? 'system') : (string) $rawCategory;
+
         $isImportant = (bool) ($data['is_important'] ?? false);
         $readAt = $this->read_at;
         $isRead = $readAt !== null;
@@ -141,7 +145,9 @@ class NotificationResource extends JsonResource
                 ];
             }
         }
-        if (($data['category'] ?? '') === 'finance') {
+        $catValue = $data['category'] ?? '';
+        $catKey = is_array($catValue) ? ($catValue['key'] ?? '') : (string) $catValue;
+        if ($catKey === 'finance') {
             $badges[] = ['type' => 'finance', 'text' => 'Financial', 'color' => '#22c55e'];
         }
 

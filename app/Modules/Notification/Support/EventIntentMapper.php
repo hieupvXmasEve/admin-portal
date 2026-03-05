@@ -53,6 +53,10 @@ class EventIntentMapper
             'finance.invoice_paid' => 'invoice_paid',
             'academic.enrollment_confirmed' => 'enrollment_confirmed',
             'manual.notification_sent' => 'manual_notification',
+            'query.ticket_submitted' => 'query_submitted',
+            'query.reply_created' => 'query_reply_created',
+            'query.staff_reply_created' => 'query_staff_reply',
+            'query.assigned' => 'query_assigned',
             default => null,
         };
     }

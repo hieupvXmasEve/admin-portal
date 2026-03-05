@@ -134,7 +134,7 @@ const getActionBadge = (action: string) => {
                     <div class="flex items-center gap-3">
                         <h1 class="text-2xl font-bold tracking-tight">Query #{{ ticket.id }}</h1>
                         <Badge :variant="statusVariantMap[ticket.query_status]">{{ statusLabelMap[ticket.query_status]
-                        }}</Badge>
+                            }}</Badge>
                     </div>
                     <p class="text-muted-foreground text-sm mt-1">Submitted {{ formatRelative(ticket.created_at) }}
                         &middot; {{ ticket.form.title }}</p>
@@ -180,7 +180,7 @@ const getActionBadge = (action: string) => {
                             </CardHeader>
                             <CardContent class="space-y-6">
                                 <!-- Topic -->
-                                <div v-if="ticket.query_ticket" class="pb-4 border-b">
+                                <!-- <div v-if="ticket.query_ticket" class="pb-4 border-b">
                                     <label
                                         class="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Support
                                         Topic</label>
@@ -188,7 +188,7 @@ const getActionBadge = (action: string) => {
                                         {{ ticket.query_ticket.topic?.title || ticket.query_ticket.custom_topic_text ||
                                             'General Inquiry' }}
                                     </div>
-                                </div>
+                                </div> -->
 
                                 <!-- Answers -->
                                 <div v-if="ticket.answers?.length" class="space-y-6">
@@ -207,9 +207,9 @@ const getActionBadge = (action: string) => {
                                                 <div v-for="opt in ans.selected_options" :key="opt.id">
                                                     <Badge variant="secondary" class="h-5 text-[14px] font-medium">{{
                                                         opt.label
-                                                    }}</Badge>
+                                                        }}</Badge>
                                                     <div v-if="opt.pivot?.free_text || opt.free_text"
-                                                        class="text-muted-foreground italic text-sm mt-1 ml-2">
+                                                        class=" italic mt-1 ml-2">
                                                         — {{ opt.pivot?.free_text || opt.free_text }}
                                                     </div>
                                                 </div>
@@ -282,7 +282,7 @@ const getActionBadge = (action: string) => {
                                                     reply.author_student?.full_name || 'System' }}</span>
                                                 <span class="text-[12px] text-muted-foreground">{{
                                                     formatDate(reply.created_at)
-                                                }}</span>
+                                                    }}</span>
                                             </div>
                                             <Badge v-if="reply.is_official_answer" variant="secondary"
                                                 class="text-[11px] px-1.5 h-4">OFFICIAL</Badge>
@@ -361,10 +361,10 @@ const getActionBadge = (action: string) => {
                                                         log.action }}</Badge>
                                                 <span class="text-sm font-medium">By: {{ log.assigned_by?.name ||
                                                     'System'
-                                                }}</span>
+                                                    }}</span>
                                             </div>
                                             <span class="text-xs text-muted-foreground">{{ formatDate(log.created_at)
-                                            }}</span>
+                                                }}</span>
                                         </div>
                                         <div class="text-sm">
                                             <span v-if="log.action === 'assign'">
@@ -373,12 +373,12 @@ const getActionBadge = (action: string) => {
                                             <span v-else-if="log.action === 'reassign'">
                                                 Reassigned from <span class="font-bold">{{ log.from_assignee?.name ||
                                                     'None'
-                                                }}</span> to <span class="font-bold">{{ log.to_assignee?.name
+                                                    }}</span> to <span class="font-bold">{{ log.to_assignee?.name
                                                     }}</span>
                                             </span>
                                             <span v-else-if="log.action === 'unassign'">
                                                 Unassigned from <span class="font-bold">{{ log.from_assignee?.name
-                                                }}</span>
+                                                    }}</span>
                                             </span>
                                         </div>
                                         <div v-if="log.note"

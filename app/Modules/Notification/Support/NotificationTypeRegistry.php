@@ -1,0 +1,119 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Notification\Support;
+
+final class NotificationTypeRegistry
+{
+    private const TYPES = [
+        'query_submitted' => [
+            'event_name' => 'query.ticket_submitted',
+            'category' => 'query',
+            'icon' => 'message-square-plus',
+            'action_text' => 'View Query',
+            'action_type' => 'query.admin_inbox',
+            'channels' => ['email', 'realtime'],
+        ],
+        'query_reply_created' => [
+            'event_name' => 'query.reply_created',
+            'category' => 'query',
+            'icon' => 'message-square-reply',
+            'action_text' => 'View Reply',
+            'action_type' => 'query.admin_inbox',
+            'channels' => ['email', 'realtime'],
+        ],
+        'query_staff_reply' => [
+            'event_name' => 'query.staff_reply_created',
+            'category' => 'query',
+            'icon' => 'message-square-reply',
+            'action_text' => 'View Reply',
+            'action_type' => 'query.student_detail',
+            'channels' => ['email', 'realtime'],
+        ],
+        'query_assigned' => [
+            'event_name' => 'query.assigned',
+            'category' => 'query',
+            'icon' => 'user-check',
+            'action_text' => 'View Query',
+            'action_type' => 'query.admin_inbox',
+            'channels' => ['email', 'realtime'],
+        ],
+        'invoice_paid' => [
+            'event_name' => 'finance.invoice_paid',
+            'category' => 'finance',
+            'icon' => 'receipt',
+            'action_text' => 'View Invoice',
+            'action_type' => 'finance.invoice',
+            'channels' => ['email', 'realtime'],
+        ],
+        'enrollment_confirmed' => [
+            'event_name' => 'academic.enrollment_confirmed',
+            'category' => 'academic',
+            'icon' => 'graduation-cap',
+            'action_text' => 'View Enrollment',
+            'action_type' => 'academic.enrollment',
+            'channels' => ['email', 'realtime'],
+        ],
+        'manual_notification' => [
+            'event_name' => 'manual.notification_sent',
+            'category' => 'announcement',
+            'icon' => 'bell',
+            'action_text' => 'View Details',
+            'action_type' => null,
+            'channels' => ['email', 'realtime'],
+        ],
+    ];
+
+    /**
+     * @return array{event_name: string, category: string, icon: string, action_text: string, action_type: ?string, channels: array<int, string>}|null
+     */
+    public function get(string $typeKey): ?array
+    {
+        return self::TYPES[$typeKey] ?? null;
+    }
+
+    /**
+     * @return array<string, array{event_name: string, category: string, icon: string, action_text: string, action_type: ?string, channels: array<int, string>}>
+     */
+    public function all(): array
+    {
+        return self::TYPES;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function availableTypes(): array
+    {
+        return array_keys(self::TYPES);
+    }
+
+    public function getDefaultActionText(string $typeKey): string
+    {
+        return self::TYPES[$typeKey]['action_text'] ?? 'View Details';
+    }
+
+    public function getDefaultActionType(string $typeKey): ?string
+    {
+        return self::TYPES[$typeKey]['action_type'] ?? null;
+    }
+
+    public function getDefaultCategory(string $typeKey): ?string
+    {
+        return self::TYPES[$typeKey]['category'] ?? null;
+    }
+
+    public function getDefaultIcon(string $typeKey): ?string
+    {
+        return self::TYPES[$typeKey]['icon'] ?? null;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function getDefaultChannels(string $typeKey): array
+    {
+        return self::TYPES[$typeKey]['channels'] ?? ['email', 'realtime'];
+    }
+}

@@ -151,12 +151,42 @@ class EmailConfiguration extends AuditableModel
             'port' => $this->port,
             'username' => $this->username,
             'password' => $this->password,
-            'encryption' => $this->encryption === 'none' ? null : $this->encryption,
+            'encryption' => $this->resolveEncryption(),
             'from' => [
                 'address' => $this->from_address,
                 'name' => $this->from_name,
             ],
         ];
+    }
+
+    /**
+     * Resolve encryption setting, auto-disable for local mail servers (Mailpit, MailHog, etc.)
+     */
+    private function resolveEncryption(): ?string
+    {
+        if ($this->encryption === 'none') {
+            return null;
+        }
+
+        if ($this->isLocalMailServer()) {
+            return null;
+        }
+
+        return $this->encryption;
+    }
+
+    /**
+     * Check if configured mail server is a local development server (Mailpit, MailHog, etc.)
+     */
+    private function isLocalMailServer(): bool
+    {
+        $localHosts = ['127.0.0.1', 'localhost', '0.0.0.0', 'host.docker.internal', 'mailpit', 'mailhog'];
+        $localPorts = [1025, 1026, 8025];
+
+        $isLocalHost = in_array(strtolower((string) $this->host), $localHosts, true);
+        $isLocalPort = in_array((int) $this->port, $localPorts, true);
+
+        return $isLocalHost && $isLocalPort;
     }
 
     /**

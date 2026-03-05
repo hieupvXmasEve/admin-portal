@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Circle, ExternalLink } from 'lucide-vue-next';
 import { formatDistanceToNow } from 'date-fns';
 import { router } from '@inertiajs/vue3';
+import { computed } from 'vue';
+
+interface NotificationCategory {
+    key: string;
+    label: string;
+    color: string;
+    variant: 'default' | 'secondary' | 'destructive' | 'outline';
+}
 
 interface NotificationType {
     id: string;
@@ -16,6 +25,7 @@ interface NotificationType {
         action_url?: string;
         action_text?: string;
         icon?: string;
+        category?: NotificationCategory;
         [key: string]: any;
     };
 }
@@ -29,23 +39,43 @@ const emit = defineEmits<{
     (e: 'click', notification: NotificationType): void;
 }>();
 
+const hasActionUrl = computed(() => !!props.notification.data?.action_url);
+const actionText = computed(() => props.notification.data?.action_text || 'View Details');
+const category = computed(() => props.notification.data?.category);
+
+const categoryColorClasses = computed(() => {
+    const color = category.value?.color;
+    if (!color) return '';
+
+    const colorMap: Record<string, string> = {
+        blue: 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400',
+        green: 'border-green-500 text-green-600 dark:border-green-400 dark:text-green-400',
+        purple: 'border-purple-500 text-purple-600 dark:border-purple-400 dark:text-purple-400',
+        red: 'border-red-500 text-red-600 dark:border-red-400 dark:text-red-400',
+        yellow: 'border-yellow-500 text-yellow-600 dark:border-yellow-400 dark:text-yellow-400',
+        gray: 'border-gray-500 text-gray-600 dark:border-gray-400 dark:text-gray-400',
+    };
+
+    return colorMap[color] || '';
+});
+
 const handleClick = () => {
     emit('click', props.notification);
     if (!props.notification.read_at) {
         emit('mark-as-read', props.notification.id);
     }
+};
 
-    // Handle navigation if action_url exists
-    if (props.notification.data?.action_url) {
-        if (props.notification.data.action_url.startsWith('http')) {
-            // open new tab
-            window.open(props.notification.data.action_url, '_blank');
-        } else {
-            // using intertiajs'router
-            router.visit(props.notification.data.action_url);
-        }
-    } else {
-        // TODO: Redirect to notification detail
+const handleActionClick = (event: Event) => {
+    event.stopPropagation();
+
+    if (!props.notification.read_at) {
+        emit('mark-as-read', props.notification.id);
+    }
+
+    const actionUrl = props.notification.data?.action_url;
+    if (actionUrl) {
+        router.visit(actionUrl);
     }
 };
 
@@ -55,7 +85,7 @@ const timeAgo = formatDistanceToNow(new Date(props.notification.created_at), { a
 <template>
     <div :class="cn(
         'flex cursor-pointer items-start gap-3 p-3 transition-colors hover:bg-muted/50',
-        !notification.read_at && 'bg-primary/5'
+        !notification.read_at && 'bg-primary/5',
     )" @click="handleClick">
         <!-- Unread indicator -->
         <div class="pt-1">
@@ -80,9 +110,23 @@ const timeAgo = formatDistanceToNow(new Date(props.notification.created_at), { a
                     {{ timeAgo }}
                 </span>
 
-                <Badge v-if="notification.data?.category" variant="outline" class="h-4 px-1 text-[10px] font-normal">
-                    {{ notification.data.category }}
-                </Badge>
+                <div class="flex items-center gap-1">
+                    <Badge
+                        v-if="category"
+                        :variant="category.variant || 'outline'"
+                        :class="cn('h-4 px-1 text-[10px] font-normal', categoryColorClasses)"
+                    >
+                        {{ category.label }}
+                    </Badge>
+                </div>
+            </div>
+
+            <!-- Action Button -->
+            <div v-if="hasActionUrl" class="pt-1">
+                <Button variant="outline" size="sm" class="h-6 gap-1 px-2 text-xs" @click="handleActionClick">
+                    <ExternalLink class="h-3 w-3" />
+                    {{ actionText }}
+                </Button>
             </div>
         </div>
     </div>

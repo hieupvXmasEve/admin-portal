@@ -37,6 +37,7 @@ const fetchNotifications = async () => {
     try {
         const { data: apiData } = await api.get<any[]>(route('api.admin.notifications.index'));
         if (apiData.value?.success) {
+            console.log('apiData.value.data', apiData.value.data)
             notifications.value = apiData.value.data;
         }
     } catch (error) {

@@ -20,7 +20,26 @@ export function useRealtimeNotifications(notifiableId: number | string | undefin
 
     const resolvedCampusId = campusId == null ? null : Number(campusId);
 
-    const onNotification = (data: any) => {
+    const onNotification = (rawData: any) => {
+        // Handle case where data comes as JSON string from websocket
+        let data = rawData;
+        if (typeof rawData === 'string') {
+            try {
+                data = JSON.parse(rawData);
+            } catch {
+                data = rawData;
+            }
+        }
+
+        // Also parse nested data field if it's a string
+        if (data && typeof data.data === 'string') {
+            try {
+                data.data = JSON.parse(data.data);
+            } catch {
+                // Keep as is
+            }
+        }
+
         const id = String(data?.id ?? `${Date.now()}-${Math.random()}`);
         if (seenNotificationIds.has(id)) {
             return;

@@ -1,14 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Actions\Query;
 
 use App\Models\FormResponse;
 use App\Models\QueryReply;
 use App\Models\User;
+use App\Modules\Notification\Actions\PublishDomainEventAction;
+use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
+use App\Modules\Notification\Support\NotificationPayloadBuilder;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ReplyToQueryAction
 {
+    public function __construct(
+        private PublishDomainEventAction $publishDomainEventAction,
+        private NotificationPayloadBuilder $payloadBuilder
+    ) {}
+
     public function execute(
         FormResponse $response,
         User $author,
@@ -18,18 +30,15 @@ class ReplyToQueryAction
         ?bool $setPending = false
     ): QueryReply {
         return DB::transaction(function () use ($response, $author, $message, $isOfficial, $uploadRecordId, $setPending) {
-            // 1. Ensure a ticket exists for this response if it doesn't already
             $ticket = $response->queryTicket;
 
-            if (!$ticket) {
-                // If it's a query type form, it should have a ticket record.
+            if (! $ticket) {
                 $ticket = $response->queryTicket()->create([
                     'status' => 'open',
                     'priority' => 'normal',
                 ]);
             }
 
-            // 2. Create the reply
             $reply = QueryReply::create([
                 'ticket_id' => $ticket->id,
                 'author_user_id' => $author->id,
@@ -38,13 +47,66 @@ class ReplyToQueryAction
                 'upload_record_id' => $uploadRecordId,
             ]);
 
-            // 3. Update status in both ticket and response
             $newStatus = $isOfficial ? 'answered' : ($setPending ? 'pending' : 'open');
-            
+
             $ticket->update(['status' => $newStatus]);
             $response->update(['query_status' => $newStatus]);
 
+            $this->dispatchStaffReplyNotification($response, $ticket, $reply, $author);
+
             return $reply;
         });
+    }
+
+    private function dispatchStaffReplyNotification(FormResponse $response, $ticket, QueryReply $reply, User $author): void
+    {
+        if (! (bool) config('notification.v2_enabled', false)) {
+            return;
+        }
+
+        $writeMode = (string) config('notification.write_mode', 'off');
+        if (! in_array($writeMode, ['dual', 'v2', 'v2_only'], true)) {
+            return;
+        }
+
+        $response->load(['student', 'form']);
+        $ticket->load(['topic']);
+
+        $student = $response->student;
+        if (! $student) {
+            return;
+        }
+
+        $recipientTargets = [
+            ['type' => 'student', 'id' => $student->id],
+        ];
+
+        $topicTitle = $ticket->topic?->title ?? $ticket->custom_topic_text ?? 'General';
+
+        $payload = $this->payloadBuilder->build('query_staff_reply', [
+            'title' => 'Reply to Your Query: ' . $topicTitle,
+            'body' => $author->name . ' replied: "' . Str::limit($reply->message, 80) . '"',
+            'action_type' => 'query.student_detail',
+            'action_params' => ['id' => $ticket->id],
+        ]);
+
+        $envelope = new DomainEventEnvelope(
+            eventId: (string) Str::uuid(),
+            eventName: 'query.staff_reply_created',
+            eventVersion: 1,
+            occurredAt: CarbonImmutable::now(),
+            aggregateType: 'query_reply',
+            aggregateId: (string) $reply->id,
+            campusId: $response->campus_id,
+            actorUserId: $author->id,
+            payload: [
+                'type_key' => 'query_staff_reply',
+                'recipient_targets' => $recipientTargets,
+                'channels' => ['email', 'realtime'],
+                'data' => $payload,
+            ],
+        );
+
+        $this->publishDomainEventAction->runAfterCommit($envelope);
     }
 }

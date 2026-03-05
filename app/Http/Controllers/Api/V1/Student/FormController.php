@@ -1,25 +1,24 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api\V1\Student;
 
+use App\Actions\Form\SubmitResponseAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Form\SubmitFormRequest;
-use App\Http\Resources\FormResource;
 use App\Http\Resources\FormDetailResource;
-use App\Http\Resources\FormResponseResource;
+use App\Http\Resources\FormResource;
 use App\Http\Resources\StudentFormAssignmentResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\Campus;
 use App\Models\Form;
-use App\Models\FormVersion;
-use App\Models\Student;
-use App\Models\User;
 use App\Services\FormService;
 use App\Services\ResponseService;
 use App\Services\SystemConfigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class FormController extends Controller
 {
@@ -174,54 +173,27 @@ class FormController extends Controller
     /**
      * Submit a form response.
      */
-    public function submit(SubmitFormRequest $request, Form $form, \App\Actions\Form\SubmitResponseAction $action): JsonResponse
-    {
-        // Get authenticated student
+    public function submit(
+        SubmitFormRequest $request,
+        Form $form,
+        SubmitResponseAction $action
+    ): JsonResponse {
         $student = $request->user();
-        if (!$student) return ApiResponse::notFound('Student not found');
-
-        // Get campus
-        $campus = Campus::find($request->input('campus_id', $student->campus_id));
-        if (!$campus) return ApiResponse::notFound('Campus not found');
-
-        // Identify the target among eligible ones
-        $targetQuery = $this->formService->getEligibleTargetsQueryForForm($form, $student, $campus->id);
-
-        // If target scope is provided, use it to find the specific target
-        $scopeType = $request->input('target_scope_type');
-        $scopeId = $request->input('target_scope_id');
-
-        if ($scopeType) {
-            $targetQuery->where('scope_type', $scopeType);
-            if ($scopeId) {
-                $targetQuery->where('scope_id', $scopeId);
-            }
-        }
-
-        $target = $targetQuery->first();
-
-        if (!$target) {
-            return ApiResponse::businessLogicError('No active target found for this form on your campus.');
-        }
-
-        // Additional check using FormService just in case logic differs
-        if (!$this->formService->canStudentSubmitForm($student, $form, $campus)) {
-             return ApiResponse::businessLogicError('Submission limit exceeded or form not available.');
+        if (! $student) {
+            return ApiResponse::notFound('Student not found');
         }
 
         try {
-            $response = $action->execute(
-                $student,
-                $target,
-                $request->validated()
-            );
-            
+            $response = $action->execute($student, $form, $request->validated());
+
             return ApiResponse::success(
                 new FormDetailResource($response),
                 [],
-                "Form submitted successfully",
+                'Form submitted successfully',
                 201
             );
+        } catch (ValidationException $e) {
+            return ApiResponse::businessLogicError($e->getMessage());
         } catch (\Exception $e) {
             return ApiResponse::error(
                 'Failed to submit form',
