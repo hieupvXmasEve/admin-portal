@@ -1,6 +1,6 @@
 # Project Roadmap
 
-Last updated: 2026-03-04  
+Last updated: 2026-03-05  
 Owner: Platform Team  
 Status: Active execution baseline  
 Horizon: next 2-3 quarters
@@ -24,13 +24,15 @@ Horizon: next 2-3 quarters
     - disabled CI workflows
     - deployment/script/security drift
 
-Recent activity through 2026-03-04:
+Recent activity through 2026-03-05:
 
 - repomix snapshot regenerated and core docs re-synced to current repository shape
 - deployment drift now tracked with concrete root-vs-`docker/` script mismatch examples
 - frontend form/filter guidance updated to mark exception paths explicitly
 - Notification V2 Phase 1 foundation completed: domain event + outbox architecture, ops monitoring pages, retry capabilities
 - `inertia-filter-table` skill documented as canonical pattern for server-filtered tables
+- Production deployment guide created (`docs/deployment-guide.md`) with FrankenPHP, queue worker, scheduler setup
+- System architecture updated with runtime scheduled commands and queue worker requirements
 
 ## 3) Phase Plan
 

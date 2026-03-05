@@ -1,6 +1,6 @@
 # System Architecture
 
-Last updated: 2026-03-04  
+Last updated: 2026-03-05  
 Owner: Platform Team  
 Status: Current-state architecture map  
 Source of truth: route files, middleware, module providers, runtime entrypoints
@@ -180,7 +180,37 @@ Phase 1 guardrails:
 - Canonical recipient identity is `recipient_user_id` in `notification_messages`; non-user targets are resolved to user ids before message/delivery persist.
 - No legacy backfill in Phase 1: new tables are clean-slate and legacy `notifications` history is not migrated.
 
-## 7) Operational Architecture Status
+## 7) Runtime Scheduled Commands
+
+Scheduled via `routes/console.php` with `onOneServer()` guard:
+
+| Command | Frequency | Purpose |
+|---------|-----------|---------|
+| `notifications:process-outbox --limit=100` | Every minute | Process pending outbox events |
+| `sessions:update-statuses` | Every 30 min | Update class session statuses |
+| `events:process-completions` | Hourly | Process event completions |
+| `events:send-reminders` | Daily 00:10 | Send event reminders |
+| `events:process-failed-gold-rewards` | Daily 02:00 | Retry failed gold rewards |
+| `academic-records:sync` | Daily 03:00 | Sync from Canvas |
+| `attendance:sync-to-academic-records` | Every 2 hours | Sync attendance |
+| `academic-records:aggregate-manual` | Daily 04:00 | Aggregate manual grades |
+
+### Queue Worker Requirements
+
+Notification V2 requires active queue worker for delivery jobs:
+
+```bash
+php artisan queue:work --sleep=1 --tries=3
+```
+
+Queue jobs:
+
+- `ProcessNotificationOutboxJob` — Process individual outbox events
+- `SendNotificationDeliveryJob` — Deliver via email/realtime channels
+
+Production setup: See `docs/deployment-guide.md` for supervisor configuration.
+
+## 9) Operational Architecture Status
 
 - Docker assets are maintained in `docker/`.
 - Scripts in `scripts/` still contain path and runtime drift:
@@ -189,7 +219,7 @@ Phase 1 guardrails:
     - deployment scripts are duplicated with overlapping intent (`scripts/prod.sh`, `scripts/deploy.sh`, `scripts/deploy-production.sh`)
 - CI workflow YAML files exist but are disabled.
 
-## 8) Architecture Risks
+## 10) Architecture Risks
 
 - Hybrid layering (module-domain folders plus a large shared service layer) creates ownership ambiguity.
 - API auth model is not fully uniform across all route groups.
@@ -197,7 +227,7 @@ Phase 1 guardrails:
 - CI disabled + script drift increases deployment and regression risk.
 - Notification read history is split between legacy and V2 data until later cutover/backfill phases.
 
-## 9) Near-Term Decisions Required
+## 11) Near-Term Decisions Required
 
 1. Standardize API auth model for finance and other mixed groups.
 2. Resolve public `system-config` exposure strategy.

@@ -1,6 +1,6 @@
 # Codebase Summary
 
-Last updated: 2026-03-04  
+Last updated: 2026-03-05  
 Owner: Platform Team  
 Status: Current-state snapshot  
 Primary source: `repomix-output.xml` (generated 2026-03-02)
@@ -84,6 +84,7 @@ Core baseline docs are maintained in:
 - `docs/system-architecture.md`
 - `docs/project-roadmap.md`
 - `docs/design-guidelines.md`
+- `docs/deployment-guide.md` (Production deployment with FrankenPHP, queue workers, scheduler)
 - `docs/features/notification/README.md` (Notification V2 module docs)
 
 Documented implementation patterns:
