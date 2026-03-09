@@ -102,7 +102,7 @@ class ReplyToQueryAction
             payload: [
                 'type_key' => 'query_staff_reply',
                 'recipient_targets' => $recipientTargets,
-                'channels' => ['email', 'realtime'],
+                'channels' => ['realtime'],
                 'data' => $payload,
             ],
         );

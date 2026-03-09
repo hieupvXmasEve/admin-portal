@@ -122,7 +122,7 @@ class CreateStudentQueryReplyAction
         }
 
         $recipientTargets = array_map(
-            fn (int $id) => ['type' => 'user', 'id' => $id],
+            fn(int $id) => ['type' => 'user', 'id' => $id],
             $userIds
         );
 
@@ -147,7 +147,7 @@ class CreateStudentQueryReplyAction
             payload: [
                 'type_key' => 'query_reply_created',
                 'recipient_targets' => $recipientTargets,
-                'channels' => ['email', 'realtime'],
+                'channels' => ['realtime'],
                 'data' => $payload,
             ],
         );

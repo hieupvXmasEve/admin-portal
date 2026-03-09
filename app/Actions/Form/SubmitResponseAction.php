@@ -182,8 +182,8 @@ class SubmitResponseAction
             ->where('form_target_id', '!=', $target->id)
             ->whereHas('formTarget', function ($q) use ($target) {
                 $q->where('form_id', $target->form_id)
-                  ->where('scope_type', $target->scope_type)
-                  ->where('scope_id', $target->scope_id);
+                    ->where('scope_type', $target->scope_type)
+                    ->where('scope_id', $target->scope_id);
             })
             ->update([
                 'status' => 'completed',
@@ -232,7 +232,7 @@ class SubmitResponseAction
         }
 
         $recipientTargets = array_map(
-            fn (int $id) => ['type' => 'user', 'id' => $id],
+            fn(int $id) => ['type' => 'user', 'id' => $id],
             $userIds
         );
 
@@ -259,7 +259,7 @@ class SubmitResponseAction
             payload: [
                 'type_key' => 'query_submitted',
                 'recipient_targets' => $recipientTargets,
-                'channels' => ['email', 'realtime'],
+                'channels' => ['realtime'],
                 'data' => $payload,
             ],
         );

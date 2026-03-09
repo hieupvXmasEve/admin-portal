@@ -141,7 +141,7 @@ class AssignQueryAction
             payload: [
                 'type_key' => 'query_assigned',
                 'recipient_targets' => $recipientTargets,
-                'channels' => ['email', 'realtime'],
+                'channels' => ['realtime'],
                 'data' => $payload,
             ],
         );
