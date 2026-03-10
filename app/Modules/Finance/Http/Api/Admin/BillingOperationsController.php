@@ -9,8 +9,11 @@ use App\Http\Responses\ApiResponse;
 use App\Modules\Finance\Actions\Operations\FixBillingExceptionAction;
 use App\Modules\Finance\Actions\Operations\GenerateBatchChargesAction;
 use App\Modules\Finance\Actions\Operations\SendPaymentRemindersAction;
+use App\Modules\Finance\Exports\GenerateChargesPreviewExport;
 use App\Modules\Finance\Queries\Operations\PreviewChargeGenerationQuery;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class BillingOperationsController extends Controller
 {
@@ -34,6 +37,30 @@ class BillingOperationsController extends Controller
         $result = $query->handle($validated);
 
         return ApiResponse::success($result);
+    }
+
+    public function exportPreviewCharges(Request $request): BinaryFileResponse
+    {
+        $validated = $request->validate([
+            'students' => 'required|array|min:1',
+            'students.*.id' => 'required|integer',
+            'students.*.student_id' => 'required|string',
+            'students.*.full_name' => 'required|string',
+            'students.*.status' => 'required|string',
+            'students.*.student_type' => 'nullable|string',
+            'students.*.has_existing_charge' => 'boolean',
+            'students.*.estimated_amount' => 'required|numeric',
+            'students.*.warning' => 'nullable|string',
+            'students.*.breakdown' => 'nullable|array',
+            'students.*.breakdown.*.label' => 'string',
+            'students.*.breakdown.*.amount' => 'numeric',
+            'students.*.will_create_invoice' => 'boolean',
+        ]);
+
+        $export = new GenerateChargesPreviewExport($validated['students']);
+        $filename = 'generate_charges_preview_'.now()->format('Y-m-d_H-i-s').'.xlsx';
+
+        return Excel::download($export, $filename);
     }
 
     public function runGenerate(Request $request)

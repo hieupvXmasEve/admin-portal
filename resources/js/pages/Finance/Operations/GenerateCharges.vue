@@ -13,20 +13,26 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import DataPagination from '@/components/DataPagination.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { formatCurrency, type Semester } from '@/types/finance';
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import {
     AlertTriangle,
+    ArrowDown,
     ArrowLeft,
     ArrowRight,
+    ArrowUp,
+    ArrowUpDown,
     CheckCircle2,
+    Download,
     FileSpreadsheet,
     Play,
     Upload,
     Users,
+    X,
 } from 'lucide-vue-next';
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
 interface ChargeTypeOption {
@@ -41,6 +47,7 @@ interface PreviewStudent {
     student_id: string;
     full_name: string;
     status: string;
+    student_type?: string; // EGC | Course - type hiện tại của student
     has_existing_charge: boolean;
     estimated_amount: number;
     warning: string | null;
@@ -82,7 +89,6 @@ const scopeType = ref<ScopeType>('all_eligible');
 const filterProgramId = ref<string>('all');
 const filterEnrollmentStatus = ref<string>('active');
 const uploadedStudentIds = ref<string>('');
-const uploadedFile = ref<File | null>(null);
 
 // Step 3: Charge Type Selection
 const selectedChargeTypes = ref<string[]>(['tuition_term', 'egc_level_fee', 'voucher']);
@@ -96,6 +102,15 @@ const mergeInvoice = ref(true);
 const previewResult = ref<PreviewResult | null>(null);
 const isLoadingPreview = ref(false);
 const isGenerating = ref(false);
+const isExporting = ref(false);
+
+// Preview list filter/sort/pagination (client-side)
+const previewSearch = ref('');
+const previewStatusFilter = ref<string>('all'); // all | new | update | skip
+const previewSortBy = ref<'student_id' | 'full_name' | 'student_type' | 'status' | 'action_status' | 'estimated_amount'>('student_id');
+const previewSortDir = ref<'asc' | 'desc'>('asc');
+const previewPage = ref(1);
+const previewPerPage = ref(25);
 
 // Computed
 const canProceedStep1 = computed(() => !!selectedSemesterId.value);
@@ -110,6 +125,171 @@ const canProceedStep3 = computed(() => selectedChargeTypes.value.length > 0);
 const selectedSemester = computed(() => {
     return props.semesters.find(s => String(s.id) === selectedSemesterId.value);
 });
+
+// Filtered, sorted, paginated preview students
+const filteredPreviewStudents = computed(() => {
+    if (!previewResult.value?.students) return [];
+    let list = [...previewResult.value.students];
+
+    // Search filter
+    const q = previewSearch.value.trim().toLowerCase();
+    if (q) {
+        list = list.filter(
+            s =>
+                (s.student_id ?? '').toLowerCase().includes(q) ||
+                (s.full_name ?? '').toLowerCase().includes(q)
+        );
+    }
+
+    // Status filter
+    if (previewStatusFilter.value !== 'all') {
+        list = list.filter(s => {
+            if (previewStatusFilter.value === 'new') return s.will_create_invoice;
+            if (previewStatusFilter.value === 'update') return s.has_existing_charge;
+            if (previewStatusFilter.value === 'skip') return !s.will_create_invoice && !s.has_existing_charge;
+            return true;
+        });
+    }
+
+    // Sort
+    const col = previewSortBy.value;
+    const dir = previewSortDir.value === 'asc' ? 1 : -1;
+    const getActionStatus = (s: PreviewStudent) =>
+        s.will_create_invoice ? 'new' : s.has_existing_charge ? 'update' : 'skip';
+    list.sort((a, b) => {
+        let va: string | number;
+        let vb: string | number;
+        if (col === 'estimated_amount') {
+            va = a.estimated_amount ?? 0;
+            vb = b.estimated_amount ?? 0;
+            return (Number(va) - Number(vb)) * dir;
+        }
+        if (col === 'action_status') {
+            va = getActionStatus(a);
+            vb = getActionStatus(b);
+        } else if (col === 'student_type') {
+            va = a.student_type ?? a.status ?? '';
+            vb = b.student_type ?? b.status ?? '';
+        } else {
+            va = String(a[col as keyof PreviewStudent] ?? '');
+            vb = String(b[col as keyof PreviewStudent] ?? '');
+        }
+        return String(va).localeCompare(String(vb)) * dir;
+    });
+
+    return list;
+});
+
+const sortedPreviewStudents = computed(() => filteredPreviewStudents.value);
+
+const paginatedPreviewStudents = computed(() => {
+    const list = sortedPreviewStudents.value;
+    const start = (previewPage.value - 1) * previewPerPage.value;
+    return list.slice(start, start + previewPerPage.value);
+});
+
+const previewPaginationMeta = computed(() => {
+    const total = sortedPreviewStudents.value.length;
+    const lastPage = Math.max(1, Math.ceil(total / previewPerPage.value));
+    const from = total === 0 ? 0 : (previewPage.value - 1) * previewPerPage.value + 1;
+    const to = Math.min(previewPage.value * previewPerPage.value, total);
+    const basePath = route('finance.operations.generate-charges');
+    return {
+        from,
+        to,
+        total,
+        current_page: previewPage.value,
+        last_page: lastPage,
+        per_page: previewPerPage.value,
+        prev_page_url: previewPage.value > 1 ? `${basePath}?page=${previewPage.value - 1}` : null,
+        next_page_url: previewPage.value < lastPage ? `${basePath}?page=${previewPage.value + 1}` : null,
+        links: [],
+    };
+});
+
+const hasPreviewFilters = computed(
+    () => previewSearch.value.trim() !== '' || previewStatusFilter.value !== 'all'
+);
+
+function clearPreviewFilters() {
+    previewSearch.value = '';
+    previewStatusFilter.value = 'all';
+    previewPage.value = 1;
+}
+
+function setPreviewSort(col: typeof previewSortBy.value) {
+    if (previewSortBy.value === col) {
+        previewSortDir.value = previewSortDir.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        previewSortBy.value = col;
+        previewSortDir.value = 'asc';
+    }
+    previewPage.value = 1;
+}
+
+function handlePreviewNavigate(url: string) {
+    try {
+        const u = new URL(url, window.location.origin);
+        const p = u.searchParams.get('page');
+        if (p) previewPage.value = Math.max(1, parseInt(p, 10) || 1);
+    } catch {
+        /* ignore */
+    }
+}
+
+function handlePreviewPageSizeChange(size: number) {
+    previewPerPage.value = size;
+    previewPage.value = 1;
+}
+
+// Export Excel
+async function exportPreviewExcel() {
+    if (!previewResult.value?.students?.length) return;
+    isExporting.value = true;
+    try {
+        const studentsToExport = sortedPreviewStudents.value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const response = await fetch(route('api.finance.operations.export-preview-charges'), {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken || '',
+                Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            },
+            body: JSON.stringify({ students: studentsToExport }),
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err?.message || `Export failed: ${response.statusText}`);
+        }
+
+        const contentDisposition = response.headers.get('content-disposition');
+        let filename = `generate_charges_preview_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '-')}.xlsx`;
+        if (contentDisposition) {
+            const match = contentDisposition.match(/filename="?([^";\n]+)"?/);
+            if (match) filename = match[1];
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast.success('Đã xuất Excel thành công!');
+    } catch (e) {
+        console.error('Export error:', e);
+        toast.error(e instanceof Error ? e.message : 'Lỗi khi xuất Excel');
+    } finally {
+        isExporting.value = false;
+    }
+}
 
 // Navigation
 const goToStep = (step: number) => {
@@ -161,6 +341,9 @@ const loadPreview = async () => {
 
         if (responseData.value?.success) {
             previewResult.value = responseData.value.data;
+            previewPage.value = 1;
+            previewSearch.value = '';
+            previewStatusFilter.value = 'all';
         } else {
             const msg = responseData.value?.message || error.value || 'Không thể tải preview';
             toast.error(msg);
@@ -535,35 +718,125 @@ defineOptions({
 
                         <!-- Student Preview Table -->
                         <Card>
-                            <CardHeader>
-                                <CardTitle class="text-base">Preview danh sách ({{ previewResult.students.length }}
-                                    đầu tiên)</CardTitle>
+                            <CardHeader class="flex flex-row items-center justify-between space-y-0">
+                                <CardTitle class="text-base">
+                                    Preview danh sách ({{ sortedPreviewStudents.length }} sinh viên)
+                                </CardTitle>
+                                <div class="flex items-center gap-2">
+                                    <Button variant="outline" size="sm" :disabled="isExporting"
+                                        @click="exportPreviewExcel">
+                                        <Download class="mr-2 h-4 w-4" />
+                                        {{ isExporting ? 'Đang xuất...' : 'Export Excel' }}
+                                    </Button>
+                                </div>
                             </CardHeader>
-                            <CardContent class="p-0">
+                            <CardContent class="space-y-4 p-0">
+                                <!-- Filters -->
+                                <div class="flex flex-wrap items-center gap-3 border-b px-6 py-4">
+                                    <Input v-model.trim="previewSearch" placeholder="Tìm mã SV, họ tên..."
+                                        class="max-w-[220px]" @keyup.enter="previewPage = 1" />
+                                    <Select v-model="previewStatusFilter">
+                                        <SelectTrigger class="w-[160px]">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                                            <SelectItem value="new">Mới (New Invoice)</SelectItem>
+                                            <SelectItem value="update">Update/Merge</SelectItem>
+                                            <SelectItem value="skip">Skipped</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <Button v-if="hasPreviewFilters" variant="ghost" size="sm"
+                                        @click="clearPreviewFilters">
+                                        <X class="mr-1 h-4 w-4" />
+                                        Xóa filter
+                                    </Button>
+                                </div>
+
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead class="text-center">STT</TableHead>
-                                            <TableHead>Sinh viên</TableHead>
+                                            <TableHead class="text-center w-14">STT</TableHead>
+                                            <TableHead>
+                                                <button type="button"
+                                                    class="flex items-center gap-1 font-medium hover:opacity-80"
+                                                    @click="setPreviewSort('student_id')">
+                                                    Mã SV
+                                                    <ArrowUpDown v-if="previewSortBy !== 'student_id'"
+                                                        class="h-4 w-4 opacity-50" />
+                                                    <ArrowUp v-else-if="previewSortDir === 'asc'"
+                                                        class="h-4 w-4" />
+                                                    <ArrowDown v-else class="h-4 w-4" />
+                                                </button>
+                                            </TableHead>
+                                            <TableHead>
+                                                <button type="button"
+                                                    class="flex items-center gap-1 font-medium hover:opacity-80"
+                                                    @click="setPreviewSort('full_name')">
+                                                    Họ tên
+                                                    <ArrowUpDown v-if="previewSortBy !== 'full_name'"
+                                                        class="h-4 w-4 opacity-50" />
+                                                    <ArrowUp v-else-if="previewSortDir === 'asc'"
+                                                        class="h-4 w-4" />
+                                                    <ArrowDown v-else class="h-4 w-4" />
+                                                </button>
+                                            </TableHead>
+                                            <TableHead>
+                                                <button type="button"
+                                                    class="flex items-center gap-1 font-medium hover:opacity-80"
+                                                    @click="setPreviewSort('student_type')">
+                                                    Type
+                                                    <ArrowUpDown v-if="previewSortBy !== 'student_type'"
+                                                        class="h-4 w-4 opacity-50" />
+                                                    <ArrowUp v-else-if="previewSortDir === 'asc'"
+                                                        class="h-4 w-4" />
+                                                    <ArrowDown v-else class="h-4 w-4" />
+                                                </button>
+                                            </TableHead>
                                             <TableHead>Charge Breakdown</TableHead>
-                                            <TableHead class="text-right">Net Due</TableHead>
-                                            <TableHead>Trạng thái</TableHead>
+                                            <TableHead>
+                                                <button type="button"
+                                                    class="ml-auto flex items-center gap-1 font-medium hover:opacity-80"
+                                                    @click="setPreviewSort('estimated_amount')">
+                                                    Net Due
+                                                    <ArrowUpDown v-if="previewSortBy !== 'estimated_amount'"
+                                                        class="h-4 w-4 opacity-50" />
+                                                    <ArrowUp v-else-if="previewSortDir === 'asc'"
+                                                        class="h-4 w-4" />
+                                                    <ArrowDown v-else class="h-4 w-4" />
+                                                </button>
+                                            </TableHead>
+                                            <TableHead>
+                                                <button type="button"
+                                                    class="flex items-center gap-1 font-medium hover:opacity-80"
+                                                    @click="setPreviewSort('action_status')">
+                                                    Trạng thái
+                                                    <ArrowUpDown v-if="previewSortBy !== 'action_status'"
+                                                        class="h-4 w-4 opacity-50" />
+                                                    <ArrowUp v-else-if="previewSortDir === 'asc'"
+                                                        class="h-4 w-4" />
+                                                    <ArrowDown v-else class="h-4 w-4" />
+                                                </button>
+                                            </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        <TableRow v-for="(student, index) in previewResult.students" :key="student.id">
+                                        <TableRow v-for="(student, index) in paginatedPreviewStudents"
+                                            :key="student.id">
                                             <TableCell>
                                                 <div class="text-muted-foreground text-xs text-center">
-                                                    {{ index + 1 }}
+                                                    {{ (previewPage - 1) * previewPerPage + index + 1 }}
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                <div>
-                                                    <div class="font-medium">{{ student.full_name }} - {{ student.student_id }}</div>
-                                                    <div
-                                                        class="mt-1 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-                                                        {{ student.status }}
-                                                    </div>
+                                                <div class="font-mono text-sm">{{ student.student_id }}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div class="font-medium">{{ student.full_name }}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                                                    {{ student.student_type ?? student.status }}
                                                 </div>
                                             </TableCell>
                                             <TableCell class="text-sm">
@@ -602,6 +875,16 @@ defineOptions({
                                         </TableRow>
                                     </TableBody>
                                 </Table>
+
+                                <!-- Pagination -->
+                                <div v-if="sortedPreviewStudents.length > 0" class="border-t px-6 py-4">
+                                    <DataPagination
+                                        :pagination-data="previewPaginationMeta"
+                                        item-name="sinh viên"
+                                        @navigate="handlePreviewNavigate"
+                                        @page-size-change="handlePreviewPageSizeChange"
+                                    />
+                                </div>
                             </CardContent>
                         </Card>
                     </template>
