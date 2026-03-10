@@ -25,8 +25,16 @@ class PreviewChargeGenerationQuery
             ]
         );
 
-        // Explicit filter
-        $query->whereIn('students.status', ['intake_pre_uni_gc', 'intake_course']);
+        // Scope by selected charge types: EGC-only => only intake_pre_uni_gc; tuition-only => only intake_course
+        $hasEgc = in_array(FinanceCharge::TYPE_EGC_LEVEL_FEE, $chargeTypes);
+        $hasTuition = in_array(FinanceCharge::TYPE_TUITION_TERM, $chargeTypes);
+        if ($hasEgc && ! $hasTuition) {
+            $query->where('students.status', 'intake_pre_uni_gc');
+        } elseif ($hasTuition && ! $hasEgc) {
+            $query->where('students.status', 'intake_course');
+        } else {
+            $query->whereIn('students.status', ['intake_pre_uni_gc', 'intake_course']);
+        }
         // Filter by Campus (assuming BillingScopeHelper might already do it, but to be safe)
         if (function_exists('app') && app()->bound('campus')) {
             $campusId = app('campus')->id ?? null;
@@ -226,11 +234,14 @@ class PreviewChargeGenerationQuery
                 // Else: Skipped because not eligible (0$ and no retake)
             }
 
+            $studentTypeLabel = $student->status === 'intake_pre_uni_gc' ? 'EGC' : ($student->status === 'intake_course' ? 'Course' : $student->status);
+
             $previewItems[] = [
                 'id' => $student->id,
                 'student_id' => $student->student_id,
                 'full_name' => $student->full_name,
                 'status' => $student->status,
+                'student_type' => $studentTypeLabel,
                 'has_existing_charge' => $hasExistingCharge,
                 'estimated_amount' => $studentTotal,
                 'warning' => $hasExistingCharge ? 'Existing charges found' : ($shouldGenInvoice ? null : 'No eligible charges (0đ)'),

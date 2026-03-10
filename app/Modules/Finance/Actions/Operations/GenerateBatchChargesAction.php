@@ -32,8 +32,16 @@ class GenerateBatchChargesAction
             ]
         );
 
-        // Explicitly filter for the two allowed statuses
-        $query->whereIn('students.status', ['intake_pre_uni_gc', 'intake_course']);
+        // Scope by selected charge types: EGC-only => only intake_pre_uni_gc; tuition-only => only intake_course
+        $hasEgc = in_array(FinanceCharge::TYPE_EGC_LEVEL_FEE, $chargeTypes);
+        $hasTuition = in_array(FinanceCharge::TYPE_TUITION_TERM, $chargeTypes);
+        if ($hasEgc && ! $hasTuition) {
+            $query->where('students.status', 'intake_pre_uni_gc');
+        } elseif ($hasTuition && ! $hasEgc) {
+            $query->where('students.status', 'intake_course');
+        } else {
+            $query->whereIn('students.status', ['intake_pre_uni_gc', 'intake_course']);
+        }
 
         // Filter by Campus (assuming BillingScopeHelper might already do it, but to be safe)
         if (function_exists('app') && app()->bound('campus')) {
