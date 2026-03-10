@@ -33,7 +33,6 @@ class Payment extends Model
         'allocated_amount',
         'unapplied_amount',
         'is_fully_allocated',
-        'has_unapplied_credit',
     ];
 
     // =====================
@@ -124,10 +123,5 @@ class Payment extends Model
     public function getIsFullyAllocatedAttribute(): bool
     {
         return $this->unapplied_amount <= 0;
-    }
-
-    public function getHasUnappliedCreditAttribute(): bool
-    {
-        return $this->unapplied_amount > 0;
     }
 }

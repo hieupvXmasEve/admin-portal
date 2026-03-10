@@ -74,11 +74,30 @@ class AutoAllocatePaymentsAction
                     continue;
                 }
 
-                // Fetch student's outstanding charges (positive amount, not void)
-                // Filter charges where (amount - paid) > 0.
+                // Get unpaid invoice IDs for this student
+                $unpaidInvoiceIds = StudentInvoice::where('student_id', $studentId)
+                    ->where('status', '!=', 'paid')
+                    ->pluck('id')
+                    ->toArray();
+
+                if (empty($unpaidInvoiceIds)) {
+                    continue;
+                }
+
+                // Get charge IDs linked to unpaid invoices
+                $chargeIdsInUnpaidInvoices = InvoiceLine::whereIn('invoice_id', $unpaidInvoiceIds)
+                    ->pluck('charge_id')
+                    ->toArray();
+
+                if (empty($chargeIdsInUnpaidInvoices)) {
+                    continue;
+                }
+
+                // Fetch student's outstanding charges that belong to unpaid invoices
                 $charges = FinanceCharge::where('student_id', $studentId)
                     ->where('amount', '>', 0)
                     ->where('status', FinanceCharge::STATUS_ACTIVE)
+                    ->whereIn('id', $chargeIdsInUnpaidInvoices)
                     ->whereRaw('(amount - (SELECT COALESCE(SUM(allocated_amount), 0) FROM payment_allocations WHERE payment_allocations.charge_id = finance_charges.id)) > ?', [0])
                     ->get();
 
@@ -91,16 +110,6 @@ class AutoAllocatePaymentsAction
                     ->pluck('invoice_id', 'charge_id')
                     ->toArray();
 
-                $invoiceRemaining = [];
-                $invoiceIds = array_unique(array_values($chargeInvoiceMap));
-                if (! empty($invoiceIds)) {
-                    $invoiceRemaining = StudentInvoice::query()
-                        ->whereIn('id', $invoiceIds)
-                        ->get()
-                        ->mapWithKeys(fn($invoice) => [$invoice->id => $invoice->outstanding_balance])
-                        ->toArray();
-                }
-
                 // Sort charges by priority
                 $charges = $charges->sortBy(function ($charge) use ($priorityOrder) {
                     $index = array_search($charge->charge_type, $priorityOrder);
@@ -109,6 +118,13 @@ class AutoAllocatePaymentsAction
                 });
 
                 $studentHasAllocations = false;
+
+                // Cache initial balances to avoid double-counting when
+                // allocations created in this loop are visible to DB queries
+                $chargeOutstanding = [];
+                foreach ($charges as $charge) {
+                    $chargeOutstanding[$charge->id] = (float) $charge->balance;
+                }
 
                 foreach ($payments as $payment) {
                     $available = $payment->unapplied_amount;
@@ -121,34 +137,16 @@ class AutoAllocatePaymentsAction
                             break;
                         }
 
-                        // Calculate effective outstanding balance considering in-memory allocations
-                        $initialBalance = $charge->balance; // Accessor value (from DB at fetch time)
-                        $allocatedInLoop = $charge->temp_paid ?? 0;
-                        $outstanding = $initialBalance - $allocatedInLoop;
-
+                        $outstanding = $chargeOutstanding[$charge->id] ?? 0;
                         if ($outstanding <= 0) {
                             continue;
                         }
 
-                        $invoiceId = $chargeInvoiceMap[$charge->id] ?? null;
-                        $invoiceAvailable = null;
-                        if ($invoiceId) {
-                            $invoiceAvailable = $invoiceRemaining[$invoiceId] ?? 0;
-                            if ($invoiceAvailable <= 0) {
-                                continue;
-                            }
-                        }
-
-                        $allocateAmount = min(
-                            $available,
-                            $outstanding,
-                            $invoiceAvailable ?? $outstanding
-                        );
+                        $allocateAmount = min($available, $outstanding);
                         if ($allocateAmount <= 0) {
                             continue;
                         }
 
-                        // Create Allocation
                         PaymentAllocation::create([
                             'payment_id' => $payment->id,
                             'charge_id' => $charge->id,
@@ -157,21 +155,9 @@ class AutoAllocatePaymentsAction
                             'allocated_by_user_id' => $userId,
                         ]);
 
-                        // Track charge ID for invoice status update
                         $allocatedChargeIds[] = $charge->id;
-
-                        // Update local variables
                         $available -= $allocateAmount;
-
-                        if ($invoiceId) {
-                            $invoiceRemaining[$invoiceId] -= $allocateAmount;
-                        }
-
-                        // Track allocations for this charge within the loop
-                        if (! isset($charge->temp_paid)) {
-                            $charge->temp_paid = 0;
-                        }
-                        $charge->temp_paid += $allocateAmount;
+                        $chargeOutstanding[$charge->id] -= $allocateAmount;
 
                         $stats['allocations_created']++;
                         $stats['total_allocated_amount'] += $allocateAmount;

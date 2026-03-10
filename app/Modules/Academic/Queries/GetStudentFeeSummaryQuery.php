@@ -4,9 +4,9 @@ namespace App\Modules\Academic\Queries;
 
 use App\Models\FinanceCharge;
 use App\Models\Student;
+use App\Models\StudentScholarshipAward;
 use App\Models\TuitionPlan;
 use App\Models\TuitionPlanTerm;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class GetStudentFeeSummaryQuery
@@ -28,23 +28,24 @@ class GetStudentFeeSummaryQuery
             ->orderBy('due_date')
             ->get();
 
-        // 3. Get All Charges (For finding links to Plan Terms)
+        // 3. Get All Active Charges (exclude voided)
         $charges = FinanceCharge::where('student_id', $student->id)
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
             ->with(['allocations'])
             ->get();
 
         // --- SECTION A: BILLING BY SEMESTER (ACTUAL) ---
-        
+
         // Group invoices by semester
         $groupedInvoices = $invoices->groupBy('semester_id');
-        
+
         // We want to list all semesters that have invoices, sorted by start date
         // Since invoices are loaded with semester, we can extract unique semesters from them
         $semestersWithInvoices = $invoices->pluck('semester')->unique('id')->sortBy('start_date');
 
         $billingBySemester = $semestersWithInvoices->map(function ($semester) use ($groupedInvoices) {
             $semInvoices = $groupedInvoices->get($semester->id) ?? collect();
-            
+
             $total = $semInvoices->sum('total_amount');
             $paid = $semInvoices->sum('paid_amount');
             $remaining = $total - $paid;
@@ -55,7 +56,7 @@ class GetStudentFeeSummaryQuery
                 $status = 'no_invoices';
             } elseif ($remaining > 0) {
                 // Check if any invoice is overdue
-                $hasOverdue = $semInvoices->contains(fn($inv) => $inv->due_date && $inv->due_date < now() && ($inv->total_amount - $inv->paid_amount) > 0);
+                $hasOverdue = $semInvoices->contains(fn ($inv) => $inv->due_date && $inv->due_date < now() && ($inv->total_amount - $inv->paid_amount) > 0);
                 $status = $hasOverdue ? 'overdue' : ($paid > 0 ? 'partial' : 'unpaid');
             }
 
@@ -81,6 +82,7 @@ class GetStudentFeeSummaryQuery
                         'remaining' => $inv->total_amount - $inv->paid_amount,
                         'lines' => $inv->invoiceLines->map(function ($line) {
                             $charge = $line->charge;
+
                             return [
                                 'id' => $line->id,
                                 'item' => $charge->description ?? $charge->charge_type,
@@ -89,7 +91,7 @@ class GetStudentFeeSummaryQuery
                                 'amount' => $charge->amount,
                             ];
                         }),
-                        'payments' => $inv->invoiceLines->flatMap(fn($l) => $l->charge->allocations)->map(fn($a) => $a->payment)->unique('id')->map(fn($p) => [
+                        'payments' => $inv->invoiceLines->flatMap(fn ($l) => $l->charge->allocations)->map(fn ($a) => $a->payment)->unique('id')->map(fn ($p) => [
                             'id' => $p->id,
                             'paid_at' => $p->paid_at?->format('Y-m-d'),
                             'method' => $p->method,
@@ -116,7 +118,12 @@ class GetStudentFeeSummaryQuery
                     ->get();
             }
 
-            $terms = $tuitionPlan->terms->map(function ($term) use ($charges, $invoices, $semestersSequence) {
+            // Pre-fetch student's scholarship for expected discount on future terms
+            $scholarshipAward = StudentScholarshipAward::where('student_id', $student->id)
+                ->with('scholarshipDefinition')
+                ->first();
+
+            $terms = $tuitionPlan->terms->map(function ($term) use ($charges, $invoices, $semestersSequence, $scholarshipAward) {
                 // Inferred semester for this term
                 $inferredSemester = $semestersSequence->get($term->term_number - 1);
 
@@ -127,29 +134,55 @@ class GetStudentFeeSummaryQuery
                 });
 
                 // Priority 2: Fallback match by Type + Semester (for legacy/imported data)
-                if (!$linkedCharge && $inferredSemester) {
-                    $linkedCharge = $charges->first(function ($c) use ($term, $inferredSemester) {
-                        return $c->charge_type === FinanceCharge::TYPE_TUITION_TERM 
+                if (! $linkedCharge && $inferredSemester) {
+                    $linkedCharge = $charges->first(function ($c) use ($inferredSemester) {
+                        return $c->charge_type === FinanceCharge::TYPE_TUITION_TERM
                             && $c->semester_id === $inferredSemester->id;
                     });
                 }
 
-                $generated = (bool)$linkedCharge;
+                $generated = (bool) $linkedCharge;
                 $paymentStatus = 'not_generated';
-                $linkedInvoiceRefs = [];
+                $linkedInvoiceDetails = [];
+
+                // Calculate discount/scholarship for this semester
+                $discountAmount = 0;
+                $isEstimatedDiscount = false;
+                if ($inferredSemester) {
+                    $discountAmount = abs($charges->filter(function ($c) use ($inferredSemester) {
+                        return $c->semester_id === $inferredSemester->id && $c->amount < 0;
+                    })->sum('amount'));
+                }
+
+                // For terms without existing discount charges, estimate from scholarship award
+                if ($discountAmount == 0 && $scholarshipAward && $scholarshipAward->scholarshipDefinition) {
+                    $scholarshipDef = $scholarshipAward->scholarshipDefinition;
+                    if ($scholarshipDef->type === 'percentage') {
+                        $discountAmount = ($term->amount * $scholarshipDef->amount) / 100;
+                    } else {
+                        $discountAmount = (float) $scholarshipDef->amount;
+                    }
+                    $isEstimatedDiscount = $discountAmount > 0;
+                }
+
+                $amountDue = max(0, $term->amount - $discountAmount);
+                $paidAmount = 0;
 
                 if ($linkedCharge) {
-                    $paid = $linkedCharge->paid_amount;
+                    $paidAmount = $linkedCharge->paid_amount;
                     $amount = $linkedCharge->amount;
-                    $remaining = $amount - $paid;
+                    $remaining = $amount - $paidAmount;
 
-                    // Find invoices containing this charge
-                    // We can use the already loaded invoices to find where this charge appears
-                    // Invoice -> InvoiceLines -> Charge
+                    // Find invoices containing this charge with full details
                     $linkedInvoiceObjs = collect();
                     foreach ($invoices as $inv) {
                         if ($inv->invoiceLines->contains('charge_id', $linkedCharge->id)) {
-                            $linkedInvoiceRefs[] = $inv->invoice_number;
+                            $linkedInvoiceDetails[] = [
+                                'id' => $inv->id,
+                                'invoice_number' => $inv->invoice_number,
+                                'status' => $inv->status,
+                                'due_date' => $inv->due_date?->toDateString(),
+                            ];
                             $linkedInvoiceObjs->push($inv);
                         }
                     }
@@ -158,15 +191,15 @@ class GetStudentFeeSummaryQuery
                     // Priority 1: If charge is fully allocated -> Paid
                     if ($remaining <= 0) {
                         $paymentStatus = 'paid';
-                    } 
+                    }
                     // Priority 2: If any linked invoice is marked 'paid' (covers discounts case) -> Paid
                     elseif ($linkedInvoiceObjs->contains('status', 'paid')) {
                         $paymentStatus = 'paid';
                     }
                     // Priority 3: Partial allocation
-                    elseif ($paid > 0) {
+                    elseif ($paidAmount > 0) {
                         $paymentStatus = 'partial';
-                    } 
+                    }
                     // Priority 4: Default
                     else {
                         $paymentStatus = 'unpaid';
@@ -175,31 +208,42 @@ class GetStudentFeeSummaryQuery
 
                 return [
                     'term_number' => $term->term_number,
-                    'semester_name' => $inferredSemester ? $inferredSemester->name : "Term " . $term->term_number,
+                    'semester_id' => $inferredSemester?->id,
+                    'semester_name' => $inferredSemester ? $inferredSemester->name : 'Term '.$term->term_number,
                     'required_amount' => $term->amount,
+                    'discount_amount' => $discountAmount,
+                    'is_estimated_discount' => $isEstimatedDiscount,
+                    'amount_due' => $amountDue,
+                    'paid_amount' => $paidAmount,
                     'generated' => $generated,
                     'charge_id' => $linkedCharge?->id,
                     'payment_status' => $paymentStatus,
-                    'linked_invoices' => $linkedInvoiceRefs,
+                    'invoices' => $linkedInvoiceDetails,
                 ];
             });
 
             $checklist = [
-                'plan_name' => $tuitionPlan->curriculumVersion->program->name . ' (' . $tuitionPlan->curriculumVersion->version_code . ')',
+                'plan_name' => $tuitionPlan->curriculumVersion->program->name.' ('.$tuitionPlan->curriculumVersion->version_code.')',
                 'terms' => $terms,
             ];
         }
 
         // --- OVERALL SUMMARY ---
-        // Using charges for accurate totals
-        $totalCharged = $charges->where('amount', '>', 0)->sum('amount');
-        $totalDiscount = $charges->where('amount', '<', 0)->sum('amount'); // This is negative
-        $totalPaid = $charges->sum(fn($c) => $c->allocations->sum('allocated_amount'));
-        
-        // Remaining is roughly (Charged - abs(Discount)) - Paid
-        // Since discount is negative, Charged + Discount = Net Due.
+        $totalCharged = (float) $charges->where('amount', '>', 0)->sum('amount');
+        $totalDiscount = (float) $charges->where('amount', '<', 0)->sum('amount');
+        $totalAllocated = (float) $charges->sum(fn ($c) => $c->allocations->sum('allocated_amount'));
+
+        // Net due = charges - discounts
         $netDue = $totalCharged + $totalDiscount;
-        $remaining = $netDue - $totalPaid;
+        $outstanding = max(0, $netDue - $totalAllocated);
+
+        // Real payments (exclude credit memo)
+        $payments = \App\Models\Payment::where('student_id', $student->id)
+            ->where('status', \App\Models\Payment::STATUS_COMPLETED)
+            ->get();
+
+        $totalPayments = (float) $payments->sum('amount');
+        $totalUnapplied = (float) $payments->sum(fn ($p) => $p->unapplied_amount);
 
         return [
             'student_info' => [
@@ -211,9 +255,12 @@ class GetStudentFeeSummaryQuery
             'summary' => [
                 'total_charged' => $totalCharged,
                 'total_discount' => $totalDiscount,
-                'total_paid' => $totalPaid,
-                'remaining' => $remaining,
-                'progress' => $netDue > 0 ? min(100, max(0, ($totalPaid / $netDue) * 100)) : 0,
+                'total_paid' => $totalPayments,
+                'total_allocated' => $totalAllocated,
+                'outstanding' => $outstanding,
+                'unapplied_balance' => $totalUnapplied,
+                'remaining' => max(0, $netDue - $totalPayments),
+                'progress' => $netDue > 0 ? min(100, max(0, ($totalAllocated / $netDue) * 100)) : 0,
             ],
             'billing_by_semester' => $billingBySemester,
             'tuition_plan_checklist' => $checklist,

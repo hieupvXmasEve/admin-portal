@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
 import { route } from 'ziggy-js';
-import AutoAllocateDialog from './Components/AutoAllocateDialog.vue';
-import { Sparkles } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { Sparkles, CreditCard } from 'lucide-vue-next';
 import {
     Table,
     TableBody,
@@ -100,10 +98,11 @@ const getSourceLabel = (source: string) => {
     switch (source) {
         case 'import': return 'Excel Import';
         case 'manual': return 'Manual';
-        default: return source;
+        case 'gateway': return 'Gateway';
+        case 'bank_transfer': return 'Bank Transfer';
+        default: return source ?? '-';
     }
 };
-const showAutoAllocateDialog = ref(false);
 </script>
 
 <template>
@@ -115,10 +114,12 @@ const showAutoAllocateDialog = ref(false);
             Payments
         </h2>
         <div class="flex gap-2">
-            <Button variant="outline" @click="showAutoAllocateDialog = true">
-                <Sparkles class="mr-2 h-4 w-4" />
-                Auto Allocate
-            </Button>
+            <Link :href="route('finance.payments.auto-allocate.show')">
+                <Button variant="outline">
+                    <Sparkles class="mr-2 h-4 w-4" />
+                    Auto Allocate
+                </Button>
+            </Link>
             <Link :href="route('finance.payments.import')">
                 <Button>
                     Import Payments
@@ -126,8 +127,6 @@ const showAutoAllocateDialog = ref(false);
             </Link>
         </div>
     </div>
-
-    <AutoAllocateDialog v-model:open="showAutoAllocateDialog" />
 
     <div>
         <!-- Filters -->
@@ -206,7 +205,9 @@ const showAutoAllocateDialog = ref(false);
                             </span>
                         </TableCell>
                         <TableCell>
-                            <Badge variant="outline">{{ getSourceLabel(payment.source) }}</Badge>
+                            <Badge variant="outline">
+                                {{ getSourceLabel(payment.source) }}
+                            </Badge>
                         </TableCell>
                         <TableCell>
                             <Badge :variant="getStatusColor(payment.status) as any">

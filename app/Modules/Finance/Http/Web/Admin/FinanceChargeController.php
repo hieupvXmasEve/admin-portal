@@ -27,18 +27,41 @@ class FinanceChargeController extends Controller
      */
     public function index(Request $request): Response
     {
+        return $this->renderIndex($request);
+    }
+
+    /**
+     * Display a listing of finance charges for a specific student.
+     */
+    public function studentCharges(Request $request, Student $student): Response
+    {
+        return $this->renderIndex($request, $student);
+    }
+
+    private function renderIndex(Request $request, ?Student $student = null): Response
+    {
         $validated = $request->validate([
             'search' => 'nullable|string|max:255',
+            'student_id' => 'nullable|integer|exists:students,id',
             'semester_id' => 'nullable|integer|exists:semesters,id',
             'charge_type' => 'nullable|string',
             'status' => 'nullable|string|in:all,active,void',
             'per_page' => 'nullable|integer|min:5|max:100',
         ]);
 
+        $selectedStudent = $student;
+
+        if (! $selectedStudent && ! empty($validated['student_id'])) {
+            $selectedStudent = Student::find($validated['student_id']);
+        }
+
         $query = FinanceCharge::query()
             ->with(['student', 'semester', 'createdBy']);
 
-        // Apply search filter
+        if ($selectedStudent) {
+            $query->where('student_id', $selectedStudent->id);
+        }
+
         if (! empty($validated['search'])) {
             $query->where(function ($q) use ($validated) {
                 $q->where('description', 'like', "%{$validated['search']}%")
@@ -50,17 +73,14 @@ class FinanceChargeController extends Controller
             });
         }
 
-        // Apply semester filter
         if (! empty($validated['semester_id'])) {
             $query->where('semester_id', $validated['semester_id']);
         }
 
-        // Apply charge type filter
         if (! empty($validated['charge_type']) && $validated['charge_type'] !== 'all') {
             $query->where('charge_type', $validated['charge_type']);
         }
 
-        // Apply status filter
         if (! empty($validated['status']) && $validated['status'] !== 'all') {
             $query->where('status', $validated['status']);
         }
@@ -68,11 +88,9 @@ class FinanceChargeController extends Controller
         $charges = $query->orderBy('effective_at', 'desc')
             ->paginate($validated['per_page'] ?? 20);
 
-        // Get semesters for filters
         $semesters = Semester::orderBy('start_date', 'desc')->get();
 
-        // Get charge type options
-        $chargeTypes = collect(FinanceCharge::CHARGE_TYPES)->map(fn($type) => [
+        $chargeTypes = collect(FinanceCharge::CHARGE_TYPES)->map(fn ($type) => [
             'value' => $type,
             'label' => ucwords(str_replace('_', ' ', $type)),
         ]);
@@ -81,8 +99,14 @@ class FinanceChargeController extends Controller
             'charges' => $charges,
             'semesters' => $semesters,
             'chargeTypes' => $chargeTypes,
+            'student' => $selectedStudent ? [
+                'id' => $selectedStudent->id,
+                'full_name' => $selectedStudent->full_name,
+                'student_id' => $selectedStudent->student_id,
+            ] : null,
             'filters' => [
                 'search' => $validated['search'] ?? '',
+                'student_id' => $selectedStudent?->id ?? $validated['student_id'] ?? null,
                 'semester_id' => $validated['semester_id'] ?? null,
                 'charge_type' => $validated['charge_type'] ?? 'all',
                 'status' => $validated['status'] ?? 'all',
@@ -117,7 +141,7 @@ class FinanceChargeController extends Controller
     {
         $semesters = Semester::orderBy('start_date', 'desc')->get();
 
-        $chargeTypes = collect(FinanceCharge::CHARGE_TYPES)->map(fn($type) => [
+        $chargeTypes = collect(FinanceCharge::CHARGE_TYPES)->map(fn ($type) => [
             'value' => $type,
             'label' => ucwords(str_replace('_', ' ', $type)),
         ]);
@@ -138,7 +162,7 @@ class FinanceChargeController extends Controller
                     ->where('status', 'draft')
                     ->orderBy('created_at', 'desc')
                     ->get()
-                    ->map(fn($invoice) => [
+                    ->map(fn ($invoice) => [
                         'id' => $invoice->id,
                         'invoice_number' => $invoice->invoice_number,
                         'status' => $invoice->status,
@@ -164,7 +188,7 @@ class FinanceChargeController extends Controller
         $validated = $request->validate([
             'student_id' => 'required|integer|exists:students,id',
             'semester_id' => 'required|integer|exists:semesters,id',
-            'charge_type' => 'required|string|in:' . implode(',', FinanceCharge::CHARGE_TYPES),
+            'charge_type' => 'required|string|in:'.implode(',', FinanceCharge::CHARGE_TYPES),
             'amount' => 'required|numeric',
             'description' => 'required|string|max:500',
             'effective_at' => 'nullable|date',
@@ -194,9 +218,16 @@ class FinanceChargeController extends Controller
         ]);
 
         try {
-            $this->voidChargeAction->handle($charge->id, $validated['void_reason']);
+            $result = $this->voidChargeAction->handle($charge->id, $validated['void_reason']);
 
-            return back()->with('success', 'Charge voided successfully.');
+            $message = 'Charge voided successfully.';
+            if ($result['released_allocations'] > 0) {
+                $message .= " Released {$result['released_allocations']} allocations"
+                    .' ('.number_format($result['released_amount']).'đ).'
+                    .' '.count($result['affected_payments']).' payment(s) now have unapplied balance.';
+            }
+
+            return back()->with('success', $message);
         } catch (\Exception $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
         }

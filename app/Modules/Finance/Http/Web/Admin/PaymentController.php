@@ -13,6 +13,7 @@ use App\Modules\Finance\Actions\StorePaymentImportAction;
 // Wait, Models are in App\Models based on previous checks.
 use App\Modules\Finance\Queries\GetPaymentDetailsQuery;
 use App\Modules\Finance\Queries\ListPaymentsQuery;
+use App\Modules\Finance\Queries\Operations\PreviewAutoAllocateQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -92,6 +93,23 @@ class PaymentController extends Controller
         return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\PaymentImportTemplateExport, 'payment_import_template.xlsx');
     }
 
+    public function showAutoAllocate()
+    {
+        return Inertia::render('Finance/Payments/AutoAllocate');
+    }
+
+    public function previewAutoAllocate(Request $request, PreviewAutoAllocateQuery $query)
+    {
+        $request->validate([
+            'priority_order' => 'required|array',
+            'priority_order.*' => 'string',
+        ]);
+
+        $preview = $query->handle($request->input('priority_order'));
+
+        return response()->json($preview);
+    }
+
     public function autoAllocate(Request $request, \App\Modules\Finance\Actions\AutoAllocatePaymentsAction $action)
     {
         $request->validate([
@@ -106,6 +124,7 @@ class PaymentController extends Controller
             $message .= " Updated {$stats['invoices_updated']} invoices.";
         }
 
-        return back()->with('success', $message);
+        return redirect()->route('finance.payments.index')
+            ->with('success', $message);
     }
 }

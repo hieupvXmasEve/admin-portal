@@ -32,6 +32,9 @@ interface FeeSummary {
         total_charged: number;
         total_discount: number;
         total_paid: number;
+        total_allocated: number;
+        outstanding: number;
+        unapplied_balance: number;
         remaining: number;
         progress: number;
     };
@@ -74,12 +77,21 @@ interface FeeSummary {
         plan_name: string;
         terms: Array<{
             term_number: number;
+            semester_id: number | null;
             semester_name: string;
             required_amount: number;
+            discount_amount: number;
+            amount_due: number;
+            paid_amount: number;
             generated: boolean;
             charge_id: number | null;
             payment_status: string;
-            linked_invoices: string[];
+            invoices: Array<{
+                id: number;
+                invoice_number: string;
+                status: string;
+                due_date: string | null;
+            }>;
         }>;
     } | null;
 }
@@ -119,6 +131,30 @@ const getInvoiceStatusBadge = (status: string) => {
     return { variant: 'outline', class: 'text-gray-600' };
 };
 
+const getInvoiceStatusClass = (status: string) => {
+    const s = status?.toLowerCase() || '';
+    if (s === 'paid') return 'bg-green-100 text-green-700 border-green-200';
+    if (s === 'partial') return 'bg-amber-100 text-amber-700 border-amber-200';
+    if (s === 'pending') return 'bg-blue-100 text-blue-700 border-blue-200';
+    if (s === 'overdue') return 'bg-red-100 text-red-700 border-red-200';
+    if (s === 'draft') return 'bg-gray-100 text-gray-600 border-gray-200';
+    if (s === 'cancelled' || s === 'void') return 'bg-gray-100 text-gray-500 border-gray-200';
+    return 'bg-gray-100 text-gray-600 border-gray-200';
+};
+
+const getInvoiceStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+        paid: 'Đã thanh toán',
+        partial: 'Thanh toán 1 phần',
+        pending: 'Chờ thanh toán',
+        overdue: 'Quá hạn',
+        draft: 'Nháp',
+        cancelled: 'Đã hủy',
+        void: 'Đã hủy',
+    };
+    return labels[status?.toLowerCase()] || status;
+};
+
 const getChecklistPaymentBadge = (status: string) => {
     const variants: Record<string, { label: string; class: string; icon: any }> = {
         paid: { label: 'Paid', class: 'text-green-600 bg-green-50 border-green-200', icon: CheckCircle },
@@ -143,45 +179,59 @@ const defaultOpenSemesters = computed(() => {
 <template>
     <div class="space-y-8">
         <!-- 1) HEADER: Overall Totals -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <Card>
                 <CardHeader class="pb-2">
-                    <CardTitle class="text-sm font-medium text-muted-foreground uppercase">Total Charged</CardTitle>
+                    <CardTitle class="text-sm font-medium text-muted-foreground uppercase">Tổng phí</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div class="text-2xl font-bold">{{ formatCurrency(feeSummary.summary.total_charged) }}</div>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader class="pb-2">
-                    <CardTitle class="text-sm font-medium text-muted-foreground uppercase">Total Discount</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div class="text-2xl font-bold text-green-600">{{ formatCurrency(feeSummary.summary.total_discount)
-                        }}</div>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader class="pb-2">
-                    <CardTitle class="text-sm font-medium text-muted-foreground uppercase">Total Paid</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div class="text-2xl font-bold text-blue-600">{{ formatCurrency(feeSummary.summary.total_paid) }}
+                    <div v-if="feeSummary.summary.total_discount < 0" class="text-xs text-green-600 mt-1">
+                        HB: {{ formatCurrency(feeSummary.summary.total_discount) }}
                     </div>
                 </CardContent>
             </Card>
             <Card>
                 <CardHeader class="pb-2">
-                    <CardTitle class="text-sm font-medium text-muted-foreground uppercase">Outstanding Balance
-                    </CardTitle>
+                    <CardTitle class="text-sm font-medium text-muted-foreground uppercase">Cần thanh toán</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div class="flex items-center justify-between gap-4">
-                        <div class="text-2xl font-bold"
-                            :class="feeSummary.summary.remaining > 0 ? 'text-red-600' : 'text-gray-600'">
-                            {{ formatCurrency(feeSummary.summary.remaining) }}
-                        </div>
+                    <div class="text-2xl font-bold">
+                        {{ formatCurrency(feeSummary.summary.total_charged + feeSummary.summary.total_discount) }}
                     </div>
+                    <div class="text-xs text-muted-foreground mt-1">Sau giảm trừ</div>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader class="pb-2">
+                    <CardTitle class="text-sm font-medium text-muted-foreground uppercase">Đã nộp</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div class="text-2xl font-bold text-blue-600">{{ formatCurrency(feeSummary.summary.total_paid) }}</div>
+                    <div v-if="feeSummary.summary.unapplied_balance > 0" class="text-xs text-amber-600 mt-1">
+                        Dư: {{ formatCurrency(feeSummary.summary.unapplied_balance) }}
+                    </div>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader class="pb-2">
+                    <CardTitle class="text-sm font-medium text-muted-foreground uppercase">Còn thiếu</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div class="text-2xl font-bold"
+                        :class="feeSummary.summary.outstanding > 0 ? 'text-red-600' : 'text-green-600'">
+                        {{ formatCurrency(feeSummary.summary.outstanding) }}
+                    </div>
+                    <div class="text-xs text-muted-foreground mt-1">Chưa phân bổ</div>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader class="pb-2">
+                    <CardTitle class="text-sm font-medium text-muted-foreground uppercase">Tiến độ</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div class="text-2xl font-bold">{{ Math.round(feeSummary.summary.progress) }}%</div>
+                    <Progress :model-value="feeSummary.summary.progress" class="h-2 mt-2" />
                 </CardContent>
             </Card>
         </div>
@@ -357,11 +407,29 @@ const defaultOpenSemesters = computed(() => {
                                 <div class="flex justify-between items-start mb-2">
                                     <div>
                                         <div class="font-semibold text-sm">Term {{ term.term_number }}</div>
-                                        <div class=" text-muted-foreground">{{ term.semester_name }}</div>
+                                        <div class="text-muted-foreground">{{ term.semester_name }}</div>
                                     </div>
                                     <div class="text-right">
-                                        <div class="font-mono text-sm">{{ formatCurrency(term.required_amount) }}</div>
+                                        <div class="font-mono text-sm font-semibold text-primary">
+                                            {{ formatCurrency(term.amount_due) }}
+                                        </div>
+                                        <div v-if="term.discount_amount > 0" class="text-[10px] text-muted-foreground">
+                                            <span class="line-through">{{ formatCurrency(term.required_amount) }}</span>
+                                            <span class="text-green-600 ml-1">-{{ formatCurrency(term.discount_amount) }}</span>
+                                            <span v-if="term.is_estimated_discount" class="text-muted-foreground/70 ml-0.5">(dự kiến)</span>
+                                        </div>
                                     </div>
+                                </div>
+
+                                <div v-if="term.generated && term.amount_due > 0" class="mb-2">
+                                    <div class="flex justify-between text-[10px] text-muted-foreground mb-1">
+                                        <span>Đã đóng</span>
+                                        <span>{{ formatCurrency(term.paid_amount) }} / {{ formatCurrency(term.amount_due) }}</span>
+                                    </div>
+                                    <Progress 
+                                        :model-value="term.amount_due > 0 ? (term.paid_amount / term.amount_due) * 100 : 0" 
+                                        class="h-1.5"
+                                    />
                                 </div>
 
                                 <div class="flex flex-wrap gap-2 items-center mt-3">
@@ -384,14 +452,17 @@ const defaultOpenSemesters = computed(() => {
                                     </Badge>
                                 </div>
 
-                                <!-- Linked Invoices -->
-                                <div v-if="term.linked_invoices.length > 0" class="mt-2 pt-2 border-t border-dashed">
+                                <!-- Linked Invoices with details -->
+                                <div v-if="term.invoices.length > 0" class="mt-2 pt-2 border-t border-dashed">
                                     <span class="text-[10px] text-muted-foreground uppercase mr-1">Invoices:</span>
-                                    <div class="inline-flex gap-1 flex-wrap">
-                                        <span v-for="inv in term.linked_invoices" :key="inv"
-                                            class="text-[10px] font-mono bg-muted px-1 rounded text-foreground">
-                                            {{ inv }}
-                                        </span>
+                                    <div class="flex flex-col gap-1 mt-1">
+                                        <div v-for="inv in term.invoices" :key="inv.id"
+                                            class="flex items-center justify-between text-[10px] bg-muted px-2 py-1 rounded">
+                                            <span class="font-mono text-foreground">{{ inv.invoice_number }}</span>
+                                            <Badge variant="outline" :class="getInvoiceStatusClass(inv.status)">
+                                                {{ getInvoiceStatusLabel(inv.status) }}
+                                            </Badge>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

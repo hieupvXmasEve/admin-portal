@@ -53,7 +53,6 @@ export interface Payment {
     allocated_amount?: number;
     unapplied_amount?: number;
     is_fully_allocated?: boolean;
-    has_unapplied_credit?: boolean;
 }
 
 export interface PaymentAllocation {

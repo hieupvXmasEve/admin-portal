@@ -39,18 +39,29 @@ class FinanceCharge extends Model
     // =====================
 
     public const TYPE_TUITION_TERM = 'tuition_term';
+
     public const TYPE_EGC_LEVEL_FEE = 'egc_level_fee';
+
     public const TYPE_RETAKE_FEE = 'retake_fee';
+
     public const TYPE_COURSE_FEE = 'course_fee';
+
     public const TYPE_MANUAL_FEE = 'manual_fee';
+
     public const TYPE_ADMISSION_FEE = 'admission_fee';
+
     public const TYPE_DEFER_CREDIT = 'defer_credit';
+
     public const TYPE_EGC_EXEMPT_CREDIT = 'egc_exempt_credit';
+
     public const TYPE_SCHOLARSHIP_CREDIT = 'scholarship_credit';
+
     public const TYPE_VOUCHER_CREDIT = 'voucher_credit';
+
     public const TYPE_ADJUSTMENT = 'adjustment';
 
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_VOID = 'void';
 
     public const CHARGE_TYPES = [
@@ -169,6 +180,7 @@ class FinanceCharge extends Model
         if ($this->amount <= 0) {
             return 0; // Credits don't have balance
         }
+
         return (float) $this->amount - $this->paid_amount;
     }
 

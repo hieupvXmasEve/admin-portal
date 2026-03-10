@@ -1,8 +1,8 @@
 <?php
 
-use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
 use App\Modules\Finance\Http\Web\Admin\BillingInvoiceController;
 use App\Modules\Finance\Http\Web\Admin\BillingOperationsController;
+use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
 use App\Modules\Finance\Http\Web\Admin\PaymentController;
 use Illuminate\Support\Facades\Route;
 
@@ -45,6 +45,10 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
     // =====================
     // Finance Charges
     // =====================
+    Route::get('/students/{student}/charges', [FinanceChargeController::class, 'studentCharges'])
+        ->middleware('can:view_finance_charges')
+        ->name('students.charges');
+
     Route::prefix('charges')->name('charges.')->group(function () {
         Route::get('/', [FinanceChargeController::class, 'index'])
             ->middleware('can:view_finance_charges')
@@ -82,6 +86,12 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::post('/import/store', [PaymentController::class, 'storeImport'])
             ->middleware('can:import_finance_payments')
             ->name('import.store');
+        Route::get('/auto-allocate', [PaymentController::class, 'showAutoAllocate'])
+            ->middleware('can:allocate_finance_payment')
+            ->name('auto-allocate.show');
+        Route::post('/auto-allocate/preview', [PaymentController::class, 'previewAutoAllocate'])
+            ->middleware('can:allocate_finance_payment')
+            ->name('auto-allocate.preview');
         Route::post('/auto-allocate', [PaymentController::class, 'autoAllocate'])
             ->middleware('can:allocate_finance_payment')
             ->name('auto-allocate');

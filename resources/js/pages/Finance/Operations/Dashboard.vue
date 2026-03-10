@@ -51,8 +51,10 @@ interface StudentBillingSummary {
     stage: 'EGC' | 'Major' | 'Unknown';
     gc_current_level: string | null;
     total_charged: number;
+    total_credits: number;
     total_paid: number;
     balance: number;
+    amount_due: number;
     unapplied_credit: number;
     breakdown: {
         major: number;
@@ -70,7 +72,14 @@ interface StudentBillingSummary {
         missing_docs: boolean;
         uncharged: boolean;
     };
-    invoice_status: 'paid' | 'partial' | 'unpaid' | 'pending' | null;
+    invoices: {
+        id: number;
+        invoice_number: string;
+        status: string;
+        due_date: string | null;
+    }[];
+    invoice_statuses: string[];
+    invoice_status: string | null;
     invoice_number: string | null;
     invoice_id: number | null;
     due_date: string | null;
@@ -154,13 +163,18 @@ const columns: ColumnDef<StudentBillingSummary>[] = [
         enableSorting: true
     },
     {
+        accessorKey: 'total_credits',
+        header: () => 'Giảm trừ',
+        enableSorting: false,
+    },
+    {
         accessorKey: 'total_paid',
         header: () => 'Paid',
         enableSorting: true,
     },
     {
         accessorKey: 'balance',
-        header: () => 'Balance',
+        header: () => 'Cần đóng',
         enableSorting: true,
     },
     {
@@ -191,6 +205,12 @@ const paidPercentage = computed(() => {
 // Get invoice status badge
 const getStatusBadgeClass = (status: string | null) => {
     switch (status) {
+        case 'draft':
+            return 'bg-slate-100 text-slate-800';
+        case 'overdue':
+            return 'bg-orange-100 text-orange-800';
+        case 'cancelled':
+            return 'bg-zinc-100 text-zinc-600';
         case 'paid':
             return 'bg-green-100 text-green-800';
         case 'partial':
@@ -198,7 +218,7 @@ const getStatusBadgeClass = (status: string | null) => {
         case 'unpaid':
             return 'bg-red-100 text-red-800';
         case 'pending':
-            return 'bg-gray-100 text-gray-800';
+            return 'bg-blue-100 text-blue-800';
         default:
             return 'bg-gray-100 text-gray-500';
     }
@@ -206,6 +226,12 @@ const getStatusBadgeClass = (status: string | null) => {
 
 const getStatusLabel = (status: string | null) => {
     switch (status) {
+        case 'draft':
+            return 'Nháp';
+        case 'overdue':
+            return 'Quá hạn';
+        case 'cancelled':
+            return 'Đã hủy';
         case 'paid':
             return 'Đã thanh toán';
         case 'partial':
@@ -225,6 +251,9 @@ const statusOptions = [
     { value: 'partial', label: 'Thanh toán một phần' },
     { value: 'unpaid', label: 'Chưa thanh toán' },
     { value: 'pending', label: 'Chờ xử lý' },
+    { value: 'overdue', label: 'Quá hạn' },
+    { value: 'draft', label: 'Nháp' },
+    { value: 'cancelled', label: 'Đã hủy' },
     { value: 'no_invoice', label: 'Chưa có hóa đơn' },
 ];
 
@@ -477,7 +506,7 @@ defineOptions({
                 <div class="flex items-center justify-between">
                     <div>
                         <CardTitle>Danh sách sinh viên</CardTitle>
-                        <CardDescription>1 dòng / 1 sinh viên với thông tin billing</CardDescription>
+                        <CardDescription>1 dòng / 1 sinh viên, hiển thị đầy đủ invoice trong kỳ</CardDescription>
                     </div>
                 </div>
             </CardHeader>
@@ -516,6 +545,13 @@ defineOptions({
                         </div>
                     </template>
 
+                    <!-- Credits Column -->
+                    <template #cell-total_credits="{ row }">
+                        <div class="text-left font-medium text-sky-600">
+                            {{ formatCurrency(row.original.total_credits) }}
+                        </div>
+                    </template>
+
                     <!-- Paid Column -->
                     <template #cell-total_paid="{ row }">
                         <div class="text-left font-medium text-green-600">
@@ -526,9 +562,12 @@ defineOptions({
                     <!-- Balance Column -->
                     <template #cell-balance="{ row }">
                         <div class="text-left font-medium">
-                            <span :class="row.original.balance > 0 ? 'text-orange-600' : ''">
-                                {{ formatCurrency(row.original.balance) }}
+                            <span :class="row.original.amount_due > 0 ? 'text-orange-600' : 'text-green-600'">
+                                {{ formatCurrency(row.original.amount_due) }}
                             </span>
+                            <div v-if="row.original.balance < 0" class="text-xs text-green-600">
+                                Dư {{ formatCurrency(Math.abs(row.original.balance)) }}
+                            </div>
                             <div v-if="row.original.unapplied_credit > 0" class="text-xs text-green-600"
                                 title="Unapplied Credit (Wallet)">
                                 +{{ formatCurrency(row.original.unapplied_credit) }}
@@ -564,13 +603,20 @@ defineOptions({
 
                     <!-- Status Column -->
                     <template #cell-invoice_status="{ row }">
-                        <div class="flex flex-col gap-1 items-start">
-                            <Badge :class="getStatusBadgeClass(row.original.invoice_status)">
-                                {{ getStatusLabel(row.original.invoice_status) }}
+                        <div v-if="row.original.invoices.length > 0" class="flex flex-col items-start gap-2">
+                            <div v-for="invoice in row.original.invoices" :key="invoice.id" class="flex flex-col items-start gap-1">
+                                <Badge :class="getStatusBadgeClass(invoice.status)">
+                                    {{ getStatusLabel(invoice.status) }}
+                                </Badge>
+                                <span class="text-xs text-muted-foreground">
+                                    #{{ invoice.invoice_number }}
+                                </span>
+                            </div>
+                        </div>
+                        <div v-else class="flex flex-col items-start gap-1">
+                            <Badge :class="getStatusBadgeClass(null)">
+                                {{ getStatusLabel(null) }}
                             </Badge>
-                            <span v-if="row.original.invoice_number" class="text-xs text-muted-foreground">
-                                #{{ row.original.invoice_number }}
-                            </span>
                         </div>
                     </template>
 

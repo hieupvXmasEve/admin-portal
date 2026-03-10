@@ -33,7 +33,7 @@ class CreateFinanceChargeAction
                 'created_by_user_id' => $data['created_by_user_id'] ?? auth()->id() ?? null,
             ]);
 
-            // Get invoice - either from user selection or find/create
+            // All charges (positive & negative) get assigned to invoice
             $invoice = $this->getInvoiceForCharge($charge, $data['invoice_id'] ?? null);
             $this->assignChargeToInvoice($charge, $invoice);
 
@@ -144,6 +144,7 @@ class CreateFinanceChargeAction
     {
         // Generate invoice number
         $invoiceNumber = $this->generateInvoiceNumber($studentId, $semesterId);
+
         // Create invoice
         return StudentInvoice::create([
             'invoice_number' => $invoiceNumber,

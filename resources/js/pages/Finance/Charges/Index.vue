@@ -24,21 +24,24 @@ import {
     type FinanceCharge,
     type Semester,
 } from '@/types/finance';
+import type { PaginatedResponse } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Eye, Plus, Search, XCircle } from 'lucide-vue-next';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import { computed, ref, watch } from 'vue';
 
 interface Props {
-    charges: {
-        data: FinanceCharge[];
-        meta: any;
-        links: any;
-    };
+    charges: PaginatedResponse<FinanceCharge>;
     chargeTypes: { value: string; label: string }[];
     semesters: Semester[];
+    student?: {
+        id: number;
+        full_name: string;
+        student_id: string;
+    } | null;
     filters: {
         search: string;
+        student_id?: number | null;
         semester_id: string;
         charge_type: string;
         status: string;
@@ -53,9 +56,23 @@ const semesterId = ref(props.filters.semester_id || 'all');
 const chargeType = ref(props.filters.charge_type || 'all');
 const status = ref(props.filters.status || 'all');
 
+const chargesIndexRoute = computed(() =>
+    props.student ? route('finance.students.charges', props.student.id) : route('finance.charges.index'),
+);
+
+const createChargeRoute = computed(() =>
+    props.student ? route('finance.charges.create', { student_id: props.student.id }) : route('finance.charges.create'),
+);
+
+const pageDescription = computed(() =>
+    props.student
+        ? `Quản lý các khoản phí và tín dụng của ${props.student.full_name} (${props.student.student_id})`
+        : 'Quản lý các khoản phí và tín dụng của sinh viên',
+);
+
 // Debounced search
 let searchTimeout: ReturnType<typeof setTimeout>;
-watch(search, (value) => {
+watch(search, () => {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
         applyFilters();
@@ -64,7 +81,7 @@ watch(search, (value) => {
 
 const applyFilters = () => {
     router.get(
-        route('finance.charges.index'),
+        chargesIndexRoute.value,
         {
             search: search.value || undefined,
             semester_id: semesterId.value !== 'all' ? semesterId.value : undefined,
@@ -81,15 +98,6 @@ const handleFilterChange = () => {
 
 const handlePaginationNavigate = (url: string) => {
     router.visit(url, { preserveState: true, preserveScroll: true });
-};
-
-const formatDate = (dateStr: string | null | undefined): string => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('vi-VN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-    });
 };
 
 // Computed statistics
@@ -135,9 +143,9 @@ const handleVoidCharge = (charge: FinanceCharge) => {
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-3xl font-bold tracking-tight">Finance Charges</h1>
-                <p class="text-muted-foreground mt-1">Quản lý các khoản phí và tín dụng của sinh viên</p>
+                <p class="text-muted-foreground mt-1">{{ pageDescription }}</p>
             </div>
-            <Link :href="route('finance.charges.create')">
+            <Link :href="createChargeRoute">
                 <Button>
                     <Plus class="mr-2 h-4 w-4" />
                     Tạo khoản phí mới
@@ -162,7 +170,7 @@ const handleVoidCharge = (charge: FinanceCharge) => {
             <Card>
                 <CardHeader class="pb-2">
                     <CardDescription>Số dòng hiển thị</CardDescription>
-                    <CardTitle class="text-lg">{{ charges.data.length }} / {{ charges.meta?.total || 0 }}</CardTitle>
+                    <CardTitle class="text-lg">{{ charges.data.length }} / {{ charges.total }}</CardTitle>
                 </CardHeader>
             </Card>
         </div>

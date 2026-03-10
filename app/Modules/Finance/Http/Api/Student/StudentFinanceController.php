@@ -24,8 +24,8 @@ class StudentFinanceController extends Controller
     public function balance(Request $request): JsonResponse
     {
         $student = $request->user('student');
-        
-        if (!$student) {
+
+        if (! $student) {
             return ApiResponse::error('Unauthorized', [], 401);
         }
 
@@ -48,8 +48,8 @@ class StudentFinanceController extends Controller
     public function charges(Request $request): JsonResponse
     {
         $student = $request->user('student');
-        
-        if (!$student) {
+
+        if (! $student) {
             return ApiResponse::error('Unauthorized', [], 401);
         }
 
@@ -81,8 +81,8 @@ class StudentFinanceController extends Controller
     public function payments(Request $request): JsonResponse
     {
         $student = $request->user('student');
-        
-        if (!$student) {
+
+        if (! $student) {
             return ApiResponse::error('Unauthorized', [], 401);
         }
 
@@ -90,7 +90,7 @@ class StudentFinanceController extends Controller
 
         // Add computed attributes
         $payments->each(function ($payment) {
-            $payment->append(['allocated_amount', 'unapplied_amount', 'is_fully_allocated', 'has_unapplied_credit']);
+            $payment->append(['allocated_amount', 'unapplied_amount', 'is_fully_allocated']);
         });
 
         return ApiResponse::success([
@@ -105,8 +105,8 @@ class StudentFinanceController extends Controller
     public function chargeDetail(Request $request, int $chargeId): JsonResponse
     {
         $student = $request->user('student');
-        
-        if (!$student) {
+
+        if (! $student) {
             return ApiResponse::error('Unauthorized', [], 401);
         }
 
@@ -115,7 +115,7 @@ class StudentFinanceController extends Controller
             ->with(['semester', 'allocations.payment'])
             ->first();
 
-        if (!$charge) {
+        if (! $charge) {
             return ApiResponse::error('Charge not found', [], 404);
         }
 

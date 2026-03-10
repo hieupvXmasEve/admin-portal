@@ -6,6 +6,7 @@ namespace App\Modules\Finance\Queries\Operations;
 
 use App\Models\DeferCase;
 use App\Models\FinanceCharge;
+use App\Models\Payment;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentInvoice;
@@ -45,15 +46,15 @@ class GetBillingDashboardStudentsQuery
             ])
             ->leftJoin('programs', 'students.program_id', '=', 'programs.id')
             ->where('students.intake_semester_id', '<=', $semesterId)
-            ->when($campusId, fn($q) => $q->where('students.campus_id', $campusId))
+            ->when($campusId, fn ($q) => $q->where('students.campus_id', $campusId))
             ->where(function (Builder $q) use ($semesterId) {
-                $q->whereHas('courseRegistrations', fn($sq) => $sq->where('semester_id', $semesterId)->whereNotIn('registration_status', ['defer', 'dropped', 'withdrawn']));
-                $q->orWhereHas('deferCases', fn($sq) => $sq->where('semester_id', $semesterId));
+                $q->whereHas('courseRegistrations', fn ($sq) => $sq->where('semester_id', $semesterId)->whereNotIn('registration_status', ['defer', 'dropped', 'withdrawn']));
+                $q->orWhereHas('deferCases', fn ($sq) => $sq->where('semester_id', $semesterId));
                 $q->orWhereHas(
                     'financeCharges',
-                    fn($sq) => $sq->where('semester_id', $semesterId)->where('status', FinanceCharge::STATUS_ACTIVE)
+                    fn ($sq) => $sq->where('semester_id', $semesterId)->where('status', FinanceCharge::STATUS_ACTIVE)
                 );
-                $q->orWhereHas('invoices', fn($sq) => $sq->where('semester_id', $semesterId));
+                $q->orWhereHas('invoices', fn ($sq) => $sq->where('semester_id', $semesterId));
             });
 
         // 2. Add finance aggregates via subqueries
@@ -86,7 +87,7 @@ class GetBillingDashboardStudentsQuery
             'total_payments' => DB::table('payments')
                 ->selectRaw('COALESCE(SUM(amount), 0)')
                 ->whereColumn('student_id', 'students.id')
-                ->where('status', 'paid'), // Assuming 'paid' status exists
+                ->where('status', Payment::STATUS_COMPLETED),
         ]);
 
         // Breakdown Subqueries
@@ -114,8 +115,8 @@ class GetBillingDashboardStudentsQuery
         // Search Filter (searches both name and student_id)
         if (! empty($search)) {
             $studentsQuery->where(function (Builder $query) use ($search) {
-                $query->where('students.full_name', 'like', '%' . $search . '%')
-                    ->orWhere('students.student_id', 'like', '%' . $search . '%');
+                $query->where('students.full_name', 'like', '%'.$search.'%')
+                    ->orWhere('students.student_id', 'like', '%'.$search.'%');
             });
         }
 
@@ -127,6 +128,14 @@ class GetBillingDashboardStudentsQuery
                         ->from('student_invoices')
                         ->whereColumn('student_invoices.student_id', 'students.id')
                         ->where('student_invoices.semester_id', $semesterId);
+                });
+            } elseif ($status === 'unpaid') {
+                $studentsQuery->whereExists(function ($query) use ($semesterId) {
+                    $query->select(DB::raw(1))
+                        ->from('student_invoices')
+                        ->whereColumn('student_invoices.student_id', 'students.id')
+                        ->where('student_invoices.semester_id', $semesterId)
+                        ->whereIn('status', ['draft', 'pending', 'overdue']);
                 });
             } else {
                 $studentsQuery->whereExists(function ($query) use ($semesterId, $status) {
@@ -155,9 +164,9 @@ class GetBillingDashboardStudentsQuery
                     ->from('defer_cases')
                     ->whereColumn('defer_cases.student_id', 'students.id')
                     ->where('defer_cases.semester_id', $semesterId)
-                    ->when($defer === 'preserve', fn($q) => $q->where('fee_policy', DeferCase::POLICY_PRESERVE))
-                    ->when($defer === 'forfeit', fn($q) => $q->where('fee_policy', DeferCase::POLICY_FORFEIT))
-                    ->when($defer === 'missing_docs', fn($q) => $q->where('fee_policy', DeferCase::POLICY_PRESERVE)->whereNull('upload_record_id'));
+                    ->when($defer === 'preserve', fn ($q) => $q->where('fee_policy', DeferCase::POLICY_PRESERVE))
+                    ->when($defer === 'forfeit', fn ($q) => $q->where('fee_policy', DeferCase::POLICY_FORFEIT))
+                    ->when($defer === 'missing_docs', fn ($q) => $q->where('fee_policy', DeferCase::POLICY_PRESERVE)->whereNull('upload_record_id'));
             });
         }
 
@@ -200,70 +209,89 @@ class GetBillingDashboardStudentsQuery
             $studentsQuery->orderBy('students.full_name', 'asc');
         }
 
-        return $studentsQuery->paginate($perPage)
-            ->through(function ($student) use ($semesterId) {
-                $totalCharged = (float) $student->total_charged;
-                $totalCredits = (float) $student->total_credits;
-                $totalPaid = (float) $student->total_paid;
+        $students = $studentsQuery->paginate($perPage);
 
-                // Net Due = Charged - Credits (if we consider credit reduces due).
-                // However, usually Balance = Net Due - Paid.
-                // In my Stats Logic: Balance = Charged - Credits - Paid.
-                $balance = $totalCharged - $totalCredits - $totalPaid;
+        $invoicesByStudent = StudentInvoice::query()
+            ->select(['id', 'student_id', 'invoice_number', 'status', 'due_date', 'created_at'])
+            ->where('semester_id', $semesterId)
+            ->whereIn('student_id', $students->getCollection()->pluck('id'))
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy('student_id');
 
-                // Unapplied Credit = Total Payments - Total Allocations (Anytime)
-                $unappliedCredit = (float) $student->total_payments - (float) $student->unapplied_allocations;
+        return $students->through(function ($student) use ($semesterId, $invoicesByStudent) {
+            $totalCharged = (float) $student->total_charged;
+            $totalCredits = (float) $student->total_credits;
+            $totalPaid = (float) $student->total_paid;
 
-                // Get invoice data
-                $invoice = StudentInvoice::where('student_id', $student->id)
-                    ->where('semester_id', $semesterId)
-                    ->first();
+            // Net Due = Charged - Credits (if we consider credit reduces due).
+            // However, usually Balance = Net Due - Paid.
+            // In my Stats Logic: Balance = Charged - Credits - Paid.
+            $balance = $totalCharged - $totalCredits - $totalPaid;
+            $amountDue = max($balance, 0);
 
-                // Get flags
-                $flags = $this->getStudentBillingFlags($student->id, $semesterId);
-                // Additional Flag: Uncharged
-                if (! $invoice && $totalCharged == 0) {
-                    $flags['uncharged'] = true;
-                }
+            // Unapplied Credit = Total Payments - Total Allocations (Anytime)
+            $unappliedCredit = (float) $student->total_payments - (float) $student->unapplied_allocations;
 
-                // Stage Logic
-                $stage = 'Unknown';
-                if ($student->intake_gc) {
-                    $stage = 'EGC';
-                }
-                if ($student->intake_course) {
-                    $stage = 'Major';
-                } // Simple logic for now
+            $studentInvoices = $invoicesByStudent->get($student->id, collect());
+            /** @var StudentInvoice|null $latestInvoice */
+            $latestInvoice = $studentInvoices->first();
 
-                return [
-                    'id' => $student->id,
-                    'student_id' => $student->student_id,
-                    'full_name' => $student->full_name,
-                    'program_code' => $student->program_code,
-                    'intake_semester' => $student->intakeSemester?->name,
-                    'stage' => $stage,
-                    'gc_current_level' => $student->gc_current_level,
-                    'status' => $student->status,
+            // Get flags
+            $flags = $this->getStudentBillingFlags($student->id, $semesterId);
+            // Additional Flag: Uncharged
+            if ($studentInvoices->isEmpty() && $totalCharged == 0.0) {
+                $flags['uncharged'] = true;
+            }
 
-                    'total_charged' => $totalCharged,
-                    'total_paid' => $totalPaid,
-                    'balance' => $balance,
-                    'unapplied_credit' => $unappliedCredit > 0 ? $unappliedCredit : 0,
+            // Stage Logic
+            $stage = 'Unknown';
+            if ($student->intake_gc) {
+                $stage = 'EGC';
+            }
+            if ($student->intake_course) {
+                $stage = 'Major';
+            } // Simple logic for now
 
-                    'breakdown' => [
-                        'major' => (float) $student->major_fee,
-                        'egc' => (float) $student->egc_fee,
-                        'retake' => (float) $student->retake_fee,
-                        'credits' => (float) $student->total_credits,
-                    ],
+            return [
+                'id' => $student->id,
+                'student_id' => $student->student_id,
+                'full_name' => $student->full_name,
+                'program_code' => $student->program_code,
+                'intake_semester' => $student->intakeSemester?->name,
+                'stage' => $stage,
+                'gc_current_level' => $student->gc_current_level,
+                'status' => $student->status,
 
-                    'flags' => $flags,
-                    'invoice_status' => $invoice?->status ?? null,
-                    'invoice_number' => $invoice?->invoice_number ?? null,
-                    'invoice_id' => $invoice?->id ?? null,
-                    'due_date' => $invoice?->due_date,
-                ];
-            });
+                'total_charged' => $totalCharged,
+                'total_credits' => $totalCredits,
+                'total_paid' => $totalPaid,
+                'balance' => $balance,
+                'amount_due' => $amountDue,
+                'unapplied_credit' => $unappliedCredit > 0 ? $unappliedCredit : 0,
+
+                'breakdown' => [
+                    'major' => (float) $student->major_fee,
+                    'egc' => (float) $student->egc_fee,
+                    'retake' => (float) $student->retake_fee,
+                    'credits' => (float) $student->total_credits,
+                ],
+
+                'flags' => $flags,
+                'invoices' => $studentInvoices->map(fn (StudentInvoice $invoice) => [
+                    'id' => $invoice->id,
+                    'invoice_number' => $invoice->invoice_number,
+                    'status' => $invoice->status,
+                    'due_date' => $invoice->due_date?->toDateString(),
+                ])->values()->all(),
+                'invoice_statuses' => $studentInvoices->pluck('status')->unique()->values()->all(),
+                'invoice_status' => $latestInvoice?->status ?? null,
+                'invoice_number' => $latestInvoice?->invoice_number ?? null,
+                'invoice_id' => $latestInvoice?->id ?? null,
+                'due_date' => $latestInvoice?->due_date?->toDateString(),
+            ];
+        });
     }
 
     private function getStudentBillingFlags(int $studentId, ?int $semesterId): array
