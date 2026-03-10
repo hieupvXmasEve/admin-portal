@@ -25,9 +25,9 @@ import {
     Wallet,
     Zap,
 } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { useApi } from '@/composables/useApiRequest';
+import { ref } from 'vue';
 import { toast } from 'vue-sonner';
-import axios from 'axios';
 import { Head, Link } from '@inertiajs/vue3';
 
 interface AllocationDetail {
@@ -104,14 +104,21 @@ const formatCurrency = (value: number) => {
     }).format(value);
 };
 
+const api = useApi();
+
 const handlePreview = async () => {
     isLoading.value = true;
     try {
-        const response = await axios.post(route('finance.payments.auto-allocate.preview'), {
+        const { data } = await api.post<PreviewData>(route('finance.payments.auto-allocate.preview'), {
             priority_order: priorities.value.map((p) => p.id),
         });
-        previewData.value = response.data;
-        currentStep.value = 'preview';
+        const result = data.value as unknown as PreviewData | null;
+        if (result && 'summary' in result) {
+            previewData.value = result;
+            currentStep.value = 'preview';
+        } else {
+            toast.error('Không thể tải xem trước. Vui lòng thử lại.');
+        }
     } catch (error) {
         toast.error('Không thể tải xem trước. Vui lòng thử lại.');
         console.error(error);

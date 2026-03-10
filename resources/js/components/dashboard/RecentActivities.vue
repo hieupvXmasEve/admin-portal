@@ -11,8 +11,6 @@ const error = ref<string | null>(null);
 onMounted(async () => {
     try {
         // This will be implemented later
-        // const res = await axios.get('/api/admin/dashboard/recent-activities')
-        // data.value = res.data
 
         // For now, show placeholder
         setTimeout(() => {
@@ -41,11 +39,13 @@ onMounted(async () => {
                 <div>{{ error }}</div>
             </div>
 
-            <div v-else class="text-muted-foreground border-muted-foreground/25 rounded-lg border-2 border-dashed py-12 text-center">
+            <div v-else
+                class="text-muted-foreground border-muted-foreground/25 rounded-lg border-2 border-dashed py-12 text-center">
                 <div class="mb-4 text-4xl">📋</div>
                 <div class="text-lg font-medium">Recent Activities Feed</div>
                 <div class="mt-2 text-sm">Latest course registrations, class sessions, and bookings</div>
-                <div class="text-muted-foreground/70 mt-1 text-xs">Data endpoint: /api/admin/dashboard/recent-activities</div>
+                <div class="text-muted-foreground/70 mt-1 text-xs">Data endpoint: /api/admin/dashboard/recent-activities
+                </div>
             </div>
         </CardContent>
     </Card>
