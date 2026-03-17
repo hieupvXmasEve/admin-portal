@@ -93,10 +93,10 @@ Route::middleware([
         // Timetable endpoints
         Route::prefix('timetable')->name('timetable.')->group(function () {
             Route::get('/', [TimetableController::class, 'index'])->name('index');
-            Route::get('/weekly', [TimetableController::class, 'weekly'])->name('weekly');
-            Route::get('/class-session/{classSession}', [TimetableController::class, 'classSessionDetail'])
-                ->name('class-session-detail');
-            Route::get('/filter-options', [TimetableController::class, 'filterOptions'])->name('filter-options');
+            // Route::get('/weekly', [TimetableController::class, 'weekly'])->name('weekly');
+            // Route::get('/class-session/{classSession}', [TimetableController::class, 'classSessionDetail'])
+            //     ->name('class-session-detail');
+            // Route::get('/filter-options', [TimetableController::class, 'filterOptions'])->name('filter-options');
         });
 
         // Grades and academic progress endpoints

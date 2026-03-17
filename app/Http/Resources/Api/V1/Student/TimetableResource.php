@@ -36,7 +36,49 @@ class TimetableResource extends JsonResource
                 'day_name' => $dayData['day_name'],
                 'day' => $dayData['day'],
                 'day_abbreviation' => $dayData['day_abbreviation'],
+                'event_count' => $dayData['event_count'] ?? count($dayData['events'] ?? []),
                 'session_count' => $dayData['session_count'],
+                'events' => collect($dayData['events'] ?? [])->map(function ($event) {
+                    return [
+                        'id' => $event['id'],
+                        'campus_id' => $event['campus_id'],
+                        'title' => $event['title'],
+                        'description' => $event['description'],
+                        'location' => $event['location'],
+                        'status' => $event['status'],
+                        'status_display' => $this->formatEventStatus($event['status']),
+                        'start_time' => $event['start_time'],
+                        'end_time' => $event['end_time'],
+                        'start_time_iso' => $event['start_time_iso'],
+                        'end_time_iso' => $event['end_time_iso'],
+                        'time' => [
+                            'start' => $event['display_start_time'],
+                            'end' => $event['display_end_time'],
+                            'display' => $this->formatTimeRange($event['display_start_time'], $event['display_end_time']),
+                        ],
+                        'occurrence_date' => $event['occurrence_date'],
+                        'gold_reward_amount' => $event['gold_reward_amount'],
+                        'max_participants' => $event['max_participants'],
+                        'qr_code' => $event['qr_code'],
+                        'organizer_type' => $event['organizer_type'],
+                        'organizer_id' => $event['organizer_id'],
+                        'published_at' => $event['published_at'],
+                        'cancelled_at' => $event['cancelled_at'],
+                        'completed_at' => $event['completed_at'],
+                        'created_by_user_id' => $event['created_by_user_id'],
+                        'created_by_admin_id' => $event['created_by_admin_id'],
+                        'is_manual' => $event['is_manual'],
+                        'is_historical' => $event['is_historical'],
+                        'requires_registration' => $event['requires_registration'],
+                        'created_at' => $event['created_at'],
+                        'updated_at' => $event['updated_at'],
+                        'is_multi_day' => $event['is_multi_day'],
+                        'color' => $event['color'],
+                        'item_type' => $event['item_type'],
+                        'is_current' => $this->isCurrentEvent($event),
+                        'is_upcoming' => $this->isUpcomingEvent($event),
+                    ];
+                })->toArray(),
                 'sessions' => collect($dayData['sessions'])->map(function ($session) use ($day) {
                     return [
                         'id' => $session['id'],
@@ -145,7 +187,7 @@ class TimetableResource extends JsonResource
         $start = $startTime instanceof \Carbon\Carbon ? $startTime : \Carbon\Carbon::createFromTimeString($startTime);
         $end = $endTime instanceof \Carbon\Carbon ? $endTime : \Carbon\Carbon::createFromTimeString($endTime);
 
-        return $start->format('g:i A') . ' - ' . $end->format('g:i A');
+        return $start->format('g:i A').' - '.$end->format('g:i A');
     }
 
     /**
@@ -158,6 +200,7 @@ class TimetableResource extends JsonResource
         }
 
         $carbonTime = $time instanceof \Carbon\Carbon ? $time : \Carbon\Carbon::createFromTimeString($time);
+
         return $carbonTime->format('g:i A');
     }
 
@@ -201,6 +244,17 @@ class TimetableResource extends JsonResource
         return implode(' - ', $parts);
     }
 
+    protected function formatEventStatus(string $status): string
+    {
+        return match ($status) {
+            'draft' => 'Draft',
+            'published' => 'Published',
+            'cancelled' => 'Cancelled',
+            'completed' => 'Completed',
+            default => ucfirst($status),
+        };
+    }
+
     /**
      * Check if session is currently happening
      */
@@ -228,6 +282,19 @@ class TimetableResource extends JsonResource
         $startTime = $session['start_time'] instanceof \Carbon\Carbon ? $session['start_time']->format('H:i') : $session['start_time'];
 
         return $day === $currentDay && $currentTime < $startTime;
+    }
+
+    protected function isCurrentEvent(array $event): bool
+    {
+        return now()->betweenIncluded(
+            \Carbon\Carbon::parse($event['start_time']),
+            \Carbon\Carbon::parse($event['end_time'])
+        );
+    }
+
+    protected function isUpcomingEvent(array $event): bool
+    {
+        return now()->lt(\Carbon\Carbon::parse($event['start_time']));
     }
 
     /**

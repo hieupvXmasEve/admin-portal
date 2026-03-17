@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -14,13 +16,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $semester_id
  * @property \Illuminate\Support\Carbon|null $due_date
  * @property string $status
- * 
  * @property-read float $total_amount
  * @property-read float $paid_amount
  * @property-read float $outstanding_balance
  */
 class StudentInvoice extends Model
 {
+    public const NON_REUSABLE_FOR_CHARGE_GENERATION_STATUSES = [
+        'issued',
+        'paid',
+        'void',
+        'cancelled',
+    ];
+
     protected $fillable = [
         'invoice_number',
         'student_id',
@@ -144,6 +152,11 @@ class StudentInvoice extends Model
         return $query->where('semester_id', $semesterId);
     }
 
+    public function scopeReusableForChargeGeneration($query)
+    {
+        return $query->whereNotIn('status', self::NON_REUSABLE_FOR_CHARGE_GENERATION_STATUSES);
+    }
+
     public function scopeSearch($query, string $term)
     {
         return $query->where(function ($q) use ($term) {
@@ -164,9 +177,9 @@ class StudentInvoice extends Model
      */
     public function scopeFilterByStatus($query, string $status)
     {
-        // This is a simplified approach. 
+        // This is a simplified approach.
         // For 'overdue', 'open', 'paid' which depend on calculations (charges - payments),
-        // doing this purely in SQL can be heavy if not optimized. 
+        // doing this purely in SQL can be heavy if not optimized.
         // We will try to use the 'status' column if it's synced, but requirements say "real-time".
         // Let's assume for now we filter in PHP or use a raw query if strictly needed.
         // However, a common pattern is to sync the 'status' column whenever charges/payments change.
@@ -181,9 +194,9 @@ class StudentInvoice extends Model
         // Invoice -> hasManyCharges -> hasManyAllocations.
         // This is too complex for a fast scope without materialized views or cached columns.
 
-        // RECOMMENDATION: We will trust the accessors for display. 
-        // For filtering, we might need to rely on the stored 'status' column OR 
-        // perform a check. 
+        // RECOMMENDATION: We will trust the accessors for display.
+        // For filtering, we might need to rely on the stored 'status' column OR
+        // perform a check.
 
         // Let's implement a best-effort SQL filter.
         switch ($status) {

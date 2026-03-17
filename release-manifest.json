@@ -1,12 +1,12 @@
 {
-  "version": "2.14.0-beta.4",
-  "generatedAt": "2026-03-02T18:07:29.604Z",
+  "version": "2.14.0-beta.24",
+  "generatedAt": "2026-03-16T17:22:42.736Z",
   "files": [
     {
       "path": ".gitignore",
-      "checksum": "a430cb0982e1ee26c7694b3d4e14a58b3041f7bbb21bbb1d6771872c5ad67f80",
-      "size": 673,
-      "lastModified": "2025-12-28T13:19:26+07:00"
+      "checksum": "fa891ac07c2369a90af9130f1f29c08a1689a9842471780a97602f1f98505881",
+      "size": 715,
+      "lastModified": "2026-03-15T10:48:03+07:00"
     },
     {
       "path": "agents/brainstormer.md",
@@ -16,9 +16,9 @@
     },
     {
       "path": "agents/code-reviewer.md",
-      "checksum": "84fde6d4933b9f0120cead1a3faeb490a33dacab17191d5e14edc9848819404c",
-      "size": 4596,
-      "lastModified": "2026-03-03T00:44:25+07:00"
+      "checksum": "8b84cd90060e21578d85c983fa7e1701efc49fbe0786156353b4668655c29f4e",
+      "size": 4886,
+      "lastModified": "2026-03-14T23:31:01+07:00"
     },
     {
       "path": "agents/code-simplifier.md",
@@ -93,120 +93,6 @@
       "lastModified": "2026-02-13T08:51:31+07:00"
     },
     {
-      "path": "command-archive/ask.md",
-      "checksum": "1fcaa1f2509dd1d6ae6f02b5489f4b022ccf422b18634831bdf945da6f1669be",
-      "size": 3235,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/ck-help.md",
-      "checksum": "d7329ad07100988918cfc33a7292b6c125b1169125191c375aed62c4a6c87da6",
-      "size": 4262,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/coding-level.md",
-      "checksum": "00a4737b72c943c1a12d9b30d43413f9ca269d0c4237aaea415db045018074b7",
-      "size": 1325,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/docs/init.md",
-      "checksum": "f16326a351c3a703b8c2eae1c2fc15c56ed19a93cc0462b9269e749cc8686f75",
-      "size": 1892,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/docs/summarize.md",
-      "checksum": "08e4decaeb7c41571e1c7591ab87c5f95e1c78d11642ecb03b1949643efb5723",
-      "size": 686,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/docs/update.md",
-      "checksum": "014705e1a34b77ed8c5c996516a194250a05504c4172d9e8b61015620c281458",
-      "size": 3367,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/journal.md",
-      "checksum": "b1bbaa373a34d279075591cc695ba618c8aa41cee04c064f933af99ba91a6fba",
-      "size": 832,
-      "lastModified": "2026-02-24T17:24:08+07:00"
-    },
-    {
-      "path": "command-archive/kanban.md",
-      "checksum": "cd1594ce537d2568fefb3b37a27dd44d13e183b8c50c14a8e1e10dd5d9847894",
-      "size": 2952,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/plan/archive.md",
-      "checksum": "6206df22216f990019ea8a655dbf5920389a8d1b33f3c5be4acc3ea8f387c8fd",
-      "size": 2608,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/plan/red-team.md",
-      "checksum": "d5b3cb565ec402fb8b468f9dba7e3cab69be2bac8b0059eed5ba2815f0bedf9a",
-      "size": 7386,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/plan/validate.md",
-      "checksum": "a3dadc5553ff041b137c17f7d0929dcad0b610c5d42b2f1e6f00c5d570cf04a0",
-      "size": 7052,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/preview.md",
-      "checksum": "fccea207e405311c97cca962fcbebd304a4fb9ecd5607d99b3c8fa4f3cb80752",
-      "size": 10104,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/review/codebase/parallel.md",
-      "checksum": "a3c1551f6a4d6aaf90cdfa031d400fa8c958736185665fde5a7304f6599348eb",
-      "size": 3195,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/review/codebase.md",
-      "checksum": "3bad3ce8a05c4bde92a0684519b973c41e9bdfb1da4a9643fe62fbdec3fa45f7",
-      "size": 3220,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/test/ui.md",
-      "checksum": "d81b1177aec27e08ed36592de34d0311aa15453eb0eee5ad7e4872bb67b25010",
-      "size": 4177,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/test.md",
-      "checksum": "6fad49039f4cb64637458141e657daa654c418e5686cb95ba439b79482fdc419",
-      "size": 316,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/use-mcp.md",
-      "checksum": "6bfdfa86e005d204a66a981064e6cfe8c35c76ff581c3f904c4242ffa34822b0",
-      "size": 1640,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/watzup.md",
-      "checksum": "ec0de1a4fdcee20df9d577a5b163f3e5e43651e3d5ab9d9b6563c3bdfb31d094",
-      "size": 316,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "command-archive/worktree.md",
-      "checksum": "f1ca92348b8ac4db63c5f14660400c3cac3baa2f1090908b54e21d876c574808",
-      "size": 3088,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
       "path": "hooks/__tests__/ck-config-utils.test.cjs",
       "checksum": "c2a892bbc1c166d18af24b6ae731c117743caa404022e0db6c5687798cc0e84e",
       "size": 17462,
@@ -231,6 +117,12 @@
       "lastModified": "2026-01-11T11:26:17-05:00"
     },
     {
+      "path": "hooks/__tests__/plan-format-kanban.test.cjs",
+      "checksum": "b2136700525ae21db825dae4a68ba2f74e9970867a698d137a3254cf622f9614",
+      "size": 12650,
+      "lastModified": "2026-03-07T09:04:58+07:00"
+    },
+    {
       "path": "hooks/__tests__/privacy-block.test.cjs",
       "checksum": "364cd461a51c27b9e657ed5eaf3cc54944fd3d8d655042eaa48b96c841718f3e",
       "size": 9940,
@@ -250,9 +142,9 @@
     },
     {
       "path": "hooks/__tests__/subagent-init.test.cjs",
-      "checksum": "10839eff794c0c1ea723954b9512678a4eda2ab349469c4f709d60df01283eb8",
-      "size": 20530,
-      "lastModified": "2026-01-03T12:46:25-05:00"
+      "checksum": "0427418c35a596d2dce8991e40affa2441946e4b974efb6ea7bb96dc91ba6465",
+      "size": 22434,
+      "lastModified": "2026-03-07T09:04:58+07:00"
     },
     {
       "path": "hooks/__tests__/task-completed-handler.test.cjs",
@@ -304,9 +196,9 @@
     },
     {
       "path": "hooks/lib/__tests__/ck-config-utils.test.cjs",
-      "checksum": "e081b082d414480a0dd1afc8deb2ab634c01628542f7a4b15a752941991c8771",
-      "size": 26211,
-      "lastModified": "2026-01-11T16:19:55-05:00"
+      "checksum": "62e59b8419a2a2f2baaf4aa3e2d4d9235e4366572620382d01dcd8dde30f8f05",
+      "size": 26812,
+      "lastModified": "2026-03-07T09:22:57+07:00"
     },
     {
       "path": "hooks/lib/__tests__/context-builder.test.cjs",
@@ -346,9 +238,9 @@
     },
     {
       "path": "hooks/lib/ck-config-utils.cjs",
-      "checksum": "a687a6df0d3cdcaed702ed55a2af9728cb73d1837e85f367854b619ffde87e3a",
-      "size": 26557,
-      "lastModified": "2026-02-05T22:24:57-05:00"
+      "checksum": "e4ef4a16ff9f144562ad8f87fc156841666db67c572a568175b371cd6e5b47ef",
+      "size": 26787,
+      "lastModified": "2026-03-07T09:22:57+07:00"
     },
     {
       "path": "hooks/lib/colors.cjs",
@@ -364,9 +256,9 @@
     },
     {
       "path": "hooks/lib/context-builder.cjs",
-      "checksum": "5f8fa23e7fc350738a3fa0a317cc543c457d3081dcbc94699abd8dcb6ea43bd6",
-      "size": 23907,
-      "lastModified": "2026-02-24T17:56:26+07:00"
+      "checksum": "a481f47eb30e0c52ecfb171e3b672e172290d6d70379a0f6851dd3cfa6388aca",
+      "size": 24256,
+      "lastModified": "2026-03-06T10:54:25+07:00"
     },
     {
       "path": "hooks/lib/git-info-cache.cjs",
@@ -399,22 +291,22 @@
       "lastModified": "2026-02-21T22:08:10+07:00"
     },
     {
+      "path": "hooks/lib/session-state-manager.cjs",
+      "checksum": "a5e148f26812b8b7295e7e347e05e75600ca8a858af7ed1f78846a8a9728bee1",
+      "size": 7638,
+      "lastModified": "2026-03-04T16:26:26+07:00"
+    },
+    {
       "path": "hooks/lib/transcript-parser.cjs",
       "checksum": "a3d769ad762072ab7630b8cbd704eb06a0994eb7c144d13b1ecc75bb31587ec1",
       "size": 7714,
       "lastModified": "2026-02-26T23:14:38+07:00"
     },
     {
-      "path": "hooks/notifications/discord_notify.sh",
-      "checksum": "5fb73d23c7fcbfd8cb1011ab0b6aa4c1e35919e2434776fe489d4e583b0fe80a",
-      "size": 6919,
-      "lastModified": "2026-01-04T22:46:55-05:00"
-    },
-    {
       "path": "hooks/notifications/docs/discord-hook-setup.md",
-      "checksum": "6a5303a28814fe1dcbc7321fc808a70bf4ab4566afafec35d500b5472003cfa4",
-      "size": 11186,
-      "lastModified": "2026-01-12T13:25:29-05:00"
+      "checksum": "d752306627ceaca88a06d29e8e72b1d0abd1628629b42e40d42300f2487da7b3",
+      "size": 4594,
+      "lastModified": "2026-03-04T01:04:18+07:00"
     },
     {
       "path": "hooks/notifications/docs/slack-hook-setup.md",
@@ -424,9 +316,9 @@
     },
     {
       "path": "hooks/notifications/docs/telegram-hook-setup.md",
-      "checksum": "e0c97ba33eae33d615f74570440b59103658d47006fc0423803ae53de6fcb5cb",
-      "size": 17965,
-      "lastModified": "2026-01-04T22:46:55-05:00"
+      "checksum": "26c3b091e7738c7d3f47b9d4d79c81855b792f71e096d7b1a3e0c9a1c8fcfba5",
+      "size": 15099,
+      "lastModified": "2026-03-04T01:04:18+07:00"
     },
     {
       "path": "hooks/notifications/lib/env-loader.cjs",
@@ -465,16 +357,10 @@
       "lastModified": "2025-12-21T20:00:05-05:00"
     },
     {
-      "path": "hooks/notifications/send-discord.sh",
-      "checksum": "51277ec15daa8f8751de61c9dedec80fa6638a8ab3a3b2499d70c925cb961120",
-      "size": 1789,
-      "lastModified": "2025-12-06T02:18:56-05:00"
-    },
-    {
-      "path": "hooks/notifications/telegram_notify.sh",
-      "checksum": "81d9470f82314af9b7e40231273c1a36b62b19802deff4c43051c9ce2e7bbb31",
-      "size": 4514,
-      "lastModified": "2026-01-04T22:46:55-05:00"
+      "path": "hooks/plan-format-kanban.cjs",
+      "checksum": "d5e7d97fb6ec9f02b8fa2c962135daa3263cb2fa1494672122226ee45c7a086e",
+      "size": 3438,
+      "lastModified": "2026-03-05T02:35:07+07:00"
     },
     {
       "path": "hooks/post-edit-simplify-reminder.cjs",
@@ -573,6 +459,12 @@
       "lastModified": "2026-03-03T00:44:25+07:00"
     },
     {
+      "path": "hooks/session-state.cjs",
+      "checksum": "811cdae7ae20879c10f17f3061f32e32c9a08a147031f92a2a96b6792f3f7610",
+      "size": 2510,
+      "lastModified": "2026-03-04T17:09:47+07:00"
+    },
+    {
       "path": "hooks/skill-dedup.cjs",
       "checksum": "c322b0818e9876a5bbc642b7934b96137930bece1fd4d0e26e6d47418954cb06",
       "size": 7938,
@@ -580,9 +472,9 @@
     },
     {
       "path": "hooks/subagent-init.cjs",
-      "checksum": "d1abe640eca338266af73ab5bb44a2f12822f89ac21532ba5993e021082a8f1d",
-      "size": 7262,
-      "lastModified": "2026-02-20T12:03:45+07:00"
+      "checksum": "7ae2b48aa147c0b60d6b60bcfdecf1db1ef0796dc916c371fb28997293c61c24",
+      "size": 8126,
+      "lastModified": "2026-03-05T13:07:01+07:00"
     },
     {
       "path": "hooks/task-completed-handler.cjs",
@@ -676,9 +568,9 @@
     },
     {
       "path": "metadata.json",
-      "checksum": "1759dddaa51cc7f7fc5fa06bd86eaa2203ccfa8a17f1ca925a473c59b1aff48e",
-      "size": 3092,
-      "lastModified": "2026-03-02T18:01:26Z"
+      "checksum": "79fdf602dcbb002da6dde5dda21e4d4516ef31306616ba53a0939e848d7cc1f6",
+      "size": 3745,
+      "lastModified": "2026-03-16T16:48:03Z"
     },
     {
       "path": "output-styles/coding-level-0-eli5.md",
@@ -718,9 +610,9 @@
     },
     {
       "path": "rules/development-rules.md",
-      "checksum": "70053f5db8acba8aed9c7987155380f7d03d5493f151c08e709cb7592e957f1e",
-      "size": 3631,
-      "lastModified": "2026-03-03T00:44:25+07:00"
+      "checksum": "f9a0a7c4646d2446b34f4a0f5a5daf93fa1140ed4f8c0e1754afab44703855a4",
+      "size": 3737,
+      "lastModified": "2026-03-15T13:23:59-04:00"
     },
     {
       "path": "rules/documentation-management.md",
@@ -730,15 +622,15 @@
     },
     {
       "path": "rules/orchestration-protocol.md",
-      "checksum": "a6010c0630ed25fabafd7c615743a55cfd26d762e356afc30e330704abf012d5",
-      "size": 1804,
-      "lastModified": "2026-03-03T00:44:25+07:00"
+      "checksum": "a63244d7b7918457f5577aed8ba025850c2f687ebbe88484c5e8cdd40c57edc7",
+      "size": 4527,
+      "lastModified": "2026-03-15T14:44:30+07:00"
     },
     {
       "path": "rules/primary-workflow.md",
-      "checksum": "d8d73e760d6a4733167926f33fbc6f630e5b3ae04f657c472feaa159e383b4db",
-      "size": 3330,
-      "lastModified": "2026-03-03T00:44:25+07:00"
+      "checksum": "cefdeec125600d786c4707fd6dec4e6fced29fdd6e1d39950c097b1ef60698d6",
+      "size": 3973,
+      "lastModified": "2026-03-15T13:28:00-04:00"
     },
     {
       "path": "rules/team-coordination-rules.md",
@@ -748,9 +640,9 @@
     },
     {
       "path": "schemas/ck-config.schema.json",
-      "checksum": "fcfa277fed12944cbfd9f2899b8073ecf68031c57937ccf93586269b117046a1",
-      "size": 11360,
-      "lastModified": "2026-02-26T23:11:20+07:00"
+      "checksum": "9df6c8f5c87951200aa3a257a6b77d68f9933e96a219d7d17b4176b404bd6fde",
+      "size": 16661,
+      "lastModified": "2026-03-05T13:18:09+07:00"
     },
     {
       "path": "scripts/README.md",
@@ -769,12 +661,6 @@
       "checksum": "c5b4682a99e793d67eafd9e3684ff8734b3ae360daf439456ebf69f35a537a37",
       "size": 123,
       "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "scripts/fix-shebang-permissions.sh",
-      "checksum": "f21b57962ba535a9e98faccd51750dcc7969109414075ab6fa128c83a58cdde7",
-      "size": 1565,
-      "lastModified": "2025-12-29T12:25:08-05:00"
     },
     {
       "path": "scripts/generate_catalogs.py",
@@ -862,15 +748,15 @@
     },
     {
       "path": "settings.json",
-      "checksum": "395fd0166cd69f51fe8e4eb4cbf1f8ef8a432ccc9911163d0ee4dee07b5c97c7",
-      "size": 2385,
-      "lastModified": "2026-02-09T16:19:24-05:00"
+      "checksum": "c92a07e179228769350c6f2b6f12211d21830ba19c21032338391d98c4406fd5",
+      "size": 2972,
+      "lastModified": "2026-03-04T14:38:39-05:00"
     },
     {
       "path": "skills/.gitignore",
-      "checksum": "b04e004e1077a3fdbe5c61670ec325a99f75925675d39c6c173c8ac1bb646296",
-      "size": 73,
-      "lastModified": "2026-02-03T00:17:21-05:00"
+      "checksum": "62d56d9d24e5e923c644143e06d9a9054340ee02b09251b13001f650ae5f155e",
+      "size": 87,
+      "lastModified": "2026-03-05T18:22:54+07:00"
     },
     {
       "path": "skills/INSTALLATION.md",
@@ -889,6 +775,18 @@
       "checksum": "a8ff7a84dee9dfb42ab448de281784387ceafdf63881b7c070ee2de7f6ed865c",
       "size": 46162,
       "lastModified": "2025-10-18T11:27:50+07:00"
+    },
+    {
+      "path": "skills/_shared/lib/plan-table-parser.cjs",
+      "checksum": "fbbea9604cd5587d141b8fc6290c1becd8e43d3d15f8e57f5b34c8e69da02795",
+      "size": 10123,
+      "lastModified": "2026-03-05T02:08:05+07:00"
+    },
+    {
+      "path": "skills/_shared/tests/plan-table-parser.test.cjs",
+      "checksum": "c4fffdc3696899afda24ddf6389cbfb49339a1fe0d34023637b6ac170720a5b6",
+      "size": 14897,
+      "lastModified": "2026-03-05T02:08:05+07:00"
     },
     {
       "path": "skills/agent-browser/SKILL.md",
@@ -916,9 +814,9 @@
     },
     {
       "path": "skills/ai-artist/SKILL.md",
-      "checksum": "2d0b2ce2e59e5729035ba0575977b142240bec2fd7ab7c79e05f416720e0ce0b",
-      "size": 3669,
-      "lastModified": "2026-03-02T12:34:26+07:00"
+      "checksum": "bd909af273c56dc5341dcb4d41d2fae90f8e2f630224f8c1a556b975ba39580f",
+      "size": 3688,
+      "lastModified": "2026-03-09T17:33:20+07:00"
     },
     {
       "path": "skills/ai-artist/data/awesome-prompts.csv",
@@ -1060,9 +958,9 @@
     },
     {
       "path": "skills/ai-multimodal/SKILL.md",
-      "checksum": "8d0cf3923732650fa461ea940b83622c89fb36462adfda24248c4c82524ab7ac",
-      "size": 7222,
-      "lastModified": "2026-03-02T17:43:38+07:00"
+      "checksum": "0fe0199608409e1f7a3b9b973d2e1175d7ea60f21a31f16b67d8ad6e9e7cf3c2",
+      "size": 7315,
+      "lastModified": "2026-03-04T11:00:34+07:00"
     },
     {
       "path": "skills/ai-multimodal/references/audio-processing.md",
@@ -1324,9 +1222,9 @@
     },
     {
       "path": "skills/bootstrap/SKILL.md",
-      "checksum": "05981d9e3874f81c9fc3ca49d0a513b463da5cf4c451fa276f3bccf800226cd7",
-      "size": 3865,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "679b0adabc135643e7ff0d6cefb2b035df1aae9b83349236954d647aaa91a80c",
+      "size": 3944,
+      "lastModified": "2026-03-05T15:36:15+07:00"
     },
     {
       "path": "skills/bootstrap/references/shared-phases.md",
@@ -1360,15 +1258,15 @@
     },
     {
       "path": "skills/brainstorm/SKILL.md",
-      "checksum": "150d79467249d764a6962bd6ab96380e942c5a12d3877f4dbcef54d4b65c95ff",
-      "size": 5456,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "dae7e233f2f39a5d405f06104a3fc18649f21255b906219f72d75d6d1e90ed20",
+      "size": 7668,
+      "lastModified": "2026-03-15T14:44:30+07:00"
     },
     {
       "path": "skills/chrome-devtools/SKILL.md",
-      "checksum": "ad2693060f08bc531e28b4c0d3ef4e20d97a6ab88ae5ee1c7bfd237ad1f118c4",
-      "size": 21747,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "f6f7e952fc665e6be70466f5fd400030414504ebd789b9374dd37dabda5123ba",
+      "size": 21829,
+      "lastModified": "2026-03-04T11:00:34+07:00"
     },
     {
       "path": "skills/chrome-devtools/references/cdp-domains.md",
@@ -1539,6 +1437,84 @@
       "lastModified": "2025-12-29T16:53:32-05:00"
     },
     {
+      "path": "skills/ck-debug/SKILL.md",
+      "checksum": "861932cbfad74650b495efdfd3301e765c3cbfad9c866f66e63b3152cddb9a30",
+      "size": 5683,
+      "lastModified": "2026-03-15T16:55:45-04:00"
+    },
+    {
+      "path": "skills/ck-debug/references/defense-in-depth.md",
+      "checksum": "89e23fdfcd85ecb2ea867e9770775cd8c7211682af4152719364b1005d0f5497",
+      "size": 3662,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-debug/references/frontend-verification.md",
+      "checksum": "3a87a80031b92d52636d9d068c5fed2d860bbca665be7b8727dd192ee2d2f9f8",
+      "size": 3731,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-debug/references/investigation-methodology.md",
+      "checksum": "21f56af62c3fa85124b5123a27a6d9cd681361a563d31febe4d19210f552b910",
+      "size": 4045,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-debug/references/log-and-ci-analysis.md",
+      "checksum": "b33c7c8c3f436a1aec3d9842a8990ebff6b731674866d7dd4ff0c75d6020db73",
+      "size": 3460,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-debug/references/performance-diagnostics.md",
+      "checksum": "be9bd0342d6bef3adba741217bcf03baa0e5781b18c7c70b07af2f7b343e7936",
+      "size": 3861,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-debug/references/reporting-standards.md",
+      "checksum": "1a89483f670ec0a6b7143896fa94ccacd8f3e1d863382f8bc96c24d5341f3162",
+      "size": 2690,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-debug/references/root-cause-tracing.md",
+      "checksum": "4df0e51b2d26a407d3e2ffba19c7c0cf8d01698c1745009e667b69ba2c962100",
+      "size": 3356,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-debug/references/systematic-debugging.md",
+      "checksum": "2c97f742d43baae7206d0859d42bb6837cb89949c7ab0c3fa37d6df129f2b628",
+      "size": 4158,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-debug/references/task-management-debugging.md",
+      "checksum": "04d23e03ad060198a59cd083839ad34643972be39789a54fef1816384fbfa85d",
+      "size": 5449,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-debug/references/verification.md",
+      "checksum": "ac56942520327efaf29b415b27e6a4211d88386d0072c5d400fdee39eba8bbf3",
+      "size": 3399,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-debug/scripts/find-polluter.sh",
+      "checksum": "f4dc594206175b17de25464b5f60a0e011774a7c7843014b6442338a085eba57",
+      "size": 1520,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-debug/scripts/find-polluter.test.md",
+      "checksum": "3147fa73a49f7ae82312277d36a357c71dde430f14a7fa86e81516f5e71365ee",
+      "size": 2117,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
       "path": "skills/ck-help/SKILL.md",
       "checksum": "6b9111ce785f3d775a814e40bd43e980dd983044ecad551fde670ae19600921a",
       "size": 3471,
@@ -1558,15 +1534,129 @@
     },
     {
       "path": "skills/ck-help/scripts/skills_data.yaml",
-      "checksum": "858ab9f8fe1882a5bc6d1d41c1a3358e4d7f6ce9c4d405328ddd383dbdd818fd",
-      "size": 24560,
-      "lastModified": "2026-02-25T18:18:29+07:00"
+      "checksum": "34b88d33464200830c5b7cb725bb8439fd47cfbe145c6f7da0e19fd813fae2c9",
+      "size": 24642,
+      "lastModified": "2026-03-15T13:28:00-04:00"
+    },
+    {
+      "path": "skills/ck-plan/SKILL.md",
+      "checksum": "8c99707237eca4f317bdfdd19678500c1bbbbc33bbaf96d9ec6bc6c35114f4de",
+      "size": 8858,
+      "lastModified": "2026-03-15T16:55:45-04:00"
+    },
+    {
+      "path": "skills/ck-plan/references/archive-workflow.md",
+      "checksum": "81af37b4ccca4ad73160a91aadb39d754d997c1dfce9dc0cda6bb89c8801c1f8",
+      "size": 2335,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-plan/references/codebase-understanding.md",
+      "checksum": "c1e78ef9dba69a667f240cec791fb8ccec0d711c96fd69d3e188d2ace061eb2b",
+      "size": 1976,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-plan/references/output-standards.md",
+      "checksum": "bcf2206ca70be531d28fafd18daac5bfbf752c41b04b95e92f58b6a03c287876",
+      "size": 4877,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-plan/references/plan-organization.md",
+      "checksum": "217de42d038d876f73d8d1c359967fccb44d51a0295fb726ea68e97ef5c0aec2",
+      "size": 4930,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-plan/references/red-team-personas.md",
+      "checksum": "b38600247151ed9bf7d3beb05609ae124dff00a0c5b2220173ad5dd6bbcb8481",
+      "size": 2621,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-plan/references/red-team-workflow.md",
+      "checksum": "104af70eaa297c391b2bfb60170a8ebfedb1cf3901572a70034938886297f1e8",
+      "size": 2684,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-plan/references/research-phase.md",
+      "checksum": "b921f91f8f2b1566824625a7ab35ae9572473c6a96ba8979b0a23f21f9e8727e",
+      "size": 1578,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-plan/references/scope-challenge.md",
+      "checksum": "429c130ca8042838f14c402abba60128031e06498269b6a52437bea91491db74",
+      "size": 3130,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-plan/references/solution-design.md",
+      "checksum": "805525a1f228e080809cd8794735ed148fb37c2702517a8982488f72a31ab7f0",
+      "size": 2057,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-plan/references/task-management.md",
+      "checksum": "b93ba3228e1df713aed2a8e1df7594c27a40af857873a920d62fc79d9481ea33",
+      "size": 5918,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-plan/references/validate-question-framework.md",
+      "checksum": "d868ac6e03e395857186f801127b2f4b47c8aaabf5326fc2a25982804a0c113c",
+      "size": 2361,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-plan/references/validate-workflow.md",
+      "checksum": "1de7551636994a5e8a3c69cc3318ccae2b80a7e525666ce136b44fad81e292df",
+      "size": 2315,
+      "lastModified": "2026-03-15T14:49:09-04:00"
+    },
+    {
+      "path": "skills/ck-plan/references/workflow-modes.md",
+      "checksum": "48f23e179c50dcd3aef00a6cdcb41ec850b91298d873cf4267092104fd02b0eb",
+      "size": 6067,
+      "lastModified": "2026-03-15T14:49:09-04:00"
     },
     {
       "path": "skills/code-review/SKILL.md",
-      "checksum": "9890b894783fda45a9d74c9dfee170b165d3a7c086d3798c167f8afc7c139fd5",
-      "size": 6041,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "a5ac2bd82922db874efd5167a45e662ea8dfce8fa9375ef069cc398d160a9789",
+      "size": 9306,
+      "lastModified": "2026-03-15T13:46:30-04:00"
+    },
+    {
+      "path": "skills/code-review/references/adversarial-review.md",
+      "checksum": "a7a3d57c2fbe7d7560e77a94e1fed6c87b05fe8f1cb273d114a2cc957b35f28b",
+      "size": 8282,
+      "lastModified": "2026-03-15T13:46:30-04:00"
+    },
+    {
+      "path": "skills/code-review/references/checklist-workflow.md",
+      "checksum": "776df3432c71d6300e50e47a70d00e019c17b494e0c821e863dba311d4a42fbb",
+      "size": 2904,
+      "lastModified": "2026-03-14T23:31:01+07:00"
+    },
+    {
+      "path": "skills/code-review/references/checklists/api.md",
+      "checksum": "9223d090952195e14f1a3ea42d3df661a996070e207c38b90be420cc6d608180",
+      "size": 1896,
+      "lastModified": "2026-03-14T23:31:01+07:00"
+    },
+    {
+      "path": "skills/code-review/references/checklists/base.md",
+      "checksum": "69824641bbb9f30d81f21f09f190acb9c40af8c32e2c80511ea84a81a00d0083",
+      "size": 4149,
+      "lastModified": "2026-03-14T23:31:01+07:00"
+    },
+    {
+      "path": "skills/code-review/references/checklists/web-app.md",
+      "checksum": "cf6c14d4772e237b417284aea79a7c1e771e890e278a0786a519e205b8811418",
+      "size": 1919,
+      "lastModified": "2026-03-14T23:31:01+07:00"
     },
     {
       "path": "skills/code-review/references/code-review-reception.md",
@@ -1576,9 +1666,9 @@
     },
     {
       "path": "skills/code-review/references/codebase-scan-workflow.md",
-      "checksum": "839e89cf67d2a54f557f1d7b3dc1ee0ab4c3a993701f9b8e9d69bf3d3cdeac7e",
-      "size": 1153,
-      "lastModified": "2026-02-26T22:16:02+07:00"
+      "checksum": "cd4a506b2fc5a09be51b43d34a202be95c4c599a556b3fee7e8cd84b776a10e5",
+      "size": 1269,
+      "lastModified": "2026-03-15T13:45:21-04:00"
     },
     {
       "path": "skills/code-review/references/edge-case-scouting.md",
@@ -1587,10 +1677,16 @@
       "lastModified": "2026-02-26T22:16:02+07:00"
     },
     {
+      "path": "skills/code-review/references/input-mode-resolution.md",
+      "checksum": "dc1179c5185a69d7c1ac071ad954260402c393bfc1435daac002b6fa63e49555",
+      "size": 3588,
+      "lastModified": "2026-03-15T13:45:21-04:00"
+    },
+    {
       "path": "skills/code-review/references/parallel-review-workflow.md",
-      "checksum": "244ab8e2eedcb29d2de997e99637d15c972bb392a6eca5f7e3099680e9dc575c",
-      "size": 1903,
-      "lastModified": "2026-02-25T17:00:33+07:00"
+      "checksum": "1e86599a6c8797aab945f374e9af7a1843f25f4d407ac4884762b4f49cdb3557",
+      "size": 2247,
+      "lastModified": "2026-03-15T13:45:21-04:00"
     },
     {
       "path": "skills/code-review/references/requesting-code-review.md",
@@ -1599,10 +1695,16 @@
       "lastModified": "2026-02-25T17:00:33+07:00"
     },
     {
+      "path": "skills/code-review/references/spec-compliance-review.md",
+      "checksum": "f66d056e6204c23cec67bca5dfb92806d9e4b5fbc4a32be415059628981a7783",
+      "size": 1455,
+      "lastModified": "2026-03-15T14:44:30+07:00"
+    },
+    {
       "path": "skills/code-review/references/task-management-reviews.md",
-      "checksum": "6a9ca5c520d2df9085a0f60c014dcf5480d9a967db9e8739bea46ed8d58af602",
-      "size": 4713,
-      "lastModified": "2026-02-05T22:28:18+07:00"
+      "checksum": "a0071129f4fcd23799fea11b277bab6d766563d986fa5590c960249d3966e8e0",
+      "size": 5268,
+      "lastModified": "2026-03-15T13:45:21-04:00"
     },
     {
       "path": "skills/code-review/references/verification-before-completion.md",
@@ -1726,9 +1828,9 @@
     },
     {
       "path": "skills/cook/SKILL.md",
-      "checksum": "65bcd96e9199829c1a6baf92d1fe20435f56179bc6095a1342a3ae1948f26641",
-      "size": 4657,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "a0ff8c26d5c747dd6f1ec588ed7470b091cfa71cd29916634134b2a0bc6a46c9",
+      "size": 6514,
+      "lastModified": "2026-03-15T14:44:30+07:00"
     },
     {
       "path": "skills/cook/references/intent-detection.md",
@@ -1750,15 +1852,15 @@
     },
     {
       "path": "skills/cook/references/workflow-steps.md",
-      "checksum": "92d7ffcc6a6f998a9b5676ff29b746b9a29152364190f4ecd12d6a348c7682e1",
-      "size": 7624,
-      "lastModified": "2026-02-26T22:16:02+07:00"
+      "checksum": "c1b1b61d0c43f90b9afab5e95828e99ad055d2bfbd4cd46f5946a9b536806389",
+      "size": 8344,
+      "lastModified": "2026-03-05T01:51:06+07:00"
     },
     {
       "path": "skills/copywriting/SKILL.md",
-      "checksum": "05ffefa6df2fa5573769fc59f49ae8e415b20666a2253591a9739ada616aea13",
-      "size": 3835,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "edbe706cb9be611195c89a7a45f19701236967d7935b1f01beea504ea921bb13",
+      "size": 3917,
+      "lastModified": "2026-03-04T11:00:34+07:00"
     },
     {
       "path": "skills/copywriting/references/copy-formulas.md",
@@ -2007,6 +2109,318 @@
       "lastModified": "2026-01-12T10:03:51+07:00"
     },
     {
+      "path": "skills/deploy/SKILL.md",
+      "checksum": "d0e1e8ff84a11fb29e41045f7c6d8c091e25430e5906f2440985f7f5b66badf3",
+      "size": 6007,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/deploy/references/platform-config-templates.md",
+      "checksum": "5840c396f3b1c91b77113968eb005f8139f5df91e8d536c8b8dfe601da7f8d8b",
+      "size": 642,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/deploy/references/platforms/aws.md",
+      "checksum": "360265be42a5129c91dd2b8d790db97134b720a05569d41b6da4e54c83589b2e",
+      "size": 1206,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/deploy/references/platforms/cloudflare.md",
+      "checksum": "d62859284bdc7412c530d66641d33b27c7ba2d4488f77bd7a13c26fbd0649203",
+      "size": 735,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/deploy/references/platforms/coolify.md",
+      "checksum": "bdbda9d71d371fb2bd1a970beead101dabb05d921dbb0c7e29c8a43198e5acea",
+      "size": 741,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/deploy/references/platforms/digitalocean.md",
+      "checksum": "bb578a1c4e809a24036bd51cfd6786ae9bb198833021465640fe153e1fb915d6",
+      "size": 878,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/deploy/references/platforms/dokploy.md",
+      "checksum": "b226baf473617fbdd8c73e7eb90d3de3c15eefc847f14fb21b8977f0078bc8ed",
+      "size": 570,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/deploy/references/platforms/flyio.md",
+      "checksum": "bfffd5e8455d037202b9f5102116bbb45c761ad9b96b836a9854ede5d6a5f1d8",
+      "size": 1028,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/deploy/references/platforms/gcp.md",
+      "checksum": "8ae4f227d3e217f823162afecfce2cf4212c09cf9cf00ebfc3ba3d593c840e9a",
+      "size": 1127,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/deploy/references/platforms/github-pages.md",
+      "checksum": "bb367a1b63ddec943f5795e38d6d53460f2ccd32540d25432763db4d6c0aae32",
+      "size": 1218,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/deploy/references/platforms/heroku.md",
+      "checksum": "e6db6c6f0ea03acb7610aa2555a5fbe6d292fe199cbd961e6d5e0323583dd296",
+      "size": 505,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/deploy/references/platforms/netlify.md",
+      "checksum": "28ae216feeb1de827e671363a65bc403b94071db3e2bfd0f621b9f0af728b2ad",
+      "size": 737,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/deploy/references/platforms/railway.md",
+      "checksum": "95ed8769d4e4d09992fba58db5768bb34eec5569c90681820b140684f86d56a0",
+      "size": 693,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/deploy/references/platforms/render.md",
+      "checksum": "2665d84001ae665df6716d88ac79c6a74b69be37bde76f3005964cfb6a2f1038",
+      "size": 786,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/deploy/references/platforms/tose.md",
+      "checksum": "a0e442b41c887cee2cc54556cca22ed2eba2c9625ca00cbc547f352df7540092",
+      "size": 1238,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/deploy/references/platforms/vercel.md",
+      "checksum": "05429775a1f9f4f3096934bc11f82368321821377ef8c50f7611687ec8de99f3",
+      "size": 697,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/deploy/references/platforms/vultr.md",
+      "checksum": "41aecb5efd19d29dfb465ca5e5999eda007450c54051ff03d28de992013ce4a9",
+      "size": 648,
+      "lastModified": "2026-03-04T22:27:52+07:00"
+    },
+    {
+      "path": "skills/design/SKILL.md",
+      "checksum": "87a5278f1fdb2e2e51c7506b69aed58efbf261185e524e37450b866e594dd102",
+      "size": 11946,
+      "lastModified": "2026-03-10T14:07:10+07:00"
+    },
+    {
+      "path": "skills/design/data/cip/deliverables.csv",
+      "checksum": "229912f35c2f5a790508ddd62270cc7a92a84694027025ea5a30f1fb5ba84b70",
+      "size": 13385,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/data/cip/industries.csv",
+      "checksum": "729b1dea6d6f39b0bc22a1e659584e7ca5cead75841146d599c9f8dc00d4da46",
+      "size": 4935,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/data/cip/mockup-contexts.csv",
+      "checksum": "15d61cef16e6746d5aa665976f4de8074fedb64bfc5c7313a40eec1112a1d499",
+      "size": 5205,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/data/cip/styles.csv",
+      "checksum": "4e7f9e209bc90b60df62fd9843a1a73b365e54161dbd820b82817a8e512af4c4",
+      "size": 5967,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/data/icon/styles.csv",
+      "checksum": "a4aa7d326ffe1e50961eb70e25a6351f45c0247cd245461fa1a27cdc72f903b4",
+      "size": 2250,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/data/logo/colors.csv",
+      "checksum": "d60218f0705bb0f0b892a10468a5c8d9a44eef3d0262ef8df8970ba3fbab567a",
+      "size": 10674,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/data/logo/industries.csv",
+      "checksum": "e58dda4b9d28851f70914f82c1d2a2cff626a991ca41076f64122f33cc8a6525",
+      "size": 13274,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/data/logo/styles.csv",
+      "checksum": "ea08bdfb7aa557f08d1b6299222423f948700f8e4029321acb58c8f83197bdf2",
+      "size": 13678,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/banner-sizes-and-styles.md",
+      "checksum": "c8906fb1073a576ee8c680d9bc8586249cbc4ed36690da960d65a1c9c37143b7",
+      "size": 4993,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/cip-deliverable-guide.md",
+      "checksum": "1424e120b967288e2334f24fcfa5cdc7f238420326a7444f4c5597efecfabc41",
+      "size": 1735,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/cip-design.md",
+      "checksum": "47a3b2e445bc07185edd0cd24ba8a417229baf86717dcdff7c4e403adbceb3f1",
+      "size": 4589,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/cip-prompt-engineering.md",
+      "checksum": "4bf3a0c858f38c230e43e872857b72d9eb692e066e8de5920da75aac733e753c",
+      "size": 2493,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/cip-style-guide.md",
+      "checksum": "f3e15408cd981e93804440c1159c12e02d001bc37a3945f455b3fc13729ed4e1",
+      "size": 2357,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/design-routing.md",
+      "checksum": "32914a913f4f20d4cb1e497e5a87cfc04b71af4e6d75db72ecf50e4f060201c8",
+      "size": 5826,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/icon-design.md",
+      "checksum": "39281931d070918b4e51ecd71054da99493cabe06a07dfa8f1f682e48637c83f",
+      "size": 4343,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/logo-color-psychology.md",
+      "checksum": "3fd0e93e24c3b2ea7f3be778e8f2d03b1c62c7c6eab3ade478c8fca332bff287",
+      "size": 3341,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/logo-design.md",
+      "checksum": "2e845fe165c845fd9582c1d74204fa31de607380982a6ea0b5f8db4e293afa3a",
+      "size": 3163,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/logo-prompt-engineering.md",
+      "checksum": "e50f55bf323263eb27b4cd4c5172383a787fb894581d5d2befb3f6e0180b253e",
+      "size": 4314,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/logo-style-guide.md",
+      "checksum": "611baa841eedab101f45c113c6bfbd4d7e16e859c9d6ebd2cf941827a6e8dd15",
+      "size": 3435,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/slides-copywriting-formulas.md",
+      "checksum": "03733d5916ab771834745550045b736deeb94a08226f2b200f7953009c35b219",
+      "size": 2604,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/slides-create.md",
+      "checksum": "792d647a5d4f87d765cf417f7ac54dd0b2fc4d229cc23ea9df56282d4c1ee086",
+      "size": 153,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/slides-html-template.md",
+      "checksum": "fd5b051a37365fc6059c75bb388ec6f64daf1bd9ae938b287b6d762dc83c0c35",
+      "size": 9004,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/slides-layout-patterns.md",
+      "checksum": "0a967ca3bd829d3234e6f1802bade6c76447fabbaddbc8117c41adbae7dfb6df",
+      "size": 3691,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/slides-strategies.md",
+      "checksum": "27ee3e53ffa0ea679ec83ebeacb0bcfbce498df57277e99f574b9c139dc44286",
+      "size": 2715,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/slides.md",
+      "checksum": "5630d5daec947ff58ab1ac97c7a1ee77a21cf6f5dce5155535b65d291691979f",
+      "size": 1742,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/references/social-photos-design.md",
+      "checksum": "2544c143ff3a4471a775e2271797a3871480f94de91b267178da92e8952192a0",
+      "size": 11251,
+      "lastModified": "2026-03-10T14:07:10+07:00"
+    },
+    {
+      "path": "skills/design/scripts/cip/core.py",
+      "checksum": "78a78a51f12d2382b2854414df395dc62b68532626ef724ddd5de713507911e4",
+      "size": 8062,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/scripts/cip/generate.py",
+      "checksum": "2745040c9b534cf4113d2f7f4d7a52bc96a9fbfa12204c4f8460be4e15449069",
+      "size": 19430,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/scripts/cip/render-html.py",
+      "checksum": "a49a89a017ea4a2c492438055f05dfba3dfb4f91563f5f913359939beeaeccab",
+      "size": 13941,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/scripts/cip/search.py",
+      "checksum": "6619fbbe71983003a858c5eb79bc59c607b342610a1178b6976c687c2932161b",
+      "size": 4524,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/scripts/icon/generate.py",
+      "checksum": "1a6be99dc233f6d9f8b558c26148203418be5b47c677cd83e48e41e78e38780c",
+      "size": 17151,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/scripts/logo/core.py",
+      "checksum": "4f8b36ffe538e5995d0e0b740053a0899a1adf445ffdf484bd47f94e71ade8d0",
+      "size": 6023,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/scripts/logo/generate.py",
+      "checksum": "6e4358f21cd85fec51c8d01b03e3696d6db180815309d7e10a19c623d4d4462c",
+      "size": 14630,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
+      "path": "skills/design/scripts/logo/search.py",
+      "checksum": "693b3a1824831f120d4c60ed72477847604da1f6b654343381f8e9d3800a28f2",
+      "size": 4745,
+      "lastModified": "2026-03-06T16:00:44+07:00"
+    },
+    {
       "path": "skills/devops/SKILL.md",
       "checksum": "7888b01bcc8c2c9613d0557af7fb4ea66c172b0b0d8cf77d7db68f01835fe9b7",
       "size": 3325,
@@ -2176,9 +2590,9 @@
     },
     {
       "path": "skills/docs/SKILL.md",
-      "checksum": "e80da3f2ac63d86fa74560f5987fe3531b5ebb759028cb6ad9610a0a00b60e09",
-      "size": 1871,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "813ab5eae3a9f151a766b957889e0e8d8dade2a8ce582a1c4d0d743781a9f62c",
+      "size": 1952,
+      "lastModified": "2026-03-04T11:00:34+07:00"
     },
     {
       "path": "skills/docs/references/init-workflow.md",
@@ -3082,9 +3496,9 @@
     },
     {
       "path": "skills/fix/SKILL.md",
-      "checksum": "6982e52a7e1e24aac74f100781e223ac4a0c0fd474e759de510f5af8a9338bb8",
-      "size": 4702,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "f6abc9cc7c393d75fd896cf73911f6da04ebee71aa2a145afb1b66bd8179fcee",
+      "size": 6662,
+      "lastModified": "2026-03-15T14:44:30+07:00"
     },
     {
       "path": "skills/fix/references/complexity-assessment.md",
@@ -3118,9 +3532,9 @@
     },
     {
       "path": "skills/fix/references/task-orchestration.md",
-      "checksum": "e52429e36efe33b430601a710561da0f1edc7f15b8b253b4e084c46ba5ec72a9",
-      "size": 4265,
-      "lastModified": "2026-02-06T10:54:01+07:00"
+      "checksum": "ab76f4ceeb1324ab217f77b2207899d6bcd00c56b736e1b09cf8f40e8caf1b05",
+      "size": 4580,
+      "lastModified": "2026-03-03T13:39:23+07:00"
     },
     {
       "path": "skills/fix/references/workflow-ci.md",
@@ -3526,9 +3940,9 @@
     },
     {
       "path": "skills/journal/SKILL.md",
-      "checksum": "6bb950ed0f246d41994bcca461acf0b6a5e46c8d62dbf87de366f8f6f4c9450a",
-      "size": 498,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "5cd6351191b7c3578b6baac3ac394862cfe070f61d2bb7f6af8416598ea90ff9",
+      "size": 578,
+      "lastModified": "2026-03-04T11:00:34+07:00"
     },
     {
       "path": "skills/kanban/SKILL.md",
@@ -3556,9 +3970,9 @@
     },
     {
       "path": "skills/markdown-novel-viewer/SKILL.md",
-      "checksum": "f3f6244503a028b905abd7dad4b483ace47197526d2a70487f9f89c55bb5c879",
-      "size": 9263,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "cc436d67613240c4f3d0fb66dbb11bc0f1bb31dac396b69d4b1fa4b3a9addec5",
+      "size": 9424,
+      "lastModified": "2026-03-15T13:52:27-04:00"
     },
     {
       "path": "skills/markdown-novel-viewer/assets/directory-browser.css",
@@ -3628,9 +4042,9 @@
     },
     {
       "path": "skills/markdown-novel-viewer/assets/styles/novel-theme-sidebar.css",
-      "checksum": "f56b56320744a68f132b58eba09a39493f1b50371a649c97a2f51ef908a083c8",
-      "size": 6351,
-      "lastModified": "2026-02-04T09:45:31-05:00"
+      "checksum": "db674ec4c3de2962d8e91fde5d5f2e7351aa52da4e0e42b9714bb5f9bbf3800c",
+      "size": 6376,
+      "lastModified": "2026-03-04T15:56:39+07:00"
     },
     {
       "path": "skills/markdown-novel-viewer/assets/styles/novel-theme-variables.css",
@@ -3670,9 +4084,9 @@
     },
     {
       "path": "skills/markdown-novel-viewer/scripts/lib/plan-navigator.cjs",
-      "checksum": "9251db2bc7d2ec2d4eef863bc6908157c3e4c2f45ad03995bf36127389f6ebb0",
-      "size": 20464,
-      "lastModified": "2026-02-04T09:30:29-05:00"
+      "checksum": "ca55d3e86e00b066ad137d2318e231975da0894a81d8fa366ff2734d244078a6",
+      "size": 10396,
+      "lastModified": "2026-03-05T02:08:05+07:00"
     },
     {
       "path": "skills/markdown-novel-viewer/scripts/lib/port-finder.cjs",
@@ -3694,9 +4108,9 @@
     },
     {
       "path": "skills/markdown-novel-viewer/scripts/tests/server.test.cjs",
-      "checksum": "68f7e9f013edffedbd89c34772e024303221cda031c68110f0137eb4ade0c460",
-      "size": 9515,
-      "lastModified": "2025-12-29T12:25:08-05:00"
+      "checksum": "716d70a43f4c2d7f3a2f39cfc7e573d47dfde5a5aecb237c8609b5cf4e017d47",
+      "size": 11529,
+      "lastModified": "2026-03-04T15:56:39+07:00"
     },
     {
       "path": "skills/markdown-novel-viewer/tests/dashboard-assets.test.cjs",
@@ -3862,9 +4276,9 @@
     },
     {
       "path": "skills/media-processing/SKILL.md",
-      "checksum": "5d5b0fed8bc652d4a99e942e08dabb7389059339c150fd0f74dff6251d22c588",
-      "size": 2816,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "7d8ed92c013e76593ca3f7aa05d8912295822555276fe6e2903fc23a864eee74",
+      "size": 2897,
+      "lastModified": "2026-03-04T11:00:34+07:00"
     },
     {
       "path": "skills/media-processing/references/common-workflows.md",
@@ -4365,84 +4779,6 @@
       "lastModified": "2025-12-29T12:25:08-05:00"
     },
     {
-      "path": "skills/plan/SKILL.md",
-      "checksum": "43811d6fec4ed8aed7b7fbebf908a79ee709f8dd5382ecf299f09f50964f45b2",
-      "size": 5608,
-      "lastModified": "2026-03-02T12:31:40+07:00"
-    },
-    {
-      "path": "skills/plan/references/archive-workflow.md",
-      "checksum": "81af37b4ccca4ad73160a91aadb39d754d997c1dfce9dc0cda6bb89c8801c1f8",
-      "size": 2335,
-      "lastModified": "2026-02-26T22:16:02+07:00"
-    },
-    {
-      "path": "skills/plan/references/codebase-understanding.md",
-      "checksum": "c1e78ef9dba69a667f240cec791fb8ccec0d711c96fd69d3e188d2ace061eb2b",
-      "size": 1976,
-      "lastModified": "2026-02-26T22:16:02+07:00"
-    },
-    {
-      "path": "skills/plan/references/output-standards.md",
-      "checksum": "f5e25b6be2c70057c1a2a11aad21c75aeb0773932e0756c9a6395d494573fcb3",
-      "size": 4571,
-      "lastModified": "2026-02-05T22:25:12+07:00"
-    },
-    {
-      "path": "skills/plan/references/plan-organization.md",
-      "checksum": "e35e3ca6137db40031897ad83c39c7925b4690fa63eeed2d5c637a2a6dcafe68",
-      "size": 3705,
-      "lastModified": "2026-02-05T22:25:12+07:00"
-    },
-    {
-      "path": "skills/plan/references/red-team-personas.md",
-      "checksum": "b38600247151ed9bf7d3beb05609ae124dff00a0c5b2220173ad5dd6bbcb8481",
-      "size": 2621,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "skills/plan/references/red-team-workflow.md",
-      "checksum": "104af70eaa297c391b2bfb60170a8ebfedb1cf3901572a70034938886297f1e8",
-      "size": 2684,
-      "lastModified": "2026-02-25T16:48:55+07:00"
-    },
-    {
-      "path": "skills/plan/references/research-phase.md",
-      "checksum": "b921f91f8f2b1566824625a7ab35ae9572473c6a96ba8979b0a23f21f9e8727e",
-      "size": 1578,
-      "lastModified": "2026-02-25T16:48:55+07:00"
-    },
-    {
-      "path": "skills/plan/references/solution-design.md",
-      "checksum": "805525a1f228e080809cd8794735ed148fb37c2702517a8982488f72a31ab7f0",
-      "size": 2057,
-      "lastModified": "2026-02-05T22:25:12+07:00"
-    },
-    {
-      "path": "skills/plan/references/task-management.md",
-      "checksum": "ed306b9e84425222cd31627433ccdc63d7fee0ab9463e88fc6ddec49414a4771",
-      "size": 5631,
-      "lastModified": "2026-02-25T16:48:55+07:00"
-    },
-    {
-      "path": "skills/plan/references/validate-question-framework.md",
-      "checksum": "d868ac6e03e395857186f801127b2f4b47c8aaabf5326fc2a25982804a0c113c",
-      "size": 2361,
-      "lastModified": "2026-02-15T08:17:26+07:00"
-    },
-    {
-      "path": "skills/plan/references/validate-workflow.md",
-      "checksum": "1de7551636994a5e8a3c69cc3318ccae2b80a7e525666ce136b44fad81e292df",
-      "size": 2315,
-      "lastModified": "2026-02-26T22:16:02+07:00"
-    },
-    {
-      "path": "skills/plan/references/workflow-modes.md",
-      "checksum": "e4da831403afc7655d05cc84f190fa513b17c6ea4114e1b17d0d7bf199eb3739",
-      "size": 5589,
-      "lastModified": "2026-02-26T22:16:02+07:00"
-    },
-    {
       "path": "skills/plans-kanban/SKILL.md",
       "checksum": "9eebef214bdc767d2f16fe582cf6eb11a183c10516e03060ce4a18dfd2ca4890",
       "size": 4379,
@@ -4492,15 +4828,15 @@
     },
     {
       "path": "skills/plans-kanban/scripts/lib/plan-metadata-extractor.cjs",
-      "checksum": "48cc9baa77555b132d49216f712c760e6587456754577bfbb4ba5d9d60477da8",
-      "size": 15236,
-      "lastModified": "2025-12-16T02:57:26-05:00"
+      "checksum": "ebbea04869cea85213cd8116bcadc03d11867f208b4a0aecc175e41906642c05",
+      "size": 15517,
+      "lastModified": "2026-03-05T02:35:07+07:00"
     },
     {
       "path": "skills/plans-kanban/scripts/lib/plan-parser.cjs",
-      "checksum": "59fd55968b6ca2f59048cb346dae2b9fb8c6c609862439113f46beb471cc6ba4",
-      "size": 5803,
-      "lastModified": "2025-12-15T19:20:57-05:00"
+      "checksum": "1f3541ed55ea2c7c32a4fed9b8926aeeb65e55a2559b754abeee3fd097358b2d",
+      "size": 739,
+      "lastModified": "2026-03-04T15:56:39+07:00"
     },
     {
       "path": "skills/plans-kanban/scripts/lib/plan-scanner.cjs",
@@ -4528,21 +4864,75 @@
     },
     {
       "path": "skills/preview/SKILL.md",
-      "checksum": "957a066310255d10fb5e4843b1b3da0cb2bf1bc3b48f437321cafe79967ec774",
-      "size": 3266,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "d9a02967dcd865e528c59d8c6ac993965a06e383bf443aad91c5cf70be8aaef4",
+      "size": 8138,
+      "lastModified": "2026-03-15T13:52:27-04:00"
     },
     {
       "path": "skills/preview/references/generation-modes.md",
-      "checksum": "9818d6847021944f9e33609305cb7198ff33e1df0c0e5318024bcceb87bce0af",
-      "size": 2061,
-      "lastModified": "2026-02-25T16:48:55+07:00"
+      "checksum": "3d51b2a13eb15faa8ad73dabe46fdc092d26c807c25d60ecf4a250788092b2a1",
+      "size": 6729,
+      "lastModified": "2026-03-15T13:23:55-04:00"
+    },
+    {
+      "path": "skills/preview/references/html-css-patterns.md",
+      "checksum": "c74785e605a4c0dddee2086f3c6ac87c89bf631c5518c57ef68b1a20714a6174",
+      "size": 35187,
+      "lastModified": "2026-03-15T13:23:50-04:00"
+    },
+    {
+      "path": "skills/preview/references/html-design-guidelines.md",
+      "checksum": "62ce869cc0dce9bd024085f6d300c1753d4b3050587096882d2b003592bf69fe",
+      "size": 13978,
+      "lastModified": "2026-03-15T13:23:50-04:00"
+    },
+    {
+      "path": "skills/preview/references/html-libraries.md",
+      "checksum": "0e0cc223d7cc800cc1e4158d26067e8ea8b41d08adf57d81427dac52ae3f4ab6",
+      "size": 19592,
+      "lastModified": "2026-03-15T13:23:50-04:00"
+    },
+    {
+      "path": "skills/preview/references/html-responsive-nav.md",
+      "checksum": "c2507c5a468632eab14028780898422b1a6d7a2e3d1708933bd294f2cf6989c3",
+      "size": 5817,
+      "lastModified": "2026-03-15T13:23:50-04:00"
+    },
+    {
+      "path": "skills/preview/references/html-slide-patterns.md",
+      "checksum": "14da4390afb8c669214e8310153f974b5bbdbd675d84b44510c24bd2e28cba4d",
+      "size": 40110,
+      "lastModified": "2026-03-15T13:23:50-04:00"
     },
     {
       "path": "skills/preview/references/view-mode.md",
       "checksum": "74c02f2ec503bb67ca6e95324c14a36dba7d0e4f54e66888bef733c7454f88f1",
       "size": 1212,
       "lastModified": "2026-02-15T08:17:26+07:00"
+    },
+    {
+      "path": "skills/preview/templates/architecture.html",
+      "checksum": "e68c76606f7ae2e4054fd07b23baf517922499cb4728faeebf122128ce577bf4",
+      "size": 17460,
+      "lastModified": "2026-03-15T13:28:00-04:00"
+    },
+    {
+      "path": "skills/preview/templates/data-table.html",
+      "checksum": "d807a18d4fdc6c973e59b35d8b895cbdae4bc461aad46ffd7a9e1c28fb7bcf2a",
+      "size": 16242,
+      "lastModified": "2026-03-15T13:28:00-04:00"
+    },
+    {
+      "path": "skills/preview/templates/mermaid-flowchart.html",
+      "checksum": "32394108033dcd3990c4a24fcb4315647d1a08a55cd566bbffb63887e512206b",
+      "size": 21391,
+      "lastModified": "2026-03-15T13:28:00-04:00"
+    },
+    {
+      "path": "skills/preview/templates/slide-deck.html",
+      "checksum": "f6478a4f4c4406b540acabb8329c14196d6f5dcbeacfc4464257cf29877f4194",
+      "size": 35552,
+      "lastModified": "2026-03-15T13:28:00-04:00"
     },
     {
       "path": "skills/problem-solving/SKILL.md",
@@ -4594,9 +4984,9 @@
     },
     {
       "path": "skills/project-management/SKILL.md",
-      "checksum": "af54b2b04c94300ebee12b8103fc8f40aa938a288ad3c73e694b4bf36d96f2a9",
-      "size": 4587,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "4082ac73e58e5727229e16a30b9d94450fddca8e872db7761b28bad6dfdd6790",
+      "size": 5148,
+      "lastModified": "2026-03-03T13:39:23+07:00"
     },
     {
       "path": "skills/project-management/references/documentation-triggers.md",
@@ -4606,15 +4996,15 @@
     },
     {
       "path": "skills/project-management/references/hydration-workflow.md",
-      "checksum": "594058faa3af0db36339d3760b7600249777c9425dd265dfc65c80871466632b",
-      "size": 3783,
-      "lastModified": "2026-02-25T16:48:55+07:00"
+      "checksum": "ef86578bd3ef79eb34e82d4b9039374af4591b2eda8be230eedbb48ab1f0a39e",
+      "size": 4233,
+      "lastModified": "2026-03-03T13:39:23+07:00"
     },
     {
       "path": "skills/project-management/references/progress-tracking.md",
-      "checksum": "1888bd25acda2f1ed19ee0f799c72125381d0f3710266cfed852d81a807d1fdc",
-      "size": 2795,
-      "lastModified": "2026-02-24T21:24:04+07:00"
+      "checksum": "c8677ed866ae6abc015d8612b7f3619d97edfa9f7f5a646eb23dabb4c22d3991",
+      "size": 3480,
+      "lastModified": "2026-03-05T02:35:13+07:00"
     },
     {
       "path": "skills/project-management/references/reporting-patterns.md",
@@ -4624,9 +5014,33 @@
     },
     {
       "path": "skills/project-management/references/task-operations.md",
-      "checksum": "76e6ba9bf653e4465a846f009dc7d8cccf726b346dabaa8cd8b67f5a530bb986",
-      "size": 2822,
-      "lastModified": "2026-02-05T22:30:37+07:00"
+      "checksum": "7894b9d8361058b176e8c49a8748edd070214a4a38f08c522a36d53322327161",
+      "size": 3091,
+      "lastModified": "2026-03-03T13:39:23+07:00"
+    },
+    {
+      "path": "skills/project-organization/SKILL.md",
+      "checksum": "599311f11670b502a4a30f5a0c7b02bb21a277fdebbe7e0a9f7294792c219177",
+      "size": 9407,
+      "lastModified": "2026-03-04T11:00:34+07:00"
+    },
+    {
+      "path": "skills/project-organization/references/directory-patterns.md",
+      "checksum": "5973cf858f405f68269b821523f57262306cb2e1cd9f8e3d8ab9e5627900d7df",
+      "size": 6637,
+      "lastModified": "2026-03-04T11:00:34+07:00"
+    },
+    {
+      "path": "skills/project-organization/references/markdown-body-templates.md",
+      "checksum": "19c5e6c97129eddaacbbddf2083113774c4ecf615568407c911fd224a32060cf",
+      "size": 4983,
+      "lastModified": "2026-03-04T11:00:34+07:00"
+    },
+    {
+      "path": "skills/project-organization/references/naming-conventions.md",
+      "checksum": "bbfe760a99b571f282ae0b95144a346718bed8182ec97d7f2ce141d9423542e3",
+      "size": 3542,
+      "lastModified": "2026-03-04T11:00:34+07:00"
     },
     {
       "path": "skills/react-best-practices/AGENTS.md",
@@ -5176,15 +5590,15 @@
     },
     {
       "path": "skills/research/SKILL.md",
-      "checksum": "aeb15adf040cee3302e585518510c3d486c1c67e8eefc82c7d3a45897b46892f",
-      "size": 7083,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "82f349273d7371bc9b7d207d98edbebd37cd098db2d2143711718719adc8211c",
+      "size": 7163,
+      "lastModified": "2026-03-04T11:00:34+07:00"
     },
     {
       "path": "skills/scout/SKILL.md",
-      "checksum": "18c30f21fb2676d1edfe29a916384d2cea4e2bb24b46dc7f69b4c440469e67c0",
-      "size": 3284,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "19b960afaf3565607dc87dcffe1b9e73be49a94acbd46f342a2005f60c045731",
+      "size": 3516,
+      "lastModified": "2026-03-04T11:00:34+07:00"
     },
     {
       "path": "skills/scout/references/external-scouting.md",
@@ -5203,6 +5617,24 @@
       "checksum": "78ab0b90b058096fef35601c10d9e082bc2c8de25bdb118e81d2008c2ca1879e",
       "size": 4184,
       "lastModified": "2026-02-05T22:32:07+07:00"
+    },
+    {
+      "path": "skills/security-scan/SKILL.md",
+      "checksum": "bef38e6901215d83e9c9395f865325aa3ea2397e7968ab13eee82178d5f64165",
+      "size": 4297,
+      "lastModified": "2026-03-04T17:23:04+07:00"
+    },
+    {
+      "path": "skills/security-scan/references/secret-patterns.md",
+      "checksum": "28f023ff7388821bf74579cb41bdc5ba5d942700e8d3b8a8b536caa15adfb43c",
+      "size": 1511,
+      "lastModified": "2026-03-04T17:23:04+07:00"
+    },
+    {
+      "path": "skills/security-scan/references/vulnerability-patterns.md",
+      "checksum": "c4fd47950903dc02745fa2299f29bad2912d3f4af9ed68b602d9ae56f6d7cb5c",
+      "size": 2213,
+      "lastModified": "2026-03-04T17:23:04+07:00"
     },
     {
       "path": "skills/sequential-thinking/.gitignore",
@@ -5367,6 +5799,30 @@
       "lastModified": "2026-01-26T16:53:31+07:00"
     },
     {
+      "path": "skills/ship/SKILL.md",
+      "checksum": "d48f6f9f1fb0449ca44b703aa0a7171519da5a539993013e7a73dbc83aeeb313",
+      "size": 5174,
+      "lastModified": "2026-03-15T11:08:06+07:00"
+    },
+    {
+      "path": "skills/ship/references/auto-detect.md",
+      "checksum": "92f6380c986cb166d2832251463617cc50d556deda8e1bdc5adda6ffd67f31f5",
+      "size": 2923,
+      "lastModified": "2026-03-14T23:31:01+07:00"
+    },
+    {
+      "path": "skills/ship/references/pr-template.md",
+      "checksum": "0c92b4111ccda2a1cf0ac622b12e9f16d3c43bdf1819fdf6c7eeb1ee17b6348e",
+      "size": 2231,
+      "lastModified": "2026-03-15T11:08:06+07:00"
+    },
+    {
+      "path": "skills/ship/references/ship-workflow.md",
+      "checksum": "74d667833cfbe3ae8cb1318d6338f71d804930dfa4a51752eb4baeb130a9f038",
+      "size": 7902,
+      "lastModified": "2026-03-15T11:08:06+07:00"
+    },
+    {
       "path": "skills/shopify/README.md",
       "checksum": "c13775e03e078aae7fee1956ec758e2f728195495a1033680e4c202625bb2d64",
       "size": 1687,
@@ -5422,9 +5878,45 @@
     },
     {
       "path": "skills/skill-creator/SKILL.md",
-      "checksum": "b037c1e7904ec72f2563557be726747837690d182a667ae61e602780d0b19515",
-      "size": 4831,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "6d4edb6e76424ab357811932e379d08fec084bc5d21e2b1eae3e2b397bf2a465",
+      "size": 6192,
+      "lastModified": "2026-03-04T10:46:43+07:00"
+    },
+    {
+      "path": "skills/skill-creator/agents/analyzer.md",
+      "checksum": "bf68f4cac5a56c673a928c2e6d619586c5b93ea364026ab37547772cb45a663a",
+      "size": 10376,
+      "lastModified": "2026-03-04T10:46:43+07:00"
+    },
+    {
+      "path": "skills/skill-creator/agents/comparator.md",
+      "checksum": "fe1fc9787c495d864c5d6eada47396478572325fde1b33a96d78bf4b849b7a3e",
+      "size": 7287,
+      "lastModified": "2026-03-04T10:46:43+07:00"
+    },
+    {
+      "path": "skills/skill-creator/agents/grader.md",
+      "checksum": "57134da0c1a4eea33fbd74a1c9c44aa814f07d6bc64de303edb586f941e5d21a",
+      "size": 9049,
+      "lastModified": "2026-03-04T10:46:43+07:00"
+    },
+    {
+      "path": "skills/skill-creator/assets/eval_review.html",
+      "checksum": "ce477dcc74dc1c0d1d3352646a79167b5a63634e936b1019160025065974e452",
+      "size": 7058,
+      "lastModified": "2026-03-04T10:46:43+07:00"
+    },
+    {
+      "path": "skills/skill-creator/eval-viewer/generate_review.py",
+      "checksum": "fc9d1b9243fe5ab6012ebd579bd76d0035de1b79fd3b969de114defab26478fb",
+      "size": 16365,
+      "lastModified": "2026-03-04T10:46:43+07:00"
+    },
+    {
+      "path": "skills/skill-creator/eval-viewer/viewer.html",
+      "checksum": "a53213426ee1100441d701a3a0d49cda7a842f992d2c36463f4d3cc0258575fa",
+      "size": 44998,
+      "lastModified": "2026-03-04T10:46:43+07:00"
     },
     {
       "path": "skills/skill-creator/references/benchmark-optimization-guide.md",
@@ -5439,6 +5931,18 @@
       "lastModified": "2026-02-12T10:58:05+07:00"
     },
     {
+      "path": "skills/skill-creator/references/eval-infrastructure-guide.md",
+      "checksum": "33e7e006324847d704a880b34ed774a974489bdc21c81069999b4a97bc5fa012",
+      "size": 3518,
+      "lastModified": "2026-03-04T10:46:43+07:00"
+    },
+    {
+      "path": "skills/skill-creator/references/eval-schemas.md",
+      "checksum": "8d3de1f31b306c202198ab3d8f24f968ff697b3018a760165089586c59583883",
+      "size": 2571,
+      "lastModified": "2026-03-04T10:46:43+07:00"
+    },
+    {
       "path": "skills/skill-creator/references/mcp-skills-integration.md",
       "checksum": "05d310fadf3ebc4bbfe2081a9e9f977e33cebec96e68621837832180f7cbd83b",
       "size": 2462,
@@ -5446,9 +5950,9 @@
     },
     {
       "path": "skills/skill-creator/references/metadata-quality-criteria.md",
-      "checksum": "6d649dbc621f7f2c25dbd5ed6dcd6321f4a2884dd7dc8477d6008c7760182271",
-      "size": 1857,
-      "lastModified": "2026-02-26T22:16:02+07:00"
+      "checksum": "0cd072db92ed67381baa41b6ac4dbd32cd866f902dcc363526ae94d5d6a2c34b",
+      "size": 2605,
+      "lastModified": "2026-03-04T10:46:43+07:00"
     },
     {
       "path": "skills/skill-creator/references/plugin-marketplace-hosting.md",
@@ -5488,15 +5992,15 @@
     },
     {
       "path": "skills/skill-creator/references/skill-anatomy-and-requirements.md",
-      "checksum": "e3755621b37e15bdddbde5d201fb8241c4ed13e7294b264b2ad2e3c05de2034c",
-      "size": 2708,
-      "lastModified": "2026-02-26T22:16:02+07:00"
+      "checksum": "6e99105d22f5bdb6625b2b6192ade552893e159bab23c9ef12229ef4c0c6dfb5",
+      "size": 2792,
+      "lastModified": "2026-03-04T10:46:43+07:00"
     },
     {
       "path": "skills/skill-creator/references/skill-creation-workflow.md",
-      "checksum": "9f6f2275051090e58f11b1dd655b8053916ee91b7e50d2d46efa9eb730b178b5",
-      "size": 3006,
-      "lastModified": "2026-02-25T16:48:55+07:00"
+      "checksum": "161141424ce080706f36ab1dcd43e59b3a1bcd1a9e9b4c2f3b01345b1a0f0e9e",
+      "size": 4504,
+      "lastModified": "2026-03-04T10:46:43+07:00"
     },
     {
       "path": "skills/skill-creator/references/skill-design-patterns.md",
@@ -5524,33 +6028,39 @@
     },
     {
       "path": "skills/skill-creator/references/token-efficiency-criteria.md",
-      "checksum": "53c667d33cb7542fd963c43d6f1b7b2f6ae97a81866b89e420d32ee894d450a7",
+      "checksum": "bf3f353ba8350907dda18f0e4f29f6564a45ecfb7a448c731e2b182770005aa8",
       "size": 1990,
-      "lastModified": "2026-01-20T14:10:08+07:00"
+      "lastModified": "2026-03-04T10:46:43+07:00"
     },
     {
       "path": "skills/skill-creator/references/troubleshooting-guide.md",
-      "checksum": "d873bf4aa4c8654f58792f376c79caee9fb3e1e637bcdd7ff1c8c1ac216ca3cb",
+      "checksum": "5e9341af2bd8ac74347105161ce787ce46fdb8aa6551964ef240940898efdee5",
       "size": 2633,
-      "lastModified": "2026-02-26T22:16:02+07:00"
+      "lastModified": "2026-03-04T10:46:43+07:00"
     },
     {
       "path": "skills/skill-creator/references/validation-checklist.md",
-      "checksum": "36b260ea60b36bd06024c586f0051ad9ca8fb15047cf40d59b0efef148b583ca",
+      "checksum": "0ed687bc1e626b37bc2f03d30cd550bfe757c90ace16898ab82c576f5a8409e6",
       "size": 2680,
-      "lastModified": "2026-02-26T22:16:02+07:00"
+      "lastModified": "2026-03-04T10:46:43+07:00"
     },
     {
       "path": "skills/skill-creator/references/writing-effective-instructions.md",
-      "checksum": "e601015dfc36982fef8fe7f6c2078591e26145085b0bfd6f775c8449490a0938",
+      "checksum": "ef419db671c42cb20c66baac7f57f15522eef510a1d2625d34dcf4e102d77830",
       "size": 2370,
-      "lastModified": "2026-02-26T22:16:02+07:00"
+      "lastModified": "2026-03-04T10:46:43+07:00"
     },
     {
       "path": "skills/skill-creator/references/yaml-frontmatter-reference.md",
       "checksum": "f8ddb433b67305f82f5d3d078dfe4537902ca233c36047fae7659ef049f10d55",
       "size": 2967,
       "lastModified": "2026-02-26T22:16:02+07:00"
+    },
+    {
+      "path": "skills/skill-creator/scripts/aggregate_benchmark.py",
+      "checksum": "123ef128ea5ccc01a4b1ac212ef5567f21e9c13d3d240609780beeb3200c49aa",
+      "size": 14386,
+      "lastModified": "2026-03-04T10:46:43+07:00"
     },
     {
       "path": "skills/skill-creator/scripts/debug.zip",
@@ -5565,6 +6075,18 @@
       "lastModified": "2026-02-03T13:29:27+07:00"
     },
     {
+      "path": "skills/skill-creator/scripts/generate_report.py",
+      "checksum": "13df7118a3c50c83c4c3250a606d5f2b20b25a3d44cbc392b3d669ec75281453",
+      "size": 12847,
+      "lastModified": "2026-03-04T10:46:43+07:00"
+    },
+    {
+      "path": "skills/skill-creator/scripts/improve_description.py",
+      "checksum": "0dc43232db7ac6361775c894f4a1dbac958cb510c51a1230ff9e7fb30a74a7e8",
+      "size": 10723,
+      "lastModified": "2026-03-04T10:46:43+07:00"
+    },
+    {
       "path": "skills/skill-creator/scripts/init_skill.py",
       "checksum": "c8d9850fc3ce7c33f88d96e0a32cbe8cc9f9a3a03eb9e7b6fdac8a306aa2c8ef",
       "size": 12860,
@@ -5572,15 +6094,33 @@
     },
     {
       "path": "skills/skill-creator/scripts/package_skill.py",
-      "checksum": "ae22bc8540ca8dd90da2b5647bdce6d58ac7c8283cf7e4da8eccb315ba398f75",
-      "size": 3391,
-      "lastModified": "2026-01-03T13:53:53-05:00"
+      "checksum": "93f687766344ebc5c0c9c27aacb315f9c7f9be0bfd4777abb80464d9df7786d4",
+      "size": 4538,
+      "lastModified": "2026-03-04T10:46:43+07:00"
     },
     {
       "path": "skills/skill-creator/scripts/quick_validate.py",
-      "checksum": "5bb7585c847143b44c24d74de9dec5d5917f48c769df3bcc0030713b13b11a45",
-      "size": 3319,
-      "lastModified": "2026-02-26T22:16:02+07:00"
+      "checksum": "3725a380a8e189c98988476df48c9ab0d80f91c018f47f80858e622392371700",
+      "size": 3838,
+      "lastModified": "2026-03-04T10:46:43+07:00"
+    },
+    {
+      "path": "skills/skill-creator/scripts/run_eval.py",
+      "checksum": "43e3b8f80dbf69c343967ba77e268fae991d9fa3ed68b32a0ff02532cd48657f",
+      "size": 11464,
+      "lastModified": "2026-03-04T10:46:43+07:00"
+    },
+    {
+      "path": "skills/skill-creator/scripts/run_loop.py",
+      "checksum": "bafdb8e25c740813c735c54bf0489b9e87146da4cf697265927513c5430112d7",
+      "size": 13685,
+      "lastModified": "2026-03-04T10:46:43+07:00"
+    },
+    {
+      "path": "skills/skill-creator/scripts/utils.py",
+      "checksum": "3af8ae62c40c73ab712207436a0d9a981e845f25c5a7040229eb189cc8e45bb1",
+      "size": 1661,
+      "lastModified": "2026-03-04T10:46:43+07:00"
     },
     {
       "path": "skills/tanstack/SKILL.md",
@@ -5608,9 +6148,9 @@
     },
     {
       "path": "skills/team/SKILL.md",
-      "checksum": "187996c98626cf8d48ccf9c52bf90fd4d0149e40f28148bd5b16462a62633ca7",
-      "size": 12089,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "b949b68a74c1df26eb0423d0af137c471a6cfcce6eed4131029452ffbe0312b0",
+      "size": 12354,
+      "lastModified": "2026-03-05T15:36:15+07:00"
     },
     {
       "path": "skills/team/references/agent-teams-controls-and-modes.md",
@@ -5638,9 +6178,9 @@
     },
     {
       "path": "skills/test/SKILL.md",
-      "checksum": "16ae82f07b2552f494007f11c742c2642413465634fb457455e2e39182bdd551",
-      "size": 4368,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "473adf1419807968a4ba46ba7e67708ee69eb3ad5246443305fd806143e2f8fd",
+      "size": 4652,
+      "lastModified": "2026-03-04T11:00:34+07:00"
     },
     {
       "path": "skills/test/references/report-format.md",
@@ -6418,80 +6958,74 @@
     },
     {
       "path": "skills/ui-ux-pro-max/SKILL.md",
-      "checksum": "2a7e677e807ffc40636288e6418bedd33db0c6c538a2a09a0e69ce32dc3c8ed6",
-      "size": 13238,
-      "lastModified": "2026-03-02T12:31:40+07:00"
+      "checksum": "0ddfc898cfe90e55991c242a796073784e582977e8d863a3fc98339f6acc393e",
+      "size": 44828,
+      "lastModified": "2026-03-10T14:07:43+07:00"
+    },
+    {
+      "path": "skills/ui-ux-pro-max/data/_sync_all.py",
+      "checksum": "b540b3a4f87598ae29048b3cceae1fc17b39b629aee2cbe5c802ffc7b48abf6d",
+      "size": 21832,
+      "lastModified": "2026-03-10T14:07:43+07:00"
+    },
+    {
+      "path": "skills/ui-ux-pro-max/data/app-interface.csv",
+      "checksum": "2a17ef810dab715ce1f339861817a8fbe3ccc38142b70517301e874803e838ac",
+      "size": 9743,
+      "lastModified": "2026-03-10T14:07:43+07:00"
     },
     {
       "path": "skills/ui-ux-pro-max/data/charts.csv",
-      "checksum": "3b0cc1b287ad48d6989e2caf8bf84d4bc434438da62feb08259ffde03d153877",
-      "size": 7680,
-      "lastModified": "2025-12-01T10:31:12+07:00"
+      "checksum": "ebb565308115f955791b0431797a89d9b3587c25d5babb9428d10712c4924817",
+      "size": 19391,
+      "lastModified": "2026-03-10T14:07:43+07:00"
     },
     {
       "path": "skills/ui-ux-pro-max/data/colors.csv",
-      "checksum": "bd1fd6cf7d93408c0250ba383e01bea2ad1f0a1c9dccd746636c6a80ed937fbf",
-      "size": 13023,
-      "lastModified": "2025-12-01T10:31:12+07:00"
+      "checksum": "69ee8c1147b269599d20ca418bdd6f32563a9aa2d962fb9a9b8dec66bf7b1ba4",
+      "size": 32432,
+      "lastModified": "2026-03-10T14:07:43+07:00"
+    },
+    {
+      "path": "skills/ui-ux-pro-max/data/design.csv",
+      "checksum": "6f0ae42f16b3cbfa3f07050268387557859ff666e2651b1b82763f099d724b3f",
+      "size": 106144,
+      "lastModified": "2026-03-10T14:07:43+07:00"
+    },
+    {
+      "path": "skills/ui-ux-pro-max/data/draft.csv",
+      "checksum": "e190c796b707858a5436dc4c27f9ee9bb6618014ca73f533e423abe5ce9e4d06",
+      "size": 106266,
+      "lastModified": "2026-03-10T14:07:43+07:00"
+    },
+    {
+      "path": "skills/ui-ux-pro-max/data/google-fonts.csv",
+      "checksum": "2c03a3cd134d126bd9d6a7dc2a6360dc5272219ad6df3eb9315b031f806e1487",
+      "size": 745196,
+      "lastModified": "2026-03-10T14:07:43+07:00"
     },
     {
       "path": "skills/ui-ux-pro-max/data/icons.csv",
-      "checksum": "26be5e47c4c3fc7acae52ac8bbfaf1bf9e5ddc9c01808953a3636f8615b9de9f",
-      "size": 13385,
-      "lastModified": "2026-01-15T16:41:51+07:00"
+      "checksum": "f376c29fb4df37b4bdb366a5aa70cb211ba3dd8b435390aaa03152a64b07d2e8",
+      "size": 20637,
+      "lastModified": "2026-03-10T14:07:43+07:00"
     },
     {
       "path": "skills/ui-ux-pro-max/data/landing.csv",
-      "checksum": "7ac095129592c6c93f10ae3bc687b22bb051c33944597613f39e3a8f7646fe6e",
-      "size": 14372,
-      "lastModified": "2025-12-01T10:31:12+07:00"
+      "checksum": "080cedbcd61ff8ec9520f33929baa76bee9589e783f83b2f8d824a466b6a46d7",
+      "size": 16720,
+      "lastModified": "2026-03-10T14:07:43+07:00"
     },
     {
       "path": "skills/ui-ux-pro-max/data/products.csv",
-      "checksum": "5359e3037dcb84e99c792ea13dd44f5b78ab6a53557afb309cf19140512aaf5b",
-      "size": 29790,
-      "lastModified": "2025-12-01T10:31:12+07:00"
-    },
-    {
-      "path": "skills/ui-ux-pro-max/data/prompts.csv",
-      "checksum": "0f5acb17260f64fcc96668414d0e8b37418dcb5eec043f49b986b99399831ff3",
-      "size": 17421,
-      "lastModified": "2025-12-01T10:31:12+07:00"
+      "checksum": "9fd9e776ba847cf44c1ea78f95fe5e33b2c56bb7e186e3cfff9c49bc7fcb691b",
+      "size": 58006,
+      "lastModified": "2026-03-10T14:07:43+07:00"
     },
     {
       "path": "skills/ui-ux-pro-max/data/react-performance.csv",
       "checksum": "904c8afcda229629545912dde0e8ac37503757131f0169f80b016f1f58c4fd3f",
       "size": 14822,
-      "lastModified": "2026-01-15T16:41:51+07:00"
-    },
-    {
-      "path": "skills/ui-ux-pro-max/data/stacks/flutter.csv",
-      "checksum": "e470e6bc2bcd8562667cc764d1e1afb0be0a30ca4dc9ec12fa18b19d46f156bd",
-      "size": 10469,
-      "lastModified": "2025-12-01T10:31:12+07:00"
-    },
-    {
-      "path": "skills/ui-ux-pro-max/data/stacks/html-tailwind.csv",
-      "checksum": "1f004891dd189f6bc2a7717401e3100244326e7e2f3963a79bf7b2349d85e091",
-      "size": 11361,
-      "lastModified": "2026-01-15T16:41:51+07:00"
-    },
-    {
-      "path": "skills/ui-ux-pro-max/data/stacks/nextjs.csv",
-      "checksum": "06a8e8c13bd44696c6ebb4cb6c4d8dea440e3de8cce77616512529ed29258f0c",
-      "size": 12546,
-      "lastModified": "2025-12-01T10:31:12+07:00"
-    },
-    {
-      "path": "skills/ui-ux-pro-max/data/stacks/nuxt-ui.csv",
-      "checksum": "05d6e74501b2b6a636faed32450622759f49a5bcafad971f5f4e7eba0eb7be71",
-      "size": 14010,
-      "lastModified": "2026-01-15T16:41:51+07:00"
-    },
-    {
-      "path": "skills/ui-ux-pro-max/data/stacks/nuxtjs.csv",
-      "checksum": "f7a3f2d9542856d00199f85c6c023b7c284cc698e2e6e12d61afce2edacb24d6",
-      "size": 16539,
       "lastModified": "2026-01-15T16:41:51+07:00"
     },
     {
@@ -6501,52 +7035,22 @@
       "lastModified": "2025-12-01T10:31:12+07:00"
     },
     {
-      "path": "skills/ui-ux-pro-max/data/stacks/react.csv",
-      "checksum": "b6e3eb0e4c9c01bd00ffb951d5ca224a19d488b4544c75436f48cf92ff12bf45",
-      "size": 13016,
-      "lastModified": "2025-12-01T10:31:12+07:00"
-    },
-    {
-      "path": "skills/ui-ux-pro-max/data/stacks/shadcn.csv",
-      "checksum": "395c2e415ef6f48a474acccdc8eb2c7258a6ed751a5037ba171a2d8823e02ded",
-      "size": 15921,
-      "lastModified": "2026-01-15T16:41:51+07:00"
-    },
-    {
-      "path": "skills/ui-ux-pro-max/data/stacks/svelte.csv",
-      "checksum": "bc8d158994a8bdf412830a9dd5e5a5534edd2f367a6e50e0ebd4d76f592dfa3f",
-      "size": 11063,
-      "lastModified": "2025-12-01T10:31:12+07:00"
-    },
-    {
-      "path": "skills/ui-ux-pro-max/data/stacks/swiftui.csv",
-      "checksum": "e87cb9eee208bb753bdab96d4a261c7f830c4317ee90ec098316b248fc32be85",
-      "size": 10872,
-      "lastModified": "2025-12-01T10:31:12+07:00"
-    },
-    {
-      "path": "skills/ui-ux-pro-max/data/stacks/vue.csv",
-      "checksum": "9b793c3f4eec85f77a758c09322f2b62f3b3ca549bb713ccf0849ef885934395",
-      "size": 11056,
-      "lastModified": "2025-12-01T10:31:12+07:00"
-    },
-    {
       "path": "skills/ui-ux-pro-max/data/styles.csv",
-      "checksum": "899a7c3a7b07a16d783b4b2fa3662c3f01327f5bcffb634a68d2309bb3223a26",
-      "size": 40970,
-      "lastModified": "2025-12-01T10:31:12+07:00"
+      "checksum": "9b5089dcde8999333b36878252a255cc3bacbb2fe7b836c76cc7f7aa2abb643d",
+      "size": 142673,
+      "lastModified": "2026-03-10T14:07:43+07:00"
     },
     {
       "path": "skills/ui-ux-pro-max/data/typography.csv",
-      "checksum": "6c0cd9db74f75d384773b347e1ddac42692c8d00c56790e8a0e619bfa4b9537d",
-      "size": 31878,
-      "lastModified": "2025-12-01T10:31:12+07:00"
+      "checksum": "dbea262a54e3bfa2e6c3b15989a365d5ef4c43349316aff46635e82ca825adce",
+      "size": 49667,
+      "lastModified": "2026-03-10T14:07:43+07:00"
     },
     {
       "path": "skills/ui-ux-pro-max/data/ui-reasoning.csv",
-      "checksum": "58fc52fff69f62709f8c7dd460de6f6693699ea820f24287f3301a427c2b554e",
-      "size": 31071,
-      "lastModified": "2026-01-16T12:45:00+07:00"
+      "checksum": "41976082ecae1100da937c949215dc6694393e03f3c2a7444dd92a9edb43cb11",
+      "size": 53070,
+      "lastModified": "2026-03-10T14:07:43+07:00"
     },
     {
       "path": "skills/ui-ux-pro-max/data/ux-guidelines.csv",
@@ -6555,28 +7059,22 @@
       "lastModified": "2025-12-01T10:31:12+07:00"
     },
     {
-      "path": "skills/ui-ux-pro-max/data/web-interface.csv",
-      "checksum": "10bfc24e09a6a15db8309e6ef9b6881e1d4af97dffb7c99418aefb8e30df7d54",
-      "size": 7472,
-      "lastModified": "2026-01-15T16:41:51+07:00"
-    },
-    {
       "path": "skills/ui-ux-pro-max/scripts/core.py",
-      "checksum": "e91bcee14c39f84d5222c71bf75df3b50d36f514cf98ca1178f083e14d598db0",
-      "size": 10357,
-      "lastModified": "2026-01-15T16:41:56+07:00"
+      "checksum": "18e00b1a2952fb919dcba0010ee71f75129a670ad565e8d0907958d6be8caeca",
+      "size": 11512,
+      "lastModified": "2026-03-10T14:07:43+07:00"
     },
     {
       "path": "skills/ui-ux-pro-max/scripts/design_system.py",
-      "checksum": "953299108226cff4063ddecf8e020f9e2b9263af8194d9b9474c1edac5d815d1",
-      "size": 21188,
-      "lastModified": "2026-02-02T20:11:34-05:00"
+      "checksum": "4da1d341f3c7749df51b51db4a543a48a427c3c746eb0e9882a1ab86acf3bb54",
+      "size": 43614,
+      "lastModified": "2026-03-10T14:07:43+07:00"
     },
     {
       "path": "skills/ui-ux-pro-max/scripts/search.py",
-      "checksum": "557a5fe4fc9d0e7689532c29d67ffa1db7c41c9e484d7375075c57d907e09723",
-      "size": 3640,
-      "lastModified": "2026-02-02T20:11:34-05:00"
+      "checksum": "18b1efa4ee5a2fc1cf14d7b25429ab423ef6026d123878fb93c5884f33cd10db",
+      "size": 5492,
+      "lastModified": "2026-03-10T14:07:43+07:00"
     },
     {
       "path": "skills/use-mcp/SKILL.md",
@@ -6880,21 +7378,9 @@
     },
     {
       "path": "statusline.cjs",
-      "checksum": "edf5150fde5870f4d554b519104577142290b04f1e7087ff8c62efa9b8d5ff8a",
-      "size": 21024,
-      "lastModified": "2026-02-26T23:44:08+07:00"
-    },
-    {
-      "path": "statusline.ps1",
-      "checksum": "c047e9728e0bcc8d404a0acbfb16d2fcef5a1d79e1afce6a026df0072bef4b55",
-      "size": 8272,
-      "lastModified": "2026-01-11T10:02:21-05:00"
-    },
-    {
-      "path": "statusline.sh",
-      "checksum": "000eb8d1a60fb32a4ffdde18f6017bb47685f622f34c6a489b3f2abf07de7d3e",
-      "size": 8363,
-      "lastModified": "2026-01-11T10:02:21-05:00"
+      "checksum": "7f968ef52b743741f75163bb7e8d634cb1b351e899ea61ba196b3f691aef7142",
+      "size": 21434,
+      "lastModified": "2026-03-14T14:31:01+07:00"
     },
     {
       "path": ".opencode/agents/brainstormer.md",
@@ -6904,8 +7390,8 @@
     },
     {
       "path": ".opencode/agents/code-reviewer.md",
-      "checksum": "5731595c120f503776d35eae3e5f958a406af7d808c82dac7ae08776c65f7f33",
-      "size": 4555,
+      "checksum": "4dd4cc51cd9bdad04921f7bf60df980d44f2db715aa2b3758ebe070a652cd9e6",
+      "size": 4845,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
@@ -6992,8 +7478,8 @@
     },
     {
       "path": ".opencode/plugin/lib/ck-config-utils.cjs",
-      "checksum": "973d27031f8bcc7cc029bbef91337187924f1b20752419451f9a8b2b902afeec",
-      "size": 26563,
+      "checksum": "eecf284afb60675162ff18d224a77a567e6d1ef0efb0fd2fc7c5f726f19a4b3b",
+      "size": 26793,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
@@ -7004,8 +7490,8 @@
     },
     {
       "path": ".opencode/plugin/lib/context-builder.cjs",
-      "checksum": "47d6bf4e485d2723038ce26365654ec3419f2ece188d4c78d3f01ef9cad65efa",
-      "size": 23917,
+      "checksum": "e68f3d69870c8972456f2d9f93c1ce20804ac8069541a23f69a6e7f5173e43a1",
+      "size": 24266,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
@@ -7129,12 +7615,6 @@
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
-      "path": ".opencode/scripts/fix-shebang-permissions.sh",
-      "checksum": "f21b57962ba535a9e98faccd51750dcc7969109414075ab6fa128c83a58cdde7",
-      "size": 1565,
-      "lastModified": "2026-01-25T17:53:40+07:00"
-    },
-    {
       "path": ".opencode/scripts/generate_catalogs.py",
       "checksum": "0fdb8f7084af692204bb075404ca346d2e5153839af1b978f10aef8347243340",
       "size": 6947
@@ -7234,8 +7714,8 @@
     },
     {
       "path": ".opencode/skills/ai-artist/SKILL.md",
-      "checksum": "2d0b2ce2e59e5729035ba0575977b142240bec2fd7ab7c79e05f416720e0ce0b",
-      "size": 3669,
+      "checksum": "bd909af273c56dc5341dcb4d41d2fae90f8e2f630224f8c1a556b975ba39580f",
+      "size": 3688,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
@@ -7365,8 +7845,8 @@
     },
     {
       "path": ".opencode/skills/ai-multimodal/SKILL.md",
-      "checksum": "cb863f975bd1e9df0fab5f5fa6519b2fe97abce1e40417971a569b0b00d07d5b",
-      "size": 7224,
+      "checksum": "072d5a6a975ee3b1c2a184bbd7564e3729ae3a806f6e35072b3559a5571cf40b",
+      "size": 7317,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
@@ -7621,8 +8101,8 @@
     },
     {
       "path": ".opencode/skills/bootstrap/SKILL.md",
-      "checksum": "05981d9e3874f81c9fc3ca49d0a513b463da5cf4c451fa276f3bccf800226cd7",
-      "size": 3865
+      "checksum": "679b0adabc135643e7ff0d6cefb2b035df1aae9b83349236954d647aaa91a80c",
+      "size": 3944
     },
     {
       "path": ".opencode/skills/bootstrap/references/shared-phases.md",
@@ -7651,13 +8131,13 @@
     },
     {
       "path": ".opencode/skills/brainstorm/SKILL.md",
-      "checksum": "150d79467249d764a6962bd6ab96380e942c5a12d3877f4dbcef54d4b65c95ff",
-      "size": 5456
+      "checksum": "dae7e233f2f39a5d405f06104a3fc18649f21255b906219f72d75d6d1e90ed20",
+      "size": 7668
     },
     {
       "path": ".opencode/skills/chrome-devtools/SKILL.md",
-      "checksum": "07d0868b1078a5cb4ad023b950be3b6c3ef0d95fe354bc164873af495954aead",
-      "size": 21801,
+      "checksum": "f0f0ceaaf65011af952f85623a526c26a9e50a4da9908771f9c38c84687fc351",
+      "size": 21883,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
@@ -7825,6 +8305,71 @@
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
+      "path": ".opencode/skills/ck-debug/SKILL.md",
+      "checksum": "861932cbfad74650b495efdfd3301e765c3cbfad9c866f66e63b3152cddb9a30",
+      "size": 5683
+    },
+    {
+      "path": ".opencode/skills/ck-debug/references/defense-in-depth.md",
+      "checksum": "89e23fdfcd85ecb2ea867e9770775cd8c7211682af4152719364b1005d0f5497",
+      "size": 3662
+    },
+    {
+      "path": ".opencode/skills/ck-debug/references/frontend-verification.md",
+      "checksum": "71aec196aeb12a629cea7f3807b39ee9e1d9bcf42ef03836b3865525ab1b5ba8",
+      "size": 3733
+    },
+    {
+      "path": ".opencode/skills/ck-debug/references/investigation-methodology.md",
+      "checksum": "21f56af62c3fa85124b5123a27a6d9cd681361a563d31febe4d19210f552b910",
+      "size": 4045
+    },
+    {
+      "path": ".opencode/skills/ck-debug/references/log-and-ci-analysis.md",
+      "checksum": "b33c7c8c3f436a1aec3d9842a8990ebff6b731674866d7dd4ff0c75d6020db73",
+      "size": 3460
+    },
+    {
+      "path": ".opencode/skills/ck-debug/references/performance-diagnostics.md",
+      "checksum": "be9bd0342d6bef3adba741217bcf03baa0e5781b18c7c70b07af2f7b343e7936",
+      "size": 3861
+    },
+    {
+      "path": ".opencode/skills/ck-debug/references/reporting-standards.md",
+      "checksum": "1a89483f670ec0a6b7143896fa94ccacd8f3e1d863382f8bc96c24d5341f3162",
+      "size": 2690
+    },
+    {
+      "path": ".opencode/skills/ck-debug/references/root-cause-tracing.md",
+      "checksum": "4df0e51b2d26a407d3e2ffba19c7c0cf8d01698c1745009e667b69ba2c962100",
+      "size": 3356
+    },
+    {
+      "path": ".opencode/skills/ck-debug/references/systematic-debugging.md",
+      "checksum": "2c97f742d43baae7206d0859d42bb6837cb89949c7ab0c3fa37d6df129f2b628",
+      "size": 4158
+    },
+    {
+      "path": ".opencode/skills/ck-debug/references/task-management-debugging.md",
+      "checksum": "04d23e03ad060198a59cd083839ad34643972be39789a54fef1816384fbfa85d",
+      "size": 5449
+    },
+    {
+      "path": ".opencode/skills/ck-debug/references/verification.md",
+      "checksum": "ac56942520327efaf29b415b27e6a4211d88386d0072c5d400fdee39eba8bbf3",
+      "size": 3399
+    },
+    {
+      "path": ".opencode/skills/ck-debug/scripts/find-polluter.sh",
+      "checksum": "f4dc594206175b17de25464b5f60a0e011774a7c7843014b6442338a085eba57",
+      "size": 1520
+    },
+    {
+      "path": ".opencode/skills/ck-debug/scripts/find-polluter.test.md",
+      "checksum": "3147fa73a49f7ae82312277d36a357c71dde430f14a7fa86e81516f5e71365ee",
+      "size": 2117
+    },
+    {
       "path": ".opencode/skills/ck-help/SKILL.md",
       "checksum": "a5611ef071a6c42335103206202e59611f820e44eee056cfba9a7ea5a42dff0e",
       "size": 3473
@@ -7841,14 +8386,109 @@
     },
     {
       "path": ".opencode/skills/ck-help/scripts/skills_data.yaml",
-      "checksum": "858ab9f8fe1882a5bc6d1d41c1a3358e4d7f6ce9c4d405328ddd383dbdd818fd",
-      "size": 24560
+      "checksum": "34b88d33464200830c5b7cb725bb8439fd47cfbe145c6f7da0e19fd813fae2c9",
+      "size": 24642
+    },
+    {
+      "path": ".opencode/skills/ck-plan/SKILL.md",
+      "checksum": "6a898bb6bd3659a83a0bf5959c434b4e425011da234f376e15a1c84d53ed54c0",
+      "size": 8860
+    },
+    {
+      "path": ".opencode/skills/ck-plan/references/archive-workflow.md",
+      "checksum": "81af37b4ccca4ad73160a91aadb39d754d997c1dfce9dc0cda6bb89c8801c1f8",
+      "size": 2335
+    },
+    {
+      "path": ".opencode/skills/ck-plan/references/codebase-understanding.md",
+      "checksum": "c1e78ef9dba69a667f240cec791fb8ccec0d711c96fd69d3e188d2ace061eb2b",
+      "size": 1976
+    },
+    {
+      "path": ".opencode/skills/ck-plan/references/output-standards.md",
+      "checksum": "bcf2206ca70be531d28fafd18daac5bfbf752c41b04b95e92f58b6a03c287876",
+      "size": 4877
+    },
+    {
+      "path": ".opencode/skills/ck-plan/references/plan-organization.md",
+      "checksum": "b225e46fe24a24c13b10596223240213cc87440bc5c4f7991e18bc901a46fb26",
+      "size": 4932
+    },
+    {
+      "path": ".opencode/skills/ck-plan/references/red-team-personas.md",
+      "checksum": "b38600247151ed9bf7d3beb05609ae124dff00a0c5b2220173ad5dd6bbcb8481",
+      "size": 2621
+    },
+    {
+      "path": ".opencode/skills/ck-plan/references/red-team-workflow.md",
+      "checksum": "104af70eaa297c391b2bfb60170a8ebfedb1cf3901572a70034938886297f1e8",
+      "size": 2684
+    },
+    {
+      "path": ".opencode/skills/ck-plan/references/research-phase.md",
+      "checksum": "b921f91f8f2b1566824625a7ab35ae9572473c6a96ba8979b0a23f21f9e8727e",
+      "size": 1578
+    },
+    {
+      "path": ".opencode/skills/ck-plan/references/scope-challenge.md",
+      "checksum": "429c130ca8042838f14c402abba60128031e06498269b6a52437bea91491db74",
+      "size": 3130
+    },
+    {
+      "path": ".opencode/skills/ck-plan/references/solution-design.md",
+      "checksum": "805525a1f228e080809cd8794735ed148fb37c2702517a8982488f72a31ab7f0",
+      "size": 2057
+    },
+    {
+      "path": ".opencode/skills/ck-plan/references/task-management.md",
+      "checksum": "ce9a5cab2b17f7d0a3a77c880df94256d47f45377253acc1403736db07833589",
+      "size": 5920
+    },
+    {
+      "path": ".opencode/skills/ck-plan/references/validate-question-framework.md",
+      "checksum": "d868ac6e03e395857186f801127b2f4b47c8aaabf5326fc2a25982804a0c113c",
+      "size": 2361
+    },
+    {
+      "path": ".opencode/skills/ck-plan/references/validate-workflow.md",
+      "checksum": "1de7551636994a5e8a3c69cc3318ccae2b80a7e525666ce136b44fad81e292df",
+      "size": 2315
+    },
+    {
+      "path": ".opencode/skills/ck-plan/references/workflow-modes.md",
+      "checksum": "a130306ba2a88c1c1a18ce9b3387c5a75fa3091150906e4cf03a977819e3e8fd",
+      "size": 6069
     },
     {
       "path": ".opencode/skills/code-review/SKILL.md",
-      "checksum": "9890b894783fda45a9d74c9dfee170b165d3a7c086d3798c167f8afc7c139fd5",
-      "size": 6041,
+      "checksum": "a5ac2bd82922db874efd5167a45e662ea8dfce8fa9375ef069cc398d160a9789",
+      "size": 9306,
       "lastModified": "2026-01-25T17:53:40+07:00"
+    },
+    {
+      "path": ".opencode/skills/code-review/references/adversarial-review.md",
+      "checksum": "a7a3d57c2fbe7d7560e77a94e1fed6c87b05fe8f1cb273d114a2cc957b35f28b",
+      "size": 8282
+    },
+    {
+      "path": ".opencode/skills/code-review/references/checklist-workflow.md",
+      "checksum": "776df3432c71d6300e50e47a70d00e019c17b494e0c821e863dba311d4a42fbb",
+      "size": 2904
+    },
+    {
+      "path": ".opencode/skills/code-review/references/checklists/api.md",
+      "checksum": "9223d090952195e14f1a3ea42d3df661a996070e207c38b90be420cc6d608180",
+      "size": 1896
+    },
+    {
+      "path": ".opencode/skills/code-review/references/checklists/base.md",
+      "checksum": "69824641bbb9f30d81f21f09f190acb9c40af8c32e2c80511ea84a81a00d0083",
+      "size": 4149
+    },
+    {
+      "path": ".opencode/skills/code-review/references/checklists/web-app.md",
+      "checksum": "cf6c14d4772e237b417284aea79a7c1e771e890e278a0786a519e205b8811418",
+      "size": 1919
     },
     {
       "path": ".opencode/skills/code-review/references/code-review-reception.md",
@@ -7858,8 +8498,8 @@
     },
     {
       "path": ".opencode/skills/code-review/references/codebase-scan-workflow.md",
-      "checksum": "839e89cf67d2a54f557f1d7b3dc1ee0ab4c3a993701f9b8e9d69bf3d3cdeac7e",
-      "size": 1153
+      "checksum": "cd4a506b2fc5a09be51b43d34a202be95c4c599a556b3fee7e8cd84b776a10e5",
+      "size": 1269
     },
     {
       "path": ".opencode/skills/code-review/references/edge-case-scouting.md",
@@ -7867,9 +8507,14 @@
       "size": 3018
     },
     {
+      "path": ".opencode/skills/code-review/references/input-mode-resolution.md",
+      "checksum": "dc1179c5185a69d7c1ac071ad954260402c393bfc1435daac002b6fa63e49555",
+      "size": 3588
+    },
+    {
       "path": ".opencode/skills/code-review/references/parallel-review-workflow.md",
-      "checksum": "244ab8e2eedcb29d2de997e99637d15c972bb392a6eca5f7e3099680e9dc575c",
-      "size": 1903
+      "checksum": "1e86599a6c8797aab945f374e9af7a1843f25f4d407ac4884762b4f49cdb3557",
+      "size": 2247
     },
     {
       "path": ".opencode/skills/code-review/references/requesting-code-review.md",
@@ -7878,9 +8523,14 @@
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
+      "path": ".opencode/skills/code-review/references/spec-compliance-review.md",
+      "checksum": "f66d056e6204c23cec67bca5dfb92806d9e4b5fbc4a32be415059628981a7783",
+      "size": 1455
+    },
+    {
       "path": ".opencode/skills/code-review/references/task-management-reviews.md",
-      "checksum": "6a9ca5c520d2df9085a0f60c014dcf5480d9a967db9e8739bea46ed8d58af602",
-      "size": 4713
+      "checksum": "a0071129f4fcd23799fea11b277bab6d766563d986fa5590c960249d3966e8e0",
+      "size": 5268
     },
     {
       "path": ".opencode/skills/code-review/references/verification-before-completion.md",
@@ -7983,8 +8633,8 @@
     },
     {
       "path": ".opencode/skills/cook/SKILL.md",
-      "checksum": "65bcd96e9199829c1a6baf92d1fe20435f56179bc6095a1342a3ae1948f26641",
-      "size": 4657
+      "checksum": "a0ff8c26d5c747dd6f1ec588ed7470b091cfa71cd29916634134b2a0bc6a46c9",
+      "size": 6514
     },
     {
       "path": ".opencode/skills/cook/references/intent-detection.md",
@@ -8003,13 +8653,13 @@
     },
     {
       "path": ".opencode/skills/cook/references/workflow-steps.md",
-      "checksum": "92d7ffcc6a6f998a9b5676ff29b746b9a29152364190f4ecd12d6a348c7682e1",
-      "size": 7624
+      "checksum": "c1b1b61d0c43f90b9afab5e95828e99ad055d2bfbd4cd46f5946a9b536806389",
+      "size": 8344
     },
     {
       "path": ".opencode/skills/copywriting/SKILL.md",
-      "checksum": "6d3861a35a7cd615d5105488e9d835da3ae7554ff72a34bd770082c508952ae4",
-      "size": 3839
+      "checksum": "8babcf803814ae54575ad2d62b1aaa2016a09a024368eb0411b1d2cce1950dad",
+      "size": 3921
     },
     {
       "path": ".opencode/skills/copywriting/references/copy-formulas.md",
@@ -8235,6 +8885,266 @@
       "size": 4763
     },
     {
+      "path": ".opencode/skills/deploy/SKILL.md",
+      "checksum": "d0e1e8ff84a11fb29e41045f7c6d8c091e25430e5906f2440985f7f5b66badf3",
+      "size": 6007
+    },
+    {
+      "path": ".opencode/skills/deploy/references/platform-config-templates.md",
+      "checksum": "5840c396f3b1c91b77113968eb005f8139f5df91e8d536c8b8dfe601da7f8d8b",
+      "size": 642
+    },
+    {
+      "path": ".opencode/skills/deploy/references/platforms/aws.md",
+      "checksum": "360265be42a5129c91dd2b8d790db97134b720a05569d41b6da4e54c83589b2e",
+      "size": 1206
+    },
+    {
+      "path": ".opencode/skills/deploy/references/platforms/cloudflare.md",
+      "checksum": "d62859284bdc7412c530d66641d33b27c7ba2d4488f77bd7a13c26fbd0649203",
+      "size": 735
+    },
+    {
+      "path": ".opencode/skills/deploy/references/platforms/coolify.md",
+      "checksum": "bdbda9d71d371fb2bd1a970beead101dabb05d921dbb0c7e29c8a43198e5acea",
+      "size": 741
+    },
+    {
+      "path": ".opencode/skills/deploy/references/platforms/digitalocean.md",
+      "checksum": "bb578a1c4e809a24036bd51cfd6786ae9bb198833021465640fe153e1fb915d6",
+      "size": 878
+    },
+    {
+      "path": ".opencode/skills/deploy/references/platforms/dokploy.md",
+      "checksum": "b226baf473617fbdd8c73e7eb90d3de3c15eefc847f14fb21b8977f0078bc8ed",
+      "size": 570
+    },
+    {
+      "path": ".opencode/skills/deploy/references/platforms/flyio.md",
+      "checksum": "bfffd5e8455d037202b9f5102116bbb45c761ad9b96b836a9854ede5d6a5f1d8",
+      "size": 1028
+    },
+    {
+      "path": ".opencode/skills/deploy/references/platforms/gcp.md",
+      "checksum": "8ae4f227d3e217f823162afecfce2cf4212c09cf9cf00ebfc3ba3d593c840e9a",
+      "size": 1127
+    },
+    {
+      "path": ".opencode/skills/deploy/references/platforms/github-pages.md",
+      "checksum": "bb367a1b63ddec943f5795e38d6d53460f2ccd32540d25432763db4d6c0aae32",
+      "size": 1218
+    },
+    {
+      "path": ".opencode/skills/deploy/references/platforms/heroku.md",
+      "checksum": "e6db6c6f0ea03acb7610aa2555a5fbe6d292fe199cbd961e6d5e0323583dd296",
+      "size": 505
+    },
+    {
+      "path": ".opencode/skills/deploy/references/platforms/netlify.md",
+      "checksum": "28ae216feeb1de827e671363a65bc403b94071db3e2bfd0f621b9f0af728b2ad",
+      "size": 737
+    },
+    {
+      "path": ".opencode/skills/deploy/references/platforms/railway.md",
+      "checksum": "95ed8769d4e4d09992fba58db5768bb34eec5569c90681820b140684f86d56a0",
+      "size": 693
+    },
+    {
+      "path": ".opencode/skills/deploy/references/platforms/render.md",
+      "checksum": "2665d84001ae665df6716d88ac79c6a74b69be37bde76f3005964cfb6a2f1038",
+      "size": 786
+    },
+    {
+      "path": ".opencode/skills/deploy/references/platforms/tose.md",
+      "checksum": "a0e442b41c887cee2cc54556cca22ed2eba2c9625ca00cbc547f352df7540092",
+      "size": 1238
+    },
+    {
+      "path": ".opencode/skills/deploy/references/platforms/vercel.md",
+      "checksum": "05429775a1f9f4f3096934bc11f82368321821377ef8c50f7611687ec8de99f3",
+      "size": 697
+    },
+    {
+      "path": ".opencode/skills/deploy/references/platforms/vultr.md",
+      "checksum": "41aecb5efd19d29dfb465ca5e5999eda007450c54051ff03d28de992013ce4a9",
+      "size": 648
+    },
+    {
+      "path": ".opencode/skills/design/SKILL.md",
+      "checksum": "c0210cc3d3f7c6be4e156dc0cfb85d515bf4cc524ee52242b644fa00c47852c5",
+      "size": 11988
+    },
+    {
+      "path": ".opencode/skills/design/data/cip/deliverables.csv",
+      "checksum": "229912f35c2f5a790508ddd62270cc7a92a84694027025ea5a30f1fb5ba84b70",
+      "size": 13385
+    },
+    {
+      "path": ".opencode/skills/design/data/cip/industries.csv",
+      "checksum": "729b1dea6d6f39b0bc22a1e659584e7ca5cead75841146d599c9f8dc00d4da46",
+      "size": 4935
+    },
+    {
+      "path": ".opencode/skills/design/data/cip/mockup-contexts.csv",
+      "checksum": "15d61cef16e6746d5aa665976f4de8074fedb64bfc5c7313a40eec1112a1d499",
+      "size": 5205
+    },
+    {
+      "path": ".opencode/skills/design/data/cip/styles.csv",
+      "checksum": "4e7f9e209bc90b60df62fd9843a1a73b365e54161dbd820b82817a8e512af4c4",
+      "size": 5967
+    },
+    {
+      "path": ".opencode/skills/design/data/icon/styles.csv",
+      "checksum": "a4aa7d326ffe1e50961eb70e25a6351f45c0247cd245461fa1a27cdc72f903b4",
+      "size": 2250
+    },
+    {
+      "path": ".opencode/skills/design/data/logo/colors.csv",
+      "checksum": "d60218f0705bb0f0b892a10468a5c8d9a44eef3d0262ef8df8970ba3fbab567a",
+      "size": 10674
+    },
+    {
+      "path": ".opencode/skills/design/data/logo/industries.csv",
+      "checksum": "e58dda4b9d28851f70914f82c1d2a2cff626a991ca41076f64122f33cc8a6525",
+      "size": 13274
+    },
+    {
+      "path": ".opencode/skills/design/data/logo/styles.csv",
+      "checksum": "ea08bdfb7aa557f08d1b6299222423f948700f8e4029321acb58c8f83197bdf2",
+      "size": 13678
+    },
+    {
+      "path": ".opencode/skills/design/references/banner-sizes-and-styles.md",
+      "checksum": "c8906fb1073a576ee8c680d9bc8586249cbc4ed36690da960d65a1c9c37143b7",
+      "size": 4993
+    },
+    {
+      "path": ".opencode/skills/design/references/cip-deliverable-guide.md",
+      "checksum": "1424e120b967288e2334f24fcfa5cdc7f238420326a7444f4c5597efecfabc41",
+      "size": 1735
+    },
+    {
+      "path": ".opencode/skills/design/references/cip-design.md",
+      "checksum": "122757710a4fbf3c7e3c6137deffc0222e4b3851a7c5f762ee869bc05df34235",
+      "size": 4613
+    },
+    {
+      "path": ".opencode/skills/design/references/cip-prompt-engineering.md",
+      "checksum": "4bf3a0c858f38c230e43e872857b72d9eb692e066e8de5920da75aac733e753c",
+      "size": 2493
+    },
+    {
+      "path": ".opencode/skills/design/references/cip-style-guide.md",
+      "checksum": "f3e15408cd981e93804440c1159c12e02d001bc37a3945f455b3fc13729ed4e1",
+      "size": 2357
+    },
+    {
+      "path": ".opencode/skills/design/references/design-routing.md",
+      "checksum": "8cb8a0d6f19b1a7b95772b0503e6db511be90e6e072a90e3ff1280b3fe8483fc",
+      "size": 5834
+    },
+    {
+      "path": ".opencode/skills/design/references/icon-design.md",
+      "checksum": "6f61bb6d6b9b568bd6d78b51f356456fc9b8cef8e350c742f27ecddac9008f17",
+      "size": 4359
+    },
+    {
+      "path": ".opencode/skills/design/references/logo-color-psychology.md",
+      "checksum": "3fd0e93e24c3b2ea7f3be778e8f2d03b1c62c7c6eab3ade478c8fca332bff287",
+      "size": 3341
+    },
+    {
+      "path": ".opencode/skills/design/references/logo-design.md",
+      "checksum": "30df7b1954cf128ca72ae889a2e2668a38fb2b6857b7274ffd10145339b7fd6f",
+      "size": 3175
+    },
+    {
+      "path": ".opencode/skills/design/references/logo-prompt-engineering.md",
+      "checksum": "e50f55bf323263eb27b4cd4c5172383a787fb894581d5d2befb3f6e0180b253e",
+      "size": 4314
+    },
+    {
+      "path": ".opencode/skills/design/references/logo-style-guide.md",
+      "checksum": "611baa841eedab101f45c113c6bfbd4d7e16e859c9d6ebd2cf941827a6e8dd15",
+      "size": 3435
+    },
+    {
+      "path": ".opencode/skills/design/references/slides-copywriting-formulas.md",
+      "checksum": "605c81501c2556e6b01d159dca9d8dc052d8bf8037d6d876ccef255551da3415",
+      "size": 2608
+    },
+    {
+      "path": ".opencode/skills/design/references/slides-create.md",
+      "checksum": "792d647a5d4f87d765cf417f7ac54dd0b2fc4d229cc23ea9df56282d4c1ee086",
+      "size": 153
+    },
+    {
+      "path": ".opencode/skills/design/references/slides-html-template.md",
+      "checksum": "fd5b051a37365fc6059c75bb388ec6f64daf1bd9ae938b287b6d762dc83c0c35",
+      "size": 9004
+    },
+    {
+      "path": ".opencode/skills/design/references/slides-layout-patterns.md",
+      "checksum": "0a08315505aa1b187a7080bf4f03e95cc0bb61b631531c22368dd9e1643ab119",
+      "size": 3695
+    },
+    {
+      "path": ".opencode/skills/design/references/slides-strategies.md",
+      "checksum": "47a7ac2bb23f199ef8fda12688a2405b8c2e8b23a09dea4870e8ae33e87c44ce",
+      "size": 2719
+    },
+    {
+      "path": ".opencode/skills/design/references/slides.md",
+      "checksum": "5630d5daec947ff58ab1ac97c7a1ee77a21cf6f5dce5155535b65d291691979f",
+      "size": 1742
+    },
+    {
+      "path": ".opencode/skills/design/references/social-photos-design.md",
+      "checksum": "2544c143ff3a4471a775e2271797a3871480f94de91b267178da92e8952192a0",
+      "size": 11251
+    },
+    {
+      "path": ".opencode/skills/design/scripts/cip/core.py",
+      "checksum": "78a78a51f12d2382b2854414df395dc62b68532626ef724ddd5de713507911e4",
+      "size": 8062
+    },
+    {
+      "path": ".opencode/skills/design/scripts/cip/generate.py",
+      "checksum": "e39ff313c70311e7c0416ed8afbbdc09e5f212373382d7aa54763402b83e46a8",
+      "size": 19432
+    },
+    {
+      "path": ".opencode/skills/design/scripts/cip/render-html.py",
+      "checksum": "a49a89a017ea4a2c492438055f05dfba3dfb4f91563f5f913359939beeaeccab",
+      "size": 13941
+    },
+    {
+      "path": ".opencode/skills/design/scripts/cip/search.py",
+      "checksum": "6619fbbe71983003a858c5eb79bc59c607b342610a1178b6976c687c2932161b",
+      "size": 4524
+    },
+    {
+      "path": ".opencode/skills/design/scripts/icon/generate.py",
+      "checksum": "1a6be99dc233f6d9f8b558c26148203418be5b47c677cd83e48e41e78e38780c",
+      "size": 17151
+    },
+    {
+      "path": ".opencode/skills/design/scripts/logo/core.py",
+      "checksum": "4f8b36ffe538e5995d0e0b740053a0899a1adf445ffdf484bd47f94e71ade8d0",
+      "size": 6023
+    },
+    {
+      "path": ".opencode/skills/design/scripts/logo/generate.py",
+      "checksum": "6e4358f21cd85fec51c8d01b03e3696d6db180815309d7e10a19c623d4d4462c",
+      "size": 14630
+    },
+    {
+      "path": ".opencode/skills/design/scripts/logo/search.py",
+      "checksum": "693b3a1824831f120d4c60ed72477847604da1f6b654343381f8e9d3800a28f2",
+      "size": 4745
+    },
+    {
       "path": ".opencode/skills/devops/SKILL.md",
       "checksum": "7888b01bcc8c2c9613d0557af7fb4ea66c172b0b0d8cf77d7db68f01835fe9b7",
       "size": 3325,
@@ -8394,8 +9304,8 @@
     },
     {
       "path": ".opencode/skills/docs/SKILL.md",
-      "checksum": "e80da3f2ac63d86fa74560f5987fe3531b5ebb759028cb6ad9610a0a00b60e09",
-      "size": 1871
+      "checksum": "813ab5eae3a9f151a766b957889e0e8d8dade2a8ce582a1c4d0d743781a9f62c",
+      "size": 1952
     },
     {
       "path": ".opencode/skills/docs/references/init-workflow.md",
@@ -8514,8 +9424,8 @@
     },
     {
       "path": ".opencode/skills/fix/SKILL.md",
-      "checksum": "6982e52a7e1e24aac74f100781e223ac4a0c0fd474e759de510f5af8a9338bb8",
-      "size": 4702
+      "checksum": "f6abc9cc7c393d75fd896cf73911f6da04ebee71aa2a145afb1b66bd8179fcee",
+      "size": 6662
     },
     {
       "path": ".opencode/skills/fix/references/complexity-assessment.md",
@@ -8544,8 +9454,8 @@
     },
     {
       "path": ".opencode/skills/fix/references/task-orchestration.md",
-      "checksum": "e52429e36efe33b430601a710561da0f1edc7f15b8b253b4e084c46ba5ec72a9",
-      "size": 4265
+      "checksum": "ab76f4ceeb1324ab217f77b2207899d6bcd00c56b736e1b09cf8f40e8caf1b05",
+      "size": 4580
     },
     {
       "path": ".opencode/skills/fix/references/workflow-ci.md",
@@ -8903,8 +9813,8 @@
     },
     {
       "path": ".opencode/skills/journal/SKILL.md",
-      "checksum": "6bb950ed0f246d41994bcca461acf0b6a5e46c8d62dbf87de366f8f6f4c9450a",
-      "size": 498
+      "checksum": "5cd6351191b7c3578b6baac3ac394862cfe070f61d2bb7f6af8416598ea90ff9",
+      "size": 578
     },
     {
       "path": ".opencode/skills/kanban/SKILL.md",
@@ -8928,8 +9838,8 @@
     },
     {
       "path": ".opencode/skills/markdown-novel-viewer/SKILL.md",
-      "checksum": "c05045eeec8933d0d0f2f2e0f5adc96f73067ef03cd192891d6b551b3fe9fa52",
-      "size": 9275,
+      "checksum": "a2e63449594596cdb5558dd1dae61e0eb9ff2ff9a92621a77d9c83306b05f0ea",
+      "size": 9436,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
@@ -8993,8 +9903,8 @@
     },
     {
       "path": ".opencode/skills/markdown-novel-viewer/assets/styles/novel-theme-sidebar.css",
-      "checksum": "f56b56320744a68f132b58eba09a39493f1b50371a649c97a2f51ef908a083c8",
-      "size": 6351
+      "checksum": "db674ec4c3de2962d8e91fde5d5f2e7351aa52da4e0e42b9714bb5f9bbf3800c",
+      "size": 6376
     },
     {
       "path": ".opencode/skills/markdown-novel-viewer/assets/styles/novel-theme-variables.css",
@@ -9031,8 +9941,8 @@
     },
     {
       "path": ".opencode/skills/markdown-novel-viewer/scripts/lib/plan-navigator.cjs",
-      "checksum": "9251db2bc7d2ec2d4eef863bc6908157c3e4c2f45ad03995bf36127389f6ebb0",
-      "size": 20464,
+      "checksum": "ca55d3e86e00b066ad137d2318e231975da0894a81d8fa366ff2734d244078a6",
+      "size": 10396,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
@@ -9055,8 +9965,8 @@
     },
     {
       "path": ".opencode/skills/markdown-novel-viewer/scripts/tests/server.test.cjs",
-      "checksum": "68f7e9f013edffedbd89c34772e024303221cda031c68110f0137eb4ade0c460",
-      "size": 9515,
+      "checksum": "716d70a43f4c2d7f3a2f39cfc7e573d47dfde5a5aecb237c8609b5cf4e017d47",
+      "size": 11529,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
@@ -9221,8 +10131,8 @@
     },
     {
       "path": ".opencode/skills/media-processing/SKILL.md",
-      "checksum": "5d5b0fed8bc652d4a99e942e08dabb7389059339c150fd0f74dff6251d22c588",
-      "size": 2816,
+      "checksum": "7d8ed92c013e76593ca3f7aa05d8912295822555276fe6e2903fc23a864eee74",
+      "size": 2897,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
@@ -9695,71 +10605,6 @@
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
-      "path": ".opencode/skills/plan/SKILL.md",
-      "checksum": "a37339e5bc052e44b7a09deb17443aac120c314a0533e3888adf9618493db5d8",
-      "size": 5610
-    },
-    {
-      "path": ".opencode/skills/plan/references/archive-workflow.md",
-      "checksum": "81af37b4ccca4ad73160a91aadb39d754d997c1dfce9dc0cda6bb89c8801c1f8",
-      "size": 2335
-    },
-    {
-      "path": ".opencode/skills/plan/references/codebase-understanding.md",
-      "checksum": "c1e78ef9dba69a667f240cec791fb8ccec0d711c96fd69d3e188d2ace061eb2b",
-      "size": 1976
-    },
-    {
-      "path": ".opencode/skills/plan/references/output-standards.md",
-      "checksum": "f5e25b6be2c70057c1a2a11aad21c75aeb0773932e0756c9a6395d494573fcb3",
-      "size": 4571
-    },
-    {
-      "path": ".opencode/skills/plan/references/plan-organization.md",
-      "checksum": "334239330d430544726fe205e39e3cb7079937d636fa4911a0db12274f4963d6",
-      "size": 3707
-    },
-    {
-      "path": ".opencode/skills/plan/references/red-team-personas.md",
-      "checksum": "b38600247151ed9bf7d3beb05609ae124dff00a0c5b2220173ad5dd6bbcb8481",
-      "size": 2621
-    },
-    {
-      "path": ".opencode/skills/plan/references/red-team-workflow.md",
-      "checksum": "104af70eaa297c391b2bfb60170a8ebfedb1cf3901572a70034938886297f1e8",
-      "size": 2684
-    },
-    {
-      "path": ".opencode/skills/plan/references/research-phase.md",
-      "checksum": "b921f91f8f2b1566824625a7ab35ae9572473c6a96ba8979b0a23f21f9e8727e",
-      "size": 1578
-    },
-    {
-      "path": ".opencode/skills/plan/references/solution-design.md",
-      "checksum": "805525a1f228e080809cd8794735ed148fb37c2702517a8982488f72a31ab7f0",
-      "size": 2057
-    },
-    {
-      "path": ".opencode/skills/plan/references/task-management.md",
-      "checksum": "d01df0d84883164ba1de87b5dff5ed48a02e2d8666ba3647f71045fe606cafe5",
-      "size": 5633
-    },
-    {
-      "path": ".opencode/skills/plan/references/validate-question-framework.md",
-      "checksum": "d868ac6e03e395857186f801127b2f4b47c8aaabf5326fc2a25982804a0c113c",
-      "size": 2361
-    },
-    {
-      "path": ".opencode/skills/plan/references/validate-workflow.md",
-      "checksum": "1de7551636994a5e8a3c69cc3318ccae2b80a7e525666ce136b44fad81e292df",
-      "size": 2315
-    },
-    {
-      "path": ".opencode/skills/plan/references/workflow-modes.md",
-      "checksum": "63235cee18720a2d2a00ac62e4ff0269f975b88daf17052adcc6fd8e3288c685",
-      "size": 5591
-    },
-    {
       "path": ".opencode/skills/plans-kanban/SKILL.md",
       "checksum": "7836f8ea462ebe17f99a05688e03e3e796452a13ed00ec606878be7059465cf2",
       "size": 4389,
@@ -9808,14 +10653,14 @@
     },
     {
       "path": ".opencode/skills/plans-kanban/scripts/lib/plan-metadata-extractor.cjs",
-      "checksum": "48cc9baa77555b132d49216f712c760e6587456754577bfbb4ba5d9d60477da8",
-      "size": 15236,
+      "checksum": "ebbea04869cea85213cd8116bcadc03d11867f208b4a0aecc175e41906642c05",
+      "size": 15517,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
       "path": ".opencode/skills/plans-kanban/scripts/lib/plan-parser.cjs",
-      "checksum": "59fd55968b6ca2f59048cb346dae2b9fb8c6c609862439113f46beb471cc6ba4",
-      "size": 5803,
+      "checksum": "1f3541ed55ea2c7c32a4fed9b8926aeeb65e55a2559b754abeee3fd097358b2d",
+      "size": 739,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
@@ -9844,18 +10689,63 @@
     },
     {
       "path": ".opencode/skills/preview/SKILL.md",
-      "checksum": "957a066310255d10fb5e4843b1b3da0cb2bf1bc3b48f437321cafe79967ec774",
-      "size": 3266
+      "checksum": "d9a02967dcd865e528c59d8c6ac993965a06e383bf443aad91c5cf70be8aaef4",
+      "size": 8138
     },
     {
       "path": ".opencode/skills/preview/references/generation-modes.md",
-      "checksum": "1f8d06c87461dcd533170022fe128c0f5d8c748a98217195299cb2cdcca9c099",
-      "size": 2063
+      "checksum": "d9908050c7b220a9c08724ab90b0ab06c1bb7419756dd3dc815cb176d123e2cd",
+      "size": 6731
+    },
+    {
+      "path": ".opencode/skills/preview/references/html-css-patterns.md",
+      "checksum": "c74785e605a4c0dddee2086f3c6ac87c89bf631c5518c57ef68b1a20714a6174",
+      "size": 35187
+    },
+    {
+      "path": ".opencode/skills/preview/references/html-design-guidelines.md",
+      "checksum": "62ce869cc0dce9bd024085f6d300c1753d4b3050587096882d2b003592bf69fe",
+      "size": 13978
+    },
+    {
+      "path": ".opencode/skills/preview/references/html-libraries.md",
+      "checksum": "0e0cc223d7cc800cc1e4158d26067e8ea8b41d08adf57d81427dac52ae3f4ab6",
+      "size": 19592
+    },
+    {
+      "path": ".opencode/skills/preview/references/html-responsive-nav.md",
+      "checksum": "c2507c5a468632eab14028780898422b1a6d7a2e3d1708933bd294f2cf6989c3",
+      "size": 5817
+    },
+    {
+      "path": ".opencode/skills/preview/references/html-slide-patterns.md",
+      "checksum": "14da4390afb8c669214e8310153f974b5bbdbd675d84b44510c24bd2e28cba4d",
+      "size": 40110
     },
     {
       "path": ".opencode/skills/preview/references/view-mode.md",
       "checksum": "689ead0e8a3c82c5d654e0fab4de16d98d709d5c57a98c5037091a3003e26911",
       "size": 1220
+    },
+    {
+      "path": ".opencode/skills/preview/templates/architecture.html",
+      "checksum": "e68c76606f7ae2e4054fd07b23baf517922499cb4728faeebf122128ce577bf4",
+      "size": 17460
+    },
+    {
+      "path": ".opencode/skills/preview/templates/data-table.html",
+      "checksum": "d807a18d4fdc6c973e59b35d8b895cbdae4bc461aad46ffd7a9e1c28fb7bcf2a",
+      "size": 16242
+    },
+    {
+      "path": ".opencode/skills/preview/templates/mermaid-flowchart.html",
+      "checksum": "32394108033dcd3990c4a24fcb4315647d1a08a55cd566bbffb63887e512206b",
+      "size": 21391
+    },
+    {
+      "path": ".opencode/skills/preview/templates/slide-deck.html",
+      "checksum": "f6478a4f4c4406b540acabb8329c14196d6f5dcbeacfc4464257cf29877f4194",
+      "size": 35552
     },
     {
       "path": ".opencode/skills/problem-solving/SKILL.md",
@@ -9907,8 +10797,8 @@
     },
     {
       "path": ".opencode/skills/project-management/SKILL.md",
-      "checksum": "af54b2b04c94300ebee12b8103fc8f40aa938a288ad3c73e694b4bf36d96f2a9",
-      "size": 4587
+      "checksum": "4082ac73e58e5727229e16a30b9d94450fddca8e872db7761b28bad6dfdd6790",
+      "size": 5148
     },
     {
       "path": ".opencode/skills/project-management/references/documentation-triggers.md",
@@ -9917,13 +10807,13 @@
     },
     {
       "path": ".opencode/skills/project-management/references/hydration-workflow.md",
-      "checksum": "594058faa3af0db36339d3760b7600249777c9425dd265dfc65c80871466632b",
-      "size": 3783
+      "checksum": "ef86578bd3ef79eb34e82d4b9039374af4591b2eda8be230eedbb48ab1f0a39e",
+      "size": 4233
     },
     {
       "path": ".opencode/skills/project-management/references/progress-tracking.md",
-      "checksum": "1888bd25acda2f1ed19ee0f799c72125381d0f3710266cfed852d81a807d1fdc",
-      "size": 2795
+      "checksum": "c8677ed866ae6abc015d8612b7f3619d97edfa9f7f5a646eb23dabb4c22d3991",
+      "size": 3480
     },
     {
       "path": ".opencode/skills/project-management/references/reporting-patterns.md",
@@ -9932,8 +10822,28 @@
     },
     {
       "path": ".opencode/skills/project-management/references/task-operations.md",
-      "checksum": "76e6ba9bf653e4465a846f009dc7d8cccf726b346dabaa8cd8b67f5a530bb986",
-      "size": 2822
+      "checksum": "7894b9d8361058b176e8c49a8748edd070214a4a38f08c522a36d53322327161",
+      "size": 3091
+    },
+    {
+      "path": ".opencode/skills/project-organization/SKILL.md",
+      "checksum": "599311f11670b502a4a30f5a0c7b02bb21a277fdebbe7e0a9f7294792c219177",
+      "size": 9407
+    },
+    {
+      "path": ".opencode/skills/project-organization/references/directory-patterns.md",
+      "checksum": "5973cf858f405f68269b821523f57262306cb2e1cd9f8e3d8ab9e5627900d7df",
+      "size": 6637
+    },
+    {
+      "path": ".opencode/skills/project-organization/references/markdown-body-templates.md",
+      "checksum": "19c5e6c97129eddaacbbddf2083113774c4ecf615568407c911fd224a32060cf",
+      "size": 4983
+    },
+    {
+      "path": ".opencode/skills/project-organization/references/naming-conventions.md",
+      "checksum": "bbfe760a99b571f282ae0b95144a346718bed8182ec97d7f2ce141d9423542e3",
+      "size": 3542
     },
     {
       "path": ".opencode/skills/react-best-practices/AGENTS.md",
@@ -10400,14 +11310,14 @@
     },
     {
       "path": ".opencode/skills/research/SKILL.md",
-      "checksum": "31c53e3a3ed897565bd1ae6f799a4b8bc749db0badfa1fad26f0f94a2cac5cd3",
-      "size": 7089,
+      "checksum": "687feacd3e4ce3ee57e2af66e21cdd51ae2e708019050e2583c5162b1b72b700",
+      "size": 7169,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
       "path": ".opencode/skills/scout/SKILL.md",
-      "checksum": "2c79875aebabf19855ca105f3674efafc1776731411d1a45cb63f85529d27928",
-      "size": 3286
+      "checksum": "0df90f3e61a2112de2d1c52fa0cb8f1c4cba5fe3a63699a8a27c9ede0b5aef7d",
+      "size": 3518
     },
     {
       "path": ".opencode/skills/scout/references/external-scouting.md",
@@ -10423,6 +11333,21 @@
       "path": ".opencode/skills/scout/references/task-management-scouting.md",
       "checksum": "78ab0b90b058096fef35601c10d9e082bc2c8de25bdb118e81d2008c2ca1879e",
       "size": 4184
+    },
+    {
+      "path": ".opencode/skills/security-scan/SKILL.md",
+      "checksum": "bef38e6901215d83e9c9395f865325aa3ea2397e7968ab13eee82178d5f64165",
+      "size": 4297
+    },
+    {
+      "path": ".opencode/skills/security-scan/references/secret-patterns.md",
+      "checksum": "28f023ff7388821bf74579cb41bdc5ba5d942700e8d3b8a8b536caa15adfb43c",
+      "size": 1511
+    },
+    {
+      "path": ".opencode/skills/security-scan/references/vulnerability-patterns.md",
+      "checksum": "c4fd47950903dc02745fa2299f29bad2912d3f4af9ed68b602d9ae56f6d7cb5c",
+      "size": 2213
     },
     {
       "path": ".opencode/skills/sequential-thinking/.gitignore",
@@ -10572,6 +11497,26 @@
       "size": 2909
     },
     {
+      "path": ".opencode/skills/ship/SKILL.md",
+      "checksum": "d48f6f9f1fb0449ca44b703aa0a7171519da5a539993013e7a73dbc83aeeb313",
+      "size": 5174
+    },
+    {
+      "path": ".opencode/skills/ship/references/auto-detect.md",
+      "checksum": "92f6380c986cb166d2832251463617cc50d556deda8e1bdc5adda6ffd67f31f5",
+      "size": 2923
+    },
+    {
+      "path": ".opencode/skills/ship/references/pr-template.md",
+      "checksum": "0c92b4111ccda2a1cf0ac622b12e9f16d3c43bdf1819fdf6c7eeb1ee17b6348e",
+      "size": 2231
+    },
+    {
+      "path": ".opencode/skills/ship/references/ship-workflow.md",
+      "checksum": "74d667833cfbe3ae8cb1318d6338f71d804930dfa4a51752eb4baeb130a9f038",
+      "size": 7902
+    },
+    {
       "path": ".opencode/skills/shopify/README.md",
       "checksum": "c13775e03e078aae7fee1956ec758e2f728195495a1033680e4c202625bb2d64",
       "size": 1687,
@@ -10627,9 +11572,39 @@
     },
     {
       "path": ".opencode/skills/skill-creator/SKILL.md",
-      "checksum": "4df5f9fe792dee7490127875b7d8feec45a87465f6d85acbdabd418e89497b86",
-      "size": 4835,
+      "checksum": "94e4ecffa585a0aba8b8aab1fbbb66b206f98b9bd2cbe3c1386d59207c07a388",
+      "size": 6196,
       "lastModified": "2026-01-25T17:53:40+07:00"
+    },
+    {
+      "path": ".opencode/skills/skill-creator/agents/analyzer.md",
+      "checksum": "bf68f4cac5a56c673a928c2e6d619586c5b93ea364026ab37547772cb45a663a",
+      "size": 10376
+    },
+    {
+      "path": ".opencode/skills/skill-creator/agents/comparator.md",
+      "checksum": "fe1fc9787c495d864c5d6eada47396478572325fde1b33a96d78bf4b849b7a3e",
+      "size": 7287
+    },
+    {
+      "path": ".opencode/skills/skill-creator/agents/grader.md",
+      "checksum": "57134da0c1a4eea33fbd74a1c9c44aa814f07d6bc64de303edb586f941e5d21a",
+      "size": 9049
+    },
+    {
+      "path": ".opencode/skills/skill-creator/assets/eval_review.html",
+      "checksum": "ce477dcc74dc1c0d1d3352646a79167b5a63634e936b1019160025065974e452",
+      "size": 7058
+    },
+    {
+      "path": ".opencode/skills/skill-creator/eval-viewer/generate_review.py",
+      "checksum": "fc9d1b9243fe5ab6012ebd579bd76d0035de1b79fd3b969de114defab26478fb",
+      "size": 16365
+    },
+    {
+      "path": ".opencode/skills/skill-creator/eval-viewer/viewer.html",
+      "checksum": "a53213426ee1100441d701a3a0d49cda7a842f992d2c36463f4d3cc0258575fa",
+      "size": 44998
     },
     {
       "path": ".opencode/skills/skill-creator/references/benchmark-optimization-guide.md",
@@ -10642,14 +11617,24 @@
       "size": 2668
     },
     {
+      "path": ".opencode/skills/skill-creator/references/eval-infrastructure-guide.md",
+      "checksum": "33e7e006324847d704a880b34ed774a974489bdc21c81069999b4a97bc5fa012",
+      "size": 3518
+    },
+    {
+      "path": ".opencode/skills/skill-creator/references/eval-schemas.md",
+      "checksum": "8d3de1f31b306c202198ab3d8f24f968ff697b3018a760165089586c59583883",
+      "size": 2571
+    },
+    {
       "path": ".opencode/skills/skill-creator/references/mcp-skills-integration.md",
       "checksum": "05d310fadf3ebc4bbfe2081a9e9f977e33cebec96e68621837832180f7cbd83b",
       "size": 2462
     },
     {
       "path": ".opencode/skills/skill-creator/references/metadata-quality-criteria.md",
-      "checksum": "6d649dbc621f7f2c25dbd5ed6dcd6321f4a2884dd7dc8477d6008c7760182271",
-      "size": 1857
+      "checksum": "0cd072db92ed67381baa41b6ac4dbd32cd866f902dcc363526ae94d5d6a2c34b",
+      "size": 2605
     },
     {
       "path": ".opencode/skills/skill-creator/references/plugin-marketplace-hosting.md",
@@ -10683,13 +11668,13 @@
     },
     {
       "path": ".opencode/skills/skill-creator/references/skill-anatomy-and-requirements.md",
-      "checksum": "e8da1046282d77962084ec4ea7737d3edcc0e5224e6c88ea32e31ec11b3c55f1",
-      "size": 2710
+      "checksum": "302481c6f70f5b1914bcc57186fcf697a8734095394f2a7f7d6a56a3dd1bc264",
+      "size": 2794
     },
     {
       "path": ".opencode/skills/skill-creator/references/skill-creation-workflow.md",
-      "checksum": "9f6f2275051090e58f11b1dd655b8053916ee91b7e50d2d46efa9eb730b178b5",
-      "size": 3006
+      "checksum": "161141424ce080706f36ab1dcd43e59b3a1bcd1a9e9b4c2f3b01345b1a0f0e9e",
+      "size": 4504
     },
     {
       "path": ".opencode/skills/skill-creator/references/skill-design-patterns.md",
@@ -10713,28 +11698,33 @@
     },
     {
       "path": ".opencode/skills/skill-creator/references/token-efficiency-criteria.md",
-      "checksum": "53c667d33cb7542fd963c43d6f1b7b2f6ae97a81866b89e420d32ee894d450a7",
+      "checksum": "bf3f353ba8350907dda18f0e4f29f6564a45ecfb7a448c731e2b182770005aa8",
       "size": 1990
     },
     {
       "path": ".opencode/skills/skill-creator/references/troubleshooting-guide.md",
-      "checksum": "d873bf4aa4c8654f58792f376c79caee9fb3e1e637bcdd7ff1c8c1ac216ca3cb",
+      "checksum": "5e9341af2bd8ac74347105161ce787ce46fdb8aa6551964ef240940898efdee5",
       "size": 2633
     },
     {
       "path": ".opencode/skills/skill-creator/references/validation-checklist.md",
-      "checksum": "fe2709be5b4e22e7cb4ec629a2460d75e71c8659ba06c84ae52a4aba1973aa71",
+      "checksum": "b6a909ffa7424d9abb0d8e380e387ec4561b2aded540fa6651d81ff202156f52",
       "size": 2692
     },
     {
       "path": ".opencode/skills/skill-creator/references/writing-effective-instructions.md",
-      "checksum": "e601015dfc36982fef8fe7f6c2078591e26145085b0bfd6f775c8449490a0938",
+      "checksum": "ef419db671c42cb20c66baac7f57f15522eef510a1d2625d34dcf4e102d77830",
       "size": 2370
     },
     {
       "path": ".opencode/skills/skill-creator/references/yaml-frontmatter-reference.md",
       "checksum": "f8ddb433b67305f82f5d3d078dfe4537902ca233c36047fae7659ef049f10d55",
       "size": 2967
+    },
+    {
+      "path": ".opencode/skills/skill-creator/scripts/aggregate_benchmark.py",
+      "checksum": "123ef128ea5ccc01a4b1ac212ef5567f21e9c13d3d240609780beeb3200c49aa",
+      "size": 14386
     },
     {
       "path": ".opencode/skills/skill-creator/scripts/debug.zip",
@@ -10748,6 +11738,16 @@
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
+      "path": ".opencode/skills/skill-creator/scripts/generate_report.py",
+      "checksum": "13df7118a3c50c83c4c3250a606d5f2b20b25a3d44cbc392b3d669ec75281453",
+      "size": 12847
+    },
+    {
+      "path": ".opencode/skills/skill-creator/scripts/improve_description.py",
+      "checksum": "0dc43232db7ac6361775c894f4a1dbac958cb510c51a1230ff9e7fb30a74a7e8",
+      "size": 10723
+    },
+    {
       "path": ".opencode/skills/skill-creator/scripts/init_skill.py",
       "checksum": "c8d9850fc3ce7c33f88d96e0a32cbe8cc9f9a3a03eb9e7b6fdac8a306aa2c8ef",
       "size": 12860,
@@ -10755,15 +11755,30 @@
     },
     {
       "path": ".opencode/skills/skill-creator/scripts/package_skill.py",
-      "checksum": "ae22bc8540ca8dd90da2b5647bdce6d58ac7c8283cf7e4da8eccb315ba398f75",
-      "size": 3391,
+      "checksum": "93f687766344ebc5c0c9c27aacb315f9c7f9be0bfd4777abb80464d9df7786d4",
+      "size": 4538,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
       "path": ".opencode/skills/skill-creator/scripts/quick_validate.py",
-      "checksum": "5bb7585c847143b44c24d74de9dec5d5917f48c769df3bcc0030713b13b11a45",
-      "size": 3319,
+      "checksum": "3725a380a8e189c98988476df48c9ab0d80f91c018f47f80858e622392371700",
+      "size": 3838,
       "lastModified": "2026-01-25T17:53:40+07:00"
+    },
+    {
+      "path": ".opencode/skills/skill-creator/scripts/run_eval.py",
+      "checksum": "0129e5099f34b3593e7d7eaccd5694a204871201c8eae71e96dcf193e4c1313b",
+      "size": 11468
+    },
+    {
+      "path": ".opencode/skills/skill-creator/scripts/run_loop.py",
+      "checksum": "bafdb8e25c740813c735c54bf0489b9e87146da4cf697265927513c5430112d7",
+      "size": 13685
+    },
+    {
+      "path": ".opencode/skills/skill-creator/scripts/utils.py",
+      "checksum": "3af8ae62c40c73ab712207436a0d9a981e845f25c5a7040229eb189cc8e45bb1",
+      "size": 1661
     },
     {
       "path": ".opencode/skills/tanstack/SKILL.md",
@@ -10787,8 +11802,8 @@
     },
     {
       "path": ".opencode/skills/team/SKILL.md",
-      "checksum": "ac5db53855ea1efa813b3a272a5efc4cb930cc2f8c3799101f5812f7b0145987",
-      "size": 12097
+      "checksum": "394432fc9ebb0407a8b5259714e32ae059b455f43c19dff0557215f1c12c2607",
+      "size": 12360
     },
     {
       "path": ".opencode/skills/team/references/agent-teams-controls-and-modes.md",
@@ -10813,8 +11828,8 @@
     },
     {
       "path": ".opencode/skills/test/SKILL.md",
-      "checksum": "16ae82f07b2552f494007f11c742c2642413465634fb457455e2e39182bdd551",
-      "size": 4368
+      "checksum": "473adf1419807968a4ba46ba7e67708ee69eb3ad5246443305fd806143e2f8fd",
+      "size": 4652
     },
     {
       "path": ".opencode/skills/test/references/report-format.md",
@@ -11577,43 +12592,62 @@
     },
     {
       "path": ".opencode/skills/ui-ux-pro-max/SKILL.md",
-      "checksum": "60ff5491c6904ce18eec6709a73bc07a3815bcdd580a7af9261e6afeef8e3648",
-      "size": 13258,
+      "checksum": "0ddfc898cfe90e55991c242a796073784e582977e8d863a3fc98339f6acc393e",
+      "size": 44828,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
+      "path": ".opencode/skills/ui-ux-pro-max/data/_sync_all.py",
+      "checksum": "b540b3a4f87598ae29048b3cceae1fc17b39b629aee2cbe5c802ffc7b48abf6d",
+      "size": 21832
+    },
+    {
+      "path": ".opencode/skills/ui-ux-pro-max/data/app-interface.csv",
+      "checksum": "2a17ef810dab715ce1f339861817a8fbe3ccc38142b70517301e874803e838ac",
+      "size": 9743
+    },
+    {
       "path": ".opencode/skills/ui-ux-pro-max/data/charts.csv",
-      "checksum": "3b0cc1b287ad48d6989e2caf8bf84d4bc434438da62feb08259ffde03d153877",
-      "size": 7680,
+      "checksum": "ebb565308115f955791b0431797a89d9b3587c25d5babb9428d10712c4924817",
+      "size": 19391,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
       "path": ".opencode/skills/ui-ux-pro-max/data/colors.csv",
-      "checksum": "bd1fd6cf7d93408c0250ba383e01bea2ad1f0a1c9dccd746636c6a80ed937fbf",
-      "size": 13023,
+      "checksum": "69ee8c1147b269599d20ca418bdd6f32563a9aa2d962fb9a9b8dec66bf7b1ba4",
+      "size": 32432,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
+      "path": ".opencode/skills/ui-ux-pro-max/data/design.csv",
+      "checksum": "6f0ae42f16b3cbfa3f07050268387557859ff666e2651b1b82763f099d724b3f",
+      "size": 106144
+    },
+    {
+      "path": ".opencode/skills/ui-ux-pro-max/data/draft.csv",
+      "checksum": "e190c796b707858a5436dc4c27f9ee9bb6618014ca73f533e423abe5ce9e4d06",
+      "size": 106266
+    },
+    {
+      "path": ".opencode/skills/ui-ux-pro-max/data/google-fonts.csv",
+      "checksum": "2c03a3cd134d126bd9d6a7dc2a6360dc5272219ad6df3eb9315b031f806e1487",
+      "size": 745196
+    },
+    {
       "path": ".opencode/skills/ui-ux-pro-max/data/icons.csv",
-      "checksum": "26be5e47c4c3fc7acae52ac8bbfaf1bf9e5ddc9c01808953a3636f8615b9de9f",
-      "size": 13385
+      "checksum": "f376c29fb4df37b4bdb366a5aa70cb211ba3dd8b435390aaa03152a64b07d2e8",
+      "size": 20637
     },
     {
       "path": ".opencode/skills/ui-ux-pro-max/data/landing.csv",
-      "checksum": "7ac095129592c6c93f10ae3bc687b22bb051c33944597613f39e3a8f7646fe6e",
-      "size": 14372,
+      "checksum": "080cedbcd61ff8ec9520f33929baa76bee9589e783f83b2f8d824a466b6a46d7",
+      "size": 16720,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
       "path": ".opencode/skills/ui-ux-pro-max/data/products.csv",
-      "checksum": "5359e3037dcb84e99c792ea13dd44f5b78ab6a53557afb309cf19140512aaf5b",
-      "size": 29790,
-      "lastModified": "2026-01-25T17:53:40+07:00"
-    },
-    {
-      "path": ".opencode/skills/ui-ux-pro-max/data/prompts.csv",
-      "checksum": "0f5acb17260f64fcc96668414d0e8b37418dcb5eec043f49b986b99399831ff3",
-      "size": 17421,
+      "checksum": "9fd9e776ba847cf44c1ea78f95fe5e33b2c56bb7e186e3cfff9c49bc7fcb691b",
+      "size": 58006,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
@@ -11622,84 +12656,27 @@
       "size": 14822
     },
     {
-      "path": ".opencode/skills/ui-ux-pro-max/data/stacks/flutter.csv",
-      "checksum": "e470e6bc2bcd8562667cc764d1e1afb0be0a30ca4dc9ec12fa18b19d46f156bd",
-      "size": 10469,
-      "lastModified": "2026-01-25T17:53:40+07:00"
-    },
-    {
-      "path": ".opencode/skills/ui-ux-pro-max/data/stacks/html-tailwind.csv",
-      "checksum": "1f004891dd189f6bc2a7717401e3100244326e7e2f3963a79bf7b2349d85e091",
-      "size": 11361,
-      "lastModified": "2026-01-25T17:53:40+07:00"
-    },
-    {
-      "path": ".opencode/skills/ui-ux-pro-max/data/stacks/nextjs.csv",
-      "checksum": "06a8e8c13bd44696c6ebb4cb6c4d8dea440e3de8cce77616512529ed29258f0c",
-      "size": 12546,
-      "lastModified": "2026-01-25T17:53:40+07:00"
-    },
-    {
-      "path": ".opencode/skills/ui-ux-pro-max/data/stacks/nuxt-ui.csv",
-      "checksum": "05d6e74501b2b6a636faed32450622759f49a5bcafad971f5f4e7eba0eb7be71",
-      "size": 14010
-    },
-    {
-      "path": ".opencode/skills/ui-ux-pro-max/data/stacks/nuxtjs.csv",
-      "checksum": "f7a3f2d9542856d00199f85c6c023b7c284cc698e2e6e12d61afce2edacb24d6",
-      "size": 16539
-    },
-    {
       "path": ".opencode/skills/ui-ux-pro-max/data/stacks/react-native.csv",
       "checksum": "a08ca77fcf6b6d9531982dce465366296013bfcf12d2938ac72ad57cf0c4f085",
       "size": 10035,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
-      "path": ".opencode/skills/ui-ux-pro-max/data/stacks/react.csv",
-      "checksum": "b6e3eb0e4c9c01bd00ffb951d5ca224a19d488b4544c75436f48cf92ff12bf45",
-      "size": 13016,
-      "lastModified": "2026-01-25T17:53:40+07:00"
-    },
-    {
-      "path": ".opencode/skills/ui-ux-pro-max/data/stacks/shadcn.csv",
-      "checksum": "395c2e415ef6f48a474acccdc8eb2c7258a6ed751a5037ba171a2d8823e02ded",
-      "size": 15921
-    },
-    {
-      "path": ".opencode/skills/ui-ux-pro-max/data/stacks/svelte.csv",
-      "checksum": "bc8d158994a8bdf412830a9dd5e5a5534edd2f367a6e50e0ebd4d76f592dfa3f",
-      "size": 11063,
-      "lastModified": "2026-01-25T17:53:40+07:00"
-    },
-    {
-      "path": ".opencode/skills/ui-ux-pro-max/data/stacks/swiftui.csv",
-      "checksum": "e87cb9eee208bb753bdab96d4a261c7f830c4317ee90ec098316b248fc32be85",
-      "size": 10872,
-      "lastModified": "2026-01-25T17:53:40+07:00"
-    },
-    {
-      "path": ".opencode/skills/ui-ux-pro-max/data/stacks/vue.csv",
-      "checksum": "9b793c3f4eec85f77a758c09322f2b62f3b3ca549bb713ccf0849ef885934395",
-      "size": 11056,
-      "lastModified": "2026-01-25T17:53:40+07:00"
-    },
-    {
       "path": ".opencode/skills/ui-ux-pro-max/data/styles.csv",
-      "checksum": "899a7c3a7b07a16d783b4b2fa3662c3f01327f5bcffb634a68d2309bb3223a26",
-      "size": 40970,
+      "checksum": "9b5089dcde8999333b36878252a255cc3bacbb2fe7b836c76cc7f7aa2abb643d",
+      "size": 142673,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
       "path": ".opencode/skills/ui-ux-pro-max/data/typography.csv",
-      "checksum": "6c0cd9db74f75d384773b347e1ddac42692c8d00c56790e8a0e619bfa4b9537d",
-      "size": 31878,
+      "checksum": "dbea262a54e3bfa2e6c3b15989a365d5ef4c43349316aff46635e82ca825adce",
+      "size": 49667,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
       "path": ".opencode/skills/ui-ux-pro-max/data/ui-reasoning.csv",
-      "checksum": "58fc52fff69f62709f8c7dd460de6f6693699ea820f24287f3301a427c2b554e",
-      "size": 31071
+      "checksum": "41976082ecae1100da937c949215dc6694393e03f3c2a7444dd92a9edb43cb11",
+      "size": 53070
     },
     {
       "path": ".opencode/skills/ui-ux-pro-max/data/ux-guidelines.csv",
@@ -11708,25 +12685,20 @@
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
-      "path": ".opencode/skills/ui-ux-pro-max/data/web-interface.csv",
-      "checksum": "10bfc24e09a6a15db8309e6ef9b6881e1d4af97dffb7c99418aefb8e30df7d54",
-      "size": 7472
-    },
-    {
       "path": ".opencode/skills/ui-ux-pro-max/scripts/core.py",
-      "checksum": "e91bcee14c39f84d5222c71bf75df3b50d36f514cf98ca1178f083e14d598db0",
-      "size": 10357,
+      "checksum": "18e00b1a2952fb919dcba0010ee71f75129a670ad565e8d0907958d6be8caeca",
+      "size": 11512,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
       "path": ".opencode/skills/ui-ux-pro-max/scripts/design_system.py",
-      "checksum": "953299108226cff4063ddecf8e020f9e2b9263af8194d9b9474c1edac5d815d1",
-      "size": 21188
+      "checksum": "4da1d341f3c7749df51b51db4a543a48a427c3c746eb0e9882a1ab86acf3bb54",
+      "size": 43614
     },
     {
       "path": ".opencode/skills/ui-ux-pro-max/scripts/search.py",
-      "checksum": "557a5fe4fc9d0e7689532c29d67ffa1db7c41c9e484d7375075c57d907e09723",
-      "size": 3640,
+      "checksum": "18b1efa4ee5a2fc1cf14d7b25429ab423ef6026d123878fb93c5884f33cd10db",
+      "size": 5492,
       "lastModified": "2026-01-25T17:53:40+07:00"
     },
     {
@@ -12022,9 +12994,9 @@
     },
     {
       "path": ".gitignore",
-      "checksum": "d962870052f5ef4851297d9ebff1372888ffaf1c310a399a3946380a73af5ab2",
-      "size": 1166,
-      "lastModified": "2026-03-02T17:47:36+07:00"
+      "checksum": "a6ee91dadedbd340535b5974984003e51dd9a371dbff718b7bc6e2b509782369",
+      "size": 1274,
+      "lastModified": "2026-03-04T16:26:26+07:00"
     },
     {
       "path": ".repomixignore",
@@ -12034,13 +13006,13 @@
     },
     {
       "path": "CLAUDE.md",
-      "checksum": "5bf1f793fc04e6722ff3b6ed4cce626810f5b38768935b5a01ce55005a5a4e90",
-      "size": 4143,
-      "lastModified": "2026-03-02T17:47:36+07:00"
+      "checksum": "2b1d697a3fdb8123f22feeeb336d236579d2431e106b81c1678b48301c0aae0e",
+      "size": 4245,
+      "lastModified": "2026-03-06T12:17:45+07:00"
     },
     {
       "path": "AGENTS.md",
-      "checksum": "228400770730deb01d9d3c1a540b931dafc98323af8f2d2d70eeca42ad400100",
+      "checksum": "c2dccfb1459ba192cce25ae9f44de443052153e0457d05e87107a15dfd216cfd",
       "size": 2359,
       "lastModified": "2026-01-18T09:18:05-05:00"
     }

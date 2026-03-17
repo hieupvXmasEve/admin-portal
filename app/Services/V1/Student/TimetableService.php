@@ -5,18 +5,19 @@ declare(strict_types=1);
 namespace App\Services\V1\Student;
 
 use App\Models\ClassSession;
+use App\Models\Event;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Repositories\V1\Student\ClassSessionRepository;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class TimetableService
 {
     public function __construct(
-        protected ClassSessionRepository $classSessionRepository
+        protected ClassSessionRepository $classSessionRepository,
+        protected TimetableEventQuery $timetableEventQuery
     ) {}
 
     /**
@@ -30,10 +31,10 @@ class TimetableService
             return $this->getEmptyTimetable('No active semester found');
         }
 
-        $cacheKey = "timetable:student:{$student->id}:semester:{$semester->id}:" . md5(serialize($filters));
-
+        [$scheduleStart, $scheduleEnd] = $this->resolveScheduleDateRange($semester, $filters);
         $classSessions = $this->classSessionRepository->getStudentClassSessions($student, $semester, $filters);
-        Log::debug('$classSessions', [$classSessions]);
+        $events = $this->timetableEventQuery->handle($student, $scheduleStart, $scheduleEnd, $filters);
+
         return [
             'semester' => [
                 'id' => $semester->id,
@@ -42,29 +43,12 @@ class TimetableService
                 'start_date' => $semester->start_date->toDateString(),
                 'end_date' => $semester->end_date->toDateString(),
             ],
-            'weekly_schedule' => $this->generateWeeklySchedule($classSessions),
+            'weekly_schedule' => $this->generateWeeklySchedule($classSessions, $events, $scheduleStart, $scheduleEnd),
             'schedule_summary' => $this->generateScheduleSummary($classSessions),
             'time_blocks' => $this->generateTimeBlocks($classSessions),
             'filters_applied' => $filters,
             'generated_at' => now()->toISOString(),
         ];
-        // return Cache::remember($cacheKey, 300, function () use ($student, $semester, $filters) {
-        //     $classSessions = $this->classSessionRepository->getStudentClassSessions($student, $semester, $filters);
-
-        //     return [
-        //         'semester' => [
-        //             'id' => $semester->id,
-        //             'name' => $semester->name,
-        //             'code' => $semester->code,
-        //             'start_date' => $semester->start_date->toDateString(),
-        //             'end_date' => $semester->end_date->toDateString(),
-        //         ],
-        //         'weekly_schedule' => $this->generateWeeklySchedule($classSessions),
-        //         'schedule_summary' => $this->generateScheduleSummary($classSessions),
-        //         'time_blocks' => $this->generateTimeBlocks($classSessions),
-        //         'filters_applied' => $filters,
-        //     ];
-        // });
     }
 
     /**
@@ -145,7 +129,7 @@ class TimetableService
                 'lecturers' => [],
                 'buildings' => [],
                 'time_slots' => [],
-                'message' => 'No active semester found'
+                'message' => 'No active semester found',
             ];
         }
 
@@ -163,10 +147,15 @@ class TimetableService
     /**
      * Generate weekly schedule structure
      */
-    protected function generateWeeklySchedule(Collection $classSessions): array
-    {
+    protected function generateWeeklySchedule(
+        Collection $classSessions,
+        Collection $events,
+        Carbon $scheduleStart,
+        Carbon $scheduleEnd
+    ): array {
         $daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         $schedule = [];
+        $eventsByDay = $this->buildScheduleEventsByDay($events, $scheduleStart, $scheduleEnd);
 
         foreach ($daysOfWeek as $day) {
             $dayMap = [
@@ -183,6 +172,7 @@ class TimetableService
                 'day_name' => ucfirst($day),
                 'day_abbreviation' => strtoupper(substr($day, 0, 3)),
                 'day' => Carbon::now()->startOfWeek(Carbon::SUNDAY)->addDays($dayMap[$day])->day,
+                'events' => $eventsByDay[$day] ?? [],
                 'sessions' => $classSessions
                     ->filter(function ($session) use ($dayMap, $day) {
                         return Carbon::parse($session->session_date)->dayOfWeek === $dayMap[$day];
@@ -197,10 +187,11 @@ class TimetableService
 
             // Add session count and total duration
             $sessions = $schedule[$day]['sessions'];
+            $schedule[$day]['event_count'] = count($schedule[$day]['events']);
             $schedule[$day]['session_count'] = count($sessions);
             $schedule[$day]['total_duration'] = [
                 'total_minutes' => collect($sessions)->sum('duration_minutes'),
-                'display' => $this->formatDuration(collect($sessions)->sum('duration_minutes'))
+                'display' => $this->formatDuration(collect($sessions)->sum('duration_minutes')),
             ];
         }
 
@@ -223,12 +214,14 @@ class TimetableService
         $byDay = $classSessions->reduce(function (array $acc, $session) {
             $day = strtolower(Carbon::parse((string) $session->session_date)->format('l'));
             $acc[$day] = ($acc[$day] ?? 0) + 1;
+
             return $acc;
         }, []);
 
         $bySessionType = $classSessions->reduce(function (array $acc, $session) {
             $type = (string) $session->session_type;
             $acc[$type] = ($acc[$type] ?? 0) + 1;
+
             return $acc;
         }, []);
 
@@ -386,6 +379,124 @@ class TimetableService
         return $colors[abs($index)];
     }
 
+    protected function generateEventColor(Event $event): string
+    {
+        return match ($event->status) {
+            'cancelled' => '#B91C1C',
+            'completed' => '#475569',
+            default => '#0F766E',
+        };
+    }
+
+    protected function buildScheduleEventsByDay(Collection $events, Carbon $scheduleStart, Carbon $scheduleEnd): array
+    {
+        $eventsByDay = [
+            'monday' => [],
+            'tuesday' => [],
+            'wednesday' => [],
+            'thursday' => [],
+            'friday' => [],
+            'saturday' => [],
+            'sunday' => [],
+        ];
+
+        foreach ($events as $event) {
+            $eventStart = $event->start_time instanceof Carbon
+                ? $event->start_time->copy()
+                : Carbon::parse($event->start_time);
+            $eventEnd = $event->end_time instanceof Carbon
+                ? $event->end_time->copy()
+                : Carbon::parse($event->end_time);
+
+            $rangeStart = $eventStart->greaterThan($scheduleStart)
+                ? $eventStart->copy()
+                : $scheduleStart->copy();
+            $rangeEnd = $eventEnd->lessThan($scheduleEnd)
+                ? $eventEnd->copy()
+                : $scheduleEnd->copy();
+
+            $cursor = $rangeStart->copy()->startOfDay();
+            $lastDay = $rangeEnd->copy()->startOfDay();
+
+            while ($cursor->lte($lastDay)) {
+                $dayKey = strtolower($cursor->format('l'));
+                $eventsByDay[$dayKey][] = $this->formatEventForSchedule($event, $cursor, $eventStart, $eventEnd);
+                $cursor->addDay();
+            }
+        }
+
+        foreach ($eventsByDay as $day => $dayEvents) {
+            usort($dayEvents, function (array $left, array $right): int {
+                return [$left['occurrence_date'], $left['display_start_time'], $left['id']]
+                    <=> [$right['occurrence_date'], $right['display_start_time'], $right['id']];
+            });
+
+            $eventsByDay[$day] = $dayEvents;
+        }
+
+        return $eventsByDay;
+    }
+
+    protected function formatEventForSchedule(
+        Event $event,
+        Carbon $occurrenceDate,
+        Carbon $eventStart,
+        Carbon $eventEnd
+    ): array {
+        $displayStart = $occurrenceDate->isSameDay($eventStart)
+            ? $eventStart->copy()
+            : $occurrenceDate->copy()->startOfDay();
+        $displayEnd = $occurrenceDate->isSameDay($eventEnd)
+            ? $eventEnd->copy()
+            : $occurrenceDate->copy()->endOfDay();
+
+        return [
+            'id' => $event->id,
+            'campus_id' => $event->campus_id,
+            'title' => $event->title,
+            'description' => $event->description,
+            'location' => $event->location,
+            'start_time' => $eventStart->format('Y-m-d H:i:s'),
+            'end_time' => $eventEnd->format('Y-m-d H:i:s'),
+            'start_time_iso' => $eventStart->toISOString(),
+            'end_time_iso' => $eventEnd->toISOString(),
+            'display_start_time' => $displayStart->format('H:i:s'),
+            'display_end_time' => $displayEnd->format('H:i:s'),
+            'occurrence_date' => $occurrenceDate->toDateString(),
+            'gold_reward_amount' => (float) $event->gold_reward_amount,
+            'max_participants' => $event->max_participants,
+            'qr_code' => $event->qr_code,
+            'organizer_type' => $event->organizer_type,
+            'organizer_id' => $event->organizer_id,
+            'status' => $event->status,
+            'published_at' => $event->published_at?->format('Y-m-d H:i:s'),
+            'cancelled_at' => $event->cancelled_at?->format('Y-m-d H:i:s'),
+            'completed_at' => $event->completed_at?->format('Y-m-d H:i:s'),
+            'created_by_user_id' => $event->created_by_user_id,
+            'created_by_admin_id' => $event->created_by_admin_id,
+            'is_manual' => (bool) $event->is_manual,
+            'is_historical' => (bool) $event->is_historical,
+            'requires_registration' => (bool) $event->requires_registration,
+            'created_at' => $event->created_at?->format('Y-m-d H:i:s'),
+            'updated_at' => $event->updated_at?->format('Y-m-d H:i:s'),
+            'is_multi_day' => ! $eventStart->isSameDay($eventEnd),
+            'color' => $this->generateEventColor($event),
+            'item_type' => 'event',
+        ];
+    }
+
+    protected function resolveScheduleDateRange(Semester $semester, array $filters): array
+    {
+        $rangeStart = ! empty($filters['week_start'])
+            ? Carbon::parse($filters['week_start'])->startOfDay()
+            : $semester->start_date->copy()->startOfDay();
+        $rangeEnd = ! empty($filters['week_end'])
+            ? Carbon::parse($filters['week_end'])->endOfDay()
+            : $semester->end_date->copy()->endOfDay();
+
+        return [$rangeStart, $rangeEnd];
+    }
+
     /**
      * Resolve semester from ID or get current active semester
      */
@@ -413,8 +524,9 @@ class TimetableService
             Log::warning('No active semester found, using current semester based on dates', [
                 'semester_id' => $currentSemester->id,
                 'semester_name' => $currentSemester->name,
-                'current_date' => $now->toDateString()
+                'current_date' => $now->toDateString(),
             ]);
+
             return $currentSemester;
         }
 
@@ -427,15 +539,17 @@ class TimetableService
             Log::warning('No current semester found, using most recent semester', [
                 'semester_id' => $recentSemester->id,
                 'semester_name' => $recentSemester->name,
-                'current_date' => $now->toDateString()
+                'current_date' => $now->toDateString(),
             ]);
+
             return $recentSemester;
         }
 
         Log::error('No semester available for timetable', [
             'current_date' => $now->toDateString(),
-            'total_semesters' => Semester::count()
+            'total_semesters' => Semester::count(),
         ]);
+
         return null;
     }
 
@@ -448,14 +562,27 @@ class TimetableService
         $emptySchedule = [];
 
         foreach ($emptyDays as $day) {
+            $dayMap = [
+                'monday' => 1,
+                'tuesday' => 2,
+                'wednesday' => 3,
+                'thursday' => 4,
+                'friday' => 5,
+                'saturday' => 6,
+                'sunday' => 7,
+            ];
+
             $emptySchedule[$day] = [
                 'day_name' => ucfirst($day),
                 'day_abbreviation' => strtoupper(substr($day, 0, 3)),
+                'day' => Carbon::now()->startOfWeek(Carbon::SUNDAY)->addDays($dayMap[$day])->day,
+                'event_count' => 0,
                 'session_count' => 0,
+                'events' => [],
                 'sessions' => [],
                 'total_duration' => [
                     'total_minutes' => 0,
-                    'display' => '0m'
+                    'display' => '0m',
                 ],
             ];
         }
@@ -524,8 +651,9 @@ class TimetableService
                 4 => 'wednesday',
                 5 => 'thursday',
                 6 => 'friday',
-                7 => 'saturday'
+                7 => 'saturday',
             ];
+
             return $dayMap[$dayOfWeek] ?? 'unknown';
         })->unique()->sort()->values()->toArray();
 
@@ -564,6 +692,7 @@ class TimetableService
                 if (is_object($building)) {
                     return $building->name ?? null;
                 }
+
                 return $building;
             })
             ->filter()
@@ -584,14 +713,14 @@ class TimetableService
             $timeSlots[] = [
                 'start' => $session->start_time,
                 'end' => $session->end_time,
-                'display' => Carbon::createFromTimeString($session->start_time)->format('g:i A') .
-                    ' - ' .
+                'display' => Carbon::createFromTimeString($session->start_time)->format('g:i A').
+                    ' - '.
                     Carbon::createFromTimeString($session->end_time)->format('g:i A'),
             ];
         }
 
         return collect($timeSlots)->unique(function ($item) {
-            return $item['start'] . '-' . $item['end'];
+            return $item['start'].'-'.$item['end'];
         })->sortBy('start')->values()->toArray();
     }
 

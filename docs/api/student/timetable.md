@@ -11,6 +11,8 @@ All endpoints require Bearer token (Sanctum) authentication.
 
 **Query Parameters** (all optional):
 - `semester_id`: Semester ID (integer, must exist in semesters table)
+- `week_start`: Filter start date for schedule/event overlap (YYYY-MM-DD)
+- `week_end`: Filter end date for schedule/event overlap (YYYY-MM-DD)
 - `day_of_week`: Filter by day (monday|tuesday|wednesday|thursday|friday|saturday|sunday)
 - `session_type`: Filter by session type (string, max 50 chars)
 - `lecturer_name`: Filter by lecturer name (string, max 255 chars)
@@ -22,6 +24,13 @@ All endpoints require Bearer token (Sanctum) authentication.
 - `time_range`: Time range object with start/end properties
   - `time_range[start]`: Start time (HH:MM format, required if time_range provided)
   - `time_range[end]`: End time (HH:MM format, required if time_range provided)
+
+**Behavior notes**:
+- `weekly_schedule[day].sessions` remains class-session data only.
+- `weekly_schedule[day].events` contains campus events for the student campus, excluding `draft` events.
+- Event lookup is scoped by date overlap with `week_start/week_end` when provided. Without those filters, events are scoped by semester date range.
+- `schedule_summary` and `time_blocks` are still calculated from class sessions only.
+- Multi-day events are duplicated into each overlapping weekday bucket. For those items, `start_time` / `end_time` remain the original event datetimes, while `time.start` / `time.end` are the display times for that specific day bucket.
 
 **Response** (200):
 ```typescript
@@ -39,8 +48,11 @@ interface TimetableResponse {
     weekly_schedule: {
       [day: string]: { // monday, tuesday, etc.
         day_name: string;
+        day: number; // day-of-month for the rendered week
         day_abbreviation: string;
+        event_count: number;
         session_count: number;
+        events: EventItem[];
         sessions: SessionItem[];
         total_duration: {
           total_minutes: number;
@@ -87,10 +99,7 @@ interface SessionItem {
     duration_minutes: number;
     duration_display: string; // e.g. "1h 30m"
   };
-  lecturer: {
-    name: string;
-    email: string;
-  };
+  lecturer: string | null;
   room: {
     code: string;
     name: string;
@@ -98,6 +107,46 @@ interface SessionItem {
     full_location: string;
   };
   color: string;
+  is_current: boolean;
+  is_upcoming: boolean;
+}
+
+interface EventItem {
+  id: number;
+  campus_id: number;
+  title: string;
+  description: string | null;
+  location: string | null;
+  status: 'published' | 'cancelled' | 'completed' | string;
+  status_display: string;
+  start_time: string;     // YYYY-MM-DD HH:mm:ss (original event start)
+  end_time: string;       // YYYY-MM-DD HH:mm:ss (original event end)
+  start_time_iso: string; // ISO timestamp
+  end_time_iso: string;   // ISO timestamp
+  time: {
+    start: string;   // HH:mm:ss, display start for this day bucket
+    end: string;     // HH:mm:ss, display end for this day bucket
+    display: string; // e.g. "1:00 PM - 3:00 PM"
+  };
+  occurrence_date: string; // YYYY-MM-DD for the current day bucket
+  gold_reward_amount: number;
+  max_participants: number | null;
+  qr_code: string | null;
+  organizer_type: string | null;
+  organizer_id: number | null;
+  published_at: string | null;  // YYYY-MM-DD HH:mm:ss
+  cancelled_at: string | null;  // YYYY-MM-DD HH:mm:ss
+  completed_at: string | null;  // YYYY-MM-DD HH:mm:ss
+  created_by_user_id: number | null;
+  created_by_admin_id: number | null;
+  is_manual: boolean;
+  is_historical: boolean;
+  requires_registration: boolean;
+  created_at: string | null; // YYYY-MM-DD HH:mm:ss
+  updated_at: string | null; // YYYY-MM-DD HH:mm:ss
+  is_multi_day: boolean;
+  color: string;
+  item_type: 'event';
   is_current: boolean;
   is_upcoming: boolean;
 }
@@ -118,6 +167,8 @@ interface TimeBlock {
 
 **Query Parameters**: Same as `/timetable` endpoint
 
+**Note**: If this endpoint is enabled, `weekly_schedule[day]` now includes `event_count` and `events` with the same semantics described above for `/api/v1/student/timetable`.
+
 **Response** (200):
 ```typescript
 interface WeeklyTimetableResponse {
@@ -134,8 +185,11 @@ interface WeeklyTimetableResponse {
     weekly_schedule: {
       [day: string]: {
         day_name: string;
+        day: number;
         day_abbreviation: string;
+        event_count: number;
         session_count: number;
+        events: EventItem[];
         sessions: SessionItem[];
         total_duration: {
           total_minutes: number;
@@ -306,27 +360,37 @@ All endpoints return standard error format:
 interface ErrorResponse {
   success: false;
   message: string;
-  error_code: string;
-  errors?: Record<string, string[]>;
+  errors: Array<{
+    code: string;
+    field: string | null;
+    detail: string | null;
+  }>;
   timestamp: string;
 }
 ```
 
 **Common Error Codes**:
-- `VALIDATION_ERROR` (400): Invalid query parameters
+- `VALIDATION_ERROR` (422): Invalid query parameters
 - `NOT_FOUND` (404): Class session not found or student not enrolled
 - `SERVER_ERROR` (500): Internal server error
 
-**Example Error** (400):
+**Example Error** (422):
 ```json
 {
   "success": false,
   "message": "Invalid timetable filter parameters",
-  "error_code": "VALIDATION_ERROR",
-  "errors": {
-    "semester_id": ["The selected semester does not exist"],
-    "day_of_week": ["Day of week must be a valid day (monday-sunday)"]
-  },
+  "errors": [
+    {
+      "code": "VALIDATION_ERROR",
+      "field": "semester_id",
+      "detail": "The selected semester does not exist"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "field": "day_of_week",
+      "detail": "Day of week must be a valid day (monday-sunday)"
+    }
+  ],
   "timestamp": "2025-08-18T15:42:42Z"
 }
 ```

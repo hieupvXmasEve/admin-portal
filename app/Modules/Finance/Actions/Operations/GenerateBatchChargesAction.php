@@ -19,7 +19,6 @@ class GenerateBatchChargesAction
     {
         $semesterId = (int) $data['semester_id'];
         $chargeTypes = $data['charge_types'];
-        $skipIfIssuedOrPaid = $data['skip_if_issued_or_paid'] ?? true;
 
         // 1. Strict Scope: Only specific statuses and current campus
         $query = BillingScopeHelper::getEligibleStudentsQuery(
@@ -78,10 +77,7 @@ class GenerateBatchChargesAction
                     $shouldSkipFullCharges = $deferCase !== null;
                     $didSkipPreserveCharge = false;
 
-                    // Check if Invoice Exists
-                    $existingInvoice = StudentInvoice::where('student_id', $student->id)
-                        ->where('semester_id', $semesterId)
-                        ->first();
+                    $reusableInvoice = self::findReusableInvoice($student->id, $semesterId);
 
                     // Pre-calculation to decide if we should create an invoice
                     $shouldGenInvoice = false;
@@ -136,30 +132,17 @@ class GenerateBatchChargesAction
                         $shouldGenInvoice = true;
                     }
 
-                    // Decision: If no existing invoice AND should not generate -> SKIP
-                    if (! $existingInvoice && ! $shouldGenInvoice) {
+                    // Decision: If no reusable invoice exists and no new charges are expected -> skip.
+                    if (! $reusableInvoice && ! $shouldGenInvoice) {
                         continue;
                     }
 
-                    // 1. Upsert Invoice
-                    $invoice = $existingInvoice ?? StudentInvoice::create([
-                        'student_id' => $student->id,
-                        'semester_id' => $semesterId,
-                        'invoice_number' => 'INV-'.time().'-'.$student->student_id.'-'.$semesterId,
-                        'due_date' => now()->addDays(30),
-                        'opened_at' => now(),
-                        'status' => 'draft',
-                    ]);
+                    // 1. Resolve target invoice. Finalized invoices must never block newly generated charges.
+                    $invoice = $reusableInvoice ?? self::createDraftInvoice($student, $semesterId);
 
-                    if ($invoice->wasRecentlyCreated) {
+                    if (! $reusableInvoice) {
                         $stats['created_invoices']++;
                     } else {
-                        // Skip if policy enabled and invoice is finalizing
-                        if ($skipIfIssuedOrPaid && in_array($invoice->status, ['issued', 'paid', 'void'])) {
-                            $stats['skipped_count']++;
-
-                            continue;
-                        }
                         $stats['updated_invoices']++;
                     }
 
@@ -390,6 +373,28 @@ class GenerateBatchChargesAction
             ->first();
 
         return $term ? (float) $term->amount : null;
+    }
+
+    private static function findReusableInvoice(int $studentId, int $semesterId): ?StudentInvoice
+    {
+        return StudentInvoice::query()
+            ->where('student_id', $studentId)
+            ->where('semester_id', $semesterId)
+            ->reusableForChargeGeneration()
+            ->latest('id')
+            ->first();
+    }
+
+    private static function createDraftInvoice(Student $student, int $semesterId): StudentInvoice
+    {
+        return StudentInvoice::create([
+            'student_id' => $student->id,
+            'semester_id' => $semesterId,
+            'invoice_number' => 'INV-'.time().'-'.$student->student_id.'-'.$semesterId,
+            'due_date' => now()->addDays(30),
+            'opened_at' => now(),
+            'status' => 'draft',
+        ]);
     }
 
     private static function createChargeIfNotExists(Student $student, int $semesterId, string $type, float $amount, ?string $sourceType = null, $sourceId = null): ?FinanceCharge

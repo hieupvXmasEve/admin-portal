@@ -6,6 +6,7 @@ namespace App\Modules\Finance\Queries\Operations;
 
 use App\Models\FinanceCharge;
 use App\Models\Student;
+use App\Models\StudentInvoice;
 use App\Modules\Finance\Services\DeferChargeResolver;
 
 class PreviewChargeGenerationQuery
@@ -67,10 +68,20 @@ class PreviewChargeGenerationQuery
             $deferCase = $deferChargeResolver->findApplicableFullCase($student, $semesterId);
             $shouldSkipFullCharges = $deferCase !== null;
 
-            // Check Existing Invoice
-            $hasExistingInvoice = \App\Models\StudentInvoice::where('student_id', $student->id)
+            $reusableInvoice = StudentInvoice::query()
+                ->where('student_id', $student->id)
                 ->where('semester_id', $semesterId)
+                ->reusableForChargeGeneration()
+                ->latest('id')
+                ->first();
+
+            $hasReusableInvoice = $reusableInvoice !== null;
+            $hasFinalizedInvoice = StudentInvoice::query()
+                ->where('student_id', $student->id)
+                ->where('semester_id', $semesterId)
+                ->whereIn('status', StudentInvoice::NON_REUSABLE_FOR_CHARGE_GENERATION_STATUSES)
                 ->exists();
+            $hasExistingInvoice = $hasReusableInvoice || $hasFinalizedInvoice;
 
             $hasRetake = $student->courseRegistrations->isNotEmpty();
 
@@ -211,9 +222,9 @@ class PreviewChargeGenerationQuery
 
             // Determine Invoice Eligibility
             $isTuitionEligible = ($student->status === 'intake_course' && in_array(FinanceCharge::TYPE_TUITION_TERM, $chargeTypes) && $this->getTuitionFee($student, $semesterId) !== null);
-            $shouldGenInvoice = ($grossAmount > 0) || $hasRetake || $hasExistingInvoice || $isTuitionEligible;
+            $shouldGenInvoice = ($grossAmount > 0) || $hasRetake || $hasReusableInvoice || $isTuitionEligible;
 
-            $willCreateInvoice = $shouldGenInvoice && ! $hasExistingInvoice;
+            $willCreateInvoice = $shouldGenInvoice && ! $hasReusableInvoice;
 
             if ($willCreateInvoice || ($hasExistingInvoice && ($studentTotal != 0 || ! empty($breakdown)))) {
                 if ($willCreateInvoice) {
@@ -244,7 +255,11 @@ class PreviewChargeGenerationQuery
                 'student_type' => $studentTypeLabel,
                 'has_existing_charge' => $hasExistingCharge,
                 'estimated_amount' => $studentTotal,
-                'warning' => $hasExistingCharge ? 'Existing charges found' : ($shouldGenInvoice ? null : 'No eligible charges (0đ)'),
+                'warning' => $hasExistingCharge
+                    ? 'Existing charges found'
+                    : ($willCreateInvoice && $hasFinalizedInvoice
+                        ? 'Existing finalized invoice found; a new invoice will be created for new charges'
+                        : ($shouldGenInvoice ? null : 'No eligible charges (0đ)')),
                 'breakdown' => $breakdown,
                 'will_create_invoice' => $willCreateInvoice,
             ];
