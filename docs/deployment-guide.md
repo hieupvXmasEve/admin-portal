@@ -511,7 +511,53 @@ Before restore, verify:
 - root password
 - whether you are overwriting live production data
 
-## 12) Production Topology
+## 12) Dev DB Restore
+
+Use this when you want to restore the `dev` database from a backup file and replace the current `dev` DB state completely.
+
+Important:
+
+- this is a clean restore, not an import on top of the current DB
+- the current `dev` DB volume will be deleted
+- if you want rollback safety, create one more backup first
+
+Optional safety backup before restore:
+
+```bash
+docker exec swinx-db-dev mariadb-dump -uroot -proot asia > backups/dev-before-restore-$(date +%Y%m%d_%H%M%S).sql
+```
+
+Clean restore flow for a `.sql` file:
+
+```bash
+./scripts/dev.sh stop
+docker compose --env-file .env -f docker/docker-compose.dev.yml -p swinx-dev down -v
+./scripts/dev.sh start
+docker exec -i swinx-db-dev mariadb -uroot -proot asia < backups/dev-20260323_161405.sql
+```
+
+If the backup file is `.sql.gz`:
+
+```bash
+./scripts/dev.sh stop
+docker compose --env-file .env -f docker/docker-compose.dev.yml -p swinx-dev down -v
+./scripts/dev.sh start
+gunzip -c backups/dev-20260323_161405.sql.gz | docker exec -i swinx-db-dev mariadb -uroot -proot asia
+```
+
+Verify after restore:
+
+```bash
+docker exec swinx-db-dev mariadb -uroot -proot asia -e "SHOW TABLES; SELECT COUNT(*) AS users_count FROM users;"
+```
+
+Notes:
+
+- `down -v` deletes the `dev` DB volume and wipes current `dev` data
+- `./scripts/dev.sh start` recreates the empty DB service
+- the final `docker exec ... < backup.sql` loads the backup into the fresh DB
+
+## 13) Production Topology
 
 - `app`: web traffic via FrankenPHP + Caddy
 - `queue`: background jobs
@@ -522,7 +568,7 @@ Before restore, verify:
 This runtime model replaces host supervisor for app processes.  
 Host cron is still used for infrastructure tasks such as database backups and cert renewal.
 
-## 13) Quick Command Reference
+## 14) Quick Command Reference
 
 Dev:
 
