@@ -18,6 +18,7 @@ public/hot
 public/storage
 
 # Logs
+storage/*
 storage/logs/*
 storage/framework/sessions/*
 storage/framework/views/*
@@ -38,6 +39,12 @@ phpunit.xml
 *.swp
 *.swo
 
+# Agent and local tooling
+.agents
+.claude
+.opencode
+.kiro
+
 # OS
 .DS_Store
 Thumbs.db
@@ -52,6 +59,10 @@ README.md
 
 # Scripts (production không cần)
 scripts/
+
+# Local artifacts
+repomix-output.xml
+release-manifest.json
 
 # Development tools (keep vite.config.ts for build)
 .prettierrc

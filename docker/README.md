@@ -1,74 +1,48 @@
-# Docker Configuration Files
+# Docker Layout
 
-This directory contains Docker configuration files for the Swinx application.
+Docker packaging is FrankenPHP-only.
 
-## 📁 Directory Structure
+## Files
 
-```
-docker/
-├── mysql/                          # MySQL database configuration
-│   ├── init.sql                    # Database initialization script
-│   ├── init-test.sql              # Test database initialization
-│   └── my.cnf                     # MySQL configuration
-├── php/                           # PHP configuration files
-│   ├── php.ini                    # Development PHP settings
-│   └── production.ini             # Production PHP settings
-├── start-frankenphp.sh           # FrankenPHP startup script (development)
-├── start-frankenphp-production.sh # FrankenPHP startup script (production)
-└── README.md                      # This file
-```
+- `docker/Dockerfile`: development image
+- `docker/Dockerfile.production`: production image
+- `docker/docker-compose.dev.yml`: local dev stack
+- `docker/docker-compose.local-prod.yml`: local production-like stack
+- `docker/docker-compose.production.yml`: production stack
+- `docker/Caddyfile.dev`: dev Caddy/FrankenPHP config
+- `docker/Caddyfile.local-prod`: local production Caddy config
+- `docker/Caddyfile.prod`: production Caddy config
+- `docker/start-frankenphp.sh`: dev bootstrap
+- `docker/start-frankenphp-production.sh`: production bootstrap
 
-## 🔧 Configuration Files
+## Environment
 
-### MySQL Configuration
-- **`mysql/init.sql`** - Creates initial database structure and users for development
-- **`mysql/init-test.sql`** - Creates test database structure for testing
-- **`mysql/my.cnf`** - MySQL server configuration optimized for Laravel
+- Use `.env.example` as the template.
+- Copy it to `.env` and adjust values per environment.
+- Do not maintain separate `.env.docker.*` files.
 
-### PHP Configuration
-- **`php/php.ini`** - Development PHP settings with debugging enabled
-- **`php/production.ini`** - Production PHP settings optimized for performance
+## Service Topology
 
-### FrankenPHP Scripts
-- **`start-frankenphp.sh`** - Development startup script with Laravel optimizations
-- **`start-frankenphp-production.sh`** - Production startup script with security hardening
+Development:
+- `app`
+- `vite`
+- `queue`
+- `scheduler`
+- `db`
+- `redis`
+- `mailpit`
 
-## 🚀 Usage
+Production:
+- `app`
+- `queue`
+- `scheduler`
+- `db`
+- `redis`
 
-These files are automatically used by the Docker Compose configurations:
-
-- **Development**: `docker-compose.dev.yml` uses development configurations
-- **Local Production**: `docker-compose.local-prod.yml` uses production configurations  
-- **Production**: `docker-compose.production.yml` uses production configurations
-
-## 📝 Customization
-
-To customize configurations:
-
-1. **MySQL Settings**: Edit `mysql/my.cnf`
-2. **PHP Settings**: Edit `php/php.ini` or `php/production.ini`
-3. **Startup Behavior**: Edit the appropriate startup script
-
-Changes will be applied when containers are rebuilt:
+## Commands
 
 ```bash
-# Development
-./dev.sh rebuild
-
-# Local Production
-./local-prod.sh rebuild
-
-# Production
-./prod.sh deploy
+./scripts/dev.sh start
+./scripts/local-prod.sh start
+./scripts/prod.sh deploy
 ```
-
-## 🔒 Security Notes
-
-- Production configurations disable debugging and enable security features
-- Database passwords should be set via environment variables, not in these files
-- PHP production settings optimize for performance and security
-
-## 📚 Related Documentation
-
-- [Main Docker Guide](../DOCKER_GUIDE.md) - Complete environment management
-- [FrankenPHP Migration Guide](../FRANKENPHP_MIGRATION_GUIDE.md) - FrankenPHP configuration details

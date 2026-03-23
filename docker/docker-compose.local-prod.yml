@@ -1,89 +1,123 @@
-# ===========================================
-# Docker Compose Local Production Override
-# ===========================================
-# For testing production FrankenPHP configuration locally
-
 services:
-  # Laravel Application with FrankenPHP (Local Production)
   app:
     build:
-      context: .
-      dockerfile: Dockerfile.production
+      context: ..
+      dockerfile: docker/Dockerfile.production
     container_name: swinx-app-local-prod
-    ports:
-      - '80:80'      # HTTP
-      - '443:443'    # HTTPS
-      - '443:443/udp' # HTTP/3
     env_file:
-      - .env.docker.production
+      - ../.env
+    ports:
+      - '${LOCAL_PROD_HTTP_PORT:-8080}:80'
+      - '${LOCAL_PROD_HTTPS_PORT:-8443}:443'
+      - '${LOCAL_PROD_HTTP3_PORT:-8443}:443/udp'
     environment:
-      - DB_HOST=db
-      - APP_ENV=production
-      - FRANKENPHP_NUM_THREADS=auto
-      - SERVER_NAME=swinx.test
-      - ACME_EMAIL=admin@swinx.test
-      # Override for local production testing
-      - APP_DEBUG=false
-      - LOG_LEVEL=info
+      APP_ENV: production
+      APP_DEBUG: 'false'
+      SERVER_NAME: ${LOCAL_PROD_SERVER_NAME:-swinx.test}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-false}
+      DB_HOST: db
+      REDIS_HOST: redis
     volumes:
-      - ./storage:/app/storage
-      - ./bootstrap/cache:/app/bootstrap/cache
-      # FrankenPHP/Caddy volumes for certificates and configuration
+      - ../:/app
+      - composer_vendor_local_prod:/app/vendor
+      - node_modules_local_prod:/app/node_modules
       - caddy_data_local_prod:/data
       - caddy_config_local_prod:/config
-      # Log directory for local production
-      - ./logs:/var/log/caddy
-      # Override Caddyfile for local production
+      - ../logs:/var/log/caddy
       - ./Caddyfile.local-prod:/etc/caddy/Caddyfile:ro
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - swinx-network
+      redis:
+        condition: service_started
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "-k", "https://localhost/up"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
 
-  # MySQL Database (Production configuration)
-  db:
-    image: mysql:8.0
-    container_name: swinx-db-local-prod
-    ports:
-      - '3306:3306'
+  queue:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.production
+    container_name: swinx-queue-local-prod
+    env_file:
+      - ../.env
+    working_dir: /app
+    command: php artisan queue:work --queue=${QUEUE_WORKER_QUEUES:-default,emails,notifications} --sleep=${QUEUE_WORKER_SLEEP:-1} --tries=${QUEUE_WORKER_TRIES:-3} --verbose
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-RootProd2024!@#SecurePass}
-      MYSQL_DATABASE: ${DB_DATABASE:-swinburne}
-      MYSQL_USER: ${DB_USERNAME:-swinx_prod_user}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-SwinxProd2024!@#SecurePass}
+      APP_ENV: production
+      APP_DEBUG: 'false'
+      DB_HOST: db
+      REDIS_HOST: redis
     volumes:
-      - mysql_data_local_prod:/var/lib/mysql
-      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
-      - ./backups:/backups
-    networks:
-      - swinx-network
+      - ../:/app
+      - composer_vendor_local_prod:/app/vendor
+      - node_modules_local_prod:/app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped
+
+  scheduler:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.production
+    container_name: swinx-scheduler-local-prod
+    env_file:
+      - ../.env
+    working_dir: /app
+    command: php artisan schedule:work
+    environment:
+      APP_ENV: production
+      APP_DEBUG: 'false'
+      DB_HOST: db
+      REDIS_HOST: redis
+    volumes:
+      - ../:/app
+      - composer_vendor_local_prod:/app/vendor
+      - node_modules_local_prod:/app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: swinx-redis-local-prod
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data_local_prod:/data
+    restart: unless-stopped
+
+  db:
+    image: mariadb:11.4
+    container_name: swinx-db-local-prod
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+      MARIADB_DATABASE: ${DB_DATABASE:-asia}
+      MARIADB_USER: ${DB_USERNAME:-swinx}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-swinx}
+    volumes:
+      - db_data_local_prod:/var/lib/mysql
+      - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+      - ../backups:/backups
     healthcheck:
-      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
+      test:
+        [
+          'CMD-SHELL',
+          'mariadb-admin ping -h localhost -uroot -p"$$MARIADB_ROOT_PASSWORD" --silent',
+        ]
       timeout: 20s
       retries: 10
       interval: 10s
       start_period: 40s
-
-
+    restart: unless-stopped
 
 volumes:
-  mysql_data_local_prod:
-    driver: local
-  # FrankenPHP/Caddy volumes for local production certificates and configuration
+  composer_vendor_local_prod:
+  node_modules_local_prod:
   caddy_data_local_prod:
-    driver: local
   caddy_config_local_prod:
-    driver: local
-
-networks:
-  swinx-network:
-    driver: bridge
+  redis_data_local_prod:
+  db_data_local_prod:

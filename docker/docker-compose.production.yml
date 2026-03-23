@@ -1,81 +1,118 @@
-version: '3.8'
-
 services:
-  # Laravel Application with FrankenPHP (Production)
   app:
     build:
-      context: .
-      dockerfile: Dockerfile.production
+      context: ..
+      dockerfile: docker/Dockerfile.production
     container_name: swinx-app
-    ports:
-      - '80:80'      # HTTP
-      - '443:443'    # HTTPS
-      - '443:443/udp' # HTTP/3
     env_file:
-      - .env.docker.production
+      - ../.env
+    ports:
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
+      - '${HTTP3_PORT:-443}:443/udp'
     environment:
-      - DB_HOST=db
-      - APP_ENV=production
-      - FRANKENPHP_NUM_THREADS=auto
-      - SERVER_NAME=${SERVER_NAME:-localhost}
-      - ACME_EMAIL=${ACME_EMAIL:-}
+      APP_ENV: production
+      APP_DEBUG: 'false'
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-false}
+      DB_HOST: db
+      REDIS_HOST: redis
     volumes:
-      - ./storage:/app/storage
-      - ./bootstrap/cache:/app/bootstrap/cache
-      # FrankenPHP/Caddy volumes for certificates and configuration
+      - storage_data:/app/storage
+      - cache_data:/app/bootstrap/cache
       - caddy_data:/data
       - caddy_config:/config
-      # Log directory for production
-      - ./logs:/var/log/caddy
+      - ../logs:/var/log/caddy
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - swinx-network
+      redis:
+        condition: service_started
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/up"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
 
-  # MySQL Database (same as dev but with production credentials)
-  db:
-    image: mysql:8.0
-    container_name: swinx-db
-    ports:
-      - '3306:3306'
+  queue:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.production
+    container_name: swinx-queue
+    env_file:
+      - ../.env
+    working_dir: /app
+    command: php artisan queue:work --queue=${QUEUE_WORKER_QUEUES:-default,emails,notifications} --sleep=${QUEUE_WORKER_SLEEP:-1} --tries=${QUEUE_WORKER_TRIES:-3} --verbose
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-RootProd2024!@#SecurePass}
-      MYSQL_DATABASE: ${DB_DATABASE:-swinburne}
-      MYSQL_USER: ${DB_USERNAME:-swinx_prod_user}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-SwinxProd2024!@#SecurePass}
+      APP_ENV: production
+      APP_DEBUG: 'false'
+      DB_HOST: db
+      REDIS_HOST: redis
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
-      - ./backups:/backups
-    networks:
-      - swinx-network
+      - storage_data:/app/storage
+      - cache_data:/app/bootstrap/cache
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped
+
+  scheduler:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.production
+    container_name: swinx-scheduler
+    env_file:
+      - ../.env
+    working_dir: /app
+    command: php artisan schedule:work
+    environment:
+      APP_ENV: production
+      APP_DEBUG: 'false'
+      DB_HOST: db
+      REDIS_HOST: redis
+    volumes:
+      - storage_data:/app/storage
+      - cache_data:/app/bootstrap/cache
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: swinx-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  db:
+    image: mariadb:11.4
+    container_name: swinx-db
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
+      MARIADB_DATABASE: ${DB_DATABASE:?DB_DATABASE is required}
+      MARIADB_USER: ${DB_USERNAME:?DB_USERNAME is required}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+      - ../backups:/backups
     healthcheck:
-      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
+      test:
+        [
+          'CMD-SHELL',
+          'mariadb-admin ping -h localhost -uroot -p"$$MARIADB_ROOT_PASSWORD" --silent',
+        ]
       timeout: 20s
       retries: 10
       interval: 10s
       start_period: 40s
-
-
+    restart: unless-stopped
 
 volumes:
-  mysql_data:
-    driver: local
-  # FrankenPHP/Caddy volumes for certificates and configuration
+  storage_data:
+  cache_data:
+  db_data:
+  redis_data:
   caddy_data:
-    driver: local
   caddy_config:
-    driver: local
-
-networks:
-  swinx-network:
-    driver: bridge

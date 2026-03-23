@@ -1,39 +1,35 @@
-# Production Deployment Guide
+# Deployment Guide
 
-Last updated: 2026-03-05  
+Last updated: 2026-03-23  
 Owner: Platform Team  
 Status: Operational baseline
 
-## 1) Prerequisites
+## 1) Scope
 
-| Requirement | Minimum |
-|-------------|---------|
-| Docker | 20.10+ |
-| Docker Compose | 2.0+ |
-| Disk space | 10GB+ |
-| RAM | 4GB+ |
+This guide documents the actual scripts used in this repo:
 
-Verify:
+- dev stack: [`scripts/dev.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/dev.sh)
+- local production-like stack: [`scripts/local-prod.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/local-prod.sh)
+- production stack: [`scripts/prod.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/prod.sh)
+- production DB backup: [`scripts/backup-database.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/backup-database.sh)
+- server bootstrap: [`scripts/server-setup.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/server-setup.sh)
 
-```bash
-docker --version
-docker-compose --version
-```
+## 2) General Rules
 
-## 2) Environment Setup
+- Use [`.env.example`](/Users/hunt2412/hieupvdev/project/swinx/.env.example) as the only template.
+- `dev`, `local-prod`, and `production` each use a different compose file and project name.
+- Production must not auto-import `init.sql` when the app or DB restarts.
+- Database durability comes from the persistent DB volume plus SQL backups stored outside the container lifecycle.
 
-Required files:
+## 3) Prepare `.env`
 
-- `.env.docker.production` — production environment variables
-- `ssl/privkey.pem` and `ssl/fullchain.pem` — SSL certificates (auto-generated if missing)
-
-Create production env file from template:
+Create `.env` from template:
 
 ```bash
-cp .env.example .env.docker.production
+cp .env.example .env
 ```
 
-Edit `.env.docker.production` with production values:
+Minimum production-oriented values:
 
 ```env
 APP_ENV=production
@@ -41,250 +37,523 @@ APP_DEBUG=false
 APP_URL=https://your-domain.com
 
 DB_HOST=db
-DB_DATABASE=swinburne
-DB_USERNAME=swinx_prod_user
-DB_PASSWORD=<secure-password>
+DB_PORT=3306
+DB_DATABASE=your_db
+DB_USERNAME=your_user
+DB_PASSWORD=your_password
+DB_ROOT_PASSWORD=your_root_password
 
-QUEUE_CONNECTION=database
-BROADCAST_CONNECTION=ably
-ABLY_KEY=<your-ably-key>
+REDIS_HOST=redis
+REDIS_PORT=6379
 
-# Notification V2
-NOTIFICATION_V2_ENABLED=true
-NOTIFICATION_V2_WRITE_MODE=v2
-NOTIFICATION_V2_READ_MODE=legacy
+QUEUE_CONNECTION=redis
+QUEUE_WORKER_QUEUES=default,emails,notifications
+QUEUE_WORKER_SLEEP=1
+QUEUE_WORKER_TRIES=3
 
-# FrankenPHP
+MAIL_MAILER=smtp
+MAIL_HOST=your-smtp-host
+MAIL_PORT=587
+MAIL_USERNAME=your-smtp-user
+MAIL_PASSWORD=your-smtp-password
+MAIL_ENCRYPTION=tls
+
 SERVER_NAME=your-domain.com
 ACME_EMAIL=admin@your-domain.com
+RUN_MIGRATIONS=false
+BACKUP_RETENTION_DAYS=14
 ```
 
-## 3) Deployment Steps
+Important values:
 
-### 3.1 Quick Deploy (Recommended)
+- `DB_ROOT_PASSWORD`: used for DB health checks and production backup dumps.
+- `RUN_MIGRATIONS`: image/runtime flag, but `prod.sh deploy` still runs migrations explicitly.
+- `BACKUP_RETENTION_DAYS`: how many days compressed SQL backups are kept in `backups/db/`.
+
+## 4) Development Stack
+
+Script: [`scripts/dev.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/dev.sh)  
+Compose: [`docker/docker-compose.dev.yml`](/Users/hunt2412/hieupvdev/project/swinx/docker/docker-compose.dev.yml)
+
+What it starts:
+
+- `app`
+- `vite`
+- `queue`
+- `scheduler`
+- `db`
+- `redis`
+- `mailpit`
+
+Start dev:
 
 ```bash
-cd docker
-./scripts/deploy-production.sh
+./scripts/dev.sh start
 ```
 
-Script performs:
-
-1. Validates Docker prerequisites
-2. Copies `.env.docker.production` to `.env`
-3. Creates SSL certificates if missing
-4. Backs up database (if running)
-5. Builds and starts containers
-6. Runs migrations
-7. Caches config/routes/views/events
-8. Creates storage link and Ziggy routes
-9. Health check verification
-
-### 3.2 Manual Deploy
+Stop dev:
 
 ```bash
-cd docker
-
-# Build containers
-docker-compose -f docker-compose.production.yml build --no-cache
-
-# Start services
-docker-compose -f docker-compose.production.yml up -d
-
-# Run migrations
-docker-compose -f docker-compose.production.yml exec app php artisan migrate --force
-
-# Cache Laravel
-docker-compose -f docker-compose.production.yml exec app php artisan config:cache
-docker-compose -f docker-compose.production.yml exec app php artisan route:cache
-docker-compose -f docker-compose.production.yml exec app php artisan view:cache
-docker-compose -f docker-compose.production.yml exec app php artisan event:cache
-
-# Storage link
-docker-compose -f docker-compose.production.yml exec app php artisan storage:link
+./scripts/dev.sh stop
 ```
 
-## 4) Service Architecture
-
-Containers:
-
-| Service | Container | Ports |
-|---------|-----------|-------|
-| App (FrankenPHP) | `swinx-app` | 80, 443, 443/udp |
-| MySQL 8.0 | `swinx-db` | 3306 |
-
-FrankenPHP features:
-
-- Built-in HTTP/2 and HTTP/3
-- Automatic HTTPS with Let's Encrypt (set `SERVER_NAME` and `ACME_EMAIL`)
-- OPcache optimized for production
-
-## 5) Queue Worker Setup
-
-Queue worker is required for Notification V2 delivery jobs.
-
-### 5.1 Inside Container
+Restart dev:
 
 ```bash
-docker-compose -f docker-compose.production.yml exec app \
-    php artisan queue:work --sleep=1 --tries=3
+./scripts/dev.sh restart
 ```
 
-### 5.2 Supervisor (Recommended)
-
-Create `/etc/supervisor/conf.d/swinx-worker.conf`:
-
-```ini
-[program:swinx-worker]
-process_name=%(program_name)s_%(process_num)02d
-command=docker exec swinx-app php artisan queue:work --sleep=1 --tries=3 --max-time=3600
-autostart=true
-autorestart=true
-stopasgroup=true
-killasgroup=true
-numprocs=1
-redirect_stderr=true
-stdout_logfile=/var/log/swinx-worker.log
-```
+Rebuild from scratch:
 
 ```bash
-sudo supervisorctl reread
-sudo supervisorctl update
-sudo supervisorctl start swinx-worker:*
+./scripts/dev.sh rebuild
 ```
 
-## 6) Scheduler Setup
-
-Laravel scheduler runs scheduled commands including `notifications:process-outbox`.
-
-### 6.1 Host Cron
-
-Add to crontab:
+See status:
 
 ```bash
-* * * * * docker exec swinx-app php artisan schedule:run >> /dev/null 2>&1
+./scripts/dev.sh status
 ```
 
-### 6.2 Verify Scheduled Commands
+See logs:
 
 ```bash
-docker exec swinx-app php artisan schedule:list
+./scripts/dev.sh logs
+./scripts/dev.sh logs app
+./scripts/dev.sh logs db
 ```
 
-Key scheduled commands:
-
-| Command | Frequency | Purpose |
-|---------|-----------|---------|
-| `notifications:process-outbox --limit=100` | Every minute | Process notification outbox |
-| `sessions:update-statuses` | Every 30 min | Update class session statuses |
-| `events:process-completions` | Hourly | Process event completions |
-
-## 7) Notification V2 Deployment Checklist
-
-Pre-deploy:
-
-- [ ] Set `NOTIFICATION_V2_ENABLED=true`
-- [ ] Set `NOTIFICATION_V2_WRITE_MODE=v2`
-- [ ] Configure `BROADCAST_CONNECTION=ably` and `ABLY_KEY`
-- [ ] Verify queue worker is running
-- [ ] Verify scheduler cron is active
-
-Post-deploy verification:
+Open shell inside app:
 
 ```bash
-# Check outbox processing
-docker exec swinx-app php artisan notifications:process-outbox --limit=10
-
-# Verify queue worker
-docker exec swinx-app php artisan queue:monitor database
-
-# Check notification tables
-docker exec swinx-db mysql -u swinx_prod_user -p -e \
-    "SELECT status, COUNT(*) FROM notification_event_outbox GROUP BY status;"
+./scripts/dev.sh shell
 ```
 
-Monitor via admin pages:
-
-- `/admin/notifications/ops/outbox` — Outbox events
-- `/admin/notifications/ops/deliveries` — Delivery attempts
-- `/admin/notifications/ops/messages` — All messages
-
-## 8) Database Backup
-
-Automated backup during deploy keeps 7 most recent backups.
-
-Manual backup:
+Run artisan:
 
 ```bash
-docker-compose -f docker-compose.production.yml exec -T db mysqldump \
-    -u root -p \
-    --all-databases --routines --triggers > backups/manual_$(date +%Y%m%d).sql
+./scripts/dev.sh artisan migrate
+./scripts/dev.sh artisan schedule:list
+./scripts/dev.sh artisan queue:work
 ```
 
-Restore:
+Run composer:
 
 ```bash
-docker-compose -f docker-compose.production.yml exec -T db mysql \
-    -u root -p < backups/manual_20260305.sql
+./scripts/dev.sh composer install
 ```
 
-## 9) Health Checks
-
-Application health endpoint:
+Run npm:
 
 ```bash
-curl http://localhost/up
+./scripts/dev.sh npm run build
 ```
 
-Container health:
+Run tests:
 
 ```bash
-docker-compose -f docker-compose.production.yml ps
-docker stats --no-stream
+./scripts/dev.sh test
+./scripts/dev.sh test --filter=Identity
 ```
 
-## 10) Rollback Procedures
-
-### 10.1 Application Rollback
+Open MariaDB shell:
 
 ```bash
-# Stop containers
-docker-compose -f docker-compose.production.yml down
-
-# Checkout previous version
-git checkout <previous-tag>
-
-# Rebuild and deploy
-./scripts/deploy-production.sh
+./scripts/dev.sh mysql
 ```
 
-### 10.2 Notification V2 Rollback
+Default dev endpoints:
 
-Disable V2 writes without full rollback:
+- app: `http://localhost:8000`
+- vite: `http://localhost:5173`
+- mailpit UI: `http://localhost:8026`
 
-```env
-NOTIFICATION_V2_WRITE_MODE=off
-NOTIFICATION_V2_READ_MODE=legacy
-```
+## 5) Local Production-Like Stack
 
-Then:
+Script: [`scripts/local-prod.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/local-prod.sh)  
+Compose: [`docker/docker-compose.local-prod.yml`](/Users/hunt2412/hieupvdev/project/swinx/docker/docker-compose.local-prod.yml)
+
+Use this when you want to test production-style behavior locally with FrankenPHP + HTTPS.
+
+Important behavior:
+
+- `local-prod` is intentionally production-like
+- only the web app is exposed on host ports
+- `db` and `redis` stay private inside the Docker network
+- `mailpit` is not part of `local-prod`
+- database starts empty unless you explicitly import a dump yourself
+
+Start:
 
 ```bash
-docker-compose -f docker-compose.production.yml exec app php artisan config:cache
+./scripts/local-prod.sh start
 ```
 
-## 11) Useful Commands
+Stop:
 
-| Task | Command |
-|------|---------|
-| View logs | `docker-compose -f docker-compose.production.yml logs -f` |
-| App shell | `docker exec -it swinx-app bash` |
-| Artisan | `docker exec swinx-app php artisan <command>` |
-| MySQL CLI | `docker exec -it swinx-db mysql -u swinx_prod_user -p` |
-| Clear cache | `docker exec swinx-app php artisan optimize:clear` |
-| Rebuild cache | `docker exec swinx-app php artisan optimize` |
+```bash
+./scripts/local-prod.sh stop
+```
+
+Restart:
+
+```bash
+./scripts/local-prod.sh restart
+```
+
+Rebuild:
+
+```bash
+./scripts/local-prod.sh rebuild
+```
+
+See status:
+
+```bash
+./scripts/local-prod.sh status
+```
+
+See logs:
+
+```bash
+./scripts/local-prod.sh logs
+./scripts/local-prod.sh logs app
+```
+
+Open shell:
+
+```bash
+./scripts/local-prod.sh shell
+```
+
+Run artisan:
+
+```bash
+./scripts/local-prod.sh artisan migrate --force
+```
+
+Open MariaDB shell:
+
+```bash
+./scripts/local-prod.sh mysql
+```
+
+Check HTTPS:
+
+```bash
+./scripts/local-prod.sh test-ssl
+```
+
+Create a manual local-prod backup:
+
+```bash
+./scripts/local-prod.sh backup
+```
+
+Default local production endpoint:
+
+- `https://localhost:8443/up`
+
+## 6) Production Stack
+
+Script: [`scripts/prod.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/prod.sh)  
+Compose: [`docker/docker-compose.production.yml`](/Users/hunt2412/hieupvdev/project/swinx/docker/docker-compose.production.yml)
+
+What it starts:
+
+- `app`
+- `queue`
+- `scheduler`
+- `db`
+- `redis`
+
+Important behavior:
+
+- only the web app is exposed publicly
+- `db` and `redis` are private services inside the Docker network
+- app containers always reach them through `DB_HOST=db` and `REDIS_HOST=redis`
+
+Primary deploy:
+
+```bash
+./scripts/prod.sh deploy
+```
+
+What `deploy` does:
+
+1. validates `.env`
+2. asks for explicit `PRODUCTION` confirmation
+3. creates `backups/` and `logs/`
+4. builds and starts the production stack
+5. runs `php artisan migrate --force`
+
+Start existing production stack:
+
+```bash
+./scripts/prod.sh start
+```
+
+Stop:
+
+```bash
+./scripts/prod.sh stop
+```
+
+Restart:
+
+```bash
+./scripts/prod.sh restart
+```
+
+See status:
+
+```bash
+./scripts/prod.sh status
+```
+
+See logs:
+
+```bash
+./scripts/prod.sh logs
+./scripts/prod.sh logs app
+./scripts/prod.sh logs db
+```
+
+Open shell:
+
+```bash
+./scripts/prod.sh shell
+```
+
+Open MariaDB shell:
+
+```bash
+./scripts/prod.sh mysql
+```
+
+Run artisan:
+
+```bash
+./scripts/prod.sh artisan optimize:clear
+./scripts/prod.sh artisan queue:restart
+```
+
+Health check:
+
+```bash
+./scripts/prod.sh health
+curl -fsS https://your-domain.com/up
+```
+
+## 7) Manual SQL Import
+
+Important rule:
+
+- local/dev: you may import SQL manually whenever needed
+- production: do not auto-import `init.sql` on app start or container restart
+
+Manual import into the running dev DB:
+
+```bash
+docker exec -i swinx-db-dev mariadb -uroot -proot asia < docker/mysql/init.sql
+```
+
+Manual import of another dump file:
+
+```bash
+docker exec -i swinx-db-dev mariadb -uroot -proot asia < /path/to/your.sql
+```
+
+If you want `init-test.sql` to match `init.sql`:
+
+```bash
+cp docker/mysql/init.sql docker/mysql/init-test.sql
+```
+
+If the DB volume already exists, MariaDB will not rerun `/docker-entrypoint-initdb.d/*` automatically.  
+In that case, either import manually as above, or destroy the DB volume and recreate the stack.
+
+Reset dev DB volume completely:
+
+```bash
+./scripts/dev.sh stop
+docker compose --env-file .env -f docker/docker-compose.dev.yml -p swinx-dev down -v
+./scripts/dev.sh start
+```
+
+## 8) Production Backup
+
+Manual production backup:
+
+```bash
+./scripts/backup-database.sh
+```
+
+What it does:
+
+- calls [`scripts/prod.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/prod.sh) in `backup` mode
+- dumps production DB using:
+  - `--single-transaction`
+  - `--routines`
+  - `--triggers`
+- uses MySQL root credentials from `.env`
+- writes SQL file into `backups/db/`
+- compresses the result as `.sql.gz`
+- deletes old backups older than `BACKUP_RETENTION_DAYS`
+
+Generated file format:
+
+```text
+backups/db/production-YYYYMMDD_HHMMSS.sql.gz
+```
+
+Manual raw backup without wrapper script:
+
+```bash
+./scripts/prod.sh backup
+```
+
+Or custom path:
+
+```bash
+./scripts/prod.sh backup backups/db/custom-name.sql
+```
+
+## 9) Backup Commands By Environment
+
+Each environment has its own MariaDB container and its own data volume.
+
+Container mapping:
+
+- dev: `swinx-db-dev`
+- local-prod: `swinx-db-local-prod`
+- production: `swinx-db`
+
+Backup `dev`:
+
+```bash
+docker exec swinx-db-dev mariadb-dump -uroot -proot asia > backups/dev-$(date +%Y%m%d_%H%M%S).sql
+```
+
+Backup `local-prod`:
+
+```bash
+./scripts/local-prod.sh backup
+```
+
+Or directly:
+
+```bash
+docker exec swinx-db-local-prod mariadb-dump -uroot -proot asia > backups/local-prod-$(date +%Y%m%d_%H%M%S).sql
+```
+
+Backup `production`:
+
+```bash
+./scripts/backup-database.sh
+```
+
+Or directly:
+
+```bash
+docker exec swinx-db mariadb-dump --single-transaction --routines --triggers -uroot -p'YOUR_ROOT_PASSWORD' your_db > backups/db/production-$(date +%Y%m%d_%H%M%S).sql
+```
+
+Important:
+
+- backup only saves the current state of that environment's DB
+- if `local-prod` DB is empty, its backup file will also be nearly empty
+- importing data into `dev` does not make `local-prod` or `production` have the same data
+- `local-prod` and `production` do not publish DB or Redis ports to the host
+
+## 10) Production Backup Schedule
+
+Default schedule:
+
+- `00:00` every day
+- `12:00` every day
+
+Installed by [`scripts/server-setup.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/server-setup.sh):
+
+```cron
+0 0,12 * * * appuser cd /path/to/app && ./scripts/backup-database.sh >> /path/to/app/logs/db-backup.log 2>&1
+```
+
+This means:
+
+- backups run from the host
+- backups survive app container restart
+- the SQL dump is stored under the project `backups/` directory on disk
+
+## 11) Restore From Backup
+
+Restore a production-style dump into a running MariaDB container:
+
+```bash
+gunzip -c backups/db/production-20260323_120000.sql.gz | docker exec -i swinx-db mariadb -uroot -p'YOUR_ROOT_PASSWORD' your_db
+```
+
+Restore an uncompressed SQL file:
+
+```bash
+docker exec -i swinx-db mariadb -uroot -p'YOUR_ROOT_PASSWORD' your_db < backups/db/production-20260323_120000.sql
+```
+
+Restore into local dev DB:
+
+```bash
+gunzip -c backups/db/production-20260323_120000.sql.gz | docker exec -i swinx-db-dev mariadb -uroot -proot asia
+```
+
+Before restore, verify:
+
+- target DB name
+- root password
+- whether you are overwriting live production data
+
+## 12) Production Topology
+
+- `app`: web traffic via FrankenPHP + Caddy
+- `queue`: background jobs
+- `scheduler`: scheduled commands
+- `db`: MariaDB with persistent `db_data` volume
+- `redis`: cache, session, and queue backend
+
+This runtime model replaces host supervisor for app processes.  
+Host cron is still used for infrastructure tasks such as database backups and cert renewal.
+
+## 13) Quick Command Reference
+
+Dev:
+
+```bash
+./scripts/dev.sh start
+./scripts/dev.sh status
+./scripts/dev.sh logs app
+./scripts/dev.sh artisan migrate
+./scripts/dev.sh mysql
+```
+
+Local production:
+
+```bash
+./scripts/local-prod.sh start
+./scripts/local-prod.sh status
+./scripts/local-prod.sh test-ssl
+./scripts/local-prod.sh backup
+```
+
+Production:
+
+```bash
+./scripts/prod.sh deploy
+./scripts/prod.sh status
+./scripts/prod.sh logs app
+./scripts/prod.sh artisan queue:restart
+./scripts/backup-database.sh
+```
 
 ## Unresolved Questions
 
-- Should queue worker run as separate container for horizontal scaling?
-- What is the backup retention policy beyond 7 days?
+- Should production database stay containerized in all environments, or move to managed DB outside Compose?
+- Should Redis stay containerized in production, or move to managed Redis before scale-out?

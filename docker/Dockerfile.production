@@ -1,47 +1,44 @@
-# ===========================================
-# FrankenPHP Production Dockerfile
-# ===========================================
-# Based on official FrankenPHP image with production optimizations
+FROM dunglas/frankenphp:1-php8.4-bookworm AS production
 
-FROM dunglas/frankenphp:latest AS production
+ENV APP_ENV=production \
+    APP_DEBUG=false \
+    COMPOSER_ALLOW_SUPERUSER=1 \
+    FRANKENPHP_CONFIG="" \
+    FRANKENPHP_NUM_THREADS=auto \
+    SERVER_NAME=localhost \
+    ACME_EMAIL=""
 
-# Set environment variables for production
-ENV APP_ENV=production
-ENV APP_DEBUG=false
-ENV COMPOSER_ALLOW_SUPERUSER=1
-ENV FRANKENPHP_CONFIG=""
-ENV FRANKENPHP_NUM_THREADS=auto
-ENV SERVER_NAME=localhost
-ENV ACME_EMAIL=""
-
-# Install additional system dependencies
 RUN apt-get update && apt-get install -y \
-    zip \
-    unzip \
     curl \
-    git \
     default-mysql-client \
-    nodejs \
+    git \
     npm \
-    cron \
+    unzip \
+    zip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install additional PHP extensions
 RUN install-php-extensions \
-    pdo_mysql \
-    mysqli \
-    zip \
+    bcmath \
     gd \
     intl \
     mbstring \
+    mysqli \
     opcache \
-    bcmath \
-    redis
+    pdo_mysql \
+    redis \
+    zip
 
-# Configure PHP for production
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+WORKDIR /app
+
+COPY . .
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+
+RUN npm ci --omit=dev
+
 RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 
-# Configure OPcache for production
 RUN echo "opcache.enable=1" >> /usr/local/etc/php/conf.d/opcache.ini \
     && echo "opcache.enable_cli=0" >> /usr/local/etc/php/conf.d/opcache.ini \
     && echo "opcache.memory_consumption=256" >> /usr/local/etc/php/conf.d/opcache.ini \
@@ -52,62 +49,26 @@ RUN echo "opcache.enable=1" >> /usr/local/etc/php/conf.d/opcache.ini \
     && echo "opcache.save_comments=1" >> /usr/local/etc/php/conf.d/opcache.ini \
     && echo "opcache.fast_shutdown=1" >> /usr/local/etc/php/conf.d/opcache.ini
 
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Set working directory to /app (FrankenPHP convention)
-WORKDIR /app
-
-# Copy application code
-COPY . .
-
-# Install PHP dependencies (production only - no dev dependencies)
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
-
-# Verify debugbar is not installed in production
 RUN if [ -d "vendor/barryvdh/laravel-debugbar" ]; then \
         echo "ERROR: Debugbar found in production build!" && exit 1; \
-    else \
-        echo "✅ Debugbar correctly excluded from production"; \
     fi
 
-# Clear any cached service providers and rebuild autoloader
-RUN composer dump-autoload --optimize --classmap-authoritative
-
-# Clear Laravel cached configs that might reference debugbar
-RUN rm -rf bootstrap/cache/*.php || true
-
-# Install Node.js dependencies and build frontend assets
-RUN npm ci --only=production
-
-# Build frontend assets
-RUN npm run build
-
-# Set proper permissions for FrankenPHP
-RUN chown -R www-data:www-data /app \
-    && chmod -R 755 /app/storage \
-    && chmod -R 755 /app/bootstrap/cache
-
-# Create log directory for Caddy
-RUN mkdir -p /var/log/caddy \
+RUN composer dump-autoload --optimize --classmap-authoritative --no-scripts \
+    && rm -rf bootstrap/cache/*.php || true \
+    && npm run build \
+    && mkdir -p /app/storage /app/bootstrap/cache /var/log/caddy \
+    && chown -R www-data:www-data /app/storage /app/bootstrap/cache \
+    && chmod -R 775 /app/storage /app/bootstrap/cache \
     && chown -R www-data:www-data /var/log/caddy
 
-# Copy FrankenPHP configuration
-COPY Caddyfile.prod /etc/caddy/Caddyfile
+COPY docker/Caddyfile.prod /etc/caddy/Caddyfile
+COPY docker/php/production.ini /usr/local/etc/php/conf.d/custom.ini
+COPY docker/start-frankenphp-production.sh /usr/local/bin/start-frankenphp-production
+RUN chmod +x /usr/local/bin/start-frankenphp-production
 
-# Copy custom PHP configuration
-COPY docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini
-
-# Create startup script for FrankenPHP production
-COPY docker/start-frankenphp-production.sh /start.sh
-RUN chmod +x /start.sh
-
-# Expose ports 80 and 443 for production (HTTP and HTTPS)
 EXPOSE 80 443 443/udp
 
-# Health check for production
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost/up || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS http://localhost/up || exit 1
 
-# Start FrankenPHP
-CMD ["/start.sh"]
+CMD ["/usr/local/bin/start-frankenphp-production"]

@@ -36,10 +36,11 @@ public/.user.ini
 # .augment
 .claude
 .opencode
+.agents
 # .kiro
 # docs
 public/.user.ini
 public/favicon.ico
-/backup
+/backups
 #docs/
 # /tests/*

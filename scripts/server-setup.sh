@@ -181,8 +181,17 @@ fi
 # Setup automatic certificate renewal
 log "🔄 Setting up automatic certificate renewal..."
 cat > /etc/cron.d/certbot << EOF
-0 12 * * * root test -x /usr/bin/certbot -a \! -d /run/systemd/system && perl -e 'sleep int(rand(43200))' && certbot -q renew --deploy-hook "cd $APP_DIR && docker-compose -f docker-compose.production.yml restart nginx"
+0 12 * * * root test -x /usr/bin/certbot -a \! -d /run/systemd/system && perl -e 'sleep int(rand(43200))' && certbot -q renew --deploy-hook "cd $APP_DIR && docker compose --env-file .env -f docker/docker-compose.production.yml restart app"
 EOF
+
+# Setup database backups
+log "💾 Setting up database backup schedule..."
+cat > /etc/cron.d/swinx-db-backup << EOF
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+0 0,12 * * * $APP_USER cd $APP_DIR && ./scripts/backup-database.sh >> $APP_DIR/logs/db-backup.log 2>&1
+EOF
+chmod 644 /etc/cron.d/swinx-db-backup
 
 # Create necessary directories
 log "📁 Creating necessary directories..."
@@ -201,7 +210,7 @@ $APP_DIR/logs/*.log {
     create 644 $APP_USER $APP_USER
 }
 
-$APP_DIR/storage/logs/nginx/*.log {
+$APP_DIR/logs/*.log {
     daily
     missingok
     rotate 52
@@ -210,7 +219,7 @@ $APP_DIR/storage/logs/nginx/*.log {
     notifempty
     create 644 $APP_USER $APP_USER
     postrotate
-        cd $APP_DIR && docker-compose -f docker-compose.production.yml exec nginx nginx -s reload
+        cd $APP_DIR && docker compose --env-file .env -f docker/docker-compose.production.yml restart app
     endscript
 }
 EOF
@@ -239,3 +248,4 @@ echo "- Domain: $DOMAIN"
 echo "- SSL certificate: $APP_DIR/ssl/"
 echo "- Logs: $APP_DIR/logs/"
 echo "- Backups: $APP_DIR/backups/"
+echo "- DB backup cron: 00:00 and 12:00 daily"
