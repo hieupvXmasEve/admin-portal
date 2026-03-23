@@ -9,15 +9,19 @@ use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Models\Notification;
-use App\Notifications\CourseCompletedNotification;
+use App\Models\Student;
+use App\Modules\Notification\Actions\PublishDomainEventAction;
+use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class CourseCompletionService
 {
     public function __construct(
         protected EgcLevelProgressionService $egcService,
-        protected CourseSurveyService $courseSurveyService
+        protected CourseSurveyService $courseSurveyService,
+        protected PublishDomainEventAction $publishDomainEventAction,
     ) {}
 
     /**
@@ -537,20 +541,13 @@ class CourseCompletionService
                 }
             }
 
-            // Create notification using custom method (compatible with custom Notification model)
-            $this->createNotification(
+            $this->publishCourseCompletedNotificationV2(
                 $student,
-                new CourseCompletedNotification(
-                    courseCode: $courseOffering->unit->code,
-                    courseName: $courseOffering->unit->name,
-                    grade: $record->final_letter_grade,
-                    finalPercentage: (float) ($record->final_percentage ?? 0),
-                    creditPoints: (float) ($record->unit->credit_points ?? 0),
-                    passed: $isPassing,
-                    message: $isPassing
-                        ? 'Great job! The credits have been added to your academic record.'
-                        : 'Please contact your academic advisor to discuss your options.'
-                )
+                $courseOffering,
+                $record->final_letter_grade,
+                (float) ($record->final_percentage ?? 0),
+                (float) ($record->unit->credit_points ?? 0),
+                $isPassing
             );
 
             $notifiedCount++;
@@ -575,24 +572,65 @@ class CourseCompletionService
         ];
     }
 
-    /**
-     * Create notification compatible with custom Notification model
-     * (Same pattern as EgcLevelProgressionService)
-     */
-    private function createNotification($notifiable, $notification): void
-    {
-        $data = $notification->toDatabase($notifiable);
+    private function publishCourseCompletedNotificationV2(
+        Student $student,
+        CourseOffering $courseOffering,
+        string $grade,
+        float $finalPercentage,
+        float $creditPoints,
+        bool $passed
+    ): void {
+        if (! (bool) config('notification.v2_enabled', false)) {
+            return;
+        }
 
-        Notification::create([
-            'type' => get_class($notification),
-            'notifiable_type' => $notifiable->getMorphClass(),
-            'notifiable_id' => $notifiable->id,
-            'category' => $data['category'],
-            'title' => $data['title'],
-            'message' => $data['message'],
-            'data' => $data['data'],
-            'channels' => $data['channels'],
-            'is_important' => $data['is_important'] ?? false,
-        ]);
+        $writeMode = (string) config('notification.write_mode', 'off');
+        if (! in_array($writeMode, ['dual', 'v2', 'v2_only'], true)) {
+            return;
+        }
+
+        if (! $student->user_id) {
+            return;
+        }
+
+        $body = $passed
+            ? "Congratulations! You have successfully completed {$courseOffering->unit->name} with grade {$grade} ({$finalPercentage}%). You earned {$creditPoints} credit points."
+            : "You have completed {$courseOffering->unit->name} with grade {$grade} ({$finalPercentage}%). Unfortunately, you did not meet the passing threshold.";
+
+        $envelope = new DomainEventEnvelope(
+            eventId: (string) Str::uuid(),
+            eventName: 'academic.course_completed',
+            eventVersion: 1,
+            occurredAt: CarbonImmutable::now(),
+            aggregateType: 'course_offering',
+            aggregateId: (string) $courseOffering->id,
+            campusId: (int) $student->campus_id,
+            actorUserId: null,
+            payload: [
+                'type_key' => 'course_completed',
+                'channels' => ['realtime'],
+                'recipient_targets' => [
+                    ['type' => 'student', 'id' => (int) $student->id],
+                ],
+                'data' => [
+                    'title' => $passed
+                        ? "Course Completed: {$courseOffering->unit->code}"
+                        : "Course Completed (Not Passed): {$courseOffering->unit->code}",
+                    'body' => $body,
+                    'category' => 'academic',
+                    'is_important' => ! $passed,
+                    'action_url' => '',
+                    'action_text' => 'View Academic Records',
+                    'course_code' => $courseOffering->unit->code,
+                    'course_name' => $courseOffering->unit->name,
+                    'grade' => $grade,
+                    'final_percentage' => $finalPercentage,
+                    'credit_points' => $creditPoints,
+                    'passed' => $passed,
+                ],
+            ],
+        );
+
+        $this->publishDomainEventAction->runAfterCommit($envelope);
     }
 }

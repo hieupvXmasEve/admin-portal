@@ -35,12 +35,12 @@ class MarkCourseOfferingCompletedAction
         $classSessions = $courseOffering->classSessions()
             ->where('status', '!=', 'cancelled')
             ->with(['attendances' => function ($q) {
-                $q->select('id', 'class_session_id', 'status');
+                $q->select('id', 'class_session_id', 'status', 'recording_method');
             }])
             ->get();
 
         $unmarkedSessions = [];
-        $allFailSessions = [];
+        $autoSystemOnlySessions = [];
 
         foreach ($classSessions as $session) {
             // Check 1: Unmarked attendance
@@ -50,13 +50,13 @@ class MarkCourseOfferingCompletedAction
                 continue;
             }
 
-            // Check 2: All fail (Attendance taken but 0 present/late)
-            $hasValidAttendance = $session->attendances->contains(function ($attendance) {
-                return in_array($attendance->status, ['present', 'late']);
+            // Check 2: auto_system-only attendance means attendance has not been manually finalized yet.
+            $hasManualAttendance = $session->attendances->contains(function ($attendance) {
+                return $attendance->recording_method !== 'auto_system';
             });
 
-            if (! $hasValidAttendance) {
-                $allFailSessions[] = "{$session->session_title} ({$session->formatted_date})";
+            if (! $hasManualAttendance) {
+                $autoSystemOnlySessions[] = "{$session->session_title} ({$session->formatted_date})";
             }
         }
 
@@ -64,8 +64,8 @@ class MarkCourseOfferingCompletedAction
             throw new RuntimeException('Cannot complete course. Attendance has not been taken for the following sessions: ' . implode(', ', $unmarkedSessions));
         }
 
-        if (! empty($allFailSessions)) {
-            throw new RuntimeException('Cannot complete course. The following sessions have 0% attendance (all absent/excused): ' . implode(', ', $allFailSessions));
+        if (! empty($autoSystemOnlySessions)) {
+            throw new RuntimeException('Cannot complete course. The following sessions only have auto_system attendance and still require manual attendance confirmation: ' . implode(', ', $autoSystemOnlySessions));
         }
 
         try {

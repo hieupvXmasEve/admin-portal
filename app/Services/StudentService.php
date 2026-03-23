@@ -13,7 +13,6 @@ use App\Models\Program;
 use App\Models\Role;
 use App\Models\Specialization;
 use App\Models\Student;
-use App\Models\StudentChange;
 use App\Models\User;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -743,107 +742,6 @@ class StudentService
                 'deletion_type' => 'FORCE_DELETE',
                 'warning' => 'DATA CANNOT BE RECOVERED',
             ]);
-        });
-    }
-
-    /**
-     * Change student status and/or GC level with audit tracking
-     * GC fields are preserved when changing status
-     */
-    public function changeStatusAndGcLevel(
-        Student $student,
-        array $data,
-        string $reason
-    ): Student {
-        return DB::transaction(function () use ($student, $data, $reason) {
-            $userId = auth()->id();
-            $newStatus = $data['status'] ?? null;
-            $newGcCurrentLevel = $data['gc_current_level'] ?? null;
-            $newGcStartingLevel = $data['gc_starting_level'] ?? null;
-            $newGcTotalLevels = $data['gc_total_levels'] ?? null;
-
-            // Track status change
-            if ($newStatus && $student->status !== $newStatus) {
-                StudentChange::create([
-                    'student_id' => $student->id,
-                    'user_id' => $userId,
-                    'field_name' => 'status',
-                    'old_value' => $student->status,
-                    'new_value' => $newStatus,
-                    'reason' => $reason,
-                    'changed_at' => now(),
-                ]);
-
-                $student->status = $newStatus;
-
-                // If switching to intake_pre_uni_gc, set default GC values if not provided
-                if ($newStatus === 'intake_pre_uni_gc') {
-                    if ($newGcTotalLevels === null && $student->gc_total_levels === null) {
-                        $newGcTotalLevels = 6;
-                    }
-                    if ($newGcStartingLevel === null && $student->gc_starting_level === null) {
-                        $newGcStartingLevel = 0;
-                    }
-                }
-            }
-
-            // Track GC starting level change
-            if ($newGcStartingLevel !== null && $student->gc_starting_level !== $newGcStartingLevel) {
-                StudentChange::create([
-                    'student_id' => $student->id,
-                    'user_id' => $userId,
-                    'field_name' => 'gc_starting_level',
-                    'old_value' => $student->gc_starting_level !== null ? (string) $student->gc_starting_level : null,
-                    'new_value' => (string) $newGcStartingLevel,
-                    'reason' => $reason,
-                    'changed_at' => now(),
-                ]);
-
-                $student->gc_starting_level = $newGcStartingLevel;
-            }
-
-            // Track GC current level change
-            if ($newGcCurrentLevel !== null && $student->gc_current_level !== $newGcCurrentLevel) {
-                StudentChange::create([
-                    'student_id' => $student->id,
-                    'user_id' => $userId,
-                    'field_name' => 'gc_current_level',
-                    'old_value' => $student->gc_current_level !== null ? (string) $student->gc_current_level : null,
-                    'new_value' => (string) $newGcCurrentLevel,
-                    'reason' => $reason,
-                    'changed_at' => now(),
-                ]);
-
-                $student->gc_current_level = $newGcCurrentLevel;
-            }
-
-            // Track GC total levels change
-            if ($newGcTotalLevels !== null && $student->gc_total_levels !== $newGcTotalLevels) {
-                StudentChange::create([
-                    'student_id' => $student->id,
-                    'user_id' => $userId,
-                    'field_name' => 'gc_total_levels',
-                    'old_value' => $student->gc_total_levels !== null ? (string) $student->gc_total_levels : null,
-                    'new_value' => (string) $newGcTotalLevels,
-                    'reason' => $reason,
-                    'changed_at' => now(),
-                ]);
-
-                $student->gc_total_levels = $newGcTotalLevels;
-            }
-
-            $student->save();
-
-            Log::info('Student status/GC level changed', [
-                'student_id' => $student->id,
-                'user_id' => $userId,
-                'new_status' => $newStatus,
-                'new_gc_starting_level' => $newGcStartingLevel,
-                'new_gc_current_level' => $newGcCurrentLevel,
-                'new_gc_total_levels' => $newGcTotalLevels,
-            ]);
-
-            return $student->fresh(['campus', 'program', 'specialization']);
         });
     }
 

@@ -262,9 +262,8 @@ const updateCourseStatus = async () => {
     const { data: apiData } = await api.post(`/api/course-offerings/${selectedCourse.value.id}/complete`, {});
 
     isLoading.value = false;
-    console.log('apiData.value', apiData.value);
     if (apiData.value?.success) {
-        const message = apiData.value.data?.message || 'Course status updated successfully';
+        const message = apiData.value.data?.message || apiData.value.message || 'Course status updated successfully';
         toast.success('Course status updated successfully', {
             description: h(HeadlessToastWithProps, { message }),
         });
@@ -272,7 +271,11 @@ const updateCourseStatus = async () => {
         router.reload();
         loadStatistics();
     } else {
-        const errorMessage = apiData.value?.data?.message || 'Failed to update course status';
+        const errorMessage =
+            apiData.value?.message ||
+            apiData.value?.error ||
+            apiData.value?.data?.message ||
+            'Failed to update course status';
         toast.error('Failed to update course status', {
             description: h(HeadlessToastWithProps, { message: errorMessage }),
         });

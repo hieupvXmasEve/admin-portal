@@ -4,15 +4,24 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\AcademicProgressionEventType;
+use App\Enums\ProgressionTriggerSource;
+use App\Models\AcademicProgressionEvent;
 use App\Models\AcademicRecord;
 use App\Models\CourseOffering;
 use App\Models\Student;
-use App\Notifications\EgcCourseCompletedNotification;
-use App\Notifications\EgcProgramCompletedNotification;
+use App\Modules\Notification\Actions\PublishDomainEventAction;
+use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class EgcLevelProgressionService
 {
+    public function __construct(
+        protected PublishDomainEventAction $publishDomainEventAction
+    ) {}
+
     /**
      * Process EGC level progression for completed course
      *
@@ -130,17 +139,14 @@ class EgcLevelProgressionService
                 }
 
                 if ($shouldNotify) {
-                    $this->createNotification(
+                    $this->publishEgcCourseCompletedNotificationV2(
                         $student,
-                        new EgcCourseCompletedNotification(
-                            courseCode: $courseOffering->unit->code,
-                            courseName: $courseOffering->unit->name,
-                            grade: $record->final_letter_grade,
-                            passed: true,
-                            levelProgressed: false,
-                            currentLevel: $studentLevel,
-                            message: 'You passed but level mismatch detected. Please contact academic office.'
-                        )
+                        $courseOffering,
+                        $record->final_letter_grade,
+                        true,
+                        false,
+                        $studentLevel,
+                        'You passed but level mismatch detected. Please contact academic office.'
                     );
                 }
 
@@ -163,29 +169,24 @@ class EgcLevelProgressionService
                     }
 
                     if ($shouldNotify) {
-                        $this->createNotification(
+                        $this->publishEgcCourseCompletedNotificationV2(
                             $student,
-                            new EgcCourseCompletedNotification(
-                                courseCode: $courseOffering->unit->code,
-                                courseName: $courseOffering->unit->name,
-                                grade: $record->final_letter_grade,
-                                passed: true,
-                                levelProgressed: true,
-                                currentLevel: $student->gc_current_level,
-                                message: $progressResult['completed_egc_program']
-                                    ? 'Congratulations! You completed all EGC levels!'
-                                    : "Level progressed: Level {$progressResult['from_level']} → Level {$progressResult['to_level']}"
-                            )
+                            $courseOffering,
+                            $record->final_letter_grade,
+                            true,
+                            true,
+                            (int) ($student->gc_current_level ?? 0),
+                            $progressResult['completed_egc_program']
+                                ? 'Congratulations! You completed all EGC levels!'
+                                : "Level progressed: Level {$progressResult['from_level']} → Level {$progressResult['to_level']}"
                         );
 
                         // Send program completion notification if applicable
                         if ($progressResult['completed_egc_program']) {
-                            $this->createNotification(
+                            $this->publishEgcProgramCompletedNotificationV2(
                                 $student,
-                                new EgcProgramCompletedNotification(
-                                    totalLevels: $progressResult['total_levels'],
-                                    newStatus: $student->status
-                                )
+                                (int) $progressResult['total_levels'],
+                                (string) $student->status
                             );
                         }
                     }
@@ -222,17 +223,14 @@ class EgcLevelProgressionService
                 }
 
                 if ($shouldNotify) {
-                    $this->createNotification(
+                    $this->publishEgcCourseCompletedNotificationV2(
                         $student,
-                        new EgcCourseCompletedNotification(
-                            courseCode: $courseOffering->unit->code,
-                            courseName: $courseOffering->unit->name,
-                            grade: $record->final_letter_grade,
-                            passed: false,
-                            levelProgressed: false,
-                            currentLevel: $currentLevel,
-                            message: 'You did not pass this course. Your level remains at Level '.($currentLevel ?? 'N/A')
-                        )
+                        $courseOffering,
+                        $record->final_letter_grade,
+                        false,
+                        false,
+                        (int) ($currentLevel ?? 0),
+                        'You did not pass this course. Your level remains at Level '.($currentLevel ?? 'N/A')
                     );
                 }
 
@@ -308,10 +306,24 @@ class EgcLevelProgressionService
 
         $student->update($updateData);
 
+        AcademicProgressionEvent::create([
+            'student_id' => $student->id,
+            'event_type' => AcademicProgressionEventType::ENGLISH_LEVEL_CHANGED,
+            'semester_id' => $courseOffering->semester_id,
+            'effective_at' => now(),
+            'trigger_source' => ProgressionTriggerSource::SYSTEM,
+            'from_english_level' => $oldLevel,
+            'to_english_level' => $newLevel,
+            'notes' => sprintf(
+                'Auto progression after passing EGC unit %s',
+                $record->unit->code
+            ),
+        ]);
+
         // Update academic record with progression note
         $progressionNote = "EGC Level Progression: Level {$oldLevel} → Level {$newLevel}";
         if ($completedProgram) {
-            $progressionNote .= ' | EGC Program Completed - Status changed to intake_course';
+            $progressionNote .= ' | EGC Program Completed - Manual status transition required';
         }
 
         $gradeHistory = $record->grade_history ?? [];
@@ -346,31 +358,123 @@ class EgcLevelProgressionService
             'to_level' => $newLevel,
             'total_levels' => $totalLevels,
             'completed_egc_program' => $completedProgram,
-            'new_status' => $completedProgram ? 'intake_course' : 'intake_pre_uni_gc',
+            'new_status' => $student->status,
             'message' => $completedProgram
-                ? "🎉 Student completed all {$totalLevels} EGC levels and transitioned to intake_course!"
+                ? "Student completed all {$totalLevels} EGC levels. Manual status transition required."
                 : "Student progressed from Level {$oldLevel} to Level {$newLevel}",
         ];
     }
 
-    /**
-     * Create notification in custom notifications table
-     */
-    private function createNotification($notifiable, $notification): void
-    {
-        $data = $notification->toDatabase($notifiable);
+    private function publishEgcCourseCompletedNotificationV2(
+        Student $student,
+        CourseOffering $courseOffering,
+        string $grade,
+        bool $passed,
+        bool $levelProgressed,
+        int $currentLevel,
+        string $message
+    ): void {
+        if (! (bool) config('notification.v2_enabled', false)) {
+            return;
+        }
 
-        \App\Models\Notification::create([
-            'type' => get_class($notification),
-            'notifiable_type' => $notifiable->getMorphClass(),
-            'notifiable_id' => $notifiable->id,
-            'category' => $data['category'],
-            'title' => $data['title'],
-            'message' => $data['message'],
-            'data' => $data['data'],
-            'channels' => $data['channels'],
-            'is_important' => $data['is_important'] ?? false,
-        ]);
+        $writeMode = (string) config('notification.write_mode', 'off');
+        if (! in_array($writeMode, ['dual', 'v2', 'v2_only'], true)) {
+            return;
+        }
+
+        if (! $student->user_id) {
+            return;
+        }
+
+        $body = $passed
+            ? "You passed {$courseOffering->unit->code} - {$courseOffering->unit->name} with grade {$grade}. {$message}"
+            : "You did not pass {$courseOffering->unit->code} - {$courseOffering->unit->name}. Grade: {$grade}. {$message}";
+
+        $envelope = new DomainEventEnvelope(
+            eventId: (string) Str::uuid(),
+            eventName: 'academic.egc_course_completed',
+            eventVersion: 1,
+            occurredAt: CarbonImmutable::now(),
+            aggregateType: 'course_offering',
+            aggregateId: (string) $courseOffering->id,
+            campusId: (int) $student->campus_id,
+            actorUserId: null,
+            payload: [
+                'type_key' => 'egc_course_completed',
+                'channels' => ['realtime'],
+                'recipient_targets' => [
+                    ['type' => 'student', 'id' => (int) $student->id],
+                ],
+                'data' => [
+                    'title' => $passed
+                        ? "EGC Course Completed: {$courseOffering->unit->code}"
+                        : "EGC Course Result: {$courseOffering->unit->code}",
+                    'body' => $body,
+                    'category' => 'academic',
+                    'is_important' => true,
+                    'action_url' => '',
+                    'action_text' => 'View Academic Records',
+                    'course_code' => $courseOffering->unit->code,
+                    'course_name' => $courseOffering->unit->name,
+                    'grade' => $grade,
+                    'passed' => $passed,
+                    'level_progressed' => $levelProgressed,
+                    'current_level' => $currentLevel,
+                ],
+            ],
+        );
+
+        $this->publishDomainEventAction->runAfterCommit($envelope);
+    }
+
+    private function publishEgcProgramCompletedNotificationV2(
+        Student $student,
+        int $totalLevels,
+        string $newStatus
+    ): void {
+        if (! (bool) config('notification.v2_enabled', false)) {
+            return;
+        }
+
+        $writeMode = (string) config('notification.write_mode', 'off');
+        if (! in_array($writeMode, ['dual', 'v2', 'v2_only'], true)) {
+            return;
+        }
+
+        if (! $student->user_id) {
+            return;
+        }
+
+        $envelope = new DomainEventEnvelope(
+            eventId: (string) Str::uuid(),
+            eventName: 'academic.egc_program_completed',
+            eventVersion: 1,
+            occurredAt: CarbonImmutable::now(),
+            aggregateType: 'student',
+            aggregateId: (string) $student->id,
+            campusId: (int) $student->campus_id,
+            actorUserId: null,
+            payload: [
+                'type_key' => 'egc_program_completed',
+                'channels' => ['realtime'],
+                'recipient_targets' => [
+                    ['type' => 'student', 'id' => (int) $student->id],
+                ],
+                'data' => [
+                    'title' => 'EGC Program Completed',
+                    'body' => "Congratulations! You have completed all {$totalLevels} EGC levels. Please contact academic services for your next status transition.",
+                    'category' => 'academic',
+                    'is_important' => true,
+                    'action_url' => '/student/academic-records',
+                    'action_text' => 'View Academic Records',
+                    'total_levels' => $totalLevels,
+                    'new_status' => $newStatus,
+                ],
+            ],
+        );
+
+        $this->publishDomainEventAction->runAfterCommit($envelope);
     }
 
     /**
