@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Actions\Placement;
 
+use App\Modules\Academic\Actions\PublishCourseStageChangedNotificationAction;
 use App\Enums\AcademicProgressionEventType;
 use App\Enums\ProgressionTriggerSource;
 use App\Models\AcademicProgressionEvent;
@@ -31,7 +32,7 @@ class TransitionToIntakeCourseAction
     public static function run(array $data): Student
     {
         $studentId = $data['student_id'];
-        $semesterId = $data['semester_id'];
+        $semesterId = (int) $data['semester_id'];
         $ieltsCertificateId = $data['ielts_certificate_id'];
         $allowMissingDocuments = $data['allow_missing_documents'] ?? false;
         $userId = $data['created_by_user_id'] ?? Auth::id();
@@ -49,8 +50,12 @@ class TransitionToIntakeCourseAction
             $student->update([
                 'status' => 'intake_course',
                 'status_change_date' => now()->toDateString(),
+                'status_reason' => $data['notes'] ?? sprintf(
+                    'Transitioned to intake_course based on IELTS score %s',
+                    $certificate->overall_score
+                ),
                 'status_changed_by' => $userId,
-                'gc_to_course_transition_semester' => $semesterId,
+                'intake_major' => $semesterId,
             ]);
 
             // Create COURSE_STAGE_CHANGED event
@@ -77,6 +82,13 @@ class TransitionToIntakeCourseAction
                 'ielts_score' => $certificate->overall_score,
                 'created_by' => $userId,
             ]);
+
+            app(PublishCourseStageChangedNotificationAction::class)->run(
+                $student,
+                $previousStage,
+                'intake_course',
+                $semesterId
+            );
 
             return $student->fresh();
         });

@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Actions;
 
+use App\Enums\AcademicProgressionEventType;
+use App\Enums\ProgressionTriggerSource;
 use App\Enums\StudentActionType;
+use App\Models\AcademicProgressionEvent;
 use App\Models\FinanceCharge;
 use App\Models\Student;
 use App\Models\StudentActionLog;
@@ -30,6 +33,7 @@ class RecordStudentActionAction
         $studentId = $data['student_id'];
         $actionType = StudentActionType::from($data['action_type']);
         $userId = $data['changed_by_user_id'] ?? Auth::id();
+        $fromSemesterId = isset($data['from_semester_id']) ? (int) $data['from_semester_id'] : null;
 
         $student = Student::findOrFail($studentId);
 
@@ -52,7 +56,7 @@ class RecordStudentActionAction
             }
         }
 
-        return DB::transaction(function () use ($student, $actionType, $targetStatus, $data, $userId) {
+        return DB::transaction(function () use ($student, $actionType, $targetStatus, $data, $userId, $fromSemesterId) {
             $previousStatus = $student->status;
             $previousCampusId = $student->campus_id;
             $shouldUpdateStatus = self::shouldUpdateStatus($actionType, $data);
@@ -91,7 +95,10 @@ class RecordStudentActionAction
             ]);
 
             // 2. Update student snapshot
-            self::updateStudentSnapshot($student, $actionType, $targetStatus, $data, $userId);
+            self::updateStudentSnapshot($student, $actionType, $targetStatus, $data, $userId, $fromSemesterId);
+
+            // 2.5 Record academic progression event for stage transition
+            self::recordAcademicProgressionEvent($student, $actionType, $previousStatus, $data, $userId, $fromSemesterId);
 
             // 3. Record field-level changes in StudentChange
             self::recordStudentChanges(
@@ -116,6 +123,15 @@ class RecordStudentActionAction
                 if ($isEgcDefer) {
                     self::createEgcDeferCredits($deferCase, $student, $data, $userId);
                 }
+            }
+
+            if ($actionType === StudentActionType::STUDENT_MAJOR_ENROLLMENT) {
+                app(PublishCourseStageChangedNotificationAction::class)->run(
+                    $student,
+                    $previousStatus,
+                    (string) $student->status,
+                    (int) $fromSemesterId
+                );
             }
 
             Log::info('Student action recorded', [
@@ -266,7 +282,8 @@ class RecordStudentActionAction
         StudentActionType $actionType,
         ?string $targetStatus,
         array $data,
-        int $userId
+        int $userId,
+        ?int $fromSemesterId = null
     ): void {
         $updateData = [];
 
@@ -276,6 +293,10 @@ class RecordStudentActionAction
             $updateData['status_change_date'] = now()->toDateString();
             $updateData['status_reason'] = $data['reason'];
             $updateData['status_changed_by'] = $userId;
+
+            if ($actionType === StudentActionType::STUDENT_MAJOR_ENROLLMENT) {
+                $updateData['intake_major'] = $fromSemesterId;
+            }
         }
 
         // Update campus if action changes it
@@ -286,6 +307,31 @@ class RecordStudentActionAction
         if (! empty($updateData)) {
             $student->update($updateData);
         }
+    }
+
+    private static function recordAcademicProgressionEvent(
+        Student $student,
+        StudentActionType $actionType,
+        string $previousStatus,
+        array $data,
+        int $userId,
+        ?int $fromSemesterId = null
+    ): void {
+        if ($actionType !== StudentActionType::STUDENT_MAJOR_ENROLLMENT) {
+            return;
+        }
+
+        AcademicProgressionEvent::create([
+            'student_id' => $student->id,
+            'event_type' => AcademicProgressionEventType::COURSE_STAGE_CHANGED,
+            'semester_id' => $fromSemesterId,
+            'effective_at' => now(),
+            'trigger_source' => ProgressionTriggerSource::MANUAL_ADMIN,
+            'created_by_user_id' => $userId,
+            'from_course_stage' => $previousStatus,
+            'to_course_stage' => (string) $student->status,
+            'notes' => $data['notes'] ?? $data['reason'],
+        ]);
     }
 
     /**

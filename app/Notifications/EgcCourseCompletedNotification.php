@@ -51,7 +51,7 @@ class EgcCourseCompletedNotification extends Notification implements ShouldQueue
                 'level_progressed' => $this->levelProgressed,
                 'current_level' => $this->currentLevel,
                 'icon' => $this->passed ? '✅' : '❌',
-                'action_url' => '/student/academic-records',
+                'action_url' => '',
                 'action_text' => 'View Academic Records',
             ],
             'is_important' => true,

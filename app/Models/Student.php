@@ -76,7 +76,6 @@ class Student extends StudentAuditableModel
         'intake_gc',
         'intake_course',
         'intake_major',
-        'gc_to_course_transition_semester',
         'admission_date',
         'expected_graduation_date',
         'emergency_contact_name',

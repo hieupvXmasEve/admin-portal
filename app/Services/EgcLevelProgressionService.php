@@ -466,7 +466,7 @@ class EgcLevelProgressionService
                     'body' => "Congratulations! You have completed all {$totalLevels} EGC levels. Please contact academic services for your next status transition.",
                     'category' => 'academic',
                     'is_important' => true,
-                    'action_url' => '/student/academic-records',
+                    'action_url' => '',
                     'action_text' => 'View Academic Records',
                     'total_levels' => $totalLevels,
                     'new_status' => $newStatus,

@@ -92,8 +92,8 @@ class InvoiceService
                     // Check if student transitioned from GC to course in this semester
                     $student = $enrollment->student;
                     if (
-                        $student->gc_to_course_transition_semester &&
-                        $student->gc_to_course_transition_semester === $cycle->semester->name
+                        $student->status === 'intake_course' &&
+                        $student->intake_major === $cycle->semester_id
                     ) {
                         // Check if tuition items already exist
                         $hasTuitionItems = $existingInvoice->items()

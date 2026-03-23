@@ -61,7 +61,7 @@ class CourseCompletedNotification extends Notification implements ShouldQueue
                 'credit_points' => $this->creditPoints,
                 'passed' => $this->passed,
                 'icon' => $this->passed ? '🎓' : '📚',
-                'action_url' => '/student/academic-records',
+                'action_url' => '',
                 'action_text' => 'View Academic Records',
             ],
             'is_important' => !$this->passed, // Only failed courses are marked important
