@@ -26,8 +26,7 @@ import {
 } from '@/types/finance';
 import type { PaginatedResponse } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { Eye, Plus, Search, XCircle } from 'lucide-vue-next';
-import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
+import { Eye, Plus, Search } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
 interface Props {
@@ -114,25 +113,6 @@ const statusOptions = [
     { value: 'active', label: 'Hoạt động' },
     { value: 'voided', label: 'Đã hủy' },
 ];
-
-const { showConfirmDialog } = useGlobalConfirmDialog();
-
-const handleVoidCharge = (charge: FinanceCharge) => {
-    showConfirmDialog(
-        {
-            title: 'Xác nhận hủy khoản phí',
-            message: `Bạn có chắc chắn muốn hủy khoản phí "${charge.description}" của sinh viên ${charge.student?.full_name}? Hành động này không thể hoàn tác.`,
-            confirmText: 'Hủy khoản phí',
-        },
-        {
-            onConfirm: () => {
-                router.post(route('finance.charges.void', charge.id), {
-                    void_reason: 'Manual void',
-                });
-            },
-        },
-    );
-};
 </script>
 
 <template>
@@ -273,10 +253,6 @@ const handleVoidCharge = (charge: FinanceCharge) => {
                                             <Eye class="h-4 w-4" />
                                         </Button>
                                     </Link>
-                                    <Button v-if="charge.status === 'active'" variant="outline" size="sm"
-                                        class="text-red-600 hover:text-red-700" @click="handleVoidCharge(charge)">
-                                        <XCircle class="h-4 w-4" />
-                                    </Button>
                                 </div>
                             </TableCell>
                         </TableRow>
