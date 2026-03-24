@@ -1,6 +1,6 @@
 # Codebase Summary
 
-Last updated: 2026-03-05  
+Last updated: 2026-03-23  
 Owner: Platform Team  
 Status: Current-state snapshot  
 Primary source: `repomix-output.xml` (generated 2026-03-02)
@@ -41,6 +41,9 @@ Current counts:
 - Vue 3 + Inertia frontend in `resources/js/*`
 - Academic admin now includes a Student Decisions registry with nullable linkage from `student_action_logs.decision_id` to `student_decisions.id`.
 - Notification V2 module (`app/Modules/Notification/`) implements domain event + outbox pattern with 33 PHP files covering actions, channels, models, queries, jobs, and ops monitoring.
+- Academic progression baseline now uses `academic_progression_events` as the semantic history for EGC level changes and EGC to major stage changes.
+- Current EGC to major billing milestone is `students.intake_major`; the old `gc_to_course_transition_semester` field is no longer used in the active invoice transition path.
+- Current new student-facing academic notifications are expected to flow through Notification V2 only.
 
 Verified entry points:
 

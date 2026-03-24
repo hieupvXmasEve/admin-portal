@@ -1,6 +1,6 @@
 # Project Overview and PDR
 
-Last updated: 2026-03-04  
+Last updated: 2026-03-23  
 Owner: Platform Team  
 Status: Current-state baseline (evidence-first)  
 Source of truth: code in `app/`, `routes/`, `resources/` + scout reports in `plans/reports/`
@@ -140,6 +140,22 @@ Acceptance criteria:
 - Admin users can monitor outbox/messages/deliveries through ops pages.
 - Failed outbox records and deliveries can be retried via ops routes.
 
+### FR-07 Academic Progression Logging and Student-Facing Notifications
+
+Code baseline:
+
+- EGC level changes now log through `academic_progression_events` with `ENGLISH_LEVEL_CHANGED` for both manual placement updates and auto progression after completed EGC courses.
+- EGC to major transitions now log through `academic_progression_events` with `COURSE_STAGE_CHANGED`.
+- `student_changes` is retained as generic field-diff audit but is not the canonical history for academic progression.
+- New student-facing academic notifications are expected to publish through Notification V2 only; current complete-course and course-stage transition flows publish domain events to `notification_event_outbox` and persist to `notification_messages` / `notification_deliveries`.
+- EGC to major financial transition uses `students.intake_major` as the semester milestone for tuition generation; `gc_to_course_transition_semester` is not part of the active billing path.
+
+Acceptance criteria:
+
+- Level/stage history can be reconstructed from `academic_progression_events` without depending on `student_changes`.
+- New academic notifications for students are persisted through Notification V2 tables, not legacy `notifications`.
+- Tuition transition logic reads `students.status` and `students.intake_major`.
+
 ## 4) Non-Functional Requirements
 
 - Security:
@@ -168,7 +184,7 @@ Acceptance criteria:
 - Scripts and compose paths are inconsistent across repo.
 - Deployment artifacts include credentials/secrets exposure risk.
 - Frontend still has literal URL pockets despite heavy route helper usage.
-- Notification history is split between legacy and V2 stores until a later migration phase.
+- Legacy notification surfaces still exist in repo, but new academic student-facing flows are expected to use Notification V2 only.
 
 ## 7) Success Metrics (Current-State Tracking)
 
@@ -179,6 +195,7 @@ Acceptance criteria:
 
 ## 8) Version History
 
+- 2026-03-23: Documented academic progression logging baseline (`academic_progression_events` for level/stage changes), V2-only student-facing academic notifications for new flows, and `intake_major` as the canonical EGC to major tuition milestone.
 - 2026-03-04: Expanded FR-06 with Notification V2 ops monitoring routes (outbox/messages/deliveries) and retry capabilities.
 - 2026-03-03: Added Notification V2 Phase 1 foundation requirements (outbox pipeline, campus isolation, canonical `recipient_user_id`, no legacy backfill) and command baseline `notifications:process-outbox`.
 - 2026-02-27: Documented student decision index sort/direction/page contract and sanitized sort allowlist defaults.

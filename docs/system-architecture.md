@@ -1,6 +1,6 @@
 # System Architecture
 
-Last updated: 2026-03-05  
+Last updated: 2026-03-23  
 Owner: Platform Team  
 Status: Current-state architecture map  
 Source of truth: route files, middleware, module providers, runtime entrypoints
@@ -43,13 +43,28 @@ Client (Web SPA / API)
     - Queries: `ListMessagesQuery`, `ListOutboxQuery`, `ListDeliveriesQuery`
     - Support: `EventIntentMapper`, `RecipientResolver`, `NotificationAuditLogger`, `NotificationMetrics`, `PolicyResolver`
 
-### 2.3 Shared Layer
+### 2.3 Academic Progression and Status Logging
+
+Current academic progression baseline:
+
+- `academic_progression_events` is the semantic audit/event store for academic placement and progression.
+- `ENGLISH_LEVEL_CHANGED` is the canonical event for EGC level changes, including auto progression after course completion.
+- `COURSE_STAGE_CHANGED` is the canonical event for transitions such as `intake_pre_uni_gc -> intake_course`.
+- `student_changes` may still exist for generic field-level audit, but it is not the source of truth for academic level/stage history.
+
+Current EGC to major baseline:
+
+- Student major transition writes `students.status = intake_course`.
+- Transition semester for tuition is stored in `students.intake_major`.
+- `students.gc_to_course_transition_semester` is no longer used by the active billing path.
+
+### 2.4 Shared Layer
 
 - `app/Services/*` (large shared business logic)
 - `app/Models/*`
 - shared HTTP middleware/controllers/requests/resources under `app/Http/*`
 
-### 2.4 Frontend
+### 2.5 Frontend
 
 - App entry: `resources/js/app.ts`
 - SSR entry: `resources/js/ssr.ts`
@@ -179,6 +194,7 @@ Phase 1 guardrails:
 - Strict campus isolation: recipient resolution rejects cross-campus targets (`RecipientResolver` checks campus for User/Student/Lecture targets).
 - Canonical recipient identity is `recipient_user_id` in `notification_messages`; non-user targets are resolved to user ids before message/delivery persist.
 - No legacy backfill in Phase 1: new tables are clean-slate and legacy `notifications` history is not migrated.
+- Current implementation baseline for new student-facing academic notifications is V2-only. Course completion, EGC completion/progression, EGC program completion, and course-stage transition notifications publish domain events and persist through the Notification V2 outbox pipeline.
 
 ## 7) Runtime Scheduled Commands
 

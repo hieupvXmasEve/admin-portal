@@ -265,6 +265,7 @@ Giai đoạn này mô tả các hoạt động của sinh viên từ lúc nhập
 - **Bảng liên quan**: `student_changes`
 - **Model**: `App\Models\StudentChange`
 - **Phụ thuộc**: `student_changes.student_id` -> `students.id`
+- **Current note**: bảng này là generic field-level audit. Không còn là nguồn sự thật cho lịch sử thay đổi level/stage học tập của student.
 
 ### 36. `ielts_certificates` (Chứng chỉ IELTS)
 
@@ -279,6 +280,9 @@ Giai đoạn này mô tả các hoạt động của sinh viên từ lúc nhập
 - **Bảng liên quan**: `academic_progression_events`
 - **Model**: `App\Models\AcademicProgressionEvent`
 - **Phụ thuộc**: `academic_progression_events.student_id` -> `students.id`; `academic_progression_events.semester_id` -> `semesters.id`; `academic_progression_events.ielts_certificate_id` -> `ielts_certificates.id`
+- **Current note**: đây là bảng canonical cho log nghiệp vụ học tập:
+  - `ENGLISH_LEVEL_CHANGED` cho thay đổi level EGC, gồm cả manual và auto progression
+  - `COURSE_STAGE_CHANGED` cho chuyển stage học tập như `intake_pre_uni_gc -> intake_course`
 
 ### 38. `student_actions` & `student_action_attachments` (Hành động hành chính)
 
@@ -466,6 +470,7 @@ Hệ thống gửi thông báo và email.
 
 - **Lý do**: Lưu trữ các thông báo gửi đến người dùng.
 - **Bảng liên quan**: `notifications`
+- **Current note**: bảng legacy vẫn tồn tại trong schema nhưng flow academic student-facing mới phải đi qua Notification V2 (`notification_event_outbox`, `notification_messages`, `notification_deliveries`).
 - **Model**: `App\Models\Notification`
 
 ### 55. `email_configurations`, `email_templates`, `email_logs` (Cấu hình Email)
