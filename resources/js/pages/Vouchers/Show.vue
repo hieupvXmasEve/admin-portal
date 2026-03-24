@@ -2,13 +2,12 @@
 import InputError from '@/components/InputError.vue';
 import StudentCombobox from '@/components/StudentCombobox.vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { AlertCircle, Calendar, DollarSign, Hash, Loader2, Receipt, TicketPercent, Trash2, UserPlus, Users } from 'lucide-vue-next';
+import { AlertCircle, Calendar, DollarSign, Hash, Loader2, Receipt, TicketPercent, UserPlus, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { route } from 'ziggy-js';
 
@@ -64,14 +63,12 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const deleteForm = useForm({});
 const applyForm = useForm({
     student_id: null as number | null,
     voucher_id: props.voucher.id,
     code: props.voucher.code,
 });
 
-const isDeleting = ref(false);
 const selectedStudent = ref<Student | null>(null);
 
 const formatDate = (date: string) => {
@@ -160,15 +157,6 @@ const handleStudentSelect = (student: Student | null) => {
     applyForm.student_id = student?.id ?? null;
 };
 
-const deleteVoucher = () => {
-    isDeleting.value = true;
-    deleteForm.delete(route('vouchers.destroy', props.voucher.id), {
-        onFinish: () => {
-            isDeleting.value = false;
-        },
-    });
-};
-
 const applyVoucher = () => {
     applyForm.post(route('vouchers.redeem'), {
         preserveScroll: true,
@@ -196,28 +184,6 @@ const applyVoucher = () => {
             <Button variant="outline" as-child>
                 <Link :href="route('vouchers.edit', voucher.id)">Edit Voucher</Link>
             </Button>
-            <AlertDialog>
-                <AlertDialogTrigger as-child>
-                    <Button variant="destructive" :disabled="isDeleting">
-                        <Loader2 v-if="isDeleting" class="mr-2 h-4 w-4 animate-spin" />
-                        <Trash2 v-else class="mr-2 h-4 w-4" />
-                        Delete
-                    </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will permanently delete the voucher "{{ voucher.code }}". This action cannot be undone.
-                            <span v-if="applications.length > 0" class="text-destructive mt-2 block font-semibold"> Warning: This voucher already has {{ applications.length }} usage record(s). </span>
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction @click="deleteVoucher" class="bg-destructive text-destructive-foreground hover:bg-destructive/90"> Delete Voucher </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     </div>
 

@@ -45,6 +45,7 @@ Current counts:
 - Current EGC to major billing milestone is `students.intake_major`; the old `gc_to_course_transition_semester` field is no longer used in the active invoice transition path.
 - Current new student-facing academic notifications are expected to flow through Notification V2 only.
 - Voucher admin manual apply now writes canonical `voucher_applications`; voucher detail includes an inline student apply card and reads canonical usage history instead of relying on legacy `voucher_redemptions`.
+- Voucher admin no longer exposes voucher import or voucher delete entrypoints; current voucher surface is create, edit, show, and apply.
 
 Verified entry points:
 

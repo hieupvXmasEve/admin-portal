@@ -3,11 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\RedeemVoucherRequest;
-use App\Http\Requests\VoucherImportRequest;
-use App\Models\BillingCycle;
 use App\Models\Semester;
 use App\Models\VoucherDefinition;
-use App\Services\VoucherImportService;
 use App\Services\VoucherService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,8 +15,7 @@ use Inertia\Response;
 class VoucherController extends Controller
 {
     public function __construct(
-        protected VoucherService $voucherService,
-        protected VoucherImportService $importService
+        protected VoucherService $voucherService
     ) {}
 
     /**
@@ -150,22 +146,6 @@ class VoucherController extends Controller
     }
 
     /**
-     * Remove the specified voucher
-     */
-    public function destroy(VoucherDefinition $voucher): RedirectResponse
-    {
-        try {
-            $this->voucherService->deleteVoucher($voucher->id);
-
-            return redirect()->route('vouchers.index')
-                ->with('success', 'Voucher deleted successfully.');
-        } catch (\Exception $e) {
-            return redirect()->back()
-                ->with('error', $e->getMessage());
-        }
-    }
-
-    /**
      * Redeem a voucher for a student
      */
     public function redeem(RedeemVoucherRequest $request): RedirectResponse
@@ -187,67 +167,4 @@ class VoucherController extends Controller
         }
     }
 
-    /**
-     * Show the voucher import form
-     */
-    public function showImport(): Response
-    {
-        $billingCycles = BillingCycle::with('semester')
-            ->orderBy('start_date', 'desc')
-            ->get();
-
-        return Inertia::render('Vouchers/Import', [
-            'billingCycles' => $billingCycles,
-        ]);
-    }
-
-    /**
-     * Upload and preview voucher import
-     */
-    public function uploadImport(VoucherImportRequest $request): Response
-    {
-        try {
-            $file = $request->file('file');
-            $billingCycleId = $request->input('billing_cycle_id');
-
-            $preview = $this->importService->previewImport($file, $billingCycleId);
-
-            $billingCycles = BillingCycle::with('semester')
-                ->orderBy('start_date', 'desc')
-                ->get();
-
-            return Inertia::render('Vouchers/Import', [
-                'billingCycles' => $billingCycles,
-                'preview' => $preview,
-            ]);
-        } catch (\Exception $e) {
-            return redirect()->back()
-                ->withErrors(['error' => $e->getMessage()]);
-        }
-    }
-
-    /**
-     * Process voucher import
-     */
-    public function processImport(VoucherImportRequest $request): Response
-    {
-        try {
-            $file = $request->file('file');
-            $billingCycleId = $request->input('billing_cycle_id');
-
-            $result = $this->importService->processImport($file, $billingCycleId);
-
-            $billingCycles = BillingCycle::with('semester')
-                ->orderBy('start_date', 'desc')
-                ->get();
-
-            return Inertia::render('Vouchers/Import', [
-                'billingCycles' => $billingCycles,
-                'result' => $result,
-            ]);
-        } catch (\Exception $e) {
-            return redirect()->back()
-                ->withErrors(['error' => $e->getMessage()]);
-        }
-    }
 }

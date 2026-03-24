@@ -11,7 +11,7 @@ import { PaginatedResponse } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { debounce } from 'lodash-es';
-import { Edit, Eye, Upload } from 'lucide-vue-next';
+import { Edit, Eye } from 'lucide-vue-next';
 import { reactive } from 'vue';
 import { route } from 'ziggy-js';
 
@@ -166,15 +166,9 @@ const handlePageSizeChange = (pageSize: number) => {
     <div class="flex items-center justify-between">
         <div>
             <h2 class="text-foreground text-xl leading-tight font-semibold">Vouchers</h2>
-            <p class="text-muted-foreground mt-1 text-sm">Manage voucher definitions and redemptions</p>
+            <p class="text-muted-foreground mt-1 text-sm">Manage voucher definitions and usage</p>
         </div>
         <div class="flex gap-2">
-            <Button variant="outline" as-child>
-                <Link :href="route('vouchers.import')">
-                    <Upload class="mr-2 h-4 w-4" />
-                    Import Vouchers
-                </Link>
-            </Button>
             <Button as-child>
                 <Link :href="route('vouchers.create')">Create Voucher</Link>
             </Button>

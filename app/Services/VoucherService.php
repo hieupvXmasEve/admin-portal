@@ -44,22 +44,6 @@ class VoucherService
     }
 
     /**
-     * Delete a voucher definition
-     */
-    public function deleteVoucher(int $id): bool
-    {
-        $voucher = VoucherDefinition::findOrFail($id);
-
-        if ($voucher->applications()->exists() || $voucher->redemptions()->exists()) {
-            throw ValidationException::withMessages([
-                'voucher' => ['Cannot delete voucher that has been used by students.'],
-            ]);
-        }
-
-        return $voucher->delete();
-    }
-
-    /**
      * Validate voucher data
      */
     protected function validateVoucherData(array $data, ?int $excludeId = null): void
