@@ -3,11 +3,11 @@
 namespace App\Modules\Academic\Queries;
 
 use App\Models\FinanceCharge;
+use App\Models\Payment;
 use App\Models\Student;
 use App\Models\StudentScholarshipAward;
 use App\Models\TuitionPlan;
 use App\Models\TuitionPlanTerm;
-use Illuminate\Support\Facades\DB;
 
 class GetStudentFeeSummaryQuery
 {
@@ -31,7 +31,18 @@ class GetStudentFeeSummaryQuery
         // 3. Get All Active Charges (exclude voided)
         $charges = FinanceCharge::where('student_id', $student->id)
             ->where('status', FinanceCharge::STATUS_ACTIVE)
-            ->with(['allocations'])
+            ->with(['allocations.payment', 'semester'])
+            ->get();
+
+        // 4. Get completed payments with allocation trail
+        $payments = Payment::query()
+            ->where('student_id', $student->id)
+            ->where('status', Payment::STATUS_COMPLETED)
+            ->with([
+                'allocations.charge.semester',
+                'allocations.charge.invoiceLines.invoice',
+            ])
+            ->orderByDesc('paid_at')
             ->get();
 
         // --- SECTION A: BILLING BY SEMESTER (ACTUAL) ---
@@ -71,6 +82,57 @@ class GetStudentFeeSummaryQuery
                     'remaining' => $remaining,
                 ],
                 'invoices' => $semInvoices->map(function ($inv) {
+                    $invoicePayments = $inv->invoiceLines
+                        ->flatMap(function ($line) use ($inv) {
+                            if (! $line->charge) {
+                                return collect();
+                            }
+
+                            return $line->charge->allocations
+                                ->filter(fn ($allocation) => $allocation->payment !== null)
+                                ->map(function ($allocation) use ($line, $inv) {
+                                    return [
+                                        'payment_id' => $allocation->payment_id,
+                                        'paid_at' => $allocation->payment->paid_at?->format('Y-m-d'),
+                                        'method' => $allocation->payment->method,
+                                        'source' => $allocation->payment->source,
+                                        'payment_amount' => (float) $allocation->payment->amount,
+                                        'allocated_amount' => (float) $allocation->allocated_amount,
+                                        'ref' => $allocation->payment->external_ref,
+                                        'charge_id' => $line->charge->id,
+                                        'charge_description' => $line->charge->description ?? $line->description_snapshot,
+                                        'invoice_id' => $inv->id,
+                                    ];
+                                });
+                        })
+                        ->groupBy('payment_id')
+                        ->map(function ($paymentAllocations) {
+                            $firstAllocation = $paymentAllocations->first();
+
+                            return [
+                                'id' => $firstAllocation['payment_id'],
+                                'paid_at' => $firstAllocation['paid_at'],
+                                'method' => $firstAllocation['method'],
+                                'source' => $firstAllocation['source'],
+                                'amount' => $firstAllocation['payment_amount'],
+                                'allocated_amount' => (float) $paymentAllocations->sum('allocated_amount'),
+                                'ref' => $firstAllocation['ref'],
+                                'charges' => $paymentAllocations
+                                    ->groupBy('charge_id')
+                                    ->map(function ($chargeAllocations) {
+                                        $firstCharge = $chargeAllocations->first();
+
+                                        return [
+                                            'charge_id' => $firstCharge['charge_id'],
+                                            'charge_description' => $firstCharge['charge_description'],
+                                            'allocated_amount' => (float) $chargeAllocations->sum('allocated_amount'),
+                                        ];
+                                    })
+                                    ->values(),
+                            ];
+                        })
+                        ->values();
+
                     return [
                         'id' => $inv->id,
                         'invoice_number' => $inv->invoice_number,
@@ -91,13 +153,7 @@ class GetStudentFeeSummaryQuery
                                 'amount' => $charge->amount,
                             ];
                         }),
-                        'payments' => $inv->invoiceLines->flatMap(fn ($l) => $l->charge->allocations)->map(fn ($a) => $a->payment)->unique('id')->map(fn ($p) => [
-                            'id' => $p->id,
-                            'paid_at' => $p->paid_at?->format('Y-m-d'),
-                            'method' => $p->method,
-                            'amount' => $p->amount,
-                            'ref' => $p->external_ref,
-                        ])->values(),
+                        'payments' => $invoicePayments,
                     ];
                 })->values(),
             ];
@@ -236,14 +292,107 @@ class GetStudentFeeSummaryQuery
         // Net due = charges - discounts
         $netDue = $totalCharged + $totalDiscount;
         $outstanding = max(0, $netDue - $totalAllocated);
-
-        // Real payments (exclude credit memo)
-        $payments = \App\Models\Payment::where('student_id', $student->id)
-            ->where('status', \App\Models\Payment::STATUS_COMPLETED)
-            ->get();
-
         $totalPayments = (float) $payments->sum('amount');
         $totalUnapplied = (float) $payments->sum(fn ($p) => $p->unapplied_amount);
+        $paymentHistory = $payments->map(function ($payment) {
+            return [
+                'id' => $payment->id,
+                'paid_at' => $payment->paid_at?->format('Y-m-d'),
+                'method' => $payment->method,
+                'source' => $payment->source,
+                'amount' => (float) $payment->amount,
+                'allocated_amount' => (float) $payment->allocated_amount,
+                'unapplied_amount' => (float) $payment->unapplied_amount,
+                'ref' => $payment->external_ref,
+                'allocations' => $payment->allocations->map(function ($allocation) {
+                    $charge = $allocation->charge;
+                    $invoice = $charge?->invoiceLines
+                        ->first(fn ($line) => $line->invoice !== null)?->invoice;
+
+                    return [
+                        'allocation_id' => $allocation->id,
+                        'allocated_amount' => (float) $allocation->allocated_amount,
+                        'semester_name' => $charge?->semester?->name,
+                        'invoice_id' => $invoice?->id,
+                        'invoice_number' => $invoice?->invoice_number,
+                        'charge_id' => $charge?->id,
+                        'charge_description' => $charge?->description ?? $charge?->charge_type,
+                    ];
+                })->values(),
+            ];
+        })->values();
+        $statementEvents = $payments
+            ->flatMap(function ($payment) {
+                $paymentEvent = collect([
+                    [
+                        'event_key' => "payment-{$payment->id}",
+                        'event_at' => $payment->paid_at,
+                        'sort_order' => 0,
+                        'kind' => 'payment',
+                        'label' => 'Payment received',
+                        'reference' => "Payment #{$payment->id}",
+                        'details' => collect([
+                            ucfirst(str_replace('_', ' ', $payment->method)),
+                            $payment->source ? 'Source: '.$payment->source : null,
+                            $payment->external_ref ? 'Ref: '.$payment->external_ref : null,
+                        ])->filter()->implode(' • '),
+                        'money_in' => (float) $payment->amount,
+                        'money_out' => 0.0,
+                    ],
+                ]);
+
+                $allocationEvents = $payment->allocations->map(function ($allocation) {
+                    $charge = $allocation->charge;
+                    $invoice = $charge?->invoiceLines
+                        ->first(fn ($line) => $line->invoice !== null)?->invoice;
+
+                    return [
+                        'event_key' => "allocation-{$allocation->id}",
+                        'event_at' => $allocation->allocated_at ?? $allocation->created_at,
+                        'sort_order' => 1,
+                        'kind' => 'allocation',
+                        'label' => 'Allocated to invoice',
+                        'reference' => $invoice?->invoice_number ?? 'Unlinked allocation',
+                        'details' => collect([
+                            $charge?->semester?->name,
+                            $charge?->description ?? $charge?->charge_type,
+                        ])->filter()->implode(' • '),
+                        'money_in' => 0.0,
+                        'money_out' => (float) $allocation->allocated_amount,
+                    ];
+                });
+
+                return $paymentEvent->concat($allocationEvents);
+            })
+            ->sort(function (array $left, array $right) {
+                $leftAt = $left['event_at']?->getTimestamp() ?? 0;
+                $rightAt = $right['event_at']?->getTimestamp() ?? 0;
+
+                if ($leftAt === $rightAt) {
+                    return $left['sort_order'] <=> $right['sort_order'];
+                }
+
+                return $leftAt <=> $rightAt;
+            })
+            ->values();
+
+        $runningUnappliedBalance = 0.0;
+        $statementEvents = $statementEvents->map(function (array $event) use (&$runningUnappliedBalance) {
+            $runningUnappliedBalance += $event['money_in'];
+            $runningUnappliedBalance -= $event['money_out'];
+
+            return [
+                'event_key' => $event['event_key'],
+                'event_at' => $event['event_at']?->format('Y-m-d H:i'),
+                'kind' => $event['kind'],
+                'label' => $event['label'],
+                'reference' => $event['reference'],
+                'details' => $event['details'],
+                'money_in' => $event['money_in'],
+                'money_out' => $event['money_out'],
+                'unapplied_balance' => $runningUnappliedBalance,
+            ];
+        })->values();
 
         return [
             'student_info' => [
@@ -255,13 +404,18 @@ class GetStudentFeeSummaryQuery
             'summary' => [
                 'total_charged' => $totalCharged,
                 'total_discount' => $totalDiscount,
+                'active_due' => $netDue,
                 'total_paid' => $totalPayments,
                 'total_allocated' => $totalAllocated,
                 'outstanding' => $outstanding,
                 'unapplied_balance' => $totalUnapplied,
                 'remaining' => max(0, $netDue - $totalPayments),
+                'net_amount_to_collect' => max(0, $outstanding - $totalUnapplied),
+                'payment_count' => $payments->count(),
                 'progress' => $netDue > 0 ? min(100, max(0, ($totalAllocated / $netDue) * 100)) : 0,
             ],
+            'payments' => $paymentHistory,
+            'statement_events' => $statementEvents,
             'billing_by_semester' => $billingBySemester,
             'tuition_plan_checklist' => $checklist,
         ];
