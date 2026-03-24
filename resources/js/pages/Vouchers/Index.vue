@@ -11,9 +11,9 @@ import { PaginatedResponse } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { debounce } from 'lodash-es';
+import { Edit, Eye, Upload } from 'lucide-vue-next';
 import { reactive } from 'vue';
 import { route } from 'ziggy-js';
-import { Edit, Eye, Upload } from 'lucide-vue-next';
 
 interface Voucher {
     id: number;
@@ -25,7 +25,7 @@ interface Voucher {
     valid_from: string;
     valid_until: string;
     is_active: boolean;
-    redemptions_count: number;
+    usage_count: number;
 }
 
 interface Props {
@@ -133,8 +133,8 @@ const columns: ColumnDef<Voucher>[] = [
         header: 'Valid Period',
     },
     {
-        accessorKey: 'redemptions_count',
-        header: 'Redemptions',
+        accessorKey: 'usage_count',
+        header: 'Usage',
     },
     {
         accessorKey: 'status',
@@ -244,8 +244,8 @@ const handlePageSizeChange = (pageSize: number) => {
                     </div>
                 </template>
 
-                <template #cell-redemptions_count="{ row }">
-                    <span class="text-muted-foreground">{{ row.original.redemptions_count }}</span>
+                <template #cell-usage_count="{ row }">
+                    <span class="text-muted-foreground">{{ row.original.usage_count }}</span>
                 </template>
 
                 <template #cell-status="{ row }">
@@ -258,7 +258,7 @@ const handlePageSizeChange = (pageSize: number) => {
                     <div class="flex gap-2">
                         <Button variant="ghost" size="sm" as-child>
                             <Link :href="route('vouchers.show', row.original.id)">
-                                <Eye class="size-4"/>
+                                <Eye class="size-4" />
                             </Link>
                         </Button>
                         <Button variant="ghost" size="sm" as-child>
@@ -272,7 +272,7 @@ const handlePageSizeChange = (pageSize: number) => {
 
             <div v-if="vouchers.data.length === 0" class="text-muted-foreground py-8 text-center">
                 <p>No vouchers found.</p>
-                <Button  class="mt-4" as-child>
+                <Button class="mt-4" as-child>
                     <Link :href="route('vouchers.create')">Create Your First Voucher</Link>
                 </Button>
             </div>

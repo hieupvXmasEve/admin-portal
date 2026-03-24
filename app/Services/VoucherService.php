@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\Semester;
+use App\Models\Student;
+use App\Models\VoucherApplication;
 use App\Models\VoucherDefinition;
 use App\Models\VoucherRedemption;
-use App\Models\Student;
+use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +15,10 @@ use Illuminate\Validation\ValidationException;
 
 class VoucherService
 {
+    public function __construct(
+        private readonly VoucherDiscountAmountResolver $voucherDiscountAmountResolver
+    ) {}
+
     /**
      * Create a new voucher definition
      */
@@ -43,10 +50,9 @@ class VoucherService
     {
         $voucher = VoucherDefinition::findOrFail($id);
 
-        // Check if voucher has been redeemed
-        if ($voucher->redemptions()->exists()) {
+        if ($voucher->applications()->exists() || $voucher->redemptions()->exists()) {
             throw ValidationException::withMessages([
-                'voucher' => ['Cannot delete voucher that has been redeemed by students.']
+                'voucher' => ['Cannot delete voucher that has been used by students.'],
             ]);
         }
 
@@ -110,67 +116,82 @@ class VoucherService
     /**
      * Validate if a voucher can be redeemed by a student
      */
-    public function validateVoucher(string $code, int $studentId, ?int $invoiceId = null): bool
+    public function validateVoucher(VoucherDefinition $voucher, Student $student, Semester $semester): void
     {
-        $voucher = VoucherDefinition::where('code', $code)->first();
-
-        if (!$voucher) {
+        if (! $voucher->is_active) {
             throw ValidationException::withMessages([
-                'code' => ['Voucher code not found.']
+                'voucher_id' => ['This voucher is not active.'],
             ]);
         }
 
-        if (!$voucher->is_active) {
+        if (! $voucher->isCurrentlyValid()) {
             throw ValidationException::withMessages([
-                'code' => ['This voucher is not active.']
+                'voucher_id' => ['This voucher is not valid at this time.'],
             ]);
         }
 
-        if (!$voucher->isCurrentlyValid()) {
+        $existingApplication = VoucherApplication::query()
+            ->where('voucher_definition_id', $voucher->id)
+            ->where('student_id', $student->id)
+            ->where('semester_id', $semester->id)
+            ->exists();
+
+        if ($existingApplication) {
             throw ValidationException::withMessages([
-                'code' => ['This voucher is not valid at this time.']
+                'student_id' => ['This voucher has already been applied to the selected student for the active semester.'],
             ]);
         }
 
-        // Check if student exists
-        if (!Student::find($studentId)) {
-            throw ValidationException::withMessages([
-                'student_id' => ['Student not found.']
-            ]);
-        }
+        if ($voucher->max_uses_per_student !== null) {
+            $usageCount = VoucherApplication::query()
+                ->where('voucher_definition_id', $voucher->id)
+                ->where('student_id', $student->id)
+                ->count();
 
-        // Check if already redeemed by this student for this invoice
-        if ($invoiceId) {
-            $existingRedemption = VoucherRedemption::where('voucher_id', $voucher->id)
-                ->where('student_id', $studentId)
-                ->where('invoice_id', $invoiceId)
-                ->exists();
-
-            if ($existingRedemption) {
+            if ($usageCount >= $voucher->max_uses_per_student) {
                 throw ValidationException::withMessages([
-                    'code' => ['This voucher has already been redeemed for this invoice.']
+                    'student_id' => ['This student has reached the maximum number of uses for this voucher.'],
                 ]);
             }
         }
-
-        return true;
     }
 
     /**
      * Redeem a voucher for a student
      */
-    public function redeemVoucher(int $studentId, string $code, ?int $invoiceId = null): VoucherRedemption
+    public function redeemVoucher(int $studentId, int $voucherId, ?int $appliedByUserId = null): VoucherApplication
     {
-        $this->validateVoucher($code, $studentId, $invoiceId);
+        $voucher = VoucherDefinition::findOrFail($voucherId);
+        $student = Student::findOrFail($studentId);
+        $semester = Semester::query()->where('is_active', true)->first();
 
-        $voucher = VoucherDefinition::where('code', $code)->firstOrFail();
+        if (! $semester) {
+            throw ValidationException::withMessages([
+                'voucher_id' => ['No active semester is configured.'],
+            ]);
+        }
 
-        return DB::transaction(function () use ($voucher, $studentId, $invoiceId) {
-            return VoucherRedemption::create([
-                'voucher_id' => $voucher->id,
-                'student_id' => $studentId,
-                'invoice_id' => $invoiceId,
-                'redeemed_at' => now(),
+        $this->validateVoucher($voucher, $student, $semester);
+
+        $resolvedAmounts = $this->voucherDiscountAmountResolver->resolveAmounts($voucher, $student, $semester->id);
+        $discountAmount = (float) ($resolvedAmounts['discount_amount'] ?? 0);
+
+        if ($voucher->voucher_type === 'discount' && $discountAmount <= 0) {
+            throw ValidationException::withMessages([
+                'student_id' => ['Unable to calculate a discount amount for the selected student in the active semester.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($voucher, $student, $semester, $appliedByUserId, $resolvedAmounts, $discountAmount) {
+            return VoucherApplication::create([
+                'voucher_definition_id' => $voucher->id,
+                'student_id' => $student->id,
+                'semester_id' => $semester->id,
+                'status' => 'applied',
+                'applied_at' => now(),
+                'applied_by_user_id' => $appliedByUserId,
+                'base_amount' => $resolvedAmounts['base_amount'],
+                'discount_amount' => $voucher->voucher_type === 'discount' ? $discountAmount : 0,
             ]);
         });
     }
@@ -225,17 +246,18 @@ class VoucherService
      */
     public function getRedemptionCount(int $voucherId): int
     {
-        return VoucherRedemption::where('voucher_id', $voucherId)->count();
+        return VoucherApplication::where('voucher_definition_id', $voucherId)->count();
     }
 
     /**
-     * Get redemptions for a voucher
+     * Get canonical applications for a voucher
      */
-    public function getVoucherRedemptions(int $voucherId): Collection
+    public function getVoucherApplications(int $voucherId): Collection
     {
-        return VoucherRedemption::where('voucher_id', $voucherId)
-            ->with(['student', 'invoice'])
-            ->orderBy('redeemed_at', 'desc')
+        return VoucherApplication::query()
+            ->where('voucher_definition_id', $voucherId)
+            ->with(['student', 'semester', 'invoice'])
+            ->orderByDesc('applied_at')
             ->get();
     }
 }

@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Support\BillingScopeHelper;
+use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -51,13 +52,14 @@ class GenerateBatchChargesAction
         }
 
         // Eager load necessary relations for logic check
-        $query->with(['scholarshipAward.scholarshipDefinition', 'voucherApplications', 'courseRegistrations' => function ($q) use ($semesterId) {
+        $query->with(['scholarshipAward.scholarshipDefinition', 'voucherApplications.voucherDefinition', 'courseRegistrations' => function ($q) use ($semesterId) {
             $q->where('semester_id', $semesterId);
         }]);
 
         $students = $query->get();
 
         $deferChargeResolver = app(DeferChargeResolver::class);
+        $voucherDiscountAmountResolver = app(VoucherDiscountAmountResolver::class);
 
         $stats = [
             'total_students' => $students->count(),
@@ -260,6 +262,11 @@ class GenerateBatchChargesAction
                             if (! $voucherApp->invoice_id) {
                                 $vAmount = (float) $voucherApp->discount_amount;
 
+                                if ($vAmount <= 0 && $voucherApp->voucherDefinition) {
+                                    $resolvedAmounts = $voucherDiscountAmountResolver->resolveAmounts($voucherApp->voucherDefinition, $student, $semesterId);
+                                    $vAmount = (float) $resolvedAmounts['discount_amount'];
+                                }
+
                                 if ($vAmount > 0) {
                                     $charge = self::createChargeIfNotExists(
                                         $student, $semesterId,
@@ -269,7 +276,7 @@ class GenerateBatchChargesAction
                                         $voucherApp->id
                                     );
                                     if ($charge) {
-                                        $charge->update(['description' => "Voucher Applied ({$voucherApp->code})"]);
+                                        $charge->update(['description' => "Voucher Applied ({$voucherApp->voucherDefinition?->code})"]);
                                         $charge->refresh();
                                         $chargesToLink[] = $charge;
 
@@ -277,6 +284,7 @@ class GenerateBatchChargesAction
                                         $voucherApp->update([
                                             'finance_charge_id' => $charge->id,
                                             'invoice_id' => $invoice->id,
+                                            'discount_amount' => $vAmount,
                                         ]);
                                     }
                                 } else {

@@ -67,10 +67,10 @@ class VoucherDefinition extends Model
     }
 
     /**
-     * Get redemption count
+     * Get canonical usage count
      */
     public function getRedemptionCountAttribute(): int
     {
-        return $this->redemptions()->count();
+        return $this->applications()->count();
     }
 }

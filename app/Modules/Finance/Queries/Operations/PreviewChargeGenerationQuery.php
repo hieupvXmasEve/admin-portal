@@ -8,6 +8,7 @@ use App\Models\FinanceCharge;
 use App\Models\Student;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Services\DeferChargeResolver;
+use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 
 class PreviewChargeGenerationQuery
 {
@@ -45,13 +46,14 @@ class PreviewChargeGenerationQuery
         }
 
         // Eager load necessary relations
-        $query->with(['scholarshipAward.scholarshipDefinition', 'voucherApplications', 'courseRegistrations' => function ($q) use ($semesterId) {
+        $query->with(['scholarshipAward.scholarshipDefinition', 'voucherApplications.voucherDefinition', 'courseRegistrations' => function ($q) use ($semesterId) {
             $q->where('semester_id', $semesterId);
         }]);
 
         $students = $query->limit(500)->get();
 
         $deferChargeResolver = app(DeferChargeResolver::class);
+        $voucherDiscountAmountResolver = app(VoucherDiscountAmountResolver::class);
 
         $previewItems = [];
         $newChargesCount = 0;
@@ -195,6 +197,11 @@ class PreviewChargeGenerationQuery
                 foreach ($student->voucherApplications as $voucherApp) {
                     if (! $voucherApp->invoice_id) {
                         $vAmount = (float) $voucherApp->discount_amount;
+
+                        if ($vAmount <= 0 && $voucherApp->voucherDefinition) {
+                            $resolvedAmounts = $voucherDiscountAmountResolver->resolveAmounts($voucherApp->voucherDefinition, $student, $semesterId);
+                            $vAmount = (float) $resolvedAmounts['discount_amount'];
+                        }
 
                         if ($vAmount > 0) {
                             $breakdown[] = [

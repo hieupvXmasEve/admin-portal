@@ -1,6 +1,6 @@
 # Codebase Summary
 
-Last updated: 2026-03-23  
+Last updated: 2026-03-24
 Owner: Platform Team  
 Status: Current-state snapshot  
 Primary source: `repomix-output.xml` (generated 2026-03-02)
@@ -44,6 +44,7 @@ Current counts:
 - Academic progression baseline now uses `academic_progression_events` as the semantic history for EGC level changes and EGC to major stage changes.
 - Current EGC to major billing milestone is `students.intake_major`; the old `gc_to_course_transition_semester` field is no longer used in the active invoice transition path.
 - Current new student-facing academic notifications are expected to flow through Notification V2 only.
+- Voucher admin manual apply now writes canonical `voucher_applications`; voucher detail includes an inline student apply card and reads canonical usage history instead of relying on legacy `voucher_redemptions`.
 
 Verified entry points:
 

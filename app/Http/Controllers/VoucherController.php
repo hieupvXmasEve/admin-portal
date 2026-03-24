@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\RedeemVoucherRequest;
 use App\Http\Requests\VoucherImportRequest;
 use App\Models\BillingCycle;
+use App\Models\Semester;
 use App\Models\VoucherDefinition;
 use App\Services\VoucherImportService;
 use App\Services\VoucherService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -53,7 +56,7 @@ class VoucherController extends Controller
             }
         }
 
-        $vouchers = $query->withCount('redemptions')
+        $vouchers = $query->withCount('applications as usage_count')
             ->orderBy('created_at', 'desc')
             ->paginate(20)
             ->withQueryString();
@@ -101,11 +104,15 @@ class VoucherController extends Controller
      */
     public function show(Request $request, VoucherDefinition $voucher): Response
     {
-        $voucher->load(['redemptions.student', 'redemptions.invoice']);
+        $currentSemester = Semester::query()
+            ->where('is_active', true)
+            ->first(['id', 'code', 'name']);
 
         return Inertia::render('Vouchers/Show', [
             'voucher' => $voucher,
-            'redemptions' => $this->voucherService->getVoucherRedemptions($voucher->id),
+            'applications' => $this->voucherService->getVoucherApplications($voucher->id),
+            'currentSemester' => $currentSemester,
+            'canApplyVoucher' => (bool) $request->user()?->can('edit_voucher'),
         ]);
     }
 
@@ -161,23 +168,19 @@ class VoucherController extends Controller
     /**
      * Redeem a voucher for a student
      */
-    public function redeem(Request $request): RedirectResponse
+    public function redeem(RedeemVoucherRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'student_id' => 'required|exists:students,id',
-            'code' => 'required|string|exists:voucher_definitions,code',
-            'invoice_id' => 'nullable|exists:student_invoices,id',
-        ]);
-
         try {
             $this->voucherService->redeemVoucher(
-                $validated['student_id'],
-                $validated['code'],
-                $validated['invoice_id'] ?? null
+                (int) $request->integer('student_id'),
+                (int) $request->integer('voucher_id'),
+                $request->user()?->id,
             );
 
             return redirect()->back()
-                ->with('success', 'Voucher redeemed successfully.');
+                ->with('success', 'Voucher applied successfully.');
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return redirect()->back()
                 ->with('error', $e->getMessage());

@@ -52,6 +52,14 @@ class VoucherApplication extends Model
     }
 
     /**
+     * Get the invoice associated with this application, if already consumed.
+     */
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(StudentInvoice::class, 'invoice_id');
+    }
+
+    /**
      * Get the user who applied the voucher
      */
     public function appliedBy(): BelongsTo

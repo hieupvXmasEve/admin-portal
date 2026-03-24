@@ -44,6 +44,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Voucher redemption
         Route::post('redeem', [VoucherController::class, 'redeem'])
+            ->middleware('can:edit_voucher')
             ->name('redeem');
 
         Route::get('{voucher}', [VoucherController::class, 'show'])
