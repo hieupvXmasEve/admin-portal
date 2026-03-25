@@ -17,6 +17,18 @@ use Inertia\Response;
 
 class FinanceChargeController extends Controller
 {
+    private const MANUAL_CREATE_CHARGE_TYPES = [
+        FinanceCharge::TYPE_TUITION_TERM,
+        FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        FinanceCharge::TYPE_RETAKE_FEE,
+        FinanceCharge::TYPE_COURSE_FEE,
+        FinanceCharge::TYPE_MANUAL_FEE,
+        FinanceCharge::TYPE_ADMISSION_FEE,
+        FinanceCharge::TYPE_DEFER_CREDIT,
+        FinanceCharge::TYPE_EGC_EXEMPT_CREDIT,
+        FinanceCharge::TYPE_ADJUSTMENT,
+    ];
+
     public function __construct(
         private CreateFinanceChargeAction $createChargeAction,
         private VoidFinanceChargeAction $voidChargeAction,
@@ -90,7 +102,7 @@ class FinanceChargeController extends Controller
 
         $semesters = Semester::orderBy('start_date', 'desc')->get();
 
-        $chargeTypes = collect(FinanceCharge::CHARGE_TYPES)->map(fn ($type) => [
+        $chargeTypes = collect(self::MANUAL_CREATE_CHARGE_TYPES)->map(fn ($type) => [
             'value' => $type,
             'label' => ucwords(str_replace('_', ' ', $type)),
         ]);
@@ -125,7 +137,7 @@ class FinanceChargeController extends Controller
             'billingCycle',
             'createdBy',
             'voidedBy',
-            'allocations.payment',
+            'invoiceLines.paymentApplications.payment',
             'invoiceLines.invoice',
         ]);
 
@@ -188,7 +200,7 @@ class FinanceChargeController extends Controller
         $validated = $request->validate([
             'student_id' => 'required|integer|exists:students,id',
             'semester_id' => 'required|integer|exists:semesters,id',
-            'charge_type' => 'required|string|in:'.implode(',', FinanceCharge::CHARGE_TYPES),
+            'charge_type' => 'required|string|in:'.implode(',', self::MANUAL_CREATE_CHARGE_TYPES),
             'amount' => 'required|numeric',
             'description' => 'required|string|max:500',
             'effective_at' => 'nullable|date',
@@ -225,6 +237,12 @@ class FinanceChargeController extends Controller
                 $message .= " Released {$result['released_allocations']} allocations"
                     .' ('.number_format($result['released_amount']).'đ).'
                     .' '.count($result['affected_payments']).' payment(s) now have unapplied balance.';
+            }
+
+            if (($result['reallocated_allocations'] ?? 0) > 0) {
+                $message .= ' Auto-reallocated '
+                    .$result['reallocated_allocations'].' allocation(s)'
+                    .' ('.number_format($result['reallocated_amount']).'đ) to remaining unpaid charges.';
             }
 
             return back()->with('success', $message);

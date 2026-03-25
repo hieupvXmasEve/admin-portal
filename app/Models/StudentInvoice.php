@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -34,12 +35,22 @@ class StudentInvoice extends Model
         'student_id',
         'billing_cycle_id',
         'semester_id',
+        'subtotal',
+        'discount_total',
+        'total_amount',
+        'paid_amount',
+        'paid_at',
         'status',
         'due_date',
     ];
 
     protected $casts = [
         'due_date' => 'datetime',
+        'paid_at' => 'datetime',
+        'subtotal' => 'decimal:2',
+        'discount_total' => 'decimal:2',
+        'total_amount' => 'decimal:2',
+        'paid_amount' => 'decimal:2',
     ];
 
     /**
@@ -74,6 +85,11 @@ class StudentInvoice extends Model
         return $this->hasMany(InvoiceLine::class, 'invoice_id');
     }
 
+    public function discounts(): HasMany
+    {
+        return $this->hasMany(InvoiceDiscount::class, 'invoice_id');
+    }
+
     /**
      * Get all charges linked to this invoice through invoice lines.
      */
@@ -94,11 +110,7 @@ class StudentInvoice extends Model
      */
     public function getTotalAmountAttribute(): float
     {
-        return (float) $this->invoiceLines()
-            ->whereHas('charge', function ($q) {
-                $q->where('status', FinanceCharge::STATUS_ACTIVE);
-            })
-            ->sum('amount_snapshot');
+        return (float) ($this->attributes['total_amount'] ?? 0);
     }
 
     /**
@@ -106,7 +118,7 @@ class StudentInvoice extends Model
      */
     public function getPaidAmountAttribute(): float
     {
-        return (float) $this->charges()->get()->sum->paid_amount;
+        return (float) ($this->attributes['paid_amount'] ?? 0);
     }
 
     /**
@@ -114,7 +126,7 @@ class StudentInvoice extends Model
      */
     public function getOutstandingBalanceAttribute(): float
     {
-        return max(0, $this->total_amount - $this->paid_amount);
+        return max(0, (float) $this->total_amount - (float) $this->paid_amount);
     }
 
     /**
@@ -134,6 +146,11 @@ class StudentInvoice extends Model
         return $this->update([
             'status' => 'paid',
         ]);
+    }
+
+    public function recalculateTotals(): void
+    {
+        app(SettlementService::class)->recalculateInvoiceSnapshot($this);
     }
 
     // =====================
@@ -177,51 +194,21 @@ class StudentInvoice extends Model
      */
     public function scopeFilterByStatus($query, string $status)
     {
-        // This is a simplified approach.
-        // For 'overdue', 'open', 'paid' which depend on calculations (charges - payments),
-        // doing this purely in SQL can be heavy if not optimized.
-        // We will try to use the 'status' column if it's synced, but requirements say "real-time".
-        // Let's assume for now we filter in PHP or use a raw query if strictly needed.
-        // However, a common pattern is to sync the 'status' column whenever charges/payments change.
-        // If we strictly follow "calculate in real-time", we need aggregations.
-
-        // Strategy: We will use the 'status' column which should be kept in sync by observers/actions,
-        // BUT for 'overdue', we can check the due_date.
-
-        // Actually, requirements say "system SHALL calculate status in real-time".
-        // Doing this in SQL for large datasets:
-        // Invoice -> hasMany Lines -> sum(amount).
-        // Invoice -> hasManyCharges -> hasManyAllocations.
-        // This is too complex for a fast scope without materialized views or cached columns.
-
-        // RECOMMENDATION: We will trust the accessors for display.
-        // For filtering, we might need to rely on the stored 'status' column OR
-        // perform a check.
-
-        // Let's implement a best-effort SQL filter.
         switch ($status) {
             case 'zero_amount':
-                // Total amount is 0 (no lines or sum of lines is 0)
-                return $query->where(function ($q) {
-                    $q->whereDoesntHave('invoiceLines')
-                        ->orWhereIn('id', function ($sub) {
-                            $sub->select('invoice_id')
-                                ->from('invoice_lines')
-                                ->groupBy('invoice_id')
-                                ->havingRaw('SUM(amount_snapshot) = 0');
-                        });
-                });
+                return $query->where('total_amount', '<=', 0);
 
             case 'overdue':
                 return $query->where('due_date', '<', now())
-                    ->where('status', '!=', 'paid');
+                    ->whereColumn('paid_amount', '<', 'total_amount');
 
             case 'paid':
-                return $query->where('status', 'paid');
+                return $query->whereColumn('paid_amount', '>=', 'total_amount');
 
             case 'open':
                 return $query->where('due_date', '>=', now())
-                    ->where('status', '!=', 'paid');
+                    ->whereColumn('paid_amount', '<', 'total_amount')
+                    ->where('total_amount', '>', 0);
 
             default:
                 return $query->where('status', $status);
@@ -237,26 +224,18 @@ class StudentInvoice extends Model
      */
     public function getRealTimeStatusAttribute(): string
     {
-        $total = $this->total_amount;
-
-        // Zero Amount
-        if ($total == 0) {
+        if ($this->total_amount <= 0) {
             return 'zero_amount';
         }
 
-        $balance = $this->outstanding_balance;
-
-        // Paid
-        if ($balance <= 0) {
+        if ($this->outstanding_balance <= 0) {
             return 'paid';
         }
 
-        // Overdue
         if ($this->due_date && $this->due_date->isPast()) {
             return 'overdue';
         }
 
-        // Open (default)
         return 'open';
     }
 }

@@ -3,7 +3,9 @@
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\InvoiceLine;
 use App\Models\StudentInvoice;
+use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use App\Modules\Finance\Http\Export\InvoiceExport;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -44,6 +46,7 @@ class BillingInvoiceController extends Controller
         // We can do this via API Resource or just append here if it's not heavy.
         $invoices->getCollection()->transform(function ($invoice) {
             $invoice->append(['real_time_status', 'total_amount', 'paid_amount', 'outstanding_balance']);
+
             return $invoice;
         });
 
@@ -66,7 +69,7 @@ class BillingInvoiceController extends Controller
             'student.program',
             'semester',
             'invoiceLines.charge', // Load charge details
-            'billingCycle'
+            'billingCycle',
         ]);
 
         // Eager load payments via charges -> allocations
@@ -74,7 +77,7 @@ class BillingInvoiceController extends Controller
         // We might want to fetch allocations derived from charges.
         // The accessor 'charges' on Invoice model uses hasManyThrough.
         // Let's load charges and their allocations.
-        $invoice->charges->load('allocations.payment', 'source', 'createdBy');
+        $invoice->charges->load('invoiceLines.paymentApplications.payment', 'source', 'createdBy');
         $invoice->charges->each->append(['paid_amount', 'balance']);
 
         $invoice->append(['real_time_status', 'total_amount', 'paid_amount', 'outstanding_balance']);
@@ -82,6 +85,25 @@ class BillingInvoiceController extends Controller
         return Inertia::render('Finance/Invoices/Show', [
             'invoice' => $invoice,
         ]);
+    }
+
+    public function voidLine(Request $request, StudentInvoice $invoice, InvoiceLine $line, VoidFinanceChargeAction $action)
+    {
+        if ((int) $line->invoice_id !== (int) $invoice->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'void_reason' => 'required|string|max:500',
+        ]);
+
+        if (! $line->charge_id) {
+            return back()->withErrors(['error' => 'Invoice line is not linked to a finance charge.']);
+        }
+
+        $action->handle((int) $line->charge_id, $validated['void_reason'], $request->user()?->id);
+
+        return back()->with('success', 'Invoice line voided successfully.');
     }
 
     public function export(Request $request)

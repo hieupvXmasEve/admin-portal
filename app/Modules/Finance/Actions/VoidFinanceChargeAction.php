@@ -6,94 +6,131 @@ namespace App\Modules\Finance\Actions;
 
 use App\Models\FinanceCharge;
 use App\Models\InvoiceLine;
-use App\Models\PaymentAllocation;
+use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Support\Facades\DB;
 
 class VoidFinanceChargeAction
 {
+    public function __construct(
+        protected AutoAllocatePaymentsAction $autoAllocatePaymentsAction,
+        protected SettlementService $settlementService,
+    ) {}
+
     /**
      * Void an existing charge, release allocations, and remove from invoice.
      *
-     * @return array{charge: FinanceCharge, released_allocations: int, affected_payments: array}
+     * @return array{charge: FinanceCharge, released_allocations: int, released_amount: float, affected_payments: array, reallocated_allocations: int, reallocated_amount: float}
      */
     public function handle(int $chargeId, string $reason, ?int $userId = null): array
     {
         return DB::transaction(function () use ($chargeId, $reason, $userId) {
             $charge = FinanceCharge::findOrFail($chargeId);
+            $actorId = $userId ?? auth()->id();
 
             if ($charge->status === FinanceCharge::STATUS_VOID) {
                 throw new \RuntimeException("Charge #{$chargeId} is already voided.");
             }
 
-            // 1. Release all allocations for this charge
-            $releasedInfo = $this->releaseAllocations($charge);
+            $invoiceLines = InvoiceLine::query()
+                ->where('charge_id', $charge->id)
+                ->where('status', 'active')
+                ->get();
 
-            // 2. Remove charge from invoice(s)
-            $affectedInvoiceIds = $this->removeFromInvoice($charge);
+            $releasedInfo = [
+                'count' => 0,
+                'amount' => 0.0,
+                'payment_ids' => [],
+            ];
 
-            // 3. Void the charge
+            $affectedInvoiceIds = [];
+
+            foreach ($invoiceLines as $line) {
+                $lineRelease = $this->settlementService->releaseLinePayments(
+                    $line,
+                    $actorId,
+                    self::class,
+                    $charge->id,
+                );
+
+                $releasedInfo['count'] += $lineRelease['count'];
+                $releasedInfo['amount'] += $lineRelease['amount'];
+                $releasedInfo['payment_ids'] = array_values(array_unique(array_merge(
+                    $releasedInfo['payment_ids'],
+                    $lineRelease['payment_ids'],
+                )));
+
+                $releasedDiscountIds = $this->settlementService->releaseLineDiscounts(
+                    $line,
+                    self::class,
+                    $charge->id,
+                );
+
+                $line->update([
+                    'status' => 'void',
+                    'voided_at' => now(),
+                    'void_reason' => $reason,
+                ]);
+
+                foreach ($releasedDiscountIds as $discountId) {
+                    $discount = \App\Models\InvoiceDiscount::query()->find($discountId);
+
+                    if ($discount) {
+                        $this->settlementService->synchronizeDiscountAllocations($discount);
+                    }
+                }
+
+                $affectedInvoiceIds[] = (int) $line->invoice_id;
+
+                $invoice = $line->invoice()->first();
+
+                if ($invoice) {
+                    $overpaymentRelease = $this->settlementService->releaseInvoiceOverpayments(
+                        $invoice,
+                        $actorId,
+                        self::class,
+                        $charge->id,
+                    );
+
+                    $releasedInfo['count'] += $overpaymentRelease['count'];
+                    $releasedInfo['amount'] += $overpaymentRelease['amount'];
+                    $releasedInfo['payment_ids'] = array_values(array_unique(array_merge(
+                        $releasedInfo['payment_ids'],
+                        $overpaymentRelease['payment_ids'],
+                    )));
+                }
+            }
+
             $charge->update([
                 'status' => FinanceCharge::STATUS_VOID,
                 'voided_at' => now(),
-                'voided_by_user_id' => $userId ?? auth()->id(),
+                'voided_by_user_id' => $actorId,
                 'void_reason' => $reason,
             ]);
 
             // 4. Recalculate affected invoice statuses
             $this->recalculateAffectedInvoices($affectedInvoiceIds);
 
+            // 5. Re-allocate newly released balances to the student's remaining unpaid invoices
+            $reallocatedStats = $releasedInfo['amount'] > 0
+                ? $this->autoAllocatePaymentsAction->runForStudents(
+                    [$charge->student_id],
+                    AutoAllocatePaymentsAction::DEFAULT_PRIORITY_ORDER,
+                    $actorId
+                )
+                : [
+                    'allocations_created' => 0,
+                    'total_allocated_amount' => 0,
+                ];
+
             return [
                 'charge' => $charge->fresh(),
                 'released_allocations' => $releasedInfo['count'],
                 'released_amount' => $releasedInfo['amount'],
                 'affected_payments' => $releasedInfo['payment_ids'],
+                'reallocated_allocations' => $reallocatedStats['allocations_created'],
+                'reallocated_amount' => (float) $reallocatedStats['total_allocated_amount'],
             ];
         });
-    }
-
-    /**
-     * Release all payment allocations for a charge.
-     *
-     * @return array{count: int, amount: float, payment_ids: array}
-     */
-    protected function releaseAllocations(FinanceCharge $charge): array
-    {
-        $allocations = PaymentAllocation::where('charge_id', $charge->id)->get();
-
-        $result = [
-            'count' => $allocations->count(),
-            'amount' => (float) $allocations->sum('allocated_amount'),
-            'payment_ids' => $allocations->pluck('payment_id')->unique()->values()->toArray(),
-        ];
-
-        PaymentAllocation::where('charge_id', $charge->id)->delete();
-
-        return $result;
-    }
-
-    /**
-     * Remove charge from invoice(s) and clean up empty invoices.
-     *
-     * @return array Invoice IDs that were affected (for recalculation)
-     */
-    protected function removeFromInvoice(FinanceCharge $charge): array
-    {
-        $invoiceLines = InvoiceLine::where('charge_id', $charge->id)->get();
-        $affectedInvoiceIds = $invoiceLines->pluck('invoice_id')->unique()->toArray();
-
-        foreach ($invoiceLines as $line) {
-            $invoiceId = $line->invoice_id;
-            $line->delete();
-
-            // If invoice has no more lines, delete it
-            $remainingLines = InvoiceLine::where('invoice_id', $invoiceId)->count();
-            if ($remainingLines === 0) {
-                \App\Models\StudentInvoice::where('id', $invoiceId)->delete();
-                $affectedInvoiceIds = array_diff($affectedInvoiceIds, [$invoiceId]);
-            }
-        }
-
-        return array_values($affectedInvoiceIds);
     }
 
     /**
@@ -105,39 +142,9 @@ class VoidFinanceChargeAction
             return;
         }
 
-        $invoices = \App\Models\StudentInvoice::whereIn('id', $invoiceIds)->get();
+        $invoices = \App\Models\StudentInvoice::whereIn('id', array_unique($invoiceIds))->get();
         foreach ($invoices as $invoice) {
-            $this->recalculateInvoiceStatus($invoice);
+            $this->settlementService->recalculateInvoiceSnapshot($invoice);
         }
-    }
-
-    /**
-     * Recalculate invoice status based on current lines and allocations.
-     * Inlined to avoid circular dependency with InvoiceGenerationService.
-     */
-    protected function recalculateInvoiceStatus(\App\Models\StudentInvoice $invoice): void
-    {
-        $lines = $invoice->invoiceLines()->get();
-
-        $subtotal = (float) $lines->where('amount_snapshot', '>', 0)->sum('amount_snapshot');
-        $credits = abs((float) $lines->where('amount_snapshot', '<', 0)->sum('amount_snapshot'));
-        $totalAmount = max(0, $subtotal - $credits);
-
-        $chargeIds = $lines->pluck('charge_id');
-        $paidAmount = (float) DB::table('payment_allocations')
-            ->whereIn('charge_id', $chargeIds)
-            ->sum('allocated_amount');
-
-        if ($totalAmount <= 0 || $paidAmount >= $totalAmount) {
-            $status = 'paid';
-        } elseif ($paidAmount > 0) {
-            $status = 'partial';
-        } elseif ($invoice->due_date && $invoice->due_date->isPast()) {
-            $status = 'overdue';
-        } else {
-            $status = $invoice->status === 'draft' ? 'draft' : 'pending';
-        }
-
-        $invoice->update(['status' => $status]);
     }
 }

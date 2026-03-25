@@ -9,6 +9,7 @@ use App\Models\InvoiceLine;
 use App\Models\Student;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Services\DeferChargeResolver;
+use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\BillingScopeHelper;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 use Illuminate\Support\Facades\DB;
@@ -59,6 +60,7 @@ class GenerateBatchChargesAction
         $students = $query->get();
 
         $deferChargeResolver = app(DeferChargeResolver::class);
+        $invoiceService = app(InvoiceGenerationService::class);
         $voucherDiscountAmountResolver = app(VoucherDiscountAmountResolver::class);
 
         $stats = [
@@ -90,27 +92,42 @@ class GenerateBatchChargesAction
                         if ($shouldSkipFullCharges) {
                             $potentialAmount = 0;
                         } else {
-                            $sLevel = $student->gc_current_level ?? 1;
-                            $tLevels = $student->gc_total_levels ?? 6;
-                            $potentialAmount = 0;
+                            $existingEgcIssuedInInvoice = StudentInvoice::query()
+                                ->where('student_id', $student->id)
+                                ->where('semester_id', $semesterId)
+                                ->whereHas('invoiceLines.charge', function ($query) {
+                                    $query->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
+                                        ->where('status', FinanceCharge::STATUS_ACTIVE);
+                                })
+                                ->exists();
 
-                            $lvls = [$sLevel];
-                            if (($sLevel + 1) < $tLevels) {
-                                $lvls[] = $sLevel + 1;
-                            }
+                            if ($existingEgcIssuedInInvoice) {
+                                $potentialAmount = 0;
+                            } else {
+                                $sLevel = $student->gc_current_level ?? 1;
+                                $tLevels = $student->gc_total_levels ?? 6;
+                                $potentialAmount = 0;
 
-                            foreach ($lvls as $l) {
-                                $u = \App\Models\Unit::where('unit_type', 'egc')->where('level', $l)->first();
-                                if ($u) {
-                                    $potentialAmount += $u->base_fee;
+                                $lvls = [$sLevel];
+                                if (($sLevel + 1) < $tLevels) {
+                                    $lvls[] = $sLevel + 1;
+                                }
+
+                                foreach ($lvls as $l) {
+                                    $u = \App\Models\Unit::where('unit_type', 'egc')->where('level', $l)->first();
+                                    if ($u) {
+                                        $potentialAmount += $u->base_fee;
+                                    }
                                 }
                             }
                         }
                     }
                     if ($student->status === 'intake_course' && in_array(FinanceCharge::TYPE_TUITION_TERM, $chargeTypes)) {
                         if (! $shouldSkipFullCharges) {
-                            $amt = self::getTuitionFee($student, $semesterId);
-                            if ($amt !== null) {
+                            $tuitionTerm = self::getTuitionTermData($student, $semesterId);
+                            $amt = $tuitionTerm['amount'];
+
+                            if ($amt !== null && $amt > 0) {
                                 $potentialAmount = $amt;
                                 $shouldGenInvoice = true;
                             }
@@ -118,14 +135,6 @@ class GenerateBatchChargesAction
                     }
 
                     if ($potentialAmount > 0) {
-                        $shouldGenInvoice = true;
-                    }
-
-                    // Check Retake (Any registration in this semester prevents 0d skip for Invoice)
-                    // Note: Since we removed is_retake from eager load in turn 41, isNotEmpty means any course registration.
-                    $hasRegistration = $student->courseRegistrations->isNotEmpty();
-
-                    if ($hasRegistration) {
                         $shouldGenInvoice = true;
                     }
 
@@ -149,6 +158,7 @@ class GenerateBatchChargesAction
                     }
 
                     $chargesToLink = [];
+                    $pendingDiscounts = [];
 
                     // 2. Generate based on Status
 
@@ -157,30 +167,43 @@ class GenerateBatchChargesAction
                         if ($shouldSkipFullCharges) {
                             $didSkipPreserveCharge = true;
                         } else {
-                            $startLevel = $student->gc_current_level ?? 1;
-                            $totalLevels = $student->gc_total_levels ?? 6;
+                            $existingEgcIssuedInInvoice = StudentInvoice::query()
+                                ->where('student_id', $student->id)
+                                ->where('semester_id', $semesterId)
+                                ->whereHas('invoiceLines.charge', function ($query) {
+                                    $query->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
+                                        ->where('status', FinanceCharge::STATUS_ACTIVE);
+                                })
+                                ->exists();
 
-                            $levelsToCharge = [$startLevel];
-                            if (($startLevel + 1) < $totalLevels) {
-                                $levelsToCharge[] = $startLevel + 1;
-                            }
+                            if ($existingEgcIssuedInInvoice) {
+                                // Semester package already issued; do not create any additional EGC level fee.
+                            } else {
+                                $startLevel = $student->gc_current_level ?? 1;
+                                $totalLevels = $student->gc_total_levels ?? 6;
 
-                            foreach ($levelsToCharge as $level) {
-                                $unit = \App\Models\Unit::where('unit_type', 'egc')->where('level', $level)->first();
-                                $fee = $unit ? (float) $unit->base_fee : 0;
+                                $levelsToCharge = [$startLevel];
+                                if (($startLevel + 1) < $totalLevels) {
+                                    $levelsToCharge[] = $startLevel + 1;
+                                }
 
-                                if ($fee > 0) {
-                                    $charge = self::createChargeIfNotExists(
-                                        $student, $semesterId,
-                                        FinanceCharge::TYPE_EGC_LEVEL_FEE,
-                                        $fee,
-                                        'App\Models\Unit',
-                                        $unit ? $unit->id : 0
-                                    );
-                                    if ($charge) {
-                                        $charge->update(['description' => "EGC Level {$level} Fee"]);
-                                        $charge->refresh();
-                                        $chargesToLink[] = $charge;
+                                foreach ($levelsToCharge as $level) {
+                                    $unit = \App\Models\Unit::where('unit_type', 'egc')->where('level', $level)->first();
+                                    $fee = $unit ? (float) $unit->base_fee : 0;
+
+                                    if ($fee > 0) {
+                                        $charge = self::createChargeIfNotExists(
+                                            $student, $semesterId,
+                                            FinanceCharge::TYPE_EGC_LEVEL_FEE,
+                                            $fee,
+                                            'App\Models\Unit',
+                                            $unit ? $unit->id : 0
+                                        );
+                                        if ($charge) {
+                                            $charge->update(['description' => "EGC Level {$level} Fee"]);
+                                            $charge->refresh();
+                                            $chargesToLink[] = $charge;
+                                        }
                                     }
                                 }
                             }
@@ -192,16 +215,11 @@ class GenerateBatchChargesAction
                         if ($shouldSkipFullCharges) {
                             $didSkipPreserveCharge = true;
                         } else {
-                            $amount = self::getTuitionFee($student, $semesterId);
-                            if ($amount !== null) {
-                                // Calculate installment index (since intake_major)
-                                $paidInst = FinanceCharge::where('student_id', $student->id)
-                                    ->where('charge_type', FinanceCharge::TYPE_TUITION_TERM)
-                                    ->where('semester_id', '>=', (int) $student->intake_major)
-                                    ->where('semester_id', '<', $semesterId)
-                                    ->active()
-                                    ->count();
-                                $termIdx = $paidInst + 1;
+                            $tuitionTerm = self::getTuitionTermData($student, $semesterId);
+                            $amount = $tuitionTerm['amount'];
+
+                            if ($amount !== null && $amount > 0) {
+                                $termIdx = $tuitionTerm['chargeable_term_index'] ?? $tuitionTerm['term_number'] ?? 1;
 
                                 // Idempotency check
                                 $existingCharge = FinanceCharge::where('student_id', $student->id)
@@ -238,16 +256,13 @@ class GenerateBatchChargesAction
                                         }
 
                                         if ($discount > 0) {
-                                            $charge = self::createChargeIfNotExists(
-                                                $student, $semesterId,
-                                                FinanceCharge::TYPE_SCHOLARSHIP_CREDIT,
-                                                -$discount,
-                                                'App\Models\StudentScholarshipAward',
-                                                $student->scholarshipAward->id
-                                            );
-                                            if ($charge) {
-                                                $chargesToLink[] = $charge;
-                                            }
+                                            $pendingDiscounts[] = [
+                                                'discount_type' => 'scholarship',
+                                                'amount' => $discount,
+                                                'discount_source' => 'App\Models\StudentScholarshipAward',
+                                                'description' => 'Scholarship: '.$scholarshipDef->name,
+                                                'reference_id' => (int) $student->scholarshipAward->id,
+                                            ];
                                         }
                                     }
                                 }
@@ -268,25 +283,19 @@ class GenerateBatchChargesAction
                                 }
 
                                 if ($vAmount > 0) {
-                                    $charge = self::createChargeIfNotExists(
-                                        $student, $semesterId,
-                                        FinanceCharge::TYPE_VOUCHER_CREDIT,
-                                        -$vAmount,
-                                        'App\Models\VoucherApplication',
-                                        $voucherApp->id
-                                    );
-                                    if ($charge) {
-                                        $charge->update(['description' => "Voucher Applied ({$voucherApp->voucherDefinition?->code})"]);
-                                        $charge->refresh();
-                                        $chargesToLink[] = $charge;
+                                    $pendingDiscounts[] = [
+                                        'discount_type' => 'voucher',
+                                        'amount' => $vAmount,
+                                        'discount_source' => 'App\Models\VoucherApplication',
+                                        'description' => 'Voucher Applied ('.$voucherApp->voucherDefinition?->code.')',
+                                        'reference_id' => (int) $voucherApp->id,
+                                    ];
 
-                                        // Update voucher app as Used
-                                        $voucherApp->update([
-                                            'finance_charge_id' => $charge->id,
-                                            'invoice_id' => $invoice->id,
-                                            'discount_amount' => $vAmount,
-                                        ]);
-                                    }
+                                    $voucherApp->update([
+                                        'finance_charge_id' => null,
+                                        'invoice_id' => $invoice->id,
+                                        'discount_amount' => $vAmount,
+                                    ]);
                                 } else {
                                     // Informational Voucher - Mark as used on this invoice without charge
                                     $voucherApp->update([
@@ -325,6 +334,17 @@ class GenerateBatchChargesAction
                         $stats['created_count']++;
                     }
 
+                    foreach ($pendingDiscounts as $pendingDiscount) {
+                        $invoiceService->applyInvoiceDiscount(
+                            $invoice,
+                            $pendingDiscount['discount_type'],
+                            (float) $pendingDiscount['amount'],
+                            $pendingDiscount['discount_source'],
+                            $pendingDiscount['description'],
+                            $pendingDiscount['reference_id'],
+                        );
+                    }
+
                     if ($deferCase && $didSkipPreserveCharge) {
                         $deferChargeResolver->markFullCaseApplied($deferCase, $semesterId);
                     }
@@ -344,23 +364,23 @@ class GenerateBatchChargesAction
         return $stats;
     }
 
-    private static function getTuitionFee(Student $student, int $semesterId): ?float
+    private static function getTuitionTermData(Student $student, int $semesterId): array
     {
         $intakeMajor = $student->intake_major;
 
         if (! $intakeMajor || $semesterId < $intakeMajor) {
-            return null;
+            return ['term_number' => null, 'amount' => null, 'chargeable_term_index' => null];
         }
 
         $intakeSemester = \App\Models\Semester::find($intakeMajor);
         $targetSemester = \App\Models\Semester::find($semesterId);
 
         if (! $intakeSemester || ! $targetSemester) {
-            return null;
+            return ['term_number' => null, 'amount' => null, 'chargeable_term_index' => null];
         }
 
         if ($targetSemester->start_date < $intakeSemester->start_date) {
-            return null;
+            return ['term_number' => null, 'amount' => null, 'chargeable_term_index' => null];
         }
 
         $termNumber = \App\Models\Semester::where('start_date', '>=', $intakeSemester->start_date)
@@ -373,14 +393,27 @@ class GenerateBatchChargesAction
             ->first();
 
         if (! $plan) {
-            return null;
+            return ['term_number' => null, 'amount' => null, 'chargeable_term_index' => null];
         }
 
         $term = \App\Models\TuitionPlanTerm::where('tuition_plan_id', $plan->id)
             ->where('term_number', $termNumber)
             ->first();
 
-        return $term ? (float) $term->amount : null;
+        if (! $term) {
+            return ['term_number' => $termNumber, 'amount' => null, 'chargeable_term_index' => null];
+        }
+
+        $chargeableTermIndex = \App\Models\TuitionPlanTerm::where('tuition_plan_id', $plan->id)
+            ->where('term_number', '<=', $termNumber)
+            ->where('amount', '>', 0)
+            ->count();
+
+        return [
+            'term_number' => $termNumber,
+            'amount' => (float) $term->amount,
+            'chargeable_term_index' => $chargeableTermIndex > 0 ? $chargeableTermIndex : null,
+        ];
     }
 
     private static function findReusableInvoice(int $studentId, int $semesterId): ?StudentInvoice

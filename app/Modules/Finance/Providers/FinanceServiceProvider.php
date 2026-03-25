@@ -8,6 +8,7 @@ use App\Modules\Finance\Services\DeferCaseService;
 use App\Modules\Finance\Services\FinanceChargeService;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Services\PaymentService;
+use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Support\ServiceProvider;
 
 class FinanceServiceProvider extends ServiceProvider
@@ -20,12 +21,8 @@ class FinanceServiceProvider extends ServiceProvider
         // Register services as singletons
         $this->app->singleton(FinanceChargeService::class);
         $this->app->singleton(PaymentService::class);
-        $this->app->singleton(InvoiceGenerationService::class, function ($app) {
-            return new InvoiceGenerationService(
-                $app->make(FinanceChargeService::class),
-                $app->make(PaymentService::class)
-            );
-        });
+        $this->app->singleton(SettlementService::class);
+        $this->app->singleton(InvoiceGenerationService::class);
         $this->app->singleton(DeferCaseService::class, function ($app) {
             return new DeferCaseService(
                 $app->make(FinanceChargeService::class)
@@ -39,14 +36,14 @@ class FinanceServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Load routes if they exist
-        $routesPath = __DIR__ . '/../routes';
-        
-        if (file_exists($routesPath . '/web.php')) {
-            $this->loadRoutesFrom($routesPath . '/web.php');
+        $routesPath = __DIR__.'/../routes';
+
+        if (file_exists($routesPath.'/web.php')) {
+            $this->loadRoutesFrom($routesPath.'/web.php');
         }
 
-        if (file_exists($routesPath . '/api.php')) {
-            $this->loadRoutesFrom($routesPath . '/api.php');
+        if (file_exists($routesPath.'/api.php')) {
+            $this->loadRoutesFrom($routesPath.'/api.php');
         }
     }
 }

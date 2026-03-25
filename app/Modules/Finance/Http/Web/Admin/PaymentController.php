@@ -95,7 +95,7 @@ class PaymentController extends Controller
 
     public function showAutoAllocate()
     {
-        return Inertia::render('Finance/Payments/AutoAllocate');
+        return redirect()->route('finance.operations.settlement.index');
     }
 
     public function previewAutoAllocate(Request $request, PreviewAutoAllocateQuery $query)

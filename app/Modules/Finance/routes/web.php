@@ -2,6 +2,7 @@
 
 use App\Modules\Finance\Http\Web\Admin\BillingInvoiceController;
 use App\Modules\Finance\Http\Web\Admin\BillingOperationsController;
+use App\Modules\Finance\Http\Web\Admin\BillingSettlementController;
 use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
 use App\Modules\Finance\Http\Web\Admin\PaymentController;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +27,13 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::get('/due-calendar', [BillingOperationsController::class, 'dueCalendar'])
             ->middleware('can:view_finance_operations_due_calendar')
             ->name('due-calendar');
+
+        Route::get('/settlement', [BillingSettlementController::class, 'index'])
+            ->middleware('can:allocate_finance_payment')
+            ->name('settlement.index');
+        Route::post('/settlement/apply', [BillingSettlementController::class, 'apply'])
+            ->middleware('can:allocate_finance_payment')
+            ->name('settlement.apply');
     });
 
     // Invoices
@@ -41,6 +49,9 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::get('/{invoice}', [BillingInvoiceController::class, 'show'])
             ->middleware('can:view_finance_invoices')
             ->name('show');
+        Route::post('/{invoice}/lines/{line}/void', [BillingInvoiceController::class, 'voidLine'])
+            ->middleware('can:void_finance_charges')
+            ->name('lines.void');
     });
     // =====================
     // Finance Charges

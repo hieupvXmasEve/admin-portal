@@ -1,30 +1,17 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
-import { route } from 'ziggy-js';
-import { Sparkles, CreditCard } from 'lucide-vue-next';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import DataPagination from '@/components/DataPagination.vue';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import DataPagination from '@/components/DataPagination.vue';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
-import { formatCurrency, formatDate } from '@/utils/format';
-import { debounce } from 'lodash-es';
 import { PaginatedResponse } from '@/types';
+import { formatCurrency, formatDate } from '@/utils/format';
+import { Head, Link } from '@inertiajs/vue3';
+import { debounce } from 'lodash-es';
+import { Sparkles } from 'lucide-vue-next';
+import { route } from 'ziggy-js';
 
 interface Payment {
     id: number;
@@ -56,13 +43,7 @@ const props = defineProps<{
     filters?: Partial<PaymentFilters>;
 }>();
 
-const {
-    filters,
-    handleSearch,
-    handleSelectFilter,
-    handlePageSizeChange,
-    handlePaginationNavigate,
-} = useInertiaFilters<PaymentFilters>({
+const { filters, handleSearch, handleSelectFilter, handlePageSizeChange, handlePaginationNavigate } = useInertiaFilters<PaymentFilters>({
     baseUrl: route('finance.payments.index'),
     initialFilters: {
         search: (typeof props.filters?.search === 'string' ? props.filters.search : '') || '',
@@ -87,43 +68,47 @@ const onSearch = debounce((val) => handleSearch(val), 500);
 
 const getStatusColor = (status: string) => {
     switch (status) {
-        case 'completed': return 'success'; // Assuming badges support 'success' variant or use class
-        case 'pending': return 'warning';
-        case 'cancelled': return 'destructive';
-        default: return 'secondary';
+        case 'completed':
+            return 'success'; // Assuming badges support 'success' variant or use class
+        case 'pending':
+            return 'warning';
+        case 'cancelled':
+            return 'destructive';
+        default:
+            return 'secondary';
     }
 };
 
 const getSourceLabel = (source: string) => {
     switch (source) {
-        case 'import': return 'Excel Import';
-        case 'manual': return 'Manual';
-        case 'gateway': return 'Gateway';
-        case 'bank_transfer': return 'Bank Transfer';
-        default: return source ?? '-';
+        case 'import':
+            return 'Excel Import';
+        case 'manual':
+            return 'Manual';
+        case 'gateway':
+            return 'Gateway';
+        case 'bank_transfer':
+            return 'Bank Transfer';
+        default:
+            return source ?? '-';
     }
 };
 </script>
 
 <template>
-
     <Head title="Payments" />
 
     <div class="flex items-center justify-between">
-        <h2 class="text-xl font-semibold leading-tight text-gray-800">
-            Payments
-        </h2>
+        <h2 class="text-xl leading-tight font-semibold text-gray-800">Payments</h2>
         <div class="flex gap-2">
-            <Link :href="route('finance.payments.auto-allocate.show')">
+            <Link :href="route('finance.operations.settlement.index')">
                 <Button variant="outline">
                     <Sparkles class="mr-2 h-4 w-4" />
-                    Auto Allocate
+                    Settlement Worklist
                 </Button>
             </Link>
             <Link :href="route('finance.payments.import')">
-                <Button>
-                    Import Payments
-                </Button>
+                <Button> Import Payments </Button>
             </Link>
         </div>
     </div>
@@ -169,19 +154,13 @@ const getSourceLabel = (source: string) => {
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead class="cursor-pointer">
-                            Date
-                        </TableHead>
+                        <TableHead class="cursor-pointer"> Date </TableHead>
                         <TableHead>Student</TableHead>
                         <TableHead>Ref</TableHead>
-                        <TableHead class="cursor-pointer">
-                            Amount
-                        </TableHead>
+                        <TableHead class="cursor-pointer"> Amount </TableHead>
                         <TableHead>Unallocated</TableHead>
                         <TableHead>Source</TableHead>
-                        <TableHead class="cursor-pointer">
-                            Status
-                        </TableHead>
+                        <TableHead class="cursor-pointer"> Status </TableHead>
                         <TableHead class="text-right">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -191,16 +170,14 @@ const getSourceLabel = (source: string) => {
                         <TableCell>
                             <div v-if="payment.student">
                                 <div class="font-medium">{{ payment.student.full_name }}</div>
-                                <div class="text-xs text-muted-foreground">{{ payment.student.student_id
-                                }}
-                                </div>
+                                <div class="text-muted-foreground text-xs">{{ payment.student.student_id }}</div>
                             </div>
                             <span v-else class="text-muted-foreground">-</span>
                         </TableCell>
                         <TableCell class="font-mono text-xs">{{ payment.external_ref }}</TableCell>
                         <TableCell>{{ formatCurrency(payment.amount) }}</TableCell>
                         <TableCell>
-                            <span :class="{ 'text-green-600 font-bold': payment.unapplied_amount > 0 }">
+                            <span :class="{ 'font-bold text-green-600': payment.unapplied_amount > 0 }">
                                 {{ formatCurrency(payment.unapplied_amount) }}
                             </span>
                         </TableCell>
@@ -221,17 +198,14 @@ const getSourceLabel = (source: string) => {
                         </TableCell>
                     </TableRow>
                     <TableRow v-if="items.data.length === 0">
-                        <TableCell colspan="8" class="h-24 text-center">
-                            No payments found.
-                        </TableCell>
+                        <TableCell colspan="8" class="h-24 text-center"> No payments found. </TableCell>
                     </TableRow>
                 </TableBody>
             </Table>
         </div>
 
         <div class="mt-4">
-            <DataPagination :pagination-data="items"
-                @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+            <DataPagination :pagination-data="items" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
         </div>
     </div>
 </template>

@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class InvoiceDiscount extends Model
 {
@@ -13,6 +16,9 @@ class InvoiceDiscount extends Model
         'discount_source',
         'description',
         'amount',
+        'status',
+        'approved_by',
+        'memo',
         'reference_id',
     ];
 
@@ -44,6 +50,21 @@ class InvoiceDiscount extends Model
         return $this->belongsTo(VoucherDefinition::class, 'reference_id');
     }
 
+    public function allocations(): HasMany
+    {
+        return $this->hasMany(DiscountAllocation::class);
+    }
+
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function getTotalAmountAttribute(): float
+    {
+        return (float) $this->amount;
+    }
+
     /**
      * Boot the model.
      */
@@ -52,11 +73,11 @@ class InvoiceDiscount extends Model
         parent::boot();
 
         static::saved(function ($discount) {
-            $discount->invoice->recalculateTotals();
+            $discount->invoice?->recalculateTotals();
         });
 
         static::deleted(function ($discount) {
-            $discount->invoice->recalculateTotals();
+            $discount->invoice?->recalculateTotals();
         });
     }
 }

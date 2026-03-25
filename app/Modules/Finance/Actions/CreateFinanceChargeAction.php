@@ -8,10 +8,15 @@ use App\Models\FinanceCharge;
 use App\Models\InvoiceLine;
 use App\Models\StudentInvoice;
 use App\Models\StudentScholarshipAward;
+use App\Modules\Finance\Services\InvoiceGenerationService;
 use Illuminate\Support\Facades\DB;
 
 class CreateFinanceChargeAction
 {
+    public function __construct(
+        protected InvoiceGenerationService $invoiceService
+    ) {}
+
     /**
      * Create a new finance charge and assign it to an invoice.
      */
@@ -78,22 +83,15 @@ class CreateFinanceChargeAction
             return;
         }
 
-        // Create scholarship charge
-        $scholarshipCharge = FinanceCharge::create([
-            'student_id' => $tuitionCharge->student_id,
-            'semester_id' => $tuitionCharge->semester_id,
-            'billing_cycle_id' => $tuitionCharge->billing_cycle_id,
-            'charge_type' => FinanceCharge::TYPE_SCHOLARSHIP_CREDIT,
-            'amount' => -1 * abs($discountAmount),
-            'description' => "Scholarship: {$scholarshipDef->name}",
-            'effective_at' => $tuitionCharge->effective_at,
-            'status' => FinanceCharge::STATUS_ACTIVE,
-            'source_type' => StudentScholarshipAward::class,
-            'source_id' => $award->id,
-            'created_by_user_id' => $tuitionCharge->created_by_user_id,
-        ]);
-
-        $this->assignChargeToInvoice($scholarshipCharge, $invoice);
+        $this->invoiceService->applyInvoiceDiscount(
+            $invoice,
+            'scholarship',
+            $discountAmount,
+            StudentScholarshipAward::class,
+            "Scholarship: {$scholarshipDef->name}",
+            (int) $award->id,
+            $tuitionCharge->created_by_user_id,
+        );
     }
 
     /**
@@ -183,24 +181,7 @@ class CreateFinanceChargeAction
      */
     protected function recalculateInvoiceTotals(StudentInvoice $invoice): void
     {
-        $lines = $invoice->invoiceLines()->get();
-
-        $subtotal = $lines->where('amount_snapshot', '>', 0)->sum('amount_snapshot');
-        $credits = abs($lines->where('amount_snapshot', '<', 0)->sum('amount_snapshot'));
-        $totalAmount = max(0, $subtotal - $credits);
-
-        // Get paid amount from allocations
-        $chargeIds = $lines->pluck('charge_id');
-        $paidAmount = (float) DB::table('payment_allocations')
-            ->whereIn('charge_id', $chargeIds)
-            ->sum('allocated_amount');
-
-        // Determine status
-        $status = $this->determineInvoiceStatus($invoice, $totalAmount, $paidAmount);
-
-        $invoice->update([
-            'status' => $status,
-        ]);
+        $this->invoiceService->updateInvoiceStatus($invoice);
     }
 
     /**

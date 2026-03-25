@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Services;
 
 use App\Models\FinanceCharge;
+use App\Models\InvoiceDiscount;
 use App\Models\InvoiceLine;
 use App\Models\StudentInvoice;
 use Illuminate\Support\Facades\DB;
@@ -12,8 +13,7 @@ use Illuminate\Support\Facades\DB;
 class InvoiceGenerationService
 {
     public function __construct(
-        protected FinanceChargeService $chargeService,
-        protected PaymentService $paymentService
+        protected SettlementService $settlementService
     ) {}
 
     /**
@@ -53,6 +53,7 @@ class InvoiceGenerationService
         $charges = FinanceCharge::where('student_id', $invoice->student_id)
             ->where('semester_id', $invoice->semester_id)
             ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->where('amount', '>', 0)
             ->when($invoice->billing_cycle_id, function ($query) use ($invoice) {
                 return $query->where(function ($q) use ($invoice) {
                     $q->where('billing_cycle_id', $invoice->billing_cycle_id)
@@ -70,7 +71,11 @@ class InvoiceGenerationService
             $toRemove = array_diff($existingChargeIds, $newChargeIds);
             InvoiceLine::where('invoice_id', $invoice->id)
                 ->whereIn('charge_id', $toRemove)
-                ->delete();
+                ->update([
+                    'status' => 'void',
+                    'voided_at' => now(),
+                    'void_reason' => 'Charge no longer active during invoice refresh',
+                ]);
 
             // Add or update lines
             foreach ($charges as $charge) {
@@ -82,6 +87,9 @@ class InvoiceGenerationService
                     [
                         'amount_snapshot' => $charge->amount,
                         'description_snapshot' => $charge->description,
+                        'status' => 'active',
+                        'voided_at' => null,
+                        'void_reason' => null,
                     ]
                 );
             }
@@ -107,24 +115,7 @@ class InvoiceGenerationService
      */
     protected function recalculateInvoiceTotals(StudentInvoice $invoice): void
     {
-        $lines = $invoice->invoiceLines()->get();
-
-        $subtotal = $lines->where('amount_snapshot', '>', 0)->sum('amount_snapshot');
-        $credits = abs($lines->where('amount_snapshot', '<', 0)->sum('amount_snapshot'));
-        $totalAmount = max(0, $subtotal - $credits);
-
-        // Get paid amount from allocations
-        $chargeIds = $lines->pluck('charge_id');
-        $paidAmount = (float) DB::table('payment_allocations')
-            ->whereIn('charge_id', $chargeIds)
-            ->sum('allocated_amount');
-
-        // Determine status
-        $status = $this->determineInvoiceStatus($invoice, $totalAmount, $paidAmount);
-
-        $invoice->update([
-            'status' => $status,
-        ]);
+        $this->settlementService->recalculateInvoiceSnapshot($invoice);
     }
 
     /**
@@ -166,6 +157,26 @@ class InvoiceGenerationService
                 $invoice->update(['status' => 'pending']);
             }
         }
+    }
+
+    public function applyInvoiceDiscount(
+        StudentInvoice $invoice,
+        string $discountType,
+        float $amount,
+        ?string $discountSource = null,
+        ?string $description = null,
+        ?int $referenceId = null,
+        ?int $approvedBy = null,
+    ): InvoiceDiscount {
+        return $this->settlementService->createOrRefreshInvoiceDiscount(
+            $invoice,
+            $discountType,
+            $amount,
+            $discountSource,
+            $description,
+            $referenceId,
+            $approvedBy,
+        );
     }
 
     /**

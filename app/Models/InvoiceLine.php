@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class InvoiceLine extends Model
 {
@@ -14,10 +15,14 @@ class InvoiceLine extends Model
         'charge_id',
         'amount_snapshot',
         'description_snapshot',
+        'status',
+        'voided_at',
+        'void_reason',
     ];
 
     protected $casts = [
         'amount_snapshot' => 'decimal:2',
+        'voided_at' => 'datetime',
     ];
 
     // =====================
@@ -32,6 +37,16 @@ class InvoiceLine extends Model
     public function charge(): BelongsTo
     {
         return $this->belongsTo(FinanceCharge::class, 'charge_id');
+    }
+
+    public function paymentApplications(): HasMany
+    {
+        return $this->hasMany(PaymentApplication::class);
+    }
+
+    public function discountAllocations(): HasMany
+    {
+        return $this->hasMany(DiscountAllocation::class);
     }
 
     // =====================

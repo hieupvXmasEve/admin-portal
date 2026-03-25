@@ -32,7 +32,7 @@ class FinanceChargeService
     /**
      * Void an existing charge.
      */
-    public function voidCharge(int $chargeId, string $reason, ?int $userId = null): FinanceCharge
+    public function voidCharge(int $chargeId, string $reason, ?int $userId = null): array
     {
         return $this->voidChargeAction->handle($chargeId, $reason, $userId);
     }

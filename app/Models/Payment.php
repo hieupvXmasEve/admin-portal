@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -82,9 +83,9 @@ class Payment extends Model
         return $this->belongsTo(User::class, 'received_by_user_id');
     }
 
-    public function allocations(): HasMany
+    public function applications(): HasMany
     {
-        return $this->hasMany(PaymentAllocation::class);
+        return $this->hasMany(PaymentApplication::class);
     }
 
     // =====================
@@ -107,17 +108,12 @@ class Payment extends Model
 
     public function getAllocatedAmountAttribute(): float
     {
-        // Use loaded relationship if available, otherwise query
-        if ($this->relationLoaded('allocations')) {
-            return (float) $this->allocations->sum('allocated_amount');
-        }
-
-        return (float) $this->allocations()->sum('allocated_amount');
+        return app(SettlementService::class)->getPaymentAllocatedAmount($this);
     }
 
     public function getUnappliedAmountAttribute(): float
     {
-        return (float) $this->amount - $this->allocated_amount;
+        return app(SettlementService::class)->getPaymentUnappliedAmount($this);
     }
 
     public function getIsFullyAllocatedAttribute(): bool

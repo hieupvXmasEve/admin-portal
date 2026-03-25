@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries;
 
-use App\Models\FinanceCharge;
 use App\Models\Payment;
-use App\Models\PaymentAllocation;
+use App\Models\StudentInvoice;
 
 class GetStudentBalanceQuery
 {
@@ -15,20 +14,17 @@ class GetStudentBalanceQuery
      */
     public function handle(int $studentId, ?int $semesterId = null): array
     {
-        $chargeQuery = FinanceCharge::where('student_id', $studentId)
-            ->where('status', FinanceCharge::STATUS_ACTIVE);
+        $invoiceQuery = StudentInvoice::query()
+            ->where('student_id', $studentId);
 
         if ($semesterId) {
-            $chargeQuery->where('semester_id', $semesterId);
+            $invoiceQuery->where('semester_id', $semesterId);
         }
 
-        $totalCharges = (float) (clone $chargeQuery)->where('amount', '>', 0)->sum('amount');
-        $totalCredits = abs((float) (clone $chargeQuery)->where('amount', '<', 0)->sum('amount'));
-        $netCharges = $totalCharges - $totalCredits;
-
-        // Get total paid
-        $chargeIds = (clone $chargeQuery)->pluck('id');
-        $totalPaid = (float) PaymentAllocation::whereIn('charge_id', $chargeIds)->sum('allocated_amount');
+        $totalCharges = (float) (clone $invoiceQuery)->sum('subtotal');
+        $totalCredits = (float) (clone $invoiceQuery)->sum('discount_total');
+        $netCharges = (float) (clone $invoiceQuery)->sum('total_amount');
+        $totalPaid = (float) (clone $invoiceQuery)->sum('paid_amount');
 
         // Get unapplied credit from payments
         $unappliedCredit = $this->getUnappliedCredits($studentId);

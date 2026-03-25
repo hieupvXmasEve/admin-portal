@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -112,11 +113,6 @@ class FinanceCharge extends Model
         return $this->belongsTo(User::class, 'voided_by_user_id');
     }
 
-    public function allocations(): HasMany
-    {
-        return $this->hasMany(PaymentAllocation::class, 'charge_id');
-    }
-
     public function invoiceLines(): HasMany
     {
         return $this->hasMany(InvoiceLine::class, 'charge_id');
@@ -172,7 +168,7 @@ class FinanceCharge extends Model
 
     public function getPaidAmountAttribute(): float
     {
-        return (float) $this->allocations()->sum('allocated_amount');
+        return app(SettlementService::class)->getChargePaidAmount($this->id);
     }
 
     public function getBalanceAttribute(): float

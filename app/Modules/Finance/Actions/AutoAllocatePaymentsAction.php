@@ -7,15 +7,21 @@ namespace App\Modules\Finance\Actions;
 use App\Models\FinanceCharge;
 use App\Models\InvoiceLine;
 use App\Models\Payment;
-use App\Models\PaymentAllocation;
 use App\Models\StudentInvoice;
-use App\Modules\Finance\Services\InvoiceGenerationService;
+use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Support\Facades\DB;
 
 class AutoAllocatePaymentsAction
 {
+    public const DEFAULT_PRIORITY_ORDER = [
+        FinanceCharge::TYPE_TUITION_TERM,
+        FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        FinanceCharge::TYPE_RETAKE_FEE,
+        FinanceCharge::TYPE_MANUAL_FEE,
+    ];
+
     public function __construct(
-        protected InvoiceGenerationService $invoiceService
+        protected SettlementService $settlementService,
     ) {}
 
     /**
@@ -25,7 +31,33 @@ class AutoAllocatePaymentsAction
      * @param  int  $userId  The ID of the user performing the allocation.
      * @return array Result summary.
      */
-    public function run(array $priorityOrder, int $userId): array
+    public function run(array $priorityOrder, ?int $userId): array
+    {
+        $campusId = app()->bound('campus') ? app('campus')->id : null;
+
+        $studentsWithPayments = Payment::query()
+            ->where('status', Payment::STATUS_COMPLETED)
+            ->when($campusId, function ($query, $campusId) {
+                $query->whereHas('student', fn ($studentQuery) => $studentQuery->where('campus_id', $campusId));
+            })
+            ->get()
+            ->filter(fn (Payment $payment) => $payment->unapplied_amount > 0)
+            ->pluck('student_id')
+            ->unique()
+            ->values()
+            ->all();
+
+        return $this->runForStudents($studentsWithPayments, $priorityOrder, $userId);
+    }
+
+    /**
+     * Auto allocate payments for a targeted set of students.
+     *
+     * @param  array<int>  $studentIds
+     * @param  array<int, string>  $priorityOrder
+     * @return array{students_processed:int,allocations_created:int,total_allocated_amount:float,invoices_updated:int}
+     */
+    public function runForStudents(array $studentIds, array $priorityOrder, ?int $userId): array
     {
         $stats = [
             'students_processed' => 0,
@@ -34,97 +66,46 @@ class AutoAllocatePaymentsAction
             'invoices_updated' => 0,
         ];
 
-        $allocatedChargeIds = [];
+        $studentIds = array_values(array_unique(array_map('intval', $studentIds)));
 
-        DB::transaction(function () use ($priorityOrder, $userId, &$stats, &$allocatedChargeIds) {
+        if ($studentIds === []) {
+            return $stats;
+        }
+
+        DB::transaction(function () use ($studentIds, $priorityOrder, $userId, &$stats) {
+
             // 0. Handle 0-amount invoices (mark as paid)
-            $zeroAmountInvoices = StudentInvoice::where('status', '!=', 'paid')
-                ->filterByStatus('zero_amount')
-                ->get();
+            $zeroAmountInvoices = StudentInvoice::query()
+                ->with(['invoiceLines.paymentApplications', 'invoiceLines.discountAllocations'])
+                ->where('status', '!=', 'paid')
+                ->whereIn('student_id', $studentIds)
+                ->get()
+                ->filter(fn (StudentInvoice $invoice) => $this->deriveInvoiceSnapshot($invoice)['total_amount'] <= 0);
 
             foreach ($zeroAmountInvoices as $invoice) {
                 $invoice->update(['status' => 'paid']);
                 $stats['invoices_updated']++;
             }
 
-            // 1. Find all students with unallocated payments (amount > 0)
-            // We verify 'amount > 0' and check unapplied amount effectively via code logic below
-            // But to optimize, we can filter students who have payments with unapplied amount.
-            // However, calculation of 'unapplied_amount' is an accessor.
-            // For batch performance, let's fetch students who have payments with status != 'allocating' or similar if applicable.
-            // For now, simpler approach: Get IDs of students with payments that are NOT fully allocated.
-
-            // Note: The Payment model has 'is_fully_allocated' accessor.
-            // In SQL we can check: (amount - (SELECT SUM(allocated_amount) FROM payment_allocations ...)) > 0
-
-            $studentsWithPayments = Payment::query()
-                ->select('student_id')
-                ->whereRaw('(amount - (SELECT COALESCE(SUM(allocated_amount), 0) FROM payment_allocations WHERE payment_allocations.payment_id = payments.id)) > 0')
-                ->distinct()
-                ->pluck('student_id');
-
-            foreach ($studentsWithPayments as $studentId) {
-                // Fetch student's unallocated payments
+            foreach ($studentIds as $studentId) {
                 $payments = Payment::where('student_id', $studentId)
-                    ->whereRaw('(amount - (SELECT COALESCE(SUM(allocated_amount), 0) FROM payment_allocations WHERE payment_allocations.payment_id = payments.id)) > 0')
+                    ->where('status', Payment::STATUS_COMPLETED)
                     ->orderBy('paid_at', 'asc') // Use oldest payments first
                     ->get();
+
+                $payments = $payments->filter(fn (Payment $payment) => $payment->unapplied_amount > 0)->values();
 
                 if ($payments->isEmpty()) {
                     continue;
                 }
 
-                // Get unpaid invoice IDs for this student
-                $unpaidInvoiceIds = StudentInvoice::where('student_id', $studentId)
-                    ->where('status', '!=', 'paid')
-                    ->pluck('id')
-                    ->toArray();
+                $lines = $this->settlementService->getOutstandingLinesForStudent($studentId, $priorityOrder);
 
-                if (empty($unpaidInvoiceIds)) {
+                if ($lines->isEmpty()) {
                     continue;
                 }
-
-                // Get charge IDs linked to unpaid invoices
-                $chargeIdsInUnpaidInvoices = InvoiceLine::whereIn('invoice_id', $unpaidInvoiceIds)
-                    ->pluck('charge_id')
-                    ->toArray();
-
-                if (empty($chargeIdsInUnpaidInvoices)) {
-                    continue;
-                }
-
-                // Fetch student's outstanding charges that belong to unpaid invoices
-                $charges = FinanceCharge::where('student_id', $studentId)
-                    ->where('amount', '>', 0)
-                    ->where('status', FinanceCharge::STATUS_ACTIVE)
-                    ->whereIn('id', $chargeIdsInUnpaidInvoices)
-                    ->whereRaw('(amount - (SELECT COALESCE(SUM(allocated_amount), 0) FROM payment_allocations WHERE payment_allocations.charge_id = finance_charges.id)) > ?', [0])
-                    ->get();
-
-                if ($charges->isEmpty()) {
-                    continue;
-                }
-
-                $chargeInvoiceMap = InvoiceLine::query()
-                    ->whereIn('charge_id', $charges->pluck('id'))
-                    ->pluck('invoice_id', 'charge_id')
-                    ->toArray();
-
-                // Sort charges by priority
-                $charges = $charges->sortBy(function ($charge) use ($priorityOrder) {
-                    $index = array_search($charge->charge_type, $priorityOrder);
-
-                    return $index === false ? 999 : $index;
-                });
 
                 $studentHasAllocations = false;
-
-                // Cache initial balances to avoid double-counting when
-                // allocations created in this loop are visible to DB queries
-                $chargeOutstanding = [];
-                foreach ($charges as $charge) {
-                    $chargeOutstanding[$charge->id] = (float) $charge->balance;
-                }
 
                 foreach ($payments as $payment) {
                     $available = $payment->unapplied_amount;
@@ -132,12 +113,12 @@ class AutoAllocatePaymentsAction
                         continue;
                     }
 
-                    foreach ($charges as $charge) {
+                    foreach ($lines as $line) {
                         if ($available <= 0) {
                             break;
                         }
 
-                        $outstanding = $chargeOutstanding[$charge->id] ?? 0;
+                        $outstanding = $this->settlementService->getLineOutstandingAmount($line);
                         if ($outstanding <= 0) {
                             continue;
                         }
@@ -147,17 +128,17 @@ class AutoAllocatePaymentsAction
                             continue;
                         }
 
-                        PaymentAllocation::create([
-                            'payment_id' => $payment->id,
-                            'charge_id' => $charge->id,
-                            'allocated_amount' => $allocateAmount,
-                            'allocated_at' => now(),
-                            'allocated_by_user_id' => $userId,
-                        ]);
+                        $this->settlementService->createPaymentApplication(
+                            $payment,
+                            $line,
+                            $allocateAmount,
+                            'application',
+                            $userId,
+                            self::class,
+                            null,
+                        );
 
-                        $allocatedChargeIds[] = $charge->id;
                         $available -= $allocateAmount;
-                        $chargeOutstanding[$charge->id] -= $allocateAmount;
 
                         $stats['allocations_created']++;
                         $stats['total_allocated_amount'] += $allocateAmount;
@@ -169,40 +150,41 @@ class AutoAllocatePaymentsAction
                     $stats['students_processed']++;
                 }
             }
-
-            // Update invoice statuses for all affected invoices
-            if (! empty($allocatedChargeIds)) {
-                $this->updateInvoiceStatuses($allocatedChargeIds, $stats);
-            }
         });
 
         return $stats;
     }
 
-    /**
-     * Update invoice statuses for invoices containing the allocated charges.
-     *
-     * @param  array  $chargeIds  Array of charge IDs that were allocated.
-     * @param  array  &$stats  Stats array to update with invoice count.
-     */
-    protected function updateInvoiceStatuses(array $chargeIds, array &$stats): void
+    private function deriveInvoiceSnapshot(StudentInvoice $invoice): array
     {
-        // Get unique invoice IDs from invoice_lines that contain these charges
-        $invoiceIds = InvoiceLine::whereIn('charge_id', array_unique($chargeIds))
-            ->distinct()
-            ->pluck('invoice_id')
-            ->toArray();
+        $lineSubtotal = (float) $invoice->invoiceLines
+            ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line) && (float) $line->amount_snapshot > 0)
+            ->sum('amount_snapshot');
 
-        if (empty($invoiceIds)) {
-            return;
+        $discountTotal = (float) $invoice->invoiceLines
+            ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line))
+            ->sum(fn (InvoiceLine $line) => max(0, (float) $line->discountAllocations->sum('amount')));
+
+        $paidAmount = (float) $invoice->invoiceLines
+            ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line))
+            ->sum(fn (InvoiceLine $line) => max(0, (float) $line->paymentApplications->sum('amount')));
+
+        $storedTotal = array_key_exists('total_amount', $invoice->getAttributes()) ? (float) $invoice->getAttributes()['total_amount'] : null;
+        $storedPaid = array_key_exists('paid_amount', $invoice->getAttributes()) ? (float) $invoice->getAttributes()['paid_amount'] : null;
+        $derivedTotal = max(0, $lineSubtotal - $discountTotal);
+
+        return [
+            'total_amount' => $storedTotal !== null ? max($storedTotal, $derivedTotal) : $derivedTotal,
+            'paid_amount' => $storedPaid !== null ? max($storedPaid, min($paidAmount, $derivedTotal)) : min($paidAmount, $derivedTotal),
+        ];
+    }
+
+    private function isBillableActiveLine(InvoiceLine $line): bool
+    {
+        if (($line->status ?? 'active') !== 'active') {
+            return false;
         }
 
-        // Update each invoice's status
-        $invoices = StudentInvoice::whereIn('id', $invoiceIds)->get();
-
-        foreach ($invoices as $invoice) {
-            $this->invoiceService->updateInvoiceStatus($invoice);
-            $stats['invoices_updated']++;
-        }
+        return $line->charge === null || $line->charge->status === FinanceCharge::STATUS_ACTIVE;
     }
 }

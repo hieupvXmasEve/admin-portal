@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\CurriculumVersion;
+use App\Models\DiscountAllocation;
 use App\Models\FinanceCharge;
+use App\Models\InvoiceDiscount;
 use App\Models\InvoiceLine;
 use App\Models\Payment;
-use App\Models\PaymentAllocation;
+use App\Models\PaymentApplication;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentInvoice;
 use App\Models\User;
+use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
+use App\Modules\Finance\Services\InvoiceGenerationService;
+use App\Modules\Finance\Services\SettlementService;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -50,8 +55,21 @@ beforeEach(function () {
     app()->singleton(PermissionService::class, fn () => $permissionService);
 });
 
-it('void charge releases payment allocations', function () {
+function createCompletedPayment(Student $student, float $amount): Payment
+{
+    return Payment::create([
+        'student_id' => $student->id,
+        'amount' => $amount,
+        'method' => Payment::METHOD_IMPORT,
+        'source' => 'import',
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+    ]);
+}
+
+it('void charge inserts reversal payment applications and restores unapplied balance', function () {
     $createAction = app(CreateFinanceChargeAction::class);
+    $settlementService = app(SettlementService::class);
     $voidAction = app(VoidFinanceChargeAction::class);
 
     $charge = $createAction->handle([
@@ -62,55 +80,27 @@ it('void charge releases payment allocations', function () {
         'description' => 'EGC Level 4',
     ]);
 
-    $payment = Payment::create([
-        'student_id' => $this->student->id,
-        'amount' => 15000000,
-        'source' => 'import',
-        'paid_at' => now(),
-        'status' => Payment::STATUS_COMPLETED,
-    ]);
+    $line = InvoiceLine::where('charge_id', $charge->id)->firstOrFail();
+    $payment = createCompletedPayment($this->student, 15000000);
 
-    PaymentAllocation::create([
-        'payment_id' => $payment->id,
-        'charge_id' => $charge->id,
-        'allocated_amount' => 15000000,
-        'allocated_at' => now(),
-    ]);
+    $settlementService->createPaymentApplication($payment, $line, 15000000, 'application', $this->user->id);
 
-    expect(PaymentAllocation::count())->toBe(1);
-    expect($payment->fresh()->unapplied_amount)->toBe(0.0);
+    expect(PaymentApplication::count())->toBe(1)
+        ->and($payment->fresh()->unapplied_amount)->toBe(0.0);
 
-    $result = $voidAction->handle($charge->id, 'Student only completed 1 level');
+    $result = $voidAction->handle($charge->id, 'Student only completed 1 level', $this->user->id);
 
-    expect(PaymentAllocation::count())->toBe(0);
-    expect($result['released_allocations'])->toBe(1);
-    expect($result['released_amount'])->toBe(15000000.0);
-    expect($payment->fresh()->unapplied_amount)->toBe(15000000.0);
+    expect(PaymentApplication::count())->toBe(2)
+        ->and((float) PaymentApplication::sum('amount'))->toBe(0.0)
+        ->and($line->fresh()->status)->toBe('void')
+        ->and($result['released_allocations'])->toBe(1)
+        ->and($result['released_amount'])->toBe(15000000.0)
+        ->and($payment->fresh()->unapplied_amount)->toBe(15000000.0);
 });
 
-it('void charge removes invoice line and deletes empty invoice', function () {
+it('void charge keeps invoice and recalculates snapshot from active lines', function () {
     $createAction = app(CreateFinanceChargeAction::class);
-    $voidAction = app(VoidFinanceChargeAction::class);
-
-    $charge = $createAction->handle([
-        'student_id' => $this->student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-        'amount' => 15000000,
-        'description' => 'EGC Level test',
-    ]);
-
-    expect(StudentInvoice::count())->toBe(1);
-    expect(InvoiceLine::count())->toBe(1);
-
-    $voidAction->handle($charge->id, 'Test void');
-
-    expect(InvoiceLine::count())->toBe(0);
-    expect(StudentInvoice::count())->toBe(0);
-});
-
-it('void charge keeps invoice when other charges remain', function () {
-    $createAction = app(CreateFinanceChargeAction::class);
+    $settlementService = app(SettlementService::class);
     $voidAction = app(VoidFinanceChargeAction::class);
 
     $charge1 = $createAction->handle([
@@ -129,90 +119,32 @@ it('void charge keeps invoice when other charges remain', function () {
         'description' => 'EGC Level 5',
     ]);
 
-    expect(StudentInvoice::count())->toBe(1);
-    expect(InvoiceLine::count())->toBe(2);
+    $invoice = StudentInvoice::firstOrFail();
+    $payment = createCompletedPayment($this->student, 30000000);
 
-    $voidAction->handle($charge2->id, 'Only completed 1 level');
+    $line1 = InvoiceLine::where('charge_id', $charge1->id)->firstOrFail();
+    $line2 = InvoiceLine::where('charge_id', $charge2->id)->firstOrFail();
 
-    expect(InvoiceLine::count())->toBe(1);
-    expect(StudentInvoice::count())->toBe(1);
-    expect($charge2->fresh()->status)->toBe(FinanceCharge::STATUS_VOID);
+    $settlementService->createPaymentApplication($payment, $line1, 15000000, 'application', $this->user->id);
+    $settlementService->createPaymentApplication($payment, $line2, 15000000, 'application', $this->user->id);
+
+    $voidAction->handle($charge2->id, 'Only completed 1 level', $this->user->id);
+
+    $invoice->refresh();
+
+    expect(StudentInvoice::count())->toBe(1)
+        ->and((float) $invoice->subtotal)->toBe(15000000.0)
+        ->and((float) $invoice->discount_total)->toBe(0.0)
+        ->and((float) $invoice->total_amount)->toBe(15000000.0)
+        ->and((float) $invoice->paid_amount)->toBe(15000000.0)
+        ->and($invoice->status)->toBe('paid')
+        ->and($payment->fresh()->unapplied_amount)->toBe(15000000.0);
 });
 
-it('void charge recalculates invoice status', function () {
+it('auto allocate writes payment applications only', function () {
     $createAction = app(CreateFinanceChargeAction::class);
-    $voidAction = app(VoidFinanceChargeAction::class);
+    $autoAllocateAction = app(AutoAllocatePaymentsAction::class);
 
-    $charge1 = $createAction->handle([
-        'student_id' => $this->student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-        'amount' => 15000000,
-        'description' => 'EGC Level 4',
-    ]);
-
-    $charge2 = $createAction->handle([
-        'student_id' => $this->student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-        'amount' => 15000000,
-        'description' => 'EGC Level 5',
-    ]);
-
-    $payment = Payment::create([
-        'student_id' => $this->student->id,
-        'amount' => 30000000,
-        'source' => 'import',
-        'paid_at' => now(),
-        'status' => Payment::STATUS_COMPLETED,
-    ]);
-
-    PaymentAllocation::create([
-        'payment_id' => $payment->id,
-        'charge_id' => $charge1->id,
-        'allocated_amount' => 15000000,
-        'allocated_at' => now(),
-    ]);
-
-    PaymentAllocation::create([
-        'payment_id' => $payment->id,
-        'charge_id' => $charge2->id,
-        'allocated_amount' => 15000000,
-        'allocated_at' => now(),
-    ]);
-
-    $voidAction->handle($charge2->id, 'Only completed 1 level');
-
-    // Invoice should still be paid (charge1 = 15M, allocated = 15M)
-    $invoice = StudentInvoice::first();
-    expect($invoice->status)->toBe('paid');
-
-    // Payment should have 15M unapplied
-    expect($payment->fresh()->unapplied_amount)->toBe(15000000.0);
-});
-
-it('negative charge is assigned to invoice without credit memo payment', function () {
-    $createAction = app(CreateFinanceChargeAction::class);
-
-    $charge = $createAction->handle([
-        'student_id' => $this->student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_SCHOLARSHIP_CREDIT,
-        'amount' => -4500000,
-        'description' => 'Scholarship discount',
-    ]);
-
-    expect((float) $charge->amount)->toBe(-4500000.0);
-    expect(InvoiceLine::count())->toBe(1);
-    expect(Payment::where('source', 'credit_memo')->count())->toBe(0);
-});
-
-it('e2e: void egc level and auto-allocate to tuition', function () {
-    $createAction = app(CreateFinanceChargeAction::class);
-    $voidAction = app(VoidFinanceChargeAction::class);
-    $autoAllocateAction = app(\App\Modules\Finance\Actions\AutoAllocatePaymentsAction::class);
-
-    // 1. Create 2 EGC levels
     $egc1 = $createAction->handle([
         'student_id' => $this->student->id,
         'semester_id' => $this->semester->id,
@@ -229,75 +161,110 @@ it('e2e: void egc level and auto-allocate to tuition', function () {
         'description' => 'EGC Level 5',
     ]);
 
-    // 2. Pay 30M
-    $payment1 = Payment::create([
-        'student_id' => $this->student->id,
-        'amount' => 30000000,
-        'source' => 'import',
-        'paid_at' => now()->subMonth(),
-        'status' => Payment::STATUS_COMPLETED,
-    ]);
+    $payment = createCompletedPayment($this->student, 30000000);
 
-    PaymentAllocation::create([
-        'payment_id' => $payment1->id,
-        'charge_id' => $egc1->id,
-        'allocated_amount' => 15000000,
-        'allocated_at' => now(),
-    ]);
+    $stats = $autoAllocateAction->run([
+        FinanceCharge::TYPE_EGC_LEVEL_FEE,
+    ], $this->user->id);
 
-    PaymentAllocation::create([
-        'payment_id' => $payment1->id,
-        'charge_id' => $egc2->id,
-        'allocated_amount' => 15000000,
-        'allocated_at' => now(),
-    ]);
+    expect($stats['students_processed'])->toBe(1)
+        ->and($stats['allocations_created'])->toBe(2)
+        ->and($stats['total_allocated_amount'])->toBe(30000000.0)
+        ->and(PaymentApplication::count())->toBe(2)
+        ->and($payment->fresh()->unapplied_amount)->toBe(0.0);
+});
 
-    // 3. Void EGC Level 5
-    $voidAction->handle($egc2->id, 'Student only completed 1 level, transitioning to Major');
+it('invoice discount allocation updates invoice totals without negative finance charges', function () {
+    $createAction = app(CreateFinanceChargeAction::class);
+    $invoiceService = app(InvoiceGenerationService::class);
 
-    expect($payment1->fresh()->unapplied_amount)->toBe(15000000.0);
-
-    // 4. Create Tuition charge (45M)
-    $tuition = $createAction->handle([
+    $charge1 = $createAction->handle([
         'student_id' => $this->student->id,
         'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
-        'amount' => 45000000,
-        'description' => 'Tuition Fee',
+        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'amount' => 15000000,
+        'description' => 'EGC Level 4',
     ]);
 
-    // 5. Pay 25.5M more
-    $payment2 = Payment::create([
+    $charge2 = $createAction->handle([
         'student_id' => $this->student->id,
-        'amount' => 25500000,
-        'source' => 'import',
-        'paid_at' => now(),
-        'status' => Payment::STATUS_COMPLETED,
+        'semester_id' => $this->semester->id,
+        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'amount' => 15000000,
+        'description' => 'EGC Level 5',
     ]);
 
-    // Before auto-allocate: payment1 has 15M unapplied, payment2 has 25.5M unapplied
-    expect($payment1->fresh()->unapplied_amount)->toBe(15000000.0);
-    expect($payment2->fresh()->unapplied_amount)->toBe(25500000.0);
+    $invoice = StudentInvoice::firstOrFail();
 
-    // Tuition invoice should exist and not be paid
-    $tuitionInvoice = InvoiceLine::where('charge_id', $tuition->id)->first()->invoice;
-    expect($tuitionInvoice)->not->toBeNull();
-    expect($tuitionInvoice->status)->not->toBe('paid');
-
-    // 6. Auto-allocate
-    $stats = $autoAllocateAction->run(
-        ['tuition_term', 'egc_level_fee'],
-        $this->user->id
+    $discount = $invoiceService->applyInvoiceDiscount(
+        $invoice,
+        'voucher',
+        5000000,
+        'tests',
+        'Voucher test',
+        1,
+        $this->user->id,
     );
 
-    expect($stats['students_processed'])->toBe(1);
+    $line1 = InvoiceLine::where('charge_id', $charge1->id)->firstOrFail();
+    $line2 = InvoiceLine::where('charge_id', $charge2->id)->firstOrFail();
 
-    // Total allocated to tuition = 15M (from payment1) + 25.5M (from payment2) = 40.5M
-    $totalAllocated = (float) PaymentAllocation::where('charge_id', $tuition->id)
-        ->sum('allocated_amount');
+    expect($discount)->toBeInstanceOf(InvoiceDiscount::class)
+        ->and(DiscountAllocation::count())->toBe(1)
+        ->and((float) DiscountAllocation::where('invoice_line_id', $line1->id)->sum('amount'))->toBe(5000000.0)
+        ->and((float) DiscountAllocation::where('invoice_line_id', $line2->id)->sum('amount'))->toBe(0.0)
+        ->and(FinanceCharge::query()->where('amount', '<', 0)->count())->toBe(0);
 
-    expect($totalAllocated)->toBe(40500000.0);
+    $invoice->refresh();
 
-    // Verify no credit memo payments exist
-    expect(Payment::where('source', 'credit_memo')->count())->toBe(0);
+    expect((float) $invoice->subtotal)->toBe(30000000.0)
+        ->and((float) $invoice->discount_total)->toBe(5000000.0)
+        ->and((float) $invoice->total_amount)->toBe(25000000.0);
+});
+
+it('void charge reassigns discount and releases excess payment from surviving line', function () {
+    $createAction = app(CreateFinanceChargeAction::class);
+    $invoiceService = app(InvoiceGenerationService::class);
+    $settlementService = app(SettlementService::class);
+    $voidAction = app(VoidFinanceChargeAction::class);
+
+    $charge1 = $createAction->handle([
+        'student_id' => $this->student->id,
+        'semester_id' => $this->semester->id,
+        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'amount' => 15000000,
+        'description' => 'EGC Level 4',
+    ]);
+
+    $charge2 = $createAction->handle([
+        'student_id' => $this->student->id,
+        'semester_id' => $this->semester->id,
+        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'amount' => 15000000,
+        'description' => 'EGC Level 5',
+    ]);
+
+    $invoice = StudentInvoice::firstOrFail();
+    $invoiceService->applyInvoiceDiscount($invoice, 'voucher', 5000000, 'tests', 'Voucher test', 1, $this->user->id);
+
+    $line1 = InvoiceLine::where('charge_id', $charge1->id)->firstOrFail();
+    $line2 = InvoiceLine::where('charge_id', $charge2->id)->firstOrFail();
+    $payment = createCompletedPayment($this->student, 25000000);
+
+    $settlementService->createPaymentApplication($payment, $line1, 10000000, 'application', $this->user->id);
+    $settlementService->createPaymentApplication($payment, $line2, 15000000, 'application', $this->user->id);
+
+    $result = $voidAction->handle($charge1->id, 'Voided after transfer', $this->user->id);
+
+    $invoice->refresh();
+
+    expect($line1->fresh()->status)->toBe('void')
+        ->and((float) DiscountAllocation::where('invoice_line_id', $line1->id)->sum('amount'))->toBe(0.0)
+        ->and((float) DiscountAllocation::where('invoice_line_id', $line2->id)->sum('amount'))->toBe(5000000.0)
+        ->and((float) $invoice->subtotal)->toBe(15000000.0)
+        ->and((float) $invoice->discount_total)->toBe(5000000.0)
+        ->and((float) $invoice->total_amount)->toBe(10000000.0)
+        ->and((float) $invoice->paid_amount)->toBe(10000000.0)
+        ->and($result['released_amount'])->toBe(15000000.0)
+        ->and($payment->fresh()->unapplied_amount)->toBe(15000000.0);
 });

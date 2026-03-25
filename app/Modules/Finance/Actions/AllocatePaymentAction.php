@@ -1,16 +1,24 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Finance\Actions;
 
 use App\Models\FinanceCharge;
+use App\Models\InvoiceLine;
 use App\Models\Payment;
-use App\Models\PaymentAllocation;
+use App\Models\PaymentApplication;
+use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class AllocatePaymentAction
 {
-    public function run(Payment $payment, FinanceCharge $charge, float $amount, int $userId): PaymentAllocation
+    public function __construct(
+        protected SettlementService $settlementService
+    ) {}
+
+    public function run(Payment $payment, FinanceCharge $charge, float $amount, int $userId): PaymentApplication
     {
         // 1. Validation
         if ($amount <= 0) {
@@ -21,33 +29,35 @@ class AllocatePaymentAction
             throw ValidationException::withMessages(['amount' => 'Amount exceeds unallocated payment balance.']);
         }
 
-        if ($amount > $charge->balance) {
+        $line = InvoiceLine::query()
+            ->where('charge_id', $charge->id)
+            ->where('status', 'active')
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->first();
+
+        if (! $line) {
+            throw ValidationException::withMessages(['charge_id' => 'Charge does not have an active invoice line.']);
+        }
+
+        if ($payment->student_id !== $line->invoice?->student_id) {
+            throw ValidationException::withMessages(['charge_id' => 'Payment student does not match invoice student.']);
+        }
+
+        if ($amount > $this->settlementService->getLineOutstandingAmount($line)) {
             throw ValidationException::withMessages(['amount' => 'Amount exceeds charge remaining balance.']);
         }
 
-        return DB::transaction(function () use ($payment, $charge, $amount, $userId) {
-            // Check if allocation already exists
-            $allocation = PaymentAllocation::where('payment_id', $payment->id)
-                ->where('charge_id', $charge->id)
-                ->first();
-
-            if ($allocation) {
-                $allocation->update([
-                    'allocated_amount' => $allocation->allocated_amount + $amount,
-                    'allocated_by_user_id' => $userId,
-                    'allocated_at' => now(),
-                ]);
-            } else {
-                $allocation = PaymentAllocation::create([
-                    'payment_id' => $payment->id,
-                    'charge_id' => $charge->id,
-                    'allocated_amount' => $amount,
-                    'allocated_at' => now(),
-                    'allocated_by_user_id' => $userId,
-                ]);
-            }
-
-            return $allocation;
+        return DB::transaction(function () use ($payment, $line, $amount, $userId) {
+            return $this->settlementService->createPaymentApplication(
+                $payment,
+                $line,
+                $amount,
+                'application',
+                $userId,
+                self::class,
+                null,
+            );
         });
     }
 }

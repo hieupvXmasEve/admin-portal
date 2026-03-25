@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Services;
 
 use App\Models\FinanceCharge;
+use App\Models\InvoiceLine;
 use App\Models\Payment;
-use App\Models\PaymentAllocation;
+use App\Models\PaymentApplication;
 use App\Models\Student;
 use App\Modules\Finance\Queries\GetStudentBalanceQuery;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
@@ -22,6 +23,7 @@ class PaymentService
     public function __construct(
         protected GetStudentBalanceQuery $getStudentBalanceQuery,
         protected PublishDomainEventAction $publishDomainEventAction,
+        protected SettlementService $settlementService,
     ) {}
 
     /**
@@ -97,7 +99,7 @@ class PaymentService
      * Allocate a payment to specific charges.
      *
      * @param  array  $allocations  Array of ['charge_id' => amount]
-     * @return Collection<PaymentAllocation>
+     * @return Collection<PaymentApplication>
      */
     public function allocatePayment(int $paymentId, array $allocations, ?int $userId = null): Collection
     {
@@ -110,16 +112,25 @@ class PaymentService
                     continue;
                 }
 
-                $allocation = PaymentAllocation::updateOrCreate(
-                    [
-                        'payment_id' => $payment->id,
-                        'charge_id' => $chargeId,
-                    ],
-                    [
-                        'allocated_amount' => $amount,
-                        'allocated_at' => now(),
-                        'allocated_by_user_id' => $userId ?? $this->currentUserId(),
-                    ]
+                $line = InvoiceLine::query()
+                    ->where('charge_id', (int) $chargeId)
+                    ->where('status', 'active')
+                    ->orderBy('created_at')
+                    ->orderBy('id')
+                    ->first();
+
+                if (! $line) {
+                    continue;
+                }
+
+                $allocation = $this->settlementService->createPaymentApplication(
+                    $payment,
+                    $line,
+                    (float) $amount,
+                    'application',
+                    $userId ?? $this->currentUserId(),
+                    self::class,
+                    null,
                 );
 
                 $createdAllocations->push($allocation);
@@ -231,7 +242,7 @@ class PaymentService
     public function getPaymentHistory(int $studentId): Collection
     {
         return Payment::where('student_id', $studentId)
-            ->with(['allocations.charge', 'receivedBy'])
+            ->with(['applications.invoiceLine.charge', 'receivedBy'])
             ->orderBy('paid_at', 'desc')
             ->get();
     }

@@ -50,7 +50,7 @@ interface FeeSummary {
     statement_events: Array<{
         event_key: string;
         event_at: string | null;
-        kind: 'payment' | 'allocation';
+        kind: 'payment' | 'application' | 'release';
         label: string;
         reference: string;
         details: string;
@@ -77,12 +77,19 @@ interface FeeSummary {
             total: number;
             paid: number;
             remaining: number;
+            final_payable: number;
+            cash_applied: number;
+            settled_amount: number;
+            snapshot_total: number;
+            discount_total: number;
             lines: Array<{
-                id: number;
+                id: number | string;
                 item: string;
                 category: string;
                 type: string;
                 amount: number;
+                status: string;
+                affects_payable: boolean;
             }>;
             payments: Array<{
                 id: number;
@@ -93,7 +100,8 @@ interface FeeSummary {
                 allocated_amount: number;
                 ref: string | null;
                 charges: Array<{
-                    charge_id: number;
+                    invoice_line_id: number;
+                    charge_id: number | null;
                     charge_description: string;
                     allocated_amount: number;
                 }>;
@@ -209,11 +217,41 @@ const getChecklistPaymentBadge = (status: string) => {
     return variants[status] || variants.not_generated;
 };
 
-const getStatementKindBadge = (kind: 'payment' | 'allocation') => {
+const getChargeLineStatusBadge = (status: string) => {
+    const normalized = status?.toLowerCase() || 'missing';
+
+    if (normalized === 'active') {
+        return {
+            label: 'Active',
+            class: 'bg-green-50 text-green-700 border-green-200',
+        };
+    }
+
+    if (normalized === 'void') {
+        return {
+            label: 'Void',
+            class: 'bg-gray-100 text-gray-500 border-gray-200',
+        };
+    }
+
+    return {
+        label: 'Unknown',
+        class: 'bg-gray-100 text-gray-500 border-gray-200',
+    };
+};
+
+const getStatementKindBadge = (kind: 'payment' | 'application' | 'release') => {
     if (kind === 'payment') {
         return {
             label: 'Money In',
             class: 'bg-blue-50 text-blue-700 border-blue-200',
+        };
+    }
+
+    if (kind === 'release') {
+        return {
+            label: 'Released',
+            class: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         };
     }
 
@@ -275,7 +313,7 @@ const summaryToneClass = computed(() => {
                 </CardHeader>
                 <CardContent>
                     <div class="text-2xl font-bold">{{ formatCurrency(feeSummary.summary.active_due) }}</div>
-                    <div v-if="feeSummary.summary.total_discount < 0" class="mt-1 text-xs text-green-600">Giảm trừ active: {{ formatCurrency(feeSummary.summary.total_discount) }}</div>
+                    <div v-if="feeSummary.summary.total_discount > 0" class="mt-1 text-xs text-green-600">Giảm trừ active: {{ formatCurrency(feeSummary.summary.total_discount) }}</div>
                 </CardContent>
             </Card>
 
@@ -483,7 +521,7 @@ const summaryToneClass = computed(() => {
                                             <p class="font-medium">{{ formatCurrency(semester.totals.total) }}</p>
                                         </div>
                                         <div>
-                                            <p class="text-muted-foreground text-[10px] uppercase">Allocated</p>
+                                            <p class="text-muted-foreground text-[10px] uppercase">Applied</p>
                                             <p class="font-medium text-green-600">{{ formatCurrency(semester.totals.paid) }}</p>
                                         </div>
                                         <div>
@@ -517,12 +555,18 @@ const summaryToneClass = computed(() => {
                                             </div>
                                             <div class="flex items-center gap-4 text-sm">
                                                 <div class="text-right">
-                                                    <span class="text-muted-foreground block">Total</span>
-                                                    <span class="font-medium">{{ formatCurrency(invoice.total) }}</span>
+                                                    <span class="text-muted-foreground block">Final Payable</span>
+                                                    <span class="font-medium">{{ formatCurrency(invoice.final_payable) }}</span>
                                                 </div>
                                                 <div class="text-right">
-                                                    <span class="text-muted-foreground block">Allocated</span>
-                                                    <span class="font-medium text-green-600">{{ formatCurrency(invoice.paid) }}</span>
+                                                    <span class="text-muted-foreground block">Cash Applied</span>
+                                                    <span class="font-medium text-green-600">{{ formatCurrency(invoice.cash_applied) }}</span>
+                                                </div>
+                                                <div class="text-right">
+                                                    <span class="text-muted-foreground block">Still Due</span>
+                                                    <span class="font-medium" :class="invoice.remaining > 0 ? 'text-red-600' : 'text-gray-400'">
+                                                        {{ formatCurrency(invoice.remaining) }}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
@@ -530,13 +574,23 @@ const summaryToneClass = computed(() => {
                                         <div class="grid gap-6 p-4 text-sm md:grid-cols-2">
                                             <div>
                                                 <h5 class="text-muted-foreground mb-2 font-bold uppercase">Details</h5>
+                                                <div class="text-muted-foreground mb-3 text-xs">
+                                                    Charges snapshot: {{ formatCurrency(invoice.snapshot_total) }} • Discounts: {{ formatCurrency(invoice.discount_total) }} • Final payable now:
+                                                    {{ formatCurrency(invoice.final_payable) }}
+                                                </div>
                                                 <ul class="space-y-1">
                                                     <li v-for="line in invoice.lines" :key="line.id" class="flex items-start justify-between border-b border-dashed py-1 last:border-0">
                                                         <div class="flex-1 pr-2">
                                                             <span class="block font-medium">{{ line.item }}</span>
-                                                            <span class="bg-muted text-muted-foreground rounded px-1 text-[10px]">{{ line.category }}</span>
+                                                            <div class="mt-1 flex flex-wrap items-center gap-1">
+                                                                <span class="bg-muted text-muted-foreground rounded px-1 text-[10px]">{{ line.category }}</span>
+                                                                <Badge variant="outline" :class="getChargeLineStatusBadge(line.status).class" class="h-5 text-[10px]">
+                                                                    {{ getChargeLineStatusBadge(line.status).label }}
+                                                                </Badge>
+                                                                <span v-if="!line.affects_payable" class="text-muted-foreground text-[10px]"> Không tính vào final payable </span>
+                                                            </div>
                                                         </div>
-                                                        <span class="font-mono" :class="line.amount < 0 ? 'text-green-600' : ''">
+                                                        <span class="font-mono" :class="[line.amount < 0 ? 'text-green-600' : '', !line.affects_payable ? 'text-muted-foreground line-through' : '']">
                                                             {{ formatCurrency(line.amount) }}
                                                         </span>
                                                     </li>
@@ -562,13 +616,15 @@ const summaryToneClass = computed(() => {
                                                                     <div class="font-medium text-green-600">
                                                                         {{ formatCurrency(payment.allocated_amount) }}
                                                                     </div>
-                                                                    <div class="text-muted-foreground text-xs">phân bổ vào invoice này</div>
+                                                                    <div class="text-muted-foreground text-xs">áp vào invoice này</div>
                                                                 </div>
                                                             </div>
 
                                                             <div v-if="payment.charges.length > 0" class="space-y-1">
-                                                                <div v-for="charge in payment.charges" :key="`${payment.id}-${charge.charge_id}`" class="bg-muted/40 flex items-center justify-between rounded px-2 py-1 text-xs">
-                                                                    <span class="text-muted-foreground">{{ charge.charge_description }}</span>
+                                                                <div v-for="charge in payment.charges" :key="`${payment.id}-${charge.invoice_line_id}`" class="bg-muted/40 flex items-center justify-between rounded px-2 py-1 text-xs">
+                                                                    <div class="text-muted-foreground">
+                                                                        <div>{{ charge.charge_description }}</div>
+                                                                    </div>
                                                                     <span class="font-medium text-green-600">{{ formatCurrency(charge.allocated_amount) }}</span>
                                                                 </div>
                                                             </div>

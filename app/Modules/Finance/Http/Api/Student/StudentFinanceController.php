@@ -112,7 +112,7 @@ class StudentFinanceController extends Controller
 
         $charge = \App\Models\FinanceCharge::where('id', $chargeId)
             ->where('student_id', $student->id)
-            ->with(['semester', 'allocations.payment'])
+            ->with(['semester', 'invoiceLines.paymentApplications.payment'])
             ->first();
 
         if (! $charge) {

@@ -12,17 +12,7 @@ import type { PaginatedResponse } from '@/types';
 import { formatCurrency, type Semester } from '@/types/finance';
 import { Head, Link } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import {
-    AlertTriangle,
-    ArrowRight,
-    CheckCircle2,
-    DollarSign,
-    FileText,
-    Play,
-    RotateCcw,
-    Wallet,
-    XCircle
-} from 'lucide-vue-next';
+import { AlertTriangle, ArrowRight, CheckCircle2, DollarSign, FileText, Play, RotateCcw, Wallet, XCircle } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface KpiStats {
@@ -50,23 +40,20 @@ interface StudentBillingSummary {
     status: string;
     stage: 'EGC' | 'Major' | 'Unknown';
     gc_current_level: string | null;
-    total_charged: number;
-    total_credits: number;
-    total_paid: number;
-    balance: number;
-    amount_due: number;
-    unapplied_credit: number;
+    gross_billed: number;
+    total_discounts: number;
+    net_due: number;
+    cash_applied: number;
+    outstanding_amount: number;
+    unapplied_cash: number;
     breakdown: {
         major: number;
         egc: number;
         retake: number;
-        credits: number;
+        discounts: number;
     };
     flags: {
-        has_egc: boolean;
-        has_major: boolean;
         has_retake: boolean;
-        has_defer: boolean;
         is_defer_preserve: boolean;
         is_defer_forfeit: boolean;
         missing_docs: boolean;
@@ -109,18 +96,10 @@ interface Props {
 const props = defineProps<Props>();
 
 // Use Inertia filters composable
-const {
-    filters,
-    handleSelectFilter,
-    handleSortChange,
-    handlePaginationNavigate,
-    handlePageSizeChange,
-    currentSort,
-    currentDirection,
-} = useInertiaFilters<DashboardFilters>({
+const { filters, handleSelectFilter, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection } = useInertiaFilters<DashboardFilters>({
     baseUrl: route('finance.operations.dashboard'),
     initialFilters: {
-        semester_id: (typeof props.filters?.semester_id === 'string' ? props.filters.semester_id : null),
+        semester_id: typeof props.filters?.semester_id === 'string' ? props.filters.semester_id : null,
         status: (typeof props.filters?.status === 'string' ? props.filters.status : 'all') || 'all',
         stage: (typeof props.filters?.stage === 'string' ? props.filters.stage : 'all') || 'all',
         defer: (typeof props.filters?.defer === 'string' ? props.filters.defer : 'all') || 'all',
@@ -158,23 +137,23 @@ const columns: ColumnDef<StudentBillingSummary>[] = [
     },
     // header align right
     {
-        accessorKey: 'total_charged',
-        header: () => 'Charged',
-        enableSorting: true
-    },
-    {
-        accessorKey: 'total_credits',
-        header: () => 'Giảm trừ',
-        enableSorting: false,
-    },
-    {
-        accessorKey: 'total_paid',
-        header: () => 'Paid',
+        accessorKey: 'gross_billed',
+        header: () => 'Gross',
         enableSorting: true,
     },
     {
-        accessorKey: 'balance',
-        header: () => 'Cần đóng',
+        accessorKey: 'total_discounts',
+        header: () => 'Discounts',
+        enableSorting: false,
+    },
+    {
+        accessorKey: 'cash_applied',
+        header: () => 'Cash Applied',
+        enableSorting: true,
+    },
+    {
+        accessorKey: 'outstanding_amount',
+        header: () => 'Còn phải thu',
         enableSorting: true,
     },
     {
@@ -263,7 +242,6 @@ defineOptions({
 </script>
 
 <template>
-
     <Head title="Billing Dashboard" />
 
     <div class="space-y-6">
@@ -274,8 +252,7 @@ defineOptions({
                 <p class="text-muted-foreground mt-1">Tổng quan billing theo kỳ học</p>
             </div>
             <div class="flex items-center gap-3">
-                <Select :model-value="filters.semester_id || 'all'"
-                    @update:model-value="val => handleSelectFilter('semester_id', val)">
+                <Select :model-value="filters.semester_id || 'all'" @update:model-value="(val) => handleSelectFilter('semester_id', val)">
                     <SelectTrigger class="w-[200px]">
                         <SelectValue placeholder="Chọn học kỳ" />
                     </SelectTrigger>
@@ -299,9 +276,7 @@ defineOptions({
                     <FileText class="text-muted-foreground h-4 w-4" />
                 </CardHeader>
                 <CardContent>
-                    <div class="text-2xl font-bold">
-                        {{ kpiStats.charged_count }} / {{ kpiStats.eligible_count }}
-                    </div>
+                    <div class="text-2xl font-bold">{{ kpiStats.charged_count }} / {{ kpiStats.eligible_count }}</div>
                     <div class="flex items-center gap-2">
                         <div class="h-2 w-full rounded-full bg-gray-200">
                             <div class="h-2 rounded-full bg-blue-500" :style="{ width: chargedPercentage + '%' }"></div>
@@ -309,7 +284,7 @@ defineOptions({
                         <span class="text-muted-foreground text-xs">{{ chargedPercentage }}%</span>
                     </div>
                     <p class="text-muted-foreground mt-1 text-xs">
-                        <span class="text-orange-600">{{ kpiStats.uncharged_count }}</span> chưa tạo charge
+                        <span class="text-orange-600">{{ kpiStats.uncharged_count }}</span> chưa có invoice trong kỳ
                     </p>
                 </CardContent>
             </Card>
@@ -317,13 +292,11 @@ defineOptions({
             <!-- Paid / Unpaid -->
             <Card>
                 <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle class="text-sm font-medium">Paid → Total</CardTitle>
+                    <CardTitle class="text-sm font-medium">Fully Settled</CardTitle>
                     <Wallet class="text-muted-foreground h-4 w-4" />
                 </CardHeader>
                 <CardContent>
-                    <div class="text-2xl font-bold">
-                        {{ kpiStats.paid_count }} / {{ kpiStats.charged_count }}
-                    </div>
+                    <div class="text-2xl font-bold">{{ kpiStats.paid_count }} / {{ kpiStats.charged_count }}</div>
                     <div class="flex items-center gap-2">
                         <div class="h-2 w-full rounded-full bg-gray-200">
                             <div class="h-2 rounded-full bg-green-500" :style="{ width: paidPercentage + '%' }"></div>
@@ -331,8 +304,7 @@ defineOptions({
                         <span class="text-muted-foreground text-xs">{{ paidPercentage }}%</span>
                     </div>
                     <p class="text-muted-foreground mt-1 text-xs">
-                        <span class="text-yellow-600">{{ kpiStats.partial_paid_count }}</span> thanh toán một phần,
-                        <span class="text-red-600">{{ kpiStats.unpaid_count }}</span> chưa thanh toán
+                        <span class="text-yellow-600">{{ kpiStats.partial_paid_count }}</span> thanh toán một phần, <span class="text-red-600">{{ kpiStats.unpaid_count }}</span> chưa thanh toán
                     </p>
                 </CardContent>
             </Card>
@@ -346,20 +318,20 @@ defineOptions({
                 <CardContent>
                     <div class="space-y-1">
                         <div class="flex justify-between text-sm">
-                            <span class="text-muted-foreground">Phí:</span>
+                            <span class="text-muted-foreground">Gross billed:</span>
                             <span class="font-medium text-red-600">{{ formatCurrency(kpiStats.total_charges) }}</span>
                         </div>
                         <div class="flex justify-between text-sm">
-                            <span class="text-muted-foreground">Credits:</span>
+                            <span class="text-muted-foreground">Discounts:</span>
                             <span class="font-medium text-green-600">{{ formatCurrency(kpiStats.total_credits) }}</span>
                         </div>
                         <div class="flex justify-between text-sm">
-                            <span class="text-muted-foreground">Đã thu:</span>
+                            <span class="text-muted-foreground">Cash applied:</span>
                             <span class="font-medium text-blue-600">{{ formatCurrency(kpiStats.total_paid) }}</span>
                         </div>
                         <div class="my-1 border-t"></div>
                         <div class="flex justify-between text-sm font-semibold">
-                            <span>Còn lại:</span>
+                            <span>Remaining:</span>
                             <span class="text-orange-600">{{ formatCurrency(kpiStats.total_balance) }}</span>
                         </div>
                     </div>
@@ -432,19 +404,24 @@ defineOptions({
                             Xem Exceptions ({{ kpiStats.uncharged_count }})
                         </Button>
                     </Link>
+                    <Link :href="route('finance.operations.settlement.index')">
+                        <Button variant="outline" class="w-full justify-start">
+                            <Wallet class="mr-2 h-4 w-4" />
+                            Settlement Worklist
+                        </Button>
+                    </Link>
                 </div>
             </CardContent>
         </Card>
 
         <!-- Filters Row -->
-        <div class="flex flex-wrap gap-4 p-4 bg-muted/50 rounded-lg border">
-            <div class="flex-1 min-w-[200px]">
+        <div class="bg-muted/50 flex flex-wrap gap-4 rounded-lg border p-4">
+            <div class="min-w-[200px] flex-1">
                 <Input v-model="filters.search" placeholder="Tìm theo tên hoặc mã SV" />
             </div>
 
-            <div class="flex-1 min-w-[150px]">
-                <Select :model-value="filters.status || 'all'"
-                    @update:model-value="val => handleSelectFilter('status', val)">
+            <div class="min-w-[150px] flex-1">
+                <Select :model-value="filters.status || 'all'" @update:model-value="(val) => handleSelectFilter('status', val)">
                     <SelectTrigger>
                         <SelectValue placeholder="Finance Status" />
                     </SelectTrigger>
@@ -456,9 +433,8 @@ defineOptions({
                 </Select>
             </div>
 
-            <div class="flex-1 min-w-[150px]">
-                <Select :model-value="filters.stage || 'all'"
-                    @update:model-value="val => handleSelectFilter('stage', val)">
+            <div class="min-w-[150px] flex-1">
+                <Select :model-value="filters.stage || 'all'" @update:model-value="(val) => handleSelectFilter('stage', val)">
                     <SelectTrigger>
                         <SelectValue placeholder="Stage" />
                     </SelectTrigger>
@@ -470,9 +446,8 @@ defineOptions({
                 </Select>
             </div>
 
-            <div class="flex-1 min-w-[150px]">
-                <Select :model-value="filters.defer || 'all'"
-                    @update:model-value="val => handleSelectFilter('defer', val)">
+            <div class="min-w-[150px] flex-1">
+                <Select :model-value="filters.defer || 'all'" @update:model-value="(val) => handleSelectFilter('defer', val)">
                     <SelectTrigger>
                         <SelectValue placeholder="Defer Status" />
                     </SelectTrigger>
@@ -485,9 +460,8 @@ defineOptions({
                 </Select>
             </div>
 
-            <div class="flex-1 min-w-[150px]">
-                <Select :model-value="filters.retake || 'all'"
-                    @update:model-value="val => handleSelectFilter('retake', val)">
+            <div class="min-w-[150px] flex-1">
+                <Select :model-value="filters.retake || 'all'" @update:model-value="(val) => handleSelectFilter('retake', val)">
                     <SelectTrigger>
                         <SelectValue placeholder="Retake Status" />
                     </SelectTrigger>
@@ -511,21 +485,14 @@ defineOptions({
                 </div>
             </CardHeader>
             <CardContent class="p-0">
-                <DataTable :data="students.data" :columns="columns" :show-column-toggle="false"
-                    :initial-sort="currentSort" :initial-direction="currentDirection" enable-server-sorting @sort-change="handleSortChange">
+                <DataTable :data="students.data" :columns="columns" :show-column-toggle="false" :initial-sort="currentSort" :initial-direction="currentDirection" enable-server-sorting @sort-change="handleSortChange">
                     <!-- Student Column -->
                     <template #cell-full_name="{ row }">
                         <div>
-                            <div class="font-medium">{{ row.original.full_name }} </div>
+                            <div class="font-medium">{{ row.original.full_name }}</div>
                             <div class="text-muted-foreground text-xs">{{ row.original.student_id }}</div>
-                            <Badge v-if="row.original.status === 'intake_pre_uni_gc'" variant="secondary"
-                                class="mt-1 text-[10px]">
-                                EGC {{ row.original.gc_current_level || '' }}
-                            </Badge>
-                            <Badge v-else-if="row.original.stage === 'Major'" variant="outline"
-                                class="mt-1 text-[10px] bg-blue-50 text-blue-700 border-blue-200">
-                                Major
-                            </Badge>
+                            <Badge v-if="row.original.status === 'intake_pre_uni_gc'" variant="secondary" class="mt-1 text-[10px]"> EGC {{ row.original.gc_current_level || '' }} </Badge>
+                            <Badge v-else-if="row.original.stage === 'Major'" variant="outline" class="mt-1 border-blue-200 bg-blue-50 text-[10px] text-blue-700"> Major </Badge>
                         </div>
                     </template>
 
@@ -537,41 +504,35 @@ defineOptions({
                         </div>
                     </template>
 
-                    <!-- Charged Column -->
-                    <template #cell-total_charged="{ row }">
-                        <div class="text-left font-medium text-red-600"
-                            :title="`Major: ${formatCurrency(row.original.breakdown.major)}\nEGC: ${formatCurrency(row.original.breakdown.egc)}\nRetake: ${formatCurrency(row.original.breakdown.retake)}`">
-                            {{ formatCurrency(row.original.total_charged) }}
+                    <!-- Gross Column -->
+                    <template #cell-gross_billed="{ row }">
+                        <div class="text-left font-medium text-red-600" :title="`Major: ${formatCurrency(row.original.breakdown.major)}\nEGC: ${formatCurrency(row.original.breakdown.egc)}\nRetake: ${formatCurrency(row.original.breakdown.retake)}`">
+                            {{ formatCurrency(row.original.gross_billed) }}
                         </div>
                     </template>
 
-                    <!-- Credits Column -->
-                    <template #cell-total_credits="{ row }">
+                    <!-- Discounts Column -->
+                    <template #cell-total_discounts="{ row }">
                         <div class="text-left font-medium text-sky-600">
-                            {{ formatCurrency(row.original.total_credits) }}
+                            {{ formatCurrency(row.original.total_discounts) }}
                         </div>
                     </template>
 
-                    <!-- Paid Column -->
-                    <template #cell-total_paid="{ row }">
+                    <!-- Cash Applied Column -->
+                    <template #cell-cash_applied="{ row }">
                         <div class="text-left font-medium text-green-600">
-                            {{ formatCurrency(row.original.total_paid) }}
+                            {{ formatCurrency(row.original.cash_applied) }}
                         </div>
                     </template>
 
-                    <!-- Balance Column -->
-                    <template #cell-balance="{ row }">
+                    <!-- Outstanding Column -->
+                    <template #cell-outstanding_amount="{ row }">
                         <div class="text-left font-medium">
-                            <span :class="row.original.amount_due > 0 ? 'text-orange-600' : 'text-green-600'">
-                                {{ formatCurrency(row.original.amount_due) }}
+                            <span :class="row.original.outstanding_amount > 0 ? 'text-orange-600' : 'text-green-600'">
+                                {{ formatCurrency(row.original.outstanding_amount) }}
                             </span>
-                            <div v-if="row.original.balance < 0" class="text-xs text-green-600">
-                                Dư {{ formatCurrency(Math.abs(row.original.balance)) }}
-                            </div>
-                            <div v-if="row.original.unapplied_credit > 0" class="text-xs text-green-600"
-                                title="Unapplied Credit (Wallet)">
-                                +{{ formatCurrency(row.original.unapplied_credit) }}
-                            </div>
+                            <div v-if="row.original.unapplied_cash > 0" class="text-xs text-green-600" title="Unapplied Cash">+{{ formatCurrency(row.original.unapplied_cash) }} unapplied</div>
+                            <div v-if="row.original.net_due > 0" class="text-muted-foreground text-xs">Net due {{ formatCurrency(row.original.net_due) }}</div>
                         </div>
                     </template>
 
@@ -579,25 +540,13 @@ defineOptions({
                     <template #cell-flags="{ row }">
                         <div class="flex flex-wrap gap-1">
                             <!-- Defer Flags -->
-                            <Badge v-if="row.original.flags.is_defer_preserve" variant="outline"
-                                class="bg-purple-50 text-purple-700 border-purple-200">
-                                Defer Preserve
-                            </Badge>
-                            <Badge v-if="row.original.flags.is_defer_forfeit" variant="outline"
-                                class="bg-red-50 text-red-700 border-red-200">
-                                Defer Forfeit
-                            </Badge>
-                            <Badge v-if="row.original.flags.missing_docs" variant="destructive" class="text-[10px]">
-                                Missing Docs</Badge>
+                            <Badge v-if="row.original.flags.is_defer_preserve" variant="outline" class="border-purple-200 bg-purple-50 text-purple-700"> Defer Preserve </Badge>
+                            <Badge v-if="row.original.flags.is_defer_forfeit" variant="outline" class="border-red-200 bg-red-50 text-red-700"> Defer Forfeit </Badge>
+                            <Badge v-if="row.original.flags.missing_docs" variant="destructive" class="text-[10px]"> Missing Docs</Badge>
 
                             <!-- Retake Flag -->
-                            <Badge v-if="row.original.flags.has_retake" variant="outline"
-                                class="bg-orange-50 text-orange-700 border-orange-200">
-                                Retake
-                            </Badge>
-                            <Badge v-if="row.original.flags.uncharged" variant="secondary" class="text-gray-500">
-                                Uncharged
-                            </Badge>
+                            <Badge v-if="row.original.flags.has_retake" variant="outline" class="border-orange-200 bg-orange-50 text-orange-700"> Retake </Badge>
+                            <Badge v-if="row.original.flags.uncharged" variant="secondary" class="text-gray-500"> Uncharged </Badge>
                         </div>
                     </template>
 
@@ -608,9 +557,7 @@ defineOptions({
                                 <Badge :class="getStatusBadgeClass(invoice.status)">
                                     {{ getStatusLabel(invoice.status) }}
                                 </Badge>
-                                <span class="text-xs text-muted-foreground">
-                                    #{{ invoice.invoice_number }}
-                                </span>
+                                <span class="text-muted-foreground text-xs"> #{{ invoice.invoice_number }} </span>
                             </div>
                         </div>
                         <div v-else class="flex flex-col items-start gap-1">
@@ -635,7 +582,6 @@ defineOptions({
         </Card>
 
         <!-- Pagination -->
-        <DataPagination :pagination-data="students" @navigate="handlePaginationNavigate"
-            @page-size-change="handlePageSizeChange" />
+        <DataPagination :pagination-data="students" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
     </div>
 </template>

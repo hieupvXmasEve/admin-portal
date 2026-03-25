@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Operations;
 
 use App\Models\FinanceCharge;
+use App\Models\InvoiceDiscount;
 use App\Models\Student;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Services\DeferChargeResolver;
@@ -85,8 +86,6 @@ class PreviewChargeGenerationQuery
                 ->exists();
             $hasExistingInvoice = $hasReusableInvoice || $hasFinalizedInvoice;
 
-            $hasRetake = $student->courseRegistrations->isNotEmpty();
-
             // 1. Calculate based on Status
 
             // Case A: Pre-Uni GC
@@ -94,47 +93,60 @@ class PreviewChargeGenerationQuery
                 if ($shouldSkipFullCharges) {
                     $breakdown[] = ['label' => 'EGC Fee (Deferred)', 'amount' => 0];
                 } else {
-                    $startLevel = $student->gc_current_level ?? 1;
-                    $totalLevels = $student->gc_total_levels ?? 6;
+                    $existingEgcIssuedInInvoice = StudentInvoice::query()
+                        ->where('student_id', $student->id)
+                        ->where('semester_id', $semesterId)
+                        ->whereHas('invoiceLines.charge', function ($query) {
+                            $query->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
+                                ->where('status', FinanceCharge::STATUS_ACTIVE);
+                        })
+                        ->exists();
 
-                    $levelsToCharge = [$startLevel];
-                    // Rule: Charge next level if within bounds (0 to total-1)
-                    // gc_total_levels is count (e.g. 6). Indices are 0..5.
-                    // Next level must be < total.
-                    if (($startLevel + 1) < $totalLevels) {
-                        $levelsToCharge[] = $startLevel + 1;
-                    }
+                    if ($existingEgcIssuedInInvoice) {
+                        // Semester package already issued; skip the entire EGC generation for this student.
+                    } else {
+                        $startLevel = $student->gc_current_level ?? 1;
+                        $totalLevels = $student->gc_total_levels ?? 6;
 
-                    foreach ($levelsToCharge as $level) {
-                        $unit = \App\Models\Unit::where('unit_type', 'egc')->where('level', $level)->first();
-                        $fee = $unit ? (float) $unit->base_fee : 0;
+                        $levelsToCharge = [$startLevel];
+                        // Rule: Charge next level if within bounds (0 to total-1)
+                        // gc_total_levels is count (e.g. 6). Indices are 0..5.
+                        // Next level must be < total.
+                        if (($startLevel + 1) < $totalLevels) {
+                            $levelsToCharge[] = $startLevel + 1;
+                        }
 
-                        if ($fee > 0) {
-                            // Check specific level existence
-                            $exists = FinanceCharge::where('student_id', $student->id)
-                                ->where('semester_id', $semesterId)
-                                ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
-                                ->where('description', 'like', "%Start Level {$level}%")
-                                ->active()
-                                ->exists();
+                        foreach ($levelsToCharge as $level) {
+                            $unit = \App\Models\Unit::where('unit_type', 'egc')->where('level', $level)->first();
+                            $fee = $unit ? (float) $unit->base_fee : 0;
 
-                            // Legacy check
-                            if (! $exists) {
+                            if ($fee > 0) {
+                                // Check specific level existence
                                 $exists = FinanceCharge::where('student_id', $student->id)
                                     ->where('semester_id', $semesterId)
                                     ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
-                                    ->where('description', 'like', "%Level {$level}%")
+                                    ->where('description', 'like', "%Start Level {$level}%")
                                     ->active()
                                     ->exists();
-                            }
 
-                            if ($exists) {
-                                $breakdown[] = ['label' => "GC Level {$level} (Skipped)", 'amount' => 0];
-                                $hasExistingCharge = true;
-                            } else {
-                                $breakdown[] = ['label' => "EGC Level {$level} Fee", 'amount' => $fee];
-                                $studentTotal += $fee;
-                                $grossAmount += $fee;
+                                // Legacy check
+                                if (! $exists) {
+                                    $exists = FinanceCharge::where('student_id', $student->id)
+                                        ->where('semester_id', $semesterId)
+                                        ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
+                                        ->where('description', 'like', "%Level {$level}%")
+                                        ->active()
+                                        ->exists();
+                                }
+
+                                if ($exists) {
+                                    $breakdown[] = ['label' => "GC Level {$level} (Skipped)", 'amount' => 0];
+                                    $hasExistingCharge = true;
+                                } else {
+                                    $breakdown[] = ['label' => "EGC Level {$level} Fee", 'amount' => $fee];
+                                    $studentTotal += $fee;
+                                    $grossAmount += $fee;
+                                }
                             }
                         }
                     }
@@ -146,8 +158,10 @@ class PreviewChargeGenerationQuery
                 if ($shouldSkipFullCharges) {
                     $breakdown[] = ['label' => 'Tuition (Deferred)', 'amount' => 0];
                 } else {
-                    $amount = $this->getTuitionFee($student, $semesterId);
-                    if ($amount !== null) {
+                    $tuitionTerm = $this->getTuitionTermData($student, $semesterId);
+                    $amount = $tuitionTerm['amount'];
+
+                    if ($amount !== null && $amount > 0) {
                         if ($this->checkChargeExists($student, $semesterId, FinanceCharge::TYPE_TUITION_TERM)) {
                             $breakdown[] = ['label' => 'Tuition (Skipped)', 'amount' => 0];
                             $hasExistingCharge = true;
@@ -158,12 +172,15 @@ class PreviewChargeGenerationQuery
 
                             // Scholarship (Only for Course Tuition)
                             if ($student->scholarshipAward) {
-                                $exists = FinanceCharge::where('student_id', $student->id)
-                                    ->where('semester_id', $semesterId)
-                                    ->where('charge_type', FinanceCharge::TYPE_SCHOLARSHIP_CREDIT)
-                                    ->exists();
+                                $existingScholarshipDiscount = $reusableInvoice
+                                    ? InvoiceDiscount::query()
+                                        ->where('invoice_id', $reusableInvoice->id)
+                                        ->where('discount_type', 'scholarship')
+                                        ->where('reference_id', $student->scholarshipAward->id)
+                                        ->exists()
+                                    : false;
 
-                                if ($exists) {
+                                if ($existingScholarshipDiscount) {
                                     $breakdown[] = ['label' => 'Scholarship (Skipped)', 'amount' => 0];
                                     $hasExistingCharge = true;
                                 } else {
@@ -228,8 +245,14 @@ class PreviewChargeGenerationQuery
             }
 
             // Determine Invoice Eligibility
-            $isTuitionEligible = ($student->status === 'intake_course' && in_array(FinanceCharge::TYPE_TUITION_TERM, $chargeTypes) && $this->getTuitionFee($student, $semesterId) !== null);
-            $shouldGenInvoice = ($grossAmount > 0) || $hasRetake || $hasReusableInvoice || $isTuitionEligible;
+            $tuitionTerm = $student->status === 'intake_course' && in_array(FinanceCharge::TYPE_TUITION_TERM, $chargeTypes)
+                ? $this->getTuitionTermData($student, $semesterId)
+                : ['amount' => null];
+            $isTuitionEligible = ($student->status === 'intake_course'
+                && in_array(FinanceCharge::TYPE_TUITION_TERM, $chargeTypes)
+                && ($tuitionTerm['amount'] ?? null) !== null
+                && (float) ($tuitionTerm['amount'] ?? 0) > 0);
+            $shouldGenInvoice = ($grossAmount > 0) || $hasReusableInvoice || $isTuitionEligible;
 
             $willCreateInvoice = $shouldGenInvoice && ! $hasReusableInvoice;
 
@@ -291,24 +314,24 @@ class PreviewChargeGenerationQuery
         ];
     }
 
-    private function getTuitionFee(Student $student, int $semesterId): ?float
+    private function getTuitionTermData(Student $student, int $semesterId): array
     {
         $intakeMajor = $student->intake_major;
 
         // Use intake_major as the start milestone.
         if (! $intakeMajor || $semesterId < $intakeMajor) {
-            return null;
+            return ['term_number' => null, 'amount' => null, 'chargeable_term_index' => null];
         }
 
         $intakeSemester = \App\Models\Semester::find($intakeMajor);
         $targetSemester = \App\Models\Semester::find($semesterId);
 
         if (! $intakeSemester || ! $targetSemester) {
-            return null;
+            return ['term_number' => null, 'amount' => null, 'chargeable_term_index' => null];
         }
 
         if ($targetSemester->start_date < $intakeSemester->start_date) {
-            return null;
+            return ['term_number' => null, 'amount' => null, 'chargeable_term_index' => null];
         }
 
         $termNumber = \App\Models\Semester::where('start_date', '>=', $intakeSemester->start_date)
@@ -321,14 +344,27 @@ class PreviewChargeGenerationQuery
             ->first();
 
         if (! $plan) {
-            return null;
+            return ['term_number' => null, 'amount' => null, 'chargeable_term_index' => null];
         }
 
         $term = \App\Models\TuitionPlanTerm::where('tuition_plan_id', $plan->id)
             ->where('term_number', $termNumber)
             ->first();
 
-        return $term ? (float) $term->amount : null;
+        if (! $term) {
+            return ['term_number' => $termNumber, 'amount' => null, 'chargeable_term_index' => null];
+        }
+
+        $chargeableTermIndex = \App\Models\TuitionPlanTerm::where('tuition_plan_id', $plan->id)
+            ->where('term_number', '<=', $termNumber)
+            ->where('amount', '>', 0)
+            ->count();
+
+        return [
+            'term_number' => $termNumber,
+            'amount' => (float) $term->amount,
+            'chargeable_term_index' => $chargeableTermIndex > 0 ? $chargeableTermIndex : null,
+        ];
     }
 
     private function checkChargeExists(Student $student, int $semesterId, string $type): bool

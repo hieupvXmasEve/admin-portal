@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Student;
 
 use App\Http\Controllers\Controller;
+use App\Http\Responses\ApiResponse;
 use App\Models\FinanceCharge;
 use App\Models\Payment;
 use App\Models\Semester;
-use App\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -145,7 +145,7 @@ class FinanceController extends Controller
             $charges = FinanceCharge::query()
                 ->forStudent($student->id)
                 ->forSemester($semesterId)
-                ->with(['source', 'allocations.payment']) // Load allocations and payment
+                ->with(['source', 'invoiceLines.paymentApplications.payment'])
                 ->orderBy('effective_at')
                 ->get();
 
@@ -166,16 +166,19 @@ class FinanceController extends Controller
             // Payment History
             $payments = collect();
             foreach ($charges as $charge) {
-                foreach ($charge->allocations as $allocation) {
-                    $payment = $allocation->payment;
-                    if ($payment) {
-                        $payments->push([
-                            'payment_id' => $payment->id,
-                            'payment_date' => $payment->paid_at,
-                            'method' => $payment->method,
-                            'total_payment_amount' => (float) $payment->amount, // Original payment
-                            'allocated_to_this_semester' => (float) $allocation->allocated_amount,
-                        ]);
+                foreach ($charge->invoiceLines as $line) {
+                    foreach ($line->paymentApplications as $application) {
+                        $payment = $application->payment;
+
+                        if ($payment && (float) $application->amount > 0) {
+                            $payments->push([
+                                'payment_id' => $payment->id,
+                                'payment_date' => $payment->paid_at,
+                                'method' => $payment->method,
+                                'total_payment_amount' => (float) $payment->amount,
+                                'allocated_to_this_semester' => (float) $application->amount,
+                            ]);
+                        }
                     }
                 }
             }
