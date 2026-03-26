@@ -145,7 +145,7 @@ class PaymentService
      */
     public function autoAllocatePayment(int $paymentId, string $strategy = 'oldest_first'): Collection
     {
-        $payment = Payment::with('allocations')->findOrFail($paymentId);
+        $payment = Payment::query()->findOrFail($paymentId);
         $unappliedAmount = $payment->unapplied_amount;
 
         if ($unappliedAmount <= 0) {
@@ -187,8 +187,7 @@ class PaymentService
     {
         $query = FinanceCharge::where('student_id', $studentId)
             ->where('status', FinanceCharge::STATUS_ACTIVE)
-            ->where('amount', '>', 0)
-            ->with('allocations');
+            ->where('amount', '>', 0);
 
         if ($semesterId) {
             $query->where('semester_id', $semesterId);
@@ -214,7 +213,6 @@ class PaymentService
     {
         $payments = Payment::where('student_id', $studentId)
             ->where('status', Payment::STATUS_COMPLETED)
-            ->with('allocations')
             ->get();
 
         return $payments->sum(function ($payment) {

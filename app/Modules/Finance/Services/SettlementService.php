@@ -15,6 +15,59 @@ use Illuminate\Database\Eloquent\Collection;
 
 class SettlementService
 {
+    public function deriveInvoiceSnapshot(StudentInvoice $invoice): array
+    {
+        $invoice->loadMissing([
+            'invoiceLines.charge',
+            'invoiceLines.paymentApplications',
+            'invoiceLines.discountAllocations',
+        ]);
+
+        $activeLines = $invoice->invoiceLines
+            ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line))
+            ->values();
+
+        $gross = (float) $activeLines
+            ->where('amount_snapshot', '>', 0)
+            ->sum('amount_snapshot');
+
+        $discount = (float) $activeLines
+            ->sum(fn (InvoiceLine $line) => max(0, (float) $line->discountAllocations->sum('amount')));
+
+        if ($discount === 0.0) {
+            $discount = abs((float) $activeLines
+                ->where('amount_snapshot', '<', 0)
+                ->sum('amount_snapshot'));
+        }
+
+        $net = max(0, $gross - $discount);
+
+        $paid = max(0, (float) $activeLines
+            ->sum(fn (InvoiceLine $line) => max(0, (float) $line->paymentApplications->sum('amount'))));
+
+        $paid = min($paid, $net);
+        $remaining = max(0, $net - $paid);
+
+        $status = $invoice->status === 'draft' ? 'draft' : 'pending';
+
+        if ($net <= 0 || $remaining <= 0) {
+            $status = 'paid';
+        } elseif ($paid > 0) {
+            $status = 'partial';
+        } elseif ($invoice->due_date && $invoice->due_date->isPast()) {
+            $status = 'overdue';
+        }
+
+        return [
+            'gross' => $gross,
+            'discount' => $discount,
+            'net' => $net,
+            'paid' => $paid,
+            'remaining' => $remaining,
+            'status' => $status,
+        ];
+    }
+
     public function getPaymentAllocatedAmount(Payment $payment): float
     {
         return max(0, (float) PaymentApplication::query()
@@ -68,53 +121,15 @@ class SettlementService
 
     public function recalculateInvoiceSnapshot(StudentInvoice $invoice): void
     {
-        $activeLines = InvoiceLine::query()
-            ->with('charge')
-            ->where('invoice_id', $invoice->id)
-            ->where('status', 'active')
-            ->get()
-            ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line))
-            ->values();
-
-        $gross = (float) $activeLines
-            ->where('amount_snapshot', '>', 0)
-            ->sum('amount_snapshot');
-
-        $discount = max(0, (float) DiscountAllocation::query()
-            ->whereIn('invoice_line_id', $activeLines->pluck('id'))
-            ->sum('amount'));
-
-        $paid = max(0, (float) PaymentApplication::query()
-            ->whereIn('invoice_line_id', $activeLines->pluck('id'))
-            ->sum('amount'));
-
-        if ($discount === 0.0) {
-            $legacyCredit = abs((float) $activeLines
-                ->where('amount_snapshot', '<', 0)
-                ->sum('amount_snapshot'));
-
-            $discount = $legacyCredit;
-        }
-
-        $net = max(0, $gross - $discount);
-
-        $status = $invoice->status === 'draft' ? 'draft' : 'pending';
-
-        if ($net <= 0 || $paid >= $net) {
-            $status = 'paid';
-        } elseif ($paid > 0) {
-            $status = 'partial';
-        } elseif ($invoice->due_date && $invoice->due_date->isPast()) {
-            $status = 'overdue';
-        }
+        $snapshot = $this->deriveInvoiceSnapshot($invoice);
 
         $invoice->forceFill([
-            'subtotal' => $gross,
-            'discount_total' => $discount,
-            'total_amount' => $net,
-            'paid_amount' => min($paid, $net),
-            'status' => $status,
-            'paid_at' => $status === 'paid' && $paid > 0 ? now() : null,
+            'subtotal' => $snapshot['gross'],
+            'discount_total' => $snapshot['discount'],
+            'total_amount' => $snapshot['net'],
+            'paid_amount' => $snapshot['paid'],
+            'status' => $snapshot['status'],
+            'paid_at' => $snapshot['status'] === 'paid' && $snapshot['paid'] > 0 ? now() : null,
         ])->save();
     }
 

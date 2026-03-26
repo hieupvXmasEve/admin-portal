@@ -110,7 +110,9 @@ class StudentInvoice extends Model
      */
     public function getTotalAmountAttribute(): float
     {
-        return (float) ($this->attributes['total_amount'] ?? 0);
+        $snapshot = app(SettlementService::class)->deriveInvoiceSnapshot($this);
+
+        return (float) $snapshot['net'];
     }
 
     /**
@@ -118,7 +120,9 @@ class StudentInvoice extends Model
      */
     public function getPaidAmountAttribute(): float
     {
-        return (float) ($this->attributes['paid_amount'] ?? 0);
+        $snapshot = app(SettlementService::class)->deriveInvoiceSnapshot($this);
+
+        return (float) $snapshot['paid'];
     }
 
     /**
@@ -126,7 +130,9 @@ class StudentInvoice extends Model
      */
     public function getOutstandingBalanceAttribute(): float
     {
-        return max(0, (float) $this->total_amount - (float) $this->paid_amount);
+        $snapshot = app(SettlementService::class)->deriveInvoiceSnapshot($this);
+
+        return (float) $snapshot['remaining'];
     }
 
     /**
@@ -194,25 +200,30 @@ class StudentInvoice extends Model
      */
     public function scopeFilterByStatus($query, string $status)
     {
-        switch ($status) {
-            case 'zero_amount':
-                return $query->where('total_amount', '<=', 0);
+        $candidates = (clone $query)
+            ->with(['invoiceLines.charge', 'invoiceLines.paymentApplications', 'invoiceLines.discountAllocations'])
+            ->get();
 
-            case 'overdue':
-                return $query->where('due_date', '<', now())
-                    ->whereColumn('paid_amount', '<', 'total_amount');
+        $matchingIds = $candidates
+            ->filter(function (StudentInvoice $invoice) use ($status) {
+                $realTimeStatus = $invoice->real_time_status;
 
-            case 'paid':
-                return $query->whereColumn('paid_amount', '>=', 'total_amount');
+                return match ($status) {
+                    'zero_amount' => $realTimeStatus === 'zero_amount',
+                    'overdue' => $realTimeStatus === 'overdue',
+                    'paid' => $realTimeStatus === 'paid',
+                    'open' => $realTimeStatus === 'open',
+                    default => $invoice->status === $status,
+                };
+            })
+            ->pluck('id')
+            ->all();
 
-            case 'open':
-                return $query->where('due_date', '>=', now())
-                    ->whereColumn('paid_amount', '<', 'total_amount')
-                    ->where('total_amount', '>', 0);
-
-            default:
-                return $query->where('status', $status);
+        if ($matchingIds === []) {
+            return $query->whereRaw('1 = 0');
         }
+
+        return $query->whereIn('id', $matchingIds);
     }
 
     // =====================
@@ -224,11 +235,13 @@ class StudentInvoice extends Model
      */
     public function getRealTimeStatusAttribute(): string
     {
-        if ($this->total_amount <= 0) {
+        $snapshot = app(SettlementService::class)->deriveInvoiceSnapshot($this);
+
+        if ($snapshot['net'] <= 0) {
             return 'zero_amount';
         }
 
-        if ($this->outstanding_balance <= 0) {
+        if ($snapshot['remaining'] <= 0) {
             return 'paid';
         }
 

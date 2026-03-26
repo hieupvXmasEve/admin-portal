@@ -11,6 +11,7 @@ use App\Models\StudentInvoice;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\BillingScopeHelper;
+use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -61,7 +62,11 @@ class GenerateBatchChargesAction
 
         $deferChargeResolver = app(DeferChargeResolver::class);
         $invoiceService = app(InvoiceGenerationService::class);
+        $studentChargeTimingResolver = app(StudentChargeTimingResolver::class);
         $voucherDiscountAmountResolver = app(VoucherDiscountAmountResolver::class);
+        $students = $students
+            ->filter(fn (Student $student) => $studentChargeTimingResolver->shouldIncludeStudentForChargeGeneration($student, $semesterId, $chargeTypes))
+            ->values();
 
         $stats = [
             'total_students' => $students->count(),
@@ -77,6 +82,10 @@ class GenerateBatchChargesAction
         try {
             foreach ($students as $student) {
                 try {
+                    $canGenerateEgc = in_array(FinanceCharge::TYPE_EGC_LEVEL_FEE, $chargeTypes, true)
+                        && $studentChargeTimingResolver->shouldGenerateEgcForSemester($student, $semesterId);
+                    $canGenerateTuition = in_array(FinanceCharge::TYPE_TUITION_TERM, $chargeTypes, true)
+                        && $studentChargeTimingResolver->shouldGenerateTuitionForSemester($student, $semesterId);
                     $deferCase = $deferChargeResolver->findApplicableFullCase($student, $semesterId);
                     $shouldSkipFullCharges = $deferCase !== null;
                     $didSkipPreserveCharge = false;
@@ -88,7 +97,7 @@ class GenerateBatchChargesAction
                     $potentialAmount = 0;
 
                     // Check Tuition/EGC Amount
-                    if ($student->status === 'intake_pre_uni_gc' && in_array(FinanceCharge::TYPE_EGC_LEVEL_FEE, $chargeTypes)) {
+                    if ($canGenerateEgc) {
                         if ($shouldSkipFullCharges) {
                             $potentialAmount = 0;
                         } else {
@@ -122,9 +131,9 @@ class GenerateBatchChargesAction
                             }
                         }
                     }
-                    if ($student->status === 'intake_course' && in_array(FinanceCharge::TYPE_TUITION_TERM, $chargeTypes)) {
+                    if ($canGenerateTuition) {
                         if (! $shouldSkipFullCharges) {
-                            $tuitionTerm = self::getTuitionTermData($student, $semesterId);
+                            $tuitionTerm = $studentChargeTimingResolver->getTuitionTermData($student, $semesterId);
                             $amt = $tuitionTerm['amount'];
 
                             if ($amt !== null && $amt > 0) {
@@ -163,7 +172,7 @@ class GenerateBatchChargesAction
                     // 2. Generate based on Status
 
                     // Case A: Intake Pre-Uni GC -> GC Fee
-                    if ($student->status === 'intake_pre_uni_gc' && in_array(FinanceCharge::TYPE_EGC_LEVEL_FEE, $chargeTypes)) {
+                    if ($canGenerateEgc) {
                         if ($shouldSkipFullCharges) {
                             $didSkipPreserveCharge = true;
                         } else {
@@ -211,11 +220,11 @@ class GenerateBatchChargesAction
                     }
 
                     // Case B: Intake Course -> Tuition
-                    if ($student->status === 'intake_course' && in_array(FinanceCharge::TYPE_TUITION_TERM, $chargeTypes)) {
+                    if ($canGenerateTuition) {
                         if ($shouldSkipFullCharges) {
                             $didSkipPreserveCharge = true;
                         } else {
-                            $tuitionTerm = self::getTuitionTermData($student, $semesterId);
+                            $tuitionTerm = $studentChargeTimingResolver->getTuitionTermData($student, $semesterId);
                             $amount = $tuitionTerm['amount'];
 
                             if ($amount !== null && $amount > 0) {
@@ -362,58 +371,6 @@ class GenerateBatchChargesAction
         }
 
         return $stats;
-    }
-
-    private static function getTuitionTermData(Student $student, int $semesterId): array
-    {
-        $intakeMajor = $student->intake_major;
-
-        if (! $intakeMajor || $semesterId < $intakeMajor) {
-            return ['term_number' => null, 'amount' => null, 'chargeable_term_index' => null];
-        }
-
-        $intakeSemester = \App\Models\Semester::find($intakeMajor);
-        $targetSemester = \App\Models\Semester::find($semesterId);
-
-        if (! $intakeSemester || ! $targetSemester) {
-            return ['term_number' => null, 'amount' => null, 'chargeable_term_index' => null];
-        }
-
-        if ($targetSemester->start_date < $intakeSemester->start_date) {
-            return ['term_number' => null, 'amount' => null, 'chargeable_term_index' => null];
-        }
-
-        $termNumber = \App\Models\Semester::where('start_date', '>=', $intakeSemester->start_date)
-            ->where('start_date', '<=', $targetSemester->start_date)
-            ->count();
-
-        // Find plan based on student's university intake cohort
-        $plan = \App\Models\TuitionPlan::where('curriculum_version_id', $student->curriculum_version_id)
-            ->where('intake_semester_id', $student->intake_semester_id)
-            ->first();
-
-        if (! $plan) {
-            return ['term_number' => null, 'amount' => null, 'chargeable_term_index' => null];
-        }
-
-        $term = \App\Models\TuitionPlanTerm::where('tuition_plan_id', $plan->id)
-            ->where('term_number', $termNumber)
-            ->first();
-
-        if (! $term) {
-            return ['term_number' => $termNumber, 'amount' => null, 'chargeable_term_index' => null];
-        }
-
-        $chargeableTermIndex = \App\Models\TuitionPlanTerm::where('tuition_plan_id', $plan->id)
-            ->where('term_number', '<=', $termNumber)
-            ->where('amount', '>', 0)
-            ->count();
-
-        return [
-            'term_number' => $termNumber,
-            'amount' => (float) $term->amount,
-            'chargeable_term_index' => $chargeableTermIndex > 0 ? $chargeableTermIndex : null,
-        ];
     }
 
     private static function findReusableInvoice(int $studentId, int $semesterId): ?StudentInvoice

@@ -7,10 +7,15 @@ namespace App\Modules\Finance\Queries\Operations;
 use App\Models\DeferCase;
 use App\Models\Student;
 use App\Models\StudentInvoice;
+use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Database\Eloquent\Builder;
 
 class GetBillingDashboardStatsQuery
 {
+    public function __construct(
+        protected SettlementService $settlementService,
+    ) {}
+
     public function handle(?int $semesterId): array
     {
         $campusId = app()->bound('campus') ? app('campus')->id : null;
@@ -45,24 +50,28 @@ class GetBillingDashboardStatsQuery
         $eligibleCount = $eligibleQuery->count();
 
         $semesterInvoices = StudentInvoice::query()
-            ->with(['invoiceLines.charge', 'discounts'])
+            ->with(['invoiceLines.charge', 'invoiceLines.paymentApplications', 'invoiceLines.discountAllocations'])
             ->where('semester_id', $semesterId)
             ->when($campusId, fn ($q) => $q->whereHas('student', fn ($sq) => $sq->where('campus_id', $campusId)))
             ->get();
 
         $chargedCount = $semesterInvoices->pluck('student_id')->unique()->count();
 
-        $totalCharges = (float) $semesterInvoices->sum(fn (StudentInvoice $invoice) => $this->grossAmount($invoice));
-        $totalCredits = (float) $semesterInvoices->sum(fn (StudentInvoice $invoice) => $this->discountAmount($invoice));
-        $totalPaid = (float) $semesterInvoices->sum(fn (StudentInvoice $invoice) => (float) $invoice->paid_amount);
-        $totalBalance = (float) $semesterInvoices->sum(fn (StudentInvoice $invoice) => max(0, $this->netDueAmount($invoice) - (float) $invoice->paid_amount));
+        $snapshots = $semesterInvoices->mapWithKeys(fn (StudentInvoice $invoice) => [
+            $invoice->id => $this->settlementService->deriveInvoiceSnapshot($invoice),
+        ]);
+
+        $totalCharges = (float) $semesterInvoices->sum(fn (StudentInvoice $invoice) => $snapshots[$invoice->id]['gross']);
+        $totalCredits = (float) $semesterInvoices->sum(fn (StudentInvoice $invoice) => $snapshots[$invoice->id]['discount']);
+        $totalPaid = (float) $semesterInvoices->sum(fn (StudentInvoice $invoice) => $snapshots[$invoice->id]['paid']);
+        $totalBalance = (float) $semesterInvoices->sum(fn (StudentInvoice $invoice) => $snapshots[$invoice->id]['remaining']);
 
         $invoiceBalances = $semesterInvoices
             ->groupBy('student_id')
-            ->map(function ($invoices) {
+            ->map(function ($invoices) use ($snapshots) {
                 return [
-                    'net_due' => (float) $invoices->sum(fn (StudentInvoice $invoice) => $this->netDueAmount($invoice)),
-                    'paid' => (float) $invoices->sum('paid_amount'),
+                    'net_due' => (float) $invoices->sum(fn (StudentInvoice $invoice) => $snapshots[$invoice->id]['net']),
+                    'paid' => (float) $invoices->sum(fn (StudentInvoice $invoice) => $snapshots[$invoice->id]['paid']),
                 ];
             });
 
@@ -120,20 +129,5 @@ class GetBillingDashboardStatsQuery
             'defer_forfeit_count' => $deferForfeitCount,
             'retake_unpaid_count' => $retakeUnpaidCount,
         ];
-    }
-
-    private function grossAmount(StudentInvoice $invoice): float
-    {
-        return max((float) $invoice->subtotal, (float) $invoice->invoiceLines->sum('amount_snapshot'));
-    }
-
-    private function discountAmount(StudentInvoice $invoice): float
-    {
-        return max((float) $invoice->discount_total, (float) $invoice->discounts->sum('amount'));
-    }
-
-    private function netDueAmount(StudentInvoice $invoice): float
-    {
-        return max(0, $this->grossAmount($invoice) - $this->discountAmount($invoice));
     }
 }

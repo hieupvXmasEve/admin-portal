@@ -1,6 +1,6 @@
 # System Architecture
 
-Last updated: 2026-03-23  
+Last updated: 2026-03-26  
 Owner: Platform Team  
 Status: Current-state architecture map  
 Source of truth: route files, middleware, module providers, runtime entrypoints
@@ -36,6 +36,14 @@ Client (Web SPA / API)
 - Identity: `app/Modules/Identity`
 - Academic: `app/Modules/Academic`
 - Finance: `app/Modules/Finance`
+    - Settlement baseline now centers on:
+        - `payments` as canonical cash receipt
+        - `payment_applications` as line-level cash application ledger
+        - `invoice_discounts` as invoice discount headers
+        - `discount_allocations` as line-level discount allocation ledger
+        - `student_invoices` snapshot columns (`subtotal`, `discount_total`, `total_amount`, `paid_amount`) as cache only
+    - `payment_allocations` is no longer part of live runtime settlement truth.
+    - New finance ops route cluster includes `finance/operations/settlement` for student-centric settlement worklist and apply flow.
 - Notification: `app/Modules/Notification` (V2 domain event + outbox architecture)
     - Actions: `PublishDomainEventAction`, `DispatchOutboxBatchAction`, `PersistIntentAction`, `SendManualNotificationV2Action`, `RetryDeliveryAction`, `RetryOutboxAction`, `HandleOutboxEventAction`
     - Channels: `EmailChannelAdapter`, `RealtimeChannelAdapter` (contracts: `ChannelAdapter`)
@@ -75,6 +83,9 @@ Current EGC to major baseline:
     - `FilterSearchInput.vue` — debounced search input (300ms default)
     - `FilterDateRange.vue` — date range picker (2 grid cells)
     - `FilterSelect.vue` — select dropdown for enum/status filters
+- Finance operations frontend now has two finance-specific ops views aligned to the new settlement model:
+    - `resources/js/pages/Finance/Operations/Settlement.vue`
+    - `resources/js/pages/Finance/Operations/Dashboard.vue` (cards/tables renamed toward gross/discounts/cash applied/outstanding semantics)
 
 ## 3) Auth and Middleware Surface Map
 
@@ -200,16 +211,16 @@ Phase 1 guardrails:
 
 Scheduled via `routes/console.php` with `onOneServer()` guard:
 
-| Command | Frequency | Purpose |
-|---------|-----------|---------|
-| `notifications:process-outbox --limit=100` | Every minute | Process pending outbox events |
-| `sessions:update-statuses` | Every 30 min | Update class session statuses |
-| `events:process-completions` | Hourly | Process event completions |
-| `events:send-reminders` | Daily 00:10 | Send event reminders |
-| `events:process-failed-gold-rewards` | Daily 02:00 | Retry failed gold rewards |
-| `academic-records:sync` | Daily 03:00 | Sync from Canvas |
-| `attendance:sync-to-academic-records` | Every 2 hours | Sync attendance |
-| `academic-records:aggregate-manual` | Daily 04:00 | Aggregate manual grades |
+| Command                                    | Frequency     | Purpose                       |
+| ------------------------------------------ | ------------- | ----------------------------- |
+| `notifications:process-outbox --limit=100` | Every minute  | Process pending outbox events |
+| `sessions:update-statuses`                 | Every 30 min  | Update class session statuses |
+| `events:process-completions`               | Hourly        | Process event completions     |
+| `events:send-reminders`                    | Daily 00:10   | Send event reminders          |
+| `events:process-failed-gold-rewards`       | Daily 02:00   | Retry failed gold rewards     |
+| `academic-records:sync`                    | Daily 03:00   | Sync from Canvas              |
+| `attendance:sync-to-academic-records`      | Every 2 hours | Sync attendance               |
+| `academic-records:aggregate-manual`        | Daily 04:00   | Aggregate manual grades       |
 
 ### Queue Worker Requirements
 
@@ -242,6 +253,7 @@ Production setup: See `docs/deployment-guide.md` for supervisor configuration.
 - Public config endpoints create configuration exposure/tampering risk.
 - CI disabled + script drift increases deployment and regression risk.
 - Notification read history is split between legacy and V2 data until later cutover/backfill phases.
+- Finance dashboard and some finance read models still carry transitional risk while snapshot columns are gradually reconciled and old data is backfilled into `discount_allocations`.
 
 ## 11) Near-Term Decisions Required
 
@@ -250,6 +262,7 @@ Production setup: See `docs/deployment-guide.md` for supervisor configuration.
 3. Select canonical deployment workflow and align scripts.
 4. Reactivate CI with minimum required gates.
 5. Define Notification V2 cutover/backfill plan beyond Phase 1 clean-slate tables.
+6. Finish finance settlement cutover for all remaining read models and legacy finance reports.
 
 ## Unresolved Questions
 

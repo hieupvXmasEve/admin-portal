@@ -21,9 +21,12 @@ class PaymentController extends Controller
 {
     public function index(Request $request, ListPaymentsQuery $query)
     {
+        $result = $query->handle($request);
+
         return Inertia::render('Finance/Payments/Index', [
-            'items' => $query->handle($request),
-            'filters' => $request->only(['search', 'source', 'status', 'date_range', 'per_page']),
+            'items' => $result['items'],
+            'stats' => $result['stats'],
+            'filters' => $request->only(['search', 'source', 'status', 'date_range', 'per_page', 'sort', 'direction']),
         ]);
     }
 

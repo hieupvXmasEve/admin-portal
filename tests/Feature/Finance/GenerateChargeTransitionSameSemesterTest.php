@@ -349,6 +349,71 @@ function seedEmptyReusableEgcInvoiceScenario(): array
     return [$student, $spring, $springInvoice];
 }
 
+function seedFutureIntakeStudentScenario(): array
+{
+    $campus = Campus::factory()->create();
+    $program = Program::factory()->create();
+
+    $fall = Semester::factory()->create([
+        'code' => 'FALL2025',
+        'name' => 'Fall2025',
+        'start_date' => '2025-09-01 00:00:00',
+        'end_date' => '2025-12-31 00:00:00',
+        'is_active' => false,
+        'is_archived' => false,
+    ]);
+
+    $spring = Semester::factory()->create([
+        'code' => 'SPRING2026',
+        'name' => 'Spring2026',
+        'start_date' => '2026-01-05 00:00:00',
+        'end_date' => '2026-05-31 00:00:00',
+        'is_active' => true,
+        'is_archived' => false,
+    ]);
+
+    $curriculumVersion = CurriculumVersion::factory()
+        ->forProgram($program)
+        ->withEffectiveSemester($fall)
+        ->create();
+
+    session(['current_campus_id' => $campus->id]);
+    app()->instance('campus', $campus);
+
+    $student = Student::factory()
+        ->forCampus($campus)
+        ->forProgram($program)
+        ->state([
+            'student_id' => 'AUSFUTURE1',
+            'full_name' => 'Future Intake Student',
+            'status' => 'intake_course',
+            'curriculum_version_id' => $curriculumVersion->id,
+            'intake_semester_id' => $spring->id,
+            'intake' => 2,
+            'intake_mode' => 'sequential',
+            'intake_course' => (string) $spring->id,
+            'intake_major' => $spring->id,
+        ])
+        ->create();
+
+    $plan = TuitionPlan::create([
+        'curriculum_version_id' => $curriculumVersion->id,
+        'intake_semester_id' => $spring->id,
+        'total_amount' => 45000000,
+        'currency' => 'VND',
+        'is_active' => true,
+    ]);
+
+    TuitionPlanTerm::create([
+        'tuition_plan_id' => $plan->id,
+        'term_number' => 1,
+        'amount' => 45000000,
+        'due_date' => '2026-02-01',
+    ]);
+
+    return [$student, $fall];
+}
+
 it('marks transition students for a new invoice in preview when the only semester invoice is paid', function () {
     [$student, $semester] = seedTransitionStudentScenario();
 
@@ -367,6 +432,38 @@ it('marks transition students for a new invoice in preview when the only semeste
         ->and($result['students'][0]['estimated_amount'])->toBe(45000000.0)
         ->and($result['students'][0]['will_create_invoice'])->toBeTrue()
         ->and($result['students'][0]['warning'])->toContain('new invoice will be created');
+});
+
+it('does not preview or generate charges for students who have not reached their intake semester yet', function () {
+    [$student, $fall] = seedFutureIntakeStudentScenario();
+
+    $preview = app(PreviewChargeGenerationQuery::class)->handle([
+        'semester_id' => $fall->id,
+        'scope_type' => 'upload_list',
+        'uploaded_student_ids' => [$student->student_id],
+        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
+        'skip_if_issued_or_paid' => true,
+        'only_update_draft' => true,
+        'merge_invoice' => true,
+    ]);
+
+    $result = GenerateBatchChargesAction::run([
+        'semester_id' => $fall->id,
+        'scope_type' => 'upload_list',
+        'uploaded_student_ids' => [$student->student_id],
+        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
+        'skip_if_issued_or_paid' => true,
+        'only_update_draft' => true,
+        'merge_invoice' => true,
+    ]);
+
+    expect($preview['students'])->toHaveCount(0)
+        ->and($preview['new_charges_count'])->toBe(0)
+        ->and($result['created_invoices'])->toBe(0)
+        ->and($result['updated_invoices'])->toBe(0)
+        ->and($result['created_count'])->toBe(0)
+        ->and(FinanceCharge::query()->where('student_id', $student->id)->count())->toBe(0)
+        ->and(StudentInvoice::query()->where('student_id', $student->id)->count())->toBe(0);
 });
 
 it('creates a new tuition invoice for transition students even when an existing semester invoice is paid', function () {

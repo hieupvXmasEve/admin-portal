@@ -1,18 +1,71 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Finance\Queries;
 
 use App\Models\Payment;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class ListPaymentsQuery
 {
-    public function handle(Request $request)
+    public function handle(Request $request): array
     {
-        $query = Payment::query()
-            ->with(['student', 'allocations']);
+        $query = $this->buildFilteredQuery($request)
+            ->with(['student', 'receivedBy'])
+            ->withSum('applications as applied_amount_total', 'amount');
 
-        // Filter by Search (External Ref, Student: Name, ID, Email)
+        $stats = $this->buildStats($this->buildFilteredQuery($request));
+
+        // Sorting
+        $sort = $request->input('sort', 'paid_at');
+        $direction = $request->input('direction', 'desc');
+
+        // Allowed sort columns
+        if (in_array($sort, ['amount', 'paid_at', 'status', 'created_at'])) {
+            $query->orderBy($sort, $direction === 'asc' ? 'asc' : 'desc');
+        } else {
+            $query->orderBy('paid_at', 'desc');
+        }
+
+        $payments = $query->paginate($request->input('per_page', 15))
+            ->withQueryString();
+
+        $payments->through(function (Payment $payment): array {
+            $allocatedAmount = max(0, (float) ($payment->applied_amount_total ?? 0));
+
+            return [
+                'id' => $payment->id,
+                'amount' => (float) $payment->amount,
+                'paid_at' => $payment->paid_at?->toDateTimeString(),
+                'source' => $payment->source,
+                'external_ref' => $payment->external_ref,
+                'status' => $payment->status,
+                'method' => $payment->method,
+                'allocated_amount' => $allocatedAmount,
+                'unapplied_amount' => max(0, (float) $payment->amount - $allocatedAmount),
+                'student' => $payment->student ? [
+                    'id' => $payment->student->id,
+                    'full_name' => $payment->student->full_name,
+                    'student_id' => $payment->student->student_id,
+                ] : null,
+            ];
+        });
+
+        return [
+            'items' => $payments,
+            'stats' => $stats,
+        ];
+    }
+
+    private function buildFilteredQuery(Request $request): Builder
+    {
+        $campusId = app('campus')?->id;
+
+        $query = Payment::query()
+            ->when($campusId, fn (Builder $builder) => $builder->whereHas('student', fn (Builder $studentQuery) => $studentQuery->where('campus_id', $campusId)));
+
         if ($request->filled('search')) {
             $term = $request->input('search');
             $query->where(function ($q) use ($term) {
@@ -46,18 +99,23 @@ class ListPaymentsQuery
             }
         }
 
-        // Sorting
-        $sort = $request->input('sort', 'paid_at');
-        $direction = $request->input('direction', 'desc');
+        return $query;
+    }
 
-        // Allowed sort columns
-        if (in_array($sort, ['amount', 'paid_at', 'status', 'created_at'])) {
-            $query->orderBy($sort, $direction === 'asc' ? 'asc' : 'desc');
-        } else {
-            $query->orderBy('paid_at', 'desc');
-        }
+    private function buildStats(Builder $query): array
+    {
+        $payments = $query
+            ->withSum('applications as applied_amount_total', 'amount')
+            ->get(['id', 'amount']);
 
-        return $query->paginate($request->input('per_page', 15))
-            ->withQueryString();
+        $totalPaid = (float) $payments->sum(fn (Payment $payment) => (float) $payment->amount);
+        $totalApplied = (float) $payments->sum(fn (Payment $payment) => max(0, (float) ($payment->applied_amount_total ?? 0)));
+
+        return [
+            'payment_count' => $payments->count(),
+            'total_paid' => $totalPaid,
+            'total_applied' => $totalApplied,
+            'total_unapplied' => max(0, $totalPaid - $totalApplied),
+        ];
     }
 }

@@ -141,10 +141,10 @@ it('shows all invoice statuses and finance totals for a student row on the billi
     ]);
 
     $invoiceOne->forceFill([
-        'subtotal' => 75000000,
-        'discount_total' => 19500000,
-        'total_amount' => 55500000,
-        'paid_amount' => 30000000,
+        'subtotal' => 0,
+        'discount_total' => 0,
+        'total_amount' => 0,
+        'paid_amount' => 0,
     ])->save();
 
     /** @var \Illuminate\Contracts\Auth\Authenticatable $authenticatedUser */
@@ -169,7 +169,7 @@ it('shows all invoice statuses and finance totals for a student row on the billi
         ->where('students.data.0.outstanding_amount', 25500000)
         ->has('students.data.0.invoices', 2)
         ->where('students.data.0.invoices.0.invoice_number', 'INV-002')
-        ->where('students.data.0.invoices.0.status', 'pending')
+        ->where('students.data.0.invoices.0.status', 'paid')
         ->where('students.data.0.invoices.1.invoice_number', 'INV-001')
         ->where('students.data.0.invoices.1.status', 'partial')
     );
@@ -223,7 +223,9 @@ it('keeps a student row when any semester invoice matches the selected status fi
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
 
-    StudentInvoice::create([
+    $charge = FinanceCharge::query()->firstOrFail();
+
+    $invoiceOne = StudentInvoice::create([
         'invoice_number' => 'INV-001',
         'student_id' => $student->id,
         'billing_cycle_id' => null,
@@ -247,6 +249,33 @@ it('keeps a student row when any semester invoice matches the selected status fi
         'discount_total' => 0,
         'total_amount' => 1000000,
         'paid_amount' => 0,
+    ]);
+
+    $line = InvoiceLine::create([
+        'invoice_id' => $invoiceOne->id,
+        'charge_id' => $charge->id,
+        'amount_snapshot' => 1000000,
+        'description_snapshot' => 'Major tuition',
+        'status' => 'active',
+    ]);
+
+    Payment::create([
+        'student_id' => $student->id,
+        'amount' => 500000,
+        'method' => Payment::METHOD_BANK_TRANSFER,
+        'source' => 'test',
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+    ]);
+
+    $payment = Payment::query()->firstOrFail();
+
+    PaymentApplication::create([
+        'payment_id' => $payment->id,
+        'invoice_line_id' => $line->id,
+        'amount' => 500000,
+        'entry_type' => 'application',
+        'applied_at' => now(),
     ]);
 
     /** @var \Illuminate\Contracts\Auth\Authenticatable $authenticatedUser */
@@ -307,7 +336,7 @@ it('sorts dashboard students globally by gross billed before pagination', functi
         'status' => 'intake_course',
     ])->create();
 
-    StudentInvoice::create([
+    $invoiceA = StudentInvoice::create([
         'invoice_number' => 'INV-A',
         'student_id' => $studentA->id,
         'billing_cycle_id' => null,
@@ -320,7 +349,7 @@ it('sorts dashboard students globally by gross billed before pagination', functi
         'paid_amount' => 0,
     ]);
 
-    StudentInvoice::create([
+    $invoiceB = StudentInvoice::create([
         'invoice_number' => 'INV-B',
         'student_id' => $studentB->id,
         'billing_cycle_id' => null,
@@ -331,6 +360,42 @@ it('sorts dashboard students globally by gross billed before pagination', functi
         'discount_total' => 0,
         'total_amount' => 9000000,
         'paid_amount' => 0,
+    ]);
+
+    $chargeA = FinanceCharge::create([
+        'student_id' => $studentA->id,
+        'semester_id' => $semester->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => 1000000,
+        'description' => 'A tuition',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+
+    $chargeB = FinanceCharge::create([
+        'student_id' => $studentB->id,
+        'semester_id' => $semester->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => 9000000,
+        'description' => 'B tuition',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+
+    InvoiceLine::create([
+        'invoice_id' => $invoiceA->id,
+        'charge_id' => $chargeA->id,
+        'amount_snapshot' => 1000000,
+        'description_snapshot' => 'A tuition',
+        'status' => 'active',
+    ]);
+
+    InvoiceLine::create([
+        'invoice_id' => $invoiceB->id,
+        'charge_id' => $chargeB->id,
+        'amount_snapshot' => 9000000,
+        'description_snapshot' => 'B tuition',
+        'status' => 'active',
     ]);
 
     /** @var \\Illuminate\\Contracts\\Auth\\Authenticatable $authenticatedUser */

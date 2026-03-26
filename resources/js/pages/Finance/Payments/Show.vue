@@ -1,62 +1,61 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency, formatDate } from '@/utils/format';
-import { Link, useForm, Head } from '@inertiajs/vue3';
+import { Head, Link, useForm } from '@inertiajs/vue3';
 import { toast } from 'vue-sonner';
 
-interface Allocation {
+interface PaymentApplication {
     id: number;
-    allocated_amount: number;
-    allocated_at: string;
-    charge: {
+    entry_type: string;
+    amount: number;
+    applied_at: string | null;
+    invoice_line: {
         id: number;
-        description: string;
-        amount: number;
-        semester?: {
-            name: string;
-        };
-    };
+        description_snapshot: string;
+        amount_snapshot: number;
+        invoice?: {
+            id: number;
+            invoice_number: string;
+            status: string;
+        } | null;
+        charge?: {
+            id: number;
+            description: string;
+            amount: number;
+            semester?: {
+                id: number;
+                name: string;
+            } | null;
+        } | null;
+    } | null;
 }
 
 interface Payment {
     id: number;
     amount: number;
-    paid_at: string;
-    source: string;
-    external_ref: string;
+    paid_at: string | null;
+    source: string | null;
+    external_ref: string | null;
     status: string;
     method: string;
-    notes: string;
+    notes: string | null;
     student: {
         id: number;
         full_name: string;
         student_id: string;
-    };
+    } | null;
     unapplied_amount: number;
     allocated_amount: number;
-    allocations: Allocation[];
+    applications: PaymentApplication[];
     received_by?: {
         name: string;
-    };
+    } | null;
 }
 
 const props = defineProps<{
@@ -78,19 +77,24 @@ const submitAllocation = () => {
         },
         onError: () => {
             toast.error('Allocation failed');
-        }
+        },
     });
 };
+
+const getApplicationDescription = (application: PaymentApplication) => application.invoice_line?.charge?.description || application.invoice_line?.description_snapshot || '-';
+
+const getApplicationSemester = (application: PaymentApplication) => application.invoice_line?.charge?.semester?.name || '-';
+
+const getApplicationInvoice = (application: PaymentApplication) => application.invoice_line?.invoice?.invoice_number || '-';
+
+const getApplicationAmountClass = (application: PaymentApplication) => (application.amount < 0 ? 'text-red-600' : 'text-foreground');
 </script>
 
 <template>
-
     <Head :title="`Payment #${payment.id}`" />
 
     <div class="flex items-center justify-between">
-        <h2 class="text-xl font-semibold leading-tight text-gray-800">
-            Payment #{{ payment.id }}
-        </h2>
+        <h2 class="text-xl leading-tight font-semibold text-gray-800">Payment #{{ payment.id }}</h2>
         <Link :href="route('finance.payments.index')">
             <Button variant="outline">Back to List</Button>
         </Link>
@@ -105,7 +109,7 @@ const submitAllocation = () => {
             <CardContent class="grid gap-4">
                 <div class="flex justify-between">
                     <span class="text-muted-foreground">Amount</span>
-                    <span class="font-bold text-lg">{{ formatCurrency(payment.amount) }}</span>
+                    <span class="text-lg font-bold">{{ formatCurrency(payment.amount) }}</span>
                 </div>
                 <div class="flex justify-between">
                     <span class="text-muted-foreground">Date</span>
@@ -129,8 +133,7 @@ const submitAllocation = () => {
                 <Separator />
                 <div class="flex justify-between">
                     <span class="text-muted-foreground">Unallocated Balance</span>
-                    <span class="font-bold text-green-600">{{ formatCurrency(payment.unapplied_amount)
-                    }}</span>
+                    <span class="font-bold text-green-600">{{ formatCurrency(payment.unapplied_amount) }}</span>
                 </div>
             </CardContent>
         </Card>
@@ -144,48 +147,47 @@ const submitAllocation = () => {
                     <div class="text-lg font-bold">{{ payment.student.full_name }}</div>
                     <div class="text-muted-foreground">{{ payment.student.student_id }}</div>
                 </div>
-                <div v-else class="text-muted-foreground">
-                    No student linked.
-                </div>
+                <div v-else class="text-muted-foreground">No student linked.</div>
 
                 <div v-if="payment.notes" class="mt-4">
                     <Label>Notes</Label>
-                    <p class="text-sm text-gray-600 mt-1">{{ payment.notes }}</p>
+                    <p class="mt-1 text-sm text-gray-600">{{ payment.notes }}</p>
                 </div>
             </CardContent>
         </Card>
     </div>
 
-    <!-- Allocations -->
+    <!-- Applications -->
     <Card>
         <CardHeader>
-            <CardTitle>Allocations</CardTitle>
-            <CardDescription>
-                Funds allocated to specific charges.
-            </CardDescription>
+            <CardTitle>Payment Applications</CardTitle>
+            <CardDescription> Settlement entries linked to invoice lines. </CardDescription>
         </CardHeader>
         <CardContent>
             <Table>
                 <TableHeader>
                     <TableRow>
                         <TableHead>Date</TableHead>
+                        <TableHead>Invoice</TableHead>
                         <TableHead>Charge</TableHead>
                         <TableHead>Semester</TableHead>
+                        <TableHead>Entry</TableHead>
                         <TableHead class="text-right">Amount</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    <TableRow v-for="allocation in payment.allocations" :key="allocation.id">
-                        <TableCell>{{ formatDate(allocation.allocated_at) }}</TableCell>
-                        <TableCell>{{ allocation.charge.description }}</TableCell>
-                        <TableCell>{{ allocation.charge.semester?.name || '-' }}</TableCell>
-                        <TableCell class="text-right">{{ formatCurrency(allocation.allocated_amount) }}
+                    <TableRow v-for="application in payment.applications" :key="application.id">
+                        <TableCell>{{ application.applied_at ? formatDate(application.applied_at) : '-' }}</TableCell>
+                        <TableCell>{{ getApplicationInvoice(application) }}</TableCell>
+                        <TableCell>{{ getApplicationDescription(application) }}</TableCell>
+                        <TableCell>{{ getApplicationSemester(application) }}</TableCell>
+                        <TableCell>
+                            <Badge variant="outline">{{ application.entry_type }}</Badge>
                         </TableCell>
+                        <TableCell class="text-right" :class="getApplicationAmountClass(application)">{{ formatCurrency(application.amount) }}</TableCell>
                     </TableRow>
-                    <TableRow v-if="payment.allocations.length === 0">
-                        <TableCell colspan="4" class="text-center h-24 text-muted-foreground">
-                            No allocations yet.
-                        </TableCell>
+                    <TableRow v-if="payment.applications.length === 0">
+                        <TableCell colspan="6" class="text-muted-foreground h-24 text-center"> No payment applications yet. </TableCell>
                     </TableRow>
                 </TableBody>
             </Table>
@@ -208,9 +210,7 @@ const submitAllocation = () => {
                     <Label for="amount">Amount</Label>
                     <Input id="amount" v-model="form.amount" type="number" step="0.01" />
                 </div>
-                <Button type="submit" :disabled="form.processing">
-                    Allocate
-                </Button>
+                <Button type="submit" :disabled="form.processing"> Allocate </Button>
             </form>
         </CardContent>
     </Card>

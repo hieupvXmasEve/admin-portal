@@ -2,6 +2,7 @@
 import DataPagination from '@/components/DataPagination.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -20,11 +21,12 @@ interface Payment {
     source: string;
     external_ref: string;
     status: string;
-    student?: {
+    allocated_amount: number;
+    student: {
         id: number;
         full_name: string;
         student_id: string;
-    };
+    } | null;
     unapplied_amount: number;
 }
 
@@ -38,8 +40,16 @@ interface PaymentFilters {
     direction: 'asc' | 'desc' | null;
 }
 
+interface PaymentStats {
+    payment_count: number;
+    total_paid: number;
+    total_applied: number;
+    total_unapplied: number;
+}
+
 const props = defineProps<{
     items: PaginatedResponse<Payment>;
+    stats: PaymentStats;
     filters?: Partial<PaymentFilters>;
 }>();
 
@@ -61,7 +71,7 @@ const { filters, handleSearch, handleSelectFilter, handlePageSizeChange, handleP
         sort: 'paid_at',
         direction: 'desc',
     },
-    only: ['items', 'filters'],
+    only: ['items', 'stats', 'filters'],
 });
 
 const onSearch = debounce((val) => handleSearch(val), 500);
@@ -114,6 +124,36 @@ const getSourceLabel = (source: string) => {
     </div>
 
     <div>
+        <div class="mb-6 grid gap-4 md:grid-cols-3">
+            <Card>
+                <CardHeader class="pb-2">
+                    <CardTitle class="text-muted-foreground text-sm font-medium">Tổng đã đóng</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div class="text-2xl font-semibold">{{ formatCurrency(stats.total_paid) }}</div>
+                    <p class="text-muted-foreground mt-1 text-xs">{{ stats.payment_count }} payment(s) trong scope hiện tại</p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader class="pb-2">
+                    <CardTitle class="text-muted-foreground text-sm font-medium">Đã thanh toán</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div class="text-2xl font-semibold text-emerald-600">{{ formatCurrency(stats.total_applied) }}</div>
+                    
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader class="pb-2">
+                    <CardTitle class="text-muted-foreground text-sm font-medium">Còn dư</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div class="text-2xl font-semibold text-amber-600">{{ formatCurrency(stats.total_unapplied) }}</div>
+                    <p class="text-muted-foreground mt-1 text-xs">Số tiền chưa được apply</p>
+                </CardContent>
+            </Card>
+        </div>
+
         <!-- Filters -->
         <div class="mb-6 grid gap-4 md:grid-cols-4">
             <div>

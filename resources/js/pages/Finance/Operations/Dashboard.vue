@@ -331,7 +331,7 @@ defineOptions({
                         </div>
                         <div class="my-1 border-t"></div>
                         <div class="flex justify-between text-sm font-semibold">
-                            <span>Remaining:</span>
+                            <span>Outstanding debt:</span>
                             <span class="text-orange-600">{{ formatCurrency(kpiStats.total_balance) }}</span>
                         </div>
                     </div>

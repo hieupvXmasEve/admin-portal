@@ -6,9 +6,14 @@ namespace App\Modules\Finance\Queries;
 
 use App\Models\Payment;
 use App\Models\StudentInvoice;
+use App\Modules\Finance\Services\SettlementService;
 
 class GetStudentBalanceQuery
 {
+    public function __construct(
+        protected SettlementService $settlementService,
+    ) {}
+
     /**
      * Get student balance summary.
      */
@@ -21,10 +26,16 @@ class GetStudentBalanceQuery
             $invoiceQuery->where('semester_id', $semesterId);
         }
 
-        $totalCharges = (float) (clone $invoiceQuery)->sum('subtotal');
-        $totalCredits = (float) (clone $invoiceQuery)->sum('discount_total');
-        $netCharges = (float) (clone $invoiceQuery)->sum('total_amount');
-        $totalPaid = (float) (clone $invoiceQuery)->sum('paid_amount');
+        $invoices = $invoiceQuery
+            ->with(['invoiceLines.charge', 'invoiceLines.paymentApplications', 'invoiceLines.discountAllocations'])
+            ->get();
+
+        $snapshots = $invoices->map(fn (StudentInvoice $invoice) => $this->settlementService->deriveInvoiceSnapshot($invoice));
+
+        $totalCharges = (float) $snapshots->sum('gross');
+        $totalCredits = (float) $snapshots->sum('discount');
+        $netCharges = (float) $snapshots->sum('net');
+        $totalPaid = (float) $snapshots->sum('paid');
 
         // Get unapplied credit from payments
         $unappliedCredit = $this->getUnappliedCredits($studentId);
@@ -49,7 +60,6 @@ class GetStudentBalanceQuery
     {
         $payments = Payment::where('student_id', $studentId)
             ->where('status', Payment::STATUS_COMPLETED)
-            ->with('allocations')
             ->get();
 
         return $payments->sum(function ($payment) {

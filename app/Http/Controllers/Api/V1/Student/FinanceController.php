@@ -9,12 +9,18 @@ use App\Http\Responses\ApiResponse;
 use App\Models\FinanceCharge;
 use App\Models\Payment;
 use App\Models\Semester;
+use App\Models\StudentInvoice;
+use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class FinanceController extends Controller
 {
+    public function __construct(
+        protected SettlementService $settlementService,
+    ) {}
+
     /**
      * Get finance summary (semesters and global balance).
      */
@@ -30,26 +36,24 @@ class FinanceController extends Controller
                 ->get()
                 ->sum('unapplied_amount');
 
-            // 2. Get all charges grouped by semester
-            $charges = FinanceCharge::query()
-                ->forStudent($student->id)
-                ->with(['semester:id,code,name,start_date', 'allocations'])
+            $invoices = StudentInvoice::query()
+                ->with(['semester:id,code,name,start_date', 'invoiceLines.charge', 'invoiceLines.paymentApplications', 'invoiceLines.discountAllocations'])
+                ->where('student_id', $student->id)
                 ->get();
 
-            // Group by semester_id
-            $grouped = $charges->groupBy('semester_id');
+            $grouped = $invoices->groupBy('semester_id');
 
             $semestersData = [];
 
-            foreach ($grouped as $semesterId => $semesterCharges) {
-                // Skip if semester relation is missing (orphan charges)
-                $semester = $semesterCharges->first()->semester;
+            foreach ($grouped as $semesterId => $semesterInvoices) {
+                $semester = $semesterInvoices->first()->semester;
                 if (! $semester) {
                     continue;
                 }
 
-                $totalDue = $semesterCharges->sum('amount');
-                $totalPaid = $semesterCharges->sum('paid_amount'); // Accessor uses allocations sum
+                $snapshots = $semesterInvoices->map(fn (StudentInvoice $invoice) => $this->settlementService->deriveInvoiceSnapshot($invoice));
+                $totalDue = (float) $snapshots->sum('net');
+                $totalPaid = (float) $snapshots->sum('paid');
                 $balance = $totalDue - $totalPaid;
 
                 // Determine status
@@ -74,7 +78,7 @@ class FinanceController extends Controller
 
                 // Badges logic
                 $badges = [];
-                $chargeTypes = $semesterCharges->pluck('charge_type')->unique();
+                $chargeTypes = $semesterInvoices->flatMap(fn (StudentInvoice $invoice) => $invoice->invoiceLines->pluck('charge.charge_type'))->filter()->unique();
                 if ($chargeTypes->contains(FinanceCharge::TYPE_EGC_LEVEL_FEE)) {
                     $badges[] = 'EGC';
                 }

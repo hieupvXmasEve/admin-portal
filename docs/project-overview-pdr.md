@@ -1,6 +1,6 @@
 # Project Overview and PDR
 
-Last updated: 2026-03-23  
+Last updated: 2026-03-26  
 Owner: Platform Team  
 Status: Current-state baseline (evidence-first)  
 Source of truth: code in `app/`, `routes/`, `resources/` + scout reports in `plans/reports/`
@@ -112,6 +112,24 @@ Acceptance criteria:
 - Document auth behavior by route group as implemented.
 - Do not claim unified API auth model while drift remains.
 
+### FR-08 Finance Settlement and Discount Allocation
+
+Code baseline:
+
+- Settlement runtime now uses `payment_applications` as the canonical line-level cash application ledger.
+- Invoice discount headers live in `invoice_discounts`; line-level discount truth lives in `discount_allocations`.
+- `payment_allocations` is no longer part of live settlement behavior.
+- `finance/operations/settlement` is the student-centric settlement worklist for bulk/per-student apply.
+- Voucher and scholarship migration commands now backfill `invoice_discounts` and `discount_allocations` using `oldest_line_first`.
+- Charge generation no longer creates invoices for zero-amount tuition terms.
+
+Acceptance criteria:
+
+- Cash application, unapplied cash, and outstanding amounts are derived from `payment_applications`.
+- Discounted net due is derived from `discount_allocations`, not header-only discount presence.
+- Settlement apply works oldest invoice first, then oldest line first.
+- Generate-charge preview and execution skip zero-amount tuition terms and reuse empty draft invoices when appropriate.
+
 ### FR-06 Notification V2 Foundation (Outbox + Ops Monitoring)
 
 Code baseline:
@@ -185,6 +203,7 @@ Acceptance criteria:
 - Deployment artifacts include credentials/secrets exposure risk.
 - Frontend still has literal URL pockets despite heavy route helper usage.
 - Legacy notification surfaces still exist in repo, but new academic student-facing flows are expected to use Notification V2 only.
+- Finance dashboard and remaining finance reports still require final convergence on fully derived settlement math for all legacy snapshots.
 
 ## 7) Success Metrics (Current-State Tracking)
 
@@ -196,6 +215,7 @@ Acceptance criteria:
 ## 8) Version History
 
 - 2026-03-23: Documented academic progression logging baseline (`academic_progression_events` for level/stage changes), V2-only student-facing academic notifications for new flows, and `intake_major` as the canonical EGC to major tuition milestone.
+- 2026-03-26: Added finance settlement v2 baseline (`payment_applications`, `invoice_discounts`, `discount_allocations`), settlement worklist, voucher/scholarship backfill commands, and zero-amount tuition generation rule.
 - 2026-03-04: Expanded FR-06 with Notification V2 ops monitoring routes (outbox/messages/deliveries) and retry capabilities.
 - 2026-03-03: Added Notification V2 Phase 1 foundation requirements (outbox pipeline, campus isolation, canonical `recipient_user_id`, no legacy backfill) and command baseline `notifications:process-outbox`.
 - 2026-02-27: Documented student decision index sort/direction/page contract and sanitized sort allowlist defaults.

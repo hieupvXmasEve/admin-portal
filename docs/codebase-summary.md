@@ -1,6 +1,6 @@
 # Codebase Summary
 
-Last updated: 2026-03-24
+Last updated: 2026-03-26
 Owner: Platform Team  
 Status: Current-state snapshot  
 Primary source: `repomix-output.xml` (generated 2026-03-02)
@@ -46,6 +46,9 @@ Current counts:
 - Current new student-facing academic notifications are expected to flow through Notification V2 only.
 - Voucher admin manual apply now writes canonical `voucher_applications`; voucher detail includes an inline student apply card and reads canonical usage history instead of relying on legacy `voucher_redemptions`.
 - Voucher admin no longer exposes voucher import or voucher delete entrypoints; current voucher surface is create, edit, show, and apply.
+- Finance settlement baseline now uses invoice-line truth: `payment_applications` for cash application, `invoice_discounts` for discount headers, and `discount_allocations` for line-level discount allocation.
+- Finance operations now include a student-centric Settlement Worklist at `finance/operations/settlement`; legacy `payments/auto-allocate` UI now redirects there.
+- Finance generation/migration flows now include backfill commands for voucher and scholarship headers + `discount_allocations`, and generation no longer creates tuition invoices for zero-amount terms.
 
 Verified entry points:
 
@@ -91,6 +94,7 @@ Core baseline docs are maintained in:
 - `docs/design-guidelines.md`
 - `docs/deployment-guide.md` (Production deployment with FrankenPHP, queue workers, scheduler)
 - `docs/features/notification/README.md` (Notification V2 module docs)
+- `docs/features/finance/tuition-settlement-model-v2.md` (target settlement source-of-truth and migration baseline)
 
 Documented implementation patterns:
 

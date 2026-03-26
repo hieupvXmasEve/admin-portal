@@ -1,6 +1,6 @@
 # Project Roadmap
 
-Last updated: 2026-03-05  
+Last updated: 2026-03-26  
 Owner: Platform Team  
 Status: Active execution baseline  
 Horizon: next 2-3 quarters
@@ -33,6 +33,7 @@ Recent activity through 2026-03-05:
 - `inertia-filter-table` skill documented as canonical pattern for server-filtered tables
 - Production deployment guide created (`docs/deployment-guide.md`) with FrankenPHP, queue worker, scheduler setup
 - System architecture updated with runtime scheduled commands and queue worker requirements
+- Finance settlement v2 landed in runtime code: invoice-line settlement, settlement worklist, voucher/scholarship migration commands, dashboard/fee summary updates, and generate-charge logic aligned to zero-amount tuition + semester-aware EGC rules
 
 ## 3) Phase Plan
 
@@ -128,12 +129,32 @@ Exit criteria:
 - reduced placement ambiguity for new domain logic
 - documented ownership by domain/module
 
+### Phase 6: Finance Settlement Cutover
+
+Status: In progress  
+Target: active
+
+Scope:
+
+- remove runtime dependence on legacy `payment_allocations`
+- standardize invoice-line settlement across fee summary, settlement worklist, generate charges, and dashboard
+- backfill voucher/scholarship data into `invoice_discounts` + `discount_allocations`
+- finish snapshot reconciliation for legacy invoices
+
+Exit criteria:
+
+- finance runtime reads no longer depend on `payment_allocations`
+- discount truth is line-level via `discount_allocations`
+- dashboard/worklist/invoice views agree on gross, discount, paid, outstanding
+- zero-amount tuition terms no longer create invoices
+
 ## 4) Dependencies
 
 - Phase 1 before Phase 2
 - Phase 2 before strict merge-gate enforcement policy
 - Phase 3 and Phase 4 can overlap after baseline CI is active
 - Documentation updates are required in every phase
+- Phase 6 depends on migration command rollout and snapshot reconciliation
 
 ## 5) Tracking Metrics
 
@@ -149,6 +170,7 @@ Exit criteria:
 2. Minimum required CI gates for merge.
 3. Final auth model for finance API routes.
 4. Ownership and timeline for public system-config hardening.
+5. Finance settlement cutover order for remaining legacy read models.
 
 ## Unresolved Questions
 

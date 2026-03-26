@@ -8,15 +8,20 @@ use App\Models\DeferCase;
 use App\Models\Payment;
 use App\Models\Student;
 use App\Models\StudentInvoice;
+use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
 class GetBillingDashboardStudentsQuery
 {
+    public function __construct(
+        protected SettlementService $settlementService,
+    ) {}
+
     public function handle(?int $semesterId, array $filters = []): LengthAwarePaginator
     {
-        $campusId = app('campus')?->id;
+        $campusId = app()->bound('campus') ? app('campus')->id : null;
         $status = $filters['status'] ?? 'all';
         $stage = $filters['stage'] ?? 'all';
         $defer = $filters['defer'] ?? 'all';
@@ -90,13 +95,19 @@ class GetBillingDashboardStudentsQuery
         $studentIds = $students->pluck('id');
 
         $semesterInvoices = StudentInvoice::query()
-            ->with(['invoiceLines.charge', 'discounts'])
+            ->with(['invoiceLines.charge', 'invoiceLines.paymentApplications', 'invoiceLines.discountAllocations'])
             ->where('semester_id', $semesterId)
             ->whereIn('student_id', $studentIds)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->get()
             ->groupBy('student_id');
+
+        $invoiceSnapshots = $semesterInvoices
+            ->flatten(1)
+            ->mapWithKeys(fn (StudentInvoice $invoice) => [
+                $invoice->id => $this->settlementService->deriveInvoiceSnapshot($invoice),
+            ]);
 
         $paymentsByStudent = Payment::query()
             ->with('applications')
@@ -105,14 +116,14 @@ class GetBillingDashboardStudentsQuery
             ->get()
             ->groupBy('student_id');
 
-        $mappedStudents = $students->map(function ($student) use ($semesterId, $semesterInvoices, $paymentsByStudent, $status) {
+        $mappedStudents = $students->map(function ($student) use ($semesterId, $semesterInvoices, $paymentsByStudent, $invoiceSnapshots, $status) {
             $studentInvoices = $semesterInvoices->get($student->id, collect());
             $payments = $paymentsByStudent->get($student->id, collect());
 
-            $grossBilled = (float) $studentInvoices->sum(fn (StudentInvoice $invoice) => max((float) $invoice->subtotal, (float) $invoice->invoiceLines->sum('amount_snapshot')));
-            $discounts = (float) $studentInvoices->sum(fn (StudentInvoice $invoice) => max((float) $invoice->discount_total, (float) $invoice->discounts->sum('amount')));
-            $netDue = (float) $studentInvoices->sum(fn (StudentInvoice $invoice) => max(0, max((float) $invoice->subtotal, (float) $invoice->invoiceLines->sum('amount_snapshot')) - max((float) $invoice->discount_total, (float) $invoice->discounts->sum('amount'))));
-            $cashApplied = (float) $studentInvoices->sum(fn (StudentInvoice $invoice) => (float) $invoice->paid_amount);
+            $grossBilled = (float) $studentInvoices->sum(fn (StudentInvoice $invoice) => $invoiceSnapshots[$invoice->id]['gross']);
+            $discounts = (float) $studentInvoices->sum(fn (StudentInvoice $invoice) => $invoiceSnapshots[$invoice->id]['discount']);
+            $netDue = (float) $studentInvoices->sum(fn (StudentInvoice $invoice) => $invoiceSnapshots[$invoice->id]['net']);
+            $cashApplied = (float) $studentInvoices->sum(fn (StudentInvoice $invoice) => $invoiceSnapshots[$invoice->id]['paid']);
             $remaining = max(0, $netDue - $cashApplied);
             $totalPayments = (float) $payments->sum('amount');
             $totalAppliedAcrossPayments = (float) $payments->sum(fn ($payment) => max(0, (float) $payment->applications->sum('amount')));
@@ -130,7 +141,7 @@ class GetBillingDashboardStudentsQuery
                     return null;
                 }
 
-                if ($status !== 'no_invoice' && ! $studentInvoices->contains(fn ($invoice) => $invoice->status === $status || ($status === 'unpaid' && in_array($invoice->status, ['draft', 'pending', 'overdue'], true)))) {
+                if ($status !== 'no_invoice' && ! $studentInvoices->contains(fn ($invoice) => ($invoiceSnapshots[$invoice->id]['status'] === $status) || ($status === 'unpaid' && in_array($invoiceSnapshots[$invoice->id]['status'], ['draft', 'pending', 'overdue'], true)))) {
                     return null;
                 }
             }
@@ -167,13 +178,13 @@ class GetBillingDashboardStudentsQuery
                 'invoices' => $studentInvoices->map(fn (StudentInvoice $invoice) => [
                     'id' => $invoice->id,
                     'invoice_number' => $invoice->invoice_number,
-                    'status' => $invoice->status,
+                    'status' => $invoiceSnapshots[$invoice->id]['status'],
                     'due_date' => $invoice->due_date?->toDateString(),
-                    'total_amount' => (float) $invoice->total_amount,
-                    'paid_amount' => (float) $invoice->paid_amount,
+                    'total_amount' => $invoiceSnapshots[$invoice->id]['net'],
+                    'paid_amount' => $invoiceSnapshots[$invoice->id]['paid'],
                 ])->values()->all(),
-                'invoice_statuses' => $studentInvoices->pluck('status')->unique()->values()->all(),
-                'invoice_status' => $latestInvoice?->status,
+                'invoice_statuses' => $studentInvoices->map(fn (StudentInvoice $invoice) => $invoiceSnapshots[$invoice->id]['status'])->unique()->values()->all(),
+                'invoice_status' => $latestInvoice ? $invoiceSnapshots[$latestInvoice->id]['status'] : null,
                 'invoice_number' => $latestInvoice?->invoice_number,
                 'invoice_id' => $latestInvoice?->id,
                 'due_date' => $latestInvoice?->due_date?->toDateString(),

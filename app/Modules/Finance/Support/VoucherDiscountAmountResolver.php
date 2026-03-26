@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Models\Semester;
 use App\Models\Student;
-use App\Models\TuitionPlan;
-use App\Models\TuitionPlanTerm;
 use App\Models\Unit;
 use App\Models\VoucherDefinition;
 
 class VoucherDiscountAmountResolver
 {
+    public function __construct(private readonly StudentChargeTimingResolver $studentChargeTimingResolver) {}
+
     /**
      * Resolve canonical voucher amounts for one student in one semester.
      *
@@ -49,11 +48,15 @@ class VoucherDiscountAmountResolver
 
     private function resolveBaseAmount(Student $student, int $semesterId): ?float
     {
-        return match ($student->status) {
-            'intake_pre_uni_gc' => $this->getEgcFee($student),
-            'intake_course' => $this->getTuitionFee($student, $semesterId),
-            default => null,
-        };
+        if ($this->studentChargeTimingResolver->shouldGenerateTuitionForSemester($student, $semesterId)) {
+            return $this->getTuitionFee($student, $semesterId);
+        }
+
+        if ($this->studentChargeTimingResolver->shouldGenerateEgcForSemester($student, $semesterId)) {
+            return $this->getEgcFee($student);
+        }
+
+        return null;
     }
 
     private function getEgcFee(Student $student): ?float
@@ -85,42 +88,6 @@ class VoucherDiscountAmountResolver
 
     private function getTuitionFee(Student $student, int $semesterId): ?float
     {
-        $intakeMajor = $student->intake_major;
-
-        if (! $intakeMajor || $semesterId < $intakeMajor) {
-            return null;
-        }
-
-        $intakeSemester = Semester::find($intakeMajor);
-        $targetSemester = Semester::find($semesterId);
-
-        if (! $intakeSemester || ! $targetSemester) {
-            return null;
-        }
-
-        if ($targetSemester->start_date < $intakeSemester->start_date) {
-            return null;
-        }
-
-        $termNumber = Semester::query()
-            ->where('start_date', '>=', $intakeSemester->start_date)
-            ->where('start_date', '<=', $targetSemester->start_date)
-            ->count();
-
-        $plan = TuitionPlan::query()
-            ->where('curriculum_version_id', $student->curriculum_version_id)
-            ->where('intake_semester_id', $student->intake_semester_id)
-            ->first();
-
-        if (! $plan) {
-            return null;
-        }
-
-        $term = TuitionPlanTerm::query()
-            ->where('tuition_plan_id', $plan->id)
-            ->where('term_number', $termNumber)
-            ->first();
-
-        return $term ? (float) $term->amount : null;
+        return $this->studentChargeTimingResolver->getTuitionTermData($student, $semesterId)['amount'];
     }
 }
