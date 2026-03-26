@@ -124,6 +124,32 @@ class DngPaymentRequest extends Model
         return $this->payment_id !== null;
     }
 
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<int, string>
+     */
+    public function callbackMismatchReasons(array $payload): array
+    {
+        $issues = [];
+
+        $callbackAmount = (float) ($payload['Amount'] ?? 0);
+        if (abs($callbackAmount - (float) $this->amount) > 0.01) {
+            $issues[] = "Amount mismatch: local={$this->amount}, callback={$callbackAmount}";
+        }
+
+        $callbackStudentCode = (string) ($payload['StudentId'] ?? '');
+        if ($callbackStudentCode !== '' && $callbackStudentCode !== $this->student_code) {
+            $issues[] = "Student mismatch: local={$this->student_code}, callback={$callbackStudentCode}";
+        }
+
+        $callbackCampusCode = (string) ($payload['CampusCode'] ?? '');
+        if ($callbackCampusCode !== '' && $callbackCampusCode !== $this->campus_code) {
+            $issues[] = "Campus mismatch: local={$this->campus_code}, callback={$callbackCampusCode}";
+        }
+
+        return $issues;
+    }
+
     // =====================
     // Scopes
     // =====================

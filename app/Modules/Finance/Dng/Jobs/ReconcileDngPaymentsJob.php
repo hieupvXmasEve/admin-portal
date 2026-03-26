@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Dng\Jobs;
 
-use App\Models\Campus;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngReconciliationService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -31,7 +30,8 @@ class ReconcileDngPaymentsJob implements ShouldQueue
     public function handle(DngReconciliationService $reconciliationService): void
     {
         $date = $this->date ?? now()->format('Y-m-d H:i:s');
-        $campusCodes = Campus::pluck('code')->filter()->values()->all();
+        $campusCode = trim((string) config('services.dng.campus_code', ''));
+        $campusCodes = $campusCode === '' ? [] : [$campusCode];
 
         $totalSummary = ['backfilled' => 0, 'up_to_date' => 0, 'orphans' => 0, 'errors' => 0];
 

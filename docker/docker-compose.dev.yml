@@ -1,150 +1,146 @@
 services:
-  app:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    image: swinx-dev-app:latest
-    container_name: swinx-app-dev
-    env_file:
-      - ../.env
-    ports:
-      - '${APP_PORT:-8000}:80'
-    environment:
-      DB_HOST: db
-      REDIS_HOST: redis
-      MAIL_HOST: mailpit
-    volumes:
-      - ../:/app
-      - composer_vendor:/app/vendor
-      - node_modules:/app/node_modules
-      - caddy_data_dev:/data
-      - caddy_config_dev:/config
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
-      mailpit:
-        condition: service_started
-    restart: unless-stopped
+    app:
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile
+        image: swinx-dev-app:latest
+        container_name: swinx-app-dev
+        env_file:
+            - ../.env
+        ports:
+            - '${APP_PORT:-8000}:80'
+        environment:
+            DB_HOST: db
+            REDIS_HOST: redis
+            MAIL_HOST: mailpit
+        volumes:
+            - ../:/app
+            - composer_vendor:/app/vendor
+            - node_modules:/app/node_modules
+            - caddy_data_dev:/data
+            - caddy_config_dev:/config
+        depends_on:
+            db:
+                condition: service_healthy
+            redis:
+                condition: service_started
+            mailpit:
+                condition: service_started
+        restart: unless-stopped
 
-  vite:
-    image: swinx-dev-app:latest
-    container_name: swinx-vite-dev
-    env_file:
-      - ../.env
-    working_dir: /app
-    environment:
-      DB_HOST: db
-      REDIS_HOST: redis
-      MAIL_HOST: mailpit
-    command: npm run dev -- --host 0.0.0.0 --port ${VITE_PORT:-5173}
-    ports:
-      - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
-    volumes:
-      - ../:/app
-      - node_modules:/app/node_modules
-    depends_on:
-      - app
-    restart: unless-stopped
+    vite:
+        image: swinx-dev-app:latest
+        container_name: swinx-vite-dev
+        env_file:
+            - ../.env
+        working_dir: /app
+        environment:
+            DB_HOST: db
+            REDIS_HOST: redis
+            MAIL_HOST: mailpit
+        command: npm run dev -- --host 0.0.0.0 --port ${VITE_PORT:-5173}
+        ports:
+            - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
+        volumes:
+            - ../:/app
+            - node_modules:/app/node_modules
+        depends_on:
+            - app
+        restart: unless-stopped
 
-  queue:
-    image: swinx-dev-app:latest
-    container_name: swinx-queue-dev
-    env_file:
-      - ../.env
-    working_dir: /app
-    environment:
-      DB_HOST: db
-      REDIS_HOST: redis
-      MAIL_HOST: mailpit
-    command: php artisan queue:work --queue=${QUEUE_WORKER_QUEUES:-default,emails,notifications} --sleep=${QUEUE_WORKER_SLEEP:-1} --tries=${QUEUE_WORKER_TRIES:-3} --verbose
-    volumes:
-      - ../:/app
-      - composer_vendor:/app/vendor
-      - node_modules:/app/node_modules
-    depends_on:
-      app:
-        condition: service_started
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    restart: unless-stopped
+    queue:
+        image: swinx-dev-app:latest
+        container_name: swinx-queue-dev
+        env_file:
+            - ../.env
+        working_dir: /app
+        environment:
+            DB_HOST: db
+            REDIS_HOST: redis
+            MAIL_HOST: mailpit
+        command: php artisan queue:work --queue=${QUEUE_WORKER_QUEUES:-default,emails,notifications,webhooks,reconciliation} --sleep=${QUEUE_WORKER_SLEEP:-1} --tries=${QUEUE_WORKER_TRIES:-3} --verbose
+        volumes:
+            - ../:/app
+            - composer_vendor:/app/vendor
+            - node_modules:/app/node_modules
+        depends_on:
+            app:
+                condition: service_started
+            db:
+                condition: service_healthy
+            redis:
+                condition: service_started
+        restart: unless-stopped
 
-  scheduler:
-    image: swinx-dev-app:latest
-    container_name: swinx-scheduler-dev
-    env_file:
-      - ../.env
-    working_dir: /app
-    environment:
-      DB_HOST: db
-      REDIS_HOST: redis
-      MAIL_HOST: mailpit
-    command: php artisan schedule:work
-    volumes:
-      - ../:/app
-      - composer_vendor:/app/vendor
-      - node_modules:/app/node_modules
-    depends_on:
-      app:
-        condition: service_started
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    restart: unless-stopped
+    scheduler:
+        image: swinx-dev-app:latest
+        container_name: swinx-scheduler-dev
+        env_file:
+            - ../.env
+        working_dir: /app
+        environment:
+            DB_HOST: db
+            REDIS_HOST: redis
+            MAIL_HOST: mailpit
+        command: php artisan schedule:work
+        volumes:
+            - ../:/app
+            - composer_vendor:/app/vendor
+            - node_modules:/app/node_modules
+        depends_on:
+            app:
+                condition: service_started
+            db:
+                condition: service_healthy
+            redis:
+                condition: service_started
+        restart: unless-stopped
 
-  redis:
-    image: redis:7-alpine
-    container_name: swinx-redis-dev
-    ports:
-      - '${REDIS_PORT:-6379}:6379'
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data_dev:/data
-    restart: unless-stopped
+    redis:
+        image: redis:7-alpine
+        container_name: swinx-redis-dev
+        ports:
+            - '${REDIS_PORT:-6379}:6379'
+        command: redis-server --appendonly yes
+        volumes:
+            - redis_data_dev:/data
+        restart: unless-stopped
 
-  mailpit:
-    image: axllent/mailpit:latest
-    container_name: swinx-mailpit-dev
-    ports:
-      - '${MAIL_PORT:-1025}:1025'
-      - '${MAILPIT_HTTP_PORT:-8025}:8025'
-    restart: unless-stopped
+    mailpit:
+        image: axllent/mailpit:latest
+        container_name: swinx-mailpit-dev
+        ports:
+            - '${MAIL_PORT:-1025}:1025'
+            - '${MAILPIT_HTTP_PORT:-8025}:8025'
+        restart: unless-stopped
 
-  db:
-    image: mariadb:11.4
-    container_name: swinx-db-dev
-    ports:
-      - '${DB_PORT:-3306}:3306'
-    environment:
-      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
-      MARIADB_DATABASE: ${DB_DATABASE:-asia}
-      MARIADB_USER: ${DB_USERNAME:-swinx}
-      MARIADB_PASSWORD: ${DB_PASSWORD:-swinx}
-    volumes:
-      - db_data_dev:/var/lib/mysql
-      - ./mysql/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
-      - ./mysql/init-test.sql:/docker-entrypoint-initdb.d/01-init-test.sql:ro
-      - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf:ro
-    healthcheck:
-      test:
-        [
-          'CMD-SHELL',
-          'mariadb-admin ping -h localhost -uroot -p"$$MARIADB_ROOT_PASSWORD" --silent',
-        ]
-      timeout: 20s
-      retries: 10
-      interval: 10s
-      start_period: 40s
-    restart: unless-stopped
+    db:
+        image: mariadb:11.4
+        container_name: swinx-db-dev
+        ports:
+            - '${DB_PORT:-3306}:3306'
+        environment:
+            MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+            MARIADB_DATABASE: ${DB_DATABASE:-asia}
+            MARIADB_USER: ${DB_USERNAME:-swinx}
+            MARIADB_PASSWORD: ${DB_PASSWORD:-swinx}
+        volumes:
+            - db_data_dev:/var/lib/mysql
+            - ./mysql/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+            - ./mysql/init-test.sql:/docker-entrypoint-initdb.d/01-init-test.sql:ro
+            - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+        healthcheck:
+            test: ['CMD-SHELL', 'mariadb-admin ping -h localhost -uroot -p"$$MARIADB_ROOT_PASSWORD" --silent']
+            timeout: 20s
+            retries: 10
+            interval: 10s
+            start_period: 40s
+        restart: unless-stopped
 
 volumes:
-  composer_vendor:
-  node_modules:
-  db_data_dev:
-  redis_data_dev:
-  caddy_data_dev:
-  caddy_config_dev:
+    composer_vendor:
+    node_modules:
+    db_data_dev:
+    redis_data_dev:
+    caddy_data_dev:
+    caddy_config_dev:

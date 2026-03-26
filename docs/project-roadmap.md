@@ -31,8 +31,9 @@ Recent activity through 2026-03-26:
     - Student data endpoint: `GET /finance/payments/{student}/dng-data`
     - API payment request: `POST /api/v1/finance/dng/payment-requests` with checksum validation
     - Webhook receiver: `POST /api/v1/finance/dng/webhook`
+    - Admin audit pages: `/finance/dng/payment-requests`, `/finance/dng/webhook-events`
     - Audit tables: `dng_payment_requests`, `dng_webhook_events`
-    - Permission gate: `create_finance_payments`
+    - Permission gates: `create_finance_payments`, `view_finance_dng_payment_requests`, `view_finance_dng_webhook_events`
     - DNG campus code now env-configurable via `DNG_CAMPUS_CODE` (config: `services.dng.campus_code`)
     - Fixed: `DngClient::insertNewRecord()` uses `student_code` (string MSSV) not `student_id` (int DB PK)
 - 2026-03-25: Finance settlement v2 landed with invoice-line truth model

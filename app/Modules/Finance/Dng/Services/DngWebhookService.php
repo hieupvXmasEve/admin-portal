@@ -113,19 +113,7 @@ class DngWebhookService
         array $payload,
         DngWebhookEvent $event,
     ): bool {
-        $issues = [];
-
-        // Amount mismatch check
-        $callbackAmount = (float) ($payload['Amount'] ?? 0);
-        if (abs($callbackAmount - (float) $request->amount) > 0.01) {
-            $issues[] = "Amount mismatch: local={$request->amount}, callback={$callbackAmount}";
-        }
-
-        // Student mismatch check
-        $callbackStudentCode = $payload['StudentId'] ?? '';
-        if ($callbackStudentCode && $callbackStudentCode !== $request->student_code) {
-            $issues[] = "Student mismatch: local={$request->student_code}, callback={$callbackStudentCode}";
-        }
+        $issues = $request->callbackMismatchReasons($payload);
 
         if (! empty($issues)) {
             $reason = implode('; ', $issues);

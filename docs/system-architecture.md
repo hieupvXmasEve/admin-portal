@@ -48,11 +48,12 @@ Client (Web SPA / API)
     - Services: `SettlementService`, `PaymentService`, `FinanceChargeService`, `DngClient`, `DngPaymentService`, `DngReconciliationService`, `DngWebhookService`, `DngChecksumService`
     - Actions: `VoidFinanceChargeAction`, `AllocatePaymentAction`, `AutoAllocatePaymentsAction`
     - Support: `StudentChargeTimingResolver` (EGC vs Tuition billing by semester & stage; EGC until `intake_major`)
-    - Web routes: `finance/payments/create` (form), `/finance/payments/{student}/dng-data` (API)
+    - Web routes: `/finance/payments/create`, `/finance/payments/{student}/dng-data`, `/finance/dng/payment-requests`, `/finance/dng/payment-requests/{dngPaymentRequest}`, `/finance/dng/webhook-events`, `/finance/dng/webhook-events/{dngWebhookEvent}`
     - API routes: `POST /api/v1/finance/dng/payment-requests` (create), `POST /api/v1/finance/dng/webhook` (receive)
     - Ops routes: `finance/operations/settlement` (worklist), `finance/operations/dashboard` (metrics)
     - DNG workflow: Staff → Payment Create form → Student selection → DNG API push (with checksum) → QR display → Webhook confirmation → Payment record
-    - Permission: `create_finance_payments` gates payment creation UI
+    - Admin monitoring workflow: request audit list/detail remain campus-scoped; webhook audit list is cross-campus while webhook detail still validates campus access
+    - Permissions: `create_finance_payments`, `view_finance_dng_payment_requests`, `view_finance_dng_webhook_events`
     - Legacy `payment_allocations` no longer used in runtime.
 - Notification: `app/Modules/Notification` (V2 domain event + outbox architecture)
     - Actions: `PublishDomainEventAction`, `DispatchOutboxBatchAction`, `PersistIntentAction`, `SendManualNotificationV2Action`, `RetryDeliveryAction`, `RetryOutboxAction`, `HandleOutboxEventAction`

@@ -104,6 +104,23 @@ class DngReconciliationService
             return;
         }
 
+        $mismatchReasons = $request->callbackMismatchReasons([
+            'Amount' => $txn['Amount'] ?? null,
+            'StudentId' => $txn['StudentId'] ?? null,
+            'CampusCode' => $campusCode,
+        ]);
+
+        if ($mismatchReasons !== []) {
+            Log::warning('DNG reconciliation: payload mismatch', [
+                'dng_payment_request_id' => $request->id,
+                'dng_payment_id' => $dngPaymentId,
+                'issues' => $mismatchReasons,
+            ]);
+            $summary['errors']++;
+
+            return;
+        }
+
         // Check if local record needs updating
         $hasInvoice = filled($txn['InvoiceSerialNumber'] ?? null)
             && filled($txn['InvoiceDate'] ?? null);
@@ -118,6 +135,17 @@ class DngReconciliationService
         $targetOrder = $statusOrder[$targetStatus] ?? 0;
 
         if ($currentOrder >= $targetOrder) {
+            if (
+                ! $request->hasBridgedPayment()
+                && in_array($request->status, [
+                    DngPaymentRequest::STATUS_PAID_UNINVOICED,
+                    DngPaymentRequest::STATUS_PAID_INVOICED,
+                    DngPaymentRequest::STATUS_RECONCILED,
+                ], true)
+            ) {
+                $this->dngPaymentService->bridgeToPayment($request);
+            }
+
             $summary['up_to_date']++;
 
             return;

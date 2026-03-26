@@ -556,6 +556,18 @@ export const mainNavItems: NavItem[] = [
                         icon: BarChart3,
                         requiredPermissions: ['view_finance_payments'],
                     },
+                    {
+                        title: 'DNG Payment Requests',
+                        href: '/finance/dng/payment-requests',
+                        icon: Receipt,
+                        requiredPermissions: ['view_finance_dng_payment_requests'],
+                    },
+                    {
+                        title: 'DNG Webhook Events',
+                        href: '/finance/dng/webhook-events',
+                        icon: Receipt,
+                        requiredPermissions: ['view_finance_dng_webhook_events'],
+                    },
                 ],
             },
 

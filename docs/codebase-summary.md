@@ -67,11 +67,14 @@ Current counts:
 - DNG payment gateway integration (2026-03-26):
     - Tables: `dng_payment_requests` (audit), `dng_webhook_events` (webhook audit)
     - Controllers: `DngPaymentController` (API), `DngWebhookController` (webhook receiver)
+    - Admin controllers: `DngPaymentRequestController`, `DngWebhookEventController`
     - Services: `DngClient` (API comms with checksum), `DngPaymentService` (payment request logic), `DngReconciliationService` (payment matching), `DngWebhookService` (webhook processing), `DngChecksumService` (HMAC checksum)
     - Jobs: `ProcessDngWebhookJob` (async webhook), `ReconcileDngPaymentsJob` (scheduled reconciliation)
     - FormRequest: `CreateDngPaymentFormRequest`
     - Web form: `GET /finance/payments/create` → `GET /finance/payments/{student}/dng-data` → `POST /api/v1/finance/dng/payment-requests` → QR display
-    - Permission: `create_finance_payments`
+    - Admin pages: `GET /finance/dng/payment-requests`, `GET /finance/dng/payment-requests/{dngPaymentRequest}`, `GET /finance/dng/webhook-events`, `GET /finance/dng/webhook-events/{dngWebhookEvent}`
+    - Permissions: `create_finance_payments`, `view_finance_dng_payment_requests`, `view_finance_dng_webhook_events`
+    - Webhook event list is cross-campus; webhook detail access still validates linked request `campus_code` or orphan payload campus code
     - Config: `DNG_CAMPUS_CODE` env var mapped to `config('services.dng.campus_code')`, `student_code` field is string (MSSV not DB ID)
 
 Verified entry points:

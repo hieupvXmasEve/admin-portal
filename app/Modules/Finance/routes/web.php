@@ -3,6 +3,8 @@
 use App\Modules\Finance\Http\Web\Admin\BillingInvoiceController;
 use App\Modules\Finance\Http\Web\Admin\BillingOperationsController;
 use App\Modules\Finance\Http\Web\Admin\BillingSettlementController;
+use App\Modules\Finance\Http\Web\Admin\DngPaymentRequestController;
+use App\Modules\Finance\Http\Web\Admin\DngWebhookEventController;
 use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
 use App\Modules\Finance\Http\Web\Admin\PaymentController;
 use Illuminate\Support\Facades\Route;
@@ -118,5 +120,25 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::post('/{payment}/allocate', [PaymentController::class, 'allocate'])
             ->middleware('can:allocate_finance_payment')
             ->name('allocate');
+    });
+
+    Route::prefix('dng')->name('dng.')->group(function () {
+        Route::prefix('payment-requests')->name('payment-requests.')->group(function () {
+            Route::get('/', [DngPaymentRequestController::class, 'index'])
+                ->middleware('can:view_finance_dng_payment_requests')
+                ->name('index');
+            Route::get('/{dngPaymentRequest}', [DngPaymentRequestController::class, 'show'])
+                ->middleware('can:view_finance_dng_payment_requests')
+                ->name('show');
+        });
+
+        Route::prefix('webhook-events')->name('webhook-events.')->group(function () {
+            Route::get('/', [DngWebhookEventController::class, 'index'])
+                ->middleware('can:view_finance_dng_webhook_events')
+                ->name('index');
+            Route::get('/{dngWebhookEvent}', [DngWebhookEventController::class, 'show'])
+                ->middleware('can:view_finance_dng_webhook_events')
+                ->name('show');
+        });
     });
 });
