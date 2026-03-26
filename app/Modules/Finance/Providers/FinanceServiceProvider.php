@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Providers;
 
+use App\Modules\Finance\Dng\Services\DngChecksumService;
+use App\Modules\Finance\Dng\Services\DngClient;
+use App\Modules\Finance\Dng\Services\DngPaymentService;
+use App\Modules\Finance\Dng\Services\DngReconciliationService;
+use App\Modules\Finance\Dng\Services\DngWebhookService;
 use App\Modules\Finance\Services\DeferCaseService;
 use App\Modules\Finance\Services\FinanceChargeService;
 use App\Modules\Finance\Services\InvoiceGenerationService;
@@ -28,6 +33,13 @@ class FinanceServiceProvider extends ServiceProvider
                 $app->make(FinanceChargeService::class)
             );
         });
+
+        // DNG payment gateway services
+        $this->app->singleton(DngChecksumService::class);
+        $this->app->singleton(DngClient::class);
+        $this->app->singleton(DngPaymentService::class);
+        $this->app->singleton(DngWebhookService::class);
+        $this->app->singleton(DngReconciliationService::class);
     }
 
     /**

@@ -1,6 +1,6 @@
 # Design Guidelines
 
-Last updated: 2026-02-25  
+Last updated: 2026-03-26  
 Owner: Frontend Team  
 Status: Active baseline
 
@@ -37,6 +37,7 @@ Status: Active baseline
 - Use typed props/interfaces for component contracts.
 - Keep loading/error/empty states explicit.
 - Reuse existing modal/confirm/toast behavior rather than introducing parallel patterns.
+- For modal/drawer form workflows: use `vee-validate` + Zod + `useApi`/`useApiRequest` pattern. See `docs/RULES_vue-form-useApi.md` for rules and checklist.
 
 ## 6) API Interaction Standards
 

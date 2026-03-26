@@ -151,7 +151,7 @@ return [
             'edit_student_application' => 'edit_student_application',
             'delete_student_application' => 'delete_student_application',
             'import_student_application' => 'import_student_application',
-            'export_student_application' => 'export_student_application'
+            'export_student_application' => 'export_student_application',
         ],
 
         // Attendance Management
@@ -240,7 +240,6 @@ return [
             'export_lecturer' => 'export_lecturer',
         ],
 
-
         // Assessment Management
         'assessments' => [
             'view_assessment' => 'view_assessment',
@@ -296,7 +295,7 @@ return [
             'edit_form' => 'edit_form',
             'create_form' => 'create_form',
             'review_form' => 'review_form',
-            'view_form_analytics' => 'view_form_analytics'
+            'view_form_analytics' => 'view_form_analytics',
         ],
 
         'gold_transactions' => [
@@ -306,7 +305,7 @@ return [
         'fee' => [
             'view_scholarship' => 'view_scholarship',
             'assign_scholarship' => 'assign_scholarship',
-            'import_student_financial' => 'import_student_financial'
+            'import_student_financial' => 'import_student_financial',
         ],
         'vouchers' => [
             'view_voucher' => 'view_voucher',
@@ -336,6 +335,7 @@ return [
             'import_finance_payments' => 'import_finance_payments',
             'allocate_finance_payment' => 'allocate_finance_payment',
             'view_finance_payment_details' => 'view_finance_payment_details',
+            'create_finance_payments' => 'create_finance_payments',
         ],
         'modules' => [
             'view_module' => 'view_module',
@@ -350,14 +350,14 @@ return [
             'delete_survey' => 'delete_survey',
             'view_survey_analytics' => 'view_survey_analytics',
             'view_survey_results_aggregate' => 'view_survey_results_aggregate',
-            'view_survey_results_raw' => 'view_survey_results_raw'
+            'view_survey_results_raw' => 'view_survey_results_raw',
         ],
         'notifications' => [
             'send_manual_notification' => 'send_manual_notification',
             'view_any_notification' => 'view_any_notification',
             'view_email_system' => 'view_email_system',
             'manage_email_system' => 'manage_email_system',
-            'view_notification_ops' => 'view_notification_ops'
+            'view_notification_ops' => 'view_notification_ops',
         ],
     ],
 

@@ -1,7 +1,8 @@
 <?php
 
-use App\Modules\Finance\Http\Api\Student\StudentFinanceController;
+use App\Modules\Finance\Dng\Http\Controllers\DngPaymentController;
 use App\Modules\Finance\Http\Api\Admin\BillingOperationsController;
+use App\Modules\Finance\Http\Api\Student\StudentFinanceController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -9,7 +10,7 @@ use Illuminate\Support\Facades\Route;
 | Finance Module API Routes
 |--------------------------------------------------------------------------
 |
-| Student-facing finance API endpoints for balance inquiry, 
+| Student-facing finance API endpoints for balance inquiry,
 | charge listing, and payment history.
 |
 */
@@ -42,4 +43,17 @@ Route::prefix('api/v1/finance/operations')
         Route::post('/run-generate', [BillingOperationsController::class, 'runGenerate'])->name('run-generate');
         Route::post('/exceptions/{exceptionId}/fix', [BillingOperationsController::class, 'fixException'])->name('fix-exception');
         Route::post('/send-reminders', [BillingOperationsController::class, 'sendReminders'])->name('send-reminders');
+    });
+
+/*
+|--------------------------------------------------------------------------
+| DNG Payment Gateway Routes
+|--------------------------------------------------------------------------
+*/
+Route::prefix('api/v1/finance/dng')
+    ->middleware(['web', 'auth'])
+    ->name('api.finance.dng.')
+    ->group(function () {
+        Route::post('/payment-requests', [DngPaymentController::class, 'store'])->name('payment-requests.store');
+        Route::get('/payment-requests/{dngPaymentRequest}/qr', [DngPaymentController::class, 'qr'])->name('payment-requests.qr');
     });

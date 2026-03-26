@@ -1,0 +1,38 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Finance\Dng\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class CreateDngPaymentFormRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    public function rules(): array
+    {
+        return [
+            'student_id' => ['required', 'integer', 'exists:students,id'],
+            'campus_code' => ['required', 'string', 'max:20'],
+            'student_code' => ['required', 'string', 'max:50'],
+            'fee_type' => ['required', 'string', 'max:20'],
+            'item_id' => ['required', 'string', 'max:100'],
+            'amount' => ['required', 'numeric', 'min:1'],
+            'type' => ['required', 'string', 'max:20'],
+            'student_name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
+            'estimate_time' => ['required', 'string', 'max:20'],
+            'student_address' => ['required', 'string', 'max:500'],
+            'cccd' => ['nullable', 'string', 'max:20'],
+            'fee_types' => ['nullable', 'array'],
+            'fee_types.*' => ['string', 'max:20'],
+        ];
+    }
+}

@@ -85,6 +85,12 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::get('/', [PaymentController::class, 'index'])
             ->middleware('can:view_finance_payments')
             ->name('index');
+        Route::get('/create', [PaymentController::class, 'create'])
+            ->middleware('can:create_finance_payments')
+            ->name('create');
+        Route::get('/{student}/dng-data', [PaymentController::class, 'getStudentDngData'])
+            ->middleware('can:create_finance_payments')
+            ->name('student-dng-data');
         Route::get('/import', [PaymentController::class, 'import'])
             ->middleware('can:import_finance_payments')
             ->name('import');

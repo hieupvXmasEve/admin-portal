@@ -1,5 +1,9 @@
 # Vue Form Validation + useApi Rules
 
+Last updated: 2026-03-26
+Owner: Frontend Team
+Status: Exception pattern (non-Inertia form flows)
+
 This document describes an exception path.
 
 Default path in this codebase:
@@ -47,6 +51,8 @@ Use the rules below only when a Vue form validates on the client with `vee-valid
     - Render an inline message: `<p v-if="errors.name" class="text-destructive text-sm">{{ errors.name }}</p>`.
 
 ## 3. Calling Laravel APIs with `useApi`
+
+**Note**: `useApi` and `useApiRequest` are the same composable; `useApiRequest` is an alias. Prefer `useApi` in new code.
 
 1. **Initialize once per component**
     ```ts

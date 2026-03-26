@@ -1,6 +1,6 @@
 # Code Standards
 
-Last updated: 2026-03-04  
+Last updated: 2026-03-26  
 Owner: Platform Team  
 Status: Active baseline (enforced by convention; CI currently inactive)  
 Source of truth: repository code and route/contracts in this workspace
@@ -60,6 +60,15 @@ For Notification V2 Phase 1 contracts keep exact fields:
 - Keep auth/authorization explicit in middleware/policies.
 - For token refresh, keep current rotation pattern consistent unless intentionally migrated.
 - For Notification V2 operations, use `notifications:process-outbox` for outbox dispatch; do not bypass pipeline with direct delivery writes.
+- For Finance settlement: use `PaymentApplication`, `DiscountAllocation` models. Do not reference legacy `payment_allocations` in new code.
+- For Finance charge/voiding: use `VoidFinanceChargeAction`, `AllocatePaymentAction`, `AutoAllocatePaymentsAction`. Respect `invoice_lines.status` lifecycle (active|void).
+- For DNG payment gateway operations:
+    - Always use `DngClient` for API calls; verify checksum before processing webhook events.
+    - Use `DngPaymentService::createPaymentRequest()` to push payment data to DNG (includes checksum).
+    - Student identifier field is `student_code` (string MSSV from `students.student_id`), never `student_id` (int DB PK).
+    - Campus code comes from `config('services.dng.campus_code')`, which is populated from `DNG_CAMPUS_CODE` env var.
+    - Queue webhook processing via `ProcessDngWebhookJob` instead of synchronous response handlers.
+    - Audit all DNG requests/responses in `dng_payment_requests` and `dng_webhook_events` tables.
 
 ## 5) API Security and Auth Standards
 
@@ -113,6 +122,7 @@ Form submission default and exception path:
 
 - Default for Inertia pages: use Inertia `useForm` and server-driven redirects/validation.
 - Exception path: use `vee-validate` + Zod + `useApi`/`useApiRequest` only for non-navigating JSON interactions (modal/drawer/inline flows).
+- **Finance exception pattern**: Finance operations pages (Settlement Worklist, Dashboard, AutoAllocate, Generate Charges) use `useApi`/`useApiRequest` for modal/drawer workflows. Reference `docs/RULES_vue-form-useApi.md` for contract details.
 
 ## 7) Testing and Quality Gates
 

@@ -1,9 +1,9 @@
 # Codebase Summary
 
 Last updated: 2026-03-26
-Owner: Platform Team  
-Status: Current-state snapshot  
-Primary source: `repomix-output.xml` (generated 2026-03-02)
+Owner: Platform Team
+Status: Current-state snapshot
+Primary source: `repomix-output.xml` (generated 2026-03-02 / updated for runtime code through commit 8651e0f4)
 
 ## 1) Snapshot Method
 
@@ -40,15 +40,39 @@ Current counts:
     - large shared layer in `app/Services/*`, `app/Models/*`, and shared HTTP layers
 - Vue 3 + Inertia frontend in `resources/js/*`
 - Academic admin now includes a Student Decisions registry with nullable linkage from `student_action_logs.decision_id` to `student_decisions.id`.
-- Notification V2 module (`app/Modules/Notification/`) implements domain event + outbox pattern with 33 PHP files covering actions, channels, models, queries, jobs, and ops monitoring.
-- Academic progression baseline now uses `academic_progression_events` as the semantic history for EGC level changes and EGC to major stage changes.
-- Current EGC to major billing milestone is `students.intake_major`; the old `gc_to_course_transition_semester` field is no longer used in the active invoice transition path.
+- Notification V2 module (`app/Modules/Notification/`) implements domain event + outbox pattern with Phase 1 foundation complete:
+    - Outbox tables: `notification_event_outbox`, `notification_messages`, `notification_deliveries`
+    - Event types in use: `academic.course_stage_changed`, `course_completed`
+    - Full audit trail + retry via outbox processor (`notifications:process-outbox` scheduled every minute)
+    - Actions: `PublishDomainEventAction`, `DispatchOutboxBatchAction`, `SendManualNotificationV2Action`, retry actions
+    - Channels: `EmailChannelAdapter`, `RealtimeChannelAdapter`
+- Academic progression baseline uses `academic_progression_events` as semantic history:
+    - `ENGLISH_LEVEL_CHANGED` for EGC level changes (manual & auto progression)
+    - `COURSE_STAGE_CHANGED` for stage transitions (e.g., `intake_pre_uni_gc` → `intake_course`)
+- EGC to major billing: `students.intake_major` stores transition semester (active).
+- Deprecated: `students.gc_to_course_transition_semester` (no longer used in settlement v2).
 - Current new student-facing academic notifications are expected to flow through Notification V2 only.
-- Voucher admin manual apply now writes canonical `voucher_applications`; voucher detail includes an inline student apply card and reads canonical usage history instead of relying on legacy `voucher_redemptions`.
-- Voucher admin no longer exposes voucher import or voucher delete entrypoints; current voucher surface is create, edit, show, and apply.
-- Finance settlement baseline now uses invoice-line truth: `payment_applications` for cash application, `invoice_discounts` for discount headers, and `discount_allocations` for line-level discount allocation.
-- Finance operations now include a student-centric Settlement Worklist at `finance/operations/settlement`; legacy `payments/auto-allocate` UI now redirects there.
-- Finance generation/migration flows now include backfill commands for voucher and scholarship headers + `discount_allocations`, and generation no longer creates tuition invoices for zero-amount terms.
+- Voucher admin surface simplified: Create, Edit, Show (with inline apply card), Apply only. No import/delete flows (2026-03-20).
+- Voucher applications write canonical `voucher_applications` table; discount flows through `invoice_discounts` + `discount_allocations`.
+- Finance settlement v2 (2026-03-25) now uses invoice-line truth:
+    - Cash application: `payment_applications` (replaces legacy `payment_allocations`)
+    - Discount headers: `invoice_discounts`
+    - Line-level discounts: `discount_allocations` (new table, replaces header-only model)
+    - InvoiceLine lifecycle: `status` (active|void), `voided_at`, `void_reason`
+    - New services: `SettlementService`, updated `PaymentService`, `FinanceChargeService`
+    - New actions: `VoidFinanceChargeAction`, `AllocatePaymentAction`, `AutoAllocatePaymentsAction`
+    - New support: `StudentChargeTimingResolver` — EGC vs Tuition billing by semester & stage (EGC until `intake_major` transition)
+- Finance operations include student-centric Settlement Worklist at `finance/operations/settlement`; legacy `payments/auto-allocate` UI redirects there.
+- Finance generation/migration flows include backfill commands for voucher and scholarship headers + `discount_allocations`. Zero-amount tuition terms no longer create invoices.
+- DNG payment gateway integration (2026-03-26):
+    - Tables: `dng_payment_requests` (audit), `dng_webhook_events` (webhook audit)
+    - Controllers: `DngPaymentController` (API), `DngWebhookController` (webhook receiver)
+    - Services: `DngClient` (API comms with checksum), `DngPaymentService` (payment request logic), `DngReconciliationService` (payment matching), `DngWebhookService` (webhook processing), `DngChecksumService` (HMAC checksum)
+    - Jobs: `ProcessDngWebhookJob` (async webhook), `ReconcileDngPaymentsJob` (scheduled reconciliation)
+    - FormRequest: `CreateDngPaymentFormRequest`
+    - Web form: `GET /finance/payments/create` → `GET /finance/payments/{student}/dng-data` → `POST /api/v1/finance/dng/payment-requests` → QR display
+    - Permission: `create_finance_payments`
+    - Config: `DNG_CAMPUS_CODE` env var mapped to `config('services.dng.campus_code')`, `student_code` field is string (MSSV not DB ID)
 
 Verified entry points:
 

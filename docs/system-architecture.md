@@ -35,15 +35,25 @@ Client (Web SPA / API)
 
 - Identity: `app/Modules/Identity`
 - Academic: `app/Modules/Academic`
-- Finance: `app/Modules/Finance`
-    - Settlement baseline now centers on:
-        - `payments` as canonical cash receipt
-        - `payment_applications` as line-level cash application ledger
-        - `invoice_discounts` as invoice discount headers
-        - `discount_allocations` as line-level discount allocation ledger
+- Finance: `app/Modules/Finance` (Settlement v2 landed 2026-03-25; DNG gateway integration 2026-03-26)
+    - Source-of-truth model:
+        - `payments` — canonical cash receipt ledger
+        - `payment_applications` — line-level cash application (replaces legacy `payment_allocations`)
+        - `invoice_lines` — settlement anchor with status/void lifecycle (active|void, voided_at, void_reason)
+        - `invoice_discounts` — discount headers
+        - `discount_allocations` — line-level discount allocation ledger
         - `student_invoices` snapshot columns (`subtotal`, `discount_total`, `total_amount`, `paid_amount`) as cache only
-    - `payment_allocations` is no longer part of live runtime settlement truth.
-    - New finance ops route cluster includes `finance/operations/settlement` for student-centric settlement worklist and apply flow.
+        - `dng_payment_requests` — DNG gateway payment request audit
+        - `dng_webhook_events` — DNG webhook event audit for payment confirmation
+    - Services: `SettlementService`, `PaymentService`, `FinanceChargeService`, `DngClient`, `DngPaymentService`, `DngReconciliationService`, `DngWebhookService`, `DngChecksumService`
+    - Actions: `VoidFinanceChargeAction`, `AllocatePaymentAction`, `AutoAllocatePaymentsAction`
+    - Support: `StudentChargeTimingResolver` (EGC vs Tuition billing by semester & stage; EGC until `intake_major`)
+    - Web routes: `finance/payments/create` (form), `/finance/payments/{student}/dng-data` (API)
+    - API routes: `POST /api/v1/finance/dng/payment-requests` (create), `POST /api/v1/finance/dng/webhook` (receive)
+    - Ops routes: `finance/operations/settlement` (worklist), `finance/operations/dashboard` (metrics)
+    - DNG workflow: Staff → Payment Create form → Student selection → DNG API push (with checksum) → QR display → Webhook confirmation → Payment record
+    - Permission: `create_finance_payments` gates payment creation UI
+    - Legacy `payment_allocations` no longer used in runtime.
 - Notification: `app/Modules/Notification` (V2 domain event + outbox architecture)
     - Actions: `PublishDomainEventAction`, `DispatchOutboxBatchAction`, `PersistIntentAction`, `SendManualNotificationV2Action`, `RetryDeliveryAction`, `RetryOutboxAction`, `HandleOutboxEventAction`
     - Channels: `EmailChannelAdapter`, `RealtimeChannelAdapter` (contracts: `ChannelAdapter`)
@@ -56,15 +66,18 @@ Client (Web SPA / API)
 Current academic progression baseline:
 
 - `academic_progression_events` is the semantic audit/event store for academic placement and progression.
-- `ENGLISH_LEVEL_CHANGED` is the canonical event for EGC level changes, including auto progression after course completion.
-- `COURSE_STAGE_CHANGED` is the canonical event for transitions such as `intake_pre_uni_gc -> intake_course`.
+- Event types:
+    - `ENGLISH_LEVEL_CHANGED` — EGC level changes (manual & auto progression after course completion)
+    - `COURSE_STAGE_CHANGED` — stage transitions (e.g., `intake_pre_uni_gc` → `intake_course`)
+- Stage change events trigger `PublishCourseStageChangedNotificationAction` → V2 outbox publication.
 - `student_changes` may still exist for generic field-level audit, but it is not the source of truth for academic level/stage history.
 
 Current EGC to major baseline:
 
 - Student major transition writes `students.status = intake_course`.
-- Transition semester for tuition is stored in `students.intake_major`.
-- `students.gc_to_course_transition_semester` is no longer used by the active billing path.
+- Transition semester for tuition is stored in `students.intake_major` (active).
+- Deprecated: `students.gc_to_course_transition_semester` (no longer used in settlement v2).
+- Course completion validation uses `MarkCourseOfferingCompletedAction` with attendance + EGC progression rules.
 
 ### 2.4 Shared Layer
 

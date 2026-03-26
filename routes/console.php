@@ -69,3 +69,9 @@ Schedule::command('notifications:process-outbox --limit=100')
     ->withoutOverlapping()
     ->onOneServer()
     ->runInBackground();
+
+// DNG payment reconciliation - every 15 minutes
+Schedule::job(new \App\Modules\Finance\Dng\Jobs\ReconcileDngPaymentsJob)
+    ->everyFifteenMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();

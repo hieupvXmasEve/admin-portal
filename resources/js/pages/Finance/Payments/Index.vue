@@ -11,7 +11,7 @@ import { PaginatedResponse } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/format';
 import { Head, Link } from '@inertiajs/vue3';
 import { debounce } from 'lodash-es';
-import { Sparkles } from 'lucide-vue-next';
+import { Plus, Sparkles } from 'lucide-vue-next';
 import { route } from 'ziggy-js';
 
 interface Payment {
@@ -117,8 +117,14 @@ const getSourceLabel = (source: string) => {
                     Settlement Worklist
                 </Button>
             </Link>
+            <Link :href="route('finance.payments.create')">
+                <Button>
+                    <Plus class="mr-2 h-4 w-4" />
+                    Create Payment
+                </Button>
+            </Link>
             <Link :href="route('finance.payments.import')">
-                <Button> Import Payments </Button>
+                <Button variant="outline"> Import Payments </Button>
             </Link>
         </div>
     </div>

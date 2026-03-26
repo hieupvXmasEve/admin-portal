@@ -53,4 +53,15 @@ return [
         'timeout' => env('CANVAS_API_TIMEOUT', 30),
     ],
 
+    'dng' => [
+        'base_url' => env('DNG_BASE_URL', 'https://googleauthensite02.fpt.edu.vn:90'),
+        'access_code' => env('DNG_ACCESS_CODE'),
+        'hash_key' => env('DNG_HASH_KEY'),
+        'api_code' => env('DNG_API_CODE', 'HC_SWB'),
+        'client_code' => env('DNG_CLIENT_CODE', 'HC_ASIA'),
+        'login' => env('DNG_LOGIN', 'HC_SWB'),
+        'campus_code' => env('DNG_CAMPUS_CODE', 'FPTUHN'),
+        'timeout' => (int) env('DNG_API_TIMEOUT', 30),
+    ],
+
 ];

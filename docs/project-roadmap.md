@@ -24,16 +24,40 @@ Horizon: next 2-3 quarters
     - disabled CI workflows
     - deployment/script/security drift
 
-Recent activity through 2026-03-05:
+Recent activity through 2026-03-26:
 
-- repomix snapshot regenerated and core docs re-synced to current repository shape
-- deployment drift now tracked with concrete root-vs-`docker/` script mismatch examples
-- frontend form/filter guidance updated to mark exception paths explicitly
-- Notification V2 Phase 1 foundation completed: domain event + outbox architecture, ops monitoring pages, retry capabilities
-- `inertia-filter-table` skill documented as canonical pattern for server-filtered tables
-- Production deployment guide created (`docs/deployment-guide.md`) with FrankenPHP, queue worker, scheduler setup
-- System architecture updated with runtime scheduled commands and queue worker requirements
-- Finance settlement v2 landed in runtime code: invoice-line settlement, settlement worklist, voucher/scholarship migration commands, dashboard/fee summary updates, and generate-charge logic aligned to zero-amount tuition + semester-aware EGC rules
+- 2026-03-26: DNG payment gateway integration completed
+    - Payment Creation UI at `/finance/payments/create`
+    - Student data endpoint: `GET /finance/payments/{student}/dng-data`
+    - API payment request: `POST /api/v1/finance/dng/payment-requests` with checksum validation
+    - Webhook receiver: `POST /api/v1/finance/dng/webhook`
+    - Audit tables: `dng_payment_requests`, `dng_webhook_events`
+    - Permission gate: `create_finance_payments`
+    - DNG campus code now env-configurable via `DNG_CAMPUS_CODE` (config: `services.dng.campus_code`)
+    - Fixed: `DngClient::insertNewRecord()` uses `student_code` (string MSSV) not `student_id` (int DB PK)
+- 2026-03-25: Finance settlement v2 landed with invoice-line truth model
+    - `PaymentApplication` replaces `payment_allocations` as cash application truth
+    - `DiscountAllocation` table for line-level discount allocation
+    - `InvoiceLine` status/void lifecycle (active|void, voided_at, void_reason)
+    - New services: `SettlementService`, `PaymentService`, `FinanceChargeService`
+    - New actions: `VoidFinanceChargeAction`, `AllocatePaymentAction`, `AutoAllocatePaymentsAction`
+    - Support: `StudentChargeTimingResolver` for EGC vs Tuition billing rules
+- 2026-03-25: Finance dashboards aligned with settlement v2 rules
+    - Settlement Worklist at `finance/operations/settlement`
+    - Dashboard at `finance/operations/dashboard` with gross/discount/paid/outstanding metrics
+    - Zero-amount tuition terms no longer create invoices
+- 2026-03-23: Academic progression course stage changes
+    - `COURSE_STAGE_CHANGED` event type in `academic_progression_events`
+    - Notifications published via V2 outbox on stage transition
+    - Student fee statement improved for staff view
+- 2026-03-20: Voucher workflows simplified
+    - Removed import/delete UI flows
+    - Retained: Create, Edit, Show (with inline apply card), Apply
+    - Discount flows via `invoice_discounts` + `discount_allocations`
+- Before 2026-03-20:
+    - Notification V2 Phase 1 foundation: domain event + outbox, ops monitoring, retry
+    - Production deployment guide with FrankenPHP, queue worker, scheduler
+    - `inertia-filter-table` skill documented as canonical pattern
 
 ## 3) Phase Plan
 
@@ -131,22 +155,27 @@ Exit criteria:
 
 ### Phase 6: Finance Settlement Cutover
 
-Status: In progress  
+Status: Settlement v2 landed (2026-03-25)
 Target: active
 
 Scope:
 
-- remove runtime dependence on legacy `payment_allocations`
-- standardize invoice-line settlement across fee summary, settlement worklist, generate charges, and dashboard
-- backfill voucher/scholarship data into `invoice_discounts` + `discount_allocations`
-- finish snapshot reconciliation for legacy invoices
+- remove runtime dependence on legacy `payment_allocations` ✓ (2026-03-25)
+- standardize invoice-line settlement across fee summary, settlement worklist, generate charges, and dashboard ✓ (2026-03-25)
+- backfill voucher/scholarship data into `invoice_discounts` + `discount_allocations` ✓ (backfill commands added 2026-03-25)
+- finish snapshot reconciliation for legacy invoices (in progress, backfill commands available)
 
 Exit criteria:
 
-- finance runtime reads no longer depend on `payment_allocations`
-- discount truth is line-level via `discount_allocations`
-- dashboard/worklist/invoice views agree on gross, discount, paid, outstanding
-- zero-amount tuition terms no longer create invoices
+- finance runtime reads no longer depend on `payment_allocations` ✓
+- discount truth is line-level via `discount_allocations` ✓
+- dashboard/worklist/invoice views agree on gross, discount, paid, outstanding ✓
+- zero-amount tuition terms no longer create invoices ✓
+
+Remaining work:
+
+- legacy read model convergence (if required for parallel systems)
+- backfill validation and reconciliation for existing data
 
 ## 4) Dependencies
 

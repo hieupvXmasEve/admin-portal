@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-03-02
+Last updated: 2026-03-26
 Source of truth: `docs/`
 
 ## Core Baseline
@@ -22,6 +22,7 @@ Source of truth: `docs/`
 - [Excel Memory Optimization](./excel-memory-optimization.md)
 - [Event Participation Service](./event-participation-service.md)
 - [Course Completion & EGC Progression](./COURSE_COMPLETION_AND_EGC_PROGRESSION.md)
+- Finance engineering: [Tuition Settlement Model v2](./features/finance/tuition-settlement-model-v2.md)
 
 ## Domain Documentation (Folders)
 

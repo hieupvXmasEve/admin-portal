@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\SystemConfigController;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -26,6 +26,11 @@ Route::put('/system-config', [SystemConfigController::class, 'update'])->name('a
 Route::post('/system-config/upload', [SystemConfigController::class, 'uploadFile'])->name('api.system-config.upload');
 Route::get('/system-config/{key}', [SystemConfigController::class, 'show'])->name('api.system-config.show');
 
+// DNG payment webhook (public, no auth — checksum verified in controller)
+Route::post('/webhooks/dng/payment', \App\Modules\Finance\Dng\Http\Controllers\DngWebhookController::class)
+    ->middleware('throttle:60,1')
+    ->name('api.webhooks.dng.payment');
+
 // Health check endpoint
 Route::get('/health', function () {
     return response()->json([
@@ -37,20 +42,20 @@ Route::get('/health', function () {
 
 // Upload routes
 Route::prefix('uploads')->group(function () {
-    require __DIR__ . '/api/uploads.php';
+    require __DIR__.'/api/uploads.php';
 });
 
 // require __DIR__.'/api/public.php';
-require __DIR__ . '/api/admin.php';
+require __DIR__.'/api/admin.php';
 
 // Module routes
-require __DIR__ . '/api/modules.php';
+require __DIR__.'/api/modules.php';
 
 // Versioned API routes
 Route::prefix('v1/student')->name('v1.student.')->group(function () {
-    require __DIR__ . '/api/v1/student.php';
+    require __DIR__.'/api/v1/student.php';
 });
 // Lecture
 Route::prefix('v1/lecturer')->name('v1.lecturer.')->group(function () {
-    require __DIR__ . '/api/v1/lecturer.php';
+    require __DIR__.'/api/v1/lecturer.php';
 });

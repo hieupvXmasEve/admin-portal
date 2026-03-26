@@ -1,16 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\FinanceCharge as FinanceChargeModel;
 use App\Models\Payment;
+use App\Models\Student;
 use App\Modules\Finance\Actions\AllocatePaymentAction;
 use App\Modules\Finance\Actions\PreviewPaymentImportAction;
 use App\Modules\Finance\Actions\StorePaymentImportAction;
-// Assuming standard model location or need alias?
-// Wait, Models are in App\Models based on previous checks.
 use App\Modules\Finance\Queries\GetPaymentDetailsQuery;
 use App\Modules\Finance\Queries\ListPaymentsQuery;
 use App\Modules\Finance\Queries\Operations\PreviewAutoAllocateQuery;
@@ -34,6 +35,33 @@ class PaymentController extends Controller
     {
         return Inertia::render('Finance/Payments/Show', [
             'payment' => $query->handle($id),
+        ]);
+    }
+
+    /**
+     * Render the Create Payment page (DNG gateway flow).
+     * Actual payment creation goes through DNG API: POST /api/v1/finance/dng/payment-requests
+     */
+    public function create()
+    {
+        return Inertia::render('Finance/Payments/Create');
+    }
+
+    /**
+     * Return student data pre-filled for DNG payment form.
+     */
+    public function getStudentDngData(int $studentId)
+    {
+        $student = Student::findOrFail($studentId);
+
+        return response()->json([
+            'student_id' => $student->id,
+            'campus_code' => (string) config('services.dng.campus_code'),
+            'student_code' => $student->student_id,
+            'student_name' => $student->full_name,
+            'email' => $student->email ?? '',
+            'student_address' => $student->address ?? $student->current_address_line ?? '',
+            'cccd' => $student->national_id ?? '',
         ]);
     }
 
