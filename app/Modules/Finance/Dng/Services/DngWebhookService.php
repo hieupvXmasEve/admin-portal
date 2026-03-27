@@ -12,6 +12,7 @@ class DngWebhookService
 {
     public function __construct(
         protected DngPaymentService $dngPaymentService,
+        protected DngChecksumService $checksumService,
     ) {}
 
     /**
@@ -24,29 +25,18 @@ class DngWebhookService
         $dngPaymentId = $payload['PaymentId'] ?? null;
 
         if (! $dngPaymentId) {
-            $event->markFailed('Missing PaymentId in payload');
+            $event->markFailedTerminal('Missing PaymentId in payload', DngWebhookEvent::ERROR_CATEGORY_MALFORMED);
 
             return;
         }
 
-        // Find the matching DNG payment request
-        $request = DngPaymentRequest::where('dng_payment_id', $dngPaymentId)->first();
+        $request = $this->resolvePaymentRequest($payload, $dngPaymentId);
 
         if (! $request) {
-            // Try fallback: match by item_id + student_code
-            $request = DngPaymentRequest::where('item_id', $payload['ItemId'] ?? '')
-                ->where('student_code', $payload['StudentId'] ?? '')
-                ->whereNull('dng_payment_id')
-                ->first();
-
-            // If found via fallback, set the dng_payment_id
-            if ($request) {
-                $request->update(['dng_payment_id' => $dngPaymentId]);
-            }
-        }
-
-        if (! $request) {
-            $event->markMismatch("No DNG payment request found for PaymentId: {$dngPaymentId}");
+            $event->markFailedTerminal(
+                "No DNG payment request found for PaymentId: {$dngPaymentId}",
+                DngWebhookEvent::ERROR_CATEGORY_NOT_FOUND,
+            );
             Log::warning('DNG webhook: orphan callback', [
                 'dng_payment_id' => $dngPaymentId,
                 'event_id' => $event->id,
@@ -58,6 +48,22 @@ class DngWebhookService
         // Link event to request
         $event->update(['dng_payment_request_id' => $request->id]);
 
+        $shouldVerifyChecksum = filled($payload['InvoiceSerialNumber'] ?? null);
+        $isValidChecksum = ! $shouldVerifyChecksum
+            || $this->checksumService->verifyWebhookChecksum($request, $payload);
+        $event->update(['is_valid_checksum' => $isValidChecksum]);
+
+        if ($shouldVerifyChecksum && ! $isValidChecksum) {
+            $event->markMismatch('Invalid checksum', DngWebhookEvent::ERROR_CATEGORY_CHECKSUM);
+
+            return;
+        }
+
+        if (! $request->dng_payment_id) {
+            $request->update(['dng_payment_id' => $dngPaymentId]);
+            $request = $request->fresh();
+        }
+
         // Cross-validate amount and student
         if (! $this->crossValidate($request, $payload, $event)) {
             return;
@@ -68,6 +74,20 @@ class DngWebhookService
         $targetStatus = $eventType === DngWebhookEvent::EVENT_PAYMENT_INVOICED
             ? DngPaymentRequest::STATUS_PAID_INVOICED
             : DngPaymentRequest::STATUS_PAID_UNINVOICED;
+
+        if ($this->statusOrder($request->status) > $this->statusOrder($targetStatus)) {
+            $this->ensurePaymentBridge($request);
+            $event->markSkipped('Request already progressed beyond this event');
+
+            return;
+        }
+
+        if ($this->statusOrder($request->status) === $this->statusOrder($targetStatus)) {
+            $this->ensurePaymentBridge($request);
+            $event->markSkipped('Equivalent event already applied');
+
+            return;
+        }
 
         // Update request fields from callback
         $updateData = [
@@ -88,12 +108,18 @@ class DngWebhookService
         $request->update($updateData);
 
         // Transition state (forward only)
-        if ($request->canTransitionTo($targetStatus)) {
-            $request->transitionTo($targetStatus);
+        if (! $request->canTransitionTo($targetStatus)) {
+            $event->markFailedTerminal(
+                "Cannot transition request from {$request->status} to {$targetStatus}",
+                DngWebhookEvent::ERROR_CATEGORY_PROCESSING,
+            );
+
+            return;
         }
 
-        // Bridge to canonical Payment if not yet done
-        $this->dngPaymentService->bridgeToPayment($request);
+        $request->transitionTo($targetStatus);
+
+        $this->ensurePaymentBridge($request->fresh());
 
         $event->markProcessed();
 
@@ -117,7 +143,7 @@ class DngWebhookService
 
         if (! empty($issues)) {
             $reason = implode('; ', $issues);
-            $event->markMismatch($reason);
+            $event->markMismatch($reason, DngWebhookEvent::ERROR_CATEGORY_MISMATCH);
             Log::warning('DNG webhook: data mismatch', [
                 'event_id' => $event->id,
                 'dng_payment_request_id' => $request->id,
@@ -128,5 +154,64 @@ class DngWebhookService
         }
 
         return true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function resolvePaymentRequest(array $payload, string $dngPaymentId): ?DngPaymentRequest
+    {
+        $itemId = (string) ($payload['ItemId'] ?? '');
+        $studentId = (string) ($payload['StudentId'] ?? '');
+
+        if ($itemId !== '' && $studentId !== '') {
+            $request = DngPaymentRequest::query()
+                ->where('item_id', $itemId)
+                ->where('student_code', $studentId)
+                ->first();
+
+            if ($request) {
+                return $request;
+            }
+        }
+
+        $request = DngPaymentRequest::query()
+            ->where('dng_payment_id', $dngPaymentId)
+            ->first();
+
+        if ($request) {
+            return $request;
+        }
+
+        $request = DngPaymentRequest::query()
+            ->where('dng_transaction_id', $dngPaymentId)
+            ->first();
+
+        if ($request) {
+            return $request;
+        }
+
+        return null;
+    }
+
+    private function ensurePaymentBridge(DngPaymentRequest $request): void
+    {
+        if (! $request->hasBridgedPayment()) {
+            $this->dngPaymentService->bridgeToPayment($request);
+        }
+    }
+
+    private function statusOrder(string $status): int
+    {
+        return match ($status) {
+            DngPaymentRequest::STATUS_PENDING => 0,
+            DngPaymentRequest::STATUS_PUSHED_TO_DNG => 1,
+            DngPaymentRequest::STATUS_QR_READY => 2,
+            DngPaymentRequest::STATUS_PAID_UNINVOICED => 3,
+            DngPaymentRequest::STATUS_PAID_INVOICED => 4,
+            DngPaymentRequest::STATUS_RECONCILED => 5,
+            DngPaymentRequest::STATUS_FAILED => -1,
+            default => 0,
+        };
     }
 }

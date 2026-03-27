@@ -54,14 +54,48 @@ class DngChecksumService
      */
     public function verifyWebhookChecksum(DngPaymentRequest $dngRequest, array $webhookPayload): bool
     {
-        $checksumValue = $this->accessCode
-            .$this->clientCode
-            .(string) $dngRequest->amount
-            .($webhookPayload['InvoiceSerialNumber'] ?? '')
-            .$dngRequest->student_code
-            .$dngRequest->fee_type
-            .$dngRequest->campus_code;
+        $pushPayload = is_array($dngRequest->push_payload) ? $dngRequest->push_payload : [];
 
-        return $this->verify($checksumValue, $webhookPayload['CheckSum'] ?? '');
+        $invoiceSerialNumber = (string) ($webhookPayload['InvoiceSerialNumber'] ?? '');
+        $studentId = (string) ($pushPayload['StudentId'] ?? $dngRequest->student_code);
+        $feeType = (string) ($pushPayload['Type'] ?? $pushPayload['FeeType'] ?? $dngRequest->fee_type);
+        $campusCode = (string) ($pushPayload['CampusCode'] ?? $dngRequest->campus_code);
+        $expectedChecksum = (string) ($webhookPayload['CheckSum'] ?? '');
+
+        foreach ($this->webhookAmountCandidates($pushPayload['Amount'] ?? $dngRequest->amount) as $amount) {
+            $checksumValue = $this->accessCode
+                .$this->clientCode
+                .$amount
+                .$invoiceSerialNumber
+                .$studentId
+                .$feeType
+                .$campusCode;
+
+            if ($this->verify($checksumValue, $expectedChecksum)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function webhookAmountCandidates(mixed $amount): array
+    {
+        $raw = (string) $amount;
+        if (! is_numeric($raw)) {
+            return [$raw];
+        }
+
+        $numeric = (float) $raw;
+
+        return array_values(array_unique([
+            $raw,
+            (string) ($numeric + 0),
+            number_format($numeric, 1, '.', ''),
+            number_format($numeric, 2, '.', ''),
+        ]));
     }
 }

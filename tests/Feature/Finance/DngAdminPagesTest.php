@@ -230,7 +230,7 @@ it('lists webhook events across campuses including orphan payloads', function ()
             'Amount' => '500000',
         ],
         'is_valid_checksum' => true,
-        'processing_status' => DngWebhookEvent::STATUS_PENDING,
+        'processing_status' => DngWebhookEvent::STATUS_RECEIVED,
         'dng_payment_request_id' => $otherRequest->id,
     ]);
 
@@ -246,7 +246,8 @@ it('lists webhook events across campuses including orphan payloads', function ()
             'Amount' => '200000',
         ],
         'is_valid_checksum' => false,
-        'processing_status' => DngWebhookEvent::STATUS_FAILED,
+        'processing_status' => DngWebhookEvent::STATUS_FAILED_TERMINAL,
+        'error_category' => DngWebhookEvent::ERROR_CATEGORY_NOT_FOUND,
     ]);
 
     DngWebhookEvent::create([
@@ -261,7 +262,8 @@ it('lists webhook events across campuses including orphan payloads', function ()
             'Amount' => '200000',
         ],
         'is_valid_checksum' => false,
-        'processing_status' => DngWebhookEvent::STATUS_FAILED,
+        'processing_status' => DngWebhookEvent::STATUS_FAILED_TERMINAL,
+        'error_category' => DngWebhookEvent::ERROR_CATEGORY_NOT_FOUND,
     ]);
 
     $result = app(ListDngWebhookEventsQuery::class)->handle(Request::create('/finance/dng/webhook-events', 'GET'));

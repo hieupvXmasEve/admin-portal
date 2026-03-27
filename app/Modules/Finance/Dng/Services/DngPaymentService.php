@@ -49,12 +49,14 @@ class DngPaymentService
         ]);
 
         // Step 2: Push to DNG
+        $pushPayload = $this->dngClient->buildInsertNewRecordPayload($chargeData);
+
         try {
-            $response = $this->dngClient->insertNewRecord($chargeData);
+            $response = $this->dngClient->insertNewRecord($chargeData, $pushPayload);
 
             $request->update([
                 'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
-                'push_payload' => $chargeData,
+                'push_payload' => $pushPayload,
                 'push_response' => $response,
                 'dng_transaction_id' => $response['data']['TransactionID'] ?? $response['data']['Id'] ?? null,
                 'dng_payment_id' => $response['data']['PaymentId'] ?? $response['data']['OtherId'] ?? null,
@@ -62,7 +64,7 @@ class DngPaymentService
         } catch (\Throwable $e) {
             $request->update([
                 'status' => DngPaymentRequest::STATUS_FAILED,
-                'push_payload' => $chargeData,
+                'push_payload' => $pushPayload,
                 'error_message' => $e->getMessage(),
             ]);
 

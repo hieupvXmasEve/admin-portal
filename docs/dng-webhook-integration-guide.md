@@ -11,7 +11,7 @@ Hệ thống nhận callback từ DNG khi sinh viên thanh toán thành công. D
 1. **Lần 1** - Thanh toán thành công (chưa có hóa đơn)
 2. **Lần 2** - Đã xuất hóa đơn (có thông tin hóa đơn)
 
-Cả 2 lần dùng cùng `PaymentId`.
+`PaymentId` và `TransactionId` trong callback thực tế có thể là mã nội bộ do bên thứ 3 sinh ra, không nhất thiết trùng 100% với `PaymentId` lúc tạo invoice ban đầu. Hệ thống ưu tiên match theo `ItemId + StudentId`.
 
 ---
 
@@ -22,13 +22,13 @@ POST {BASE_URL}/api/webhooks/dng/payment
 Content-Type: application/json
 ```
 
-| Thuộc tính    | Giá trị                |
-|---------------|------------------------|
-| Method        | `POST`                 |
-| Content-Type  | `application/json`     |
-| Auth          | Không yêu cầu token    |
-| Xác thực      | Qua trường `CheckSum`  |
-| Rate limit    | 60 request/phút        |
+| Thuộc tính   | Giá trị                                                               |
+| ------------ | --------------------------------------------------------------------- |
+| Method       | `POST`                                                                |
+| Content-Type | `application/json`                                                    |
+| Auth         | Không yêu cầu token                                                   |
+| Xác thực     | Qua trường `CheckSum` ở callback lần 2 (khi có `InvoiceSerialNumber`) |
+| Rate limit   | 60 request/phút                                                       |
 
 ---
 
@@ -36,51 +36,53 @@ Content-Type: application/json
 
 ### 3.1. Các trường bắt buộc
 
-| Trường        | Kiểu    | Mô tả                                      | Ví dụ              |
-|---------------|---------|---------------------------------------------|---------------------|
-| `StudentId`   | string  | Mã sinh viên                                | `"HE170001"`        |
-| `PaymentId`   | string  | Mã giao dịch DNG (unique cho mỗi khoản nợ) | `"12345678"`        |
-| `Amount`      | numeric | Số tiền thanh toán (VNĐ)                    | `5000000`           |
-| `CampusCode`  | string  | Mã campus                                   | `"FPTUHN"`          |
-| `ItemId`      | string  | Mã khoản phí                                | `"ITEM001"`         |
-| `CheckSum`    | string  | Chữ ký xác thực HMAC-SHA1                   | `"abc123..."`       |
+| Trường       | Kiểu    | Mô tả                                         | Ví dụ         |
+| ------------ | ------- | --------------------------------------------- | ------------- |
+| `StudentId`  | string  | Mã sinh viên                                  | `"HE170001"`  |
+| `PaymentId`  | string  | Mã giao dịch callback do DNG/bên thứ 3 trả về | `"12345678"`  |
+| `Amount`     | numeric | Số tiền thanh toán (VNĐ)                      | `5000000`     |
+| `CampusCode` | string  | Mã campus                                     | `"FPTUHN"`    |
+| `ItemId`     | string  | Mã khoản phí                                  | `"ITEM001"`   |
+| `CheckSum`   | string  | Chữ ký xác thực HMAC-SHA1                     | `"abc123..."` |
 
 ### 3.2. Các trường tùy chọn
 
-| Trường                  | Kiểu    | Mô tả                                | Ví dụ                        |
-|-------------------------|---------|---------------------------------------|-------------------------------|
-| `PSPCode`               | string  | Mã nhà cung cấp thanh toán (ngân hàng) | `"BIDV"`                    |
-| `FeeType`               | string  | Loại phí                              | `"tuition"`                   |
-| `InvoiceSerialNumber`   | string  | Số serial hóa đơn (lần gọi thứ 2)    | `"1/001;K23TF"`               |
-| `InvoiceDate`           | string  | Ngày xuất hóa đơn (lần gọi thứ 2)    | `"2025-03-20T03:08:02"`       |
+| Trường                | Kiểu   | Mô tả                                  | Ví dụ                   |
+| --------------------- | ------ | -------------------------------------- | ----------------------- |
+| `PSPCode`             | string | Mã nhà cung cấp thanh toán (ngân hàng) | `"BIDV"`                |
+| `FeeType`             | string | Loại phí                               | `"tuition"`             |
+| `InvoiceSerialNumber` | string | Số serial hóa đơn (lần gọi thứ 2)      | `"1/001;K23TF"`         |
+| `InvoiceDate`         | string | Ngày xuất hóa đơn (lần gọi thứ 2)      | `"2025-03-20T03:08:02"` |
 
 > **Lưu ý:** Khi `InvoiceSerialNumber` VÀ `InvoiceDate` đều có giá trị → hệ thống xác nhận đã xuất hóa đơn.
 
+> **Lưu ý:** Callback lần 1 thường **không có** `InvoiceSerialNumber`, nên hệ thống không enforce checksum ở lần này. Business validation vẫn kiểm tra `StudentId`, `FeeType`, `Amount`.
+
 ### 3.3. Nguồn dữ liệu cho CheckSum
 
-**Quan trọng:** Checksum trong webhook callback được tạo từ chính dữ liệu mà bên tích hợp đã gửi lên DNG khi tạo invoice, không phải từ payload callback.
+**Quan trọng:** Checksum trong webhook callback được tạo từ chính dữ liệu mà bên tích hợp đã gửi lên DNG khi tạo invoice, không phải từ các mã giao dịch callback (`PaymentId`, `TransactionId`) mà bên thứ 3 phát sinh sau đó.
 
 Khi tạo invoice trên DNG (gọi `InsertNewRecord`), bên tích hợp gửi:
 
 ```json
 {
-  "ApiCode": "HC_SWB",
-  "StudentId": "AUH121620",
-  "CampusCode": "FAUHN",
-  "Type": "HP",
-  "Amount": 10000,
-  "ItemId": "AUH121620_1774517167168",
-  "Login": "HC_SWB",
-  "CheckSum": "...",
-  "StudentName": "PHẠM TIẾN ĐỒNG",
-  "Email": "phamdongdongpham12@gmail.com",
-  "EstimateTime": "05/26",
-  "StudentAddress": "XÓM 10 THÔN VÂN ĐÌNH, VÂN ĐÌNH, ỨNG HÒA, HÀ NỘI",
-  "CCCD": "001206079828"
+    "ApiCode": "HC_SWB",
+    "StudentId": "AUH121620",
+    "CampusCode": "FAUHN",
+    "Type": "HP",
+    "Amount": 10000,
+    "ItemId": "AUH121620_1774517167168",
+    "Login": "HC_SWB",
+    "CheckSum": "...",
+    "StudentName": "PHẠM TIẾN ĐỒNG",
+    "Email": "phamdongdongpham12@gmail.com",
+    "EstimateTime": "05/26",
+    "StudentAddress": "XÓM 10 THÔN VÂN ĐÌNH, VÂN ĐÌNH, ỨNG HÒA, HÀ NỘI",
+    "CCCD": "001206079828"
 }
 ```
 
-DNG lưu lại các trường: `StudentId` → `AUH121620`, `CampusCode` → `FAUHN`, `Type` (FeeType) → `HP`, `Amount` → `10000`, `ItemId` → `AUH121620_1774517167168`. **Chính các trường này được dùng để tạo checksum cho webhook callback.**
+DNG lưu lại các trường: `StudentId` → `AUH121620`, `CampusCode` → `FAUHN`, `Type` (FeeType) → `HP`, `Amount` → `10000`, `ItemId` → `AUH121620_1774517167168`. **Hệ thống dùng dữ liệu push gốc này để verify callback**, không dùng `PaymentId` / `TransactionId` callback làm nguồn checksum.
 
 ### 3.4. Ví dụ payload callback
 
@@ -88,13 +90,13 @@ DNG lưu lại các trường: `StudentId` → `AUH121620`, `CampusCode` → `FA
 
 ```json
 {
-  "StudentId": "AUH121620",
-  "PaymentId": "AUH121620_1774517167168",
-  "Amount": 10000,
-  "CampusCode": "FAUHN",
-  "ItemId": "AUH121620_1774517167168",
-  "FeeType": "HP",
-  "CheckSum": "hAQwb/sc5rqnueDydS5C4vrQax4%3d"
+    "StudentId": "AUH121620",
+    "PaymentId": "AUH121620_1774517167168",
+    "Amount": 10000,
+    "CampusCode": "FAUHN",
+    "ItemId": "AUH121620_1774517167168",
+    "FeeType": "HP",
+    "CheckSum": "hAQwb/sc5rqnueDydS5C4vrQax4%3d"
 }
 ```
 
@@ -102,19 +104,19 @@ DNG lưu lại các trường: `StudentId` → `AUH121620`, `CampusCode` → `FA
 
 ```json
 {
-  "StudentId": "AUH121620",
-  "PaymentId": "AUH121620_1774517167168",
-  "Amount": 10000,
-  "CampusCode": "FAUHN",
-  "ItemId": "AUH121620_1774517167168",
-  "FeeType": "HP",
-  "CheckSum": "...",
-  "InvoiceSerialNumber": "1/001;K23TF",
-  "InvoiceDate": "2026-03-26T10:00:00"
+    "StudentId": "AUH121620",
+    "PaymentId": "AUH121620_1774517167168",
+    "Amount": 10000,
+    "CampusCode": "FAUHN",
+    "ItemId": "AUH121620_1774517167168",
+    "FeeType": "HP",
+    "CheckSum": "...",
+    "InvoiceSerialNumber": "1/001;K23TF",
+    "InvoiceDate": "2026-03-26T10:00:00"
 }
 ```
 
-> **Lưu ý:** `PaymentId` = `ItemId` mà bên tích hợp tự sinh khi tạo invoice (thường là `{StudentId}_{timestamp}`).
+> **Lưu ý:** Trong môi trường thật, `PaymentId` callback có thể khác `ItemId` / `PaymentId` lúc tạo invoice. Vì vậy hệ thống không verify cứng `PaymentId` và `TransactionId` như business key bắt buộc.
 
 ---
 
@@ -123,45 +125,50 @@ DNG lưu lại các trường: `StudentId` → `AUH121620`, `CampusCode` → `FA
 ### 4.1. Thuật toán
 
 1. **Ghép chuỗi** (không có dấu phân cách):
-   ```
-   ChecksumValue = AccessCode + ClientCode + Amount + InvoiceSerialNumber + StudentId + FeeType + CampusCode
-   ```
 
-   | Trường                | Nguồn                                          | Giá trị từ ví dụ trên   |
-   |-----------------------|------------------------------------------------|--------------------------|
-   | `AccessCode`          | Được cung cấp riêng (cùng với secret key)      | `"<AccessCode>"`         |
-   | `ClientCode`          | Được cung cấp riêng                            | `"HC_ASIA"`              |
-   | `Amount`              | `Amount` từ request `InsertNewRecord` gốc      | `"10000.00"`             |
-   | `InvoiceSerialNumber` | Từ webhook payload (rỗng nếu chưa có hóa đơn) | `""` / `"1/001;K23TF"`   |
-   | `StudentId`           | `StudentId` từ request `InsertNewRecord` gốc   | `"AUH121620"`            |
-   | `FeeType`             | `Type` từ request `InsertNewRecord` gốc        | `"HP"`                   |
-   | `CampusCode`          | `CampusCode` từ request `InsertNewRecord` gốc  | `"FAUHN"`                |
+    ```
+    ChecksumValue = AccessCode + ClientCode + Amount + InvoiceSerialNumber + StudentId + FeeType + CampusCode
+    ```
 
-   Ví dụ (lần 1, chưa có hóa đơn):
-   ```
-   "<AccessCode>HC_ASIA10000.00AUH121620HPFAUHN"
-   ```
+    | Trường                | Nguồn                                                          | Giá trị từ ví dụ trên    |
+    | --------------------- | -------------------------------------------------------------- | ------------------------ |
+    | `AccessCode`          | Được cung cấp riêng (cùng với secret key)                      | `"<AccessCode>"`         |
+    | `ClientCode`          | Được cung cấp riêng                                            | `"HC_ASIA"`              |
+    | `Amount`              | `Amount` từ request `InsertNewRecord` gốc (`push_payload`)     | `"10000"` / `"10000.00"` |
+    | `InvoiceSerialNumber` | Từ webhook payload (rỗng nếu chưa có hóa đơn)                  | `""` / `"1/001;K23TF"`   |
+    | `StudentId`           | `StudentId` từ request `InsertNewRecord` gốc (`push_payload`)  | `"AUH121620"`            |
+    | `FeeType`             | `Type` từ request `InsertNewRecord` gốc (`push_payload`)       | `"HP"`                   |
+    | `CampusCode`          | `CampusCode` từ request `InsertNewRecord` gốc (`push_payload`) | `"FAUHN"`                |
 
-   Ví dụ (lần 2, có hóa đơn):
-   ```
-   "<AccessCode>HC_ASIA10000.001/001;K23TFAUH121620HPFAUHN"
-   ```
+    Ví dụ (lần 1, chưa có hóa đơn):
 
-   > **Lưu ý:** `Amount` phải đúng định dạng decimal 2 chữ số như đã lưu (vd: `10000.00`), `StudentId` và `FeeType` lấy **nguyên gốc** từ request `InsertNewRecord`, không phải từ payload callback.
+    ```
+    "<AccessCode>HC_ASIA10000.00AUH121620HPFAUHN"
+    ```
+
+    Ví dụ (lần 2, có hóa đơn):
+
+    ```
+    "<AccessCode>HC_ASIA10000.001/001;K23TFAUH121620HPFAUHN"
+    ```
+
+    > **Lưu ý:** `Amount`, `StudentId`, `FeeType`, `CampusCode` được lấy từ payload gốc đã push sang DNG. `InvoiceSerialNumber` chỉ lấy từ callback lần 2. Callback lần 1 không có `InvoiceSerialNumber` nên checksum được bỏ qua để tránh false negative từ bên thứ 3.
 
 2. **Tạo HMAC-SHA1** với secret key (được cung cấp riêng):
-   ```
-   hash = HMAC-SHA1(ChecksumValue, SECRET_KEY)  // binary output
-   ```
+
+    ```
+    hash = HMAC-SHA1(ChecksumValue, SECRET_KEY)  // binary output
+    ```
 
 3. **Encode base64:**
-   ```
-   base64 = Base64Encode(hash)
-   ```
+
+    ```
+    base64 = Base64Encode(hash)
+    ```
 
 4. **Thay thế ký tự:**
-   - `=` → `%3d`
-   - ` ` (space) → `+`
+    - `=` → `%3d`
+    - ` ` (space) → `+`
 
 ### 4.2. Ví dụ pseudocode
 
@@ -187,13 +194,10 @@ def generate_checksum(access_code, client_code, amount, invoice_serial_number,
 ```javascript
 const crypto = require('crypto');
 
-function generateChecksum(accessCode, clientCode, amount, invoiceSerialNumber,
-                          studentId, feeType, campusCode, secretKey) {
+function generateChecksum(accessCode, clientCode, amount, invoiceSerialNumber, studentId, feeType, campusCode, secretKey) {
     const value = accessCode + clientCode + String(amount) + invoiceSerialNumber + studentId + feeType + campusCode;
 
-    const hash = crypto.createHmac('sha1', secretKey)
-        .update(value, 'utf-8')
-        .digest();
+    const hash = crypto.createHmac('sha1', secretKey).update(value, 'utf-8').digest();
 
     let checksum = hash.toString('base64');
     checksum = checksum.replace(/=/g, '%3d').replace(/ /g, '+');
@@ -214,67 +218,60 @@ Secret key sẽ được cung cấp riêng qua kênh bảo mật. **Không chia 
 
 ```json
 {
-  "Code": 200,
-  "Type": "Success",
-  "Message": "Accepted",
-  "data": null
+    "Code": 200,
+    "Type": "Success",
+    "Message": "Accepted",
+    "data": null
 }
 ```
 
-### 5.2. Đã nhận trước đó - Duplicate (200)
+### 5.2. Đã nhận và đưa vào hàng đợi xử lý (200)
 
 ```json
 {
-  "Code": 200,
-  "Type": "Success",
-  "Message": "Already received",
-  "data": null
+    "Code": 200,
+    "Type": "Success",
+    "Message": "Accepted",
+    "data": null
 }
 ```
 
-> Hệ thống đảm bảo **idempotent** — gửi cùng payload nhiều lần không gây side effect.
+> Hệ thống hiện áp dụng mô hình **inbox-first**: callback tới đâu lưu raw payload tới đó vào `dng_webhook_events`, sau đó queue mới kiểm tra checksum, dedup nghiệp vụ, mismatch, và side effect.
 
-### 5.3. Checksum không hợp lệ (401)
+### 5.3. Checksum không hợp lệ (chỉ áp dụng callback có invoice)
 
-```json
-{
-  "Code": 401,
-  "Type": "Error",
-  "Message": "Invalid checksum",
-  "data": null
-}
-```
+Checksum không còn bị reject ngay tại HTTP layer. Callback vẫn được lưu vào inbox, sau đó worker async sẽ gán `processing_status = mismatch` và `error_category = checksum` nếu verify thất bại.
 
-### 5.4. Thiếu trường bắt buộc (422)
+- Callback lần 1 (không có `InvoiceSerialNumber`) → bỏ qua checksum
+- Callback lần 2 (có `InvoiceSerialNumber`) → enforce checksum
 
-```json
-{
-  "message": "The StudentId field is required. (and X more errors)",
-  "errors": {
-    "StudentId": ["The StudentId field is required."],
-    "PaymentId": ["The PaymentId field is required."]
-  }
-}
-```
+### 5.4. Payload thiếu trường / không map được request
+
+Callback vẫn được lưu trước để phục vụ forensic/debug. Sau đó worker sẽ phân loại:
+
+- `failed_terminal` nếu payload không đủ để resolve nghiệp vụ
+- `mismatch` nếu checksum (callback lần 2) hoặc business fields `StudentId`, `FeeType`, `Amount` không khớp
+- `failed_retryable` nếu lỗi xử lý tạm thời
 
 ---
 
 ## 6. Xử lý lỗi & Retry
 
-| Tình huống                     | HTTP Status | Hành động bên gọi            |
-|--------------------------------|-------------|-------------------------------|
-| Thành công                     | 200         | Không cần retry               |
-| Duplicate payload              | 200         | Không cần retry               |
-| Checksum sai                   | 401         | Kiểm tra lại logic checksum   |
-| Thiếu trường                   | 422         | Bổ sung trường thiếu          |
-| Server error                   | 500         | Retry sau 10s, tối đa 5 lần  |
-| Timeout (>30s)                 | -           | Retry sau 30s, tối đa 5 lần  |
+| Tình huống           | HTTP Status | Hành động bên gọi                   |
+| -------------------- | ----------- | ----------------------------------- |
+| Thành công           | 200         | Không cần retry                     |
+| Callback đã nhận     | 200         | Không cần retry HTTP layer          |
+| Checksum sai (lần 2) | 200         | Kiểm tra dữ liệu checksum async     |
+| Thiếu trường         | 200         | Kiểm tra bản ghi inbox và log xử lý |
+| Server error         | 500         | Retry sau 10s, tối đa 5 lần         |
+| Timeout (>30s)       | -           | Retry sau 30s, tối đa 5 lần         |
 
 **Khuyến nghị retry:**
+
 - Retry tối đa 5 lần
 - Backoff: 10s → 30s → 60s → 300s → 600s
 - Chỉ retry khi HTTP 5xx hoặc timeout
-- **Không retry** khi 401 hoặc 422
+- Với HTTP 200 nhưng xử lý async bị `mismatch`, cần đối chiếu `dng_webhook_events`
 
 ---
 
@@ -286,31 +283,32 @@ DNG                          Hệ thống SwinX
  │  POST /api/webhooks/dng/payment│
  │  (Lần 1: không có invoice)    │
  │ ──────────────────────────────>│
- │                                │── Validate fields
- │                                │── Verify CheckSum
- │                                │── Dedup (payload hash)
- │                                │── Lưu webhook event
- │       200 {"Message":"Accepted"}│
- │ <──────────────────────────────│
- │                                │── Xử lý async (queue)
- │                                │── Cập nhật trạng thái: paid_uninvoiced
+  │                                │── Lưu raw webhook event vào inbox
+  │       200 {"Message":"Accepted"}│
+  │ <──────────────────────────────│
+  │                                │── Queue xử lý async
+  │                                │── Resolve local payment request (ưu tiên `ItemId + StudentId`)
+  │                                │── Bỏ qua Verify CheckSum
+  │                                │── Verify `StudentId`, `FeeType`, `Amount`
+  │                                │── Cập nhật trạng thái: paid_uninvoiced
  │                                │
  │  POST /api/webhooks/dng/payment│
  │  (Lần 2: có invoice)          │
  │ ──────────────────────────────>│
- │                                │── Validate & Verify
- │                                │── Dedup (payload hash mới)
- │                                │── Lưu webhook event
- │       200 {"Message":"Accepted"}│
- │ <──────────────────────────────│
- │                                │── Xử lý async (queue)
- │                                │── Cập nhật trạng thái: paid_invoiced
+  │                                │── Lưu raw webhook event vào inbox
+  │       200 {"Message":"Accepted"}│
+  │ <──────────────────────────────│
+  │                                │── Queue xử lý async
+  │                                │── Resolve local payment request
+  │                                │── Verify CheckSum
+  │                                │── Verify `StudentId`, `FeeType`, `Amount`
+  │                                │── Transition + bridge payment
+  │                                │── Cập nhật trạng thái: paid_invoiced
 ```
-
 
 ## 8. Liên hệ hỗ trợ
 
 Nếu gặp vấn đề khi tích hợp, vui lòng liên hệ team kỹ thuật để được hỗ trợ:
 
-- Cung cấp `PaymentId` và thời gian gọi webhook để debug
+- Cung cấp `PaymentId`, `ItemId` và thời gian gọi webhook để debug
 - Cung cấp full request/response để đối chiếu

@@ -49,9 +49,32 @@ class DngClient
      *     student_address: string,
      *     cccd?: string|null,
      * }  $data
+     * @param  array<string, mixed>|null  $payload
      * @return array{Code: int, Type: string, Message: string, data: mixed}
      */
-    public function insertNewRecord(array $data): array
+    public function insertNewRecord(array $data, ?array $payload = null): array
+    {
+        $payload ??= $this->buildInsertNewRecordPayload($data);
+
+        return $this->post('/api/apiv2/InsertNewRecord', $payload);
+    }
+
+    /**
+     * @param  array{
+     *     student_code: string,
+     *     campus_code: string,
+     *     type: string,
+     *     amount: int|float|string,
+     *     item_id: string,
+     *     student_name: string,
+     *     email: string,
+     *     estimate_time: string,
+     *     student_address: string,
+     *     cccd?: string|null,
+     * }  $data
+     * @return array<string, mixed>
+     */
+    public function buildInsertNewRecordPayload(array $data): array
     {
         $amount = (string) $data['amount'];
         $studentId = (string) $data['student_code'];
@@ -65,7 +88,7 @@ class DngClient
             .$itemId
             .mb_strtolower($studentId, 'UTF-8');
 
-        $payload = [
+        return [
             'ApiCode' => $this->apiCode,
             'StudentId' => $studentId,
             'CampusCode' => $campusCode,
@@ -80,8 +103,6 @@ class DngClient
             'StudentAddress' => $data['student_address'],
             'CCCD' => $data['cccd'] ?? '',
         ];
-
-        return $this->post('/api/apiv2/InsertNewRecord', $payload);
     }
 
     /**

@@ -13,6 +13,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ProcessDngWebhookJob implements ShouldBeUnique, ShouldQueue
 {
@@ -20,7 +21,7 @@ class ProcessDngWebhookJob implements ShouldBeUnique, ShouldQueue
 
     public int $tries = 5;
 
-    public int $maxExceptions = 3;
+    public int $maxExceptions = 5;
 
     public int $timeout = 60;
 
@@ -53,22 +54,47 @@ class ProcessDngWebhookJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        // Skip if already processed
-        if ($event->processing_status === DngWebhookEvent::STATUS_PROCESSED) {
+        if (in_array($event->processing_status, [
+            DngWebhookEvent::STATUS_PROCESSED,
+            DngWebhookEvent::STATUS_MISMATCH,
+            DngWebhookEvent::STATUS_FAILED_TERMINAL,
+            DngWebhookEvent::STATUS_SKIPPED,
+        ], true)) {
             return;
         }
 
-        $webhookService->processEvent($event);
+        $event->markProcessing();
+
+        try {
+            $webhookService->processEvent($event);
+        } catch (Throwable $exception) {
+            if ($this->attempts() < $this->tries) {
+                $event->markFailedRetryable(
+                    $exception->getMessage(),
+                    DngWebhookEvent::ERROR_CATEGORY_PROCESSING,
+                    now()->addSeconds($this->retryDelayForAttempt($this->attempts())),
+                );
+            }
+
+            throw $exception;
+        }
     }
 
     public function failed(\Throwable $exception): void
     {
         $event = DngWebhookEvent::find($this->eventId);
-        $event?->markFailed($exception->getMessage());
+        $event?->markFailedTerminal($exception->getMessage(), DngWebhookEvent::ERROR_CATEGORY_PROCESSING);
 
         Log::error('DNG webhook job failed permanently', [
             'event_id' => $this->eventId,
             'error' => $exception->getMessage(),
         ]);
+    }
+
+    private function retryDelayForAttempt(int $attempt): int
+    {
+        $delays = $this->backoff();
+
+        return $delays[max(0, min($attempt - 1, count($delays) - 1))] ?? 600;
     }
 }

@@ -122,7 +122,7 @@ class ListDngWebhookEventsQuery
         if (($filters['checksum_validity'] ?? 'all') === 'valid') {
             $query->where('is_valid_checksum', true);
         } elseif (($filters['checksum_validity'] ?? 'all') === 'invalid') {
-            $query->where('is_valid_checksum', false);
+            $query->where('error_category', DngWebhookEvent::ERROR_CATEGORY_CHECKSUM);
         }
 
         if (($filters['linked_request'] ?? 'all') === 'linked') {
@@ -148,11 +148,19 @@ class ListDngWebhookEventsQuery
 
         return [
             'total' => (clone $query)->count(),
-            'pending_count' => (clone $query)->where('processing_status', DngWebhookEvent::STATUS_PENDING)->count(),
+            'pending_count' => (clone $query)
+                ->whereIn('processing_status', [
+                    DngWebhookEvent::STATUS_RECEIVED,
+                    DngWebhookEvent::STATUS_PROCESSING,
+                    DngWebhookEvent::STATUS_FAILED_RETRYABLE,
+                ])
+                ->count(),
             'processed_count' => (clone $query)->where('processing_status', DngWebhookEvent::STATUS_PROCESSED)->count(),
             'mismatch_count' => (clone $query)->where('processing_status', DngWebhookEvent::STATUS_MISMATCH)->count(),
-            'failed_count' => (clone $query)->where('processing_status', DngWebhookEvent::STATUS_FAILED)->count(),
-            'invalid_checksum_count' => (clone $query)->where('is_valid_checksum', false)->count(),
+            'failed_count' => (clone $query)->where('processing_status', DngWebhookEvent::STATUS_FAILED_TERMINAL)->count(),
+            'invalid_checksum_count' => (clone $query)
+                ->where('error_category', DngWebhookEvent::ERROR_CATEGORY_CHECKSUM)
+                ->count(),
             'orphan_count' => (clone $query)->whereNull('dng_payment_request_id')->count(),
         ];
     }

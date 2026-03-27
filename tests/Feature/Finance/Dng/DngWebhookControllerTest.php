@@ -7,10 +7,13 @@ use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Modules\Finance\Dng\Jobs\ProcessDngWebhookJob;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
 use App\Modules\Finance\Dng\Services\DngChecksumService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 
 uses(RefreshDatabase::class);
 
@@ -33,6 +36,9 @@ beforeEach(function () {
         ->forProgram($this->program)
         ->withEffectiveSemester($this->semester)
         ->create();
+
+    Cache::flush();
+    Bus::fake();
 });
 
 /**
@@ -97,8 +103,9 @@ it('accepts valid webhook callback and returns 200', function () {
 
     expect(DngWebhookEvent::count())->toBe(1);
     $event = DngWebhookEvent::first();
-    expect($event->is_valid_checksum)->toBeTrue();
-    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_PENDING);
+    expect($event->is_valid_checksum)->toBeFalse();
+    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_RECEIVED);
+    expect($event->received_at)->not->toBeNull();
 });
 
 it('accepts webhook with invalid checksum while checksum enforcement is temporarily bypassed', function () {
@@ -144,8 +151,8 @@ it('accepts webhook with invalid checksum while checksum enforcement is temporar
 
     expect(DngWebhookEvent::count())->toBe(1);
     $event = DngWebhookEvent::first();
-    expect($event->is_valid_checksum)->toBeTrue();
-    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_PENDING);
+    expect($event->is_valid_checksum)->toBeFalse();
+    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_RECEIVED);
     expect($event->error_message)->toBeNull();
 });
 
@@ -194,14 +201,13 @@ it('deduplicates identical payloads and returns 200 on second call', function ()
     $response2->assertJson([
         'Code' => 200,
         'Type' => 'Success',
-        'Message' => 'Already received',
+        'Message' => 'Accepted',
     ]);
 
-    // Should not create duplicate event
-    expect(DngWebhookEvent::count())->toBe(1);
+    expect(DngWebhookEvent::count())->toBe(2);
 });
 
-it('rejects mismatched amount without storing a webhook event', function () {
+it('captures mismatched amount payloads for debugging', function () {
     $student = Student::factory()
         ->forCampus($this->campus)
         ->forProgram($this->program)
@@ -236,14 +242,15 @@ it('rejects mismatched amount without storing a webhook event', function () {
 
     $response = $this->postJson('/api/webhooks/dng/payment', $payload);
 
-    $response->assertUnprocessable();
+    $response->assertOk();
     $response->assertJson([
-        'Code' => 422,
-        'Type' => 'Error',
-        'Message' => 'Payload mismatch',
+        'Code' => 200,
+        'Type' => 'Success',
+        'Message' => 'Accepted',
     ]);
 
-    expect(DngWebhookEvent::count())->toBe(0);
+    expect(DngWebhookEvent::count())->toBe(1);
+    expect(DngWebhookEvent::first()?->dng_payment_request_id)->not->toBeNull();
 });
 
 it('deduplicates repeated valid webhook events for the same payment and event type', function () {
@@ -290,13 +297,13 @@ it('deduplicates repeated valid webhook events for the same payment and event ty
     $response->assertJson([
         'Code' => 200,
         'Type' => 'Success',
-        'Message' => 'Already received',
+        'Message' => 'Accepted',
     ]);
 
-    expect(DngWebhookEvent::count())->toBe(1);
+    expect(DngWebhookEvent::count())->toBe(2);
 });
 
-it('rejects orphan callbacks without storing a webhook event', function () {
+it('captures orphan callbacks for debugging', function () {
     $payload = [
         'CampusCode' => 'CAMPUS001',
         'StudentId' => 'STU001',
@@ -307,17 +314,18 @@ it('rejects orphan callbacks without storing a webhook event', function () {
 
     $response = $this->postJson('/api/webhooks/dng/payment', $payload);
 
-    $response->assertUnprocessable();
+    $response->assertOk();
     $response->assertJson([
-        'Code' => 422,
-        'Type' => 'Error',
-        'Message' => 'Payment request not found',
+        'Code' => 200,
+        'Type' => 'Success',
+        'Message' => 'Accepted',
     ]);
 
-    expect(DngWebhookEvent::count())->toBe(0);
+    expect(DngWebhookEvent::count())->toBe(1);
+    expect(DngWebhookEvent::first()?->dng_payment_request_id)->toBeNull();
 });
 
-it('validates required fields and returns 422', function () {
+it('captures incomplete payloads for debugging', function () {
     $payload = [
         'CampusCode' => 'CAMPUS001',
         'StudentId' => 'STU001',
@@ -326,13 +334,94 @@ it('validates required fields and returns 422', function () {
 
     $response = $this->postJson('/api/webhooks/dng/payment', $payload);
 
-    $response->assertUnprocessable();
-    // The API returns errors in a specific format with "field" key
-    $errors = $response->json('errors');
-    $errorFields = array_map(fn ($error) => $error['field'], $errors);
-    expect($errorFields)->toContain('PaymentId');
-    expect($errorFields)->toContain('Amount');
-    expect($errorFields)->toContain('CheckSum');
+    $response->assertOk();
+    $response->assertJson([
+        'Code' => 200,
+        'Type' => 'Success',
+        'Message' => 'Accepted',
+    ]);
+
+    expect(DngWebhookEvent::count())->toBe(1);
+    expect(DngWebhookEvent::first()?->payload)->toBe($payload);
+});
+
+it('dispatches webhook processing asynchronously after capture', function () {
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'STU001',
+            'curriculum_version_id' => $this->curriculumVersion->id,
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+        ])
+        ->create();
+
+    DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'CAMPUS001',
+        'student_code' => 'STU001',
+        'fee_type' => 'tuition',
+        'item_id' => 'ITEM001',
+        'amount' => 5000000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+        'dng_payment_id' => 'PAY001',
+    ]);
+
+    $payload = [
+        'CampusCode' => 'CAMPUS001',
+        'StudentId' => 'STU001',
+        'PaymentId' => 'PAY001',
+        'Amount' => '5000000',
+        'CheckSum' => 'any',
+    ];
+
+    $this->postJson('/api/webhooks/dng/payment', $payload)->assertOk();
+
+    Bus::assertDispatched(ProcessDngWebhookJob::class);
+});
+
+it('links inbox event by item and student when callback payment id differs from stored request id', function () {
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'AUH13582',
+            'curriculum_version_id' => $this->curriculumVersion->id,
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+        ])
+        ->create();
+
+    $request = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'AUH13582',
+        'fee_type' => 'HP',
+        'item_id' => 'AUH13582_1774587192884',
+        'amount' => 200000,
+        'status' => DngPaymentRequest::STATUS_QR_READY,
+        'dng_transaction_id' => 'uqvgalfplbym',
+        'dng_payment_id' => 'AUH13582_1774587192884',
+    ]);
+
+    $payload = [
+        'StudentId' => 'AUH13582',
+        'PaymentId' => 'vhsfgf23423432esf',
+        'Amount' => 200000,
+        'CampusCode' => 'FAUHN',
+        'ItemId' => 'AUH13582_1774587192884',
+        'FeeType' => 'HP',
+        'CheckSum' => 'any',
+    ];
+
+    $this->postJson('/api/webhooks/dng/payment', $payload)->assertOk();
+
+    $event = DngWebhookEvent::query()->latest('id')->first();
+    expect($event)->not->toBeNull();
+    expect($event?->dng_payment_request_id)->toBe($request->id);
 });
 
 it('stores event with payload and headers', function () {

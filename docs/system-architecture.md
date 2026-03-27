@@ -51,7 +51,7 @@ Client (Web SPA / API)
     - Web routes: `/finance/payments/create`, `/finance/payments/{student}/dng-data`, `/finance/dng/payment-requests`, `/finance/dng/payment-requests/{dngPaymentRequest}`, `/finance/dng/webhook-events`, `/finance/dng/webhook-events/{dngWebhookEvent}`
     - API routes: `POST /api/v1/finance/dng/payment-requests` (create), `POST /api/v1/finance/dng/webhook` (receive)
     - Ops routes: `finance/operations/settlement` (worklist), `finance/operations/dashboard` (metrics)
-    - DNG workflow: Staff → Payment Create form → Student selection → DNG API push (with checksum) → QR display → Webhook confirmation → Payment record
+    - DNG workflow: Staff → Payment Create form → Student selection → DNG API push (with checksum) → QR display → Webhook inbox capture (`dng_webhook_events`) → Async checksum/business validation → Payment record
     - Admin monitoring workflow: request audit list/detail remain campus-scoped; webhook audit list is cross-campus while webhook detail still validates campus access
     - Permissions: `create_finance_payments`, `view_finance_dng_payment_requests`, `view_finance_dng_webhook_events`
     - Legacy `payment_allocations` no longer used in runtime.

@@ -142,9 +142,9 @@ class DngPaymentRequest extends Model
             $issues[] = "Student mismatch: local={$this->student_code}, callback={$callbackStudentCode}";
         }
 
-        $callbackCampusCode = (string) ($payload['CampusCode'] ?? '');
-        if ($callbackCampusCode !== '' && $callbackCampusCode !== $this->campus_code) {
-            $issues[] = "Campus mismatch: local={$this->campus_code}, callback={$callbackCampusCode}";
+        $callbackFeeType = (string) ($payload['FeeType'] ?? '');
+        if ($callbackFeeType !== '' && $callbackFeeType !== $this->fee_type) {
+            $issues[] = "Fee type mismatch: local={$this->fee_type}, callback={$callbackFeeType}";
         }
 
         return $issues;
