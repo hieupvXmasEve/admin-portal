@@ -11,6 +11,7 @@ use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentInvoice;
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
 use App\Modules\Finance\Queries\Operations\ListSettlementWorklistQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -105,6 +106,34 @@ it('lists unpaid students with readiness based on unapplied cash', function () {
         ->and($result['summary']['ready_students'])->toBe(1)
         ->and($rows->firstWhere('student_code', 'AUS-READY')['actionable'])->toBeTrue()
         ->and($rows->firstWhere('student_code', 'AUS-NOCASH')['actionable'])->toBeFalse();
+});
+
+it('includes the latest dng request indicator for each student row', function () {
+    [$student, $semester, $campus] = createSettlementStudent('AUS-DNG');
+
+    app()->singleton('campus', fn () => $campus);
+
+    createUnpaidInvoice($student, $semester, 'INV-DNG', 12000000);
+
+    DngPaymentRequest::query()->create([
+        'student_id' => $student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => $student->student_id,
+        'fee_type' => 'HP',
+        'description' => 'Outstanding tuition for settlement',
+        'item_id' => 'ITEM-DNG-001',
+        'amount' => 12000000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+        'dng_payment_id' => 'PAY-DNG-001',
+    ]);
+
+    $result = app(ListSettlementWorklistQuery::class)->handle(Request::create('/finance/operations/settlement', 'GET'));
+    $row = collect($result['students']->items())->firstWhere('student_code', 'AUS-DNG');
+
+    expect($row)->not->toBeNull()
+        ->and($row['latest_dng_request'])->not->toBeNull()
+        ->and($row['latest_dng_request']['status'])->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG)
+        ->and($row['latest_dng_request']['description'])->toBe('Outstanding tuition for settlement');
 });
 
 it('excludes invoice lines whose linked charges are void from active due totals', function () {

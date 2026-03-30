@@ -136,6 +136,36 @@ class DngClient
     }
 
     /**
+     * Get installment payment link for a student by fee types.
+     *
+     * @param  array{
+     *     student_code: string,
+     *     campus_code: string,
+     *     fee_types: array<int, string>,
+     * }  $data
+     * @return array<string, mixed>
+     */
+    public function createFoxpayPaymentByFeeType(array $data): array
+    {
+        $studentCode = $data['student_code'];
+
+        $checksumString = mb_strtolower(
+            $this->accessCode.$this->apiCode.$studentCode,
+            'UTF-8',
+        );
+
+        $payload = [
+            'StudentCode' => $studentCode,
+            'ApiCode' => $this->apiCode,
+            'CampusCode' => $data['campus_code'],
+            'FeeTypes' => array_values($data['fee_types']),
+            'CheckSum' => $this->checksumService->generate($checksumString),
+        ];
+
+        return $this->post('/api/dng/createpayfoxpaybyFeeType', $payload);
+    }
+
+    /**
      * Check paid transactions for a given campus and date.
      *
      * @return array{Code: int, Type: string, Message: string, data: mixed}
@@ -191,15 +221,17 @@ class DngClient
         $decoded = $response->json();
 
         // DNG returns error codes in body even with HTTP 200
-        if (isset($decoded['Code']) && (int) $decoded['Code'] >= 400) {
+        $businessCode = $decoded['Code'] ?? $decoded['code'] ?? null;
+
+        if ($businessCode !== null && (int) $businessCode >= 400) {
             Log::channel('stack')->warning('DNG API business error', [
                 'endpoint' => $endpoint,
-                'code' => $decoded['Code'],
-                'message' => $decoded['Message'] ?? 'Unknown error',
+                'code' => $businessCode,
+                'message' => $decoded['Message'] ?? $decoded['message'] ?? 'Unknown error',
             ]);
 
             throw new RuntimeException(
-                "DNG API error [{$decoded['Code']}]: ".($decoded['Message'] ?? 'Unknown error')
+                "DNG API error [{$businessCode}]: ".($decoded['Message'] ?? $decoded['message'] ?? 'Unknown error')
             );
         }
 

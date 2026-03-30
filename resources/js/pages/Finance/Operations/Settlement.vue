@@ -7,12 +7,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { usePermission } from '@/composables/usePermission';
 import { useServerTableQuery } from '@/composables/useServerTableQuery';
 import { createColumns } from '@/lib/table-utils';
 import type { PaginatedResponse } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { ArrowLeft, CheckCircle2, Zap } from 'lucide-vue-next';
+import { ArrowLeft, CheckCircle2, ExternalLink, Wallet, Zap } from 'lucide-vue-next';
 import { h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
@@ -40,6 +44,13 @@ interface SettlementStudent {
     total_payments: number;
     net_amount_to_collect: number;
     actionable: boolean;
+    latest_dng_request: {
+        id: number;
+        status: string;
+        item_id: string;
+        description: string | null;
+        created_at: string | null;
+    } | null;
     invoices: SettlementInvoice[];
 }
 
@@ -64,6 +75,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const permission = usePermission();
 
 const formatCurrency = (value: number) =>
     new Intl.NumberFormat('vi-VN', {
@@ -107,6 +119,9 @@ const { filters, hasActiveFilters, clearFilters, applySearch, setFilter, apply, 
 
 const selectedStudentIds = ref<number[]>(props.students.data.filter((student) => student.actionable).map((student) => student.student_id));
 const isApplying = ref(false);
+const isCreateDngDialogOpen = ref(false);
+const dngTargetStudent = ref<SettlementStudent | null>(null);
+const dngFeeDescription = ref('');
 
 watch(
     () => props.students.data,
@@ -168,6 +183,33 @@ const getReadinessBadge = (student: SettlementStudent) => {
     }
 
     return { label: 'No cash', class: 'bg-amber-50 text-amber-700 border-amber-200' };
+};
+
+const openCreateDngDialog = (student: SettlementStudent) => {
+    dngTargetStudent.value = student;
+    dngFeeDescription.value = '';
+    isCreateDngDialogOpen.value = true;
+};
+
+const redirectToCreateDngRequest = () => {
+    if (!dngTargetStudent.value) {
+        return;
+    }
+
+    const description = dngFeeDescription.value.trim();
+
+    if (description.length === 0) {
+        toast.error('Please enter a fee description.');
+
+        return;
+    }
+
+    router.get(route('finance.payments.create'), {
+        student_id: dngTargetStudent.value.student_id,
+        amount: dngTargetStudent.value.net_amount_to_collect,
+        description,
+        source_context: 'settlement_no_cash',
+    });
 };
 
 const columns: ColumnDef<SettlementStudent>[] = createColumns<SettlementStudent>([
@@ -273,6 +315,36 @@ const columns: ColumnDef<SettlementStudent>[] = createColumns<SettlementStudent>
             </Button>
         </div>
 
+        <Dialog v-model:open="isCreateDngDialogOpen">
+            <DialogContent class="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Create DNG request</DialogTitle>
+                    <DialogDescription> Enter the fee description before continuing to the DNG payment form. </DialogDescription>
+                </DialogHeader>
+
+                <div class="space-y-4">
+                    <div v-if="dngTargetStudent" class="bg-muted/30 rounded-lg border p-3 text-sm">
+                        <div class="font-medium">{{ dngTargetStudent.student_name }}</div>
+                        <div class="text-muted-foreground">{{ dngTargetStudent.student_code }}</div>
+                        <div class="mt-2">
+                            <span class="text-muted-foreground">Suggested amount:</span>
+                            <span class="ml-1 font-medium">{{ formatCurrency(dngTargetStudent.net_amount_to_collect) }}</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <Label for="settlement-dng-description">Fee description *</Label>
+                        <Input id="settlement-dng-description" v-model="dngFeeDescription" placeholder="Example: Outstanding tuition for unpaid invoices" />
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button variant="outline" @click="isCreateDngDialogOpen = false">Cancel</Button>
+                    <Button @click="redirectToCreateDngRequest"> Continue to payment form </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
         <div class="grid gap-4 md:grid-cols-4">
             <Card>
                 <CardHeader class="pb-2">
@@ -361,10 +433,25 @@ const columns: ColumnDef<SettlementStudent>[] = createColumns<SettlementStudent>
                     </template>
 
                     <template #cell-actions="{ row }">
-                        <div class="flex justify-end">
-                            <Button size="sm" :disabled="isApplying || !row.original.actionable" @click="applySettlement([row.original.student_id])">
+                        <div class="flex flex-col items-end gap-2">
+                            <div v-if="row.original.latest_dng_request" class="flex items-center gap-2">
+                                <Badge variant="outline" class="border-blue-200 bg-blue-50 text-blue-700">Has DNG request</Badge>
+                                <Link v-if="permission.can('view_finance_dng_payment_requests')" :href="route('finance.dng.payment-requests.show', row.original.latest_dng_request.id)">
+                                    <Button variant="ghost" size="sm">
+                                        <ExternalLink class="mr-2 h-4 w-4" />
+                                        View
+                                    </Button>
+                                </Link>
+                            </div>
+
+                            <Button v-if="row.original.actionable" size="sm" :disabled="isApplying" @click="applySettlement([row.original.student_id])">
                                 <CheckCircle2 class="mr-2 h-4 w-4" />
                                 Apply
+                            </Button>
+
+                            <Button v-else-if="permission.can('create_finance_payments')" size="sm" variant="outline" @click="openCreateDngDialog(row.original)">
+                                <Wallet class="mr-2 h-4 w-4" />
+                                Create DNG request
                             </Button>
                         </div>
                     </template>

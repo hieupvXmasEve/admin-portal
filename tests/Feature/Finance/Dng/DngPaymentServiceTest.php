@@ -50,6 +50,7 @@ it('stores the exact DNG insert payload on successful push', function () {
         'campus_code' => 'FAUHN',
         'student_code' => 'STU001',
         'fee_type' => 'HP',
+        'description' => 'Settlement no-cash tuition request',
         'item_id' => 'ITEM001',
         'amount' => '11000.0',
         'type' => 'payment',
@@ -86,6 +87,7 @@ it('stores the exact DNG insert payload on successful push', function () {
     $request = $service->createAndPush($this->student, $chargeData);
 
     expect($request->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG)
+        ->and($request->description)->toBe('Settlement no-cash tuition request')
         ->and($request->push_payload)
         ->toMatchArray($expectedPayload)
         ->and((float) $request->push_payload['Amount'])->toBe((float) $expectedPayload['Amount'])
@@ -98,6 +100,7 @@ it('stores the exact DNG insert payload when push fails', function () {
         'campus_code' => 'FAUHN',
         'student_code' => 'STU001',
         'fee_type' => 'HP',
+        'description' => 'Settlement no-cash tuition request',
         'item_id' => 'ITEM001',
         'amount' => '11000.0',
         'type' => 'payment',
@@ -131,8 +134,81 @@ it('stores the exact DNG insert payload when push fails', function () {
     $request = DngPaymentRequest::query()->sole();
 
     expect($request->status)->toBe(DngPaymentRequest::STATUS_FAILED)
+        ->and($request->description)->toBe('Settlement no-cash tuition request')
         ->and($request->push_payload)
         ->toMatchArray($expectedPayload)
         ->and((float) $request->push_payload['Amount'])->toBe((float) $expectedPayload['Amount'])
         ->and($request->error_message)->toBe('DNG unavailable');
+});
+
+it('returns qr access data without storing qr payload', function () {
+    $request = DngPaymentRequest::query()->create([
+        'student_id' => $this->student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'STU001',
+        'fee_type' => 'HP',
+        'description' => 'Tuition request',
+        'item_id' => 'ITEM-QR-001',
+        'amount' => 11000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+    ]);
+
+    $dngClientMock = Mockery::mock(DngClient::class);
+    $dngClientMock->shouldReceive('createVirtualAccountByFeeType')
+        ->once()
+        ->with([
+            'student_code' => 'STU001',
+            'campus_code' => 'FAUHN',
+            'fee_types' => ['HP'],
+        ])
+        ->andReturn([
+            'Code' => 200,
+            'data' => ['PaymentUrl' => 'https://example.test/qr'],
+        ]);
+
+    $paymentServiceMock = Mockery::mock(PaymentService::class);
+
+    $service = new DngPaymentService($dngClientMock, $paymentServiceMock);
+
+    $response = $service->createQrAccess($request, ['HP']);
+
+    expect($response['data']['PaymentUrl'])->toBe('https://example.test/qr')
+        ->and($request->fresh()->qr_payload)->toBeNull()
+        ->and($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+});
+
+it('returns installment access data without storing qr payload', function () {
+    $request = DngPaymentRequest::query()->create([
+        'student_id' => $this->student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'STU001',
+        'fee_type' => 'HP',
+        'description' => 'Installment request',
+        'item_id' => 'ITEM-FOX-001',
+        'amount' => 11000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+    ]);
+
+    $dngClientMock = Mockery::mock(DngClient::class);
+    $dngClientMock->shouldReceive('createFoxpayPaymentByFeeType')
+        ->once()
+        ->with([
+            'student_code' => 'STU001',
+            'campus_code' => 'FAUHN',
+            'fee_types' => ['HP'],
+        ])
+        ->andReturn([
+            'code' => 200,
+            'data' => ['PaymentUrl' => 'https://example.test/installment'],
+        ]);
+
+    $paymentServiceMock = Mockery::mock(PaymentService::class);
+
+    $service = new DngPaymentService($dngClientMock, $paymentServiceMock);
+
+    $response = $service->createInstallmentAccess($request, ['HP']);
+
+    expect($response['data']['PaymentUrl'])->toBe('https://example.test/installment')
+        ->and($request->fresh()->qr_payload)->toBeNull()
+        ->and($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
 });

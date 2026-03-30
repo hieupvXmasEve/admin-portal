@@ -13,7 +13,7 @@ import type { PaginatedResponse } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/format';
 import { Head, Link } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { ArrowLeft, ArrowRight, CheckCircle2, Clock3, QrCode, XCircle } from 'lucide-vue-next';
+import { ArrowLeft, ArrowRight, CheckCircle2, Clock3, Send, XCircle } from 'lucide-vue-next';
 import { h } from 'vue';
 import { route } from 'ziggy-js';
 
@@ -28,6 +28,7 @@ interface DngPaymentRequestRow {
     campus_code: string;
     student_code: string;
     fee_type: string;
+    description: string | null;
     item_id: string;
     amount: number;
     status: string;
@@ -67,7 +68,7 @@ interface Props {
     stats: {
         total: number;
         pending_count: number;
-        qr_ready_count: number;
+        pushed_count: number;
         paid_uninvoiced_count: number;
         paid_invoiced_count: number;
         failed_count: number;
@@ -82,7 +83,6 @@ const permission = usePermission();
 const statusOptions = [
     { value: 'pending', label: 'Pending' },
     { value: 'pushed_to_dng', label: 'Pushed to DNG' },
-    { value: 'qr_ready', label: 'QR Ready' },
     { value: 'paid_uninvoiced', label: 'Paid Uninvoiced' },
     { value: 'paid_invoiced', label: 'Paid Invoiced' },
     { value: 'reconciled', label: 'Reconciled' },
@@ -143,7 +143,6 @@ const getRequestStatusClass = (status: string) => {
         case 'paid_invoiced':
             return 'bg-green-50 text-green-700 border-green-200';
         case 'paid_uninvoiced':
-        case 'qr_ready':
             return 'bg-blue-50 text-blue-700 border-blue-200';
         case 'pushed_to_dng':
             return 'bg-amber-50 text-amber-700 border-amber-200';
@@ -246,8 +245,8 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
                 <CardContent class="flex items-center gap-2 text-2xl font-semibold"><Clock3 class="h-5 w-5 text-amber-600" />{{ stats.pending_count }}</CardContent>
             </Card>
             <Card>
-                <CardHeader class="pb-2"><CardTitle class="text-sm">QR Ready</CardTitle></CardHeader>
-                <CardContent class="flex items-center gap-2 text-2xl font-semibold"><QrCode class="h-5 w-5 text-blue-600" />{{ stats.qr_ready_count }}</CardContent>
+                <CardHeader class="pb-2"><CardTitle class="text-sm">Pushed to DNG</CardTitle></CardHeader>
+                <CardContent class="flex items-center gap-2 text-2xl font-semibold"><Send class="h-5 w-5 text-amber-600" />{{ stats.pushed_count }}</CardContent>
             </Card>
             <Card>
                 <CardHeader class="pb-2"><CardTitle class="text-sm">Paid Uninvoiced</CardTitle></CardHeader>
@@ -308,6 +307,7 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
                     <template #cell-fee_type="{ row }">
                         <div class="space-y-1">
                             <Badge variant="outline">{{ row.original.fee_type }}</Badge>
+                            <div class="text-muted-foreground text-xs">{{ row.original.description || 'No description' }}</div>
                             <div class="font-mono text-xs">{{ row.original.item_id }}</div>
                         </div>
                     </template>

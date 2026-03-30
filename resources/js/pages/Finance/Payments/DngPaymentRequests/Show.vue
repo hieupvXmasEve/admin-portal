@@ -21,6 +21,7 @@ interface Props {
         campus_code: string;
         student_code: string;
         fee_type: string;
+        description: string | null;
         item_id: string;
         amount: number;
         status: string;
@@ -65,7 +66,6 @@ const getStatusClass = (status: string) => {
         case 'paid_invoiced':
             return 'bg-green-50 text-green-700 border-green-200';
         case 'paid_uninvoiced':
-        case 'qr_ready':
             return 'bg-blue-50 text-blue-700 border-blue-200';
         case 'pushed_to_dng':
             return 'bg-amber-50 text-amber-700 border-amber-200';
@@ -115,6 +115,7 @@ const getStatusClass = (status: string) => {
                 >
                 <CardContent class="space-y-2 text-sm">
                     <div><span class="text-muted-foreground">Fee type:</span> {{ request.fee_type }}</div>
+                    <div><span class="text-muted-foreground">Description:</span> {{ request.description || '-' }}</div>
                     <div>
                         <span class="text-muted-foreground">Item:</span> <span class="font-mono">{{ request.item_id }}</span>
                     </div>
@@ -220,7 +221,6 @@ const getStatusClass = (status: string) => {
         <div class="grid gap-6 xl:grid-cols-2">
             <JsonPayloadCard title="Push Payload" :payload="request.payloads.push_payload" />
             <JsonPayloadCard title="Push Response" :payload="request.payloads.push_response" />
-            <JsonPayloadCard title="QR Payload" :payload="request.payloads.qr_payload" />
             <JsonPayloadCard title="Last Callback Payload" :payload="request.payloads.last_callback_payload" />
         </div>
     </div>

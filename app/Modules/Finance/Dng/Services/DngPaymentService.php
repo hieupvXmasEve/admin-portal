@@ -25,6 +25,7 @@ class DngPaymentService
      *     campus_code: string,
      *     student_code: string,
      *     fee_type: string,
+     *     description?: string|null,
      *     item_id: string,
      *     amount: float|int|string,
      *     type: string,
@@ -43,6 +44,7 @@ class DngPaymentService
             'campus_code' => $chargeData['campus_code'],
             'student_code' => $chargeData['student_code'],
             'fee_type' => $chargeData['fee_type'],
+            'description' => $chargeData['description'] ?? null,
             'item_id' => $chargeData['item_id'],
             'amount' => $chargeData['amount'],
             'status' => DngPaymentRequest::STATUS_PENDING,
@@ -80,29 +82,33 @@ class DngPaymentService
     }
 
     /**
-     * Pull QR code / virtual account from DNG.
+     * Build a payment access payload for QR/virtual account flow.
      *
      * @param  array<int, string>  $feeTypes
-     * @return array<string, mixed> QR data from DNG
+     * @return array<string, mixed>
      */
-    public function pullQrCode(DngPaymentRequest $request, array $feeTypes): array
+    public function createQrAccess(DngPaymentRequest $request, array $feeTypes): array
     {
-        $response = $this->dngClient->createVirtualAccountByFeeType([
+        return $this->dngClient->createVirtualAccountByFeeType([
             'student_code' => $request->student_code,
             'campus_code' => $request->campus_code,
             'fee_types' => $feeTypes,
         ]);
+    }
 
-        $request->update([
-            'qr_payload' => $response,
+    /**
+     * Build a payment access payload for installment/Foxpay flow.
+     *
+     * @param  array<int, string>  $feeTypes
+     * @return array<string, mixed>
+     */
+    public function createInstallmentAccess(DngPaymentRequest $request, array $feeTypes): array
+    {
+        return $this->dngClient->createFoxpayPaymentByFeeType([
+            'student_code' => $request->student_code,
+            'campus_code' => $request->campus_code,
+            'fee_types' => $feeTypes,
         ]);
-
-        // Only transition if currently in pushed_to_dng state
-        if ($request->canTransitionTo(DngPaymentRequest::STATUS_QR_READY)) {
-            $request->transitionTo(DngPaymentRequest::STATUS_QR_READY);
-        }
-
-        return $response;
     }
 
     /**

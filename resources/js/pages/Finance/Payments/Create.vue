@@ -23,54 +23,65 @@ interface StudentDngData {
     email: string;
     student_address: string;
     cccd: string;
+    latest_dng_request: {
+        id: number;
+        status: string;
+        item_id: string;
+        description: string | null;
+        created_at: string | null;
+    } | null;
 }
 
 // DNG payment request response
 interface DngPaymentResponse {
     id: number;
     status: string;
+    description: string | null;
     dng_transaction_id: string | null;
     dng_payment_id: string | null;
-    qr: Record<string, any> | null;
 }
 
+interface PrefillProps {
+    student: StudentBasic;
+    dng_data: StudentDngData;
+    amount: number | null;
+    fee_type: string;
+    description: string;
+    source_context: string | null;
+}
+
+interface Props {
+    prefill: PrefillProps | null;
+}
+
+const props = defineProps<Props>();
+
 // Student search
-const {
-    searchQuery: studentSearch,
-    searchResults,
-    isLoading: isSearching,
-    reset: resetStudentSearch,
-} = useStudentSearch({ limit: 5 });
+const { searchQuery: studentSearch, searchResults, isLoading: isSearching, reset: resetStudentSearch } = useStudentSearch({ limit: 5 });
 
 const api = useApi();
 
 // State
-const selectedStudent = ref<StudentBasic | null>(null);
-const studentDngData = ref<StudentDngData | null>(null);
+const selectedStudent = ref<StudentBasic | null>(props.prefill?.student ?? null);
+const studentDngData = ref<StudentDngData | null>(props.prefill?.dng_data ?? null);
 const loadingDngData = ref(false);
-const amount = ref<number | null>(null);
-const feeType = ref('HP');
+const amount = ref<number | null>(props.prefill?.amount ?? null);
+const feeType = ref(props.prefill?.fee_type ?? 'HP');
+const feeDescription = ref(props.prefill?.description ?? '');
 const itemId = ref('');
 // estimate_time in MM/YY format per DNG spec
 const now = new Date();
-const estimateTime = ref(
-    `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}`,
-);
+const estimateTime = ref(`${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}`);
 const submitting = ref(false);
 const dngResponse = ref<DngPaymentResponse | null>(null);
 const apiError = ref('');
 
+if (studentDngData.value) {
+    itemId.value = `${studentDngData.value.student_code}_${Date.now()}`;
+}
+
 // Computed
-const canSubmit = computed(() =>
-    selectedStudent.value
-    && studentDngData.value
-    && amount.value
-    && amount.value > 0
-    && feeType.value
-    && itemId.value
-    && !submitting.value
-    && !dngResponse.value,
-);
+const canSubmit = computed(() => selectedStudent.value && studentDngData.value && amount.value && amount.value > 0 && feeType.value && feeDescription.value.trim().length > 0 && itemId.value && !submitting.value && !dngResponse.value);
 
 // Student selection → fetch DNG data
 const selectStudent = async (student: StudentBasic) => {
@@ -81,10 +92,12 @@ const selectStudent = async (student: StudentBasic) => {
     loadingDngData.value = true;
     try {
         const res = await api.get(`/finance/payments/${student.id}/dng-data`);
-        if (res.data.value) {
-            studentDngData.value = res.data.value as StudentDngData;
+        const dngData = res.data.value as unknown as StudentDngData | null;
+
+        if (dngData) {
+            studentDngData.value = dngData;
             // Auto-generate item_id from student code + timestamp
-            itemId.value = `${res.data.value.student_code}_${Date.now()}`;
+            itemId.value = `${dngData.student_code}_${Date.now()}`;
         }
     } catch {
         toast.error('Không thể tải thông tin sinh viên');
@@ -97,6 +110,7 @@ const clearStudent = () => {
     selectedStudent.value = null;
     studentDngData.value = null;
     amount.value = null;
+    feeDescription.value = '';
     dngResponse.value = null;
     apiError.value = '';
     itemId.value = '';
@@ -115,6 +129,7 @@ const handleSubmit = async () => {
             campus_code: studentDngData.value.campus_code,
             student_code: studentDngData.value.student_code,
             fee_type: feeType.value,
+            description: feeDescription.value.trim(),
             item_id: itemId.value,
             amount: amount.value,
             type: feeType.value,
@@ -126,10 +141,12 @@ const handleSubmit = async () => {
             fee_types: [feeType.value],
         };
 
-        const res = await api.post<{ data: DngPaymentResponse }>('/api/v1/finance/dng/payment-requests', payload);
+        const res = await api.post<DngPaymentResponse>('/api/v1/finance/dng/payment-requests', payload);
 
-        if (res.data.value?.data) {
-            dngResponse.value = res.data.value.data;
+        const createdRequest = res.data.value?.data ?? null;
+
+        if (createdRequest) {
+            dngResponse.value = createdRequest;
             toast.success('Đã tạo yêu cầu thanh toán DNG thành công');
         } else {
             apiError.value = 'Phản hồi không hợp lệ từ DNG';
@@ -143,25 +160,10 @@ const handleSubmit = async () => {
     }
 };
 
-// Refresh QR code
-const refreshQr = async () => {
-    if (!dngResponse.value) return;
-
-    try {
-        const res = await api.get(`/api/v1/finance/dng/payment-requests/${dngResponse.value.id}/qr`);
-        if (res.data.value?.data) {
-            dngResponse.value = { ...dngResponse.value, qr: res.data.value.data };
-            toast.success('Đã làm mới mã QR');
-        }
-    } catch {
-        toast.error('Không thể làm mới mã QR');
-    }
-};
-
 // Status badge variant
 const statusVariant = computed(() => {
     const s = dngResponse.value?.status;
-    if (s === 'qr_ready' || s === 'pushed_to_dng') return 'secondary';
+    if (s === 'pushed_to_dng') return 'secondary';
     if (s === 'paid_uninvoiced' || s === 'paid_invoiced') return 'default';
     if (s === 'failed') return 'destructive';
     return 'outline';
@@ -171,7 +173,6 @@ const statusLabel = computed(() => {
     const map: Record<string, string> = {
         pending: 'Đang chờ',
         pushed_to_dng: 'Đã gửi DNG',
-        qr_ready: 'QR sẵn sàng',
         paid_uninvoiced: 'Đã thanh toán',
         paid_invoiced: 'Đã xuất hóa đơn',
         reconciled: 'Đã đối soát',
@@ -198,6 +199,13 @@ const statusLabel = computed(() => {
             </div>
         </div>
 
+        <Card v-if="props.prefill?.source_context === 'settlement_no_cash'" class="border-blue-200 bg-blue-50/60">
+            <CardHeader>
+                <CardTitle class="text-base text-blue-900">Settlement prefill</CardTitle>
+                <CardDescription class="text-blue-800">This request was started from the settlement worklist for a student with no unapplied cash.</CardDescription>
+            </CardHeader>
+        </Card>
+
         <div class="grid gap-6 lg:grid-cols-3">
             <div class="space-y-6 lg:col-span-2">
                 <!-- Student Selection -->
@@ -210,50 +218,33 @@ const statusLabel = computed(() => {
                         <div v-if="selectedStudent" class="flex items-center justify-between rounded-lg border p-4">
                             <div>
                                 <p class="font-medium">{{ selectedStudent.full_name }}</p>
-                                <p class="text-muted-foreground text-sm">
-                                    {{ selectedStudent.student_id }} - {{ selectedStudent.email }}
-                                </p>
-                                <p v-if="studentDngData" class="text-muted-foreground text-xs mt-1">
-                                    Campus: {{ studentDngData.campus_code }}
-                                </p>
+                                <p class="text-muted-foreground text-sm">{{ selectedStudent.student_id }} - {{ selectedStudent.email }}</p>
+                                <p v-if="studentDngData" class="text-muted-foreground mt-1 text-xs">Campus: {{ studentDngData.campus_code }}</p>
                             </div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                :disabled="!!dngResponse"
-                                @click="clearStudent"
-                            >
-                                Thay đổi
-                            </Button>
+                            <Button type="button" variant="outline" size="sm" :disabled="!!dngResponse" @click="clearStudent"> Thay đổi </Button>
                         </div>
                         <div v-else class="space-y-2">
                             <div class="relative">
-                                <Search class="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-                                <Input
-                                    v-model="studentSearch"
-                                    placeholder="Tìm kiếm sinh viên theo tên, MSSV, email..."
-                                    class="pl-10"
-                                />
+                                <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                                <Input v-model="studentSearch" placeholder="Tìm kiếm sinh viên theo tên, MSSV, email..." class="pl-10" />
                             </div>
                             <div v-if="searchResults.length > 0" class="rounded-lg border">
-                                <div
-                                    v-for="student in searchResults"
-                                    :key="student.id"
-                                    class="cursor-pointer border-b p-3 last:border-b-0 hover:bg-muted"
-                                    @click="selectStudent(student)"
-                                >
+                                <div v-for="student in searchResults" :key="student.id" class="hover:bg-muted cursor-pointer border-b p-3 last:border-b-0" @click="selectStudent(student)">
                                     <p class="font-medium">{{ student.full_name }}</p>
-                                    <p class="text-muted-foreground text-sm">
-                                        {{ student.student_id }} - {{ student.email }}
-                                    </p>
+                                    <p class="text-muted-foreground text-sm">{{ student.student_id }} - {{ student.email }}</p>
                                 </div>
                             </div>
                             <p v-if="isSearching" class="text-muted-foreground text-sm">Đang tìm kiếm...</p>
                         </div>
-                        <div v-if="loadingDngData" class="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div v-if="loadingDngData" class="text-muted-foreground flex items-center gap-2 text-sm">
                             <Loader2 class="h-4 w-4 animate-spin" />
                             Đang tải thông tin DNG...
+                        </div>
+                        <div v-if="studentDngData?.latest_dng_request" class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                            <div class="font-medium">Student already has a DNG request</div>
+                            <div class="mt-1">Request #{{ studentDngData.latest_dng_request.id }} · {{ studentDngData.latest_dng_request.status }}</div>
+                            <div class="mt-1 font-mono text-xs">{{ studentDngData.latest_dng_request.item_id }}</div>
+                            <div v-if="studentDngData.latest_dng_request.description" class="mt-2">{{ studentDngData.latest_dng_request.description }}</div>
                         </div>
                     </CardContent>
                 </Card>
@@ -271,10 +262,15 @@ const statusLabel = computed(() => {
                                     id="amount"
                                     :default-value="amount ?? 0"
                                     :model-value="amount ?? 0"
-                                    @update:model-value="(v: number | null) => {
-                                        if (v) { amount = v }
-                                        else { amount = null }
-                                    }"
+                                    @update:model-value="
+                                        (v: number | null) => {
+                                            if (v) {
+                                                amount = v;
+                                            } else {
+                                                amount = null;
+                                            }
+                                        }
+                                    "
                                     :format-options="{
                                         style: 'currency',
                                         currency: 'VND',
@@ -295,6 +291,11 @@ const statusLabel = computed(() => {
                                 <Input v-model="feeType" placeholder="VD: HP, LPT, ..." />
                                 <p class="text-muted-foreground text-xs">Mã loại phí trên hệ thống DNG</p>
                             </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="fee_description">Mô tả khoản phí *</Label>
+                            <Input id="fee_description" v-model="feeDescription" placeholder="Ví dụ: Thu học phí còn thiếu của invoice chưa thanh toán" />
                         </div>
 
                         <div class="grid gap-4 sm:grid-cols-2">
@@ -346,25 +347,14 @@ const statusLabel = computed(() => {
 
                         <Separator />
 
-                        <!-- QR Data display -->
-                        <div v-if="dngResponse.qr" class="rounded-lg bg-muted p-4">
-                            <p class="text-sm font-medium mb-2">Thông tin thanh toán QR</p>
-                            <pre class="text-xs overflow-auto whitespace-pre-wrap">{{ JSON.stringify(dngResponse.qr, null, 2) }}</pre>
-                        </div>
-                        <div v-else class="flex flex-col items-center gap-3 py-4 text-center">
-                            <Clock class="h-8 w-8 text-muted-foreground" />
-                            <p class="text-muted-foreground text-sm">Đang chờ mã QR từ DNG...</p>
-                            <Button type="button" variant="outline" size="sm" @click="refreshQr">
-                                Làm mới QR
-                            </Button>
+                        <div class="flex flex-col items-center gap-3 py-4 text-center">
+                            <Clock class="text-muted-foreground h-8 w-8" />
+                            <p class="text-muted-foreground text-sm">Debt was pushed successfully. Student payment actions should now request a QR link or installment link from the student finance APIs.</p>
                         </div>
 
-                        <!-- Status info -->
                         <div class="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950">
-                            <CheckCircle2 class="mt-0.5 h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                            <p class="text-sm text-blue-700 dark:text-blue-300">
-                                Yêu cầu đã được gửi đến DNG. Khi sinh viên thanh toán, hệ thống sẽ tự động xác nhận qua webhook.
-                            </p>
+                            <CheckCircle2 class="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                            <p class="text-sm text-blue-700 dark:text-blue-300">Yêu cầu đã được gửi đến DNG. Frontend student actions should fetch the third-party payment link from the dedicated student APIs before redirecting the student.</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -377,13 +367,7 @@ const statusLabel = computed(() => {
                         <CardTitle>Hành động</CardTitle>
                     </CardHeader>
                     <CardContent class="space-y-3">
-                        <Button
-                            v-if="!dngResponse"
-                            type="button"
-                            class="w-full"
-                            :disabled="!canSubmit"
-                            @click="handleSubmit"
-                        >
+                        <Button v-if="!dngResponse" type="button" class="w-full" :disabled="!canSubmit" @click="handleSubmit">
                             <Loader2 v-if="submitting" class="mr-2 h-4 w-4 animate-spin" />
                             Gửi yêu cầu đến DNG
                         </Button>

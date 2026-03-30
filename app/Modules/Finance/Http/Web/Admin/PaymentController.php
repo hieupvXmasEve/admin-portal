@@ -9,6 +9,7 @@ use App\Http\Responses\ApiResponse;
 use App\Models\FinanceCharge as FinanceChargeModel;
 use App\Models\Payment;
 use App\Models\Student;
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Actions\AllocatePaymentAction;
 use App\Modules\Finance\Actions\PreviewPaymentImportAction;
 use App\Modules\Finance\Actions\StorePaymentImportAction;
@@ -17,6 +18,7 @@ use App\Modules\Finance\Queries\ListPaymentsQuery;
 use App\Modules\Finance\Queries\Operations\PreviewAutoAllocateQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class PaymentController extends Controller
 {
@@ -42,9 +44,11 @@ class PaymentController extends Controller
      * Render the Create Payment page (DNG gateway flow).
      * Actual payment creation goes through DNG API: POST /api/v1/finance/dng/payment-requests
      */
-    public function create()
+    public function create(Request $request): Response
     {
-        return Inertia::render('Finance/Payments/Create');
+        return Inertia::render('Finance/Payments/Create', [
+            'prefill' => $this->buildCreatePrefill($request),
+        ]);
     }
 
     /**
@@ -52,9 +56,37 @@ class PaymentController extends Controller
      */
     public function getStudentDngData(int $studentId)
     {
-        $student = Student::findOrFail($studentId);
+        $studentQuery = Student::query()->whereKey($studentId);
+        $campus = app()->bound('campus') ? app('campus') : null;
+        if ($campus !== null && isset($campus->id)) {
+            $studentQuery->where('campus_id', (int) $campus->id);
+        }
 
-        return response()->json([
+        $student = $studentQuery->firstOrFail();
+
+        return response()->json($this->buildStudentDngData($student));
+    }
+
+    /**
+     * @return array{
+     *     student_id: int,
+     *     campus_code: string,
+     *     student_code: string,
+     *     student_name: string,
+     *     email: string,
+     *     student_address: string,
+     *     cccd: string,
+     *     latest_dng_request: array{id: int, status: string, item_id: string, description: string|null, created_at: string|null}|null,
+     * }
+     */
+    private function buildStudentDngData(Student $student): array
+    {
+        $latestDngRequest = DngPaymentRequest::query()
+            ->where('student_id', $student->id)
+            ->latest('created_at')
+            ->first();
+
+        return [
             'student_id' => $student->id,
             'campus_code' => (string) config('services.dng.campus_code'),
             'student_code' => $student->student_id,
@@ -62,7 +94,74 @@ class PaymentController extends Controller
             'email' => $student->email ?? '',
             'student_address' => $student->address ?? $student->current_address_line ?? '',
             'cccd' => $student->national_id ?? '',
+            'latest_dng_request' => $latestDngRequest ? [
+                'id' => $latestDngRequest->id,
+                'status' => $latestDngRequest->status,
+                'item_id' => $latestDngRequest->item_id,
+                'description' => $latestDngRequest->description,
+                'created_at' => $latestDngRequest->created_at?->toIso8601String(),
+            ] : null,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     student: array{id: int, student_id: string, full_name: string, email: string},
+     *     dng_data: array{
+     *         student_id: int,
+     *         campus_code: string,
+     *         student_code: string,
+     *         student_name: string,
+     *         email: string,
+     *         student_address: string,
+     *         cccd: string,
+     *         latest_dng_request: array{id: int, status: string, item_id: string, description: string|null, created_at: string|null}|null,
+     *     },
+     *     amount: float|null,
+     *     fee_type: string,
+     *     description: string,
+     *     source_context: string|null,
+     * }|null
+     */
+    private function buildCreatePrefill(Request $request): ?array
+    {
+        $validated = $request->validate([
+            'student_id' => ['nullable', 'integer', 'exists:students,id'],
+            'amount' => ['nullable', 'numeric', 'min:1'],
+            'fee_type' => ['nullable', 'string', 'max:20'],
+            'description' => ['nullable', 'string', 'max:255'],
+            'source_context' => ['nullable', 'string', 'max:50'],
         ]);
+
+        if (! isset($validated['student_id'])) {
+            return null;
+        }
+
+        $studentQuery = Student::query()->whereKey((int) $validated['student_id']);
+        $campus = app()->bound('campus') ? app('campus') : null;
+        if ($campus !== null && isset($campus->id)) {
+            $studentQuery->where('campus_id', (int) $campus->id);
+        }
+
+        $student = $studentQuery->first();
+
+        if (! $student) {
+            return null;
+        }
+
+        return [
+            'student' => [
+                'id' => $student->id,
+                'student_id' => $student->student_id,
+                'full_name' => $student->full_name,
+                'email' => $student->email ?? '',
+            ],
+            'dng_data' => $this->buildStudentDngData($student),
+            'amount' => isset($validated['amount']) ? (float) $validated['amount'] : null,
+            'fee_type' => (string) ($validated['fee_type'] ?? 'HP'),
+            'description' => (string) ($validated['description'] ?? ''),
+            'source_context' => $validated['source_context'] ?? null,
+        ];
     }
 
     public function import()

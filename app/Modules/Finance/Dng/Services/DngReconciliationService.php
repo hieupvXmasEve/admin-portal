@@ -194,10 +194,9 @@ class DngReconciliationService
         return [
             DngPaymentRequest::STATUS_PENDING => 0,
             DngPaymentRequest::STATUS_PUSHED_TO_DNG => 1,
-            DngPaymentRequest::STATUS_QR_READY => 2,
-            DngPaymentRequest::STATUS_PAID_UNINVOICED => 3,
-            DngPaymentRequest::STATUS_PAID_INVOICED => 4,
-            DngPaymentRequest::STATUS_RECONCILED => 5,
+            DngPaymentRequest::STATUS_PAID_UNINVOICED => 2,
+            DngPaymentRequest::STATUS_PAID_INVOICED => 3,
+            DngPaymentRequest::STATUS_RECONCILED => 4,
             DngPaymentRequest::STATUS_FAILED => -1,
         ];
     }

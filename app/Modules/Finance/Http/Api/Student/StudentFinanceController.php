@@ -9,6 +9,7 @@ use App\Http\Responses\ApiResponse;
 use App\Models\Payment;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Services\FinanceChargeService;
 use App\Modules\Finance\Services\PaymentService;
 use Illuminate\Http\JsonResponse;
@@ -251,7 +252,7 @@ class StudentFinanceController extends Controller
         }
 
         $validated = $request->validate([
-            'status' => 'nullable|string|in:pending,pushed_to_dng,qr_ready,paid_uninvoiced,paid_invoiced,reconciled,failed',
+            'status' => 'nullable|string|in:pending,pushed_to_dng,paid_uninvoiced,paid_invoiced,reconciled,failed',
         ]);
 
         $query = DngPaymentRequest::where('student_id', $student->id)
@@ -266,7 +267,6 @@ class StudentFinanceController extends Controller
         $pendingStatuses = [
             DngPaymentRequest::STATUS_PENDING,
             DngPaymentRequest::STATUS_PUSHED_TO_DNG,
-            DngPaymentRequest::STATUS_QR_READY,
         ];
 
         $paidStatuses = [
@@ -284,9 +284,9 @@ class StudentFinanceController extends Controller
                 'dng_payment_id' => $r->dng_payment_id,
                 'amount' => (float) $r->amount,
                 'fee_type' => $r->fee_type,
+                'description' => $r->description,
                 'item_id' => $r->item_id,
                 'status' => $r->status,
-                'has_qr' => $r->qr_payload !== null,
                 'paid_at' => $r->paid_at?->toIso8601String(),
                 'invoice_serial_number' => $r->invoice_serial_number,
                 'invoice_date' => $r->invoice_date?->toDateString(),
@@ -326,9 +326,9 @@ class StudentFinanceController extends Controller
             'dng_payment_id' => $dngRequest->dng_payment_id,
             'amount' => (float) $dngRequest->amount,
             'fee_type' => $dngRequest->fee_type,
+            'description' => $dngRequest->description,
             'item_id' => $dngRequest->item_id,
             'status' => $dngRequest->status,
-            'qr_payload' => $dngRequest->qr_payload,
             'payment' => $dngRequest->payment ? [
                 'id' => $dngRequest->payment->id,
                 'amount' => (float) $dngRequest->payment->amount,
@@ -340,6 +340,38 @@ class StudentFinanceController extends Controller
             'created_at' => $dngRequest->created_at?->toIso8601String(),
             'updated_at' => $dngRequest->updated_at?->toIso8601String(),
         ]);
+    }
+
+    /**
+     * Create QR/virtual-account access data for the student's DNG request.
+     */
+    public function dngRequestQr(Request $request, int $dngRequestId, DngPaymentService $dngPaymentService): JsonResponse
+    {
+        $dngRequest = $this->resolveOwnedDngRequest($request, $dngRequestId);
+
+        if (! $dngRequest) {
+            return ApiResponse::notFound('DNG request not found');
+        }
+
+        $providerResponse = $dngPaymentService->createQrAccess($dngRequest, [$dngRequest->fee_type]);
+
+        return ApiResponse::success($this->formatPaymentAccessResponse('qr', $dngRequest, $providerResponse));
+    }
+
+    /**
+     * Create installment/Foxpay access data for the student's DNG request.
+     */
+    public function dngRequestInstallment(Request $request, int $dngRequestId, DngPaymentService $dngPaymentService): JsonResponse
+    {
+        $dngRequest = $this->resolveOwnedDngRequest($request, $dngRequestId);
+
+        if (! $dngRequest) {
+            return ApiResponse::notFound('DNG request not found');
+        }
+
+        $providerResponse = $dngPaymentService->createInstallmentAccess($dngRequest, [$dngRequest->fee_type]);
+
+        return ApiResponse::success($this->formatPaymentAccessResponse('installment', $dngRequest, $providerResponse));
     }
 
     /**
@@ -397,6 +429,38 @@ class StudentFinanceController extends Controller
                 'total_outstanding' => (float) max(0, $totalInvoiced - $totalPaid),
             ],
         ]);
+    }
+
+    private function resolveOwnedDngRequest(Request $request, int $dngRequestId): ?DngPaymentRequest
+    {
+        $student = $request->user('student');
+
+        if (! $student) {
+            return null;
+        }
+
+        return DngPaymentRequest::query()
+            ->where('id', $dngRequestId)
+            ->where('student_id', $student->id)
+            ->first();
+    }
+
+    /**
+     * @param  array<string, mixed>  $providerResponse
+     * @return array<string, mixed>
+     */
+    private function formatPaymentAccessResponse(string $paymentMethod, DngPaymentRequest $dngRequest, array $providerResponse): array
+    {
+        $providerData = is_array($providerResponse['data'] ?? null) ? $providerResponse['data'] : [];
+        $paymentUrl = $providerData['PaymentUrl'] ?? $providerData['payment_url'] ?? $providerData['LinkQRCode'] ?? null;
+
+        return [
+            'dng_request_id' => $dngRequest->id,
+            'payment_method' => $paymentMethod,
+            'status' => $dngRequest->fresh()->status,
+            'payment_url' => $paymentUrl,
+            'provider_response' => $providerResponse,
+        ];
     }
 
     /**
@@ -517,7 +581,6 @@ class StudentFinanceController extends Controller
         $dngPendingStatuses = [
             DngPaymentRequest::STATUS_PENDING,
             DngPaymentRequest::STATUS_PUSHED_TO_DNG,
-            DngPaymentRequest::STATUS_QR_READY,
         ];
 
         $dngPending = DngPaymentRequest::where('student_id', $student->id)

@@ -338,7 +338,7 @@ it('resolves request by item and student then verifies checksum from stored push
         'fee_type' => 'HP',
         'item_id' => 'AUH13582_1774587192884',
         'amount' => 200000,
-        'status' => DngPaymentRequest::STATUS_QR_READY,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
         'dng_transaction_id' => 'uqvgalfplbym',
         'dng_payment_id' => 'AUH13582_1774587192884',
         'push_payload' => [
@@ -411,7 +411,7 @@ it('accepts invoice callback checksum when third party formats amount with one d
         'fee_type' => 'HP',
         'item_id' => 'AUH120339_1774595915622',
         'amount' => 230000,
-        'status' => DngPaymentRequest::STATUS_QR_READY,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
         'dng_transaction_id' => 'szhpoloijxyx',
         'dng_payment_id' => 'AUH120339_1774595915622',
         'push_payload' => [

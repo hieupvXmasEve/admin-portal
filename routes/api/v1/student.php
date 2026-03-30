@@ -266,6 +266,8 @@ Route::middleware([
             Route::get('/payments/{paymentId}', [StudentFinanceController::class, 'paymentDetail'])->name('payments.show');
             Route::get('/dng-requests', [StudentFinanceController::class, 'dngRequests'])->name('dng-requests');
             Route::get('/dng-requests/{dngRequestId}', [StudentFinanceController::class, 'dngRequestDetail'])->name('dng-requests.show');
+            Route::post('/dng-requests/{dngRequestId}/qr', [StudentFinanceController::class, 'dngRequestQr'])->name('dng-requests.qr');
+            Route::post('/dng-requests/{dngRequestId}/installment', [StudentFinanceController::class, 'dngRequestInstallment'])->name('dng-requests.installment');
             Route::get('/invoices', [StudentFinanceController::class, 'invoices'])->name('invoices');
             Route::get('/invoices/{invoiceId}', [StudentFinanceController::class, 'invoiceDetail'])->name('invoices.show');
             Route::get('/overview', [StudentFinanceController::class, 'overview'])->name('overview');

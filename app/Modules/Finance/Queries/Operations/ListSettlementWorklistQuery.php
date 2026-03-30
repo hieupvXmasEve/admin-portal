@@ -7,6 +7,7 @@ namespace App\Modules\Finance\Queries\Operations;
 use App\Models\InvoiceLine;
 use App\Models\Payment;
 use App\Models\StudentInvoice;
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -81,11 +82,26 @@ class ListSettlementWorklistQuery
             ->get()
             ->groupBy('student_id');
 
+        $latestDngRequestsByStudent = DngPaymentRequest::query()
+            ->whereIn('student_id', $studentIds)
+            ->latest('created_at')
+            ->get([
+                'id',
+                'student_id',
+                'status',
+                'item_id',
+                'description',
+                'created_at',
+            ])
+            ->groupBy('student_id')
+            ->map(fn (Collection $requests) => $requests->first());
+
         $students = $invoices
             ->groupBy('student_id')
-            ->map(function (Collection $studentInvoices, int $studentId) use ($paymentsByStudent) {
+            ->map(function (Collection $studentInvoices, int $studentId) use ($paymentsByStudent, $latestDngRequestsByStudent) {
                 $student = $studentInvoices->first()?->student;
                 $payments = $paymentsByStudent->get($studentId, collect());
+                $latestDngRequest = $latestDngRequestsByStudent->get($studentId);
                 $totalPayments = (float) $payments->sum('amount');
                 $allocatedAmount = (float) $payments->sum(fn (Payment $payment) => max(0, (float) $payment->applications->sum('amount')));
                 $unappliedBalance = max(0, $totalPayments - $allocatedAmount);
@@ -108,6 +124,13 @@ class ListSettlementWorklistQuery
                     'total_payments' => $totalPayments,
                     'net_amount_to_collect' => max(0, $activeDue - $unappliedBalance),
                     'actionable' => $activeDue > 0 && $unappliedBalance > 0,
+                    'latest_dng_request' => $latestDngRequest ? [
+                        'id' => $latestDngRequest->id,
+                        'status' => $latestDngRequest->status,
+                        'item_id' => $latestDngRequest->item_id,
+                        'description' => $latestDngRequest->description,
+                        'created_at' => $latestDngRequest->created_at?->toIso8601String(),
+                    ] : null,
                     'invoices' => $studentInvoices->map(function (StudentInvoice $invoice) {
                         $snapshot = $this->deriveInvoiceSnapshot($invoice);
 

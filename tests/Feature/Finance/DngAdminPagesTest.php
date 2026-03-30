@@ -80,6 +80,7 @@ function seedDngRequestWithEvent(object $context): array
         'campus_code' => $context->campus->code,
         'student_code' => $student->student_id,
         'fee_type' => 'tuition',
+        'description' => 'Existing tuition collection request',
         'item_id' => 'ITEM-DNG-001',
         'amount' => 1000000,
         'status' => DngPaymentRequest::STATUS_PAID_INVOICED,
@@ -124,6 +125,7 @@ it('renders the dng payment request index page', function () {
         ->component('Finance/Payments/DngPaymentRequests/Index')
         ->has('items.data', 1)
         ->where('items.data.0.id', $request->id)
+        ->where('items.data.0.description', 'Existing tuition collection request')
         ->where('items.data.0.student_code', 'DNG001')
         ->where('items.data.0.payment.id', $request->payment_id)
         ->where('stats.bridged_count', 1)
@@ -139,6 +141,7 @@ it('renders the dng payment request detail page', function () {
     $response->assertInertia(fn ($page) => $page
         ->component('Finance/Payments/DngPaymentRequests/Show')
         ->where('request.id', $request->id)
+        ->where('request.description', 'Existing tuition collection request')
         ->where('request.payment.id', $payment->id)
         ->has('request.webhook_events', 1)
         ->where('request.webhook_events.0.id', $event->id)
@@ -156,7 +159,7 @@ it('lists dng payment requests by student campus even when dng campus code diffe
         'fee_type' => 'tuition',
         'item_id' => 'ITEM-CAMPUS-MAP',
         'amount' => 250000,
-        'status' => DngPaymentRequest::STATUS_QR_READY,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
         'dng_payment_id' => 'PAY-CAMPUS-MAP',
     ]);
 

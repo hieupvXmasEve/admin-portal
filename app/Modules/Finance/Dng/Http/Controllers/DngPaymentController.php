@@ -23,42 +23,35 @@ class DngPaymentController extends Controller
     public function store(CreateDngPaymentFormRequest $request): JsonResponse
     {
         $validated = $request->validated();
-        $student = Student::findOrFail($validated['student_id']);
-
-        $dngRequest = $this->dngPaymentService->createAndPush($student, $validated);
-
-        // Optionally pull QR if fee_types provided
-        $qrData = null;
-        if (! empty($validated['fee_types'])) {
-            $qrData = $this->dngPaymentService->pullQrCode(
-                $dngRequest,
-                $validated['fee_types'],
-            );
+        $studentQuery = Student::query()->whereKey($validated['student_id']);
+        $campus = app()->bound('campus') ? app('campus') : null;
+        if ($campus !== null && isset($campus->id)) {
+            $studentQuery->where('campus_id', (int) $campus->id);
         }
+
+        $student = $studentQuery->firstOrFail();
+
+        $chargeData = array_merge($validated, [
+            'campus_code' => (string) config('services.dng.campus_code'),
+            'student_code' => $student->student_id,
+            'type' => (string) ($validated['type'] ?? $validated['fee_type']),
+            'student_name' => $student->full_name,
+            'email' => $student->email ?? '',
+            'student_address' => $student->address ?? $student->current_address_line ?? 'N/A',
+            'cccd' => $student->national_id ?? '',
+            'fee_types' => $validated['fee_types'] ?? [$validated['fee_type']],
+        ]);
+
+        $dngRequest = $this->dngPaymentService->createAndPush($student, $chargeData);
 
         return response()->json([
             'data' => [
                 'id' => $dngRequest->id,
                 'status' => $dngRequest->status,
+                'description' => $dngRequest->description,
                 'dng_transaction_id' => $dngRequest->dng_transaction_id,
                 'dng_payment_id' => $dngRequest->dng_payment_id,
-                'qr' => $qrData,
             ],
         ], 201);
-    }
-
-    /**
-     * Pull a fresh QR code for an existing DNG payment request.
-     */
-    public function qr(DngPaymentRequest $dngPaymentRequest): JsonResponse
-    {
-        $qrData = $this->dngPaymentService->pullQrCode(
-            $dngPaymentRequest,
-            [$dngPaymentRequest->fee_type],
-        );
-
-        return response()->json([
-            'data' => $qrData,
-        ]);
     }
 }

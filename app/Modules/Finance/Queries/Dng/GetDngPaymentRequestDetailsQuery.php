@@ -33,6 +33,7 @@ class GetDngPaymentRequestDetailsQuery
             'campus_code' => $paymentRequest->campus_code,
             'student_code' => $paymentRequest->student_code,
             'fee_type' => $paymentRequest->fee_type,
+            'description' => $paymentRequest->description,
             'item_id' => $paymentRequest->item_id,
             'amount' => (float) $paymentRequest->amount,
             'status' => $paymentRequest->status,
@@ -61,7 +62,6 @@ class GetDngPaymentRequestDetailsQuery
             'payloads' => [
                 'push_payload' => $paymentRequest->push_payload,
                 'push_response' => $paymentRequest->push_response,
-                'qr_payload' => $paymentRequest->qr_payload,
                 'last_callback_payload' => $paymentRequest->last_callback_payload,
             ],
             'webhook_events' => $paymentRequest->webhookEvents->map(fn ($event) => [

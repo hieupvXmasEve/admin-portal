@@ -402,7 +402,7 @@ it('links inbox event by item and student when callback payment id differs from 
         'fee_type' => 'HP',
         'item_id' => 'AUH13582_1774587192884',
         'amount' => 200000,
-        'status' => DngPaymentRequest::STATUS_QR_READY,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
         'dng_transaction_id' => 'uqvgalfplbym',
         'dng_payment_id' => 'AUH13582_1774587192884',
     ]);

@@ -13,6 +13,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentInvoice;
 use App\Models\User;
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -35,7 +36,7 @@ beforeEach(function () {
 
     $permissionService = Mockery::mock(PermissionService::class);
     $permissionService->shouldReceive('getUserPermissions')
-        ->andReturn(['view_finance_payments', 'allocate_finance_payment']);
+        ->andReturn(['view_finance_payments', 'allocate_finance_payment', 'create_finance_payments']);
 
     app()->singleton(PermissionService::class, fn () => $permissionService);
 });
@@ -158,4 +159,66 @@ it('renders payment details with payment applications instead of legacy allocati
         ->where('payment.applications.0.invoice_line.charge.description', 'Major tuition')
         ->where('payment.applications.0.invoice_line.invoice.invoice_number', 'INV-PAY-001')
     );
+});
+
+it('renders the create payment page with settlement prefill and latest dng request details', function () {
+    [$student] = seedPaymentWithApplication($this);
+
+    $dngRequest = DngPaymentRequest::query()->create([
+        'student_id' => $student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => $student->student_id,
+        'fee_type' => 'HP',
+        'description' => 'Outstanding tuition collected from settlement',
+        'item_id' => 'ITEM-PAY-001',
+        'amount' => 2500000,
+        'status' => DngPaymentRequest::STATUS_PENDING,
+    ]);
+
+    $response = actingAs($this->user)->get(route('finance.payments.create', [
+        'student_id' => $student->id,
+        'amount' => 2500000,
+        'fee_type' => 'HP',
+        'description' => 'Outstanding tuition collected from settlement',
+        'source_context' => 'settlement_no_cash',
+    ]));
+
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->component('Finance/Payments/Create')
+        ->where('prefill.student.id', $student->id)
+        ->where('prefill.amount', 2500000.0)
+        ->where('prefill.fee_type', 'HP')
+        ->where('prefill.description', 'Outstanding tuition collected from settlement')
+        ->where('prefill.source_context', 'settlement_no_cash')
+        ->where('prefill.dng_data.latest_dng_request.id', $dngRequest->id)
+        ->where('prefill.dng_data.latest_dng_request.description', 'Outstanding tuition collected from settlement')
+    );
+});
+
+it('returns dng prefill data only for students in the current campus', function () {
+    [$student] = seedPaymentWithApplication($this);
+
+    $response = actingAs($this->user)->get(route('finance.payments.student-dng-data', $student->id));
+
+    $response->assertOk()
+        ->assertJsonPath('student_id', $student->id)
+        ->assertJsonPath('student_code', $student->student_id);
+
+    $otherCampus = Campus::factory()->create();
+    $otherStudent = Student::factory()
+        ->forCampus($otherCampus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'PAY999',
+            'curriculum_version_id' => $this->curriculumVersion->id,
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+        ])
+        ->create();
+
+    actingAs($this->user)
+        ->get(route('finance.payments.student-dng-data', $otherStudent->id))
+        ->assertNotFound();
 });

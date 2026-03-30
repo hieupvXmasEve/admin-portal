@@ -72,6 +72,7 @@ class ListDngPaymentRequestsQuery
                 'campus_code' => $paymentRequest->campus_code,
                 'student_code' => $paymentRequest->student_code,
                 'fee_type' => $paymentRequest->fee_type,
+                'description' => $paymentRequest->description,
                 'item_id' => $paymentRequest->item_id,
                 'amount' => (float) $paymentRequest->amount,
                 'status' => $paymentRequest->status,
@@ -169,7 +170,7 @@ class ListDngPaymentRequestsQuery
         return [
             'total' => (clone $query)->count(),
             'pending_count' => (clone $query)->where('status', DngPaymentRequest::STATUS_PENDING)->count(),
-            'qr_ready_count' => (clone $query)->where('status', DngPaymentRequest::STATUS_QR_READY)->count(),
+            'pushed_count' => (clone $query)->where('status', DngPaymentRequest::STATUS_PUSHED_TO_DNG)->count(),
             'paid_uninvoiced_count' => (clone $query)->where('status', DngPaymentRequest::STATUS_PAID_UNINVOICED)->count(),
             'paid_invoiced_count' => (clone $query)->where('status', DngPaymentRequest::STATUS_PAID_INVOICED)->count(),
             'failed_count' => (clone $query)->where('status', DngPaymentRequest::STATUS_FAILED)->count(),

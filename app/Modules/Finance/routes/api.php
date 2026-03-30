@@ -40,5 +40,4 @@ Route::prefix('api/v1/finance/dng')
     ->name('api.finance.dng.')
     ->group(function () {
         Route::post('/payment-requests', [DngPaymentController::class, 'store'])->name('payment-requests.store');
-        Route::get('/payment-requests/{dngPaymentRequest}/qr', [DngPaymentController::class, 'qr'])->name('payment-requests.qr');
     });

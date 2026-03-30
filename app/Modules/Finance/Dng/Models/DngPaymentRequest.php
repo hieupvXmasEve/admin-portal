@@ -17,8 +17,6 @@ class DngPaymentRequest extends Model
 
     public const STATUS_PUSHED_TO_DNG = 'pushed_to_dng';
 
-    public const STATUS_QR_READY = 'qr_ready';
-
     public const STATUS_PAID_UNINVOICED = 'paid_uninvoiced';
 
     public const STATUS_PAID_INVOICED = 'paid_invoiced';
@@ -32,8 +30,7 @@ class DngPaymentRequest extends Model
      */
     public const TRANSITIONS = [
         self::STATUS_PENDING => [self::STATUS_PUSHED_TO_DNG, self::STATUS_FAILED],
-        self::STATUS_PUSHED_TO_DNG => [self::STATUS_QR_READY, self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_FAILED],
-        self::STATUS_QR_READY => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_FAILED],
+        self::STATUS_PUSHED_TO_DNG => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_FAILED],
         self::STATUS_PAID_UNINVOICED => [self::STATUS_PAID_INVOICED, self::STATUS_RECONCILED],
         self::STATUS_PAID_INVOICED => [self::STATUS_RECONCILED],
         self::STATUS_RECONCILED => [],
@@ -45,6 +42,7 @@ class DngPaymentRequest extends Model
         'campus_code',
         'student_code',
         'fee_type',
+        'description',
         'item_id',
         'amount',
         'status',
