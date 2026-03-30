@@ -1,6 +1,6 @@
 # Phase 2: Student Invoices API
 
-**Priority:** High | **Effort:** S | **Status:** Planned
+**Priority:** High | **Effort:** S | **Status:** Completed
 
 ## Overview
 
@@ -114,11 +114,11 @@ Cho student xem danh sách hóa đơn (invoices) và chi tiết từng hóa đơ
 
 ## Todo
 
-- [ ] Add `invoices()` to controller
-- [ ] Add `invoiceDetail()` to controller
-- [ ] Register routes
-- [ ] Compute `remaining` = total_amount - paid_amount
-- [ ] Include payment method info in line-level payments
+- [x] Add `invoices()` to controller
+- [x] Add `invoiceDetail()` to controller
+- [x] Register routes
+- [x] Compute `remaining` = total_amount - paid_amount
+- [x] Include payment method info in line-level payments
 
 ## Success Criteria
 

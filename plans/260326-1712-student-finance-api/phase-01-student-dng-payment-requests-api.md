@@ -1,6 +1,6 @@
 # Phase 1: Student DNG Payment Requests API
 
-**Priority:** High | **Effort:** S | **Status:** Planned
+**Priority:** High | **Effort:** S | **Status:** Completed
 
 ## Overview
 
@@ -95,11 +95,11 @@ Cho phép student xem danh sách các khoản nợ đã đẩy lên DNG và tr�
 
 ## Todo
 
-- [ ] Check/add `dngPaymentRequests()` relationship on Student
-- [ ] Add `dngRequests()` to controller
-- [ ] Add `dngRequestDetail()` to controller
-- [ ] Register routes
-- [ ] Verify response format matches existing API patterns
+- [x] Check/add `dngPaymentRequests()` relationship on Student
+- [x] Add `dngRequests()` to controller
+- [x] Add `dngRequestDetail()` to controller
+- [x] Register routes
+- [x] Verify response format matches existing API patterns
 
 ## Success Criteria
 

@@ -1,0 +1,8 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend development guide"}
+{"file": "README.md", "reason": "Project baseline and source-of-truth docs"}
+{"file": "docs/code-standards.md", "reason": "Code-verified coding conventions to extract into Trellis specs"}
+{"file": "docs/system-architecture.md", "reason": "Current architecture and directory layout patterns"}
+{"file": "AGENTS.md", "reason": "Repo-specific agent workflow and documentation rules"}
+{"file": "CLAUDE.md", "reason": "Repo-specific Laravel/Vue conventions and verification rules"}

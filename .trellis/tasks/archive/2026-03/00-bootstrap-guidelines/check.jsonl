@@ -1,0 +1,8 @@
+{"file": ".opencode/commands/trellis/finish-work.md", "reason": "Finish work checklist"}
+{"file": ".opencode/commands/trellis/check-backend.md", "reason": "Backend check spec"}
+{"file": ".opencode/commands/trellis/check-frontend.md", "reason": "Frontend check spec"}
+{"file": "README.md", "reason": "Validate docs against current repo baseline"}
+{"file": "docs/code-standards.md", "reason": "Validate Trellis guidelines against real coding standards"}
+{"file": "docs/system-architecture.md", "reason": "Validate Trellis guidelines against actual architecture"}
+{"file": "AGENTS.md", "reason": "Validate compliance with repo workflow rules"}
+{"file": "CLAUDE.md", "reason": "Validate compliance with repo coding constraints"}

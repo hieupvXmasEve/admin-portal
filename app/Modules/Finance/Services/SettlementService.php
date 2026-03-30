@@ -95,6 +95,24 @@ class SettlementService
             ->sum('amount'));
     }
 
+    /**
+     * Sum of discount allocations (scholarship/voucher) applied to a charge's invoice lines.
+     */
+    public function getChargeDiscountAmount(int $chargeId): float
+    {
+        $lineIds = InvoiceLine::query()
+            ->where('charge_id', $chargeId)
+            ->pluck('id');
+
+        if ($lineIds->isEmpty()) {
+            return 0.0;
+        }
+
+        return max(0, (float) DiscountAllocation::query()
+            ->whereIn('invoice_line_id', $lineIds)
+            ->sum('amount'));
+    }
+
     public function getLineDiscountAmount(InvoiceLine $line): float
     {
         return max(0, (float) DiscountAllocation::query()

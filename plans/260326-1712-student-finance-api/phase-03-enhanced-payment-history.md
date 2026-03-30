@@ -1,6 +1,6 @@
 # Phase 3: Enhanced Payment History
 
-**Priority:** Medium | **Effort:** S | **Status:** Planned
+**Priority:** Medium | **Effort:** S | **Status:** Completed
 
 ## Overview
 
@@ -117,12 +117,12 @@ Single payment with full allocation tree.
 
 ## Todo
 
-- [ ] Add date/method filters to `payments()`
-- [ ] Include allocations in payment list response
-- [ ] Add `paymentDetail()` method
-- [ ] Link DNG request data for gateway payments
-- [ ] Register route `GET /payments/{id}`
-- [ ] Add summary totals
+- [x] Add date/method filters to `payments()`
+- [x] Include allocations in payment list response
+- [x] Add `paymentDetail()` method
+- [x] Link DNG request data for gateway payments
+- [x] Register route `GET /payments/{id}`
+- [x] Add summary totals
 
 ## Success Criteria
 

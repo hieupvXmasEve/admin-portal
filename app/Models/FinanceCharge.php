@@ -171,13 +171,22 @@ class FinanceCharge extends Model
         return app(SettlementService::class)->getChargePaidAmount($this->id);
     }
 
+    /**
+     * Total discount (scholarship/voucher) applied to this charge's invoice lines.
+     */
+    public function getDiscountAmountAttribute(): float
+    {
+        return app(SettlementService::class)->getChargeDiscountAmount($this->id);
+    }
+
     public function getBalanceAttribute(): float
     {
         if ($this->amount <= 0) {
             return 0; // Credits don't have balance
         }
 
-        return (float) $this->amount - $this->paid_amount;
+        // Subtract both cash payments and discount allocations (scholarship/voucher)
+        return max(0, (float) $this->amount - $this->paid_amount - $this->discount_amount);
     }
 
     public function getIsFullyPaidAttribute(): bool

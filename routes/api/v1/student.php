@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\Student\CourseRegistrationController;
 use App\Http\Controllers\Api\V1\Student\CurriculumController;
 use App\Http\Controllers\Api\V1\Student\DashboardController;
 use App\Http\Controllers\Api\V1\Student\FinanceController;
+use App\Modules\Finance\Http\Api\Student\StudentFinanceController;
 use App\Http\Controllers\Api\V1\Student\GradeController;
 use App\Http\Controllers\Api\V1\Student\ModuleController;
 use App\Http\Controllers\Api\V1\Student\NotificationController;
@@ -258,6 +259,16 @@ Route::middleware([
         // Finance
         Route::prefix('finance')->name('finance.')->group(function () {
             Route::get('/', [FinanceController::class, 'index'])->name('index');
+            Route::get('/balance', [StudentFinanceController::class, 'balance'])->name('balance');
+            Route::get('/charges', [StudentFinanceController::class, 'charges'])->name('charges');
+            Route::get('/charges/{chargeId}', [StudentFinanceController::class, 'chargeDetail'])->name('charges.show');
+            Route::get('/payments', [StudentFinanceController::class, 'payments'])->name('payments');
+            Route::get('/payments/{paymentId}', [StudentFinanceController::class, 'paymentDetail'])->name('payments.show');
+            Route::get('/dng-requests', [StudentFinanceController::class, 'dngRequests'])->name('dng-requests');
+            Route::get('/dng-requests/{dngRequestId}', [StudentFinanceController::class, 'dngRequestDetail'])->name('dng-requests.show');
+            Route::get('/invoices', [StudentFinanceController::class, 'invoices'])->name('invoices');
+            Route::get('/invoices/{invoiceId}', [StudentFinanceController::class, 'invoiceDetail'])->name('invoices.show');
+            Route::get('/overview', [StudentFinanceController::class, 'overview'])->name('overview');
             Route::get('/{semester}', [FinanceController::class, 'semester'])->name('semester');
         });
 

@@ -1,6 +1,6 @@
 # Phase 4: Finance Overview (Dashboard)
 
-**Priority:** Medium | **Effort:** S | **Status:** Planned
+**Priority:** Medium | **Effort:** S | **Status:** Completed
 
 ## Overview
 
@@ -68,10 +68,10 @@ Endpoint tổng quan tài chính cho student — 1 API call trả về toàn b�
 
 ## Todo
 
-- [ ] Add `overview()` to controller
-- [ ] Compose data from existing services (no new queries)
-- [ ] Register route
-- [ ] Limit recent_payments to 5
+- [x] Add `overview()` to controller
+- [x] Compose data from existing services (no new queries)
+- [x] Register route
+- [x] Limit recent_payments to 5
 
 ## Success Criteria
 

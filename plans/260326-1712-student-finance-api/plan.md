@@ -1,6 +1,6 @@
 # Student Finance API - Implementation Plan
 
-**Date:** 2026-03-26 | **Branch:** dev | **Status:** Draft
+**Date:** 2026-03-26 | **Branch:** dev | **Status:** In Progress (Phases 1-4 Completed, Phase 5 Pending)
 
 ## Goal
 
@@ -33,10 +33,10 @@ Mở rộng student-facing finance API để sinh viên có thể:
 
 | # | Phase | Priority | Effort | Status |
 |---|-------|----------|--------|--------|
-| 1 | Student DNG Payment Requests API | High | S | Planned |
-| 2 | Student Invoices API | High | S | Planned |
-| 3 | Enhanced Payment History | Medium | S | Planned |
-| 4 | Finance Overview (Dashboard) | Medium | S | Planned |
+| 1 | Student DNG Payment Requests API | High | S | Completed |
+| 2 | Student Invoices API | High | S | Completed |
+| 3 | Enhanced Payment History | Medium | S | Completed |
+| 4 | Finance Overview (Dashboard) | Medium | S | Completed |
 | 5 | Tests | High | M | Planned |
 
 ## Architecture

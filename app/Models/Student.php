@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Traits\HasNotifications;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -422,6 +423,14 @@ class Student extends StudentAuditableModel
     public function invoices(): HasMany
     {
         return $this->hasMany(StudentInvoice::class);
+    }
+
+    /**
+     * Get the student's DNG payment requests.
+     */
+    public function dngPaymentRequests(): HasMany
+    {
+        return $this->hasMany(DngPaymentRequest::class);
     }
 
     /**
