@@ -1,0 +1,8 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend development guide"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Schema change and DNG request persistence"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Validation and redirect error handling"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Popup and autofill UI patterns"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Use page-local state and Inertia flows"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Typed settlement and payment page props"}
