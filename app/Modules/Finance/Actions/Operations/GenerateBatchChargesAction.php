@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Actions\Operations;
 
 use App\Models\FinanceCharge;
+use App\Models\InvoiceDiscount;
 use App\Models\InvoiceLine;
 use App\Models\Student;
 use App\Models\StudentInvoice;
+use App\Models\StudentScholarshipAward;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\BillingScopeHelper;
@@ -91,6 +93,8 @@ class GenerateBatchChargesAction
                     $didSkipPreserveCharge = false;
 
                     $reusableInvoice = self::findReusableInvoice($student->id, $semesterId);
+                    $existingTuitionCharge = null;
+                    $tuitionScholarshipPendingDiscount = null;
 
                     // Pre-calculation to decide if we should create an invoice
                     $shouldGenInvoice = false;
@@ -137,8 +141,22 @@ class GenerateBatchChargesAction
                             $amt = $tuitionTerm['amount'];
 
                             if ($amt !== null && $amt > 0) {
-                                $potentialAmount = $amt;
-                                $shouldGenInvoice = true;
+                                $existingTuitionCharge = FinanceCharge::where('student_id', $student->id)
+                                    ->where('semester_id', $semesterId)
+                                    ->where('charge_type', FinanceCharge::TYPE_TUITION_TERM)
+                                    ->active()
+                                    ->first();
+
+                                if (! $existingTuitionCharge) {
+                                    $potentialAmount = $amt;
+                                    $shouldGenInvoice = true;
+                                } elseif ($reusableInvoice && self::invoiceHasActiveTuitionLine($reusableInvoice)) {
+                                    $tuitionScholarshipPendingDiscount = self::resolveScholarshipDiscountPayload(
+                                        $reusableInvoice,
+                                        $student->scholarshipAward,
+                                        (float) $existingTuitionCharge->amount,
+                                    );
+                                }
                             }
                         }
                     }
@@ -160,14 +178,9 @@ class GenerateBatchChargesAction
                     // 1. Resolve target invoice. Finalized invoices must never block newly generated charges.
                     $invoice = $reusableInvoice ?? self::createDraftInvoice($student, $semesterId);
 
-                    if (! $reusableInvoice) {
-                        $stats['created_invoices']++;
-                    } else {
-                        $stats['updated_invoices']++;
-                    }
-
                     $chargesToLink = [];
                     $pendingDiscounts = [];
+                    $hasInvoiceMutation = false;
 
                     // 2. Generate based on Status
 
@@ -212,6 +225,7 @@ class GenerateBatchChargesAction
                                             $charge->update(['description' => "EGC Level {$level} Fee"]);
                                             $charge->refresh();
                                             $chargesToLink[] = $charge;
+                                            $hasInvoiceMutation = true;
                                         }
                                     }
                                 }
@@ -230,15 +244,8 @@ class GenerateBatchChargesAction
                             if ($amount !== null && $amount > 0) {
                                 $termIdx = $tuitionTerm['chargeable_term_index'] ?? $tuitionTerm['term_number'] ?? 1;
 
-                                // Idempotency check
-                                $existingCharge = FinanceCharge::where('student_id', $student->id)
-                                    ->where('semester_id', $semesterId)
-                                    ->where('charge_type', FinanceCharge::TYPE_TUITION_TERM)
-                                    ->active()
-                                    ->first();
-
-                                if ($existingCharge) {
-                                    $charge = $existingCharge;
+                                if ($existingTuitionCharge) {
+                                    $charge = null;
                                 } else {
                                     $charge = self::createChargeIfNotExists(
                                         $student, $semesterId,
@@ -251,29 +258,20 @@ class GenerateBatchChargesAction
                                     $charge->update(['description' => "Major Tuition (Installment {$termIdx})"]);
                                     $charge->refresh();
                                     $chargesToLink[] = $charge;
+                                    $hasInvoiceMutation = true;
                                 }
 
-                                // Apply Scholarship only for Tuition students
-                                if ($student->scholarshipAward) {
-                                    $scholarshipDef = $student->scholarshipAward->scholarshipDefinition;
-                                    if ($scholarshipDef) {
-                                        $discount = 0;
-                                        if ($scholarshipDef->type === 'percentage') {
-                                            $discount = ($amount * $scholarshipDef->amount) / 100;
-                                        } else {
-                                            $discount = $scholarshipDef->amount;
-                                        }
+                                $scholarshipDiscount = $charge
+                                    ? self::resolveScholarshipDiscountPayload(
+                                        $invoice,
+                                        $student->scholarshipAward,
+                                        (float) $charge->amount,
+                                    )
+                                    : $tuitionScholarshipPendingDiscount;
 
-                                        if ($discount > 0) {
-                                            $pendingDiscounts[] = [
-                                                'discount_type' => 'scholarship',
-                                                'amount' => $discount,
-                                                'discount_source' => 'App\Models\StudentScholarshipAward',
-                                                'description' => 'Scholarship: '.$scholarshipDef->name,
-                                                'reference_id' => (int) $student->scholarshipAward->id,
-                                            ];
-                                        }
-                                    }
+                                if ($scholarshipDiscount !== null) {
+                                    $pendingDiscounts[] = $scholarshipDiscount;
+                                    $hasInvoiceMutation = true;
                                 }
                             }
                         }
@@ -305,11 +303,13 @@ class GenerateBatchChargesAction
                                         'invoice_id' => $invoice->id,
                                         'discount_amount' => $vAmount,
                                     ]);
+                                    $hasInvoiceMutation = true;
                                 } else {
                                     // Informational Voucher - Mark as used on this invoice without charge
                                     $voucherApp->update([
                                         'invoice_id' => $invoice->id,
                                     ]);
+                                    $hasInvoiceMutation = true;
                                 }
                             }
                         }
@@ -328,7 +328,22 @@ class GenerateBatchChargesAction
                             $charge->update(['description' => 'Manual Adjustment']);
                             $charge->refresh();
                             $chargesToLink[] = $charge;
+                            $hasInvoiceMutation = true;
                         }
+                    }
+
+                    if (! $hasInvoiceMutation) {
+                        if (! $reusableInvoice) {
+                            $invoice->delete();
+                        }
+
+                        continue;
+                    }
+
+                    if (! $reusableInvoice) {
+                        $stats['created_invoices']++;
+                    } else {
+                        $stats['updated_invoices']++;
                     }
 
                     // 5. Link Charges
@@ -428,5 +443,58 @@ class GenerateBatchChargesAction
             'status' => 'active',
             'effective_at' => now(),
         ]);
+    }
+
+    private static function invoiceHasActiveTuitionLine(StudentInvoice $invoice): bool
+    {
+        return InvoiceLine::query()
+            ->where('invoice_id', $invoice->id)
+            ->whereHas('charge', function ($query) {
+                $query->where('charge_type', FinanceCharge::TYPE_TUITION_TERM)
+                    ->where('status', FinanceCharge::STATUS_ACTIVE);
+            })
+            ->exists();
+    }
+
+    private static function resolveScholarshipDiscountPayload(
+        StudentInvoice $invoice,
+        ?StudentScholarshipAward $award,
+        float $baseAmount,
+    ): ?array {
+        if (! $award || $baseAmount <= 0) {
+            return null;
+        }
+
+        $existingScholarshipDiscount = InvoiceDiscount::query()
+            ->where('invoice_id', $invoice->id)
+            ->where('discount_type', 'scholarship')
+            ->where('reference_id', $award->id)
+            ->where('discount_source', StudentScholarshipAward::class)
+            ->exists();
+
+        if ($existingScholarshipDiscount) {
+            return null;
+        }
+
+        $scholarshipDef = $award->scholarshipDefinition;
+        if (! $scholarshipDef) {
+            return null;
+        }
+
+        $discount = $scholarshipDef->type === 'percentage'
+            ? ($baseAmount * $scholarshipDef->amount) / 100
+            : (float) $scholarshipDef->amount;
+
+        if ($discount <= 0) {
+            return null;
+        }
+
+        return [
+            'discount_type' => 'scholarship',
+            'amount' => $discount,
+            'discount_source' => StudentScholarshipAward::class,
+            'description' => 'Scholarship: '.$scholarshipDef->name,
+            'reference_id' => (int) $award->id,
+        ];
     }
 }

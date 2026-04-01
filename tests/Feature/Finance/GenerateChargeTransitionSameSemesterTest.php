@@ -8,6 +8,8 @@ use App\Models\DiscountAllocation;
 use App\Models\FinanceCharge;
 use App\Models\InvoiceDiscount;
 use App\Models\InvoiceLine;
+use App\Models\Payment;
+use App\Models\PaymentApplication;
 use App\Models\Program;
 use App\Models\ScholarshipDefinition;
 use App\Models\Semester;
@@ -414,6 +416,148 @@ function seedFutureIntakeStudentScenario(): array
     return [$student, $fall];
 }
 
+function seedExistingTuitionInvoiceMissingScholarshipScenario(): array
+{
+    [$student, $semester] = seedTransitionStudentScenario();
+
+    $scholarship = ScholarshipDefinition::create([
+        'code' => 'ASIA_REUSE',
+        'name' => 'Asia Reuse',
+        'description' => 'Scholarship reuse test',
+        'type' => 'percentage',
+        'amount' => 20,
+        'valid_from' => now()->subYear()->toDateString(),
+        'valid_until' => now()->addYear()->toDateString(),
+        'is_active' => true,
+    ]);
+
+    StudentScholarshipAward::create([
+        'student_id' => $student->id,
+        'scholarship_code' => $scholarship->code,
+        'awarded_at' => now()->toDateString(),
+    ]);
+
+    $invoice = StudentInvoice::create([
+        'invoice_number' => 'INV-TUITION-DRAFT-001',
+        'student_id' => $student->id,
+        'billing_cycle_id' => null,
+        'semester_id' => $semester->id,
+        'status' => 'draft',
+        'due_date' => now()->addDays(30),
+    ]);
+
+    $tuitionCharge = FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => 45000000,
+        'description' => 'Major Tuition (Installment 1)',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+
+    InvoiceLine::create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $tuitionCharge->id,
+        'amount_snapshot' => $tuitionCharge->amount,
+        'description_snapshot' => $tuitionCharge->description,
+    ]);
+
+    return [$student, $semester, $invoice, $tuitionCharge, $scholarship];
+}
+
+function seedExistingPaidTuitionScenario(): array
+{
+    [$student, $semester] = seedTransitionStudentScenario();
+
+    $scholarship = ScholarshipDefinition::create([
+        'code' => 'ASIA_SKIP',
+        'name' => 'Asia Skip',
+        'description' => 'Scholarship skip test',
+        'type' => 'percentage',
+        'amount' => 10,
+        'valid_from' => now()->subYear()->toDateString(),
+        'valid_until' => now()->addYear()->toDateString(),
+        'is_active' => true,
+    ]);
+
+    $award = StudentScholarshipAward::create([
+        'student_id' => $student->id,
+        'scholarship_code' => $scholarship->code,
+        'awarded_at' => now()->toDateString(),
+    ]);
+
+    $invoice = StudentInvoice::create([
+        'invoice_number' => 'INV-TUITION-PAID-001',
+        'student_id' => $student->id,
+        'billing_cycle_id' => null,
+        'semester_id' => $semester->id,
+        'status' => 'paid',
+        'due_date' => now()->addDays(30),
+        'subtotal' => 45000000,
+        'discount_total' => 4500000,
+        'total_amount' => 40500000,
+        'paid_amount' => 40500000,
+    ]);
+
+    $tuitionCharge = FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => 45000000,
+        'description' => 'Major Tuition (Installment 1)',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+
+    InvoiceLine::create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $tuitionCharge->id,
+        'amount_snapshot' => $tuitionCharge->amount,
+        'description_snapshot' => $tuitionCharge->description,
+    ]);
+
+    InvoiceDiscount::create([
+        'invoice_id' => $invoice->id,
+        'discount_type' => 'scholarship',
+        'discount_source' => StudentScholarshipAward::class,
+        'description' => 'Scholarship: '.$scholarship->name,
+        'amount' => 4500000,
+        'status' => 'active',
+        'reference_id' => $award->id,
+    ]);
+
+    DiscountAllocation::create([
+        'invoice_discount_id' => $invoice->discounts()->firstOrFail()->id,
+        'invoice_line_id' => $invoice->invoiceLines()->firstOrFail()->id,
+        'amount' => 4500000,
+        'entry_type' => 'allocation',
+        'allocation_rule' => 'current_line_chronology',
+    ]);
+
+    $payment = Payment::create([
+        'student_id' => $student->id,
+        'amount' => 40500000,
+        'method' => Payment::METHOD_BANK_TRANSFER,
+        'source' => 'test',
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+    ]);
+
+    PaymentApplication::create([
+        'payment_id' => $payment->id,
+        'invoice_line_id' => $invoice->invoiceLines()->firstOrFail()->id,
+        'amount' => 40500000,
+        'entry_type' => 'application',
+        'applied_at' => now(),
+    ]);
+
+    $invoice->recalculateTotals();
+    $invoice->refresh();
+
+    return [$student, $semester, $invoice, $tuitionCharge];
+}
+
 it('marks transition students for a new invoice in preview when the only semester invoice is paid', function () {
     [$student, $semester] = seedTransitionStudentScenario();
 
@@ -553,6 +697,87 @@ it('creates scholarship invoice discounts and discount allocations during charge
         ->and($discount->discount_source)->toBe('App\Models\StudentScholarshipAward')
         ->and(DiscountAllocation::query()->where('invoice_discount_id', $discount->id)->count())->toBeGreaterThan(0)
         ->and((float) DiscountAllocation::query()->where('invoice_discount_id', $discount->id)->sum('amount'))->toBe(18000000.0);
+});
+
+it('applies scholarship to an existing reusable tuition invoice without creating a new tuition charge', function () {
+    [$student, $semester, $invoice, $tuitionCharge, $scholarship] = seedExistingTuitionInvoiceMissingScholarshipScenario();
+
+    $preview = app(PreviewChargeGenerationQuery::class)->handle([
+        'semester_id' => $semester->id,
+        'scope_type' => 'upload_list',
+        'uploaded_student_ids' => [$student->student_id],
+        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
+        'skip_if_issued_or_paid' => true,
+        'only_update_draft' => true,
+        'merge_invoice' => true,
+    ]);
+
+    $result = GenerateBatchChargesAction::run([
+        'semester_id' => $semester->id,
+        'scope_type' => 'upload_list',
+        'uploaded_student_ids' => [$student->student_id],
+        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
+        'skip_if_issued_or_paid' => true,
+        'only_update_draft' => true,
+        'merge_invoice' => true,
+    ]);
+
+    $discount = InvoiceDiscount::query()
+        ->where('invoice_id', $invoice->id)
+        ->where('discount_type', 'scholarship')
+        ->first();
+
+    expect($preview['students'])->toHaveCount(1)
+        ->and($preview['students'][0]['will_create_invoice'])->toBeFalse()
+        ->and($preview['students'][0]['estimated_amount'])->toBe(-9000000.0)
+        ->and(collect($preview['students'][0]['breakdown'])->pluck('label')->all())->not->toContain('Tuition (Skipped)')
+        ->and(collect($preview['students'][0]['breakdown'])->pluck('label')->all())->toContain("Scholarship ({$scholarship->code})")
+        ->and($result['created_invoices'])->toBe(0)
+        ->and($result['updated_invoices'])->toBe(1)
+        ->and($result['created_count'])->toBe(0)
+        ->and(FinanceCharge::query()
+            ->where('student_id', $student->id)
+            ->where('semester_id', $semester->id)
+            ->where('charge_type', FinanceCharge::TYPE_TUITION_TERM)
+            ->count())->toBe(1)
+        ->and($discount)->not->toBeNull()
+        ->and((float) $discount->amount)->toBe(9000000.0)
+        ->and(DiscountAllocation::query()->where('invoice_discount_id', $discount->id)->count())->toBeGreaterThan(0)
+        ->and((float) $invoice->fresh()->discount_total)->toBe(9000000.0)
+        ->and((float) $invoice->fresh()->total_amount)->toBe(36000000.0)
+        ->and(InvoiceLine::query()->where('charge_id', $tuitionCharge->id)->count())->toBe(1);
+});
+
+it('skips preview and generate completely when tuition charge already exists on a paid invoice with no pending invoice changes', function () {
+    [$student, $semester, $invoice, $tuitionCharge] = seedExistingPaidTuitionScenario();
+
+    $preview = app(PreviewChargeGenerationQuery::class)->handle([
+        'semester_id' => $semester->id,
+        'scope_type' => 'upload_list',
+        'uploaded_student_ids' => [$student->student_id],
+        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
+        'skip_if_issued_or_paid' => true,
+        'only_update_draft' => true,
+        'merge_invoice' => true,
+    ]);
+
+    $result = GenerateBatchChargesAction::run([
+        'semester_id' => $semester->id,
+        'scope_type' => 'upload_list',
+        'uploaded_student_ids' => [$student->student_id],
+        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
+        'skip_if_issued_or_paid' => true,
+        'only_update_draft' => true,
+        'merge_invoice' => true,
+    ]);
+
+    expect($preview['students'])->toHaveCount(0)
+        ->and($result['created_invoices'])->toBe(0)
+        ->and($result['updated_invoices'])->toBe(0)
+        ->and($result['created_count'])->toBe(0)
+        ->and($result['failed_count'])->toBe(0)
+        ->and(StudentInvoice::query()->where('student_id', $student->id)->where('semester_id', $semester->id)->count())->toBe(2)
+        ->and(InvoiceLine::query()->where('charge_id', $tuitionCharge->id)->count())->toBe(1);
 });
 
 it('does not create invoice for zero tuition term amounts', function () {

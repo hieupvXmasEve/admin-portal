@@ -6,8 +6,10 @@ namespace App\Modules\Finance\Queries\Operations;
 
 use App\Models\FinanceCharge;
 use App\Models\InvoiceDiscount;
+use App\Models\InvoiceLine;
 use App\Models\Student;
 use App\Models\StudentInvoice;
+use App\Models\StudentScholarshipAward;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
@@ -171,46 +173,33 @@ class PreviewChargeGenerationQuery
                     $amount = $tuitionTerm['amount'];
 
                     if ($amount !== null && $amount > 0) {
-                        if ($this->checkChargeExists($student, $semesterId, FinanceCharge::TYPE_TUITION_TERM)) {
-                            $breakdown[] = ['label' => 'Tuition (Skipped)', 'amount' => 0];
-                            $hasExistingCharge = true;
+                        $existingTuitionCharge = $this->findExistingCharge($student, $semesterId, FinanceCharge::TYPE_TUITION_TERM);
+
+                        if ($existingTuitionCharge) {
+                            $scholarshipPreview = $this->buildScholarshipPreview(
+                                $reusableInvoice,
+                                $student->scholarshipAward,
+                                (float) $existingTuitionCharge->amount,
+                            );
+
+                            if ($scholarshipPreview !== null) {
+                                $breakdown[] = $scholarshipPreview;
+                                $studentTotal -= abs((float) $scholarshipPreview['amount']);
+                            }
                         } else {
                             $breakdown[] = ['label' => 'Tuition (Major)', 'amount' => $amount];
                             $studentTotal += $amount;
                             $grossAmount += $amount;
 
-                            // Scholarship (Only for Course Tuition)
-                            if ($student->scholarshipAward) {
-                                $existingScholarshipDiscount = $reusableInvoice
-                                    ? InvoiceDiscount::query()
-                                        ->where('invoice_id', $reusableInvoice->id)
-                                        ->where('discount_type', 'scholarship')
-                                        ->where('reference_id', $student->scholarshipAward->id)
-                                        ->exists()
-                                    : false;
+                            $scholarshipPreview = $this->buildScholarshipPreview(
+                                $reusableInvoice,
+                                $student->scholarshipAward,
+                                $amount,
+                            );
 
-                                if ($existingScholarshipDiscount) {
-                                    $breakdown[] = ['label' => 'Scholarship (Skipped)', 'amount' => 0];
-                                    $hasExistingCharge = true;
-                                } else {
-                                    $scholarshipDef = $student->scholarshipAward->scholarshipDefinition;
-                                    if ($scholarshipDef) {
-                                        $sAmount = 0;
-                                        if ($scholarshipDef->type === 'percentage') {
-                                            $sAmount = ($amount * $scholarshipDef->amount) / 100;
-                                        } else {
-                                            $sAmount = $scholarshipDef->amount;
-                                        }
-
-                                        if ($sAmount > 0) {
-                                            $breakdown[] = [
-                                                'label' => "Scholarship ({$scholarshipDef->code})",
-                                                'amount' => -$sAmount,
-                                            ];
-                                            $studentTotal -= $sAmount;
-                                        }
-                                    }
-                                }
+                            if ($scholarshipPreview !== null) {
+                                $breakdown[] = $scholarshipPreview;
+                                $studentTotal -= abs((float) $scholarshipPreview['amount']);
                             }
                         }
                     }
@@ -254,13 +243,7 @@ class PreviewChargeGenerationQuery
             }
 
             // Determine Invoice Eligibility
-            $tuitionTerm = $canGenerateTuition
-                ? $studentChargeTimingResolver->getTuitionTermData($student, $semesterId)
-                : ['amount' => null];
-            $isTuitionEligible = ($canGenerateTuition
-                && ($tuitionTerm['amount'] ?? null) !== null
-                && (float) ($tuitionTerm['amount'] ?? 0) > 0);
-            $shouldGenInvoice = ($grossAmount > 0) || $hasReusableInvoice || $isTuitionEligible;
+            $shouldGenInvoice = $grossAmount > 0;
 
             $willCreateInvoice = $shouldGenInvoice && ! $hasReusableInvoice;
 
@@ -322,12 +305,62 @@ class PreviewChargeGenerationQuery
         ];
     }
 
-    private function checkChargeExists(Student $student, int $semesterId, string $type): bool
+    private function findExistingCharge(Student $student, int $semesterId, string $type): ?FinanceCharge
     {
         return FinanceCharge::where('student_id', $student->id)
             ->where('semester_id', $semesterId)
             ->where('charge_type', $type)
             ->active()
+            ->first();
+    }
+
+    private function buildScholarshipPreview(
+        ?StudentInvoice $invoice,
+        ?StudentScholarshipAward $award,
+        float $baseAmount,
+    ): ?array {
+        if (! $invoice || ! $award || $baseAmount <= 0) {
+            return null;
+        }
+
+        $hasTuitionLine = InvoiceLine::query()
+            ->where('invoice_id', $invoice->id)
+            ->whereHas('charge', function ($query) {
+                $query->where('charge_type', FinanceCharge::TYPE_TUITION_TERM)
+                    ->where('status', FinanceCharge::STATUS_ACTIVE);
+            })
             ->exists();
+
+        if (! $hasTuitionLine) {
+            return null;
+        }
+
+        $existingScholarshipDiscount = InvoiceDiscount::query()
+            ->where('invoice_id', $invoice->id)
+            ->where('discount_type', 'scholarship')
+            ->where('reference_id', $award->id)
+            ->exists();
+
+        if ($existingScholarshipDiscount) {
+            return null;
+        }
+
+        $scholarshipDef = $award->scholarshipDefinition;
+        if (! $scholarshipDef) {
+            return null;
+        }
+
+        $discount = $scholarshipDef->type === 'percentage'
+            ? ($baseAmount * $scholarshipDef->amount) / 100
+            : (float) $scholarshipDef->amount;
+
+        if ($discount <= 0) {
+            return null;
+        }
+
+        return [
+            'label' => "Scholarship ({$scholarshipDef->code})",
+            'amount' => -$discount,
+        ];
     }
 }
