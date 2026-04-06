@@ -202,10 +202,10 @@ class GenerateBatchChargesAction
                                 // Semester package already issued; do not create any additional EGC level fee.
                             } else {
                                 $startLevel = $student->gc_current_level ?? 1;
-                                $totalLevels = $student->gc_total_levels ?? 6;
 
-                                $levelsToCharge = [$startLevel];
-                                if (($startLevel + 1) < $totalLevels) {
+                                // EGC program: student pays for levels 0–5 only; cap at level 5.
+                                $levelsToCharge = $startLevel <= 5 ? [$startLevel] : [];
+                                if ($startLevel < 5) {
                                     $levelsToCharge[] = $startLevel + 1;
                                 }
 

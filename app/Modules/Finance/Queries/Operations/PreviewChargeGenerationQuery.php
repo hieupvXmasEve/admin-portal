@@ -117,13 +117,10 @@ class PreviewChargeGenerationQuery
                         // Semester package already issued; skip the entire EGC generation for this student.
                     } else {
                         $startLevel = $student->gc_current_level ?? 1;
-                        $totalLevels = $student->gc_total_levels ?? 6;
 
-                        $levelsToCharge = [$startLevel];
-                        // Rule: Charge next level if within bounds (0 to total-1)
-                        // gc_total_levels is count (e.g. 6). Indices are 0..5.
-                        // Next level must be < total.
-                        if (($startLevel + 1) < $totalLevels) {
+                        // EGC program: student pays for levels 0–5 only; cap at level 5.
+                        $levelsToCharge = $startLevel <= 5 ? [$startLevel] : [];
+                        if ($startLevel < 5) {
                             $levelsToCharge[] = $startLevel + 1;
                         }
 
