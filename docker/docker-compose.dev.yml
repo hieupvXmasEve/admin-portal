@@ -121,9 +121,10 @@ services:
             - '${DB_PORT:-3306}:3306'
         environment:
             MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+            MARIADB_ROOT_HOST: ${DB_ROOT_HOST:-%}
             MARIADB_DATABASE: ${DB_DATABASE:-asia}
-            MARIADB_USER: ${DB_USERNAME:-swinx}
-            MARIADB_PASSWORD: ${DB_PASSWORD:-swinx}
+            MARIADB_USER: ${DB_APP_USERNAME:-swinx}
+            MARIADB_PASSWORD: ${DB_APP_PASSWORD:-swinx}
         volumes:
             - db_data_dev:/var/lib/mysql
             - ./mysql/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro

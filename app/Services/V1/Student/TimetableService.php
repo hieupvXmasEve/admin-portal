@@ -171,7 +171,7 @@ class TimetableService
             $schedule[$day] = [
                 'day_name' => ucfirst($day),
                 'day_abbreviation' => strtoupper(substr($day, 0, 3)),
-                'day' => Carbon::now()->startOfWeek(Carbon::SUNDAY)->addDays($dayMap[$day])->day,
+                'day' => $scheduleStart->copy()->startOfWeek(Carbon::SUNDAY)->addDays($dayMap[$day])->day,
                 'events' => $eventsByDay[$day] ?? [],
                 'sessions' => $classSessions
                     ->filter(function ($session) use ($dayMap, $day) {

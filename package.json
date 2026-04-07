@@ -13,9 +13,10 @@
         "pre-push": "./scripts/pre-push.sh",
         "pre-push:docker": "./scripts/pre-push.sh --docker",
         "test:local": "./scripts/test-local.sh",
-        "docker:up": "./scripts/docker-compose-dev.sh up",
-        "docker:down": "./scripts/docker-compose-dev.sh down",
-        "docker:logs": "./scripts/docker-compose-dev.sh logs",
+        "docker:up": "./scripts/dev.sh start",
+        "docker:down": "./scripts/dev.sh stop",
+        "docker:logs": "./scripts/dev.sh logs",
+        "docker:status": "./scripts/dev.sh status",
         "docker:test": "docker-compose -f docker-compose.yml -f docker-compose.test.yml up -d",
         "docker:test:down": "docker-compose -f docker-compose.yml -f docker-compose.test.yml down -v",
         "type-check": "vue-tsc --noEmit"

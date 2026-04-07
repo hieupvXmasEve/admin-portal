@@ -336,7 +336,7 @@ class EventService
 
         // Apply sorting
         $sortBy = $filters['sort_by'] ?? 'start_time';
-        $sortDirection = $filters['sort_direction'] ?? 'asc';
+        $sortDirection = $filters['sort_direction'] ?? 'desc';
         $query->orderBy($sortBy, $sortDirection);
 
         return $query->with(['campus'])->paginate($perPage);

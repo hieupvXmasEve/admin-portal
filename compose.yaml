@@ -1,0 +1,4 @@
+name: swinx-dev
+
+include:
+  - docker/docker-compose.dev.yml
