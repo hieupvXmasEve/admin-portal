@@ -24,6 +24,7 @@ class GenerateBatchChargesAction
     {
         $semesterId = (int) $data['semester_id'];
         $chargeTypes = $data['charge_types'];
+        $createdByUserId = auth()->id();
 
         // 1. Strict Scope: Only specific statuses and current campus
         $query = BillingScopeHelper::getEligibleStudentsQuery(
@@ -219,7 +220,8 @@ class GenerateBatchChargesAction
                                             FinanceCharge::TYPE_EGC_LEVEL_FEE,
                                             $fee,
                                             'App\Models\Unit',
-                                            $unit ? $unit->id : 0
+                                            $unit ? $unit->id : 0,
+                                            $createdByUserId
                                         );
                                         if ($charge) {
                                             $charge->update(['description' => "EGC Level {$level} Fee"]);
@@ -250,7 +252,10 @@ class GenerateBatchChargesAction
                                     $charge = self::createChargeIfNotExists(
                                         $student, $semesterId,
                                         FinanceCharge::TYPE_TUITION_TERM,
-                                        $amount
+                                        $amount,
+                                        null,
+                                        null,
+                                        $createdByUserId
                                     );
                                 }
 
@@ -322,7 +327,8 @@ class GenerateBatchChargesAction
                             FinanceCharge::TYPE_COURSE_FEE,
                             (float) $data['custom_amount'],
                             'Manual',
-                            0 // source_id 0
+                            0, // source_id 0
+                            $createdByUserId
                         );
                         if ($charge) {
                             $charge->update(['description' => 'Manual Adjustment']);
@@ -410,7 +416,7 @@ class GenerateBatchChargesAction
         ]);
     }
 
-    private static function createChargeIfNotExists(Student $student, int $semesterId, string $type, float $amount, ?string $sourceType = null, $sourceId = null): ?FinanceCharge
+    private static function createChargeIfNotExists(Student $student, int $semesterId, string $type, float $amount, ?string $sourceType = null, $sourceId = null, ?int $createdByUserId = null): ?FinanceCharge
     {
         $query = FinanceCharge::where('student_id', $student->id)
             ->where('semester_id', $semesterId)
@@ -442,6 +448,7 @@ class GenerateBatchChargesAction
             'source_id' => $sourceId,
             'status' => 'active',
             'effective_at' => now(),
+            'created_by_user_id' => $createdByUserId,
         ]);
     }
 
