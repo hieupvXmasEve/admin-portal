@@ -74,15 +74,12 @@ class SendSingleEmailJob implements ShouldQueue
             // Mark email as sending
             $this->emailLog->markAsSending();
 
-            // Get active email configuration
+            // Apply active EmailConfiguration if available, otherwise use .env defaults
             $config = EmailConfiguration::getActive();
 
-            if (!$config) {
-                throw new \Exception('No active email configuration found');
+            if ($config) {
+                $this->configureMailer($config);
             }
-
-            // Configure mail settings dynamically
-            $this->configureMailer($config);
 
             // Create and send the email
             $email = new GenericEmail(

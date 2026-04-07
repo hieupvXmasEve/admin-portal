@@ -79,7 +79,7 @@ class ListDueInvoicesQuery
                     'due_date' => $dueDate->toDateString(),
                     'days_until_due' => $daysUntilDue,
                     'status' => $invoiceStatus,
-                    'last_reminder_at' => null,
+                    'last_reminder_at' => $invoice->last_reminder_at?->toISOString(),
                 ];
             });
     }

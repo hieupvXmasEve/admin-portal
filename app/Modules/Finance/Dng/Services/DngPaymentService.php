@@ -8,14 +8,19 @@ use App\Models\Payment;
 use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Services\PaymentService;
+use App\Modules\Notification\Actions\PublishDomainEventAction;
+use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class DngPaymentService
 {
     public function __construct(
         protected DngClient $dngClient,
         protected PaymentService $paymentService,
+        protected PublishDomainEventAction $publishDomainEventAction,
     ) {}
 
     /**
@@ -63,6 +68,15 @@ class DngPaymentService
                 'dng_transaction_id' => $response['data']['TransactionID'] ?? $response['data']['Id'] ?? null,
                 'dng_payment_id' => $response['data']['PaymentId'] ?? $response['data']['OtherId'] ?? null,
             ]);
+
+            $this->publishPushNotification(
+                studentId: (int) $student->id,
+                campusId: (int) $student->campus_id,
+                studentName: $student->full_name,
+                requestId: $request->id,
+                amount: (string) $chargeData['amount'],
+                description: $chargeData['description'] ?? $chargeData['fee_type'],
+            );
         } catch (\Throwable $e) {
             $request->update([
                 'status' => DngPaymentRequest::STATUS_FAILED,
@@ -125,6 +139,8 @@ class DngPaymentService
         try {
             $response = $this->dngClient->insertBatchRecords($campusCode, $batchData);
 
+            $campusId = app()->bound('campus') ? (int) app('campus')->id : null;
+
             foreach ($created as $i => $item) {
                 $responseRecord = $response['data'][$i] ?? null;
                 $item['request']->update([
@@ -134,6 +150,15 @@ class DngPaymentService
                     'dng_transaction_id' => $responseRecord['TransactionID'] ?? $responseRecord['Id'] ?? null,
                     'dng_payment_id' => $responseRecord['PaymentId'] ?? $responseRecord['OtherId'] ?? null,
                 ]);
+
+                $this->publishPushNotification(
+                    studentId: (int) $item['data']['student_id'],
+                    campusId: $campusId,
+                    studentName: $item['data']['student_name'],
+                    requestId: $item['request']->id,
+                    amount: (string) $item['data']['amount'],
+                    description: $item['data']['note'] ?? $item['data']['type'],
+                );
             }
 
             return ['created' => count($created), 'failed' => 0];
@@ -178,6 +203,57 @@ class DngPaymentService
             'campus_code' => $request->campus_code,
             'fee_types' => $feeTypes,
         ]);
+    }
+
+    /**
+     * Publish a notification (realtime + email) after a DNG payment request is pushed successfully.
+     */
+    private function publishPushNotification(
+        int $studentId,
+        ?int $campusId,
+        string $studentName,
+        int $requestId,
+        string $amount,
+        string $description,
+    ): void {
+        try {
+            $formattedAmount = number_format((float) $amount, 0, ',', '.') . ' VNĐ';
+
+            $envelope = new DomainEventEnvelope(
+                eventId: (string) Str::uuid(),
+                eventName: 'finance.dng_payment_pushed',
+                eventVersion: 1,
+                occurredAt: CarbonImmutable::now(),
+                aggregateType: 'dng_payment_request',
+                aggregateId: (string) $requestId,
+                campusId: $campusId,
+                actorUserId: null,
+                payload: [
+                    'type_key' => 'dng_payment_pushed',
+                    'channels' => ['email', 'realtime'],
+                    'recipient_targets' => [
+                        ['type' => 'student', 'id' => $studentId],
+                    ],
+                    'data' => [
+                        'title' => 'Yêu cầu thanh toán đã được tạo',
+                        'body' => "Xin chào {$studentName}, yêu cầu thanh toán {$formattedAmount} ({$description}) đã được gửi thành công đến hệ thống DNG. Vui lòng hoàn tất thanh toán theo hướng dẫn.",
+                        'category' => 'finance',
+                        'is_important' => true,
+                        'action_text' => 'Xem chi tiết',
+                        'action_type' => 'finance.dng_payment_request',
+                        'action_params' => ['id' => $requestId],
+                    ],
+                ],
+            );
+
+            $this->publishDomainEventAction->run($envelope);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to publish DNG push notification', [
+                'student_id' => $studentId,
+                'dng_payment_request_id' => $requestId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

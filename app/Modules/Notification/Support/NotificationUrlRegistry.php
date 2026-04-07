@@ -23,6 +23,10 @@ final class NotificationUrlRegistry
             'web' => '/finance/invoices/{id}',
             'mobile' => '/invoices/{id}',
         ],
+        'finance.dng_payment_request' => [
+            'web' => '/finance/operations/batch-dng',
+            'mobile' => '/finance/payments/{id}',
+        ],
         'academic.enrollment' => [
             'web' => '/academic/enrollments/{id}',
             'mobile' => '/enrollments/{id}',

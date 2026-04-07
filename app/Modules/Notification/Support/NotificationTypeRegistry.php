@@ -63,6 +63,14 @@ final class NotificationTypeRegistry
             'action_type' => null,
             'channels' => ['email', 'realtime'],
         ],
+        'dng_payment_pushed' => [
+            'event_name' => 'finance.dng_payment_pushed',
+            'category' => 'finance',
+            'icon' => 'credit-card',
+            'action_text' => 'Xem chi tiết',
+            'action_type' => 'finance.dng_payment_request',
+            'channels' => ['email', 'realtime'],
+        ],
     ];
 
     /**

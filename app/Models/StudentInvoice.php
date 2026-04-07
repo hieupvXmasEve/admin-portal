@@ -42,11 +42,13 @@ class StudentInvoice extends Model
         'paid_at',
         'status',
         'due_date',
+        'last_reminder_at',
     ];
 
     protected $casts = [
         'due_date' => 'datetime',
         'paid_at' => 'datetime',
+        'last_reminder_at' => 'datetime',
         'subtotal' => 'decimal:2',
         'discount_total' => 'decimal:2',
         'total_amount' => 'decimal:2',
