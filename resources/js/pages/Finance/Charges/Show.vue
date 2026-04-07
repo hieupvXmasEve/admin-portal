@@ -11,7 +11,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Table,
@@ -33,8 +32,9 @@ import {
     type FinanceCharge,
     type PaymentAllocation,
 } from '@/types/finance';
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, Ban, Calendar, CreditCard, FileText, User } from 'lucide-vue-next';
+import { usePermission } from '@/composables/usePermission';
+import { Head, Link, useForm } from '@inertiajs/vue3';
+import { ArrowLeft, Ban, Check, CreditCard, FileText, Pencil, User, X } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -46,7 +46,38 @@ interface Props {
 
 const props = defineProps<Props>();
 
+const { can } = usePermission();
+
 const isVoidDialogOpen = ref(false);
+
+// Description inline edit
+const isEditingDescription = ref(false);
+const descriptionForm = useForm({
+    description: props.charge.description ?? '',
+});
+
+const startEditDescription = () => {
+    descriptionForm.description = props.charge.description ?? '';
+    isEditingDescription.value = true;
+};
+
+const cancelEditDescription = () => {
+    isEditingDescription.value = false;
+    descriptionForm.reset();
+};
+
+const saveDescription = () => {
+    descriptionForm.patch(route('finance.charges.update-description', props.charge.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            toast.success('Mô tả đã được cập nhật');
+            isEditingDescription.value = false;
+        },
+        onError: () => {
+            toast.error('Không thể cập nhật mô tả');
+        },
+    });
+};
 
 const voidForm = useForm({
     void_reason: '',
@@ -180,8 +211,44 @@ const formatDateOnly = (dateStr: string | null | undefined): string => {
                         </div>
 
                         <div>
-                            <p class="text-muted-foreground text-sm">Mô tả</p>
-                            <p class="mt-1">{{ charge.description }}</p>
+                            <div class="flex items-center gap-2">
+                                <p class="text-muted-foreground text-sm">Mô tả</p>
+                                <Button
+                                    v-if="can('create_finance_charges') && !isEditingDescription"
+                                    variant="ghost"
+                                    size="icon"
+                                    class="h-5 w-5"
+                                    @click="startEditDescription"
+                                >
+                                    <Pencil class="h-3 w-3" />
+                                </Button>
+                            </div>
+                            <div v-if="isEditingDescription" class="mt-1 flex items-start gap-2">
+                                <Textarea
+                                    v-model="descriptionForm.description"
+                                    class="min-h-[80px] flex-1"
+                                    rows="3"
+                                />
+                                <div class="flex flex-col gap-1">
+                                    <Button
+                                        size="icon"
+                                        class="h-7 w-7"
+                                        :disabled="descriptionForm.processing"
+                                        @click="saveDescription"
+                                    >
+                                        <Check class="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        class="h-7 w-7"
+                                        @click="cancelEditDescription"
+                                    >
+                                        <X class="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            </div>
+                            <p v-else class="mt-1">{{ charge.description }}</p>
                         </div>
 
                         <div v-if="charge.status === 'voided'" class="rounded-lg border border-red-200 bg-red-50 p-4">

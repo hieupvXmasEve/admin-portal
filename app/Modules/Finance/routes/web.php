@@ -78,6 +78,9 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::post('/{charge}/void', [FinanceChargeController::class, 'void'])
             ->middleware('can:void_finance_charges')
             ->name('void');
+        Route::patch('/{charge}/description', [FinanceChargeController::class, 'updateDescription'])
+            ->middleware('can:create_finance_charges')
+            ->name('update-description');
     });
 
     // =====================

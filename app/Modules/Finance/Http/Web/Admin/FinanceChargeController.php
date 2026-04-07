@@ -221,6 +221,20 @@ class FinanceChargeController extends Controller
     }
 
     /**
+     * Update the description of a charge.
+     */
+    public function updateDescription(Request $request, FinanceCharge $charge)
+    {
+        $validated = $request->validate([
+            'description' => 'required|string|max:500',
+        ]);
+
+        $charge->update(['description' => $validated['description']]);
+
+        return back()->with('success', 'Mô tả đã được cập nhật.');
+    }
+
+    /**
      * Void a charge.
      */
     public function void(Request $request, FinanceCharge $charge)
