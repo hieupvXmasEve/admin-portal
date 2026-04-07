@@ -16,7 +16,7 @@ import { createColumns } from '@/lib/table-utils';
 import type { PaginatedResponse } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { ArrowLeft, CheckCircle2, ExternalLink, Wallet, Zap } from 'lucide-vue-next';
+import { ArrowLeft, CheckCircle2, ExternalLink, Send, Wallet, Zap } from 'lucide-vue-next';
 import { h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
@@ -309,10 +309,18 @@ const columns: ColumnDef<SettlementStudent>[] = createColumns<SettlementStudent>
                     <p class="text-muted-foreground text-sm">Quản lý student còn invoice chưa thanh toán và chạy settlement theo batch.</p>
                 </div>
             </div>
-            <Button @click="applySettlement(selectedStudentIds)" :disabled="isApplying || selectedStudentIds.length === 0">
-                <Zap class="mr-2 h-4 w-4" />
-                Apply selected
-            </Button>
+            <div class="flex gap-2">
+                <Link :href="route('finance.operations.batch-dng')">
+                    <Button variant="outline">
+                        <Send class="mr-2 h-4 w-4" />
+                        Tạo DNG hàng loạt
+                    </Button>
+                </Link>
+                <Button @click="applySettlement(selectedStudentIds)" :disabled="isApplying || selectedStudentIds.length === 0">
+                    <Zap class="mr-2 h-4 w-4" />
+                    Apply selected
+                </Button>
+            </div>
         </div>
 
         <Dialog v-model:open="isCreateDngDialogOpen">

@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Finance\Http\Web\Admin\BatchDngPageController;
 use App\Modules\Finance\Http\Web\Admin\BillingInvoiceController;
 use App\Modules\Finance\Http\Web\Admin\BillingOperationsController;
 use App\Modules\Finance\Http\Web\Admin\BillingSettlementController;
@@ -36,6 +37,9 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::post('/settlement/apply', [BillingSettlementController::class, 'apply'])
             ->middleware('can:allocate_finance_payment')
             ->name('settlement.apply');
+        Route::get('/batch-dng', [BatchDngPageController::class, 'show'])
+            ->middleware('can:create_finance_payments')
+            ->name('batch-dng');
     });
 
     // Invoices

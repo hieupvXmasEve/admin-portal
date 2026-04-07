@@ -530,6 +530,12 @@ export const mainNavItems: NavItem[] = [
                         icon: Sparkles,
                         requiredPermissions: ['allocate_finance_payment'],
                     },
+                    {
+                        title: 'Batch DNG',
+                        href: '/finance/operations/batch-dng',
+                        icon: Send,
+                        requiredPermissions: ['create_finance_payments'],
+                    },
                 ],
             },
             // Group: charges, invoices, payments

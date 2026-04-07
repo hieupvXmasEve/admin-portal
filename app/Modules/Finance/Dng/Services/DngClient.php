@@ -166,6 +166,65 @@ class DngClient
     }
 
     /**
+     * Build the payload for a batch insert (multiple records in one request).
+     *
+     * Batch checksum: accessCode + apiCode + campusCode
+     *
+     * @param  array<int, array{
+     *     student_code: string,
+     *     campus_code: string,
+     *     type: string,
+     *     amount: int|float|string,
+     *     item_id: string,
+     *     student_name: string,
+     *     email: string,
+     *     estimate_time: string,
+     *     student_address: string,
+     *     note?: string|null,
+     *     note_einvoice?: string|null,
+     *     cccd?: string|null,
+     * }>  $records
+     * @return array<string, mixed>
+     */
+    public function buildBatchInsertPayload(string $campusCode, array $records): array
+    {
+        $checksumString = $this->accessCode.$this->apiCode.$campusCode;
+
+        return [
+            'ApiCode' => $this->apiCode,
+            'CampusCode' => $campusCode,
+            'CheckSum' => $this->checksumService->generate($checksumString),
+            'Records' => array_values(array_map(fn (array $record) => [
+                'StudentId' => $record['student_code'],
+                'CampusCode' => $campusCode,
+                'Type' => $record['type'],
+                'Amount' => is_numeric($record['amount']) ? $record['amount'] + 0 : (string) $record['amount'],
+                'ItemId' => $record['item_id'],
+                'StudentName' => $record['student_name'],
+                'Email' => $record['email'],
+                'EstimateTime' => $record['estimate_time'],
+                'Note' => $record['note'] ?? '',
+                'NoteEinvoice' => $record['note_einvoice'] ?? '',
+                'StudentAddress' => $record['student_address'],
+                'CCCD' => $record['cccd'] ?? '',
+            ], $records)),
+        ];
+    }
+
+    /**
+     * Push multiple debt records to DNG in a single batch call.
+     *
+     * @param  array<int, array{...}>  $records
+     * @return array{Code: int, Type: string, Message: string, data: mixed}
+     */
+    public function insertBatchRecords(string $campusCode, array $records): array
+    {
+        $payload = $this->buildBatchInsertPayload($campusCode, $records);
+
+        return $this->post('/api/apiv2/InsertListNewRecord11', $payload);
+    }
+
+    /**
      * Check paid transactions for a given campus and date.
      *
      * @return array{Code: int, Type: string, Message: string, data: mixed}

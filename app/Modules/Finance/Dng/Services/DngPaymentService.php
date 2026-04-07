@@ -82,6 +82,75 @@ class DngPaymentService
     }
 
     /**
+     * Create local DNG payment request records and push them as a batch to DNG.
+     *
+     * @param  array<int, array{
+     *     student_id: int,
+     *     student_code: string,
+     *     type: string,
+     *     amount: float|int,
+     *     item_id: string,
+     *     student_name: string,
+     *     email: string,
+     *     estimate_time: string,
+     *     student_address: string,
+     *     note?: string|null,
+     *     note_einvoice?: string|null,
+     *     cccd?: string|null,
+     * }>  $records
+     * @return array{created: int, failed: int}
+     */
+    public function createAndPushBatch(array $records, string $campusCode): array
+    {
+        // Step 1: Persist all local records before calling DNG
+        $created = [];
+        foreach ($records as $record) {
+            $request = DngPaymentRequest::create([
+                'student_id' => $record['student_id'],
+                'campus_code' => $campusCode,
+                'student_code' => $record['student_code'],
+                'fee_type' => $record['type'],
+                'description' => $record['description'] ?? $record['note'] ?? null,
+                'item_id' => $record['item_id'],
+                'amount' => $record['amount'],
+                'status' => DngPaymentRequest::STATUS_PENDING,
+            ]);
+            $created[] = ['request' => $request, 'data' => $record];
+        }
+
+        // Step 2: Build batch payload and push
+        $batchData = array_map(fn ($r) => $r['data'], $created);
+        $payload = $this->dngClient->buildBatchInsertPayload($campusCode, $batchData);
+
+        try {
+            $response = $this->dngClient->insertBatchRecords($campusCode, $batchData);
+
+            foreach ($created as $i => $item) {
+                $responseRecord = $response['data'][$i] ?? null;
+                $item['request']->update([
+                    'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+                    'push_payload' => $payload['Records'][$i] ?? null,
+                    'push_response' => $responseRecord,
+                    'dng_transaction_id' => $responseRecord['TransactionID'] ?? $responseRecord['Id'] ?? null,
+                    'dng_payment_id' => $responseRecord['PaymentId'] ?? $responseRecord['OtherId'] ?? null,
+                ]);
+            }
+
+            return ['created' => count($created), 'failed' => 0];
+        } catch (\Throwable $e) {
+            foreach ($created as $item) {
+                $item['request']->update([
+                    'status' => DngPaymentRequest::STATUS_FAILED,
+                    'push_payload' => $payload,
+                    'error_message' => $e->getMessage(),
+                ]);
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
      * Build a payment access payload for QR/virtual account flow.
      *
      * @param  array<int, string>  $feeTypes
