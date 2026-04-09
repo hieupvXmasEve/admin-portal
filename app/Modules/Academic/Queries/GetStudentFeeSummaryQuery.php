@@ -269,112 +269,131 @@ class GetStudentFeeSummaryQuery
             return null;
         }
 
-        $intakeSemester = \App\Models\Semester::find($student->intake_semester_id);
-        $semesterSequence = collect();
-
-        if ($intakeSemester) {
-            $semesterSequence = \App\Models\Semester::query()
-                ->where('start_date', '>=', $intakeSemester->start_date)
-                ->orderBy('start_date')
-                ->limit(20)
-                ->get();
-        }
-
         $scholarshipAward = StudentScholarshipAward::query()
             ->where('student_id', $student->id)
             ->with('scholarshipDefinition')
             ->first();
 
-        return [
-            'plan_name' => $tuitionPlan->curriculumVersion->program->name.' ('.$tuitionPlan->curriculumVersion->version_code.')',
-            'terms' => $tuitionPlan->terms->map(function (TuitionPlanTerm $term) use ($charges, $invoices, $semesterSequence, $scholarshipAward) {
-                $inferredSemester = $semesterSequence->get($term->term_number - 1);
+        $intakeMajorSemester = \App\Models\Semester::find($student->intake_major);
+        $planTermsById = $tuitionPlan->terms->keyBy('id');
+        $planTermsByNumber = $tuitionPlan->terms->keyBy('term_number');
 
-                $linkedCharge = $charges->first(function (FinanceCharge $charge) use ($term) {
-                    return $charge->source_type === TuitionPlanTerm::class && (int) $charge->source_id === (int) $term->id;
-                });
+        // Source of truth: actual tuition charges, sorted by semester date
+        $tuitionCharges = $charges
+            ->filter(fn (FinanceCharge $c) => $c->charge_type === FinanceCharge::TYPE_TUITION_TERM)
+            ->sortBy(fn (FinanceCharge $c) => $c->semester?->start_date?->timestamp ?? 0);
 
-                if (! $linkedCharge && $inferredSemester) {
-                    $linkedCharge = $charges->first(function (FinanceCharge $charge) use ($inferredSemester) {
-                        return $charge->charge_type === FinanceCharge::TYPE_TUITION_TERM
-                            && (int) $charge->semester_id === (int) $inferredSemester->id;
-                    });
+        $usedPlanTermIds = [];
+
+        // Build items from actual generated charges
+        $generatedItems = $tuitionCharges->map(function (FinanceCharge $charge) use (
+            $planTermsById, $planTermsByNumber, $intakeMajorSemester, $invoices, $scholarshipAward, &$usedPlanTermIds
+        ) {
+            // Resolve linked plan term: prefer explicit source link, fallback to term_number inference
+            $linkedTerm = null;
+            if ($charge->source_type === TuitionPlanTerm::class && $charge->source_id) {
+                $linkedTerm = $planTermsById->get((int) $charge->source_id);
+            }
+            if (! $linkedTerm && $intakeMajorSemester && $charge->semester) {
+                $termNumber = \App\Models\Semester::query()
+                    ->where('start_date', '>=', $intakeMajorSemester->start_date)
+                    ->where('start_date', '<=', $charge->semester->start_date)
+                    ->count();
+                $linkedTerm = $planTermsByNumber->get($termNumber);
+            }
+            if ($linkedTerm) {
+                $usedPlanTermIds[] = $linkedTerm->id;
+            }
+
+            // Discount: from actual invoice discounts, fallback to scholarship estimate
+            $linkedInvoiceIds = $charge->invoiceLines->pluck('invoice_id')->filter()->unique();
+            $discountAmount = (float) $invoices
+                ->whereIn('id', $linkedInvoiceIds)
+                ->sum(fn (StudentInvoice $invoice) => $this->deriveInvoiceSnapshot($invoice)['discount']);
+
+            $isEstimatedDiscount = false;
+            if ($discountAmount === 0.0 && $scholarshipAward?->scholarshipDefinition) {
+                $scholarship = $scholarshipAward->scholarshipDefinition;
+                $discountAmount = $scholarship->type === 'percentage'
+                    ? ((float) $charge->amount * $scholarship->amount) / 100
+                    : (float) $scholarship->amount;
+                $isEstimatedDiscount = $discountAmount > 0;
+            }
+
+            $chargeLines = $charge->invoiceLines->filter(fn (InvoiceLine $line) => ($line->status ?? 'active') === 'active');
+            $paidAmount = (float) $chargeLines->sum(fn (InvoiceLine $line) => $this->sumNetPaymentApplications($line->paymentApplications));
+            $amountDue = max(0, (float) $charge->amount - $discountAmount);
+
+            $paymentStatus = match (true) {
+                $amountDue <= 0, $paidAmount >= $amountDue => 'paid',
+                $paidAmount > 0 => 'partial',
+                default => 'unpaid',
+            };
+
+            $linkedInvoiceDetails = [];
+            foreach ($invoices as $invoice) {
+                if ($invoice->invoiceLines->contains('charge_id', $charge->id)) {
+                    $linkedInvoiceDetails[] = [
+                        'id' => $invoice->id,
+                        'invoice_number' => $invoice->invoice_number,
+                        'status' => $invoice->status,
+                        'due_date' => $invoice->due_date?->toDateString(),
+                    ];
                 }
+            }
 
-                $generated = (bool) $linkedCharge;
-                $linkedInvoiceDetails = [];
-                $paidAmount = 0.0;
+            return [
+                'term_number' => $linkedTerm?->term_number,
+                'semester_id' => $charge->semester_id,
+                'semester_name' => $charge->semester?->name,
+                'required_amount' => (float) $charge->amount,
+                'discount_amount' => $discountAmount,
+                'is_estimated_discount' => $isEstimatedDiscount,
+                'amount_due' => $amountDue,
+                'paid_amount' => $paidAmount,
+                'generated' => true,
+                'charge_id' => $charge->id,
+                'payment_status' => $paymentStatus,
+                'invoices' => $linkedInvoiceDetails,
+            ];
+        })->values();
 
-                if ($linkedCharge) {
-                    $chargeLines = $linkedCharge->invoiceLines->filter(fn (InvoiceLine $line) => ($line->status ?? 'active') === 'active');
-                    $paidAmount = (float) $chargeLines->sum(fn (InvoiceLine $line) => $this->sumNetPaymentApplications($line->paymentApplications));
-
-                    foreach ($invoices as $invoice) {
-                        if ($invoice->invoiceLines->contains('charge_id', $linkedCharge->id)) {
-                            $linkedInvoiceDetails[] = [
-                                'id' => $invoice->id,
-                                'invoice_number' => $invoice->invoice_number,
-                                'status' => $invoice->status,
-                                'due_date' => $invoice->due_date?->toDateString(),
-                            ];
-                        }
-                    }
-                }
-
+        // Append unmatched plan terms as projected — no semester assigned to avoid false inference
+        $projectedItems = $tuitionPlan->terms
+            ->filter(fn (TuitionPlanTerm $term) => ! in_array($term->id, $usedPlanTermIds))
+            ->map(function (TuitionPlanTerm $term) use ($scholarshipAward) {
+                $isWaived = (float) $term->amount === 0.0;
                 $discountAmount = 0.0;
                 $isEstimatedDiscount = false;
 
-                if ($linkedCharge) {
-                    $linkedInvoiceIds = $linkedCharge->invoiceLines
-                        ->pluck('invoice_id')
-                        ->filter()
-                        ->unique();
-
-                    $discountAmount = (float) $invoices
-                        ->whereIn('id', $linkedInvoiceIds)
-                        ->sum(fn (StudentInvoice $invoice) => $this->deriveInvoiceSnapshot($invoice)['discount']);
-                } elseif ($inferredSemester) {
-                    $discountAmount = (float) $invoices
-                        ->where('semester_id', $inferredSemester->id)
-                        ->sum(fn (StudentInvoice $invoice) => $this->deriveInvoiceSnapshot($invoice)['discount']);
-                }
-
-                if ($discountAmount === 0.0 && $scholarshipAward?->scholarshipDefinition) {
+                if (! $isWaived && $scholarshipAward?->scholarshipDefinition) {
                     $scholarship = $scholarshipAward->scholarshipDefinition;
                     $discountAmount = $scholarship->type === 'percentage'
-                        ? ($term->amount * $scholarship->amount) / 100
+                        ? ((float) $term->amount * $scholarship->amount) / 100
                         : (float) $scholarship->amount;
                     $isEstimatedDiscount = $discountAmount > 0;
                 }
 
-                $amountDue = max(0, (float) $term->amount - $discountAmount);
-                $paymentStatus = 'not_generated';
-
-                if ($generated) {
-                    if ($amountDue <= 0 || $paidAmount >= $amountDue) {
-                        $paymentStatus = 'paid';
-                    } elseif ($paidAmount > 0) {
-                        $paymentStatus = 'partial';
-                    } else {
-                        $paymentStatus = 'unpaid';
-                    }
-                }
-
                 return [
                     'term_number' => $term->term_number,
-                    'semester_id' => $inferredSemester?->id,
-                    'semester_name' => $inferredSemester?->name ?? 'Term '.$term->term_number,
+                    'semester_id' => null,
+                    'semester_name' => null, // Intentionally null: no semester inferred for ungenerated terms
                     'required_amount' => (float) $term->amount,
                     'discount_amount' => $discountAmount,
                     'is_estimated_discount' => $isEstimatedDiscount,
-                    'amount_due' => $amountDue,
-                    'paid_amount' => $paidAmount,
-                    'generated' => $generated,
-                    'charge_id' => $linkedCharge?->id,
-                    'payment_status' => $paymentStatus,
-                    'invoices' => $linkedInvoiceDetails,
+                    'amount_due' => max(0, (float) $term->amount - $discountAmount),
+                    'paid_amount' => 0.0,
+                    'generated' => false,
+                    'charge_id' => null,
+                    'payment_status' => $isWaived ? 'waived' : 'not_generated',
+                    'invoices' => [],
                 ];
-            })->values(),
+            })->values();
+
+        return [
+            'plan_id' => $tuitionPlan->id,
+            'plan_name' => $tuitionPlan->curriculumVersion->program->name.' ('.$tuitionPlan->curriculumVersion->version_code.')',
+            'terms' => $generatedItems->concat($projectedItems),
         ];
     }
 

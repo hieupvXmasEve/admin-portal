@@ -5,8 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { Student } from '@/types/models';
+import { Link } from '@inertiajs/vue3';
 import { AlertTriangle, CheckCircle, CircleDollarSign, Clock, CreditCard, FileText, ListChecks, XCircle } from 'lucide-vue-next';
 import { computed } from 'vue';
+import { route } from 'ziggy-js';
 
 interface FeeSummary {
     student_info: {
@@ -109,11 +111,12 @@ interface FeeSummary {
         }>;
     }>;
     tuition_plan_checklist: {
+        plan_id: number;
         plan_name: string;
         terms: Array<{
             term_number: number;
             semester_id: number | null;
-            semester_name: string;
+            semester_name: string | null;
             required_amount: number;
             discount_amount: number;
             is_estimated_discount?: boolean;
@@ -212,6 +215,7 @@ const getChecklistPaymentBadge = (status: string) => {
         partial: { label: 'Partial', class: 'text-amber-600 bg-amber-50 border-amber-200', icon: Clock },
         unpaid: { label: 'Unpaid', class: 'text-red-600 bg-red-50 border-red-200', icon: XCircle },
         not_generated: { label: 'Pending', class: 'text-gray-400 bg-gray-50 border-gray-200', icon: Clock },
+        waived: { label: 'Không cần tạo phí', class: 'text-slate-500 bg-slate-50 border-slate-200', icon: CheckCircle },
     };
 
     return variants[status] || variants.not_generated;
@@ -652,7 +656,14 @@ const summaryToneClass = computed(() => {
                     <CardHeader class="bg-muted/20 space-y-3 pb-3">
                         <CardTitle class="text-sm font-medium">
                             <span class="text-muted-foreground mb-1 block uppercase">Active Plan</span>
-                            {{ feeSummary.tuition_plan_checklist?.plan_name || 'No Active Plan' }}
+                            <Link
+                                v-if="feeSummary.tuition_plan_checklist"
+                                :href="route('tuition-plans.show', feeSummary.tuition_plan_checklist.plan_id)"
+                                class="text-blue-500 transition-colors hover:underline"
+                            >
+                                {{ feeSummary.tuition_plan_checklist.plan_name }}
+                            </Link>
+                            <span v-else>No Active Plan</span>
                         </CardTitle>
                         <div class="space-y-2">
                             <Badge variant="outline" class="bg-background w-fit text-[10px]">
@@ -665,11 +676,13 @@ const summaryToneClass = computed(() => {
                         <div v-if="!feeSummary.tuition_plan_checklist" class="text-muted-foreground p-4 text-sm italic">No active tuition plan assigned.</div>
 
                         <div v-else class="divide-y">
-                            <div v-for="term in feeSummary.tuition_plan_checklist.terms" :key="term.term_number" class="hover:bg-muted/50 p-4 transition-colors">
+                            <div v-for="term in feeSummary.tuition_plan_checklist.terms" :key="term.charge_id ?? `proj-${term.term_number}`" class="hover:bg-muted/50 p-4 transition-colors">
                                 <div class="mb-2 flex items-start justify-between">
                                     <div>
-                                        <div class="text-sm font-semibold">Term {{ term.term_number }}</div>
-                                        <div class="text-muted-foreground">{{ term.semester_name }}</div>
+                                        <div class="text-sm font-semibold">Term {{ term.term_number ?? '—' }}</div>
+                                        <div class="text-muted-foreground">
+                                            {{ term.semester_name ?? 'Dự kiến' }}
+                                        </div>
                                     </div>
                                     <div class="text-right">
                                         <div class="text-primary font-mono text-sm font-semibold">
@@ -693,9 +706,9 @@ const summaryToneClass = computed(() => {
 
                                 <div class="mt-3 flex flex-wrap items-center gap-2">
                                     <Badge v-if="term.generated" variant="outline" class="border-blue-200 bg-blue-50 text-[10px] text-blue-700"> Generated </Badge>
-                                    <Badge v-else variant="outline" class="bg-gray-100 text-[10px] text-gray-500"> Not Generated </Badge>
+                                    <Badge v-else-if="term.payment_status !== 'waived'" variant="outline" class="bg-gray-100 text-[10px] text-gray-500"> Not Generated </Badge>
 
-                                    <Badge v-if="term.generated" :class="`border text-[10px] ${getChecklistPaymentBadge(term.payment_status).class}`" variant="outline">
+                                    <Badge v-if="term.generated || term.payment_status === 'waived'" :class="`border text-[10px] ${getChecklistPaymentBadge(term.payment_status).class}`" variant="outline">
                                         <component :is="getChecklistPaymentBadge(term.payment_status).icon" class="mr-1 inline h-3 w-3" />
                                         {{ getChecklistPaymentBadge(term.payment_status).label }}
                                     </Badge>
