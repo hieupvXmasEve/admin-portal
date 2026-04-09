@@ -6,7 +6,6 @@ namespace App\Modules\Finance\Queries\Operations;
 
 use App\Models\FinanceCharge;
 use App\Models\InvoiceDiscount;
-use App\Models\InvoiceLine;
 use App\Models\Student;
 use App\Models\StudentInvoice;
 use App\Models\StudentScholarshipAward;
@@ -173,15 +172,18 @@ class PreviewChargeGenerationQuery
                         $existingTuitionCharge = $this->findExistingCharge($student, $semesterId, FinanceCharge::TYPE_TUITION_TERM);
 
                         if ($existingTuitionCharge) {
-                            $scholarshipPreview = $this->buildScholarshipPreview(
-                                $reusableInvoice,
-                                $student->scholarshipAward,
-                                (float) $existingTuitionCharge->amount,
-                            );
-
-                            if ($scholarshipPreview !== null) {
-                                $breakdown[] = $scholarshipPreview;
-                                $studentTotal -= abs((float) $scholarshipPreview['amount']);
+                            // Only preview scholarship update when there is a reusable invoice to mutate;
+                            // without one the student will be skipped in generation entirely.
+                            if ($reusableInvoice) {
+                                $scholarshipPreview = $this->buildScholarshipPreview(
+                                    $reusableInvoice,
+                                    $student->scholarshipAward,
+                                    (float) $existingTuitionCharge->amount,
+                                );
+                                if ($scholarshipPreview !== null) {
+                                    $breakdown[] = $scholarshipPreview;
+                                    $studentTotal -= abs((float) $scholarshipPreview['amount']);
+                                }
                             }
                         } else {
                             $breakdown[] = ['label' => 'Tuition (Major)', 'amount' => $amount];
@@ -193,7 +195,6 @@ class PreviewChargeGenerationQuery
                                 $student->scholarshipAward,
                                 $amount,
                             );
-
                             if ($scholarshipPreview !== null) {
                                 $breakdown[] = $scholarshipPreview;
                                 $studentTotal -= abs((float) $scholarshipPreview['amount']);
@@ -311,35 +312,31 @@ class PreviewChargeGenerationQuery
             ->first();
     }
 
+    /**
+     * Build scholarship discount preview entry.
+     * No expiry check — business rule: scholarship applies to all semesters.
+     * No invoice required — works for both new and existing students.
+     */
     private function buildScholarshipPreview(
         ?StudentInvoice $invoice,
         ?StudentScholarshipAward $award,
         float $baseAmount,
     ): ?array {
-        if (! $invoice || ! $award || $baseAmount <= 0) {
+        if (! $award || $baseAmount <= 0) {
             return null;
         }
 
-        $hasTuitionLine = InvoiceLine::query()
-            ->where('invoice_id', $invoice->id)
-            ->whereHas('charge', function ($query) {
-                $query->where('charge_type', FinanceCharge::TYPE_TUITION_TERM)
-                    ->where('status', FinanceCharge::STATUS_ACTIVE);
-            })
-            ->exists();
+        // If invoice already exists, prevent showing duplicate scholarship discount
+        if ($invoice) {
+            $alreadyApplied = InvoiceDiscount::query()
+                ->where('invoice_id', $invoice->id)
+                ->where('discount_type', 'scholarship')
+                ->where('reference_id', $award->id)
+                ->exists();
 
-        if (! $hasTuitionLine) {
-            return null;
-        }
-
-        $existingScholarshipDiscount = InvoiceDiscount::query()
-            ->where('invoice_id', $invoice->id)
-            ->where('discount_type', 'scholarship')
-            ->where('reference_id', $award->id)
-            ->exists();
-
-        if ($existingScholarshipDiscount) {
-            return null;
+            if ($alreadyApplied) {
+                return null;
+            }
         }
 
         $scholarshipDef = $award->scholarshipDefinition;

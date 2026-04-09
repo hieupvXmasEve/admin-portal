@@ -95,7 +95,6 @@ class GenerateBatchChargesAction
 
                     $reusableInvoice = self::findReusableInvoice($student->id, $semesterId);
                     $existingTuitionCharge = null;
-                    $tuitionScholarshipPendingDiscount = null;
 
                     // Pre-calculation to decide if we should create an invoice
                     $shouldGenInvoice = false;
@@ -151,12 +150,6 @@ class GenerateBatchChargesAction
                                 if (! $existingTuitionCharge) {
                                     $potentialAmount = $amt;
                                     $shouldGenInvoice = true;
-                                } elseif ($reusableInvoice && self::invoiceHasActiveTuitionLine($reusableInvoice)) {
-                                    $tuitionScholarshipPendingDiscount = self::resolveScholarshipDiscountPayload(
-                                        $reusableInvoice,
-                                        $student->scholarshipAward,
-                                        (float) $existingTuitionCharge->amount,
-                                    );
                                 }
                             }
                         }
@@ -266,14 +259,13 @@ class GenerateBatchChargesAction
                                     $hasInvoiceMutation = true;
                                 }
 
-                                $scholarshipDiscount = $charge
-                                    ? self::resolveScholarshipDiscountPayload(
-                                        $invoice,
-                                        $student->scholarshipAward,
-                                        (float) $charge->amount,
-                                    )
-                                    : $tuitionScholarshipPendingDiscount;
-
+                                // Apply scholarship discount regardless of expiry — business rule: scholarship applies to all semesters
+                                $chargeAmountForScholarship = $charge ? (float) $charge->amount : (float) $existingTuitionCharge->amount;
+                                $scholarshipDiscount = self::resolveScholarshipDiscountPayload(
+                                    $invoice,
+                                    $student->scholarshipAward,
+                                    $chargeAmountForScholarship,
+                                );
                                 if ($scholarshipDiscount !== null) {
                                     $pendingDiscounts[] = $scholarshipDiscount;
                                     $hasInvoiceMutation = true;
@@ -452,17 +444,10 @@ class GenerateBatchChargesAction
         ]);
     }
 
-    private static function invoiceHasActiveTuitionLine(StudentInvoice $invoice): bool
-    {
-        return InvoiceLine::query()
-            ->where('invoice_id', $invoice->id)
-            ->whereHas('charge', function ($query) {
-                $query->where('charge_type', FinanceCharge::TYPE_TUITION_TERM)
-                    ->where('status', FinanceCharge::STATUS_ACTIVE);
-            })
-            ->exists();
-    }
-
+    /**
+     * Resolve scholarship discount payload for a tuition charge.
+     * No expiry check — business rule: scholarship applies across all semesters.
+     */
     private static function resolveScholarshipDiscountPayload(
         StudentInvoice $invoice,
         ?StudentScholarshipAward $award,
