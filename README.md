@@ -78,21 +78,26 @@ Verified behavior:
 composer install
 npm ci
 cp .env.example .env
-php artisan key:generate
-php artisan migrate
-composer dev
+./scripts/dev.sh start
+./scripts/dev.sh artisan key:generate
+./scripts/dev.sh artisan migrate
 ```
+
+Local note:
+- Backend/app commands are expected to run inside Docker via `./scripts/dev.sh ...`.
+- Prefer `./scripts/dev.sh artisan ...`, `./scripts/dev.sh composer ...`, `./scripts/dev.sh npm ...`, and `./scripts/dev.sh test ...`.
 
 ## Common Commands
 
 ```bash
-composer dev
-npm run dev
-npm run build
-npm run lint
-npm run format:check
-npm run type-check
-php artisan test
+./scripts/dev.sh start
+./scripts/dev.sh status
+./scripts/dev.sh npm run dev
+./scripts/dev.sh npm run build
+./scripts/dev.sh npm run lint
+./scripts/dev.sh npm run format:check
+./scripts/dev.sh npm run type-check
+./scripts/dev.sh test
 ```
 
 ## Current Quality Gates Status

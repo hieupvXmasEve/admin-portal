@@ -26,28 +26,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 2. Commands You May Need
 
 ```bash
-# Dev everything (starts server, queue, logs, vite)
-composer dev
+# Dev stack via Docker
+./scripts/dev.sh start
+./scripts/dev.sh stop
+./scripts/dev.sh status
+./scripts/dev.sh logs app
 
-# PHP tests
-composer test          # Run all
-php artisan test       # Run pest
-./vendor/bin/pest      # Run pest directly
+# Backend commands must run inside Docker
+./scripts/dev.sh artisan migrate
+./scripts/dev.sh artisan queue:work
+./scripts/dev.sh composer test
+./scripts/dev.sh test
+./scripts/dev.sh test --filter=Dng
 
 # TS type check
-pnpm run type-check
-pnpm run vue-tsc --noEmit
+./scripts/dev.sh npm run type-check
+./scripts/dev.sh npm run vue-tsc --noEmit
 
 # Frontend build/lint/format
-pnpm run dev
-pnpm run build
-pnpm run lint
-pnpm run format
-pnpm run format:check
+./scripts/dev.sh npm run dev
+./scripts/dev.sh npm run build
+./scripts/dev.sh npm run lint
+./scripts/dev.sh npm run format
+./scripts/dev.sh npm run format:check
 
 # PHP format
-./vendor/bin/pint
+./scripts/dev.sh artisan pint
 ```
+
+## 2.1 Docker Rule
+
+This repo uses Docker for local runtime and tests.
+
+- Do not assume `php`, `composer`, `npm`, or `pnpm` are available on the host.
+- Prefer `./scripts/dev.sh ...` wrappers for all local commands.
+- For backend verification, run tests and artisan commands in the `app` container via `./scripts/dev.sh`.
+- If direct `docker compose` is needed, use `docker/docker-compose.dev.yml` and the dev project name managed by `./scripts/dev.sh`.
 
 ## 3. Workflow You Must Follow
 

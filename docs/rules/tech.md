@@ -36,52 +36,65 @@ alwaysApply: true
 ### Development Environment
 
 ```bash
-# Traditional development (without Docker)
-composer dev
+# Start Docker dev stack
+./scripts/dev.sh start
+
+# Stop Docker dev stack
+./scripts/dev.sh stop
+
+# Inspect Docker dev stack
+./scripts/dev.sh status
 
 # Frontend development with hot reload
-npm run dev
+./scripts/dev.sh npm run dev
 ```
+
+### Docker-First Rule
+
+- Local backend runtime is Docker-based.
+- Do not assume `php`, `composer`, `npm`, or `pnpm` are installed on the host machine.
+- Prefer `./scripts/dev.sh artisan ...`, `./scripts/dev.sh composer ...`, `./scripts/dev.sh npm ...`, and `./scripts/dev.sh test ...`.
+- Use direct host commands only when the task is explicitly host-only.
 
 ### Testing
 
 ```bash
 # Run all PHP tests
-php artisan test
+./scripts/dev.sh test
 
 # Run specific test file
-php artisan test tests/Feature/UserControllerTest.php
+./scripts/dev.sh test tests/Feature/UserControllerTest.php
 
 # Frontend type checking
-npm run type-check
+./scripts/dev.sh npm run type-check
 
 # Linting and formatting
-npm run lint
-npm run format
+./scripts/dev.sh npm run lint
+./scripts/dev.sh npm run format
 ```
 
 ### Database
 
 ```bash
 # Run migrations
-php artisan migrate
+./scripts/dev.sh artisan migrate
 
 # Seed database
-php artisan db:seed
+./scripts/dev.sh artisan db:seed
 
 # Fresh migration with seeding
-php artisan migrate:fresh --seed
+./scripts/dev.sh artisan migrate:fresh --seed
 ```
 
 ### Code Generation
 
 ```bash
 # Create controller
-php artisan make:controller UserController --resource
+./scripts/dev.sh artisan make:controller UserController --resource
 
 # Create model with migration and factory
-php artisan make:model User -mf
+./scripts/dev.sh artisan make:model User -mf
 
 # Create module routes
-php artisan make:module-routes users UserController
+./scripts/dev.sh artisan make:module-routes users UserController
 ```
