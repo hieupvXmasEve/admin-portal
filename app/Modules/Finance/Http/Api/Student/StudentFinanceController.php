@@ -252,7 +252,7 @@ class StudentFinanceController extends Controller
         }
 
         $validated = $request->validate([
-            'status' => 'nullable|string|in:pending,pushed_to_dng,paid_uninvoiced,paid_invoiced,reconciled,failed',
+            'status' => 'nullable|string|in:pending,pushed_to_dng,paid_uninvoiced,paid_invoiced,reconciled,failed,cancelled',
         ]);
 
         $query = DngPaymentRequest::where('student_id', $student->id)

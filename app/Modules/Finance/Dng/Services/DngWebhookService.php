@@ -69,6 +69,12 @@ class DngWebhookService
             return;
         }
 
+        if ($request->status === DngPaymentRequest::STATUS_CANCELLED) {
+            $event->markSkipped('Request was superseded and cancelled before this callback arrived');
+
+            return;
+        }
+
         // Determine target state based on event type
         $eventType = $event->event_type;
         $targetStatus = $eventType === DngWebhookEvent::EVENT_PAYMENT_INVOICED
@@ -210,6 +216,7 @@ class DngWebhookService
             DngPaymentRequest::STATUS_PAID_INVOICED => 3,
             DngPaymentRequest::STATUS_RECONCILED => 4,
             DngPaymentRequest::STATUS_FAILED => -1,
+            DngPaymentRequest::STATUS_CANCELLED => -2,
             default => 0,
         };
     }

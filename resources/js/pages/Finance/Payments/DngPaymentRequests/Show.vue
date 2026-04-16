@@ -62,6 +62,8 @@ const getStatusClass = (status: string) => {
     switch (status) {
         case 'failed':
             return 'bg-red-50 text-red-700 border-red-200';
+        case 'cancelled':
+            return 'bg-slate-100 text-slate-700 border-slate-300';
         case 'reconciled':
         case 'paid_invoiced':
             return 'bg-green-50 text-green-700 border-green-200';

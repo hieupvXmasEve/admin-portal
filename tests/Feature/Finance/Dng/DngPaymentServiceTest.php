@@ -11,6 +11,7 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Services\PaymentService;
+use App\Modules\Notification\Actions\PublishDomainEventAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -44,6 +45,14 @@ beforeEach(function () {
         ])
         ->create();
 });
+
+function makeDngPaymentService(DngClient $dngClientMock, PaymentService $paymentServiceMock): DngPaymentService
+{
+    $publishDomainEventActionMock = Mockery::mock(PublishDomainEventAction::class);
+    $publishDomainEventActionMock->shouldIgnoreMissing();
+
+    return new DngPaymentService($dngClientMock, $paymentServiceMock, $publishDomainEventActionMock);
+}
 
 it('stores the exact DNG insert payload on successful push', function () {
     $chargeData = [
@@ -82,7 +91,7 @@ it('stores the exact DNG insert payload on successful push', function () {
 
     $paymentServiceMock = Mockery::mock(PaymentService::class);
 
-    $service = new DngPaymentService($dngClientMock, $paymentServiceMock);
+    $service = makeDngPaymentService($dngClientMock, $paymentServiceMock);
 
     $request = $service->createAndPush($this->student, $chargeData);
 
@@ -93,6 +102,86 @@ it('stores the exact DNG insert payload on successful push', function () {
         ->and((float) $request->push_payload['Amount'])->toBe((float) $expectedPayload['Amount'])
         ->and($request->dng_transaction_id)->toBe('TXN001')
         ->and($request->dng_payment_id)->toBe('PAY001');
+});
+
+it('cancels previous unpaid requests of the same fee type after successful push', function () {
+    DngPaymentRequest::query()->create([
+        'student_id' => $this->student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'STU001',
+        'fee_type' => 'HP',
+        'description' => 'Old pending request',
+        'item_id' => 'OLD-PENDING',
+        'amount' => 9000,
+        'status' => DngPaymentRequest::STATUS_PENDING,
+    ]);
+
+    DngPaymentRequest::query()->create([
+        'student_id' => $this->student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'STU001',
+        'fee_type' => 'HP',
+        'description' => 'Old pushed request',
+        'item_id' => 'OLD-PUSHED',
+        'amount' => 10000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+    ]);
+
+    DngPaymentRequest::query()->create([
+        'student_id' => $this->student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'STU001',
+        'fee_type' => 'OTHER',
+        'description' => 'Different fee type',
+        'item_id' => 'KEEP-OTHER',
+        'amount' => 8000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+    ]);
+
+    $chargeData = [
+        'campus_code' => 'FAUHN',
+        'student_code' => 'STU001',
+        'fee_type' => 'HP',
+        'description' => 'Replacement request',
+        'item_id' => 'NEW-ITEM',
+        'amount' => '11000.0',
+        'type' => 'payment',
+        'student_name' => 'Test Student',
+        'email' => 'student@example.com',
+        'estimate_time' => '2026-03-27 09:00:00',
+        'student_address' => '123 Test Street',
+        'cccd' => '012345678901',
+    ];
+
+    $dngClient = app(DngClient::class);
+    $expectedPayload = $dngClient->buildInsertNewRecordPayload($chargeData);
+
+    $dngClientMock = Mockery::mock(DngClient::class);
+    $dngClientMock->shouldReceive('buildInsertNewRecordPayload')
+        ->once()
+        ->with($chargeData)
+        ->andReturn($expectedPayload);
+    $dngClientMock->shouldReceive('insertNewRecord')
+        ->once()
+        ->with($chargeData, $expectedPayload)
+        ->andReturn([
+            'data' => [
+                'Id' => 'REC002',
+                'TransactionID' => 'TXN002',
+                'PaymentId' => 'PAY002',
+            ],
+        ]);
+
+    $paymentServiceMock = Mockery::mock(PaymentService::class);
+
+    $service = makeDngPaymentService($dngClientMock, $paymentServiceMock);
+
+    $request = $service->createAndPush($this->student, $chargeData);
+
+    expect($request->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG)
+        ->and(DngPaymentRequest::query()->where('item_id', 'OLD-PENDING')->value('status'))->toBe(DngPaymentRequest::STATUS_CANCELLED)
+        ->and(DngPaymentRequest::query()->where('item_id', 'OLD-PUSHED')->value('status'))->toBe(DngPaymentRequest::STATUS_CANCELLED)
+        ->and(DngPaymentRequest::query()->where('item_id', 'KEEP-OTHER')->value('status'))->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
 });
 
 it('stores the exact DNG insert payload when push fails', function () {
@@ -126,7 +215,7 @@ it('stores the exact DNG insert payload when push fails', function () {
 
     $paymentServiceMock = Mockery::mock(PaymentService::class);
 
-    $service = new DngPaymentService($dngClientMock, $paymentServiceMock);
+    $service = makeDngPaymentService($dngClientMock, $paymentServiceMock);
 
     expect(fn () => $service->createAndPush($this->student, $chargeData))
         ->toThrow(RuntimeException::class, 'DNG unavailable');
@@ -139,6 +228,69 @@ it('stores the exact DNG insert payload when push fails', function () {
         ->toMatchArray($expectedPayload)
         ->and((float) $request->push_payload['Amount'])->toBe((float) $expectedPayload['Amount'])
         ->and($request->error_message)->toBe('DNG unavailable');
+});
+
+it('keeps previous unpaid requests unchanged when replacement push fails', function () {
+    DngPaymentRequest::query()->create([
+        'student_id' => $this->student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'STU001',
+        'fee_type' => 'HP',
+        'description' => 'Old pending request',
+        'item_id' => 'OLD-PENDING',
+        'amount' => 9000,
+        'status' => DngPaymentRequest::STATUS_PENDING,
+    ]);
+
+    DngPaymentRequest::query()->create([
+        'student_id' => $this->student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'STU001',
+        'fee_type' => 'HP',
+        'description' => 'Old pushed request',
+        'item_id' => 'OLD-PUSHED',
+        'amount' => 10000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+    ]);
+
+    $chargeData = [
+        'campus_code' => 'FAUHN',
+        'student_code' => 'STU001',
+        'fee_type' => 'HP',
+        'description' => 'Replacement request',
+        'item_id' => 'NEW-ITEM',
+        'amount' => '11000.0',
+        'type' => 'payment',
+        'student_name' => 'Test Student',
+        'email' => 'student@example.com',
+        'estimate_time' => '2026-03-27 09:00:00',
+        'student_address' => '123 Test Street',
+        'cccd' => null,
+    ];
+
+    $dngClient = app(DngClient::class);
+    $expectedPayload = $dngClient->buildInsertNewRecordPayload($chargeData);
+
+    $dngClientMock = Mockery::mock(DngClient::class);
+    $dngClientMock->shouldReceive('buildInsertNewRecordPayload')
+        ->once()
+        ->with($chargeData)
+        ->andReturn($expectedPayload);
+    $dngClientMock->shouldReceive('insertNewRecord')
+        ->once()
+        ->with($chargeData, $expectedPayload)
+        ->andThrow(new RuntimeException('DNG unavailable'));
+
+    $paymentServiceMock = Mockery::mock(PaymentService::class);
+
+    $service = makeDngPaymentService($dngClientMock, $paymentServiceMock);
+
+    expect(fn () => $service->createAndPush($this->student, $chargeData))
+        ->toThrow(RuntimeException::class, 'DNG unavailable');
+
+    expect(DngPaymentRequest::query()->where('item_id', 'OLD-PENDING')->value('status'))->toBe(DngPaymentRequest::STATUS_PENDING)
+        ->and(DngPaymentRequest::query()->where('item_id', 'OLD-PUSHED')->value('status'))->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG)
+        ->and(DngPaymentRequest::query()->where('item_id', 'NEW-ITEM')->value('status'))->toBe(DngPaymentRequest::STATUS_FAILED);
 });
 
 it('returns qr access data without storing qr payload', function () {
@@ -168,7 +320,7 @@ it('returns qr access data without storing qr payload', function () {
 
     $paymentServiceMock = Mockery::mock(PaymentService::class);
 
-    $service = new DngPaymentService($dngClientMock, $paymentServiceMock);
+    $service = makeDngPaymentService($dngClientMock, $paymentServiceMock);
 
     $response = $service->createQrAccess($request, ['HP']);
 
@@ -204,7 +356,7 @@ it('returns installment access data without storing qr payload', function () {
 
     $paymentServiceMock = Mockery::mock(PaymentService::class);
 
-    $service = new DngPaymentService($dngClientMock, $paymentServiceMock);
+    $service = makeDngPaymentService($dngClientMock, $paymentServiceMock);
 
     $response = $service->createInstallmentAccess($request, ['HP']);
 

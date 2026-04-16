@@ -165,6 +165,7 @@ const statusVariant = computed(() => {
     const s = dngResponse.value?.status;
     if (s === 'pushed_to_dng') return 'secondary';
     if (s === 'paid_uninvoiced' || s === 'paid_invoiced') return 'default';
+    if (s === 'cancelled') return 'outline';
     if (s === 'failed') return 'destructive';
     return 'outline';
 });
@@ -176,6 +177,7 @@ const statusLabel = computed(() => {
         paid_uninvoiced: 'Đã thanh toán',
         paid_invoiced: 'Đã xuất hóa đơn',
         reconciled: 'Đã đối soát',
+        cancelled: 'Đã hủy',
         failed: 'Thất bại',
     };
     return map[dngResponse.value?.status ?? ''] ?? dngResponse.value?.status;
@@ -302,14 +304,14 @@ const statusLabel = computed(() => {
                             <!-- Item ID -->
                             <div class="space-y-2">
                                 <Label for="item_id">Mã khoản phí *</Label>
-                                <Input v-model="itemId" placeholder="Mã định danh khoản phí" />
+                                <Input v-model="itemId" disabled placeholder="Mã định danh khoản phí" />
                             </div>
 
                             <!-- Estimate Time (MM/YY format per DNG spec) -->
                             <div class="space-y-2">
                                 <Label for="estimate_time">Thời hạn thanh toán (MM/YY)</Label>
                                 <Input v-model="estimateTime" placeholder="05/26" />
-                                <p class="text-muted-foreground text-xs">Tháng/năm hết hạn, VD: 05/26</p>
+                                <p class="text-muted-foreground text-xs">Tháng/năm phân bổ, VD: 05/26</p>
                             </div>
                         </div>
 

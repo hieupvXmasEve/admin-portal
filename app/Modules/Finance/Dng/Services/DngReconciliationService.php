@@ -121,6 +121,16 @@ class DngReconciliationService
             return;
         }
 
+        if ($request->status === DngPaymentRequest::STATUS_CANCELLED) {
+            Log::info('DNG reconciliation: skipped cancelled request', [
+                'dng_payment_request_id' => $request->id,
+                'dng_payment_id' => $dngPaymentId,
+            ]);
+            $summary['up_to_date']++;
+
+            return;
+        }
+
         // Check if local record needs updating
         $hasInvoice = filled($txn['InvoiceSerialNumber'] ?? null)
             && filled($txn['InvoiceDate'] ?? null);
@@ -198,6 +208,7 @@ class DngReconciliationService
             DngPaymentRequest::STATUS_PAID_INVOICED => 3,
             DngPaymentRequest::STATUS_RECONCILED => 4,
             DngPaymentRequest::STATUS_FAILED => -1,
+            DngPaymentRequest::STATUS_CANCELLED => -2,
         ];
     }
 }

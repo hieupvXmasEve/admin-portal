@@ -25,7 +25,7 @@ class ListCampusRequest extends FormRequest
     {
         return [
             'search' => ['nullable', 'string', 'max:255'],
-            'sort' => ['nullable', 'string', 'in:name,code,address,created_at'],
+            'sort' => ['nullable', 'string', 'in:name,code,dng_code,address,created_at'],
             'direction' => ['nullable', 'string', 'in:asc,desc'],
             'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
         ];

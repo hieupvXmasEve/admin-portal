@@ -209,6 +209,29 @@ it('handles callback 2 arriving before callback 1 and skips to paid_invoiced', f
     expect($dngPaymentRequest->invoice_serial_number)->toBe('INV-2024-001');
 });
 
+it('skips callback processing for cancelled requests', function () {
+    $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY001', 5000000);
+    $dngPaymentRequest->update(['status' => DngPaymentRequest::STATUS_CANCELLED]);
+
+    $event = createWebhookEvent($dngPaymentRequest, DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE);
+
+    $mockPaymentService = Mockery::mock(DngPaymentService::class);
+    $mockPaymentService->shouldNotReceive('bridgeToPayment');
+
+    app()->instance(DngPaymentService::class, $mockPaymentService);
+
+    $job = new ProcessDngWebhookJob($event->id);
+    $job->handle(app(App\Modules\Finance\Dng\Services\DngWebhookService::class));
+
+    $dngPaymentRequest->refresh();
+    expect($dngPaymentRequest->status)->toBe(DngPaymentRequest::STATUS_CANCELLED)
+        ->and($dngPaymentRequest->payment_id)->toBeNull();
+
+    $event->refresh();
+    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_SKIPPED)
+        ->and($event->error_message)->toContain('cancelled');
+});
+
 it('marks event as mismatch when amount differs', function () {
     $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY001', 5000000);
 

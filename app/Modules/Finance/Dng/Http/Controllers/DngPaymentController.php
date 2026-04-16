@@ -7,7 +7,7 @@ namespace App\Modules\Finance\Dng\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Modules\Finance\Dng\Http\Requests\CreateDngPaymentFormRequest;
-use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use Illuminate\Http\JsonResponse;
 
@@ -15,6 +15,7 @@ class DngPaymentController extends Controller
 {
     public function __construct(
         protected DngPaymentService $dngPaymentService,
+        protected DngCampusCodeResolver $dngCampusCodeResolver,
     ) {}
 
     /**
@@ -32,7 +33,7 @@ class DngPaymentController extends Controller
         $student = $studentQuery->firstOrFail();
 
         $chargeData = array_merge($validated, [
-            'campus_code' => (string) config('services.dng.campus_code'),
+            'campus_code' => $this->dngCampusCodeResolver->requireForStudent($student),
             'student_code' => $student->student_id,
             'type' => (string) ($validated['type'] ?? $validated['fee_type']),
             'student_name' => $student->full_name,

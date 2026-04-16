@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Requests\Campus;
 
 use Illuminate\Foundation\Http\FormRequest;
@@ -24,6 +26,7 @@ class StoreCampusRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:255', 'unique:campuses,code'],
+            'dng_code' => ['nullable', 'string', 'max:255', 'unique:campuses,dng_code'],
             'address' => ['required', 'string'],
         ];
     }
@@ -39,6 +42,8 @@ class StoreCampusRequest extends FormRequest
             'code.required' => 'Campus code is required',
             'code.max' => 'Campus code must not exceed 255 characters',
             'code.unique' => 'Campus code already exists',
+            'dng_code.max' => 'DNG code must not exceed 255 characters',
+            'dng_code.unique' => 'DNG code already exists',
             'address.required' => 'Campus address is required',
         ];
     }
@@ -51,6 +56,7 @@ class StoreCampusRequest extends FormRequest
         return [
             'name' => 'campus name',
             'code' => 'campus code',
+            'dng_code' => 'DNG code',
             'address' => 'campus address',
         ];
     }

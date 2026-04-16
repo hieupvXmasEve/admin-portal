@@ -174,6 +174,7 @@ class ListDngPaymentRequestsQuery
             'paid_uninvoiced_count' => (clone $query)->where('status', DngPaymentRequest::STATUS_PAID_UNINVOICED)->count(),
             'paid_invoiced_count' => (clone $query)->where('status', DngPaymentRequest::STATUS_PAID_INVOICED)->count(),
             'failed_count' => (clone $query)->where('status', DngPaymentRequest::STATUS_FAILED)->count(),
+            'cancelled_count' => (clone $query)->where('status', DngPaymentRequest::STATUS_CANCELLED)->count(),
             'bridged_count' => (clone $query)->whereNotNull('payment_id')->count(),
         ];
     }

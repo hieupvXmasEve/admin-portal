@@ -119,3 +119,38 @@ it('bridges paid requests during reconciliation when status is already up to dat
         'errors' => 0,
     ]);
 });
+
+it('skips bridging cancelled requests during reconciliation', function () {
+    $request = createReconciliationRequest($this->student, 'PAY001', 5000000);
+    $request->update(['status' => DngPaymentRequest::STATUS_CANCELLED]);
+
+    $mockClient = Mockery::mock(DngClient::class);
+    $mockClient->shouldReceive('checkPaidOfDay')
+        ->once()
+        ->with('CAMPUS001', '2026-03-26 21:10:00')
+        ->andReturn([
+            'data' => [[
+                'PaymentId' => 'PAY001',
+                'StudentId' => 'STU001',
+                'Amount' => '5000000',
+            ]],
+        ]);
+
+    $mockPaymentService = Mockery::mock(DngPaymentService::class);
+    $mockPaymentService->shouldNotReceive('bridgeToPayment');
+
+    $service = new DngReconciliationService($mockClient, $mockPaymentService);
+
+    $summary = $service->reconcileDay('CAMPUS001', '2026-03-26 21:10:00');
+
+    expect($summary)->toBe([
+        'backfilled' => 0,
+        'up_to_date' => 1,
+        'orphans' => 0,
+        'errors' => 0,
+    ]);
+
+    $request->refresh();
+    expect($request->status)->toBe(DngPaymentRequest::STATUS_CANCELLED)
+        ->and($request->payment_id)->toBeNull();
+});

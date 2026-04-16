@@ -24,6 +24,7 @@ const updateCampusSchema = toTypedSchema(
     z.object({
         name: z.string().min(1, 'Campus name is required').max(255, 'Campus name must not exceed 255 characters'),
         code: z.string().min(1, 'Campus code is required').max(255, 'Campus code must not exceed 255 characters'),
+        dng_code: z.string().max(255, 'DNG code must not exceed 255 characters').optional().nullable(),
         address: z.string().min(1, 'Campus address is required'),
     }),
 );
@@ -32,6 +33,7 @@ const updateCampusSchema = toTypedSchema(
 const inertiaForm = useForm({
     name: props.campus.name,
     code: props.campus.code,
+    dng_code: props.campus.dng_code ?? '',
     address: props.campus.address,
 });
 
@@ -100,6 +102,24 @@ const goBack = () => {
                             </FormLabel>
                             <FormControl>
                                 <Input v-bind="componentField" placeholder="e.g., HN, HCM, DN" class="font-mono" :disabled="inertiaForm.processing" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="dng_code">
+                        <FormItem>
+                            <FormLabel class="flex items-center gap-2">
+                                <Hash class="h-4 w-4" />
+                                DNG Code
+                            </FormLabel>
+                            <FormControl>
+                                <Input
+                                    v-bind="componentField"
+                                    placeholder="e.g., FAUHN"
+                                    class="font-mono"
+                                    :disabled="inertiaForm.processing"
+                                />
                             </FormControl>
                             <FormMessage />
                         </FormItem>

@@ -72,6 +72,7 @@ interface Props {
         paid_uninvoiced_count: number;
         paid_invoiced_count: number;
         failed_count: number;
+        cancelled_count: number;
         bridged_count: number;
     };
     filters: Filters;
@@ -87,6 +88,7 @@ const statusOptions = [
     { value: 'paid_invoiced', label: 'Paid Invoiced' },
     { value: 'reconciled', label: 'Reconciled' },
     { value: 'failed', label: 'Failed' },
+    { value: 'cancelled', label: 'Cancelled' },
 ];
 
 const yesNoOptions = [
@@ -139,6 +141,8 @@ const getRequestStatusClass = (status: string) => {
     switch (status) {
         case 'failed':
             return 'bg-red-50 text-red-700 border-red-200';
+        case 'cancelled':
+            return 'bg-slate-100 text-slate-700 border-slate-300';
         case 'reconciled':
         case 'paid_invoiced':
             return 'bg-green-50 text-green-700 border-green-200';
@@ -260,6 +264,7 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
                 <CardHeader class="pb-2"><CardTitle class="text-sm">Failed / Bridged</CardTitle></CardHeader>
                 <CardContent class="space-y-1">
                     <div class="flex items-center gap-2 text-lg font-semibold text-red-700"><XCircle class="h-5 w-5" />{{ stats.failed_count }}</div>
+                    <div class="text-muted-foreground text-sm">Cancelled {{ stats.cancelled_count }}</div>
                     <div class="text-muted-foreground text-sm">Bridged {{ stats.bridged_count }}</div>
                 </CardContent>
             </Card>

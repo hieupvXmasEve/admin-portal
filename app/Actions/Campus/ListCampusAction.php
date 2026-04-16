@@ -33,6 +33,7 @@ class ListCampusAction
                 $query->where(function ($q) use ($term) {
                         $q->where('name', 'like', "%{$term}%")
                             ->orWhere('code', 'like', "%{$term}%")
+                            ->orWhere('dng_code', 'like', "%{$term}%")
                             ->orWhere('address', 'like', "%{$term}%");
                     });
                 })

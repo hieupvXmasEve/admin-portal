@@ -6,15 +6,18 @@ namespace App\Modules\Finance\Dng\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Student;
+use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
 
 class BatchDngApiController extends Controller
 {
     public function __construct(
         protected DngPaymentService $dngPaymentService,
+        protected DngCampusCodeResolver $dngCampusCodeResolver,
     ) {}
 
     public function store(Request $request): JsonResponse
@@ -28,21 +31,20 @@ class BatchDngApiController extends Controller
             'records.*.estimate_time' => 'required|string|max:10',
         ]);
 
-        // Use same campus_code as single DNG creation
-        $campusCode = (string) config('services.dng.campus_code');
-
         // Load all students in one query
         $studentIds = collect($validated['records'])->pluck('student_id')->unique()->values();
-        $students = Student::whereIn('id', $studentIds)->get()->keyBy('id');
+        $students = Student::with('campus')->whereIn('id', $studentIds)->get()->keyBy('id');
 
-        $batchRecords = [];
+        $groupedRecords = [];
         foreach ($validated['records'] as $record) {
             $student = $students->get($record['student_id']);
             if (! $student) {
                 continue;
             }
 
-            $batchRecords[] = [
+            $campusCode = $this->dngCampusCodeResolver->requireForStudent($student);
+
+            $groupedRecords[$campusCode][] = [
                 'student_id' => $student->id,
                 'student_code' => $student->student_id,
                 'type' => $record['type'],
@@ -58,7 +60,18 @@ class BatchDngApiController extends Controller
             ];
         }
 
-        $result = $this->dngPaymentService->createAndPushBatch($batchRecords, $campusCode);
+        if ($groupedRecords === []) {
+            throw ValidationException::withMessages([
+                'records' => 'No valid students were found for DNG batch creation.',
+            ]);
+        }
+
+        $result = ['created' => 0, 'failed' => 0];
+        foreach ($groupedRecords as $campusCode => $records) {
+            $batchResult = $this->dngPaymentService->createAndPushBatch($records, $campusCode);
+            $result['created'] += $batchResult['created'];
+            $result['failed'] += $batchResult['failed'];
+        }
 
         return response()->json(['data' => $result], 201);
     }

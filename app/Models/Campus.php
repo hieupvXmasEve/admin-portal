@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,7 +11,14 @@ class Campus extends AuditableModel
     /** @use HasFactory<\Database\Factories\CampusFactory> */
     use HasFactory;
 
-    protected $fillable = ['name', 'code', 'address'];
+    protected $fillable = ['name', 'code', 'dng_code', 'address'];
+
+    public function getDngCode(): ?string
+    {
+        $dngCode = trim((string) $this->dng_code);
+
+        return $dngCode !== '' ? $dngCode : null;
+    }
 
     public function users()
     {

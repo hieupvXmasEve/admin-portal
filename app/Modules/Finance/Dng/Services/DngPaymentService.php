@@ -43,6 +43,13 @@ class DngPaymentService
      */
     public function createAndPush(Student $student, array $chargeData): DngPaymentRequest
     {
+        $previousRequestIds = DngPaymentRequest::query()
+            ->where('student_id', $student->id)
+            ->where('fee_type', $chargeData['fee_type'])
+            ->awaitingPayment()
+            ->pluck('id')
+            ->all();
+
         // Step 1: Create local record first (must commit before calling DNG)
         $request = DngPaymentRequest::create([
             'student_id' => $student->id,
@@ -61,13 +68,24 @@ class DngPaymentService
         try {
             $response = $this->dngClient->insertNewRecord($chargeData, $pushPayload);
 
-            $request->update([
-                'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
-                'push_payload' => $pushPayload,
-                'push_response' => $response,
-                'dng_transaction_id' => $response['data']['TransactionID'] ?? $response['data']['Id'] ?? null,
-                'dng_payment_id' => $response['data']['PaymentId'] ?? $response['data']['OtherId'] ?? null,
-            ]);
+            DB::transaction(function () use ($request, $pushPayload, $response, $previousRequestIds): void {
+                $request->update([
+                    'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+                    'push_payload' => $pushPayload,
+                    'push_response' => $response,
+                    'dng_transaction_id' => $response['data']['TransactionID'] ?? $response['data']['Id'] ?? null,
+                    'dng_payment_id' => $response['data']['PaymentId'] ?? $response['data']['OtherId'] ?? null,
+                ]);
+
+                if ($previousRequestIds !== []) {
+                    DngPaymentRequest::query()
+                        ->whereIn('id', $previousRequestIds)
+                        ->awaitingPayment()
+                        ->update([
+                            'status' => DngPaymentRequest::STATUS_CANCELLED,
+                        ]);
+                }
+            });
 
             $this->publishPushNotification(
                 studentId: (int) $student->id,
@@ -119,6 +137,13 @@ class DngPaymentService
         // Step 1: Persist all local records before calling DNG
         $created = [];
         foreach ($records as $record) {
+            $previousRequestIds = DngPaymentRequest::query()
+                ->where('student_id', $record['student_id'])
+                ->where('fee_type', $record['type'])
+                ->awaitingPayment()
+                ->pluck('id')
+                ->all();
+
             $request = DngPaymentRequest::create([
                 'student_id' => $record['student_id'],
                 'campus_code' => $campusCode,
@@ -129,7 +154,7 @@ class DngPaymentService
                 'amount' => $record['amount'],
                 'status' => DngPaymentRequest::STATUS_PENDING,
             ]);
-            $created[] = ['request' => $request, 'data' => $record];
+            $created[] = ['request' => $request, 'data' => $record, 'previous_request_ids' => $previousRequestIds];
         }
 
         // Step 2: Build batch payload and push
@@ -143,13 +168,26 @@ class DngPaymentService
 
             foreach ($created as $i => $item) {
                 $responseRecord = $response['data'][$i] ?? null;
-                $item['request']->update([
-                    'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
-                    'push_payload' => $payload['Records'][$i] ?? null,
-                    'push_response' => $responseRecord,
-                    'dng_transaction_id' => $responseRecord['TransactionID'] ?? $responseRecord['Id'] ?? null,
-                    'dng_payment_id' => $responseRecord['PaymentId'] ?? $responseRecord['OtherId'] ?? null,
-                ]);
+                $recordPayload = $payload['Records'][$i] ?? null;
+
+                DB::transaction(function () use ($item, $recordPayload, $responseRecord): void {
+                    $item['request']->update([
+                        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+                        'push_payload' => $recordPayload,
+                        'push_response' => $responseRecord,
+                        'dng_transaction_id' => $responseRecord['TransactionID'] ?? $responseRecord['Id'] ?? null,
+                        'dng_payment_id' => $responseRecord['PaymentId'] ?? $responseRecord['OtherId'] ?? null,
+                    ]);
+
+                    if (($item['previous_request_ids'] ?? []) !== []) {
+                        DngPaymentRequest::query()
+                            ->whereIn('id', $item['previous_request_ids'])
+                            ->awaitingPayment()
+                            ->update([
+                                'status' => DngPaymentRequest::STATUS_CANCELLED,
+                            ]);
+                    }
+                });
 
                 $this->publishPushNotification(
                     studentId: (int) $item['data']['student_id'],

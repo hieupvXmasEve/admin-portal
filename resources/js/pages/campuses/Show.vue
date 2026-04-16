@@ -208,6 +208,10 @@ const deleteBuilding = async (buildingId: number) => {
                         <p class="font-mono font-medium">{{ campus.code }}</p>
                     </div>
                     <div>
+                        <label class="text-sm font-medium text-gray-500 dark:text-gray-400">DNG Code</label>
+                        <p class="font-mono font-medium">{{ campus.dng_code || 'Not set' }}</p>
+                    </div>
+                    <div>
                         <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Campus Name</label>
                         <p class="font-medium">{{ campus.name }}</p>
                     </div>

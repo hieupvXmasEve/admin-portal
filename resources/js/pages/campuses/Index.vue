@@ -79,6 +79,12 @@ const columns: ColumnDef<Campus>[] = [
         cell: ({ row }) => h('div', { class: 'font-mono font-medium' }, row.original.code),
     },
     {
+        header: 'DNG Code',
+        accessorKey: 'dng_code',
+        enableSorting: true,
+        cell: ({ row }) => h('div', { class: 'font-mono text-sm' }, row.original.dng_code || 'Not set'),
+    },
+    {
         header: 'Campus Name',
         accessorKey: 'name',
         enableSorting: true,

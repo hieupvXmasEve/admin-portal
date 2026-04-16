@@ -60,7 +60,6 @@ return [
         'api_code' => env('DNG_API_CODE', 'HC_SWB'),
         'client_code' => env('DNG_CLIENT_CODE', 'HC_ASIA'),
         'login' => env('DNG_LOGIN', 'HC_SWB'),
-        'campus_code' => env('DNG_CAMPUS_CODE', 'FPTUHN'),
         'timeout' => (int) env('DNG_API_TIMEOUT', 30),
     ],
 

@@ -10,6 +10,7 @@ use App\Models\FinanceCharge as FinanceChargeModel;
 use App\Models\Payment;
 use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Actions\AllocatePaymentAction;
 use App\Modules\Finance\Actions\PreviewPaymentImportAction;
 use App\Modules\Finance\Actions\StorePaymentImportAction;
@@ -22,6 +23,10 @@ use Inertia\Response;
 
 class PaymentController extends Controller
 {
+    public function __construct(
+        private DngCampusCodeResolver $dngCampusCodeResolver,
+    ) {}
+
     public function index(Request $request, ListPaymentsQuery $query)
     {
         $result = $query->handle($request);
@@ -88,7 +93,7 @@ class PaymentController extends Controller
 
         return [
             'student_id' => $student->id,
-            'campus_code' => (string) config('services.dng.campus_code'),
+            'campus_code' => $this->dngCampusCodeResolver->requireForStudent($student),
             'student_code' => $student->student_id,
             'student_name' => $student->full_name,
             'email' => $student->email ?? '',

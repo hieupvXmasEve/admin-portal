@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -16,9 +18,12 @@ class CampusFactory extends Factory
      */
     public function definition(): array
     {
+        $code = strtoupper(fake()->unique()->lexify('???'));
+
         return [
             'name' => fake()->name().' Campus',
-            'code' => strtoupper(fake()->unique()->lexify('???')),
+            'code' => $code,
+            'dng_code' => $code,
             'address' => fake()->address(),
         ];
     }

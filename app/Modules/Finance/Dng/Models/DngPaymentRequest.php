@@ -25,16 +25,19 @@ class DngPaymentRequest extends Model
 
     public const STATUS_FAILED = 'failed';
 
+    public const STATUS_CANCELLED = 'cancelled';
+
     /**
      * Allowed forward transitions. Key = current status, value = allowed next statuses.
      */
     public const TRANSITIONS = [
-        self::STATUS_PENDING => [self::STATUS_PUSHED_TO_DNG, self::STATUS_FAILED],
-        self::STATUS_PUSHED_TO_DNG => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_FAILED],
+        self::STATUS_PENDING => [self::STATUS_PUSHED_TO_DNG, self::STATUS_FAILED, self::STATUS_CANCELLED],
+        self::STATUS_PUSHED_TO_DNG => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_FAILED, self::STATUS_CANCELLED],
         self::STATUS_PAID_UNINVOICED => [self::STATUS_PAID_INVOICED, self::STATUS_RECONCILED],
         self::STATUS_PAID_INVOICED => [self::STATUS_RECONCILED],
         self::STATUS_RECONCILED => [],
         self::STATUS_FAILED => [self::STATUS_PENDING],
+        self::STATUS_CANCELLED => [],
     ];
 
     protected $fillable = [
@@ -166,5 +169,13 @@ class DngPaymentRequest extends Model
     public function scopeAwaitingInvoice($query)
     {
         return $query->where('status', self::STATUS_PAID_UNINVOICED);
+    }
+
+    public function scopeAwaitingPayment($query)
+    {
+        return $query->whereIn('status', [
+            self::STATUS_PENDING,
+            self::STATUS_PUSHED_TO_DNG,
+        ]);
     }
 }
