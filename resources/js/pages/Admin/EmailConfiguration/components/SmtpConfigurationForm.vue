@@ -35,9 +35,17 @@ import {
 import { useSmtpConfiguration } from '@/composables/useSmtpConfiguration'
 import { Checkbox } from '@/components/ui/checkbox';
 
+interface Campus {
+    id: number
+    name: string
+    code: string
+}
+
 interface Props {
     configuration?: any
     isOpen: boolean
+    campuses?: Campus[]
+    currentCampusId?: number | null
 }
 
 interface Emits {
@@ -53,6 +61,7 @@ const { testConnectionWithData } = useSmtpConfiguration()
 const isEditing = computed(() => !!props.configuration)
 
 const formSchema = toTypedSchema(z.object({
+    campus_id: z.number().nullable().optional(),
     name: z.string().min(1, 'Configuration name is required'),
     host: z.string().min(1, 'SMTP host is required'),
     port: z.number().min(1).max(65535),
@@ -86,6 +95,7 @@ watch(() => [props.isOpen, props.configuration], ([isOpen, config]) => {
         if (config) {
             // Editing existing configuration
             setValues({
+                campus_id: config.campus_id ?? null,
                 name: config.name || '',
                 host: config.host || '',
                 port: config.port || 587,
@@ -99,8 +109,9 @@ watch(() => [props.isOpen, props.configuration], ([isOpen, config]) => {
                 is_active: config.is_active || false,
             });
         } else {
-            // Creating new configuration
+            // Creating new configuration — default to current campus
             setValues({
+                campus_id: props.currentCampusId ?? null,
                 name: '',
                 host: '',
                 port: 587,
@@ -148,6 +159,29 @@ const onCancel = () => {
 
 <template>
     <form @submit.prevent="onSubmit" class="space-y-6">
+        <FormField v-if="campuses && campuses.length > 0" name="campus_id" v-slot="{ field }">
+            <FormItem>
+                <FormLabel>Campus</FormLabel>
+                <Select
+                    :model-value="field.value != null ? String(field.value) : ''"
+                    @update:model-value="(v) => field.onChange(v ? Number(v) : null)"
+                >
+                    <FormControl>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Global (shared across all campuses)" />
+                        </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                        <SelectItem value="">Global (shared)</SelectItem>
+                        <SelectItem v-for="campus in campuses" :key="campus.id" :value="String(campus.id)">
+                            {{ campus.name }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+                <FormMessage />
+            </FormItem>
+        </FormField>
+
         <FormField name="name" v-slot="{ componentField }">
             <FormItem class="col-span-2">
                 <FormLabel>Configuration Name *</FormLabel>

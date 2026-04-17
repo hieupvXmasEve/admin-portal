@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Services\EmailCredentialEncryptionService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Crypt;
 
 class EmailConfiguration extends AuditableModel
@@ -16,6 +17,7 @@ class EmailConfiguration extends AuditableModel
      * @var array<int, string>
      */
     protected $fillable = [
+        'campus_id',
         'name',
         'host',
         'port',
@@ -112,23 +114,49 @@ class EmailConfiguration extends AuditableModel
         return null;
     }
 
-    /**
-     * Get the active email configuration
-     */
-    public static function getActive(): ?self
+    public function campus(): BelongsTo
     {
-        return static::where('is_active', true)->first();
+        return $this->belongsTo(Campus::class);
     }
 
     /**
-     * Set this configuration as active and deactivate others
+     * Get active config for a specific campus, falling back to global (campus_id = null).
+     */
+    public static function getActiveForCampus(?int $campusId): ?self
+    {
+        if ($campusId) {
+            $config = static::where('is_active', true)->where('campus_id', $campusId)->first();
+            if ($config) {
+                return $config;
+            }
+        }
+
+        return static::where('is_active', true)->whereNull('campus_id')->first();
+    }
+
+    /**
+     * BC alias — returns global active config.
+     */
+    public static function getActive(): ?self
+    {
+        return static::getActiveForCampus(null);
+    }
+
+    /**
+     * Set this configuration as active and deactivate others in the same campus scope.
      */
     public function setAsActive(): bool
     {
-        // Deactivate all other configurations
-        static::where('id', '!=', $this->id)->update(['is_active' => false]);
+        $query = static::where('id', '!=', $this->id);
 
-        // Activate this configuration
+        if ($this->campus_id) {
+            $query->where('campus_id', $this->campus_id);
+        } else {
+            $query->whereNull('campus_id');
+        }
+
+        $query->update(['is_active' => false]);
+
         return $this->update(['is_active' => true]);
     }
 
@@ -195,6 +223,7 @@ class EmailConfiguration extends AuditableModel
     public static function validationRules(): array
     {
         return [
+            'campus_id' => 'nullable|exists:campuses,id',
             'name' => 'required|string|max:255',
             'host' => 'required|string|max:255',
             'port' => 'required|integer|min:1|max:65535',

@@ -13,8 +13,15 @@ import SmtpConfigurationForm from './SmtpConfigurationForm.vue'
 import { useSmtpConfiguration } from '@/composables/useSmtpConfiguration'
 import { toast } from 'vue-sonner';
 
+interface Campus {
+    id: number
+    name: string
+    code: string
+}
+
 interface EmailConfiguration {
     id: number
+    campus_id: number | null
     name: string
     host: string
     port: number
@@ -30,8 +37,9 @@ interface EmailConfiguration {
 }
 
 interface Props {
-  open: boolean
-  configuration?: EmailConfiguration | null
+    open: boolean
+    configuration?: EmailConfiguration | null
+    campuses?: Campus[]
 }
 
 interface Emits {
@@ -52,7 +60,6 @@ const isOpen = computed({
 const isSubmitting = ref(false)
 
 const handleFormSubmit = async (formValues: any) => {
-    console.log('formValues', formValues)
     if (!props.configuration?.id) {
         console.error('No configuration ID provided for update');
         return;
@@ -95,6 +102,7 @@ const closeModal = () => {
       <SmtpConfigurationForm
         :configuration="configuration"
         :is-open="isOpen"
+        :campuses="campuses"
         @submit="handleFormSubmit"
         @cancel="handleFormCancel"
       >

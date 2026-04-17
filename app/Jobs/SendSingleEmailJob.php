@@ -60,7 +60,8 @@ class SendSingleEmailJob implements ShouldQueue
         protected EmailLog $emailLog,
         protected string $htmlContent,
         protected ?string $textContent = null,
-        protected array $attachments = []
+        protected array $attachments = [],
+        protected ?int $campusId = null,
     ) {
         $this->onQueue('emails');
     }
@@ -74,8 +75,8 @@ class SendSingleEmailJob implements ShouldQueue
             // Mark email as sending
             $this->emailLog->markAsSending();
 
-            // Apply active EmailConfiguration if available, otherwise fall back to .env defaults
-            $config = EmailConfiguration::getActive();
+            // Resolve campus-specific config, falling back to global then .env defaults
+            $config = EmailConfiguration::getActiveForCampus($this->campusId);
 
             if ($config) {
                 $this->configureMailer($config);

@@ -38,7 +38,8 @@ class EmailService
         ?EmailTemplate $template = null,
         array $attachments = [],
         ?User $sender = null,
-        array $templateVariables = []
+        array $templateVariables = [],
+        ?int $campusId = null,
     ): EmailLog {
         // Comprehensive email address validation
         $this->validateEmailAddress($recipient);
@@ -73,6 +74,7 @@ class EmailService
                 'content_length' => strlen($content),
                 'template_variables' => $templateVariables,
                 'created_via' => 'single_email_api',
+                'campus_id' => $campusId,
             ]
         );
 
@@ -99,7 +101,8 @@ class EmailService
                 $emailLog,
                 $htmlContent,
                 $textContent,
-                $attachments
+                $attachments,
+                $campusId,
             ));
 
             // Mark as queued with additional metadata
@@ -716,9 +719,9 @@ class EmailService
     /**
      * Get active email configuration
      */
-    public function getActiveConfiguration(): ?EmailConfiguration
+    public function getActiveConfiguration(?int $campusId = null): ?EmailConfiguration
     {
-        return EmailConfiguration::getActive();
+        return EmailConfiguration::getActiveForCampus($campusId);
     }
 
     /**
@@ -970,12 +973,13 @@ class EmailService
                     'error_message' => null,
                 ]);
 
-                // Re-queue the email
+                // Re-queue the email — restore campus context from original dispatch metadata
                 dispatch(new SendSingleEmailJob(
                     $emailLog,
                     $emailLog->metadata['html_content'] ?? '',
                     $emailLog->metadata['text_content'] ?? null,
-                    $emailLog->metadata['attachments'] ?? []
+                    $emailLog->metadata['attachments'] ?? [],
+                    isset($emailLog->metadata['campus_id']) ? (int) $emailLog->metadata['campus_id'] : null
                 ));
 
                 $retryCount++;

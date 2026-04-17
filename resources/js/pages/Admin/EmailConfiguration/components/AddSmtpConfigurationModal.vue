@@ -13,8 +13,16 @@ import SmtpConfigurationForm from './SmtpConfigurationForm.vue'
 import { useSmtpConfiguration } from '@/composables/useSmtpConfiguration'
 import { toast } from 'vue-sonner';
 
+interface Campus {
+    id: number
+    name: string
+    code: string
+}
+
 interface Props {
-  open: boolean
+    open: boolean
+    campuses?: Campus[]
+    currentCampusId?: number | null
 }
 
 interface Emits {
@@ -71,6 +79,8 @@ const closeModal = () => {
 
       <SmtpConfigurationForm
         :is-open="isOpen"
+        :campuses="campuses"
+        :current-campus-id="currentCampusId"
         @submit="handleFormSubmit"
         @cancel="handleFormCancel"
       >

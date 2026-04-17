@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Campus extends AuditableModel
 {
@@ -18,6 +19,11 @@ class Campus extends AuditableModel
         $dngCode = trim((string) $this->dng_code);
 
         return $dngCode !== '' ? $dngCode : null;
+    }
+
+    public function emailConfigurations(): HasMany
+    {
+        return $this->hasMany(EmailConfiguration::class);
     }
 
     public function users()

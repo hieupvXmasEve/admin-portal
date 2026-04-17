@@ -3,6 +3,8 @@ import { ref } from 'vue';
 
 interface EmailConfiguration {
     id: number;
+    campus_id: number | null;
+    campus?: { id: number; name: string; code: string } | null;
     name: string;
     host: string;
     port: number;
@@ -26,6 +28,7 @@ interface Statistics {
 }
 
 interface ConfigurationForm {
+    campus_id: number | null;
     name: string;
     host: string;
     port: number;
@@ -181,10 +184,15 @@ export function useSmtpConfiguration() {
             const response = await api.post<EmailConfiguration>(`/api/email-configurations/${id}/activate`, {});
 
             if (response.data.value?.success) {
-                // Update all configurations in local state
+                const activated = configurations.value.find((c) => c.id === id);
+                // Only deactivate configs in the same campus scope
                 configurations.value = configurations.value.map((config) => ({
                     ...config,
-                    is_active: config.id === id,
+                    is_active: config.id === id
+                        ? true
+                        : config.campus_id === (activated?.campus_id ?? null)
+                            ? false
+                            : config.is_active,
                 }));
 
                 return response.data.value.data;

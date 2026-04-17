@@ -26,7 +26,12 @@ class EmailChannelAdapter implements ChannelAdapter
 
         $subject = $message->title ?: 'Notification';
         $content = $message->body ?: ($message->data['body'] ?? 'You have a new notification.');
-        $emailLog = $this->emailService->sendSingleEmail((string) $recipient->email, $subject, (string) $content);
+        $emailLog = $this->emailService->sendSingleEmail(
+            (string) $recipient->email,
+            $subject,
+            (string) $content,
+            campusId: $message->campus_id,
+        );
 
         return [
             'provider_message_id' => null,

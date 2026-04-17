@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Campus;
 use App\Models\EmailTemplate;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -15,7 +16,12 @@ class EmailConfigurationController extends Controller
      */
     public function index(): Response
     {
-        return Inertia::render('Admin/EmailConfiguration/Index');
+        $campuses = Campus::orderBy('name')->get(['id', 'name', 'code']);
+
+        return Inertia::render('Admin/EmailConfiguration/Index', [
+            'campuses' => $campuses,
+            'currentCampusId' => session('current_campus_id') ? (int) session('current_campus_id') : null,
+        ]);
     }
 
     /**

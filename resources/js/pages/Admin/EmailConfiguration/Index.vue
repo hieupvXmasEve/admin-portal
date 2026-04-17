@@ -7,8 +7,17 @@ import { CheckCircleIcon, ClockIcon, PencilIcon, PlusIcon, RefreshCwIcon, Server
 import { onMounted, ref } from 'vue';
 import AddSmtpConfigurationModal from './components/AddSmtpConfigurationModal.vue';
 import EditSmtpConfigurationModal from './components/EditSmtpConfigurationModal.vue';
+
+interface Campus {
+    id: number;
+    name: string;
+    code: string;
+}
+
 interface EmailConfiguration {
     id: number;
+    campus_id: number | null;
+    campus?: Campus | null;
     name: string;
     host: string;
     port: number;
@@ -30,6 +39,11 @@ interface Statistics {
     successful_tests: number;
     test_success_rate: number;
 }
+
+const props = defineProps<{
+    campuses: Campus[];
+    currentCampusId: number | null;
+}>();
 
 const { configurations, statistics, isLoading, isRefreshing, testingConfigs, activatingConfigs, loadConfigurations, testConnection, setActiveConfiguration, deleteConfiguration: deleteConfig } = useSmtpConfiguration();
 
@@ -178,11 +192,13 @@ const formatDate = (dateString: string) => {
                                     <div :class="['h-3 w-3 rounded-full', config.is_active ? 'bg-green-500' : 'bg-gray-400']"></div>
                                 </div>
                                 <div class="ml-4">
-                                    <div class="flex items-center">
+                                    <div class="flex items-center gap-2">
                                         <p class="text-sm font-medium">
                                             {{ config.name }}
                                         </p>
-                                        <span v-if="config.is_active" class="ml-2 inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800"> Active </span>
+                                        <span v-if="config.is_active" class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Active</span>
+                                        <span v-if="config.campus" class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">{{ config.campus.name }}</span>
+                                        <span v-else class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Global</span>
                                     </div>
                                     <div class="text-muted-foreground mt-1 flex items-center text-sm">
                                         <span>{{ config.host }}:{{ config.port }}</span>
@@ -252,12 +268,18 @@ const formatDate = (dateString: string) => {
         </Card>
 
         <!-- Add Modal -->
-        <AddSmtpConfigurationModal v-model:open="showAddModal" @saved="onAddConfigurationSaved" />
+        <AddSmtpConfigurationModal
+            v-model:open="showAddModal"
+            :campuses="props.campuses"
+            :current-campus-id="props.currentCampusId"
+            @saved="onAddConfigurationSaved"
+        />
 
         <!-- Edit Modal -->
         <EditSmtpConfigurationModal
             v-model:open="showEditModal"
             :configuration="editingConfiguration"
+            :campuses="props.campuses"
             @saved="onEditConfigurationSaved"
             @update:open="
                 (open) => {

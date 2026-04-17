@@ -52,14 +52,16 @@ class SmtpConfigurationService
      */
     public function delete(EmailConfiguration $configuration): bool
     {
-        // Prevent deletion of active configuration if it's the only one
-        if ($configuration->is_active && EmailConfiguration::where('id', '!=', $configuration->id)->count() === 0) {
-            throw new Exception('Cannot delete the only active email configuration.');
-        }
-
-        // If deleting active configuration, activate another one
         if ($configuration->is_active) {
-            $nextConfig = EmailConfiguration::where('id', '!=', $configuration->id)->first();
+            // Find another config in the same campus scope to promote
+            $scopeQuery = EmailConfiguration::where('id', '!=', $configuration->id);
+            if ($configuration->campus_id) {
+                $scopeQuery->where('campus_id', $configuration->campus_id);
+            } else {
+                $scopeQuery->whereNull('campus_id');
+            }
+
+            $nextConfig = $scopeQuery->first();
             if ($nextConfig) {
                 $nextConfig->setAsActive();
             }
@@ -69,21 +71,29 @@ class SmtpConfigurationService
     }
 
     /**
-     * Get all SMTP configurations
+     * Get SMTP configurations scoped to a campus (campus-specific + global fallbacks).
      */
-    public function getAll(): \Illuminate\Database\Eloquent\Collection
+    public function getAll(?int $campusId = null): \Illuminate\Database\Eloquent\Collection
     {
-        return EmailConfiguration::orderBy('is_active', 'desc')
-            ->orderBy('name')
-            ->get();
+        $query = EmailConfiguration::with('campus')
+            ->orderBy('is_active', 'desc')
+            ->orderBy('name');
+
+        if ($campusId !== null) {
+            $query->where(function ($q) use ($campusId) {
+                $q->where('campus_id', $campusId)->orWhereNull('campus_id');
+            });
+        }
+
+        return $query->get();
     }
 
     /**
-     * Get active SMTP configuration
+     * Get active SMTP configuration for a campus (campus-specific → global fallback).
      */
-    public function getActive(): ?EmailConfiguration
+    public function getActive(?int $campusId = null): ?EmailConfiguration
     {
-        return EmailConfiguration::getActive();
+        return EmailConfiguration::getActiveForCampus($campusId);
     }
 
     /**
@@ -237,13 +247,24 @@ class SmtpConfigurationService
     {
         $rules = EmailConfiguration::validationRules();
 
-        // Add unique rule for name if needed
+        // Scope name uniqueness to the same campus (NULL-safe via extra where clause)
         if (isset($data['name'])) {
-            $nameRule = 'required|string|max:255|unique:email_configurations,name';
+            $campusId = $data['campus_id'] ?? null;
+
+            $nameUnique = \Illuminate\Validation\Rule::unique('email_configurations', 'name')
+                ->where(function ($query) use ($campusId) {
+                    if ($campusId !== null) {
+                        $query->where('campus_id', $campusId);
+                    } else {
+                        $query->whereNull('campus_id');
+                    }
+                });
+
             if ($excludeId) {
-                $nameRule .= ',' . $excludeId;
+                $nameUnique->ignore($excludeId);
             }
-            $rules['name'] = $nameRule;
+
+            $rules['name'] = ['required', 'string', 'max:255', $nameUnique];
         }
 
         $validator = Validator::make($data, $rules);

@@ -21,7 +21,8 @@ class EmailConfigurationController extends Controller
      */
     public function index(): JsonResponse
     {
-        $configurations = $this->smtpService->getAll();
+        $campusId = session('current_campus_id') ? (int) session('current_campus_id') : null;
+        $configurations = $this->smtpService->getAll($campusId);
         $statistics = $this->smtpService->getStatistics();
 
         return response()->json([
@@ -38,6 +39,11 @@ class EmailConfigurationController extends Controller
     {
         try {
             $validated = $request->validate(EmailConfiguration::validationRules());
+
+            // Default campus_id to current session campus if not explicitly set
+            if (!array_key_exists('campus_id', $validated)) {
+                $validated['campus_id'] = session('current_campus_id') ? (int) session('current_campus_id') : null;
+            }
 
             $configuration = $this->smtpService->create($validated);
 
@@ -66,6 +72,8 @@ class EmailConfigurationController extends Controller
      */
     public function show(EmailConfiguration $configuration): JsonResponse
     {
+        $this->authorizeCampusAccess($configuration);
+
         return response()->json([
             'success' => true,
             'data' => $configuration,
@@ -77,6 +85,8 @@ class EmailConfigurationController extends Controller
      */
     public function update(Request $request, EmailConfiguration $configuration): JsonResponse
     {
+        $this->authorizeCampusAccess($configuration);
+
         try {
             $rules = EmailConfiguration::validationRules();
             // Make password optional for updates
@@ -116,6 +126,8 @@ class EmailConfigurationController extends Controller
      */
     public function destroy(EmailConfiguration $configuration): JsonResponse
     {
+        $this->authorizeCampusAccess($configuration);
+
         try {
             $this->smtpService->delete($configuration);
 
@@ -142,6 +154,8 @@ class EmailConfigurationController extends Controller
      */
     public function test(EmailConfiguration $configuration): JsonResponse
     {
+        $this->authorizeCampusAccess($configuration);
+
         try {
             $result = $this->smtpService->testConnection($configuration);
 
@@ -194,6 +208,8 @@ class EmailConfigurationController extends Controller
      */
     public function setActive(EmailConfiguration $configuration): JsonResponse
     {
+        $this->authorizeCampusAccess($configuration);
+
         try {
             $configuration->setAsActive();
 
@@ -211,5 +227,16 @@ class EmailConfigurationController extends Controller
         }
     }
 
+    /**
+     * Verify the configuration belongs to the current campus session or is global.
+     * Global (campus_id=null) configs are accessible from any campus context.
+     */
+    private function authorizeCampusAccess(EmailConfiguration $configuration): void
+    {
+        $campusId = session('current_campus_id') ? (int) session('current_campus_id') : null;
 
+        if ($configuration->campus_id !== null && $configuration->campus_id !== $campusId) {
+            abort(403, 'Access denied to this email configuration.');
+        }
+    }
 }
