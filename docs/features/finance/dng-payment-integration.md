@@ -351,7 +351,6 @@ DNG_HASH_KEY=YOUR_HASH_KEY
 DNG_API_CODE=HC_ASIA
 DNG_CLIENT_CODE=HC_ASIA
 DNG_LOGIN=HC_ASIA
-DNG_CAMPUS_CODE=FAUHN              # Configurable per campus
 DNG_API_TIMEOUT=30
 ```
 
@@ -365,10 +364,15 @@ Mapped to `config/services.php`:
     'api_code' => env('DNG_API_CODE', 'HC_ASIA'),
     'client_code' => env('DNG_CLIENT_CODE', 'HC_ASIA'),
     'login' => env('DNG_LOGIN', 'HC_ASIA'),
-    'campus_code' => env('DNG_CAMPUS_CODE', 'FAUHN'),
     'timeout' => env('DNG_API_TIMEOUT', 30),
 ]
 ```
+
+Campus mapping:
+
+- DNG campus code is now resolved from `campuses.dng_code` instead of a single global env var.
+- Leave `dng_code` nullable for campuses that do not integrate with DNG.
+- Request creation should fail validation/business checks if the current campus has no `dng_code`.
 
 ## Permission
 
@@ -422,7 +426,7 @@ Jobs retry with `ShouldQueue` + `Retryable` traits (configurable attempts).
 2. **Student Identity**: Uses `students.student_id` (string MSSV), not DB primary key.
 3. **Sensitive Data**: Avoid logging full payment amounts or CCCD in production. Audit tables store full payloads for reconciliation only.
 4. **Webhook Authentication**: Checksum is the only authentication (DNG does not send API key in webhook). No IP allowlist needed.
-5. **Campus Isolation**: `dng_payment_requests` and `dng_webhook_events` include `campus_id` for multi-campus support.
+5. **Campus Isolation**: request access is scoped by the linked student's internal campus; DNG external campus mapping is stored in `campuses.dng_code`.
 
 ## Testing
 
@@ -441,7 +445,7 @@ Jobs retry with `ShouldQueue` + `Retryable` traits (configurable attempts).
 Run tests:
 
 ```bash
-php artisan test --filter=Dng
+./scripts/dev.sh test --filter=Dng
 ```
 
 ## Troubleshooting
@@ -449,7 +453,7 @@ php artisan test --filter=Dng
 ### "Checksum invalid"
 
 - Verify `DNG_HASH_KEY` matches DNG's test/prod key
-- Ensure `DNG_CAMPUS_CODE` is correct
+- Ensure the current campus has the correct `campuses.dng_code`
 - Check `student_code` is string (MSSV), not int
 
 ### "Payment not reconciled"
@@ -468,6 +472,13 @@ php artisan test --filter=Dng
 ## Future Enhancements
 
 - [ ] Batch payment request API for bulk uploads
+
+## Replacement Rule
+
+- DNG only keeps one unpaid debt per `student + fee_type`.
+- When Swinx creates a newer request for the same `student + fee_type`, old unpaid requests in `pending` or `pushed_to_dng` are moved to `cancelled` only after the new push succeeds.
+- If the new push fails, older unpaid requests remain unchanged.
+- Late webhook/reconciliation events for cancelled requests are skipped and must not create/bridge payments.
 - [ ] Payment status polling UI (real-time QR refresh)
 - [ ] Webhook signature verification via DNG public key (if offered)
 - [ ] Payment reconciliation dashboard

@@ -424,7 +424,7 @@ GET /dng-requests?status=pushed_to_dng
 
 | Param    | Type    | Description                                                                            |
 | -------- | ------- | -------------------------------------------------------------------------------------- |
-| `status` | string? | `pending`, `pushed_to_dng`, `paid_uninvoiced`, `paid_invoiced`, `reconciled`, `failed` |
+| `status` | string? | `pending`, `pushed_to_dng`, `paid_uninvoiced`, `paid_invoiced`, `reconciled`, `failed`, `cancelled` |
 
 **Response:**
 
@@ -571,6 +571,7 @@ Frontend handling:
 - `paid_uninvoiced` → "Đã thanh toán" (green)
 - `paid_invoiced` → "Đã xuất hóa đơn" (green + invoice icon)
 - `reconciled` → "Hoàn tất" (gray)
+- `cancelled` → "Đã hủy" (gray) + do not show payment actions
 - `failed` → "Thất bại" (red)
 
 **Frontend action rule:**
@@ -578,6 +579,7 @@ Frontend handling:
 - Do not expect `qr_payload` in request detail anymore.
 - When user taps a payment action, call the corresponding POST API and redirect to `data.payment_url`.
 - Keep `provider_response` only for debugging/inspection; `payment_url` is the field the UI should use.
+- If a newer DNG request replaces an older unpaid request with the same `fee_type`, the older request can appear as `cancelled`.
 
 ---
 

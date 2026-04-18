@@ -64,9 +64,11 @@ For Notification V2 Phase 1 contracts keep exact fields:
 - For Finance charge/voiding: use `VoidFinanceChargeAction`, `AllocatePaymentAction`, `AutoAllocatePaymentsAction`. Respect `invoice_lines.status` lifecycle (active|void).
 - For DNG payment gateway operations:
     - Always use `DngClient` for API calls; verify checksum before processing webhook events.
-    - Use `DngPaymentService::createPaymentRequest()` to push payment data to DNG (includes checksum).
+    - Use `DngPaymentService` entrypoints for DNG create/push flows and payment-link flows.
     - Student identifier field is `student_code` (string MSSV from `students.student_id`), never `student_id` (int DB PK).
-    - Campus code comes from `config('services.dng.campus_code')`, which is populated from `DNG_CAMPUS_CODE` env var.
+    - Campus code for DNG is resolved per campus from `campuses.dng_code`; do not treat `services.dng.campus_code` as source of truth.
+    - When creating a new DNG request for the same `student + fee_type`, only cancel previous unpaid requests (`pending`, `pushed_to_dng`) after the new push succeeds.
+    - Cancelled DNG requests are terminal and must not be revived by late webhook/reconciliation processing.
     - Queue webhook processing via `ProcessDngWebhookJob` instead of synchronous response handlers.
     - Audit all DNG requests/responses in `dng_payment_requests` and `dng_webhook_events` tables.
 
@@ -133,9 +135,9 @@ Current status:
 
 Minimum expected checks before merge:
 
-- `php artisan test`
-- `npm run type-check`
-- `npm run lint`
+- `./scripts/dev.sh test`
+- `./scripts/dev.sh npm run type-check`
+- `./scripts/dev.sh npm run lint`
 
 Transition policy while CI is inactive:
 

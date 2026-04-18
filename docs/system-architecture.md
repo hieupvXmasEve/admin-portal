@@ -1,6 +1,6 @@
 # System Architecture
 
-Last updated: 2026-03-26  
+Last updated: 2026-04-16  
 Owner: Platform Team  
 Status: Current-state architecture map  
 Source of truth: route files, middleware, module providers, runtime entrypoints
@@ -35,7 +35,7 @@ Client (Web SPA / API)
 
 - Identity: `app/Modules/Identity`
 - Academic: `app/Modules/Academic`
-- Finance: `app/Modules/Finance` (Settlement v2 landed 2026-03-25; DNG gateway integration 2026-03-26)
+- Finance: `app/Modules/Finance` (Settlement v2 landed 2026-03-25; DNG gateway integration 2026-03-26; campus-mapped DNG flow updated 2026-04-16)
     - Source-of-truth model:
         - `payments` — canonical cash receipt ledger
         - `payment_applications` — line-level cash application (replaces legacy `payment_allocations`)
@@ -51,7 +51,9 @@ Client (Web SPA / API)
     - Web routes: `/finance/payments/create`, `/finance/payments/{student}/dng-data`, `/finance/dng/payment-requests`, `/finance/dng/payment-requests/{dngPaymentRequest}`, `/finance/dng/webhook-events`, `/finance/dng/webhook-events/{dngWebhookEvent}`
     - API routes: `POST /api/v1/finance/dng/payment-requests` (create), `POST /api/v1/finance/dng/webhook` (receive)
     - Ops routes: `finance/operations/settlement` (worklist), `finance/operations/dashboard` (metrics)
-    - DNG workflow: Staff → Payment Create form → Student selection → DNG API push (with checksum) → QR display → Webhook inbox capture (`dng_webhook_events`) → Async checksum/business validation → Payment record
+    - DNG workflow: Staff → Payment Create form → Student selection → resolve `campuses.dng_code` → DNG API push (with checksum) → QR display → Webhook inbox capture (`dng_webhook_events`) → Async checksum/business validation → Payment record
+    - DNG replacement rule: for the same `student + fee_type`, only one unpaid DNG request should stay active; older unpaid requests move to `cancelled` after the replacement push succeeds
+    - Late webhook/reconciliation events for cancelled requests are skipped
     - Admin monitoring workflow: request audit list/detail remain campus-scoped; webhook audit list is cross-campus while webhook detail still validates campus access
     - Permissions: `create_finance_payments`, `view_finance_dng_payment_requests`, `view_finance_dng_webhook_events`
     - Legacy `payment_allocations` no longer used in runtime.
@@ -61,6 +63,7 @@ Client (Web SPA / API)
     - Models: `NotificationDelivery`, `NotificationEventOutbox`, `NotificationMessage`
     - Queries: `ListMessagesQuery`, `ListOutboxQuery`, `ListDeliveriesQuery`
     - Support: `EventIntentMapper`, `RecipientResolver`, `NotificationAuditLogger`, `NotificationMetrics`, `PolicyResolver`
+    - Email SMTP resolution: `EmailConfiguration` table is campus-scoped; `getActiveForCampus(?int)` resolves campus-specific config (priority) or falls back to global; `SendSingleEmailJob` threads `campus_id` through the dispatch chain
 
 ### 2.3 Academic Progression and Status Logging
 

@@ -1,6 +1,6 @@
 # Codebase Summary
 
-Last updated: 2026-03-26
+Last updated: 2026-04-16
 Owner: Platform Team
 Status: Current-state snapshot
 Primary source: `repomix-output.xml` (generated 2026-03-02 / updated for runtime code through commit 8651e0f4)
@@ -46,6 +46,7 @@ Current counts:
     - Full audit trail + retry via outbox processor (`notifications:process-outbox` scheduled every minute)
     - Actions: `PublishDomainEventAction`, `DispatchOutboxBatchAction`, `SendManualNotificationV2Action`, retry actions
     - Channels: `EmailChannelAdapter`, `RealtimeChannelAdapter`
+    - Email configuration: `email_configurations` table is campus-scoped (`nullable campus_id`); email dispatch resolves campus-specific SMTP config with fallback to global config
 - Academic progression baseline uses `academic_progression_events` as semantic history:
     - `ENGLISH_LEVEL_CHANGED` for EGC level changes (manual & auto progression)
     - `COURSE_STAGE_CHANGED` for stage transitions (e.g., `intake_pre_uni_gc` → `intake_course`)
@@ -64,7 +65,7 @@ Current counts:
     - New support: `StudentChargeTimingResolver` — EGC vs Tuition billing by semester & stage (EGC until `intake_major` transition)
 - Finance operations include student-centric Settlement Worklist at `finance/operations/settlement`; legacy `payments/auto-allocate` UI redirects there.
 - Finance generation/migration flows include backfill commands for voucher and scholarship headers + `discount_allocations`. Zero-amount tuition terms no longer create invoices.
-- DNG payment gateway integration (2026-03-26):
+- DNG payment gateway integration (2026-03-26, updated 2026-04-16):
     - Tables: `dng_payment_requests` (audit), `dng_webhook_events` (webhook audit)
     - Controllers: `DngPaymentController` (API), `DngWebhookController` (webhook receiver)
     - Admin controllers: `DngPaymentRequestController`, `DngWebhookEventController`
@@ -76,7 +77,11 @@ Current counts:
     - Permissions: `create_finance_payments`, `view_finance_dng_payment_requests`, `view_finance_dng_webhook_events`
     - Webhook event list is cross-campus; webhook detail access still validates linked request `campus_code` or orphan payload campus code
     - Webhook flow is inbox-first: controller stores raw callback immediately, queue processing applies checksum/business validation later, and event lifecycle now uses `received`, `processing`, `processed`, `failed_retryable`, `failed_terminal`, `mismatch`, `skipped`
-    - Config: `DNG_CAMPUS_CODE` env var mapped to `config('services.dng.campus_code')`, `student_code` field is string (MSSV not DB ID)
+    - Campus mapping: `campuses.dng_code` is the per-campus source of truth for DNG `CampusCode`
+    - Replacement rule: same `student + fee_type` keeps only one active unpaid DNG request locally; older unpaid requests move to `cancelled` only after the newer push succeeds
+    - Cancelled requests are terminal for webhook/reconciliation processing
+    - Student DNG request API now accepts `cancelled` in status filtering
+    - `student_code` field is string (MSSV not DB ID)
 
 Verified entry points:
 
@@ -108,7 +113,7 @@ Current frontend integration posture:
 ## 6) Ops/Delivery Baseline
 
 - CI workflows exist but are disabled (fully commented out): `deploy.yml`, `lint.yml`, `tests.yml`.
-- Script/compose path drift still present (missing helper scripts; root path assumptions vs `docker/*` files).
+- Docker-first local command wrappers are now documented around `./scripts/dev.sh`; remaining script/compose path drift should be measured against that wrapper flow.
 - Deployment/runtime artifacts still expose security risks (hardcoded defaults/credentials and public DB port mapping in production compose files).
 
 ## 7) Documentation Baseline

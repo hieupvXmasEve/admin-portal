@@ -1,6 +1,6 @@
 # Project Roadmap
 
-Last updated: 2026-03-26  
+Last updated: 2026-04-16  
 Owner: Platform Team  
 Status: Active execution baseline  
 Horizon: next 2-3 quarters
@@ -24,7 +24,15 @@ Horizon: next 2-3 quarters
     - disabled CI workflows
     - deployment/script/security drift
 
-Recent activity through 2026-03-26:
+Recent activity through 2026-04-16:
+
+- 2026-04-16: DNG campus mapping and replacement rules updated
+    - `campuses.dng_code` added as nullable per-campus DNG mapping
+    - DNG create/reconcile flows now resolve external `CampusCode` from `campuses.dng_code`
+    - Campus CRUD now exposes `dng_code`
+    - Same `student + fee_type` DNG replacements now cancel older unpaid requests only after the new push succeeds
+    - Late webhook/reconciliation events for cancelled requests are skipped
+    - Local docs/rules now prefer Docker-first commands via `./scripts/dev.sh`
 
 - 2026-03-26: DNG payment gateway integration completed
     - Payment Creation UI at `/finance/payments/create`
@@ -34,7 +42,6 @@ Recent activity through 2026-03-26:
     - Admin audit pages: `/finance/dng/payment-requests`, `/finance/dng/webhook-events`
     - Audit tables: `dng_payment_requests`, `dng_webhook_events`
     - Permission gates: `create_finance_payments`, `view_finance_dng_payment_requests`, `view_finance_dng_webhook_events`
-    - DNG campus code now env-configurable via `DNG_CAMPUS_CODE` (config: `services.dng.campus_code`)
     - Fixed: `DngClient::insertNewRecord()` uses `student_code` (string MSSV) not `student_id` (int DB PK)
 - 2026-03-25: Finance settlement v2 landed with invoice-line truth model
     - `PaymentApplication` replaces `payment_allocations` as cash application truth
