@@ -171,7 +171,16 @@ class StudentService
             // Update student data with only allowed fields
             $student->update($filteredData);
 
-            return $student->fresh(['campus', 'program', 'specialization', 'curriculumVersion', 'parentProfiles']);
+            if (array_key_exists('email', $filteredData) && $student->user) {
+                $student->user->update([
+                    'email' => $filteredData['email'],
+                ]);
+            }
+
+            $student->refresh();
+            $student->load(['campus', 'program', 'specialization', 'curriculumVersion', 'parentProfiles']);
+
+            return $student;
         });
     }
 

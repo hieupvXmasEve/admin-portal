@@ -21,19 +21,15 @@ class UpdateStudentRequest extends FormRequest
     public function rules(): array
     {
         // Only allow updating fields that are displayed on the UI
-        $studentId = $this->route('student')->id;
-        $student = $this->route('student');
+        $studentRouteParameter = $this->route('student');
+        $student = $studentRouteParameter instanceof Student
+            ? $studentRouteParameter
+            : Student::query()->findOrFail((int) $studentRouteParameter);
+        $studentId = $student->id;
 
         $rules = [
             // Personal Information
             'full_name' => ['required', 'string', 'max:100'],
-            'email' => [
-                'required',
-                'string',
-                'email',
-                'max:255',
-                Rule::unique('students')->ignore($studentId),
-            ],
             'phone' => ['nullable', 'string', 'max:20'],
             'avatar_url' => ['nullable', 'string', 'url', 'max:255'],
             'date_of_birth' => ['nullable', 'date'],
@@ -73,6 +69,22 @@ class UpdateStudentRequest extends FormRequest
             // Parent User
             'parent_name' => ['nullable', 'string', 'max:255'],
         ];
+
+        $studentEmailRules = [
+            'required',
+            'string',
+            'email',
+            'max:255',
+            Rule::unique('students')->ignore($studentId),
+        ];
+
+        if ($student->user_id) {
+            $studentEmailRules[] = Rule::unique('users', 'email')->ignore($student->user_id);
+        } else {
+            $studentEmailRules[] = Rule::unique('users', 'email');
+        }
+
+        $rules['email'] = $studentEmailRules;
 
         // Build parent_email validation rules
         // Note: nullable rule must come before unique to skip unique check when value is null
