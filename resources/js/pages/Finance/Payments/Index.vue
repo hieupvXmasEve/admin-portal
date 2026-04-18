@@ -123,9 +123,6 @@ const getSourceLabel = (source: string) => {
                     Create Payment
                 </Button>
             </Link>
-            <Link :href="route('finance.payments.import')">
-                <Button variant="outline"> Import Payments </Button>
-            </Link>
         </div>
     </div>
 

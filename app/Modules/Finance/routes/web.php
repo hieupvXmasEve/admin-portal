@@ -100,18 +100,6 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::get('/{student}/dng-data', [PaymentController::class, 'getStudentDngData'])
             ->middleware('can:create_finance_payments')
             ->name('student-dng-data');
-        Route::get('/import', [PaymentController::class, 'import'])
-            ->middleware('can:import_finance_payments')
-            ->name('import');
-        Route::get('/import/template', [PaymentController::class, 'downloadTemplate'])
-            ->middleware('can:import_finance_payments')
-            ->name('import.template');
-        Route::post('/import/preview', [PaymentController::class, 'previewImport'])
-            ->middleware('can:import_finance_payments')
-            ->name('import.preview');
-        Route::post('/import/store', [PaymentController::class, 'storeImport'])
-            ->middleware('can:import_finance_payments')
-            ->name('import.store');
         Route::get('/auto-allocate', [PaymentController::class, 'showAutoAllocate'])
             ->middleware('can:allocate_finance_payment')
             ->name('auto-allocate.show');

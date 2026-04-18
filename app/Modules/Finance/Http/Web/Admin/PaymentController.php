@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Responses\ApiResponse;
 use App\Models\FinanceCharge as FinanceChargeModel;
 use App\Models\Payment;
 use App\Models\Semester;
@@ -14,8 +13,6 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Actions\AllocatePaymentAction;
-use App\Modules\Finance\Actions\PreviewPaymentImportAction;
-use App\Modules\Finance\Actions\StorePaymentImportAction;
 use App\Modules\Finance\Queries\GetPaymentDetailsQuery;
 use App\Modules\Finance\Queries\ListPaymentsQuery;
 use App\Modules\Finance\Queries\Operations\PreviewAutoAllocateQuery;
@@ -195,39 +192,6 @@ class PaymentController extends Controller
             ->all();
     }
 
-    public function import()
-    {
-        return Inertia::render('Finance/Payments/Import');
-    }
-
-    public function previewImport(Request $request, PreviewPaymentImportAction $action)
-    {
-        $request->validate([
-            'file' => 'required|file|mimes:xlsx,xls,csv',
-        ]);
-
-        $result = $action->run($request->file('file'));
-
-        return ApiResponse::success($result, [], 'File preview generated successfully');
-    }
-
-    public function storeImport(Request $request, StorePaymentImportAction $action)
-    {
-        $request->validate([
-            'rows' => 'required|array',
-            'rows.*.student_id' => 'required|exists:students,id',
-            'rows.*.amount' => 'required|numeric|min:0',
-            'rows.*.paid_at' => 'required|date',
-            // other validation
-        ]);
-
-        $result = $action->run($request->input('rows'), $request->user()->id);
-
-        $importedCount = $result['imported_count'] ?? 0;
-
-        return ApiResponse::success($result, [], "Successfully imported {$importedCount} payments");
-    }
-
     public function allocate(int $id, Request $request, AllocatePaymentAction $action)
     {
         $payment = Payment::findOrFail($id);
@@ -247,11 +211,6 @@ class PaymentController extends Controller
         );
 
         return back()->with('success', 'Payment allocated successfully.');
-    }
-
-    public function downloadTemplate()
-    {
-        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\PaymentImportTemplateExport, 'payment_import_template.xlsx');
     }
 
     public function showAutoAllocate()

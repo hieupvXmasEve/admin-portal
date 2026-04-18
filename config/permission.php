@@ -332,7 +332,6 @@ return [
             'void_finance_charges' => 'void_finance_charges',
             // Payments
             'view_finance_payments' => 'view_finance_payments',
-            'import_finance_payments' => 'import_finance_payments',
             'allocate_finance_payment' => 'allocate_finance_payment',
             'view_finance_payment_details' => 'view_finance_payment_details',
             'create_finance_payments' => 'create_finance_payments',
