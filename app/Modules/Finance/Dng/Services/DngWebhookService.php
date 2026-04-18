@@ -230,7 +230,7 @@ class DngWebhookService
                 occurredAt: CarbonImmutable::now(),
                 aggregateType: 'dng_payment_request',
                 aggregateId: (string) $request->id,
-                campusId: null,
+                campusId: $student?->campus_id ? (int) $student->campus_id : null,
                 actorUserId: null,
                 payload: [
                     'type_key' => 'dng_payment_received',

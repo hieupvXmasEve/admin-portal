@@ -23,6 +23,7 @@ return [
         'global_event_allowlist' => [
             'system.security',
             'system.announcement.global',
+            'finance.dng_payment_allocated',
         ],
     ],
 
