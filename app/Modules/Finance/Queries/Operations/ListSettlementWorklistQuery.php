@@ -137,6 +137,7 @@ class ListSettlementWorklistQuery
                         return [
                             'id' => $invoice->id,
                             'invoice_number' => $invoice->invoice_number,
+                            'semester_id' => $invoice->semester_id,
                             'semester_name' => $invoice->semester?->name,
                             'status' => $invoice->status,
                             'due_date' => $invoice->due_date?->toDateString(),

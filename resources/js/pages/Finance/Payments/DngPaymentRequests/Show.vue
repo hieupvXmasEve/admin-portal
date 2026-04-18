@@ -22,6 +22,12 @@ interface Props {
         student_code: string;
         fee_type: string;
         description: string | null;
+        semester: {
+            id: number;
+            name: string;
+            code: string;
+        } | null;
+        due_date: string | null;
         item_id: string;
         amount: number;
         status: string;
@@ -118,6 +124,8 @@ const getStatusClass = (status: string) => {
                 <CardContent class="space-y-2 text-sm">
                     <div><span class="text-muted-foreground">Fee type:</span> {{ request.fee_type }}</div>
                     <div><span class="text-muted-foreground">Description:</span> {{ request.description || '-' }}</div>
+                    <div><span class="text-muted-foreground">Semester:</span> {{ request.semester ? `${request.semester.name} (${request.semester.code})` : '-' }}</div>
+                    <div><span class="text-muted-foreground">Due date:</span> {{ request.due_date || '-' }}</div>
                     <div>
                         <span class="text-muted-foreground">Item:</span> <span class="font-mono">{{ request.item_id }}</span>
                     </div>

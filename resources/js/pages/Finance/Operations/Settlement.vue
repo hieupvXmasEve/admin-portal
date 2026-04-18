@@ -24,6 +24,7 @@ import { route } from 'ziggy-js';
 interface SettlementInvoice {
     id: number;
     invoice_number: string;
+    semester_id: number;
     semester_name: string | null;
     status: string;
     due_date: string | null;
@@ -191,6 +192,9 @@ const openCreateDngDialog = (student: SettlementStudent) => {
     isCreateDngDialogOpen.value = true;
 };
 
+const getDefaultDngInvoice = (student: SettlementStudent): SettlementInvoice | null =>
+    student.invoices.find((invoice) => invoice.remaining_amount > 0) ?? null;
+
 const redirectToCreateDngRequest = () => {
     if (!dngTargetStudent.value) {
         return;
@@ -204,10 +208,14 @@ const redirectToCreateDngRequest = () => {
         return;
     }
 
+    const defaultInvoice = getDefaultDngInvoice(dngTargetStudent.value);
+
     router.get(route('finance.payments.create'), {
         student_id: dngTargetStudent.value.student_id,
         amount: dngTargetStudent.value.net_amount_to_collect,
         description,
+        semester_id: defaultInvoice?.semester_id,
+        due_date: defaultInvoice?.due_date ?? undefined,
         source_context: 'settlement_no_cash',
     });
 };

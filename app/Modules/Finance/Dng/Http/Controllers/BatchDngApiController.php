@@ -28,6 +28,8 @@ class BatchDngApiController extends Controller
             'records.*.amount' => 'required|numeric|min:1',
             'records.*.type' => 'required|string|max:20',
             'records.*.description' => 'required|string|max:255',
+            'records.*.semester_id' => 'required|integer|exists:semesters,id',
+            'records.*.due_date' => 'required|date',
             'records.*.estimate_time' => 'required|string|max:10',
         ]);
 
@@ -49,6 +51,8 @@ class BatchDngApiController extends Controller
                 'student_code' => $student->student_id,
                 'type' => $record['type'],
                 'amount' => (float) $record['amount'],
+                'semester_id' => (int) $record['semester_id'],
+                'due_date' => $record['due_date'],
                 'item_id' => Str::uuid()->toString(),
                 'student_name' => $student->full_name,
                 'email' => $student->email ?? '',

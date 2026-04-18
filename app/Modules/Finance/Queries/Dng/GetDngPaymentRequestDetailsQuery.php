@@ -15,6 +15,7 @@ class GetDngPaymentRequestDetailsQuery
         $paymentRequest = DngPaymentRequest::query()
             ->with([
                 'student:id,campus_id,student_id,full_name,email',
+                'semester:id,name,code',
                 'payment.student:id,student_id,full_name',
                 'webhookEvents' => fn ($builder) => $builder->orderByDesc('created_at'),
             ])
@@ -34,6 +35,12 @@ class GetDngPaymentRequestDetailsQuery
             'student_code' => $paymentRequest->student_code,
             'fee_type' => $paymentRequest->fee_type,
             'description' => $paymentRequest->description,
+            'semester' => $paymentRequest->semester ? [
+                'id' => $paymentRequest->semester->id,
+                'name' => $paymentRequest->semester->name,
+                'code' => $paymentRequest->semester->code,
+            ] : null,
+            'due_date' => $paymentRequest->due_date?->toDateString(),
             'item_id' => $paymentRequest->item_id,
             'amount' => (float) $paymentRequest->amount,
             'status' => $paymentRequest->status,

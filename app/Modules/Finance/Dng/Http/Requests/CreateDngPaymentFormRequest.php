@@ -20,10 +20,12 @@ class CreateDngPaymentFormRequest extends FormRequest
     {
         return [
             'student_id' => ['required', 'integer', 'exists:students,id'],
+            'semester_id' => ['required', 'integer', 'exists:semesters,id'],
             'campus_code' => ['nullable', 'string', 'max:20'],
             'student_code' => ['nullable', 'string', 'max:50'],
             'fee_type' => ['required', 'string', 'max:20'],
             'description' => ['required', 'string', 'max:255'],
+            'due_date' => ['required', 'date'],
             'item_id' => ['required', 'string', 'max:100'],
             'amount' => ['required', 'numeric', 'min:1'],
             'type' => ['nullable', 'string', 'max:20'],

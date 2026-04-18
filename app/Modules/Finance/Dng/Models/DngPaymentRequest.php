@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Dng\Models;
 
 use App\Models\Payment;
+use App\Models\Semester;
 use App\Models\Student;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -46,6 +47,8 @@ class DngPaymentRequest extends Model
         'student_code',
         'fee_type',
         'description',
+        'semester_id',
+        'due_date',
         'item_id',
         'amount',
         'status',
@@ -67,6 +70,7 @@ class DngPaymentRequest extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'due_date' => 'date',
             'invoice_date' => 'datetime',
             'paid_at' => 'datetime',
             'push_payload' => 'array',
@@ -88,6 +92,11 @@ class DngPaymentRequest extends Model
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class);
+    }
+
+    public function semester(): BelongsTo
+    {
+        return $this->belongsTo(Semester::class);
     }
 
     public function webhookEvents(): HasMany

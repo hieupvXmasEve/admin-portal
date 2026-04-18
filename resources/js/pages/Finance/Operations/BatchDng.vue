@@ -2,14 +2,16 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import DatePicker from '@/components/ui/DatePicker.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useApi } from '@/composables';
+import { useApi, useGlobalConfirmDialog } from '@/composables';
 import type { PaginatedResponse } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowLeft, Send } from 'lucide-vue-next';
+import { ArrowLeft, CalendarIcon, Send } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
@@ -26,16 +28,27 @@ interface BatchStudent {
 interface Props {
     students: PaginatedResponse<BatchStudent>;
     feeTypes: { value: string; label: string }[];
+    semesters: Array<{
+        id: number;
+        name: string;
+        code: string;
+    }>;
 }
 
 const props = defineProps<Props>();
 const api = useApi();
+const confirmDialog = useGlobalConfirmDialog();
 
 // Common batch settings (mirrors single DNG create form)
 const now = new Date();
 const commonType = ref('HP');
 const feeDescription = ref('');
+const commonSemesterId = ref('');
+const commonDueDate = ref('');
 const estimateTime = ref(`${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}`);
+const estimateTimePickerOpen = ref(false);
+const estimateMonth = ref(String(now.getMonth() + 1).padStart(2, '0'));
+const estimateYear = ref(String(now.getFullYear()));
 
 // Per-student overrides
 const amountOverrides = ref<Record<number, number>>({});
@@ -84,24 +97,72 @@ const totalAmount = computed(() =>
     }, 0),
 );
 
-const handleSubmit = async () => {
-    if (selectedIds.value.length === 0) return;
+const estimateMonthOptions = [
+    { value: '01', label: 'Tháng 01' },
+    { value: '02', label: 'Tháng 02' },
+    { value: '03', label: 'Tháng 03' },
+    { value: '04', label: 'Tháng 04' },
+    { value: '05', label: 'Tháng 05' },
+    { value: '06', label: 'Tháng 06' },
+    { value: '07', label: 'Tháng 07' },
+    { value: '08', label: 'Tháng 08' },
+    { value: '09', label: 'Tháng 09' },
+    { value: '10', label: 'Tháng 10' },
+    { value: '11', label: 'Tháng 11' },
+    { value: '12', label: 'Tháng 12' },
+];
 
+const estimateYearOptions = Array.from({ length: 6 }, (_, index) => {
+    const year = now.getFullYear() - 1 + index;
+
+    return {
+        value: String(year),
+        label: `Năm ${year}`,
+    };
+});
+
+const applyEstimateTimeSelection = () => {
+    estimateTime.value = `${estimateMonth.value}/${estimateYear.value.slice(-2)}`;
+    estimateTimePickerOpen.value = false;
+};
+
+const validateBatchSettings = (): boolean => {
+    if (selectedIds.value.length === 0) {
+        return false;
+    }
+
+    if (!feeDescription.value.trim()) {
+        toast.error('Vui lòng nhập mô tả khoản phí');
+        return false;
+    }
+
+    if (!commonSemesterId.value) {
+        toast.error('Vui lòng chọn kỳ học nội bộ');
+        return false;
+    }
+
+    if (!commonDueDate.value) {
+        toast.error('Vui lòng chọn hạn thanh toán nội bộ');
+        return false;
+    }
+
+    return true;
+};
+
+const submitBatchDng = async () => {
     isSubmitting.value = true;
-    try {
-        if (!feeDescription.value.trim()) {
-            toast.error('Vui lòng nhập mô tả khoản phí');
-            isSubmitting.value = false;
-            return;
-        }
 
+    try {
         const records = selectedIds.value.map((id) => {
             const s = props.students.data.find((s) => s.student_id === id)!;
+
             return {
                 student_id: id,
                 amount: getAmount(s),
                 type: commonType.value,
                 description: feeDescription.value.trim(),
+                semester_id: Number(commonSemesterId.value),
+                due_date: commonDueDate.value,
                 estimate_time: estimateTime.value,
             };
         });
@@ -115,9 +176,28 @@ const handleSubmit = async () => {
         amountOverrides.value = {};
     } catch (e: any) {
         toast.error(e.message ?? 'Không thể tạo DNG hàng loạt');
+        throw e;
     } finally {
         isSubmitting.value = false;
     }
+};
+
+const handleSubmit = () => {
+    if (!validateBatchSettings() || isSubmitting.value) {
+        return;
+    }
+
+    confirmDialog.showConfirmDialog(
+        {
+            title: 'Xác nhận tạo DNG hàng loạt',
+            message: `Bạn có chắc muốn tạo ${selectedIds.value.length} yêu cầu DNG với tổng số tiền ${formatCurrency(totalAmount.value)} không?`,
+            confirmText: 'Xác nhận tạo',
+            cancelText: 'Hủy',
+        },
+        {
+            onConfirm: submitBatchDng,
+        },
+    );
 };
 </script>
 
@@ -151,7 +231,7 @@ const handleSubmit = async () => {
                 <CardTitle class="text-base">Cài đặt chung</CardTitle>
             </CardHeader>
             <CardContent>
-                <div class="grid gap-4 sm:grid-cols-3">
+                <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <div class="space-y-2">
                         <Label>Loại phí</Label>
                         <Select v-model="commonType">
@@ -170,8 +250,62 @@ const handleSubmit = async () => {
                         <Input v-model="feeDescription" placeholder="VD: Học phí kỳ 1 năm học 2025-2026" />
                     </div>
                     <div class="space-y-2">
+                        <Label>Kỳ học nội bộ <span class="text-red-500">*</span></Label>
+                        <Select v-model="commonSemesterId">
+                            <SelectTrigger>
+                                <SelectValue placeholder="Chọn kỳ học" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="semester in props.semesters" :key="semester.id" :value="semester.id.toString()">
+                                    {{ semester.name }} ({{ semester.code }})
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div class="space-y-2">
+                        <Label>Hạn thanh toán nội bộ <span class="text-red-500">*</span></Label>
+                        <DatePicker v-model="commonDueDate" placeholder="Chọn hạn thanh toán" />
+                    </div>
+                    <div class="space-y-2 xl:col-span-2">
                         <Label>Thời hạn thanh toán (MM/YY)</Label>
-                        <Input v-model="estimateTime" placeholder="04/26" maxlength="5" />
+                        <Popover v-model:open="estimateTimePickerOpen">
+                            <PopoverTrigger as-child>
+                                <Button variant="outline" class="w-full justify-start text-left font-normal">
+                                    <CalendarIcon class="mr-2 h-4 w-4" />
+                                    {{ estimateTime || 'Chọn tháng/năm' }}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent class="w-72 space-y-4 p-4" align="start">
+                                <div class="space-y-2">
+                                    <Label>Tháng</Label>
+                                    <Select v-model="estimateMonth">
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Chọn tháng" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem v-for="month in estimateMonthOptions" :key="month.value" :value="month.value">
+                                                {{ month.label }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div class="space-y-2">
+                                    <Label>Năm</Label>
+                                    <Select v-model="estimateYear">
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Chọn năm" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem v-for="year in estimateYearOptions" :key="year.value" :value="year.value">
+                                                {{ year.label }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <Button type="button" class="w-full" @click="applyEstimateTimeSelection">Áp dụng</Button>
+                            </PopoverContent>
+                        </Popover>
+                        <p class="text-muted-foreground text-xs">Chọn theo tháng/năm, hệ thống lưu chuỗi MM/YY cho DNG.</p>
                     </div>
                 </div>
             </CardContent>

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Semester;
+use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
 use App\Modules\Finance\Queries\Operations\ListSettlementWorklistQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -27,12 +29,16 @@ class BatchDngPageController extends Controller
             'students' => $data['students'],
             'summary' => $data['summary'],
             'filters' => $data['filters'],
-            'feeTypes' => [
-                ['value' => 'HP', 'label' => 'Học phí (HP)'],
-                // ['value' => 'KHAC', 'label' => 'Khác (KHAC)'],
-                // ['value' => 'HL', 'label' => 'Học liệu (HL)'],
-                // ['value' => 'PNH', 'label' => 'Phòng nội học (PNH)'],
-            ],
+            'semesters' => Semester::query()
+                ->orderByDesc('start_date')
+                ->get(['id', 'name', 'code'])
+                ->map(fn (Semester $semester) => [
+                    'id' => $semester->id,
+                    'name' => $semester->name,
+                    'code' => $semester->code,
+                ])
+                ->all(),
+            'feeTypes' => DngFeeTypeOptions::all(),
         ]);
     }
 }

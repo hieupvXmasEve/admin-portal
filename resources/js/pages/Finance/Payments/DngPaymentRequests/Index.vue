@@ -29,6 +29,12 @@ interface DngPaymentRequestRow {
     student_code: string;
     fee_type: string;
     description: string | null;
+    semester: {
+        id: number;
+        name: string;
+        code: string;
+    } | null;
+    due_date: string | null;
     item_id: string;
     amount: number;
     status: string;
@@ -313,6 +319,10 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
                         <div class="space-y-1">
                             <Badge variant="outline">{{ row.original.fee_type }}</Badge>
                             <div class="text-muted-foreground text-xs">{{ row.original.description || 'No description' }}</div>
+                            <div class="text-muted-foreground text-xs">
+                                {{ row.original.semester ? `${row.original.semester.name} (${row.original.semester.code})` : 'No semester' }}
+                                <span v-if="row.original.due_date"> • Due {{ row.original.due_date }}</span>
+                            </div>
                             <div class="font-mono text-xs">{{ row.original.item_id }}</div>
                         </div>
                     </template>

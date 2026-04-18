@@ -8,8 +8,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\FinanceCharge as FinanceChargeModel;
 use App\Models\Payment;
+use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Actions\AllocatePaymentAction;
 use App\Modules\Finance\Actions\PreviewPaymentImportAction;
@@ -53,6 +55,8 @@ class PaymentController extends Controller
     {
         return Inertia::render('Finance/Payments/Create', [
             'prefill' => $this->buildCreatePrefill($request),
+            'semesters' => $this->buildSemesterOptions(),
+            'feeTypes' => DngFeeTypeOptions::all(),
         ]);
     }
 
@@ -125,6 +129,8 @@ class PaymentController extends Controller
      *     amount: float|null,
      *     fee_type: string,
      *     description: string,
+     *     semester_id: int|null,
+     *     due_date: string,
      *     source_context: string|null,
      * }|null
      */
@@ -135,6 +141,8 @@ class PaymentController extends Controller
             'amount' => ['nullable', 'numeric', 'min:1'],
             'fee_type' => ['nullable', 'string', 'max:20'],
             'description' => ['nullable', 'string', 'max:255'],
+            'semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
+            'due_date' => ['nullable', 'date'],
             'source_context' => ['nullable', 'string', 'max:50'],
         ]);
 
@@ -165,8 +173,26 @@ class PaymentController extends Controller
             'amount' => isset($validated['amount']) ? (float) $validated['amount'] : null,
             'fee_type' => (string) ($validated['fee_type'] ?? 'HP'),
             'description' => (string) ($validated['description'] ?? ''),
+            'semester_id' => isset($validated['semester_id']) ? (int) $validated['semester_id'] : null,
+            'due_date' => isset($validated['due_date']) ? (string) $validated['due_date'] : '',
             'source_context' => $validated['source_context'] ?? null,
         ];
+    }
+
+    /**
+     * @return array<int, array{id: int, name: string, code: string}>
+     */
+    private function buildSemesterOptions(): array
+    {
+        return Semester::query()
+            ->orderByDesc('start_date')
+            ->get(['id', 'name', 'code'])
+            ->map(fn (Semester $semester) => [
+                'id' => $semester->id,
+                'name' => $semester->name,
+                'code' => $semester->code,
+            ])
+            ->all();
     }
 
     public function import()

@@ -2,15 +2,18 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import DatePicker from '@/components/ui/DatePicker.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumberField, NumberFieldContent, NumberFieldInput } from '@/components/ui/number-field';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApi, useStudentSearch } from '@/composables';
 import type { StudentBasic } from '@/types/finance';
 import { formatCurrency } from '@/utils/format';
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowLeft, CheckCircle2, Clock, Loader2, QrCode, Search } from 'lucide-vue-next';
+import { ArrowLeft, CalendarIcon, CheckCircle2, Clock, Loader2, QrCode, Search } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -47,11 +50,22 @@ interface PrefillProps {
     amount: number | null;
     fee_type: string;
     description: string;
+    semester_id: number | null;
+    due_date: string;
     source_context: string | null;
 }
 
 interface Props {
     prefill: PrefillProps | null;
+    semesters: Array<{
+        id: number;
+        name: string;
+        code: string;
+    }>;
+    feeTypes: Array<{
+        value: string;
+        label: string;
+    }>;
 }
 
 const props = defineProps<Props>();
@@ -68,10 +82,15 @@ const loadingDngData = ref(false);
 const amount = ref<number | null>(props.prefill?.amount ?? null);
 const feeType = ref(props.prefill?.fee_type ?? 'HP');
 const feeDescription = ref(props.prefill?.description ?? '');
+const semesterId = ref(props.prefill?.semester_id ? String(props.prefill.semester_id) : '');
+const dueDate = ref(props.prefill?.due_date ?? '');
 const itemId = ref('');
 // estimate_time in MM/YY format per DNG spec
 const now = new Date();
 const estimateTime = ref(`${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}`);
+const estimateTimePickerOpen = ref(false);
+const estimateMonth = ref(String(now.getMonth() + 1).padStart(2, '0'));
+const estimateYear = ref(String(now.getFullYear()));
 const submitting = ref(false);
 const dngResponse = ref<DngPaymentResponse | null>(null);
 const apiError = ref('');
@@ -81,7 +100,20 @@ if (studentDngData.value) {
 }
 
 // Computed
-const canSubmit = computed(() => selectedStudent.value && studentDngData.value && amount.value && amount.value > 0 && feeType.value && feeDescription.value.trim().length > 0 && itemId.value && !submitting.value && !dngResponse.value);
+const canSubmit = computed(
+    () =>
+        selectedStudent.value &&
+        studentDngData.value &&
+        amount.value &&
+        amount.value > 0 &&
+        feeType.value &&
+        feeDescription.value.trim().length > 0 &&
+        semesterId.value &&
+        dueDate.value &&
+        itemId.value &&
+        !submitting.value &&
+        !dngResponse.value,
+);
 
 // Student selection → fetch DNG data
 const selectStudent = async (student: StudentBasic) => {
@@ -111,9 +143,46 @@ const clearStudent = () => {
     studentDngData.value = null;
     amount.value = null;
     feeDescription.value = '';
+    semesterId.value = '';
+    dueDate.value = '';
     dngResponse.value = null;
     apiError.value = '';
     itemId.value = '';
+};
+
+const selectedSemesterLabel = computed(() => {
+    const matchedSemester = props.semesters.find((semester) => semester.id === Number(semesterId.value));
+
+    return matchedSemester ? `${matchedSemester.name} (${matchedSemester.code})` : null;
+});
+
+const estimateMonthOptions = [
+    { value: '01', label: 'Tháng 01' },
+    { value: '02', label: 'Tháng 02' },
+    { value: '03', label: 'Tháng 03' },
+    { value: '04', label: 'Tháng 04' },
+    { value: '05', label: 'Tháng 05' },
+    { value: '06', label: 'Tháng 06' },
+    { value: '07', label: 'Tháng 07' },
+    { value: '08', label: 'Tháng 08' },
+    { value: '09', label: 'Tháng 09' },
+    { value: '10', label: 'Tháng 10' },
+    { value: '11', label: 'Tháng 11' },
+    { value: '12', label: 'Tháng 12' },
+];
+
+const estimateYearOptions = Array.from({ length: 6 }, (_, index) => {
+    const year = now.getFullYear() - 1 + index;
+
+    return {
+        value: String(year),
+        label: `Năm ${year}`,
+    };
+});
+
+const applyEstimateTimeSelection = () => {
+    estimateTime.value = `${estimateMonth.value}/${estimateYear.value.slice(-2)}`;
+    estimateTimePickerOpen.value = false;
 };
 
 // Submit to DNG API
@@ -126,10 +195,12 @@ const handleSubmit = async () => {
     try {
         const payload = {
             student_id: studentDngData.value.student_id,
+            semester_id: Number(semesterId.value),
             campus_code: studentDngData.value.campus_code,
             student_code: studentDngData.value.student_code,
             fee_type: feeType.value,
             description: feeDescription.value.trim(),
+            due_date: dueDate.value,
             item_id: itemId.value,
             amount: amount.value,
             type: feeType.value,
@@ -290,14 +361,52 @@ const statusLabel = computed(() => {
                             <!-- Fee Type -->
                             <div class="space-y-2">
                                 <Label for="fee_type">Loại phí *</Label>
-                                <Input v-model="feeType" placeholder="VD: HP, LPT, ..." />
-                                <p class="text-muted-foreground text-xs">Mã loại phí trên hệ thống DNG</p>
+                                <Select v-model="feeType">
+                                    <SelectTrigger id="fee_type">
+                                        <SelectValue placeholder="Chọn loại phí" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem v-for="feeTypeOption in props.feeTypes" :key="feeTypeOption.value" :value="feeTypeOption.value">
+                                            {{ feeTypeOption.label }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p class="text-muted-foreground text-xs">Giá trị gửi sang DNG là mã in hoa đã chọn.</p>
                             </div>
                         </div>
 
                         <div class="space-y-2">
                             <Label for="fee_description">Mô tả khoản phí *</Label>
                             <Input id="fee_description" v-model="feeDescription" placeholder="Ví dụ: Thu học phí còn thiếu của invoice chưa thanh toán" />
+                        </div>
+
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="space-y-2">
+                                <Label for="semester_id">Kỳ học nội bộ *</Label>
+                                <Select v-model="semesterId">
+                                    <SelectTrigger id="semester_id">
+                                        <SelectValue placeholder="Chọn kỳ học" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem v-for="semester in props.semesters" :key="semester.id" :value="semester.id.toString()">
+                                            {{ semester.name }} ({{ semester.code }})
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div class="space-y-2">
+                                <Label for="due_date">Hạn thanh toán nội bộ *</Label>
+                                <DatePicker v-model="dueDate" placeholder="Chọn hạn thanh toán" />
+                            </div>
+                        </div>
+
+                        <div v-if="selectedSemesterLabel || dueDate" class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+                            <div class="font-medium text-slate-900">Metadata nội bộ để nhắc nợ/email</div>
+                            <div class="mt-1 text-slate-700">
+                                {{ selectedSemesterLabel || 'Chưa chọn kỳ học' }}
+                                <span v-if="dueDate"> • Due {{ dueDate }}</span>
+                            </div>
                         </div>
 
                         <div class="grid gap-4 sm:grid-cols-2">
@@ -310,8 +419,48 @@ const statusLabel = computed(() => {
                             <!-- Estimate Time (MM/YY format per DNG spec) -->
                             <div class="space-y-2">
                                 <Label for="estimate_time">Thời hạn thanh toán (MM/YY)</Label>
-                                <Input v-model="estimateTime" placeholder="05/26" />
-                                <p class="text-muted-foreground text-xs">Tháng/năm phân bổ, VD: 05/26</p>
+                                <Popover v-model:open="estimateTimePickerOpen">
+                                    <PopoverTrigger as-child>
+                                        <Button
+                                            id="estimate_time"
+                                            variant="outline"
+                                            class="w-full justify-start text-left font-normal"
+                                        >
+                                            <CalendarIcon class="mr-2 h-4 w-4" />
+                                            {{ estimateTime || 'Chọn tháng/năm' }}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent class="w-72 space-y-4 p-4" align="start">
+                                        <div class="space-y-2">
+                                            <Label>Tháng</Label>
+                                            <Select v-model="estimateMonth">
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Chọn tháng" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem v-for="month in estimateMonthOptions" :key="month.value" :value="month.value">
+                                                        {{ month.label }}
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <Label>Năm</Label>
+                                            <Select v-model="estimateYear">
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Chọn năm" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem v-for="year in estimateYearOptions" :key="year.value" :value="year.value">
+                                                        {{ year.label }}
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <Button type="button" class="w-full" @click="applyEstimateTimeSelection">Áp dụng</Button>
+                                    </PopoverContent>
+                                </Popover>
+                                <p class="text-muted-foreground text-xs">Chọn theo tháng/năm, hệ thống chỉ lưu chuỗi MM/YY cho DNG.</p>
                             </div>
                         </div>
 
@@ -356,7 +505,7 @@ const statusLabel = computed(() => {
 
                         <div class="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950">
                             <CheckCircle2 class="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
-                            <p class="text-sm text-blue-700 dark:text-blue-300">Yêu cầu đã được gửi đến DNG. Frontend student actions should fetch the third-party payment link from the dedicated student APIs before redirecting the student.</p>
+                            <p class="text-sm text-blue-700 dark:text-blue-300">Yêu cầu đã được gửi đến DNG.</p>
                         </div>
                     </CardContent>
                 </Card>

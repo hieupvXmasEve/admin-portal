@@ -180,6 +180,8 @@ it('renders the create payment page with settlement prefill and latest dng reque
         'amount' => 2500000,
         'fee_type' => 'HP',
         'description' => 'Outstanding tuition collected from settlement',
+        'semester_id' => $this->semester->id,
+        'due_date' => '2026-05-15',
         'source_context' => 'settlement_no_cash',
     ]));
 
@@ -187,9 +189,11 @@ it('renders the create payment page with settlement prefill and latest dng reque
     $response->assertInertia(fn ($page) => $page
         ->component('Finance/Payments/Create')
         ->where('prefill.student.id', $student->id)
-        ->where('prefill.amount', 2500000.0)
+        ->where('prefill.amount', 2500000)
         ->where('prefill.fee_type', 'HP')
         ->where('prefill.description', 'Outstanding tuition collected from settlement')
+        ->where('prefill.semester_id', $this->semester->id)
+        ->where('prefill.due_date', '2026-05-15')
         ->where('prefill.source_context', 'settlement_no_cash')
         ->where('prefill.dng_data.latest_dng_request.id', $dngRequest->id)
         ->where('prefill.dng_data.latest_dng_request.description', 'Outstanding tuition collected from settlement')
