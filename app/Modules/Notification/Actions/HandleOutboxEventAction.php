@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Notification\Actions;
 
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
+use App\Modules\Notification\Domain\Contracts\NotificationIntent;
+use App\Modules\Notification\EmailContent\EmailContentRegistry;
 use App\Modules\Notification\Enums\NotificationOutboxStatus;
 use App\Modules\Notification\Jobs\SendNotificationDeliveryJob;
 use App\Modules\Notification\Models\NotificationEventOutbox;
@@ -13,6 +16,7 @@ use App\Modules\Notification\Support\EventIntentMapper;
 use App\Modules\Notification\Support\NotificationAuditLogger;
 use App\Modules\Notification\Support\NotificationMetrics;
 use App\Modules\Notification\Support\RecipientResolver;
+use Illuminate\Support\Facades\Log;
 
 class HandleOutboxEventAction
 {
@@ -23,6 +27,7 @@ class HandleOutboxEventAction
         private readonly PersistIntentAction $persistIntentAction,
         private readonly NotificationAuditLogger $auditLogger,
         private readonly NotificationMetrics $metrics,
+        private readonly EmailContentRegistry $emailContentRegistry,
     ) {}
 
     public function run(NotificationEventOutbox $outbox): int
@@ -78,11 +83,14 @@ class HandleOutboxEventAction
                 continue;
             }
 
+            $renderedEmail = $this->buildRenderedEmail($intent, $envelope);
+
             $deliveries = $this->persistIntentAction->run(
                 $envelope,
                 $intent,
                 $resolved['resolved_user_ids'],
                 $allowChannels,
+                $renderedEmail,
             );
 
             foreach ($deliveries as $delivery) {
@@ -94,6 +102,68 @@ class HandleOutboxEventAction
         $this->markDispatched($outbox);
 
         return $queuedDeliveries;
+    }
+
+    /**
+     * Build rendered email content if a provider is registered for this type_key.
+     * Returns empty array if no provider registered (old path).
+     *
+     * @return array{rendered_subject?: string, rendered_html?: string, rendered_text?: string|null}
+     */
+    private function buildRenderedEmail(NotificationIntent $intent, DomainEventEnvelope $envelope): array
+    {
+        if (! $this->emailContentRegistry->has($intent->typeKey)) {
+            return [];
+        }
+
+        try {
+            $data = $this->buildEmailData($intent, $envelope);
+            $provider = $this->emailContentRegistry->resolve($intent->typeKey);
+
+            return [
+                'rendered_subject' => $provider->subject($data),
+                'rendered_html' => $provider->htmlBody($data),
+                'rendered_text' => $provider->textBody($data),
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('Failed to render email content, falling back to old path', [
+                'type_key' => $intent->typeKey,
+                'event_name' => $envelope->eventName,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
+     * Build the data array for email content rendering.
+     * Performs DB queries here so EmailContentProvider stays query-free.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildEmailData(NotificationIntent $intent, DomainEventEnvelope $envelope): array
+    {
+        $data = $intent->data;
+
+        $requestId = $data['dng_payment_request_id'] ?? null;
+
+        if ($requestId !== null) {
+            $request = DngPaymentRequest::with(['semester', 'student.program'])->find((int) $requestId);
+
+            if ($request !== null) {
+                $student = $request->student;
+                $data['student_name'] = $student?->full_name ?? $data['student_name'] ?? '';
+                $data['student_code'] = $request->student_code;
+                $data['semester_code'] = $request->semester?->code ?? '';
+                $data['program_name'] = $student?->program?->name ?? '';
+                $data['invoice_code'] = $request->item_id;
+                $data['amount_formatted'] = number_format((float) $request->amount, 0, ',', '.') . ' VNĐ';
+                $data['due_date'] = $request->due_date?->format('d/m/Y') ?? null;
+            }
+        }
+
+        return $data;
     }
 
     private function markDispatched(NotificationEventOutbox $outbox): void

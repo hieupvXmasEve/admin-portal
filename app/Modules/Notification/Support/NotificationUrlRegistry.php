@@ -25,7 +25,7 @@ final class NotificationUrlRegistry
         ],
         'finance.dng_payment_request' => [
             'web' => '/finance/operations/batch-dng',
-            'mobile' => '/finance/payments/{id}',
+            'mobile' => '/finance?tab=dng',
         ],
         'academic.enrollment' => [
             'web' => '/academic/enrollments/{id}',

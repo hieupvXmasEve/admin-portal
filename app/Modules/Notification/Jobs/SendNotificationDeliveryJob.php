@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Notification\Jobs;
 
 use App\Modules\Notification\Channels\EmailChannelAdapter;
+use App\Modules\Notification\Channels\RenderedEmailChannelAdapter;
 use App\Modules\Notification\Channels\RealtimeChannelAdapter;
 use App\Modules\Notification\Enums\NotificationDeliveryStatus;
 use App\Modules\Notification\Models\NotificationDelivery;
@@ -40,6 +41,7 @@ class SendNotificationDeliveryJob implements ShouldQueue
 
     public function handle(
         EmailChannelAdapter $emailChannelAdapter,
+        RenderedEmailChannelAdapter $renderedEmailChannelAdapter,
         RealtimeChannelAdapter $realtimeChannelAdapter,
     ): void {
         $delivery = NotificationDelivery::query()->with('message')->findOrFail($this->deliveryId);
@@ -53,7 +55,9 @@ class SendNotificationDeliveryJob implements ShouldQueue
         ])->save();
 
         $result = match ($delivery->channel->value) {
-            'email' => $emailChannelAdapter->send($delivery),
+            'email' => $delivery->rendered_subject !== null
+                ? $renderedEmailChannelAdapter->send($delivery)
+                : $emailChannelAdapter->send($delivery),
             'realtime' => $realtimeChannelAdapter->send($delivery),
             default => throw new RuntimeException('Unsupported notification channel: '.$delivery->channel->value),
         };

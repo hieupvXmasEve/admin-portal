@@ -16,9 +16,10 @@ class PersistIntentAction
     /**
      * @param  array<int, int>  $recipientUserIds
      * @param  array<int, string>  $allowChannels
+     * @param  array{rendered_subject?: string, rendered_html?: string, rendered_text?: string|null}  $renderedEmail
      * @return array<int, NotificationDelivery>
      */
-    public function run(DomainEventEnvelope $event, NotificationIntent $intent, array $recipientUserIds, array $allowChannels): array
+    public function run(DomainEventEnvelope $event, NotificationIntent $intent, array $recipientUserIds, array $allowChannels, array $renderedEmail = []): array
     {
         $deliveries = [];
 
@@ -42,15 +43,23 @@ class PersistIntentAction
             );
 
             foreach ($allowChannels as $channel) {
+                $deliveryData = [
+                    'status' => NotificationDeliveryStatus::Pending,
+                    'queued_at' => now(),
+                ];
+
+                if ($channel === 'email' && isset($renderedEmail['rendered_subject'])) {
+                    $deliveryData['rendered_subject'] = $renderedEmail['rendered_subject'];
+                    $deliveryData['rendered_html'] = $renderedEmail['rendered_html'] ?? null;
+                    $deliveryData['rendered_text'] = $renderedEmail['rendered_text'] ?? null;
+                }
+
                 $delivery = NotificationDelivery::query()->firstOrCreate(
                     [
                         'message_id' => $message->id,
                         'channel' => $channel,
                     ],
-                    [
-                        'status' => NotificationDeliveryStatus::Pending,
-                        'queued_at' => now(),
-                    ]
+                    $deliveryData
                 );
 
                 if ($delivery->status === NotificationDeliveryStatus::Pending) {
