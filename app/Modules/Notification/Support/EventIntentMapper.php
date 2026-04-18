@@ -51,6 +51,8 @@ class EventIntentMapper
 
         return match ($event->eventName) {
             'finance.invoice_paid' => 'invoice_paid',
+            'finance.dng_payment_received' => 'dng_payment_received',
+            'finance.dng_payment_allocated' => 'dng_payment_allocated',
             'academic.enrollment_confirmed' => 'enrollment_confirmed',
             'manual.notification_sent' => 'manual_notification',
             'query.ticket_submitted' => 'query_submitted',

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Dng\Services;
 
+use App\Models\Department;
 use App\Models\Payment;
 use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
@@ -11,6 +12,7 @@ use App\Modules\Finance\Services\PaymentService;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -263,7 +265,7 @@ class DngPaymentService
         string $description,
     ): void {
         try {
-            $formattedAmount = number_format((float) $amount, 0, ',', '.') . ' VNĐ';
+            $formattedAmount = number_format((float) $amount, 0, ',', '.').' VNĐ';
 
             $envelope = new DomainEventEnvelope(
                 eventId: (string) Str::uuid(),
@@ -304,6 +306,74 @@ class DngPaymentService
         }
     }
 
+    private function publishAllocationNotification(
+        DngPaymentRequest $request,
+        Payment $payment,
+        Collection $allocations,
+    ): void {
+        try {
+            $deptId = Department::query()->where('code', 'HQ')->value('id');
+
+            if ($deptId === null) {
+                Log::warning('DNG allocation notification: HQ department not found', [
+                    'dng_payment_request_id' => $request->id,
+                ]);
+
+                return;
+            }
+
+            $studentName = $request->student?->full_name ?? $request->student_code;
+            $studentCode = $request->student_code;
+            $formattedAmount = number_format((float) $payment->amount, 0, ',', '.').' VNĐ';
+
+            if ($allocations->isNotEmpty()) {
+                $count = $allocations->count();
+                $allocatedTotal = number_format((float) $allocations->sum('amount'), 0, ',', '.').' VNĐ';
+                $title = 'Phân bổ thanh toán thành công';
+                $body = "Đã phân bổ tự động {$count} khoản phí / {$allocatedTotal} từ thanh toán của SV {$studentName} ({$studentCode})";
+            } else {
+                $title = 'Cảnh báo: Không phân bổ được thanh toán';
+                $body = "Cảnh báo: Thanh toán {$formattedAmount} của SV {$studentName} ({$studentCode}) nhận được nhưng không tìm thấy khoản phí tồn đọng để phân bổ";
+            }
+
+            $envelope = new DomainEventEnvelope(
+                eventId: (string) Str::uuid(),
+                eventName: 'finance.dng_payment_allocated',
+                eventVersion: 1,
+                occurredAt: CarbonImmutable::now(),
+                aggregateType: 'dng_payment_request',
+                aggregateId: (string) $request->id,
+                campusId: null,
+                actorUserId: null,
+                payload: [
+                    'type_key' => 'dng_payment_allocated',
+                    'channels' => ['realtime'],
+                    'recipient_targets' => [
+                        ['type' => 'department', 'id' => $deptId],
+                    ],
+                    'data' => [
+                        'title' => $title,
+                        'body' => $body,
+                        'category' => 'finance',
+                        'is_important' => $allocations->isEmpty(),
+                        'student_name' => $studentName,
+                        'student_code' => $studentCode,
+                        'amount_formatted' => $formattedAmount,
+                        'allocated_count' => $allocations->count(),
+                        'dng_payment_request_id' => $request->id,
+                    ],
+                ],
+            );
+
+            $this->publishDomainEventAction->runAfterCommit($envelope);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to publish DNG allocation notification', [
+                'dng_payment_request_id' => $request->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     /**
      * Bridge a confirmed DNG payment into the canonical Payment system.
      * Called when a callback confirms the student has paid.
@@ -338,7 +408,9 @@ class DngPaymentService
             $request->update(['payment_id' => $payment->id]);
 
             // Auto-allocate the payment to outstanding charges
-            $this->paymentService->autoAllocatePayment($payment->id);
+            $allocations = $this->paymentService->autoAllocatePayment($payment->id);
+
+            $this->publishAllocationNotification($request, $payment, $allocations);
 
             Log::info('DNG payment bridged to canonical Payment', [
                 'dng_payment_request_id' => $request->id,

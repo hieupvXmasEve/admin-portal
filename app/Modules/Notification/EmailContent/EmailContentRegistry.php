@@ -6,6 +6,7 @@ namespace App\Modules\Notification\EmailContent;
 
 use App\Modules\Notification\EmailContent\Contracts\EmailContentProvider;
 use App\Modules\Notification\EmailContent\Types\DngPaymentPushedEmailContent;
+use App\Modules\Notification\EmailContent\Types\DngPaymentReceivedEmailContent;
 use InvalidArgumentException;
 
 final class EmailContentRegistry
@@ -13,6 +14,7 @@ final class EmailContentRegistry
     /** @var array<string, class-string<EmailContentProvider>> */
     private array $map = [
         'dng_payment_pushed' => DngPaymentPushedEmailContent::class,
+        'dng_payment_received' => DngPaymentReceivedEmailContent::class,
     ];
 
     public function has(string $typeKey): bool

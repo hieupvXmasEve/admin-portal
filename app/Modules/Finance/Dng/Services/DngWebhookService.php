@@ -6,13 +6,18 @@ namespace App\Modules\Finance\Dng\Services;
 
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
+use App\Modules\Notification\Actions\PublishDomainEventAction;
+use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class DngWebhookService
 {
     public function __construct(
         protected DngPaymentService $dngPaymentService,
         protected DngChecksumService $checksumService,
+        protected PublishDomainEventAction $publishDomainEventAction,
     ) {}
 
     /**
@@ -125,9 +130,13 @@ class DngWebhookService
 
         $request->transitionTo($targetStatus);
 
-        $this->ensurePaymentBridge($request->fresh());
+        $freshRequest = $request->fresh();
+
+        $this->ensurePaymentBridge($freshRequest);
 
         $event->markProcessed();
+
+        $this->publishPaymentReceivedNotification($freshRequest->fresh());
 
         Log::info('DNG webhook processed', [
             'event_id' => $event->id,
@@ -204,6 +213,52 @@ class DngWebhookService
     {
         if (! $request->hasBridgedPayment()) {
             $this->dngPaymentService->bridgeToPayment($request);
+        }
+    }
+
+    private function publishPaymentReceivedNotification(DngPaymentRequest $request): void
+    {
+        try {
+            $student = $request->student;
+            $studentName = $student?->full_name ?? '';
+            $formattedAmount = number_format((float) $request->amount, 0, ',', '.').' VNĐ';
+
+            $envelope = new DomainEventEnvelope(
+                eventId: (string) Str::uuid(),
+                eventName: 'finance.dng_payment_received',
+                eventVersion: 1,
+                occurredAt: CarbonImmutable::now(),
+                aggregateType: 'dng_payment_request',
+                aggregateId: (string) $request->id,
+                campusId: null,
+                actorUserId: null,
+                payload: [
+                    'type_key' => 'dng_payment_received',
+                    'channels' => ['realtime', 'email'],
+                    'recipient_targets' => [
+                        ['type' => 'student', 'id' => $request->student_id],
+                    ],
+                    'data' => [
+                        'title' => 'Xác nhận thanh toán thành công',
+                        'body' => "Hệ thống đã nhận được khoản thanh toán {$formattedAmount} của bạn.",
+                        'category' => 'finance',
+                        'is_important' => true,
+                        'dng_payment_request_id' => $request->id,
+                        'student_name' => $studentName,
+                        'student_code' => $request->student_code,
+                        'amount_formatted' => $formattedAmount,
+                        'semester_code' => $request->semester?->code ?? '',
+                        'paid_at' => $request->paid_at?->toISOString(),
+                    ],
+                ],
+            );
+
+            $this->publishDomainEventAction->run($envelope);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to publish DNG payment received notification', [
+                'dng_payment_request_id' => $request->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

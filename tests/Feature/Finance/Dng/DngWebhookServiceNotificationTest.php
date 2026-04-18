@@ -1,0 +1,153 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Models\Campus;
+use App\Models\CurriculumVersion;
+use App\Models\Program;
+use App\Models\Semester;
+use App\Models\Student;
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Models\DngWebhookEvent;
+use App\Modules\Finance\Dng\Services\DngChecksumService;
+use App\Modules\Finance\Dng\Services\DngPaymentService;
+use App\Modules\Finance\Dng\Services\DngWebhookService;
+use App\Modules\Notification\Models\NotificationEventOutbox;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    config([
+        'services.dng.hash_key' => '2CabGHY9XaBCyeTOXU48tlajCC5NrLE32G7pWoW3Jrtsw7FFGX7hMqFQC1IdMlRmFJL2hE2J',
+        'services.dng.access_code' => 'TEST_ACCESS',
+        'services.dng.client_code' => 'TEST_CLIENT',
+    ]);
+
+    $this->campus = Campus::factory()->create();
+    $this->semester = Semester::factory()->active()->create();
+    $this->program = Program::factory()->create();
+    $this->curriculumVersion = CurriculumVersion::factory()
+        ->forProgram($this->program)
+        ->withEffectiveSemester($this->semester)
+        ->create();
+
+    $this->student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'STU001',
+            'curriculum_version_id' => $this->curriculumVersion->id,
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+        ])
+        ->create();
+
+    $this->checksumService = app(DngChecksumService::class);
+});
+
+function makeWebhookRequest(Student $student, string $dngPaymentId, float $amount): DngPaymentRequest
+{
+    return DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'CAMPUS001',
+        'student_code' => 'STU001',
+        'fee_type' => 'tuition',
+        'item_id' => 'ITEM001',
+        'amount' => $amount,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+        'dng_transaction_id' => 'TXN001',
+        'dng_payment_id' => $dngPaymentId,
+        'push_payload' => [
+            'StudentId' => 'STU001',
+            'CampusCode' => 'CAMPUS001',
+            'Type' => 'tuition',
+            'Amount' => $amount,
+            'ItemId' => 'ITEM001',
+        ],
+    ]);
+}
+
+function makeWebhookEventForNotification(
+    DngPaymentRequest $request,
+    string $eventType,
+    DngChecksumService $checksumService,
+    array $overrides = []
+): DngWebhookEvent {
+    $payload = array_merge([
+        'CampusCode' => 'CAMPUS001',
+        'StudentId' => 'STU001',
+        'PaymentId' => $request->dng_payment_id,
+        'Amount' => (string) $request->amount,
+    ], $overrides);
+
+    if (! isset($overrides['CheckSum'])) {
+        $pushPayload = $request->push_payload;
+        $payload['CheckSum'] = $checksumService->generate(
+            'TEST_ACCESS'.'TEST_CLIENT'.
+            (string) $pushPayload['Amount'].
+            (string) ($payload['InvoiceSerialNumber'] ?? '').
+            (string) $pushPayload['StudentId'].
+            (string) $pushPayload['Type'].
+            (string) $pushPayload['CampusCode']
+        );
+    }
+
+    return DngWebhookEvent::create([
+        'dng_payment_id' => $request->dng_payment_id,
+        'dng_payment_request_id' => $request->id,
+        'event_type' => $eventType,
+        'payload_hash' => DngWebhookEvent::computePayloadHash($payload),
+        'headers' => [],
+        'payload' => $payload,
+        'is_valid_checksum' => false,
+        'processing_status' => DngWebhookEvent::STATUS_RECEIVED,
+        'received_at' => now(),
+    ]);
+}
+
+it('publishes finance.dng_payment_received outbox event on first PAID transition', function () {
+    $request = makeWebhookRequest($this->student, 'PAY001', 5000000);
+
+    $event = makeWebhookEventForNotification(
+        $request,
+        DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE,
+        $this->checksumService
+    );
+
+    $mockPaymentService = Mockery::mock(DngPaymentService::class);
+    $mockPaymentService->shouldReceive('bridgeToPayment')->once();
+    app()->instance(DngPaymentService::class, $mockPaymentService);
+
+    app(DngWebhookService::class)->processEvent($event);
+
+    expect(NotificationEventOutbox::where('event_name', 'finance.dng_payment_received')->exists())->toBeTrue();
+
+    $outbox = NotificationEventOutbox::where('event_name', 'finance.dng_payment_received')->first();
+    expect($outbox->payload['type_key'])->toBe('dng_payment_received')
+        ->and($outbox->payload['channels'])->toContain('realtime', 'email')
+        ->and($outbox->payload['recipient_targets'][0]['type'])->toBe('student')
+        ->and($outbox->payload['recipient_targets'][0]['id'])->toBe($this->student->id);
+});
+
+it('does not publish notification when webhook is a duplicate (markSkipped)', function () {
+    $request = makeWebhookRequest($this->student, 'PAY001', 5000000);
+    $request->update(['status' => DngPaymentRequest::STATUS_PAID_UNINVOICED]);
+
+    $event = makeWebhookEventForNotification(
+        $request,
+        DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE,
+        $this->checksumService
+    );
+
+    $mockPaymentService = Mockery::mock(DngPaymentService::class);
+    $mockPaymentService->shouldReceive('bridgeToPayment')->once();
+    app()->instance(DngPaymentService::class, $mockPaymentService);
+
+    app(DngWebhookService::class)->processEvent($event);
+
+    $event->refresh();
+    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_SKIPPED);
+    expect(NotificationEventOutbox::where('event_name', 'finance.dng_payment_received')->exists())->toBeFalse();
+});

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Notification\Support;
 
+use App\Models\Department;
+use App\Models\DepartmentMembership;
 use App\Models\Lecture;
 use App\Models\Student;
 use App\Models\User;
@@ -82,6 +84,27 @@ class RecipientResolver
                 }
 
                 $resolvedUserIds[] = (int) $lecture->user_id;
+
+                continue;
+            }
+
+            if ($type === 'department') {
+                if (! Department::query()->where('id', $id)->exists()) {
+                    $unresolved[] = ['type' => $type, 'id' => $id, 'reason' => 'department_not_found'];
+
+                    continue;
+                }
+
+                $memberUserIds = DepartmentMembership::query()
+                    ->where('department_id', $id)
+                    ->where('is_active', true)
+                    ->pluck('user_id')
+                    ->map(fn ($uid) => (int) $uid)
+                    ->all();
+
+                foreach ($memberUserIds as $uid) {
+                    $resolvedUserIds[] = $uid;
+                }
 
                 continue;
             }
