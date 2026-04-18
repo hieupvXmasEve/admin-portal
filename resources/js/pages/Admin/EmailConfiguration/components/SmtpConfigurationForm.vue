@@ -163,8 +163,8 @@ const onCancel = () => {
             <FormItem>
                 <FormLabel>Campus</FormLabel>
                 <Select
-                    :model-value="field.value != null ? String(field.value) : ''"
-                    @update:model-value="(v) => field.onChange(v ? Number(v) : null)"
+                    :model-value="field.value != null ? String(field.value) : '__global__'"
+                    @update:model-value="(v) => field.onChange(v === '__global__' ? null : Number(v))"
                 >
                     <FormControl>
                         <SelectTrigger>
@@ -172,7 +172,7 @@ const onCancel = () => {
                         </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                        <SelectItem value="">Global (shared)</SelectItem>
+                        <SelectItem value="__global__">Global (shared)</SelectItem>
                         <SelectItem v-for="campus in campuses" :key="campus.id" :value="String(campus.id)">
                             {{ campus.name }}
                         </SelectItem>

@@ -53,6 +53,7 @@ export function useSmtpConfiguration() {
         successful_tests: 0,
         test_success_rate: 0,
     });
+    const perCampusStats = ref<Record<string, { total: number; active: number }>>({});
 
     const isLoading = ref(false);
     const isRefreshing = ref(false);
@@ -66,13 +67,14 @@ export function useSmtpConfiguration() {
         try {
             const response = await api.get('/api/email-configurations');
 
-            if (response.data.value?.success && response.data.value.data) {
-                configurations.value = Array.isArray(response.data.value.data) ? response.data.value.data : (response.data.value.data as any).data || [];
-
-                // Handle statistics if present in the response
-                const stats = (response.data.value.data as any).statistics || (response.data.value as any).statistics;
-                if (stats) {
-                    statistics.value = stats;
+            const raw = response.data.value as any;
+            if (raw?.success) {
+                configurations.value = Array.isArray(raw.data) ? raw.data : [];
+                if (raw.statistics) {
+                    statistics.value = raw.statistics;
+                }
+                if (raw.per_campus_stats) {
+                    perCampusStats.value = raw.per_campus_stats;
                 }
             }
         } catch (error) {
@@ -226,6 +228,7 @@ export function useSmtpConfiguration() {
         // State
         configurations,
         statistics,
+        perCampusStats,
         isLoading,
         isRefreshing,
         testingConfigs,

@@ -24,11 +24,13 @@ class EmailConfigurationController extends Controller
         $campusId = session('current_campus_id') ? (int) session('current_campus_id') : null;
         $configurations = $this->smtpService->getAll($campusId);
         $statistics = $this->smtpService->getStatistics();
+        $perCampusStats = $this->smtpService->getStatisticsByCampus();
 
         return response()->json([
             'success' => true,
             'data' => $configurations,
             'statistics' => $statistics,
+            'per_campus_stats' => $perCampusStats,
         ]);
     }
 

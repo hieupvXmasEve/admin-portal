@@ -6,6 +6,7 @@ namespace App\Modules\Notification\Actions;
 
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use App\Modules\Notification\Enums\NotificationOutboxStatus;
+use App\Modules\Notification\Jobs\DispatchSingleOutboxEventJob;
 use App\Modules\Notification\Models\NotificationEventOutbox;
 use Illuminate\Support\Facades\DB;
 
@@ -13,7 +14,7 @@ class PublishDomainEventAction
 {
     public function run(DomainEventEnvelope $envelope): NotificationEventOutbox
     {
-        return NotificationEventOutbox::query()->firstOrCreate(
+        $outbox = NotificationEventOutbox::query()->firstOrCreate(
             ['event_id' => $envelope->eventId],
             [
                 'event_name' => $envelope->eventName,
@@ -27,6 +28,12 @@ class PublishDomainEventAction
                 'status' => NotificationOutboxStatus::Pending,
             ]
         );
+
+        if ($outbox->wasRecentlyCreated && (bool) config('notification.outbox.push_enabled', true)) {
+            DispatchSingleOutboxEventJob::dispatch($outbox->id)->afterCommit();
+        }
+
+        return $outbox;
     }
 
     public function runAfterCommit(DomainEventEnvelope $envelope): void

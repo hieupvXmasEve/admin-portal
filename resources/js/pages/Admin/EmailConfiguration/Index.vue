@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSmtpConfiguration } from '@/composables/useSmtpConfiguration';
 import { CheckCircleIcon, ClockIcon, PencilIcon, PlusIcon, RefreshCwIcon, ServerIcon, TestTubeIcon, TrashIcon, TrendingUpIcon } from 'lucide-vue-next';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import AddSmtpConfigurationModal from './components/AddSmtpConfigurationModal.vue';
 import EditSmtpConfigurationModal from './components/EditSmtpConfigurationModal.vue';
 
@@ -45,7 +45,14 @@ const props = defineProps<{
     currentCampusId: number | null;
 }>();
 
-const { configurations, statistics, isLoading, isRefreshing, testingConfigs, activatingConfigs, loadConfigurations, testConnection, setActiveConfiguration, deleteConfiguration: deleteConfig } = useSmtpConfiguration();
+const { configurations, statistics, perCampusStats, isLoading, isRefreshing, testingConfigs, activatingConfigs, loadConfigurations, testConnection, setActiveConfiguration, deleteConfiguration: deleteConfig } = useSmtpConfiguration();
+
+const campusStatRows = computed(() =>
+    props.campuses.map((campus) => {
+        const stat = perCampusStats.value[campus.id] ?? { total: 0, active: 0 };
+        return { ...campus, ...stat };
+    }),
+);
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
@@ -127,51 +134,80 @@ const formatDate = (dateString: string) => {
             </div>
         </div>
 
-        <!-- Statistics Cards -->
-        <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            <Card>
-                <CardHeader class="flex flex-row items-center justify-between pb-2">
-                    <CardTitle class="text-sm font-medium"> Total Configurations </CardTitle>
-                    <ServerIcon class="text-muted-foreground h-4 w-4" />
-                </CardHeader>
-                <CardContent>
-                    <div class="text-2xl font-bold">
-                        {{ statistics.total_configurations || 0 }}
-                    </div>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader class="flex flex-row items-center justify-between pb-2">
-                    <CardTitle class="text-sm font-medium"> Active Configurations </CardTitle>
-                    <CheckCircleIcon class="text-muted-foreground h-4 w-4" />
-                </CardHeader>
-                <CardContent>
-                    <div class="text-2xl font-bold">
-                        {{ statistics.active_configurations || 0 }}
-                    </div>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader class="flex flex-row items-center justify-between pb-2">
-                    <CardTitle class="text-sm font-medium">Tested Configurations</CardTitle>
-                    <TestTubeIcon class="text-muted-foreground h-4 w-4" />
-                </CardHeader>
-                <CardContent>
-                    <div class="text-2xl font-bold">
-                        {{ statistics.tested_configurations || 0 }}
-                    </div>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader class="flex flex-row items-center justify-between pb-2">
-                    <CardTitle class="text-sm font-medium">Success Rate</CardTitle>
-                    <TrendingUpIcon class="text-muted-foreground h-4 w-4" />
-                </CardHeader>
-                <CardContent>
-                    <div class="text-2xl font-bold">{{ statistics.test_success_rate || 0 }}%</div>
-                </CardContent>
-            </Card>
+        <!-- Statistics — All Campuses -->
+        <div>
+            <p class="mb-3 text-xs font-medium uppercase tracking-wide text-gray-400">All Campuses Overview</p>
+            <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                    <CardHeader class="flex flex-row items-center justify-between pb-2">
+                        <CardTitle class="text-sm font-medium">Total Configurations</CardTitle>
+                        <ServerIcon class="text-muted-foreground h-4 w-4" />
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-2xl font-bold">{{ statistics.total_configurations }}</div>
+                        <p class="text-muted-foreground mt-1 text-xs">across all campuses</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader class="flex flex-row items-center justify-between pb-2">
+                        <CardTitle class="text-sm font-medium">Active Configurations</CardTitle>
+                        <CheckCircleIcon class="text-muted-foreground h-4 w-4" />
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-2xl font-bold">{{ statistics.active_configurations }}</div>
+                        <p class="text-muted-foreground mt-1 text-xs">across all campuses</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader class="flex flex-row items-center justify-between pb-2">
+                        <CardTitle class="text-sm font-medium">Tested Configurations</CardTitle>
+                        <TestTubeIcon class="text-muted-foreground h-4 w-4" />
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-2xl font-bold">{{ statistics.tested_configurations }}</div>
+                        <p class="text-muted-foreground mt-1 text-xs">across all campuses</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader class="flex flex-row items-center justify-between pb-2">
+                        <CardTitle class="text-sm font-medium">Success Rate</CardTitle>
+                        <TrendingUpIcon class="text-muted-foreground h-4 w-4" />
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-2xl font-bold">{{ statistics.test_success_rate }}%</div>
+                        <p class="text-muted-foreground mt-1 text-xs">across all campuses</p>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
+
+        <!-- Per-Campus Breakdown -->
+        <Card v-if="props.campuses.length > 0">
+            <CardHeader class="pb-3">
+                <CardTitle class="text-sm font-medium">Configuration by Campus</CardTitle>
+            </CardHeader>
+            <CardContent class="pt-0">
+                <div class="divide-y">
+                    <div v-for="row in campusStatRows" :key="row.id" class="flex items-center justify-between py-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-medium">{{ row.name }}</span>
+                            <span class="text-muted-foreground text-xs">({{ row.code }})</span>
+                        </div>
+                        <div class="flex items-center gap-4 text-sm">
+                            <span class="text-muted-foreground">{{ row.total }} config{{ row.total !== 1 ? 's' : '' }}</span>
+                            <span v-if="row.active > 0" class="inline-flex items-center gap-1 text-green-600">
+                                <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
+                                {{ row.active }} active
+                            </span>
+                            <span v-else class="text-muted-foreground inline-flex items-center gap-1">
+                                <span class="h-1.5 w-1.5 rounded-full bg-gray-300"></span>
+                                no active
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
 
         <Card>
             <CardHeader>

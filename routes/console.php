@@ -64,8 +64,9 @@ Schedule::command('academic-records:aggregate-manual')
     ->onOneServer()
     ->runInBackground();
 
+// Safety-net: catches records missed by the push-based path (DispatchSingleOutboxEventJob).
 Schedule::command('notifications:process-outbox --limit=100')
-    ->everyMinute()
+    ->everyFiveMinutes()
     ->withoutOverlapping()
     ->onOneServer()
     ->runInBackground();

@@ -350,7 +350,7 @@ class SmtpConfigurationService
     }
 
     /**
-     * Get configuration statistics
+     * Get global configuration statistics (all campuses)
      */
     public function getStatistics(): array
     {
@@ -364,8 +364,26 @@ class SmtpConfigurationService
             'active_configurations' => $active,
             'tested_configurations' => $tested,
             'successful_tests' => $successful,
-            'test_success_rate' => $tested > 0 ? round(($successful / $tested) * 100, 2) : 0
+            'test_success_rate' => $tested > 0 ? round(($successful / $tested) * 100, 2) : 0,
         ];
+    }
+
+    /**
+     * Get per-campus configuration statistics
+     */
+    public function getStatisticsByCampus(): array
+    {
+        $rows = EmailConfiguration::selectRaw(
+            'campus_id, COUNT(*) as total, SUM(is_active) as active'
+        )
+            ->groupBy('campus_id')
+            ->get()
+            ->keyBy('campus_id');
+
+        return $rows->map(fn ($r) => [
+            'total' => (int) $r->total,
+            'active' => (int) $r->active,
+        ])->toArray();
     }
 
     /**
