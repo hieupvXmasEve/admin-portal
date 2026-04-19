@@ -75,17 +75,16 @@ class SendSingleEmailJob implements ShouldQueue
             // Mark email as sending
             $this->emailLog->markAsSending();
 
-            // Resolve campus-specific config, falling back to global then .env defaults
+            // Resolve campus-specific config — must exist, .env fallback is not allowed
             $config = EmailConfiguration::getActiveForCampus($this->campusId);
 
-            if ($config) {
-                $this->configureMailer($config);
-            } else {
-                Log::warning('No active EmailConfiguration found, falling back to .env mail defaults', [
-                    'email_log_id' => $this->emailLog->id,
-                    'recipient' => $this->emailLog->recipient,
-                ]);
+            if (! $config) {
+                throw new \RuntimeException(
+                    'No active EmailConfiguration found for campus_id=' . ($this->campusId ?? 'null') . '. Configure an active email configuration in the database.'
+                );
             }
+
+            $this->configureMailer($config);
 
             // Create and send the email
             $email = new GenericEmail(
