@@ -37,13 +37,13 @@ class CreditProgressService
      */
     protected function calculateProgress(Collection $curriculumUnits, Collection $completedRecords): array
     {
-        $totalRequired = $curriculumUnits->sum('credit_hours');
+        $totalRequired = $curriculumUnits->sum(fn ($unit) => (float) ($unit->unit?->credit_points ?? 0));
         $totalCompleted = $completedRecords->sum('credit_hours_earned');
 
-        // Group by curriculum unit type
-        $progressByCategory = $curriculumUnits->groupBy('curriculum_unit_type_id')
-            ->map(function ($units, $typeId) use ($completedRecords) {
-                $requiredCredits = $units->sum('credit_hours');
+        // Group by current curriculum_units.type enum instead of removed unit_types table.
+        $progressByCategory = $curriculumUnits->groupBy(fn ($unit) => $unit->type ?? 'unknown')
+            ->map(function ($units, $typeKey) use ($completedRecords) {
+                $requiredCredits = $units->sum(fn ($unit) => (float) ($unit->unit?->credit_points ?? 0));
                 $unitCodes = $units->pluck('unit.code')->toArray();
 
                 $completedCredits = $completedRecords
@@ -55,8 +55,8 @@ class CreditProgressService
                     : 0;
 
                 return [
-                    'type_id' => $typeId,
-                    'type_name' => $units->first()->curriculumUnitType->name ?? 'Unknown',
+                    'type_id' => $typeKey,
+                    'type_name' => $this->formatCurriculumUnitType((string) $typeKey),
                     'required_credits' => $requiredCredits,
                     'completed_credits' => $completedCredits,
                     'remaining_credits' => max(0, $requiredCredits - $completedCredits),
@@ -72,8 +72,8 @@ class CreditProgressService
             return [
                 'unit_code' => $unit->unit->code,
                 'unit_name' => $unit->unit->name,
-                'credit_hours' => $unit->credit_hours,
-                'semester_offered' => $unit->semester_offered,
+                'credit_hours' => (float) ($unit->unit?->credit_points ?? 0),
+                'semester_offered' => $unit->semester_number,
                 'is_prerequisite_met' => $this->checkPrerequisites($unit),
             ];
         });
@@ -205,30 +205,40 @@ class CreditProgressService
     public function getCreditRequirementsByType(Student $student): array
     {
         return $student->curriculumVersion->curriculumUnits()
-            ->with(['curriculumUnitType', 'unit'])
+            ->with('unit')
             ->get()
-            ->groupBy('curriculum_unit_type_id')
-            ->map(function ($units, $typeId) {
-                $type = $units->first()->curriculumUnitType;
+            ->groupBy(fn ($unit) => $unit->type ?? 'unknown')
+            ->map(function ($units, $typeKey) {
+                $typeName = $this->formatCurriculumUnitType((string) $typeKey);
 
                 return [
-                    'type_id' => $typeId,
-                    'type_name' => $type->name,
-                    'type_description' => $type->description,
-                    'required_credits' => $units->sum('credit_hours'),
+                    'type_id' => $typeKey,
+                    'type_name' => $typeName,
+                    'type_description' => $typeName,
+                    'required_credits' => $units->sum(fn ($unit) => (float) ($unit->unit?->credit_points ?? 0)),
                     'unit_count' => $units->count(),
                     'units' => $units->map(function ($unit) {
                         return [
                             'code' => $unit->unit->code,
                             'name' => $unit->unit->name,
-                            'credits' => $unit->credit_hours,
-                            'semester_offered' => $unit->semester_offered,
+                            'credits' => (float) ($unit->unit?->credit_points ?? 0),
+                            'semester_offered' => $unit->semester_number,
                         ];
                     }),
                 ];
             })
             ->values()
             ->toArray();
+    }
+
+    protected function formatCurriculumUnitType(string $type): string
+    {
+        return match ($type) {
+            'core' => 'Core',
+            'major' => 'Major',
+            'elective' => 'Elective',
+            default => 'Unknown',
+        };
     }
 
     /**

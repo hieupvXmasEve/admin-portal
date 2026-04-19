@@ -392,9 +392,7 @@ class EventParticipationService
 
         Log::info("Gold reward {$action}", $auditData);
 
-        // Audit trail is already handled by GoldTransaction table
-        // No need for separate audit table since wallet_transactions already contains:
-        // - student_id, amount, type, source_type, source_id, notes, created_at
+        // Audit trail is already handled by GoldTransaction table.
     }
 
     /**

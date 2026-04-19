@@ -52,7 +52,7 @@ export interface GoldStats {
 
 export interface WalletSummary {
     wallet: StudentWallet;
-    stats: WalletStats;
+    stats: GoldStats;
     recent_transactions: GoldTransaction[];
 }
 
@@ -100,113 +100,5 @@ export interface TransactionPagination {
 export interface StudentGoldTabData {
     summary: WalletSummary;
     recent_transactions: GoldTransaction[];
-    stats: WalletStats;
-}
-
-
-export interface WalletTransaction {
-  id: number
-  transaction_type: 'deposit' | 'payment' | 'refund' | 'adjustment'
-  amount: number
-  formatted_amount: string
-  balance_before: number
-  balance_after: number
-  formatted_balance_after: string
-  description: string
-  created_at: string
-  updated_at: string
-  created_by?: {
-    id: number
-    name: string
-  }
-  reference_type?: string
-  reference_id?: number
-}
-
-export interface StudentCashWallet {
-  id: number
-  student_id: number
-  balance: number
-  currency: string
-  formatted_balance: string
-  created_at: string
-  updated_at: string
-}
-
-export interface WalletStats {
-  current_balance: number
-  total_deposits: number
-  total_payments: number
-  total_refunds: number
-  transaction_count: number
-  last_transaction_date?: string
-}
-
-export interface PaginatedTransactions {
-  data: WalletTransaction[]
-  from: number
-  to: number
-  total: number
-  current_page: number
-  last_page: number
-  per_page: number
-  prev_page_url: string | null
-  next_page_url: string | null
-  links: any[]
-}
-
-export interface PaymentValidationResult {
-  valid: boolean
-  errors: string[]
-  wallet?: StudentCashWallet
-}
-
-export interface PaymentProcessingResult {
-  success: boolean
-  errors: string[]
-  transaction?: WalletTransaction
-}
-
-export interface TuitionPlanTerm {
-  id: number
-  term_number: number
-  amount: number
-  due_date?: string
-  formatted_due_date?: string
-  semester?: {
-    id: number
-    code: string
-    name: string
-    start_date?: string
-    end_date?: string
-  }
-}
-
-export interface TuitionPlan {
-  id: number
-  total_amount: number
-  currency: string
-  is_active: boolean
-  curriculum_version?: {
-    id: number
-    version_code: string
-    program?: {
-      id: number
-      name: string
-      code: string
-    }
-    specialization?: {
-      id: number
-      name: string
-      code: string
-    }
-  }
-  intake_semester?: {
-    id: number
-    code: string
-    name: string
-    start_date?: string
-    end_date?: string
-  }
-  terms: TuitionPlanTerm[]
+    stats: GoldStats;
 }

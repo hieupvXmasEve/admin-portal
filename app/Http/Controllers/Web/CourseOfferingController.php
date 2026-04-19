@@ -20,7 +20,6 @@ use App\Models\Student;
 use App\Models\Unit;
 use App\Modules\Academic\Actions\MoveStudentToSectionAction;
 use App\Modules\Academic\Http\Requests\MoveStudentRequest;
-use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Services\CourseSurveyService;
 use App\Services\SystemConfigService;
 use App\Support\CampusLogContext;
@@ -1442,9 +1441,6 @@ class CourseOfferingController extends Controller
                     // Update course offering enrollment count
                     $courseOffering->increment('current_enrollment');
 
-                    // Create invoice item for course fee (EGC or retake) - MANDATORY
-                    $this->createCourseFeeInvoiceItem($student, $courseOffering, $registration, $isRetake);
-
                     $result['success'] = true;
                     $result['message'] = 'Successfully registered';
                     $successCount++;
@@ -1874,15 +1870,6 @@ class CourseOfferingController extends Controller
             $studentId = $registration->student->student_id ?? 'Unknown ID';
             $studentDbId = $registration->student->id;
 
-            // Delete invoice items (must use model instance to trigger events)
-            $invoiceItems = \App\Models\InvoiceItem::where('reference_id', $registration->id)
-                ->where('reference_type', CourseRegistration::class)
-                ->get();
-
-            foreach ($invoiceItems as $item) {
-                $item->delete(); // Triggers model event → recalculateTotals()
-            }
-
             // Force delete ALL academic records for this student + offering (including soft-deleted ones)
             // After removing unique constraints, there might be multiple records
             $academicRecords = \App\Models\AcademicRecord::withTrashed()
@@ -1982,185 +1969,6 @@ class CourseOfferingController extends Controller
         return Redirect::back()->with('error', 'This route is deprecated. Please use the API endpoint.');
     }
     */
-
-    /**
-     * Create invoice item for course registration fee (EGC base_fee or retake_fee)
-     */
-    private function createCourseFeeInvoiceItem(
-        Student $student,
-        CourseOffering $courseOffering,
-        CourseRegistration $registration,
-        bool $isRetake
-    ): void {
-        $unit = $courseOffering->unit;
-
-        // Determine if fee should be charged
-        $shouldCharge = false;
-        $itemType = null;
-        $fee = 0;
-        $description = '';
-
-        if ($unit->unit_type === 'egc') {
-            // EGC courses: charge base_fee for first attempt, retake_fee for retakes
-            if ($isRetake) {
-                $shouldCharge = true;
-                $itemType = 'retake';
-                $fee = $unit->retake_fee ?? 0;
-                $description = "Retake Fee: {$unit->code} - {$unit->name} (Attempt #".($isRetake ? '2+' : '1').')';
-            } else {
-                // First time EGC - charge base_fee
-                $shouldCharge = true;
-                $itemType = 'egc';
-                $fee = $unit->base_fee ?? 0;
-                $description = "EGC Course Fee: {$unit->code} - {$unit->name}";
-            }
-        } elseif ($isRetake) {
-            // Non-EGC retake - charge retake_fee
-            $shouldCharge = true;
-            $itemType = 'retake';
-            $fee = $unit->retake_fee ?? 0;
-            $description = "Retake Fee: {$unit->code} - {$unit->name}";
-        }
-        // Non-EGC first time - no charge
-
-        if (! $shouldCharge || $fee <= 0) {
-            Log::info('No invoice item created', [
-                'student_id' => $student->student_id,
-                'unit_code' => $unit->code,
-                'unit_type' => $unit->unit_type,
-                'is_retake' => $isRetake,
-                'reason' => $fee <= 0 ? 'Fee is zero or null' : 'No charge required',
-            ]);
-
-            return;
-        }
-
-        $deferChargeResolver = app(DeferChargeResolver::class);
-        $deferCase = $deferChargeResolver->findApplicableFullCase($student, $courseOffering->semester_id);
-
-        if ($deferCase) {
-            $deferChargeResolver->markFullCaseApplied($deferCase, $courseOffering->semester_id);
-
-            return;
-        }
-
-        if ($isRetake) {
-            $deferItem = $deferChargeResolver->findApplicableCourseItem($registration);
-
-            if ($deferItem) {
-                $deferChargeResolver->markItemApplied($deferItem, $courseOffering->semester_id);
-
-                return;
-            }
-        }
-
-        // Find or create student invoice for current semester
-        $invoice = $this->findOrCreateStudentInvoice($student, $courseOffering->semester_id);
-
-        // Create invoice item
-        $invoiceItem = \App\Models\InvoiceItem::create([
-            'invoice_id' => $invoice->id,
-            'item_type' => $itemType,
-            'description' => $description,
-            'quantity' => 1,
-            'unit_price' => $fee,
-            'total_price' => $fee, // Will be auto-calculated by model
-            'paid_amount' => 0.00,
-            'reference_id' => $registration->id,
-            'reference_type' => CourseRegistration::class,
-        ]);
-
-        // Invoice totals will be recalculated automatically via model events
-        // Status will be updated to 'partial' if needed
-
-        Log::info('Invoice item created for course registration', [
-            'student_id' => $student->student_id,
-            'invoice_id' => $invoice->id,
-            'invoice_item_id' => $invoiceItem->id,
-            'item_type' => $itemType,
-            'unit_code' => $unit->code,
-            'fee' => $fee,
-            'is_retake' => $isRetake,
-        ]);
-    }
-
-    /**
-     * Find or create student invoice for given semester
-     */
-    private function findOrCreateStudentInvoice(Student $student, int $semesterId): \App\Models\StudentInvoice
-    {
-        // Try to find existing invoice for student in this semester
-        $invoice = \App\Models\StudentInvoice::where('student_id', $student->id)
-            ->where('semester_id', $semesterId)
-            ->first();
-
-        if ($invoice) {
-            return $invoice;
-        }
-
-        // No invoice found, create new one
-        // First, find or create billing cycle for this semester
-        $billingCycle = \App\Models\BillingCycle::where('semester_id', $semesterId)
-            ->first();
-
-        if (! $billingCycle) {
-            // Create a default billing cycle if none exists
-            $semester = Semester::find($semesterId);
-            $billingCycle = \App\Models\BillingCycle::create([
-                'semester_id' => $semesterId,
-                'name' => 'Default Billing Cycle - '.$semester->name,
-                'start_date' => $semester->start_date,
-                'end_date' => $semester->end_date,
-                'due_date' => $semester->end_date,
-                'status' => 'active',
-            ]);
-
-            Log::info('Created default billing cycle', [
-                'billing_cycle_id' => $billingCycle->id,
-                'semester_id' => $semesterId,
-            ]);
-        }
-
-        // Generate unique invoice number
-        $invoiceNumber = $this->generateInvoiceNumber($student, $semesterId);
-
-        // Create new invoice
-        $invoice = \App\Models\StudentInvoice::create([
-            'invoice_number' => $invoiceNumber,
-            'student_id' => $student->id,
-            'billing_cycle_id' => $billingCycle->id,
-            'semester_id' => $semesterId,
-            'subtotal' => 0,
-            'discount_total' => 0,
-            'total_amount' => 0,
-            'paid_amount' => 0,
-            'status' => 'pending',
-            'due_date' => $billingCycle->due_date,
-        ]);
-
-        Log::info('Created new student invoice', [
-            'invoice_id' => $invoice->id,
-            'invoice_number' => $invoiceNumber,
-            'student_id' => $student->student_id,
-            'semester_id' => $semesterId,
-            'billing_cycle_id' => $billingCycle->id,
-        ]);
-
-        return $invoice;
-    }
-
-    /**
-     * Generate unique invoice number for student and semester
-     */
-    private function generateInvoiceNumber(Student $student, int $semesterId): string
-    {
-        $semester = Semester::find($semesterId);
-        $semesterCode = $semester ? $semester->code : 'SEM';
-
-        // Format: INV-{SEMESTER_CODE}-{STUDENT_ID}-{TIMESTAMP}
-        // Example: INV-FALL2025-S001-20251027
-        return 'INV-'.$semesterCode.'-'.$student->student_id.'-'.now()->format('YmdHis');
-    }
 
     /**
      * Parse registration error to user-friendly message

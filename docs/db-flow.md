@@ -312,14 +312,7 @@ Quản lý học phí, thanh toán, và hỗ trợ tài chính cho sinh viên.
 - **Model**: `App\Models\StudentWallet`, `App\Models\GoldTransaction`
 - **Phụ thuộc**: `student_wallets.student_id` -> `students.id`; `gold_transactions.wallet_id` -> `student_wallets.id`
 
-### 41. `student_cash_wallets` & `wallet_transactions` (Ví tiền mặt)
-
-- **Lý do**: Quản lý ví tiền thực và lịch sử giao dịch thanh toán của sinh viên.
-- **Bảng liên quan**: `student_cash_wallets`, `wallet_transactions`
-- **Model**: `App\Models\StudentCashWallet`, `App\Models\WalletTransaction`
-- **Phụ thuộc**: `student_cash_wallets.student_id` -> `students.id`; `wallet_transactions.wallet_id` -> `student_cash_wallets.id`
-
-### 42. `voucher_definitions` & `voucher_applications` (Voucher/Mã giảm giá) ⭐ SIMPLIFIED
+### 41. `voucher_definitions` & `voucher_applications` (Voucher/Mã giảm giá) ⭐ SIMPLIFIED
 
 - **Lý do**: Định nghĩa các loại voucher. Admin có thể tạo, chỉnh sửa, xem chi tiết và áp dụng voucher cho sinh viên. Không còn hỗ trợ import/delete flows.
 - **Bảng liên quan**: `voucher_definitions`, `voucher_applications`
@@ -329,25 +322,25 @@ Quản lý học phí, thanh toán, và hỗ trợ tài chính cho sinh viên.
 - **Admin flows**: Create → Edit → Show (with inline apply card) → Apply. Import/delete workflows removed (2026-03-20).
 - **Finance integration**: Voucher applications now flow through `invoice_discounts` + `discount_allocations` in settlement v2.
 
-### 43. `tuition_plans` & `tuition_plan_terms` (Kế hoạch học phí)
+### 42. `tuition_plans` & `tuition_plan_terms` (Kế hoạch học phí)
 
 - **Lý do**: Định nghĩa các kế hoạch học phí và các kỳ thanh toán.
 - **Bảng liên quan**: `tuition_plans`, `tuition_plan_terms`
 - **Model**: `App\Models\TuitionPlan`, `App\Models\TuitionPlanTerm`
 - **Phụ thuộc**: `tuition_plan_terms.tuition_plan_id` -> `tuition_plans.id`
 
-### 44. `billing_cycles` (Chu kỳ thanh toán)
+### 43. `billing_cycles` (Chu kỳ thanh toán)
 
 - **Lý do**: Định nghĩa các chu kỳ thanh toán cho việc quản lý hóa đơn.
 - **Bảng liên quan**: `billing_cycles`
 - **Model**: `App\Models\BillingCycle`
 
-### 45. `student_invoices`, `invoice_items`, `invoice_discounts` (Hóa đơn)
+### 45. `student_invoices` & `invoice_discounts` (Hóa đơn)
 
-- **Lý do**: Tạo và quản lý hóa đơn học phí cho sinh viên, bao gồm các mục chi tiết và giảm giá.
-- **Bảng liên quan**: `student_invoices`, `invoice_items`, `invoice_discounts`
-- **Model**: `App\Models\StudentInvoice`, `App\Models\InvoiceItem`, `App\Models\InvoiceDiscount`
-- **Phụ thuộc**: `student_invoices.student_id` -> `students.id`; `student_invoices.semester_id` -> `semesters.id`; `invoice_items.invoice_id` -> `student_invoices.id`; `invoice_discounts.invoice_id` -> `student_invoices.id`
+- **Lý do**: Tạo và quản lý hóa đơn học phí cho sinh viên, cùng header-level discount metadata. Chi tiết dòng hóa đơn đã chuyển sang `invoice_lines`.
+- **Bảng liên quan**: `student_invoices`, `invoice_discounts`
+- **Model**: `App\Models\StudentInvoice`, `App\Models\InvoiceDiscount`
+- **Phụ thuộc**: `student_invoices.student_id` -> `students.id`; `student_invoices.semester_id` -> `semesters.id`; `invoice_discounts.invoice_id` -> `student_invoices.id`
 
 ### 46. `finance_charges` (Sổ cái phí - Finance Ledger) ⭐ NEW
 
@@ -372,11 +365,11 @@ Quản lý học phí, thanh toán, và hỗ trợ tài chính cho sinh viên.
 - **Fields `payment_applications`** (replacing legacy `payment_allocations`): `payment_id`, `invoice_line_id`, `allocated_amount`, `allocated_at`, `allocated_by_user_id`
 - **Phụ thuộc**: `payments.student_id` -> `students.id`; `payment_applications.payment_id` -> `payments.id`; `payment_applications.invoice_line_id` -> `invoice_lines.id`
 - **Định nghĩa**: "Unapplied credit" = `payment.amount - sum(payment_applications.allocated_amount)`, dùng để cấn trừ kỳ sau
-- **Legacy note**: `payment_allocations` table no longer in use; all settlement operations read from `payment_applications`.
+- **Legacy note**: `payment_allocations` has been removed from the active schema; all settlement operations read from `payment_applications`.
 
 ### 48. `invoice_lines` (Dòng hóa đơn từ Charge) ⭐ SETTLEMENT V2
 
-- **Lý do**: Thay thế cách tiếp cận polymorphic của `invoice_items`. Mỗi dòng hóa đơn gắn trực tiếp với một `finance_charges`, tạo snapshot tại thời điểm xuất hóa đơn. Dòng hóa đơn là điểm neo (anchor point) cho settlement v2.
+- **Lý do**: Thay thế hoàn toàn cách tiếp cận polymorphic cũ của `invoice_items`. Mỗi dòng hóa đơn gắn trực tiếp với một `finance_charges`, tạo snapshot tại thời điểm xuất hóa đơn. Dòng hóa đơn là điểm neo (anchor point) cho settlement v2.
 - **Bảng liên quan**: `invoice_lines`
 - **Model**: `App\Models\InvoiceLine`
 - **Fields chính**: `invoice_id`, `charge_id`, `amount_snapshot`, `description_snapshot`, `status` (active|void), `voided_at`, `void_reason`
@@ -540,7 +533,7 @@ users
 │   ├── ielts_certificates -> academic_progression_events
 │   ├── student_actions
 │   ├── attendances
-│   ├── student_wallets, student_cash_wallets
+│   ├── student_wallets
 │   ├── student_invoices
 │   ├── club_members
 │   ├── event_participants

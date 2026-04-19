@@ -6,7 +6,6 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\VoucherApplication;
 use App\Models\VoucherDefinition;
-use App\Models\VoucherRedemption;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -181,13 +180,14 @@ class VoucherService
     }
 
     /**
-     * Get all vouchers for a student
+     * Get all voucher applications for a student.
      */
     public function getStudentVouchers(int $studentId): Collection
     {
-        return VoucherRedemption::where('student_id', $studentId)
-            ->with(['voucher', 'invoice'])
-            ->orderBy('redeemed_at', 'desc')
+        return VoucherApplication::query()
+            ->where('student_id', $studentId)
+            ->with(['voucherDefinition', 'semester', 'invoice', 'appliedBy'])
+            ->orderByDesc('applied_at')
             ->get();
     }
 

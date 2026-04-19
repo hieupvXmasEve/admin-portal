@@ -196,9 +196,8 @@ class CurriculumVersion extends AuditableModel
     public function getElectiveSlots(): \Illuminate\Support\Collection
     {
         return $this->curriculumUnits()
-            ->join('unit_types', 'curriculum_units.unit_type_id', '=', 'unit_types.id')
-            ->where('unit_types.name', 'elective')
-            ->with(['unit', 'unitType'])
+            ->where('curriculum_units.type', 'elective')
+            ->with('unit')
             ->select('curriculum_units.*')
             ->orderBy('year_level')
             ->orderBy('semester_number')

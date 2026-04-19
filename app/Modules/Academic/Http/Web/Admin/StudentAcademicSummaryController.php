@@ -9,7 +9,6 @@ use App\Http\Controllers\Api\StudentWalletController;
 use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Services\StudentAcademicSummaryService;
-use App\Services\CashWalletService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -32,7 +31,6 @@ class StudentAcademicSummaryController extends Controller
         private StudentAcademicSummaryService $academicSummaryService,
         private StudentWalletController $studentWalletController,
         private GoldTransactionController $goldTransactionController,
-        private CashWalletService $walletService
     ) {
         $this->middleware('can:view_student_summary')->only([
             'show',
@@ -43,8 +41,6 @@ class StudentAcademicSummaryController extends Controller
             'gpa',
             'graduation',
             'gold',
-            'wallet',
-            'tuitionPlan',
         ]);
     }
 
@@ -225,74 +221,6 @@ class StudentAcademicSummaryController extends Controller
             'feeSummary' => $feeSummary,
         ]);
     }
-
-    /**
-     * Display the wallet tab for academic summary
-     *
-     * @param  Student  $student  The student to display wallet for
-     * @return Response Inertia response with wallet data
-     */
-    public function wallet(Student $student): Response
-    {
-        // Get or create wallet for the student
-        $wallet = $this->walletService->getOrCreateWallet($student->id);
-
-        // Get transaction history with pagination
-        $transactions = $this->walletService->getTransactionHistory($wallet->id, 20);
-
-        // Get wallet statistics
-        $stats = $this->walletService->getWalletStats($wallet->id);
-
-        // Get tuition plan for the student
-        $tuitionPlan = \App\Models\TuitionPlan::where('curriculum_version_id', $student->curriculum_version_id)
-            ->where('intake_semester_id', $student->intake_semester_id)
-            ->where('is_active', true)
-            ->with([
-                'curriculumVersion:id,version_code,program_id,specialization_id',
-                'curriculumVersion.program:id,name,code',
-                'curriculumVersion.specialization:id,name,code',
-                'intakeSemester:id,code,name,start_date,end_date',
-                'terms' => function ($query) {
-                    $query->with('semester:id,code,name,start_date,end_date')
-                        ->orderBy('term_number');
-                },
-            ])
-            ->first();
-
-        return Inertia::render('students/AcademicSummary/Wallets/Show', [
-            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
-            'wallet' => [
-                'id' => $wallet->id,
-                'balance' => $wallet->balance,
-                'currency' => $wallet->currency,
-                'formatted_balance' => $wallet->formatted_balance,
-            ],
-            'transactions' => $transactions,
-            'stats' => $stats,
-            'tuitionPlan' => $tuitionPlan ? [
-                'id' => $tuitionPlan->id,
-                'total_amount' => $tuitionPlan->total_amount,
-                'currency' => $tuitionPlan->currency,
-                'is_active' => $tuitionPlan->is_active,
-                'curriculum_version' => $tuitionPlan->curriculumVersion ? [
-                    'id' => $tuitionPlan->curriculumVersion->id,
-                    'version_code' => $tuitionPlan->curriculumVersion->version_code,
-                    'program' => $tuitionPlan->curriculumVersion->program,
-                    'specialization' => $tuitionPlan->curriculumVersion->specialization,
-                ] : null,
-                'intake_semester' => $tuitionPlan->intakeSemester,
-                'terms' => $tuitionPlan->terms->map(fn($term) => [
-                    'id' => $term->id,
-                    'term_number' => $term->term_number,
-                    'amount' => $term->amount,
-                    'due_date' => $term->due_date?->format('Y-m-d'),
-                    'formatted_due_date' => $term->due_date?->format('d/m/Y'),
-                    'semester' => $term->semester,
-                ]),
-            ] : null,
-        ]);
-    }
-
 
     /**
      * Get attendance details for a specific unit

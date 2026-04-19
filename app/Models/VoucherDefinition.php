@@ -41,14 +41,6 @@ class VoucherDefinition extends Model
     }
 
     /**
-     * Get all redemptions for this voucher (Legacy)
-     */
-    public function redemptions(): HasMany
-    {
-        return $this->hasMany(VoucherRedemption::class, 'voucher_id');
-    }
-
-    /**
      * Check if voucher is valid for a given date
      */
     public function isValidOn(Carbon $date): bool

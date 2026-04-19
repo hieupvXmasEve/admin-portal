@@ -8,7 +8,6 @@ use App\Http\Controllers\Api\StudentWalletController;
 use App\Http\Controllers\Api\V1\Student\AcademicRecordController;
 use App\Http\Controllers\Api\V1\Student\AttendanceController;
 use App\Http\Controllers\Api\V1\Student\CalendarController;
-use App\Http\Controllers\Api\V1\Student\CashWalletController;
 use App\Http\Controllers\Api\V1\Student\ClubController;
 use App\Http\Controllers\Api\V1\Student\ClubManagementController;
 use App\Http\Controllers\Api\V1\Student\CourseRegistrationController;
@@ -234,28 +233,6 @@ Route::middleware([
             });
         });
 
-        // Cash Wallet endpoints
-        Route::prefix('cash-wallet')->name('cash-wallet.')->group(function () {
-            // Wallet information
-            Route::get('/', [CashWalletController::class, 'show'])->name('show');
-            Route::get('/summary', [CashWalletController::class, 'summary'])->name('summary');
-
-            // Tuition plan
-            Route::get('/tuition-plan', [CashWalletController::class, 'tuitionPlan'])->name('tuition-plan');
-
-            // Transactions
-            Route::prefix('transactions')->name('transactions.')->group(function () {
-                Route::get('/', [CashWalletController::class, 'transactions'])->name('index');
-                Route::get('/recent', [CashWalletController::class, 'recentTransactions'])->name('recent');
-                Route::get('/stats', [CashWalletController::class, 'stats'])->name('stats');
-            });
-
-            // Invoices
-            Route::prefix('invoices')->name('invoices.')->group(function () {
-                Route::get('/', [CashWalletController::class, 'invoices'])->name('index');
-                Route::get('/{invoice}', [CashWalletController::class, 'invoiceDetail'])->name('show');
-            });
-        });
         // Finance
         Route::prefix('finance')->name('finance.')->group(function () {
             Route::get('/', [FinanceController::class, 'index'])->name('index');

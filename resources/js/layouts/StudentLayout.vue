@@ -71,7 +71,6 @@ const tabs = [
     // { key: 'graduation', label: 'Graduation', icon: GraduationCap, route: 'students.academic-summary.graduation' },
     { key: 'fees', label: 'Fees', icon: Receipt, route: 'students.academic-summary.fees' },
     { key: 'gold', label: 'Gold', icon: Wallet, route: 'students.academic-summary.gold' },
-    // { key: 'wallet', label: 'Cash wallet', icon: Wallet, route: 'students.academic-summary.wallet' },
 ];
 </script>
 

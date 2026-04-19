@@ -341,11 +341,11 @@ Phase 2:
 Phase 3:
 
 - switch read models and staff UI to new settlement truth
-- keep old `payment_allocations` for temporary audit only
+- remove legacy `payment_allocations` after runtime migration completes
 
 Phase 4:
 
-- stop writing new `payment_allocations`
+- drop old `payment_allocations` and `invoice_items` from active schema
 - stop generating negative `finance_charges` for voucher or scholarship
 
 ## Guardrails

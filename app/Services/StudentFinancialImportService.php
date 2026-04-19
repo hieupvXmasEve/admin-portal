@@ -5,8 +5,6 @@ namespace App\Services;
 use App\Models\Student;
 use App\Models\ScholarshipDefinition;
 use App\Models\StudentScholarshipAward;
-use App\Models\StudentCashWallet;
-use App\Models\WalletTransaction;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -276,72 +274,6 @@ class StudentFinancialImportService
         }
 
         return $results;
-    }
-
-    /**
-     * Get the first active billing cycle by created_at
-     */
-    protected function getActiveBillingCycleId(): ?int
-    {
-        $activeCycle = \App\Models\BillingCycle::where('status', 'active')
-            ->orderBy('created_at', 'asc')
-            ->first();
-
-        return $activeCycle?->id;
-    }
-
-    /**
-     * Process voucher redemptions for a student
-     */
-    protected function processVoucherRedemptions(Student $student, string $voucherCodes, ?int $billingCycleId, int $row): array
-    {
-        $count = 0;
-        $warnings = [];
-
-        // Split voucher codes by comma
-        $codes = array_map('trim', explode(',', $voucherCodes));
-        $codes = array_filter($codes); // Remove empty values
-
-        foreach ($codes as $code) {
-            try {
-                // Find voucher by code
-                $voucher = \App\Models\VoucherDefinition::where('code', $code)->first();
-
-                if (!$voucher) {
-                    $warnings[] = "Row {$row}: Voucher code '{$code}' not found";
-                    continue;
-                }
-
-                // Check if redemption already exists for this student, voucher, and billing cycle
-                $existingRedemption = \App\Models\VoucherRedemption::where('student_id', $student->id)
-                    ->where('voucher_id', $voucher->id)
-                    ->where('billing_cycle_id', $billingCycleId)
-                    ->first();
-
-                if ($existingRedemption) {
-                    $warnings[] = "Row {$row}: Voucher '{$code}' already assigned to student for this billing cycle";
-                    continue;
-                }
-
-                // Create voucher redemption
-                \App\Models\VoucherRedemption::create([
-                    'voucher_id' => $voucher->id,
-                    'student_id' => $student->id,
-                    'billing_cycle_id' => $billingCycleId,
-                    'status' => 'pending',
-                    'redeemed_at' => null,
-                ]);
-
-                $count++;
-            } catch (\Throwable $e) {
-                $warnings[] = "Row {$row}: Failed to assign voucher '{$code}' - " . $e->getMessage();
-            }
-        }
-
-        return [
-            'count' => $count,
-            'warnings' => $warnings,
-        ];
     }
 
     /**

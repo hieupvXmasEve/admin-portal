@@ -269,7 +269,7 @@ Student Wallet API cung cấp hệ thống quản lý số dư Gold cho sinh vi�
   - `view_any_wallet_transaction`: Xem bất kỳ giao dịch nào
 
 ### Audit Trail
-- Mọi thay đổi số dư đều được log trong `wallet_transactions`
+- Mọi thay đổi số dư đều được log trong `gold_transactions`
 - Ghi nhận user thực hiện điều chỉnh (trong `source_id` khi `source_type = 'manual'`)
 - Timestamp chính xác cho mọi giao dịch
 - Notes bắt buộc cho manual adjustments
