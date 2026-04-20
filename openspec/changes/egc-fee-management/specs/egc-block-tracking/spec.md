@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: EGC block entity exists per student per block position per semester
-The system SHALL maintain one `egc_blocks` record per block position (block_number 1 or 2) per student per semester. Each record tracks: block number, level number (GC level 0–6), result (pending/pass/fail), attendance rate, linked finance charge, linked adjustment charge, retake flag, and deferred state (finance_charge_id = null until charged). The UNIQUE constraint is `(student_id, semester_id, block_number)`.
+The system SHALL maintain one `egc_blocks` record per block position (block_number 1 or 2) per student per semester. Each record tracks: block number, level number (GC level 0–6), result (pending/pass/fail), attendance rate, linked finance charge (`finance_charge_id`), retake entitlement consumed marker (`retake_discount_id` FK → invoice_discounts), retake flag (`is_retake`), and deferred state (finance_charge_id = null until charged). The UNIQUE constraint is `(student_id, semester_id, block_number)`.
 
 #### Scenario: Block created at charge generation time
 - **WHEN** Generate EGC Charges runs for a student in semester S
@@ -26,9 +26,28 @@ The system SHALL use `App\Models\EgcBlock` as the Eloquent model for `egc_blocks
 - **WHEN** `$student->egcProgress` is accessed
 - **THEN** it returns all EgcBlock records for that student
 
-### Requirement: Adjustment charge is linked to the block
-The system SHALL store the FK of any adjustment FinanceCharge on `egc_block.adjustment_charge_id` when a retake credit is applied.
+### Requirement: Retake discount entitlement is tracked on the source block
+The system SHALL set `egc_block.retake_discount_id` (nullable FK → `invoice_discounts`) when the block's entitlement is consumed. A consumed entitlement cannot be used again.
 
-#### Scenario: Credit linked after apply
-- **WHEN** staff applies a retake credit adjustment for an egc_block
-- **THEN** `egc_block.adjustment_charge_id` is set to the new FinanceCharge id
+#### Scenario: Source block marked as consumed after apply
+- **WHEN** staff applies a retake discount sourced from an egc_block
+- **THEN** `egc_block.retake_discount_id` is set to the InvoiceDiscount id, and the block no longer appears as an available source in the Retake Adjustments UI
+
+#### Scenario: Same source block cannot be used twice
+- **WHEN** `egc_block.retake_discount_id` is already set
+- **THEN** the apply action is rejected with a validation error
+
+### Requirement: Source-to-target mapping is stored in egc_retake_discount_links
+The system SHALL maintain a record in `egc_retake_discount_links` for every applied retake discount, storing `invoice_discount_id`, `source_egc_block_id`, and `target_finance_charge_id`. A UNIQUE constraint on `target_finance_charge_id` prevents any target charge from receiving a retake discount more than once.
+
+#### Scenario: Target charge uniqueness enforced at DB level
+- **WHEN** an attempt is made to apply a retake discount to a target charge that already has an `egc_retake_discount_links` record
+- **THEN** the action fails with a validation error before any DB write occurs (application-level pre-check) and the UNIQUE constraint acts as a final guard
+
+#### Scenario: Audit trail queryable
+- **WHEN** querying which block discounted which charge
+- **THEN** `egc_retake_discount_links` returns the source egc_block and target finance_charge for any InvoiceDiscount of type `egc_retake`
+
+#### Scenario: Discount only available when target charge has an invoice
+- **WHEN** the target `egc_level_fee` charge does not yet have an associated invoice
+- **THEN** the apply action is unavailable — UI shows "Charge kỳ sau chưa được generate"

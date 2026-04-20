@@ -22,20 +22,20 @@ The system SHALL automatically include deferred egc_blocks (finance_charge_id = 
 - **WHEN** Generate EGC Charges is confirmed for semester S+1
 - **THEN** the deferred egc_block is charged (finance_charge_id set), and a new egc_level_fee FinanceCharge is created
 
-### Requirement: Retake discount is auto-applied at charge generation
-The system SHALL detect students eligible for a retake discount (previous semester egc_block with result = fail, attendance_rate ≥ 80%, no adjustment applied) and charge the retake level at 50% (7,500,000 VND instead of 15,000,000 VND).
+### Requirement: Retake-eligible blocks are flagged at charge generation, but discount is applied manually
+The system SHALL detect students eligible for a retake discount (prior semester egc_block with result = fail, attendance_rate ≥ 80%, retake_discount_id IS NULL) and mark the new egc_block as `is_retake = true`. The charge is always generated at full price (15,000,000 VND). Staff then applies the 50% discount manually via the Retake Adjustments page by selecting a target charge.
 
-#### Scenario: Retake discount applied automatically
-- **WHEN** Generate EGC Charges runs for a student who failed a block in a prior semester with attendance ≥ 80% and no adjustment_charge was applied
-- **THEN** the matching level's egc_block is marked `is_retake = true` and the finance_charge amount = 7,500,000
+#### Scenario: Retake-eligible block flagged at generation
+- **WHEN** Generate EGC Charges runs for a student who failed a prior block with attendance ≥ 80% and retake_discount_id IS NULL
+- **THEN** the new egc_block is created with `is_retake = true` and the finance_charge amount = 15,000,000 (full price)
 
-#### Scenario: No discount if adjustment already applied
-- **WHEN** Generate EGC Charges runs for a student who already received a -7.5M credit adjustment in the prior semester
-- **THEN** the retake level is charged at full price (15,000,000) and `is_retake = false`
+#### Scenario: No retake flag if discount already consumed
+- **WHEN** Generate EGC Charges runs for a student whose prior egc_block already has retake_discount_id set
+- **THEN** `is_retake = false` — the entitlement was already used
 
-#### Scenario: No discount if attendance below threshold
+#### Scenario: No retake flag if attendance below threshold
 - **WHEN** Generate EGC Charges runs for a student who failed a block with attendance_rate < 80%
-- **THEN** the retake level is charged at full price (15,000,000) and `is_retake = false`
+- **THEN** `is_retake = false` — student is not eligible for the retake discount
 
 ### Requirement: EGC charge generation is separate from Course/Major charge generation
 The system SHALL provide a dedicated Generate EGC Charges flow under EGC Operations. It SHALL only process students with `status = intake_pre_uni_gc`.

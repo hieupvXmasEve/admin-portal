@@ -1,6 +1,6 @@
 # Project Roadmap
 
-Last updated: 2026-04-16  
+Last updated: 2026-04-21  
 Owner: Platform Team  
 Status: Active execution baseline  
 Horizon: next 2-3 quarters
@@ -24,8 +24,18 @@ Horizon: next 2-3 quarters
     - disabled CI workflows
     - deployment/script/security drift
 
-Recent activity through 2026-04-16:
+Recent activity through 2026-04-21:
 
+- 2026-04-21: EGC finance operations baseline expanded
+    - New EGC ops pages now cover block result review, retake adjustments, and unused EGC carry-forward
+    - EGC carry-forward uses `egc_blocks` + `finance_charge_id` as consume truth and releases unused paid EGC balance back to unapplied cash without auto-reallocation
+    - Retake target selection now requires a later retake block charge for the same student/level
+    - EGC ops list pages are now campus-scoped by `current_campus_id` session context:
+        - `/finance/egc/block-results`
+        - `/finance/egc/retake-adjustments`
+        - `/finance/egc/carry-forward`
+    - `egc:backfill-blocks` now includes historical students with EGC registrations/charges regardless of current status, so deferred/dropout FALL2025 cases can be rebuilt
+    - Backfill no longer creates new `egc_block` rows from unmatched active charges; extra charges are reported for repair instead
 - 2026-04-16: DNG campus mapping and replacement rules updated
     - `campuses.dng_code` added as nullable per-campus DNG mapping
     - DNG create/reconcile flows now resolve external `CampusCode` from `campuses.dng_code`

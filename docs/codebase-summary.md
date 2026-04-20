@@ -1,6 +1,6 @@
 # Codebase Summary
 
-Last updated: 2026-04-16
+Last updated: 2026-04-21
 Owner: Platform Team
 Status: Current-state snapshot
 Primary source: `repomix-output.xml` (generated 2026-03-02 / updated for runtime code through commit 8651e0f4)
@@ -63,6 +63,24 @@ Current counts:
     - New services: `SettlementService`, updated `PaymentService`, `FinanceChargeService`
     - New actions: `VoidFinanceChargeAction`, `AllocatePaymentAction`, `AutoAllocatePaymentsAction`
     - New support: `StudentChargeTimingResolver` — EGC vs Tuition billing by semester & stage (EGC until `intake_major` transition)
+- EGC fee-management runtime now adds dedicated tracking + ops flows:
+    - Tables/models: `egc_blocks`, `egc_retake_discount_links`
+    - Actions: `SyncEgcBlockResultsAction`, `ApplyEgcRetakeDiscountAction`, `ApplyEgcCarryForwardAction`, `BuildEgcCarryForwardPlanAction`, `GenerateEgcChargesAction`
+    - Queries: `ListEgcBlockResultsQuery`, `ListEgcRetakeAdjustmentsQuery`, `ListEgcCarryForwardCandidatesQuery`, `PreviewEgcChargeGenerationQuery`
+    - Web pages:
+        - `/finance/egc/block-results`
+        - `/finance/egc/retake-adjustments`
+        - `/finance/egc/carry-forward`
+        - `/finance/egc/generate-charges`
+    - Campus scope: current EGC ops pages now read only students in `session('current_campus_id')`
+    - Carry-forward truth: `egc_blocks.finance_charge_id` + block `result`
+        - mapped block with `result != pending` => consumed
+        - unused active paid EGC charges can be released to unapplied balance without auto-reallocation
+    - Retake truth: target charge must belong to a later mapped retake block for the same student + level
+    - Backfill command behavior:
+        - `egc:backfill-blocks` now includes historical/deferred/dropout students with EGC registrations or active EGC charges
+        - missing `finance_charge_id` on existing blocks is repaired in place
+        - unmatched active EGC charges are reported, not converted into new blocks
 - Finance operations include student-centric Settlement Worklist at `finance/operations/settlement`; legacy `payments/auto-allocate` UI redirects there.
 - Finance generation/migration flows include backfill commands for voucher and scholarship headers + `discount_allocations`. Zero-amount tuition terms no longer create invoices.
 - DNG payment gateway integration (2026-03-26, updated 2026-04-16):

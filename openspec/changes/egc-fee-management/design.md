@@ -14,7 +14,7 @@ Constraints: shared infra (`FinanceCharge`, `StudentInvoice`, `Payment`) must no
 **Goals:**
 - Introduce `egc_blocks` as a first-class entity linking academic outcome to finance charge
 - Separate EGC and Major finance navigation per staff team
-- Enable: block-aware charge generation (1 or 2 blocks, deferred carry-forward, auto retake discount), result sync from academic_records, and retake adjustment workflow
+- Enable: block-aware charge generation (1 or 2 blocks, deferred carry-forward, retake eligibility flagging), result sync from academic_records, and manual retake discount application via Retake Adjustments
 
 **Non-Goals:**
 - Changing invoice, payment, or settlement infrastructure
@@ -37,11 +37,33 @@ Constraints: shared infra (`FinanceCharge`, `StudentInvoice`, `Payment`) must no
 
 **Rationale**: Enables next-semester Generate Charges to query `egc_blocks WHERE semester_id = ? AND finance_charge_id IS NULL` — a clean, indexable pattern.
 
-### D3: Block 1 failure allows "Apply Credit Now" (-7.5M this semester) OR "auto next semester"
+### D3: Retake discount uses InvoiceDiscount + a thin audit link table
 
-**Chosen**: Both options available on the Retake Adjustments page. "Apply Credit Now" creates a `TYPE_ADJUSTMENT` FinanceCharge (-7,500,000) immediately, linked via `egc_block.adjustment_charge_id`. "Auto next semester" leaves `adjustment_charge_id = null`; Generate Charges next semester detects this and sets `is_retake = true` on the matching level block (charge = 7.5M).
+**Chosen**: The 50% retake discount (7,500,000 VND) is applied as an `InvoiceDiscount` (discount_type = `egc_retake`) on the invoice of the target `egc_level_fee` charge, plus a `DiscountAllocation` to the exact invoice line. To make the source→target mapping explicit and queryable, a thin join table `egc_retake_discount_links` stores both audit refs:
 
-**Rationale**: Finance team may want to reflect the credit in the current semester's balance for reporting. Making both options available avoids forcing a policy decision at the code level.
+```
+egc_retake_discount_links
+  id
+  invoice_discount_id       FK → invoice_discounts
+  source_egc_block_id       FK → egc_blocks        (the "right to discount")
+  target_finance_charge_id  FK → finance_charges   (the charge being discounted)
+  UNIQUE (target_finance_charge_id)                 ← prevents double discount on same charge
+  timestamps
+```
+
+`egc_block.retake_discount_id` (nullable FK → `invoice_discounts`) marks that a source block's entitlement has been consumed.
+
+**Business rules locked:**
+- One eligible block → one target charge (1:1 entitlement use)
+- One target charge → cannot receive retake discount twice (`UNIQUE target_finance_charge_id`)
+- A student can hold multiple block entitlements in the same semester — each maps to a different target charge
+- If the target invoice is already paid when discount is applied, the system still applies and the overpaid amount is released as unapplied payment following the existing settlement flow
+
+**Staff selects the target**: current semester or next semester's retake level charge. UI shows only charges that (a) exist, (b) have an invoice, and (c) have no existing `egc_retake_discount_links` record.
+
+**Rationale**: `egc_retake_discount_links.UNIQUE(target_finance_charge_id)` enforces the "one discount per target charge" rule at the DB level, no application-layer race condition possible. Storing both FKs explicitly enables traceability ("block X discounted charge Y") without joining through DiscountAllocation → InvoiceLine on every query.
+
+**Alternative considered**: `TYPE_ADJUSTMENT -7.5M` FinanceCharge — rejected; free-floating credit not linked to the discounted charge, breaks settlement traceability and balance reporting.
 
 ### D4: Retake discount logic lives in `GenerateEgcChargesAction` (new), not in shared `GenerateBatchChargesAction`
 
@@ -58,7 +80,10 @@ Constraints: shared infra (`FinanceCharge`, `StudentInvoice`, `Payment`) must no
 ## Risks / Trade-offs
 
 - **Risk**: Student has egc_block deferred to S+1 AND a retake discount eligible from same prior semester — double discount applied at generation time.
-  → **Mitigation**: `GenerateEgcChargesAction` checks `adjustment_charge_id IS NULL AND is_retake = false` before applying discount; unit tests cover this scenario.
+  → **Mitigation**: `GenerateEgcChargesAction` checks `retake_discount_id IS NULL AND is_retake = false` before marking a block eligible; `UNIQUE(target_finance_charge_id)` in `egc_retake_discount_links` is the final DB-level guard.
+
+- **Risk**: Target invoice is already fully paid when staff applies discount → negative balance on invoice.
+  → **Mitigation**: Follow existing settlement flow — discount application triggers invoice recalculation; overpaid amount becomes unapplied payment on the student account (same as scholarship applied to paid invoice).
 
 - **Risk**: `academic_records` for EGC units may have multiple records per student per level (e.g., supplementary assessments).
   → **Mitigation**: Sync logic takes the final result: `override_pass = true` takes precedence, else latest `is_passed` by `recorded_at` DESC.
@@ -101,6 +126,12 @@ Constraints: shared infra (`FinanceCharge`, `StudentInvoice`, `Payment`) must no
 
 Rollback: migration is additive; removing the new menu section and pages leaves existing functionality intact.
 
-## Open Questions
+## Decisions (continued)
 
-- For the "early major entry" credit (-15M `TYPE_EGC_EXEMPT_CREDIT`): should it be triggered from the Academic module (when student action `STUDENT_MAJOR_ENROLLMENT` fires) or remain a manual entry on the Retake Adjustments page?
+### D8: Early major entry credit is a manual staff action on the Retake Adjustments page
+
+**Chosen**: Staff applies the -15M `TYPE_EGC_EXEMPT_CREDIT` credit manually from the Retake Adjustments page. No Academic module event hook required.
+
+**Rationale**: Coupling to `STUDENT_MAJOR_ENROLLMENT` would introduce cross-module dependency and require Academic module changes. The credit is a finance operation — keeping it staff-initiated on the finance page preserves module boundaries and allows staff to verify timing.
+
+**Implementation**: A dedicated "Apply Early Major Entry Credit" action on the Retake Adjustments page, scoped to students with at least one egc_block who have transitioned to major (detectable via student status change or explicit staff selection). Creates a `TYPE_EGC_EXEMPT_CREDIT` FinanceCharge of -15,000,000 and triggers invoice recalculation.

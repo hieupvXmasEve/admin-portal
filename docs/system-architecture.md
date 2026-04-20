@@ -1,6 +1,6 @@
 # System Architecture
 
-Last updated: 2026-04-16  
+Last updated: 2026-04-21  
 Owner: Platform Team  
 Status: Current-state architecture map  
 Source of truth: route files, middleware, module providers, runtime entrypoints
@@ -35,7 +35,7 @@ Client (Web SPA / API)
 
 - Identity: `app/Modules/Identity`
 - Academic: `app/Modules/Academic`
-- Finance: `app/Modules/Finance` (Settlement v2 landed 2026-03-25; DNG gateway integration 2026-03-26; campus-mapped DNG flow updated 2026-04-16)
+- Finance: `app/Modules/Finance` (Settlement v2 landed 2026-03-25; DNG gateway integration 2026-03-26; EGC fee-management ops expanded 2026-04-21)
     - Source-of-truth model:
         - `payments` — canonical cash receipt ledger
         - `payment_applications` — line-level cash application (replaces legacy `payment_allocations`)
@@ -47,10 +47,35 @@ Client (Web SPA / API)
         - `dng_webhook_events` — DNG webhook event audit for payment confirmation
     - Services: `SettlementService`, `PaymentService`, `FinanceChargeService`, `DngClient`, `DngPaymentService`, `DngReconciliationService`, `DngWebhookService`, `DngChecksumService`
     - Actions: `VoidFinanceChargeAction`, `AllocatePaymentAction`, `AutoAllocatePaymentsAction`
+    - EGC tracking/actions:
+        - `SyncEgcBlockResultsAction`
+        - `ApplyEgcRetakeDiscountAction`
+        - `ApplyEgcCarryForwardAction`
+        - `BuildEgcCarryForwardPlanAction`
+        - `GenerateEgcChargesAction`
+    - EGC query/read-model layer:
+        - `ListEgcBlockResultsQuery`
+        - `ListEgcRetakeAdjustmentsQuery`
+        - `ListEgcCarryForwardCandidatesQuery`
+        - `PreviewEgcChargeGenerationQuery`
     - Support: `StudentChargeTimingResolver` (EGC vs Tuition billing by semester & stage; EGC until `intake_major`)
     - Web routes: `/finance/payments/create`, `/finance/payments/{student}/dng-data`, `/finance/dng/payment-requests`, `/finance/dng/payment-requests/{dngPaymentRequest}`, `/finance/dng/webhook-events`, `/finance/dng/webhook-events/{dngWebhookEvent}`
     - API routes: `POST /api/v1/finance/dng/payment-requests` (create), `POST /api/v1/finance/dng/webhook` (receive)
     - Ops routes: `finance/operations/settlement` (worklist), `finance/operations/dashboard` (metrics)
+    - EGC ops routes:
+        - `finance/egc/block-results`
+        - `finance/egc/retake-adjustments`
+        - `finance/egc/carry-forward`
+        - `finance/egc/generate-charges`
+    - EGC campus scope:
+        - current ops list pages are locked to `session('current_campus_id')`
+        - no campus picker is exposed on the current EGC pages
+    - EGC data truth:
+        - `egc_blocks` tracks per-semester block order, level, result, retake flag, and mapped `finance_charge_id`
+        - `egc_retake_discount_links` binds failed source block -> target charge -> discount header
+        - carry-forward releases unused paid EGC charges back to unapplied balance by voiding unused charges without immediate auto-allocation
+        - retake discounts only target later mapped retake blocks of the same level
+        - `egc:backfill-blocks` rebuilds historical EGC blocks from registrations, repairs null `finance_charge_id`, and reports unmatched charges instead of inventing new blocks
     - DNG workflow: Staff → Payment Create form → Student selection → resolve `campuses.dng_code` → DNG API push (with checksum) → QR display → Webhook inbox capture (`dng_webhook_events`) → Async checksum/business validation → Payment record
     - DNG replacement rule: for the same `student + fee_type`, only one unpaid DNG request should stay active; older unpaid requests move to `cancelled` after the replacement push succeeds
     - Late webhook/reconciliation events for cancelled requests are skipped
