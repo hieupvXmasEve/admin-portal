@@ -31,7 +31,7 @@ class CurriculumVersionFactory extends Factory
             'program_id' => Program::factory(),
             'specialization_id' => null, // Can be set when needed
             'version_code' => 'V'.$this->faker->randomFloat(1, 1.0, 9.9),
-            'semester_id' => null, // Can be set when needed
+            'semester_id' => Semester::factory(),
             'notes' => $this->faker->optional()->paragraph(),
         ];
     }

@@ -6,11 +6,60 @@ use App\Modules\Finance\Http\Web\Admin\BillingOperationsController;
 use App\Modules\Finance\Http\Web\Admin\BillingSettlementController;
 use App\Modules\Finance\Http\Web\Admin\DngPaymentRequestController;
 use App\Modules\Finance\Http\Web\Admin\DngWebhookEventController;
+use App\Modules\Finance\Http\Web\Admin\EgcBlockResultsController;
+use App\Modules\Finance\Http\Web\Admin\EgcCarryForwardController;
+use App\Modules\Finance\Http\Web\Admin\EgcChargeGenerationController;
+use App\Modules\Finance\Http\Web\Admin\EgcRetakeAdjustmentsController;
 use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
 use App\Modules\Finance\Http\Web\Admin\PaymentController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(function () {
+    // EGC Operations
+    Route::prefix('egc')->name('egc.')->group(function () {
+        // EGC Charge Generation
+        Route::prefix('charges')->name('charges.')->group(function () {
+            Route::get('/', [EgcChargeGenerationController::class, 'index'])
+                ->middleware('can:view_egc_finance_operations')
+                ->name('index');
+            Route::post('/', [EgcChargeGenerationController::class, 'store'])
+                ->middleware('can:generate_egc_finance_charges')
+                ->name('store');
+        });
+
+        // EGC Block Results
+        Route::prefix('block-results')->name('block-results.')->group(function () {
+            Route::get('/', [EgcBlockResultsController::class, 'index'])
+                ->middleware('can:view_egc_block_results')
+                ->name('index');
+            Route::post('/sync', [EgcBlockResultsController::class, 'sync'])
+                ->middleware('can:sync_egc_block_results')
+                ->name('sync');
+        });
+
+        // EGC Retake Adjustments
+        Route::prefix('retake-adjustments')->name('retake-adjustments.')->group(function () {
+            Route::get('/', [EgcRetakeAdjustmentsController::class, 'index'])
+                ->middleware('can:view_egc_retake_adjustments')
+                ->name('index');
+            Route::post('/', [EgcRetakeAdjustmentsController::class, 'store'])
+                ->middleware('can:apply_egc_retake_adjustment')
+                ->name('store');
+            Route::post('/apply-major-entry-credit', [EgcRetakeAdjustmentsController::class, 'applyMajorEntryCredit'])
+                ->middleware('can:apply_egc_retake_adjustment')
+                ->name('apply-major-entry-credit');
+        });
+
+        Route::prefix('carry-forward')->name('carry-forward.')->group(function () {
+            Route::get('/', [EgcCarryForwardController::class, 'index'])
+                ->middleware('can:view_egc_retake_adjustments')
+                ->name('index');
+            Route::post('/', [EgcCarryForwardController::class, 'store'])
+                ->middleware('can:apply_egc_retake_adjustment')
+                ->name('store');
+        });
+    });
+
     // ... other finance routes ...
 
     // Operations

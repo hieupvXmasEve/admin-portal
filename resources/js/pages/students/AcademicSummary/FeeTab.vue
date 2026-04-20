@@ -52,7 +52,7 @@ interface FeeSummary {
     statement_events: Array<{
         event_key: string;
         event_at: string | null;
-        kind: 'payment' | 'application' | 'release';
+        kind: 'payment' | 'application' | 'release' | 'discount';
         label: string;
         reference: string;
         details: string;
@@ -84,6 +84,7 @@ interface FeeSummary {
             settled_amount: number;
             snapshot_total: number;
             discount_total: number;
+            discount_allocated: number;
             lines: Array<{
                 id: number | string;
                 item: string;
@@ -102,6 +103,20 @@ interface FeeSummary {
                 allocated_amount: number;
                 ref: string | null;
                 charges: Array<{
+                    invoice_line_id: number;
+                    charge_id: number | null;
+                    charge_description: string;
+                    allocated_amount: number;
+                }>;
+            }>;
+            discounts: Array<{
+                id: number;
+                created_at: string | null;
+                description: string;
+                discount_type: string;
+                amount: number;
+                allocated_amount: number;
+                targets: Array<{
                     invoice_line_id: number;
                     charge_id: number | null;
                     charge_description: string;
@@ -140,6 +155,18 @@ interface Props {
     student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status' | 'email' | 'intake'>;
     loading?: boolean;
 }
+
+type BillingInvoice = FeeSummary['billing_by_semester'][number]['invoices'][number];
+type SettlementChargeSummary = {
+    key: string;
+    label: string;
+    lineAmount: number | null;
+    cashApplied: number;
+    discountApplied: number;
+    totalApplied: number;
+    paymentCount: number;
+    discountCount: number;
+};
 
 const props = withDefaults(defineProps<Props>(), {
     loading: false,
@@ -244,7 +271,7 @@ const getChargeLineStatusBadge = (status: string) => {
     };
 };
 
-const getStatementKindBadge = (kind: 'payment' | 'application' | 'release') => {
+const getStatementKindBadge = (kind: 'payment' | 'application' | 'release' | 'discount') => {
     if (kind === 'payment') {
         return {
             label: 'Money In',
@@ -259,10 +286,112 @@ const getStatementKindBadge = (kind: 'payment' | 'application' | 'release') => {
         };
     }
 
+    if (kind === 'discount') {
+        return {
+            label: 'Discount',
+            class: 'bg-violet-50 text-violet-700 border-violet-200',
+        };
+    }
+
     return {
         label: 'Applied',
         class: 'bg-amber-50 text-amber-700 border-amber-200',
     };
+};
+
+const getInvoiceSettlementSummary = (invoice: BillingInvoice): SettlementChargeSummary[] => {
+    const summaryMap = new Map<string, SettlementChargeSummary>();
+
+    const ensureSummary = (key: string, label: string, lineAmount: number | null) => {
+        const existing = summaryMap.get(key);
+
+        if (existing) {
+            return existing;
+        }
+
+        const summary: SettlementChargeSummary = {
+            key,
+            label,
+            lineAmount,
+            cashApplied: 0,
+            discountApplied: 0,
+            totalApplied: 0,
+            paymentCount: 0,
+            discountCount: 0,
+        };
+
+        summaryMap.set(key, summary);
+
+        return summary;
+    };
+
+    invoice.lines.forEach((line) => {
+        ensureSummary(`line-${line.id}`, line.item, line.affects_payable ? Math.abs(line.amount) : null);
+    });
+
+    invoice.payments.forEach((payment) => {
+        const visitedChargeKeys = new Set<string>();
+
+        payment.charges.forEach((charge) => {
+            const key = charge.invoice_line_id ? `line-${charge.invoice_line_id}` : `charge-${charge.charge_id ?? charge.charge_description}`;
+            const summary = ensureSummary(key, charge.charge_description, null);
+
+            summary.cashApplied += charge.allocated_amount;
+            summary.totalApplied += charge.allocated_amount;
+
+            if (!visitedChargeKeys.has(key)) {
+                summary.paymentCount += 1;
+                visitedChargeKeys.add(key);
+            }
+        });
+    });
+
+    invoice.discounts.forEach((discount) => {
+        const visitedChargeKeys = new Set<string>();
+
+        discount.targets.forEach((target) => {
+            const key = target.invoice_line_id ? `line-${target.invoice_line_id}` : `charge-${target.charge_id ?? target.charge_description}`;
+            const summary = ensureSummary(key, target.charge_description, null);
+
+            summary.discountApplied += target.allocated_amount;
+            summary.totalApplied += target.allocated_amount;
+
+            if (!visitedChargeKeys.has(key)) {
+                summary.discountCount += 1;
+                visitedChargeKeys.add(key);
+            }
+        });
+    });
+
+    return Array.from(summaryMap.values())
+        .filter((summary) => summary.totalApplied > 0 || summary.lineAmount !== null)
+        .sort((left, right) => right.totalApplied - left.totalApplied);
+};
+
+const getInvoiceSettlementHint = (invoice: BillingInvoice): string | null => {
+    const summaries = getInvoiceSettlementSummary(invoice);
+
+    if (summaries.length !== 1) {
+        return null;
+    }
+
+    const [summary] = summaries;
+
+    if (summary.paymentCount <= 1 && summary.discountCount === 0) {
+        return null;
+    }
+
+    const parts: string[] = [];
+
+    if (summary.paymentCount > 0) {
+        parts.push(`${summary.paymentCount} lần thu tiền`);
+    }
+
+    if (summary.discountCount > 0) {
+        parts.push(`${summary.discountCount} lần giảm trừ`);
+    }
+
+    return `${summary.label} là một khoản phí duy nhất. Các dòng bên dưới chỉ là ${parts.join(' + ')} được áp vào cùng khoản phí này, không phải fee bị tạo trùng.`;
 };
 
 const defaultOpenSemesters = computed(() => {
@@ -567,6 +696,10 @@ const summaryToneClass = computed(() => {
                                                     <span class="font-medium text-green-600">{{ formatCurrency(invoice.cash_applied) }}</span>
                                                 </div>
                                                 <div class="text-right">
+                                                    <span class="text-muted-foreground block">Discount Applied</span>
+                                                    <span class="font-medium text-violet-600">{{ formatCurrency(invoice.discount_allocated) }}</span>
+                                                </div>
+                                                <div class="text-right">
                                                     <span class="text-muted-foreground block">Still Due</span>
                                                     <span class="font-medium" :class="invoice.remaining > 0 ? 'text-red-600' : 'text-gray-400'">
                                                         {{ formatCurrency(invoice.remaining) }}
@@ -602,9 +735,38 @@ const summaryToneClass = computed(() => {
                                             </div>
 
                                             <div class="md:border-l md:pl-6">
-                                                <h5 class="text-muted-foreground mb-2 font-bold uppercase">Payments</h5>
-                                                <div v-if="invoice.payments.length > 0">
-                                                    <ul class="space-y-3">
+                                                <h5 class="text-muted-foreground mb-2 font-bold uppercase">Settlements</h5>
+                                                <div v-if="invoice.payments.length > 0 || invoice.discounts.length > 0" class="space-y-4">
+                                                    <div v-if="getInvoiceSettlementSummary(invoice).length > 0" class="space-y-3">
+                                                        <div class="grid gap-2">
+                                                            <div v-for="summary in getInvoiceSettlementSummary(invoice)" :key="summary.key" class="bg-muted/35 rounded-lg border px-3 py-2">
+                                                                <div class="flex items-start justify-between gap-3">
+                                                                    <div class="min-w-0">
+                                                                        <div class="font-medium">{{ summary.label }}</div>
+                                                                        <div class="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                                                            <span v-if="summary.lineAmount !== null">Tổng khoản phí: {{ formatCurrency(summary.lineAmount) }}</span>
+                                                                            <span v-if="summary.paymentCount > 0">{{ summary.paymentCount }} lần thu tiền</span>
+                                                                            <span v-if="summary.discountCount > 0">{{ summary.discountCount }} lần giảm trừ</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="text-right">
+                                                                        <div class="font-medium">{{ formatCurrency(summary.totalApplied) }}</div>
+                                                                        <div class="text-muted-foreground text-xs">đã áp vào khoản này</div>
+                                                                    </div>
+                                                                </div>
+                                                                <div v-if="summary.cashApplied > 0 || summary.discountApplied > 0" class="mt-2 flex flex-wrap gap-2 text-xs">
+                                                                    <span v-if="summary.cashApplied > 0" class="rounded-full bg-green-50 px-2 py-1 text-green-700"> Thu tiền: {{ formatCurrency(summary.cashApplied) }} </span>
+                                                                    <span v-if="summary.discountApplied > 0" class="rounded-full bg-violet-50 px-2 py-1 text-violet-700"> Giảm trừ: {{ formatCurrency(summary.discountApplied) }} </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div v-if="getInvoiceSettlementHint(invoice)" class="rounded-lg border border-blue-200 bg-blue-50/70 px-3 py-2 text-xs text-blue-800">
+                                                            {{ getInvoiceSettlementHint(invoice) }}
+                                                        </div>
+                                                    </div>
+
+                                                    <ul v-if="invoice.payments.length > 0" class="space-y-3">
                                                         <li v-for="payment in invoice.payments" :key="payment.id" class="space-y-2 border-b border-dashed pb-3 last:border-0 last:pb-0">
                                                             <div class="flex items-center justify-between gap-3">
                                                                 <div>
@@ -627,9 +789,37 @@ const summaryToneClass = computed(() => {
                                                             <div v-if="payment.charges.length > 0" class="space-y-1">
                                                                 <div v-for="charge in payment.charges" :key="`${payment.id}-${charge.invoice_line_id}`" class="bg-muted/40 flex items-center justify-between rounded px-2 py-1 text-xs">
                                                                     <div class="text-muted-foreground">
-                                                                        <div>{{ charge.charge_description }}</div>
+                                                                        <div>Áp vào {{ charge.charge_description }}</div>
                                                                     </div>
                                                                     <span class="font-medium text-green-600">{{ formatCurrency(charge.allocated_amount) }}</span>
+                                                                </div>
+                                                            </div>
+                                                        </li>
+                                                    </ul>
+                                                    <ul v-if="invoice.discounts.length > 0" class="space-y-3">
+                                                        <li v-for="discount in invoice.discounts" :key="discount.id" class="space-y-2 border-b border-dashed pb-3 last:border-0 last:pb-0">
+                                                            <div class="flex items-center justify-between gap-3">
+                                                                <div>
+                                                                    <div class="font-medium">{{ discount.created_at || 'N/A' }}</div>
+                                                                    <div class="text-muted-foreground">
+                                                                        {{ discount.description }}
+                                                                    </div>
+                                                                    <div class="text-muted-foreground text-xs">Loại discount: {{ formatEnumLabel(discount.discount_type) }}</div>
+                                                                </div>
+                                                                <div class="text-right">
+                                                                    <div class="font-medium text-violet-600">
+                                                                        {{ formatCurrency(discount.allocated_amount || discount.amount) }}
+                                                                    </div>
+                                                                    <div class="text-muted-foreground text-xs">giảm vào invoice này</div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div v-if="discount.targets.length > 0" class="space-y-1">
+                                                                <div v-for="target in discount.targets" :key="`${discount.id}-${target.invoice_line_id}`" class="flex items-center justify-between rounded bg-violet-50/60 px-2 py-1 text-xs">
+                                                                    <div class="text-muted-foreground">
+                                                                        <div>Giảm cho {{ target.charge_description }}</div>
+                                                                    </div>
+                                                                    <span class="font-medium text-violet-600">{{ formatCurrency(target.allocated_amount) }}</span>
                                                                 </div>
                                                             </div>
                                                         </li>
@@ -656,11 +846,7 @@ const summaryToneClass = computed(() => {
                     <CardHeader class="bg-muted/20 space-y-3 pb-3">
                         <CardTitle class="text-sm font-medium">
                             <span class="text-muted-foreground mb-1 block uppercase">Active Plan</span>
-                            <Link
-                                v-if="feeSummary.tuition_plan_checklist"
-                                :href="route('tuition-plans.show', feeSummary.tuition_plan_checklist.plan_id)"
-                                class="text-blue-500 transition-colors hover:underline"
-                            >
+                            <Link v-if="feeSummary.tuition_plan_checklist" :href="route('tuition-plans.show', feeSummary.tuition_plan_checklist.plan_id)" class="text-blue-500 transition-colors hover:underline">
                                 {{ feeSummary.tuition_plan_checklist.plan_name }}
                             </Link>
                             <span v-else>No Active Plan</span>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Queries;
 
 use App\Models\FinanceCharge;
+use App\Models\InvoiceDiscount;
 use App\Models\InvoiceLine;
 use App\Models\Payment;
 use App\Models\PaymentApplication;
@@ -32,7 +33,7 @@ class GetStudentFeeSummaryQuery
                 'semester',
                 'invoiceLines.charge.semester',
                 'invoiceLines.paymentApplications.payment',
-                'discounts',
+                'discounts.allocations.invoiceLine.charge.semester',
             ])
             ->orderBy('due_date')
             ->get();
@@ -86,7 +87,7 @@ class GetStudentFeeSummaryQuery
                 'progress' => $netDue > 0 ? min(100, max(0, ($totalAllocated / $netDue) * 100)) : 0,
             ],
             'payments' => $this->buildPaymentHistory($payments),
-            'statement_events' => $this->buildStatementEvents($payments),
+            'statement_events' => $this->buildStatementEvents($payments, $invoices),
             'billing_by_semester' => $billingBySemester,
             'tuition_plan_checklist' => $checklist,
         ];
@@ -158,6 +159,11 @@ class GetStudentFeeSummaryQuery
             'discount_total' => $snapshot['discount'],
             'lines' => $this->mapInvoiceLines($invoice),
             'payments' => $this->mapInvoicePayments($invoice),
+            'discounts' => $this->mapInvoiceDiscounts($invoice),
+            'discount_allocated' => (float) $invoice->discounts
+                ->flatMap(fn (InvoiceDiscount $discount) => $discount->allocations)
+                ->where('entry_type', 'allocation')
+                ->sum('amount'),
         ];
     }
 
@@ -442,9 +448,9 @@ class GetStudentFeeSummaryQuery
         })->values();
     }
 
-    private function buildStatementEvents(Collection $payments): Collection
+    private function buildStatementEvents(Collection $payments, Collection $invoices): Collection
     {
-        $events = $payments
+        $paymentEvents = $payments
             ->flatMap(function (Payment $payment) {
                 $paymentEvent = collect([[
                     'event_key' => 'payment-'.$payment->id,
@@ -486,7 +492,52 @@ class GetStudentFeeSummaryQuery
                 });
 
                 return $paymentEvent->concat($applicationEvents);
-            })
+            });
+
+        $discountEvents = $invoices
+            ->flatMap(function (StudentInvoice $invoice) {
+                return $invoice->discounts->flatMap(function (InvoiceDiscount $discount) use ($invoice) {
+                    $allocatedAmount = (float) $discount->allocations
+                        ->where('entry_type', 'allocation')
+                        ->sum('amount');
+
+                    if ($allocatedAmount <= 0) {
+                        return [];
+                    }
+
+                    $details = $discount->allocations
+                        ->where('entry_type', 'allocation')
+                        ->map(function ($allocation) {
+                            $line = $allocation->invoiceLine;
+
+                            return collect([
+                                $line?->charge?->semester?->name,
+                                $line?->charge?->description ?? $line?->description_snapshot,
+                            ])->filter()->implode(' • ');
+                        })
+                        ->filter()
+                        ->unique()
+                        ->implode(' | ');
+
+                    return [[
+                        'event_key' => 'discount-'.$discount->id,
+                        'event_at' => $discount->created_at,
+                        'sort_order' => 1,
+                        'kind' => 'discount',
+                        'label' => 'Discount applied',
+                        'reference' => $invoice->invoice_number,
+                        'details' => collect([
+                            $discount->description,
+                            $details ?: null,
+                        ])->filter()->implode(' • '),
+                        'money_in' => 0.0,
+                        'money_out' => $allocatedAmount,
+                    ]];
+                });
+            });
+
+        $events = $paymentEvents
+            ->concat($discountEvents)
             ->sort(function (array $left, array $right) {
                 $leftAt = $left['event_at']?->getTimestamp() ?? 0;
                 $rightAt = $right['event_at']?->getTimestamp() ?? 0;
@@ -502,8 +553,10 @@ class GetStudentFeeSummaryQuery
         $runningBalance = 0.0;
 
         return $events->map(function (array $event) use (&$runningBalance) {
-            $runningBalance += $event['money_in'];
-            $runningBalance -= $event['money_out'];
+            if ($event['kind'] !== 'discount') {
+                $runningBalance += $event['money_in'];
+                $runningBalance -= $event['money_out'];
+            }
 
             return [
                 'event_key' => $event['event_key'],
@@ -517,6 +570,43 @@ class GetStudentFeeSummaryQuery
                 'unapplied_balance' => $runningBalance,
             ];
         })->values();
+    }
+
+    private function mapInvoiceDiscounts(StudentInvoice $invoice): Collection
+    {
+        return $invoice->discounts
+            ->filter(fn (InvoiceDiscount $discount) => ($discount->status ?? 'active') === 'active')
+            ->map(function (InvoiceDiscount $discount) {
+                $allocatedAmount = (float) $discount->allocations
+                    ->where('entry_type', 'allocation')
+                    ->sum('amount');
+
+                $targets = $discount->allocations
+                    ->where('entry_type', 'allocation')
+                    ->map(function ($allocation) {
+                        $line = $allocation->invoiceLine;
+
+                        return [
+                            'invoice_line_id' => $line?->id,
+                            'charge_id' => $line?->charge?->id,
+                            'charge_description' => $line?->charge?->description ?? $line?->description_snapshot,
+                            'allocated_amount' => (float) $allocation->amount,
+                        ];
+                    })
+                    ->filter(fn (array $target) => $target['invoice_line_id'] !== null)
+                    ->values();
+
+                return [
+                    'id' => $discount->id,
+                    'created_at' => $discount->created_at?->format('Y-m-d'),
+                    'description' => $discount->description,
+                    'discount_type' => $discount->discount_type,
+                    'amount' => (float) $discount->amount,
+                    'allocated_amount' => $allocatedAmount,
+                    'targets' => $targets,
+                ];
+            })
+            ->values();
     }
 
     private function deriveInvoiceSnapshot(StudentInvoice $invoice): array

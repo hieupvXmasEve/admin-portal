@@ -11,7 +11,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatDate } from '@/utils/format';
 import { Head, Link } from '@inertiajs/vue3';
 import {
@@ -19,6 +18,7 @@ import {
     ChevronLeft,
     CreditCard,
     DollarSign,
+    Percent,
     Receipt,
     User as UserIcon
 } from 'lucide-vue-next';
@@ -26,24 +26,44 @@ import { route } from 'ziggy-js';
 
 interface Charge {
     id: number;
+    invoice_line_id: number;
     charge_type: string;
     description: string;
     amount: number;
     paid_amount: number;
+    discount_amount: number;
+    settled_amount: number;
     balance: number;
-    effective_at: string;
-    source_type: string;
+    effective_at: string | null;
+    source_type: string | null;
     status: string;
-    allocations: Array<{
+}
+
+interface SettlementEntry {
+    id: string;
+    entry_group: 'payment' | 'discount';
+    entry_type: string;
+    applied_at: string | null;
+    amount: number;
+    charge: {
+        id: number | null;
+        description: string;
+        charge_type: string | null;
+    };
+    payment: {
         id: number;
-        allocated_amount: number;
-        payment: {
-            id: number;
-            amount: number;
-            paid_at: string;
-            method: string;
-        }
-    }>;
+        amount: number;
+        paid_at: string | null;
+        method: string;
+        status: string;
+        external_ref: string | null;
+    } | null;
+    discount: {
+        id: number;
+        description: string;
+        discount_type: string;
+        discount_source: string | null;
+    } | null;
 }
 
 interface Invoice {
@@ -56,7 +76,7 @@ interface Invoice {
         email: string;
         program: {
             name: string;
-        }
+        } | null
     };
     semester: {
         id: number;
@@ -65,17 +85,20 @@ interface Invoice {
     billing_cycle: {
         name: string;
     } | null;
-    due_date: string;
-    created_at: string;
+    due_date: string | null;
+    created_at: string | null;
 
     // Status metrics
     real_time_status: string;
+    subtotal: number;
+    discount_total: number;
     total_amount: number;
     paid_amount: number;
     outstanding_balance: number;
 
     // Relations
     charges: Charge[];
+    settlement_entries: SettlementEntry[];
 }
 
 defineProps<{
@@ -96,6 +119,41 @@ const getChargeTypeLabel = (type: string) => {
     return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 };
 
+const getSettlementBadgeVariant = (entryGroup: SettlementEntry['entry_group']) => {
+    return entryGroup === 'payment' ? 'default' : 'secondary';
+};
+
+const getSettlementLabel = (entry: SettlementEntry) => {
+    return entry.entry_group === 'payment' ? 'Payment' : 'Discount';
+};
+
+const getSettlementReference = (entry: SettlementEntry) => {
+    if (entry.payment) {
+        return `#${entry.payment.id}`;
+    }
+
+    if (entry.discount) {
+        return `#${entry.discount.id}`;
+    }
+
+    return '-';
+};
+
+const getSettlementSource = (entry: SettlementEntry) => {
+    if (entry.payment) {
+        return entry.payment.method;
+    }
+
+    return entry.discount?.discount_type ?? '-';
+};
+
+const getSettlementDescription = (entry: SettlementEntry) => {
+    if (entry.payment) {
+        return entry.payment.external_ref || 'Cash application';
+    }
+
+    return entry.discount?.description || entry.discount?.discount_source || 'Discount allocation';
+};
 </script>
 
 <template>
@@ -169,14 +227,22 @@ const getChargeTypeLabel = (type: string) => {
                 </div>
                 <Separator />
                 <div class="flex justify-between items-center">
-                    <span class="text-muted-foreground">Total Charges</span>
-                    <span class="font-bold text-lg">{{ formatCurrency(invoice.total_amount) }}</span>
+                    <span class="text-muted-foreground">Gross Charges</span>
+                    <span class="font-bold text-lg">{{ formatCurrency(invoice.subtotal) }}</span>
+                </div>
+                <div class="flex justify-between items-center text-amber-600">
+                    <span class="text-muted-foreground">Discount Allocations</span>
+                    <span class="font-bold text-lg">- {{ formatCurrency(invoice.discount_total) }}</span>
                 </div>
                 <div class="flex justify-between items-center text-green-600">
-                    <span class="text-muted-foreground">Paid Amount</span>
+                    <span class="text-muted-foreground">Cash Applied</span>
                     <span class="font-bold text-lg">- {{ formatCurrency(invoice.paid_amount) }}</span>
                 </div>
                 <Separator />
+                <div class="flex justify-between items-center">
+                    <span class="text-muted-foreground">Net Invoice Amount</span>
+                    <span class="font-medium">{{ formatCurrency(invoice.total_amount) }}</span>
+                </div>
                 <div class="flex justify-between items-center pt-2">
                     <div class="flex flex-col">
                         <span class="font-bold text-xl">Balance Due</span>
@@ -192,121 +258,126 @@ const getChargeTypeLabel = (type: string) => {
         </Card>
     </div>
 
-    <!-- Details Tabs -->
-    <Tabs default-value="charges" class="w-full">
-        <TabsList>
-            <TabsTrigger value="charges" class="flex items-center gap-2">
-                <Receipt class="h-4 w-4" /> Charge Details
-            </TabsTrigger>
-            <TabsTrigger value="payments" class="flex items-center gap-2">
+    <Card>
+        <CardHeader>
+            <CardTitle class="flex items-center gap-2">
+                <Receipt class="h-4 w-4" /> Charge Breakdown
+            </CardTitle>
+            <CardDescription>Line-level charges with cash applied and discount allocations.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Charge Type</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Effective Date</TableHead>
+                        <TableHead class="text-right">Amount</TableHead>
+                        <TableHead class="text-right">Cash Applied</TableHead>
+                        <TableHead class="text-right">Discount Applied</TableHead>
+                        <TableHead class="text-right">Balance</TableHead>
+                        <TableHead>Status</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    <TableRow v-for="charge in invoice.charges" :key="charge.invoice_line_id">
+                        <TableCell class="font-medium">
+                            {{ getChargeTypeLabel(charge.charge_type) }}
+                        </TableCell>
+                        <TableCell>
+                            {{ charge.description }}
+                            <div v-if="charge.source_type === 'Manual'" class="text-xs text-muted-foreground mt-1">
+                                Manually added
+                            </div>
+                        </TableCell>
+                        <TableCell>{{ formatDate(charge.effective_at) }}</TableCell>
+                        <TableCell class="text-right font-medium" :class="charge.amount < 0 ? 'text-green-600' : ''">
+                            {{ formatCurrency(charge.amount) }}
+                        </TableCell>
+                        <TableCell class="text-right text-green-600">
+                            {{ formatCurrency(charge.paid_amount) }}
+                        </TableCell>
+                        <TableCell class="text-right text-amber-600">
+                            {{ formatCurrency(charge.discount_amount) }}
+                        </TableCell>
+                        <TableCell class="text-right">
+                            {{ formatCurrency(charge.balance) }}
+                        </TableCell>
+                        <TableCell>
+                            <Badge variant="outline" v-if="charge.status === 'void'"
+                                class="text-destructive border-destructive">Void</Badge>
+                            <Badge variant="outline" v-else>Active</Badge>
+                        </TableCell>
+                    </TableRow>
+                </TableBody>
+            </Table>
+        </CardContent>
+    </Card>
+
+    <Card>
+        <CardHeader>
+            <CardTitle class="flex items-center gap-2">
                 <CreditCard class="h-4 w-4" /> Payments & Allocations
-            </TabsTrigger>
-        </TabsList>
-
-        <!-- Charges Tab -->
-        <TabsContent value="charges" class="mt-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Charge Breakdown</CardTitle>
-                    <CardDescription>Detailed list of all charges included in this invoice.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Charge Type</TableHead>
-                                <TableHead>Description</TableHead>
-                                <TableHead>Effective Date</TableHead>
-                                <TableHead class="text-right">Amount</TableHead>
-                                <TableHead class="text-right">Paid</TableHead>
-                                <TableHead class="text-right">Balance</TableHead>
-                                <TableHead>Status</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            <TableRow v-for="charge in invoice.charges" :key="charge.id">
-                                <TableCell class="font-medium">
-                                    {{ getChargeTypeLabel(charge.charge_type) }}
-                                </TableCell>
-                                <TableCell>
-                                    {{ charge.description }}
-                                    <div v-if="charge.source_type === 'Manual'"
-                                        class="text-xs text-muted-foreground mt-1">
-                                        Manually added
-                                    </div>
-                                </TableCell>
-                                <TableCell>{{ formatDate(charge.effective_at) }}</TableCell>
-                                <TableCell class="text-right font-medium"
-                                    :class="charge.amount < 0 ? 'text-green-600' : ''">
-                                    {{ formatCurrency(charge.amount) }}
-                                </TableCell>
-                                <TableCell class="text-right text-muted-foreground">
-                                    {{ formatCurrency(charge.paid_amount) }}
-                                </TableCell>
-                                <TableCell class="text-right">
-                                    {{ formatCurrency(charge.balance) }}
-                                </TableCell>
-                                <TableCell>
-                                    <Badge variant="outline" v-if="charge.status === 'void'"
-                                        class="text-destructive border-destructive">Void</Badge>
-                                    <Badge variant="outline" v-else>Active</Badge>
-                                </TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-        </TabsContent>
-
-        <!-- Payments Tab -->
-        <TabsContent value="payments" class="mt-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Payment History</CardTitle>
-                    <CardDescription>Payments allocated to charges on this invoice.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Payment #</TableHead>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Method</TableHead>
-                                <TableHead>Allocated To</TableHead>
-                                <TableHead class="text-right">Allocated Amount</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            <template v-for="charge in invoice.charges" :key="charge.id">
-                                <TableRow v-for="allocation in charge.allocations" :key="allocation.id">
-                                    <TableCell class="font-medium">
-                                        <Link :href="route('finance.payments.show', allocation.payment.id)"
-                                            class="hover:underline text-primary">
-                                            {{ allocation.payment.id }}
-                                        </Link>
-                                    </TableCell>
-                                    <TableCell>{{ formatDate(allocation.payment.paid_at) }}</TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline">{{ allocation.payment.method }}</Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        <span class="text-sm text-muted-foreground">Charge:</span> {{
-                                            charge.description }}
-                                    </TableCell>
-                                    <TableCell class="text-right font-medium text-green-600">
-                                        {{ formatCurrency(allocation.allocated_amount) }}
-                                    </TableCell>
-                                </TableRow>
-                            </template>
-                            <TableRow v-if="!invoice.charges.some(c => c.allocations.length > 0)">
-                                <TableCell colspan="5" class="h-24 text-center text-muted-foreground">
-                                    No payments allocated yet.
-                                </TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-        </TabsContent>
-    </Tabs>
+            </CardTitle>
+            <CardDescription>Settlement ledger from `payment_applications` and `discount_allocations`.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Reference</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Method / Source</TableHead>
+                        <TableHead>Details</TableHead>
+                        <TableHead>Allocated To</TableHead>
+                        <TableHead>Entry</TableHead>
+                        <TableHead class="text-right">Amount</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    <TableRow v-for="entry in invoice.settlement_entries" :key="entry.id">
+                        <TableCell>
+                            <Badge :variant="getSettlementBadgeVariant(entry.entry_group)">
+                                <span class="flex items-center gap-1">
+                                    <Percent v-if="entry.entry_group === 'discount'" class="h-3 w-3" />
+                                    <CreditCard v-else class="h-3 w-3" />
+                                    {{ getSettlementLabel(entry) }}
+                                </span>
+                            </Badge>
+                        </TableCell>
+                        <TableCell class="font-medium">
+                            <Link v-if="entry.payment" :href="route('finance.payments.show', entry.payment.id)"
+                                class="hover:underline text-primary">
+                                {{ getSettlementReference(entry) }}
+                            </Link>
+                            <span v-else>{{ getSettlementReference(entry) }}</span>
+                        </TableCell>
+                        <TableCell>{{ formatDate(entry.applied_at) }}</TableCell>
+                        <TableCell>
+                            <Badge variant="outline">{{ getSettlementSource(entry) }}</Badge>
+                        </TableCell>
+                        <TableCell class="text-sm text-muted-foreground">
+                            {{ getSettlementDescription(entry) }}
+                        </TableCell>
+                        <TableCell>
+                            {{ entry.charge.description }}
+                        </TableCell>
+                        <TableCell>
+                            <Badge variant="outline">{{ entry.entry_type }}</Badge>
+                        </TableCell>
+                        <TableCell class="text-right font-medium"
+                            :class="entry.entry_group === 'payment' ? 'text-green-600' : 'text-amber-600'">
+                            {{ formatCurrency(entry.amount) }}
+                        </TableCell>
+                    </TableRow>
+                    <TableRow v-if="invoice.settlement_entries.length === 0">
+                        <TableCell colspan="8" class="h-24 text-center text-muted-foreground">
+                            No payment or discount allocations yet.
+                        </TableCell>
+                    </TableRow>
+                </TableBody>
+            </Table>
+        </CardContent>
+    </Card>
 </template>

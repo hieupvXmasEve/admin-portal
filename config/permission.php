@@ -323,6 +323,13 @@ return [
             'view_finance_operations_generate_charges' => 'view_finance_operations_generate_charges',
             'view_finance_operations_exceptions' => 'view_finance_operations_exceptions',
             'view_finance_operations_due_calendar' => 'view_finance_operations_due_calendar',
+            // EGC Operations
+            'view_egc_finance_operations' => 'view_egc_finance_operations',
+            'generate_egc_finance_charges' => 'generate_egc_finance_charges',
+            'view_egc_block_results' => 'view_egc_block_results',
+            'sync_egc_block_results' => 'sync_egc_block_results',
+            'view_egc_retake_adjustments' => 'view_egc_retake_adjustments',
+            'apply_egc_retake_adjustment' => 'apply_egc_retake_adjustment',
             // Invoices
             'view_finance_invoices' => 'view_finance_invoices',
             'view_finance_export_invoices' => 'view_finance_export_invoices',

@@ -143,6 +143,13 @@ class RoleAndPermissionSeeder extends Seeder
                 'view_course',
                 'create_course',
                 'edit_course',
+                // EGC Operations
+                'view_egc_finance_operations',
+                'generate_egc_finance_charges',
+                'view_egc_block_results',
+                'sync_egc_block_results',
+                'view_egc_retake_adjustments',
+                'apply_egc_retake_adjustment',
             ],
             'can_bo' => [
                 'view_user',
@@ -152,6 +159,13 @@ class RoleAndPermissionSeeder extends Seeder
                 'view_course',
                 'view_program',
                 'view_unit',
+                // EGC Operations
+                'view_egc_finance_operations',
+                'generate_egc_finance_charges',
+                'view_egc_block_results',
+                'sync_egc_block_results',
+                'view_egc_retake_adjustments',
+                'apply_egc_retake_adjustment',
             ],
         ];
 

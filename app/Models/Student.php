@@ -20,7 +20,7 @@ class Student extends StudentAuditableModel
         HasNotifications::notifications insteadof Notifiable;
     }
     // enum ('active', 'inactive', 'suspended', 'graduated', 'intake_pre_uni_gc', 'intake_course', 'deferred', 'dropout', 'dropout_transfer', 'pending', 'admission_deferred')
-    
+
     /**
      * Statuses that are blocked from active operations (e.g., login)
      */
@@ -350,7 +350,7 @@ class Student extends StudentAuditableModel
      */
     public function egcProgress(): HasMany
     {
-        return $this->hasMany(EgcStudentProgress::class);
+        return $this->hasMany(EgcBlock::class);
     }
 
     /**

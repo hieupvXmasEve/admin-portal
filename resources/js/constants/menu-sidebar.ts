@@ -1,6 +1,7 @@
 import type { NavItem } from '@/types';
 import {
     AlertCircle,
+    ArrowRightLeft,
     Award,
     BarChart3,
     Bell,
@@ -496,7 +497,45 @@ export const mainNavItems: NavItem[] = [
         icon: DollarSign,
         children: [
             {
-                title: 'Operations',
+                title: 'EGC Operations',
+                href: '#',
+                icon: GraduationCap,
+                requiredPermissions: ['view_egc_finance_operations'],
+                children: [
+                    {
+                        title: 'Generate Charges',
+                        href: '/finance/egc/charges',
+                        icon: Play,
+                        requiredPermissions: ['generate_egc_finance_charges'],
+                    },
+                    {
+                        title: 'Block Results',
+                        href: '/finance/egc/block-results',
+                        icon: CheckSquare,
+                        requiredPermissions: ['view_egc_block_results'],
+                    },
+                    {
+                        title: 'Retake Adjustments',
+                        href: '/finance/egc/retake-adjustments',
+                        icon: TrendingUp,
+                        requiredPermissions: ['view_egc_retake_adjustments'],
+                    },
+                    {
+                        title: 'Carry Forward',
+                        href: '/finance/egc/carry-forward',
+                        icon: ArrowRightLeft,
+                        requiredPermissions: ['view_egc_retake_adjustments'],
+                    },
+                    {
+                        title: 'Due Calendar',
+                        href: '/finance/operations/due-calendar',
+                        icon: CalendarIcon,
+                        requiredPermissions: ['view_finance_operations_due_calendar'],
+                    },
+                ],
+            },
+            {
+                title: 'Major Operations',
                 href: '#',
                 icon: BarChart3,
                 children: [
