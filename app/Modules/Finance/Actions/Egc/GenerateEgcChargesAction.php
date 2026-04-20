@@ -7,6 +7,7 @@ namespace App\Modules\Finance\Actions\Egc;
 use App\Models\EgcBlock;
 use App\Models\FinanceCharge;
 use App\Models\InvoiceLine;
+use App\Models\Student;
 use App\Models\StudentInvoice;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -30,16 +31,28 @@ class GenerateEgcChargesAction
         foreach ($data['students'] as $studentData) {
             $studentId = (int) $studentData['student_id'];
             $blockCount = (int) ($studentData['block_count'] ?? 2);
-            $currentLevel = (int) ($studentData['current_level'] ?? 1);
+            $student = Student::query()
+                ->select(['id', 'gc_current_level', 'gc_total_levels'])
+                ->find($studentId);
+            $currentLevel = $student?->gc_current_level !== null
+                ? (int) $student->gc_current_level
+                : (int) ($studentData['current_level'] ?? 0);
+            $totalLevels = $student?->gc_total_levels !== null
+                ? (int) $student->gc_total_levels
+                : 0;
 
-            // Guard: skip if student is currently studying their current level
+            if ($totalLevels <= 0 || $currentLevel >= $totalLevels) {
+                $results['skipped'] += $blockCount;
+
+                continue;
+            }
+
             if (self::isStudyingLevel($studentId, $semesterId, $currentLevel)) {
                 $results['skipped'] += $blockCount;
 
                 continue;
             }
 
-            // Guard: skip if already fully charged for this semester
             $existingChargeCount = FinanceCharge::where('student_id', $studentId)
                 ->where('semester_id', $semesterId)
                 ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
@@ -53,8 +66,8 @@ class GenerateEgcChargesAction
             }
 
             try {
-                DB::transaction(function () use ($studentId, $semesterId, $blockCount, $currentLevel, $existingChargeCount, $createdByUserId, &$results) {
-                    self::generateForStudent($studentId, $semesterId, $blockCount, $currentLevel, $existingChargeCount, $createdByUserId, $results);
+                DB::transaction(function () use ($studentId, $semesterId, $blockCount, $currentLevel, $totalLevels, $existingChargeCount, $createdByUserId, &$results) {
+                    self::generateForStudent($studentId, $semesterId, $blockCount, $currentLevel, $totalLevels, $existingChargeCount, $createdByUserId, $results);
                 });
             } catch (\Exception $e) {
                 Log::error('GenerateEgcChargesAction failed', [
@@ -74,11 +87,11 @@ class GenerateEgcChargesAction
         int $semesterId,
         int $blockCount,
         int $currentLevel,
+        int $totalLevels,
         int $existingChargeCount,
         ?int $createdByUserId,
         array &$results
     ): void {
-        // 1. Fulfil deferred blocks from prior semester (finance_charge_id IS NULL)
         $deferredBlocks = EgcBlock::where('student_id', $studentId)
             ->where('semester_id', $semesterId)
             ->whereNull('finance_charge_id')
@@ -90,24 +103,27 @@ class GenerateEgcChargesAction
             $results['created']++;
         }
 
-        // 2. Determine next block number from egc_blocks (for sequential numbering)
         $existingBlockNumbers = EgcBlock::where('student_id', $studentId)
             ->where('semester_id', $semesterId)
             ->pluck('block_number')
             ->toArray();
 
         $nextBlockNumber = empty($existingBlockNumbers) ? 1 : (max($existingBlockNumbers) + 1);
-
-        // Idempotency: use FinanceCharge count (consistent with preview logic)
         $blocksToCreate = max(0, $blockCount - $existingChargeCount);
+
         if ($blocksToCreate === 0) {
             $results['skipped'] += $blockCount;
         }
 
-        // 3. Create new blocks for the requested count
         for ($i = 0; $i < $blocksToCreate; $i++) {
             $blockNumber = $nextBlockNumber + $i;
             $levelNumber = $currentLevel + $i;
+
+            if ($levelNumber >= $totalLevels) {
+                $results['skipped']++;
+
+                continue;
+            }
 
             if (in_array($blockNumber, $existingBlockNumbers, true)) {
                 $results['skipped']++;
@@ -115,7 +131,6 @@ class GenerateEgcChargesAction
                 continue;
             }
 
-            // Detect retake eligibility: prior egc_block fail + attendance ≥ 80% + no entitlement consumed
             $isRetake = self::isRetakeEligible($studentId, $levelNumber);
 
             try {
@@ -137,12 +152,11 @@ class GenerateEgcChargesAction
             }
         }
 
-        // 4. Create deferred block for next semester if only 1 block requested (2-level model)
         if ($blockCount === 1) {
             $deferredBlockNumber = $nextBlockNumber + 1;
             $deferredLevel = $currentLevel + 1;
 
-            if (! in_array($deferredBlockNumber, $existingBlockNumbers, true)) {
+            if ($deferredLevel < $totalLevels && ! in_array($deferredBlockNumber, $existingBlockNumbers, true)) {
                 try {
                     EgcBlock::create([
                         'student_id' => $studentId,
@@ -151,7 +165,7 @@ class GenerateEgcChargesAction
                         'level_number' => $deferredLevel,
                         'result' => EgcBlock::RESULT_PENDING,
                         'is_retake' => false,
-                        'finance_charge_id' => null, // deferred — no charge yet
+                        'finance_charge_id' => null,
                     ]);
                 } catch (UniqueConstraintViolationException) {
                     // already deferred, skip

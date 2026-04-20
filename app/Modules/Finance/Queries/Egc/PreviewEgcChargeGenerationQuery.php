@@ -7,74 +7,96 @@ namespace App\Modules\Finance\Queries\Egc;
 use App\Models\EgcBlock;
 use App\Models\FinanceCharge;
 use App\Models\Student;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 
 class PreviewEgcChargeGenerationQuery
 {
-    public function handle(int $semesterId): array
+    public function handle(int $semesterId, array $filters = [], ?int $campusId = null): array
     {
-        $campusId = app()->bound('campus') ? app('campus')?->id : null;
-
-        $query = Student::where('status', 'intake_pre_uni_gc')
-            ->with(['egcProgress' => function ($q) use ($semesterId) {
-                $q->where('semester_id', $semesterId);
-            }]);
-
-        if ($campusId) {
-            $query->where('campus_id', $campusId);
-        }
-
-        $students = $query->get();
-
-        $eligible = [];
-        $ineligible = [];
-        $warnings = [];
-
-        foreach ($students as $student) {
-            $row = $this->classify($student, $semesterId);
-
-            match ($row['eligibility_status']) {
-                'eligible' => $eligible[] = $row,
-                'ineligible' => $ineligible[] = $row,
-                default => $warnings[] = $row,
-            };
-        }
+        $rows = $this->collectRows($semesterId, $filters, $campusId);
+        $eligible = $rows->where('eligibility_status', 'eligible')->values();
+        $ineligible = $rows->where('eligibility_status', 'ineligible')->values();
+        $warnings = $rows->where('eligibility_status', 'warning')->values();
+        $perPage = (int) ($filters['per_page'] ?? 20);
+        $page = (int) ($filters['page'] ?? 1);
 
         return [
-            'eligible_students' => $eligible,
-            'ineligible_students' => $ineligible,
-            'warning_students' => $warnings,
+            'eligible_students' => $this->paginateCollection($eligible, $perPage, $page),
+            'ineligible_students' => $ineligible->all(),
+            'warning_students' => $warnings->all(),
             'summary' => [
-                'eligible_count' => count($eligible),
-                'ineligible_count' => count($ineligible),
-                'warning_count' => count($warnings),
-                'total_count' => $students->count(),
+                'eligible_count' => $eligible->count(),
+                'ineligible_count' => $ineligible->count(),
+                'warning_count' => $warnings->count(),
+                'total_count' => $rows->count(),
             ],
         ];
+    }
+
+    public function resolveEligibleStudents(int $semesterId, array $filters = [], ?int $campusId = null): Collection
+    {
+        return $this->collectRows($semesterId, $filters, $campusId)
+            ->where('eligibility_status', 'eligible')
+            ->values();
+    }
+
+    private function collectRows(int $semesterId, array $filters = [], ?int $campusId = null): Collection
+    {
+        $search = trim((string) ($filters['search'] ?? ''));
+        $ignoredStudentIds = collect($filters['ignore_student_ids'] ?? [])
+            ->filter(fn (mixed $studentId): bool => is_string($studentId) && trim($studentId) !== '')
+            ->map(fn (string $studentId): string => trim($studentId))
+            ->values()
+            ->all();
+
+        $students = Student::query()
+            ->where('status', 'intake_pre_uni_gc')
+            ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
+            ->when($ignoredStudentIds !== [], fn ($query) => $query->whereNotIn('student_id', $ignoredStudentIds))
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($studentQuery) use ($search) {
+                    $studentQuery->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('student_id', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('student_id')
+            ->get();
+
+        return $students->map(fn (Student $student) => $this->classify($student, $semesterId));
     }
 
     private function classify(Student $student, int $semesterId): array
     {
         $base = $this->baseRow($student);
 
-        $currentLevel = (int) ($student->gc_current_level ?? 0);
-        $totalLevels = (int) ($student->gc_total_levels ?? 0);
-
-        if ($currentLevel === 0) {
+        if ($student->gc_current_level === null) {
             return array_merge($base, [
                 'eligibility_status' => 'warning',
                 'eligibility_reason' => 'missing_current_level',
             ]);
         }
 
-        if ($totalLevels === 0) {
+        if ($student->gc_total_levels === null) {
             return array_merge($base, [
                 'eligibility_status' => 'warning',
                 'eligibility_reason' => 'missing_total_levels',
             ]);
         }
 
-        if ($currentLevel > $totalLevels) {
+        $currentLevel = (int) $student->gc_current_level;
+        $totalLevels = (int) $student->gc_total_levels;
+
+        if ($totalLevels <= 0) {
+            return array_merge($base, [
+                'eligibility_status' => 'warning',
+                'eligibility_reason' => 'missing_total_levels',
+            ]);
+        }
+
+        if ($currentLevel >= $totalLevels) {
             return array_merge($base, [
                 'eligibility_status' => 'ineligible',
                 'eligibility_reason' => 'exceeded_max_level',
@@ -83,17 +105,15 @@ class PreviewEgcChargeGenerationQuery
             ]);
         }
 
-        // Skip if student is actively studying their current level this semester
         if ($this->isStudyingLevel($student->id, $semesterId, $currentLevel)) {
             return array_merge($base, [
-                'eligibility_status' => 'ineligible',
+                'eligibility_status' => 'warning',
                 'eligibility_reason' => 'currently_studying',
                 'current_level' => $currentLevel,
                 'total_levels' => $totalLevels,
             ]);
         }
 
-        // Use FinanceCharge as source of truth for already-charged count
         $chargedCount = FinanceCharge::where('student_id', $student->id)
             ->where('semester_id', $semesterId)
             ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
@@ -106,8 +126,7 @@ class PreviewEgcChargeGenerationQuery
             ->get();
 
         $deferredCount = $deferredBlocks->count();
-
-        $levelsRemaining = $totalLevels - $currentLevel + 1;
+        $levelsRemaining = max(0, $totalLevels - $currentLevel);
         $maxChargeableBlocks = min(2, max(0, $levelsRemaining - $chargedCount));
 
         if ($chargedCount >= 2 && $deferredCount === 0) {
@@ -135,6 +154,7 @@ class PreviewEgcChargeGenerationQuery
             'current_level' => $currentLevel,
             'total_levels' => $totalLevels,
             'already_charged_blocks' => $chargedCount,
+            'student_email' => $student->email,
             'has_deferred_blocks' => $deferredCount > 0,
             'max_chargeable_blocks' => $maxChargeableBlocks,
             'deferred_blocks' => $deferredBlocks->values()->map(fn ($b) => [
@@ -195,6 +215,7 @@ class PreviewEgcChargeGenerationQuery
             'student_id' => $student->id,
             'student_name' => $student->full_name,
             'student_code' => $student->student_id,
+            'student_email' => $student->email,
             'eligibility_status' => 'eligible',
             'eligibility_reason' => null,
             'current_level' => null,
@@ -205,5 +226,22 @@ class PreviewEgcChargeGenerationQuery
             'deferred_blocks' => [],
             'chargeable_levels' => [],
         ];
+    }
+
+    private function paginateCollection(Collection $items, int $perPage, int $page): LengthAwarePaginator
+    {
+        $perPage = in_array($perPage, [20, 50, 100], true) ? $perPage : 20;
+        $page = max(1, $page);
+
+        return new LengthAwarePaginator(
+            $items->forPage($page, $perPage)->values(),
+            $items->count(),
+            $perPage,
+            $page,
+            [
+                'path' => request()->url(),
+                'query' => request()->query(),
+            ]
+        );
     }
 }
