@@ -19,6 +19,7 @@ class CourseOffering extends AuditableModel
 
     protected $fillable = [
         'semester_id',
+        'curriculum_unit_id',
         'unit_id',
         'syllabus_template_id',
         'grading_type',
@@ -144,6 +145,11 @@ class CourseOffering extends AuditableModel
     public function unit(): BelongsTo
     {
         return $this->belongsTo(Unit::class);
+    }
+
+    public function curriculumUnit(): BelongsTo
+    {
+        return $this->belongsTo(CurriculumUnit::class, 'curriculum_unit_id');
     }
 
     public function lecture(): BelongsTo
