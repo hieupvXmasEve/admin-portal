@@ -41,13 +41,12 @@ class GenerateEgcChargesAction
                 ? (int) $student->gc_total_levels
                 : 0;
 
-            if ($totalLevels <= 0 || $currentLevel >= $totalLevels) {
-                $results['skipped'] += $blockCount;
+            // Student đang học current level → phí dự kiến cho level tiếp theo
+            // Student đã học xong → phí cho current level hiện tại
+            $isStudying = self::isStudyingLevel($studentId, $currentLevel);
+            $effectiveStartLevel = $isStudying ? $currentLevel + 1 : $currentLevel;
 
-                continue;
-            }
-
-            if (self::isStudyingLevel($studentId, $semesterId, $currentLevel)) {
+            if ($totalLevels <= 0 || $effectiveStartLevel >= $totalLevels) {
                 $results['skipped'] += $blockCount;
 
                 continue;
@@ -66,8 +65,8 @@ class GenerateEgcChargesAction
             }
 
             try {
-                DB::transaction(function () use ($studentId, $semesterId, $blockCount, $currentLevel, $totalLevels, $existingChargeCount, $createdByUserId, &$results) {
-                    self::generateForStudent($studentId, $semesterId, $blockCount, $currentLevel, $totalLevels, $existingChargeCount, $createdByUserId, $results);
+                DB::transaction(function () use ($studentId, $semesterId, $blockCount, $effectiveStartLevel, $totalLevels, $existingChargeCount, $createdByUserId, &$results) {
+                    self::generateForStudent($studentId, $semesterId, $blockCount, $effectiveStartLevel, $totalLevels, $existingChargeCount, $createdByUserId, $results);
                 });
             } catch (\Exception $e) {
                 Log::error('GenerateEgcChargesAction failed', [
@@ -174,15 +173,21 @@ class GenerateEgcChargesAction
         }
     }
 
-    private static function isStudyingLevel(int $studentId, int $semesterId, int $levelNumber): bool
+    private static function isStudyingLevel(int $studentId, int $levelNumber): bool
     {
-        return DB::table('academic_records')
-            ->join('units', 'academic_records.unit_id', '=', 'units.id')
-            ->where('academic_records.student_id', $studentId)
-            ->where('academic_records.semester_id', $semesterId)
+        return DB::table('academic_records as ar')
+            ->join('units', 'ar.unit_id', '=', 'units.id')
+            ->where('ar.student_id', $studentId)
             ->where('units.unit_type', 'egc')
             ->where('units.level', $levelNumber)
-            ->where('academic_records.completion_status', 'in_progress')
+            ->where('ar.completion_status', 'in_progress')
+            ->where('ar.semester_id', function ($query) use ($studentId): void {
+                $query->selectRaw('MAX(ar2.semester_id)')
+                    ->from('academic_records as ar2')
+                    ->join('units as u2', 'ar2.unit_id', '=', 'u2.id')
+                    ->where('ar2.student_id', $studentId)
+                    ->where('u2.unit_type', 'egc');
+            })
             ->exists();
     }
 

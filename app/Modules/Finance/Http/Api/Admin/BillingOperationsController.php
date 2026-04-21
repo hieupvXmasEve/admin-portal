@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Modules\Finance\Actions\Operations\FixBillingExceptionAction;
 use App\Modules\Finance\Actions\Operations\GenerateBatchChargesAction;
+use App\Modules\Finance\Actions\Operations\SendParentPaymentRemindersAction;
 use App\Modules\Finance\Actions\Operations\SendPaymentRemindersAction;
 use App\Modules\Finance\Exports\GenerateChargesPreviewExport;
 use App\Modules\Finance\Queries\Operations\PreviewChargeGenerationQuery;
@@ -102,6 +103,18 @@ class BillingOperationsController extends Controller
         ]);
 
         $result = SendPaymentRemindersAction::run($validated);
+
+        return ApiResponse::success($result);
+    }
+
+    public function sendParentReminders(Request $request)
+    {
+        $validated = $request->validate([
+            'invoice_ids' => 'required|array|min:1',
+            'invoice_ids.*' => 'integer|exists:student_invoices,id',
+        ]);
+
+        $result = SendParentPaymentRemindersAction::run($validated);
 
         return ApiResponse::success($result);
     }

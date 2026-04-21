@@ -177,16 +177,36 @@ const toggleInvoice = (id: number) => {
 };
 
 // Bulk actions
-const isSendingReminders = ref(false);
+const isSendingStudentReminders = ref(false);
+const isSendingParentReminders = ref(false);
 const isExporting = ref(false);
 
-const sendReminders = async () => {
+const handleReminderResponse = async (response: Response, defaultErrorMessage: string) => {
+    if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+            if ((data.data.sent_count || 0) > 0) {
+                toast.success(data.data.message || `Đã gửi ${data.data.sent_count} email`);
+            } else {
+                toast.warning(data.data.message || 'Không có email nào được gửi');
+            }
+            selectedInvoices.value = [];
+            router.reload({ only: ['invoices'] });
+        } else {
+            toast.error(data.message || defaultErrorMessage);
+        }
+    } else {
+        toast.error('Lỗi kết nối server');
+    }
+};
+
+const sendStudentReminders = async () => {
     if (selectedInvoices.value.length === 0) {
         toast.error('Vui lòng chọn ít nhất một hóa đơn');
         return;
     }
 
-    isSendingReminders.value = true;
+    isSendingStudentReminders.value = true;
 
     try {
         const response = await fetch(route('api.finance.operations.send-reminders'), {
@@ -200,23 +220,41 @@ const sendReminders = async () => {
             }),
         });
 
-        if (response.ok) {
-            const data = await response.json();
-            if (data.success) {
-                toast.success(`Đã gửi ${data.data.sent_count} nhắc nợ thành công!`);
-                selectedInvoices.value = [];
-                router.reload({ only: ['invoices'] });
-            } else {
-                toast.error(data.message || 'Không thể gửi nhắc nợ');
-            }
-        } else {
-            toast.error('Lỗi kết nối server');
-        }
+        await handleReminderResponse(response, 'Không thể gửi nhắc nợ cho sinh viên');
     } catch (error) {
-        console.error('Send reminders error:', error);
-        toast.error('Lỗi khi gửi nhắc nợ');
+        console.error('Send student reminders error:', error);
+        toast.error('Lỗi khi gửi nhắc nợ cho sinh viên');
     } finally {
-        isSendingReminders.value = false;
+        isSendingStudentReminders.value = false;
+    }
+};
+
+const sendParentReminders = async () => {
+    if (selectedInvoices.value.length === 0) {
+        toast.error('Vui lòng chọn ít nhất một hóa đơn');
+        return;
+    }
+
+    isSendingParentReminders.value = true;
+
+    try {
+        const response = await fetch(route('api.finance.operations.send-parent-reminders'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            },
+            body: JSON.stringify({
+                invoice_ids: selectedInvoices.value,
+            }),
+        });
+
+        await handleReminderResponse(response, 'Không thể gửi thông báo cho phụ huynh');
+    } catch (error) {
+        console.error('Send parent reminders error:', error);
+        toast.error('Lỗi khi gửi thông báo cho phụ huynh');
+    } finally {
+        isSendingParentReminders.value = false;
     }
 };
 
@@ -257,7 +295,7 @@ defineOptions({
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-3xl font-bold tracking-tight">Billing Calendar</h1>
-                <p class="text-muted-foreground mt-1">Quản lý hạn thanh toán và gửi nhắc nợ</p>
+                <p class="text-muted-foreground mt-1">Quản lý hạn thanh toán và gửi nhắc nợ cho sinh viên hoặc phụ huynh</p>
             </div>
             <div class="flex items-center gap-3">
                 <Select v-model="semesterId">
@@ -352,9 +390,13 @@ defineOptions({
                             <Download class="mr-2 h-4 w-4" />
                             Export Excel
                         </Button>
-                        <Button :disabled="selectedInvoices.length === 0 || isSendingReminders" @click="sendReminders">
+                        <Button :disabled="selectedInvoices.length === 0 || isSendingStudentReminders || isSendingParentReminders" @click="sendStudentReminders">
                             <Mail class="mr-2 h-4 w-4" />
-                            {{ isSendingReminders ? 'Đang gửi...' : `Gửi nhắc nợ (${selectedInvoices.length})` }}
+                            {{ isSendingStudentReminders ? 'Đang gửi...' : `Gửi nhắc sinh viên (${selectedInvoices.length})` }}
+                        </Button>
+                        <Button :disabled="selectedInvoices.length === 0 || isSendingStudentReminders || isSendingParentReminders" @click="sendParentReminders">
+                            <Mail class="mr-2 h-4 w-4" />
+                            {{ isSendingParentReminders ? 'Đang gửi...' : `Gửi thông báo phụ huynh (${selectedInvoices.length})` }}
                         </Button>
                     </div>
                 </div>

@@ -31,6 +31,7 @@ interface EligibleStudent {
     eligibility_status: 'eligible';
     current_level: number;
     total_levels: number;
+    is_studying: boolean;
     already_charged_blocks: number;
     has_deferred_blocks: boolean;
     max_chargeable_blocks: number;
@@ -160,10 +161,10 @@ function reasonLabel(reason: string): string {
     const labels: Record<string, string> = {
         already_fully_charged: 'Đã tạo đủ charge trong kỳ này',
         exceeded_max_level: 'Đã tới total level, không được tạo charge mới',
+        studying_last_level: 'Đang học level cuối, không còn level tiếp theo để tạo phí dự kiến',
         no_chargeable_blocks_remaining: 'Không còn block hợp lệ để tạo',
         missing_current_level: 'Thiếu dữ liệu current level',
         missing_total_levels: 'Thiếu dữ liệu total levels',
-        currently_studying: 'Student chưa kết thúc level hiện tại',
     };
 
     return labels[reason] ?? reason;
@@ -305,7 +306,12 @@ function rowNumber(index: number): number {
                                 </TableCell>
                                 <TableCell class="text-sm">{{ student.student_email || '—' }}</TableCell>
                                 <TableCell>
-                                    <span class="text-sm">{{ student.current_level }} / {{ student.total_levels }}</span>
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-sm">{{ student.current_level }} / {{ student.total_levels }}</span>
+                                        <Badge v-if="student.is_studying" variant="outline" class="border-blue-300 text-blue-600 text-xs">
+                                            Dự kiến
+                                        </Badge>
+                                    </div>
                                 </TableCell>
                                 <TableCell>
                                     <div v-if="student.has_deferred_blocks" class="flex flex-wrap gap-1">

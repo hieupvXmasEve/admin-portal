@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Egc;
 
+use App\Models\CourseRegistration;
 use App\Models\EgcBlock;
 use App\Models\FinanceCharge;
 use App\Models\Payment;
@@ -30,11 +31,37 @@ class BuildEgcCarryForwardPlanAction
                     'payments' => fn ($query) => $query
                         ->where('status', Payment::STATUS_COMPLETED)
                         ->with('applications'),
+                    'courseRegistrations' => fn ($query) => $query
+                        ->where('semester_id', $semesterId)
+                        ->whereNotIn('registration_status', ['defer', 'dropped', 'withdrawn'])
+                        ->whereHas('courseOffering.unit', fn ($unitQuery) => $unitQuery->where('unit_type', 'egc'))
+                        ->with('courseOffering:id,semester_id')
+                        ->orderBy('registration_date')
+                        ->orderBy('id'),
                 ])
                 ->findOrFail($student);
 
+        $registrationsBySemester = $student->relationLoaded('courseRegistrations')
+            ? $student->courseRegistrations
+                ->groupBy('semester_id')
+                ->map(fn ($registrations) => $registrations->sortBy([
+                    ['registration_date', 'asc'],
+                    ['id', 'asc'],
+                ])->values())
+            : collect();
+
         $consumedBlocks = $student->egcProgress
-            ->filter(fn ($block) => $block->finance_charge_id !== null && $block->result !== EgcBlock::RESULT_PENDING)
+            ->filter(function ($block) use ($registrationsBySemester) {
+                if ($block->finance_charge_id === null) {
+                    return false;
+                }
+
+                if ($block->result !== EgcBlock::RESULT_PENDING) {
+                    return true;
+                }
+
+                return $this->hasMatchedRegistration($block, $registrationsBySemester);
+            })
             ->sortBy(['semester_id', 'block_number'])
             ->values();
 
@@ -139,5 +166,15 @@ class BuildEgcCarryForwardPlanAction
                 'finance_charge_id' => $block->finance_charge_id,
             ])->values()->all(),
         ];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, CourseRegistration>>  $registrationsBySemester
+     */
+    private function hasMatchedRegistration(EgcBlock $block, \Illuminate\Support\Collection $registrationsBySemester): bool
+    {
+        $registrations = $registrationsBySemester->get($block->semester_id, collect());
+
+        return $registrations->get($block->block_number - 1) !== null;
     }
 }

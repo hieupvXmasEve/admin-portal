@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Operations;
 
+use App\Models\ParentProfile;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Notification\EmailContent\EmailContentRegistry;
 use App\Services\EmailService;
+use Illuminate\Support\Collection;
 
-class SendPaymentRemindersAction
+class SendParentPaymentRemindersAction
 {
     public static function run(array $data): array
     {
@@ -17,11 +19,15 @@ class SendPaymentRemindersAction
         $sentCount = 0;
         $failedCount = 0;
         $skippedNoDebtCount = 0;
-        $skippedNoStudentEmailCount = 0;
+        $skippedNoParentEmailCount = 0;
 
         $invoices = StudentInvoice::query()
             ->whereIn('id', $invoiceIds)
-            ->with(['student:id,student_id,full_name,email,campus_id', 'semester:id,code'])
+            ->with([
+                'student:id,student_id,full_name,campus_id',
+                'student.parentProfiles.user:id,email,status,type',
+                'semester:id,code',
+            ])
             ->get();
 
         $settlementService = app(SettlementService::class);
@@ -40,8 +46,10 @@ class SendPaymentRemindersAction
                 continue;
             }
 
-            if (! is_string($student?->email) || trim($student->email) === '') {
-                $skippedNoStudentEmailCount++;
+            $parentEmails = self::extractParentEmails($student?->parentProfiles);
+
+            if ($parentEmails->isEmpty()) {
+                $skippedNoParentEmailCount++;
 
                 continue;
             }
@@ -55,18 +63,26 @@ class SendPaymentRemindersAction
                 'due_date' => $invoice->due_date?->format('d/m/Y') ?? '',
             ];
 
-            try {
-                $emailService->sendSingleEmail(
-                    recipient: $student->email,
-                    subject: $emailContent->subject($contentData),
-                    content: $emailContent->htmlBody($contentData),
-                    campusId: $student->campus_id,
-                );
+            $sentAnyParent = false;
 
+            foreach ($parentEmails as $parentEmail) {
+                try {
+                    $emailService->sendSingleEmail(
+                        recipient: $parentEmail,
+                        subject: $emailContent->subject($contentData),
+                        content: $emailContent->htmlBody($contentData),
+                        campusId: $student->campus_id,
+                    );
+
+                    $sentCount++;
+                    $sentAnyParent = true;
+                } catch (\Throwable $e) {
+                    $failedCount++;
+                }
+            }
+
+            if ($sentAnyParent) {
                 $invoice->update(['last_reminder_at' => $now]);
-                $sentCount++;
-            } catch (\Throwable $e) {
-                $failedCount++;
             }
         }
 
@@ -74,23 +90,45 @@ class SendPaymentRemindersAction
             'sent_count' => $sentCount,
             'failed_count' => $failedCount,
             'skipped_no_debt_count' => $skippedNoDebtCount,
-            'skipped_no_student_email_count' => $skippedNoStudentEmailCount,
+            'skipped_no_parent_email_count' => $skippedNoParentEmailCount,
             'message' => self::buildSummaryMessage(
                 $sentCount,
                 $failedCount,
                 $skippedNoDebtCount,
-                $skippedNoStudentEmailCount,
+                $skippedNoParentEmailCount,
             ),
         ];
+    }
+
+    private static function extractParentEmails(?Collection $parentProfiles): Collection
+    {
+        if ($parentProfiles === null) {
+            return collect();
+        }
+
+        return $parentProfiles
+            ->filter(function (ParentProfile $profile): bool {
+                $user = $profile->user;
+
+                return $profile->status === 'active'
+                    && $user !== null
+                    && $user->isParent()
+                    && $user->isActive();
+            })
+            ->map(fn (ParentProfile $profile) => $profile->user?->email)
+            ->filter(fn ($email) => is_string($email) && trim($email) !== '')
+            ->map(fn (string $email) => mb_strtolower(trim($email)))
+            ->unique()
+            ->values();
     }
 
     private static function buildSummaryMessage(
         int $sentCount,
         int $failedCount,
         int $skippedNoDebtCount,
-        int $skippedNoStudentEmailCount
+        int $skippedNoParentEmailCount
     ): string {
-        $parts = ["Đã gửi {$sentCount} email nhắc nợ cho sinh viên"];
+        $parts = ["Đã gửi {$sentCount} email thông báo học phí cho phụ huynh"];
 
         if ($failedCount > 0) {
             $parts[] = "{$failedCount} email thất bại";
@@ -100,8 +138,8 @@ class SendPaymentRemindersAction
             $parts[] = "{$skippedNoDebtCount} invoice không còn nợ";
         }
 
-        if ($skippedNoStudentEmailCount > 0) {
-            $parts[] = "{$skippedNoStudentEmailCount} invoice không có email sinh viên";
+        if ($skippedNoParentEmailCount > 0) {
+            $parts[] = "{$skippedNoParentEmailCount} invoice không có email phụ huynh";
         }
 
         return implode(', ', $parts);

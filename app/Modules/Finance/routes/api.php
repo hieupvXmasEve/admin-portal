@@ -29,6 +29,7 @@ Route::prefix('api/v1/finance/operations')
         Route::post('/run-generate', [BillingOperationsController::class, 'runGenerate'])->name('run-generate');
         Route::post('/exceptions/{exceptionId}/fix', [BillingOperationsController::class, 'fixException'])->name('fix-exception');
         Route::post('/send-reminders', [BillingOperationsController::class, 'sendReminders'])->name('send-reminders');
+        Route::post('/send-parent-reminders', [BillingOperationsController::class, 'sendParentReminders'])->name('send-parent-reminders');
     });
 
 /*

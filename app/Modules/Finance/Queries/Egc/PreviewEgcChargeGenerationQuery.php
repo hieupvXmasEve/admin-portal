@@ -105,10 +105,15 @@ class PreviewEgcChargeGenerationQuery
             ]);
         }
 
-        if ($this->isStudyingLevel($student->id, $semesterId, $currentLevel)) {
+        // Student đang học current level → phát sinh phí dự kiến cho level tiếp theo
+        // Student đã học xong → phát sinh phí cho current level
+        $isStudying = $this->isStudyingLevel($student->id, $currentLevel);
+        $effectiveStartLevel = $isStudying ? $currentLevel + 1 : $currentLevel;
+
+        if ($effectiveStartLevel >= $totalLevels) {
             return array_merge($base, [
-                'eligibility_status' => 'warning',
-                'eligibility_reason' => 'currently_studying',
+                'eligibility_status' => 'ineligible',
+                'eligibility_reason' => $isStudying ? 'studying_last_level' : 'exceeded_max_level',
                 'current_level' => $currentLevel,
                 'total_levels' => $totalLevels,
             ]);
@@ -126,7 +131,7 @@ class PreviewEgcChargeGenerationQuery
             ->get();
 
         $deferredCount = $deferredBlocks->count();
-        $levelsRemaining = max(0, $totalLevels - $currentLevel);
+        $levelsRemaining = max(0, $totalLevels - $effectiveStartLevel);
         $maxChargeableBlocks = min(2, max(0, $levelsRemaining - $chargedCount));
 
         if ($chargedCount >= 2 && $deferredCount === 0) {
@@ -153,6 +158,7 @@ class PreviewEgcChargeGenerationQuery
             'eligibility_reason' => null,
             'current_level' => $currentLevel,
             'total_levels' => $totalLevels,
+            'is_studying' => $isStudying,
             'already_charged_blocks' => $chargedCount,
             'student_email' => $student->email,
             'has_deferred_blocks' => $deferredCount > 0,
@@ -161,19 +167,27 @@ class PreviewEgcChargeGenerationQuery
                 'block_number' => $b->block_number,
                 'level_number' => $b->level_number,
             ])->all(),
-            'chargeable_levels' => $this->resolveChargeableLevels($student->id, $currentLevel, $maxChargeableBlocks),
+            'chargeable_levels' => $this->resolveChargeableLevels($student->id, $effectiveStartLevel, $maxChargeableBlocks),
         ]);
     }
 
-    private function isStudyingLevel(int $studentId, int $semesterId, int $levelNumber): bool
+    private function isStudyingLevel(int $studentId, int $levelNumber): bool
     {
-        return DB::table('academic_records')
-            ->join('units', 'academic_records.unit_id', '=', 'units.id')
-            ->where('academic_records.student_id', $studentId)
-            ->where('academic_records.semester_id', $semesterId)
+        // Kiểm tra semester gần nhất có EGC record của student
+        // Không dùng target semester vì semester tương lai chưa có academic records
+        return DB::table('academic_records as ar')
+            ->join('units', 'ar.unit_id', '=', 'units.id')
+            ->where('ar.student_id', $studentId)
             ->where('units.unit_type', 'egc')
             ->where('units.level', $levelNumber)
-            ->where('academic_records.completion_status', 'in_progress')
+            ->where('ar.completion_status', 'in_progress')
+            ->where('ar.semester_id', function ($query) use ($studentId): void {
+                $query->selectRaw('MAX(ar2.semester_id)')
+                    ->from('academic_records as ar2')
+                    ->join('units as u2', 'ar2.unit_id', '=', 'u2.id')
+                    ->where('ar2.student_id', $studentId)
+                    ->where('u2.unit_type', 'egc');
+            })
             ->exists();
     }
 

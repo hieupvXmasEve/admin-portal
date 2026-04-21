@@ -56,6 +56,7 @@ class EgcCarryForwardController extends Controller
             (int) $validated['student_id'],
             (int) $validated['semester_id'],
             auth()->id(),
+            session('current_campus_id') ? (int) session('current_campus_id') : null,
         );
 
         return redirect()

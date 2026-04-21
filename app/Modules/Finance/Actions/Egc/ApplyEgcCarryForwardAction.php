@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Egc;
 
+use App\Models\Student;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -15,9 +16,21 @@ class ApplyEgcCarryForwardAction
         private VoidFinanceChargeAction $voidFinanceChargeAction,
     ) {}
 
-    public function run(int $studentId, int $semesterId, ?int $userId = null): array
+    public function run(int $studentId, int $semesterId, ?int $userId = null, ?int $campusId = null): array
     {
-        return DB::transaction(function () use ($studentId, $semesterId, $userId) {
+        return DB::transaction(function () use ($studentId, $semesterId, $userId, $campusId) {
+            if ($campusId !== null) {
+                $studentCampusId = Student::query()
+                    ->whereKey($studentId)
+                    ->value('campus_id');
+
+                if ((int) $studentCampusId !== $campusId) {
+                    throw ValidationException::withMessages([
+                        'student_id' => ['Student does not belong to the current campus.'],
+                    ]);
+                }
+            }
+
             $plan = $this->buildPlanAction->run($studentId, $semesterId);
 
             if ($plan['status'] !== 'eligible') {

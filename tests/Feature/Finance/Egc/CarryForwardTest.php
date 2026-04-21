@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Models\CurriculumVersion;
 use App\Models\Campus;
+use App\Models\CourseOffering;
+use App\Models\CourseRegistration;
 use App\Models\DiscountAllocation;
 use App\Models\EgcBlock;
 use App\Models\FinanceCharge;
@@ -14,6 +16,7 @@ use App\Models\PaymentApplication;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentInvoice;
+use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Finance\Actions\Egc\ApplyEgcCarryForwardAction;
 use App\Modules\Finance\Queries\Egc\ListEgcCarryForwardCandidatesQuery;
@@ -79,6 +82,42 @@ function makeCompletedPayment(Student $student, float $amount): Payment
     ]);
 }
 
+function makeCarryForwardEgcRegistration(
+    Student $student,
+    Semester $semester,
+    int $level,
+    int $attemptNumber = 1,
+    string $registrationStatus = 'confirmed'
+): CourseRegistration
+{
+    $unit = Unit::factory()->state([
+        'unit_type' => 'egc',
+        'level' => $level,
+    ])->create();
+
+    $attributes = CourseOffering::factory()->state([
+        'unit_id' => $unit->id,
+        'semester_id' => $semester->id,
+    ])->raw();
+
+    unset($attributes['drop_deadline'], $attributes['withdrawal_deadline']);
+
+    $offering = CourseOffering::query()->create($attributes);
+
+    return CourseRegistration::query()->create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $semester->id,
+        'registration_status' => $registrationStatus,
+        'registration_date' => now()->addMinutes($attemptNumber),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => $attemptNumber,
+        'is_retake' => $attemptNumber > 1,
+    ]);
+}
+
 it('lists transitioned students with paid unused egc charge as eligible carry-forward candidates', function () {
     $semester = Semester::factory()->create();
     $student = makeCarryForwardStudent(['status' => 'intake_major']);
@@ -115,6 +154,90 @@ it('treats pending mapped egc blocks as unused for carry-forward eligibility', f
 
     $charge1 = makeEgcChargeWithInvoice($student, $semester, 2);
     $charge2 = makeEgcChargeWithInvoice($student, $semester, 3);
+
+    EgcBlock::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'block_number' => 1,
+        'level_number' => 2,
+        'finance_charge_id' => $charge1->id,
+        'result' => EgcBlock::RESULT_PASS,
+    ])->create();
+
+    EgcBlock::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'block_number' => 2,
+        'level_number' => 3,
+        'finance_charge_id' => $charge2->id,
+        'result' => EgcBlock::RESULT_PENDING,
+    ])->create();
+
+    $payment = makeCompletedPayment($student, 15_000_000);
+    $line = InvoiceLine::query()->where('charge_id', $charge2->id)->firstOrFail();
+    app(SettlementService::class)->createPaymentApplication($payment, $line, 15_000_000, 'application');
+
+    $candidate = collect(app(ListEgcCarryForwardCandidatesQuery::class)->handle($semester->id)['eligible'])
+        ->firstWhere('student_id', $student->id);
+
+    expect($candidate)->not->toBeNull()
+        ->and($candidate['consumed_levels_count'])->toBe(1)
+        ->and($candidate['eligible_release_amount'])->toBe(15_000_000.0)
+        ->and(collect($candidate['unused_charges'])->pluck('id')->all())->toBe([$charge2->id]);
+});
+
+it('treats pending mapped egc blocks with matching registrations as consumed for carry-forward', function () {
+    $semester = Semester::factory()->create();
+    $student = makeCarryForwardStudent(['status' => 'intake_course']);
+
+    $charge1 = makeEgcChargeWithInvoice($student, $semester, 2);
+    $charge2 = makeEgcChargeWithInvoice($student, $semester, 3);
+
+    makeCarryForwardEgcRegistration($student, $semester, 2, 1);
+    makeCarryForwardEgcRegistration($student, $semester, 3, 2);
+
+    EgcBlock::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'block_number' => 1,
+        'level_number' => 2,
+        'finance_charge_id' => $charge1->id,
+        'result' => EgcBlock::RESULT_PASS,
+    ])->create();
+
+    EgcBlock::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'block_number' => 2,
+        'level_number' => 3,
+        'finance_charge_id' => $charge2->id,
+        'result' => EgcBlock::RESULT_PENDING,
+    ])->create();
+
+    $payment = makeCompletedPayment($student, 15_000_000);
+    $line = InvoiceLine::query()->where('charge_id', $charge2->id)->firstOrFail();
+    app(SettlementService::class)->createPaymentApplication($payment, $line, 15_000_000, 'application');
+
+    $groups = app(ListEgcCarryForwardCandidatesQuery::class)->handle($semester->id);
+    $candidate = collect($groups['eligible'])->firstWhere('student_id', $student->id);
+    $ineligible = collect($groups['ineligible'])->firstWhere('student_id', $student->id);
+
+    expect($candidate)->toBeNull()
+        ->and($ineligible)->not->toBeNull()
+        ->and($ineligible['consumed_levels_count'])->toBe(2)
+        ->and($ineligible['eligible_release_amount'])->toBe(0.0)
+        ->and($ineligible['reason'])->toBe('All selected-semester EGC charges are already consumed by mapped EGC blocks.');
+});
+
+it('ignores dropped registrations when deciding whether a pending block is consumed', function () {
+    $semester = Semester::factory()->create();
+    $student = makeCarryForwardStudent(['status' => 'intake_course']);
+
+    $charge1 = makeEgcChargeWithInvoice($student, $semester, 2);
+    $charge2 = makeEgcChargeWithInvoice($student, $semester, 3);
+
+    makeCarryForwardEgcRegistration($student, $semester, 2, 1);
+    makeCarryForwardEgcRegistration($student, $semester, 3, 2, 'dropped');
 
     EgcBlock::factory()->state([
         'student_id' => $student->id,
@@ -287,5 +410,34 @@ it('rejects carry-forward when student is still active egc', function () {
     makeEgcChargeWithInvoice($student, $semester, 1);
 
     expect(fn () => app(ApplyEgcCarryForwardAction::class)->run($student->id, $semester->id))
+        ->toThrow(ValidationException::class);
+});
+
+it('rejects carry-forward when the student is outside the current campus scope', function () {
+    $semester = Semester::factory()->create();
+    $campusA = Campus::factory()->create();
+    $campusB = Campus::factory()->create();
+    $student = makeCarryForwardStudent([
+        'status' => 'intake_major',
+        'campus_id' => $campusB->id,
+    ]);
+
+    $consumedCharge = makeEgcChargeWithInvoice($student, $semester, 1);
+    $unusedCharge = makeEgcChargeWithInvoice($student, $semester, 2);
+
+    EgcBlock::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'block_number' => 1,
+        'level_number' => 1,
+        'finance_charge_id' => $consumedCharge->id,
+        'result' => EgcBlock::RESULT_PASS,
+    ])->create();
+
+    $payment = makeCompletedPayment($student, 15_000_000);
+    $line = InvoiceLine::query()->where('charge_id', $unusedCharge->id)->firstOrFail();
+    app(SettlementService::class)->createPaymentApplication($payment, $line, 15_000_000, 'application');
+
+    expect(fn () => app(ApplyEgcCarryForwardAction::class)->run($student->id, $semester->id, null, $campusA->id))
         ->toThrow(ValidationException::class);
 });
