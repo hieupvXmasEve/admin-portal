@@ -444,6 +444,16 @@ class Student extends StudentAuditableModel
     }
 
     /**
+     * Display full name in uppercase (Vietnamese-safe).
+     */
+    public function getFullNameAttribute(): ?string
+    {
+        $value = $this->attributes['full_name'] ?? null;
+
+        return $value !== null ? mb_strtoupper($value, 'UTF-8') : null;
+    }
+
+    /**
      * Get the course stage label.
      */
     public function getCourseStageAttribute(): ?string
