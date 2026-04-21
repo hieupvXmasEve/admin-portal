@@ -28,15 +28,19 @@ class ListSettlementWorklistQuery
         $validated = $request->validate([
             'search' => 'nullable|string',
             'readiness' => 'nullable|string|in:all,ready,no_cash',
-            'per_page' => 'nullable|integer|min:1|max:100',
+            'dng_status' => 'nullable|string|in:all,has_dng,no_dng',
+            'student_status' => 'nullable|string|max:50',
+            'per_page' => 'nullable|integer|min:1|max:500',
             'page' => 'nullable|integer|min:1',
             'sort' => 'nullable|string|max:50',
             'direction' => 'nullable|in:asc,desc',
         ]);
 
         $readiness = $validated['readiness'] ?? 'all';
+        $dngStatus = $validated['dng_status'] ?? 'all';
+        $studentStatus = $validated['student_status'] ?? '';
         $search = trim((string) ($validated['search'] ?? ''));
-        $perPage = (int) ($validated['per_page'] ?? 15);
+        $perPage = (int) ($validated['per_page'] ?? 50);
         $page = (int) ($validated['page'] ?? 1);
         $sort = self::SORTABLE[$validated['sort'] ?? 'active_due'] ?? self::SORTABLE['active_due'];
         $direction = ($validated['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
@@ -59,6 +63,12 @@ class ListSettlementWorklistQuery
                         $studentQuery->where('student_id', 'like', "%{$search}%")
                             ->orWhere('full_name', 'like', "%{$search}%");
                     });
+            });
+        }
+
+        if ($studentStatus !== '') {
+            $invoiceQuery->whereHas('student', function ($q) use ($studentStatus) {
+                $q->where('status', $studentStatus);
             });
         }
 
@@ -116,6 +126,7 @@ class ListSettlementWorklistQuery
                     'student_id' => $studentId,
                     'student_code' => $student?->student_id,
                     'student_name' => $student?->full_name,
+                    'student_status' => $student?->status,
                     'invoice_count' => $studentInvoices->count(),
                     'overdue_invoice_count' => $overdueCount,
                     'active_due' => $activeDue,
@@ -148,12 +159,20 @@ class ListSettlementWorklistQuery
                     })->values(),
                 ];
             })
-            ->filter(function (array $student) use ($readiness) {
-                return match ($readiness) {
+            ->filter(function (array $student) use ($readiness, $dngStatus) {
+                $passReadiness = match ($readiness) {
                     'ready' => $student['actionable'],
                     'no_cash' => ! $student['actionable'],
                     default => true,
                 };
+
+                $passDng = match ($dngStatus) {
+                    'has_dng' => $student['latest_dng_request'] !== null,
+                    'no_dng' => $student['latest_dng_request'] === null,
+                    default => true,
+                };
+
+                return $passReadiness && $passDng;
             })
             ->values();
 
@@ -191,6 +210,8 @@ class ListSettlementWorklistQuery
             'filters' => [
                 'search' => $search,
                 'readiness' => $readiness,
+                'dng_status' => $dngStatus,
+                'student_status' => $studentStatus,
                 'per_page' => $perPage,
                 'page' => $page,
                 'sort' => array_search($sort, self::SORTABLE, true) ?: 'active_due',

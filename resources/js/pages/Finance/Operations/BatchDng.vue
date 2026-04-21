@@ -2,15 +2,21 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import DataPagination from '@/components/DataPagination.vue';
 import DatePicker from '@/components/ui/DatePicker.vue';
+import FilterPanel from '@/components/filters/FilterPanel.vue';
+import FilterSearchInput from '@/components/filters/FilterSearchInput.vue';
+import FilterSelect from '@/components/filters/FilterSelect.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApi, useGlobalConfirmDialog } from '@/composables';
+import { getStudentStatusBadgeClass, getStudentStatusLabel } from '@/types/student';
+import { useServerTableQuery } from '@/composables/useServerTableQuery';
 import type { PaginatedResponse } from '@/types';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowLeft, CalendarIcon, Send } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
@@ -20,26 +26,61 @@ interface BatchStudent {
     student_id: number;
     student_code: string;
     student_name: string;
+    student_status: string | null;
     active_due: number;
     net_amount_to_collect: number;
-    latest_dng_request: { id: number; status: string } | null;
+    latest_dng_request: { id: number; status: string; created_at: string } | null;
+}
+
+interface BatchDngFilters {
+    search?: string;
+    dng_status?: string;
+    student_status?: string;
+    per_page?: number;
+    page?: number;
+    sort?: string | null;
+    direction?: 'asc' | 'desc' | null;
 }
 
 interface Props {
     students: PaginatedResponse<BatchStudent>;
+    filters: BatchDngFilters;
+    summary: {
+        students_with_unpaid_invoices: number;
+        ready_students: number;
+        total_active_due: number;
+        total_unapplied_balance: number;
+    };
     feeTypes: { value: string; label: string }[];
-    semesters: Array<{
-        id: number;
-        name: string;
-        code: string;
-    }>;
+    semesters: Array<{ id: number; name: string; code: string }>;
+    studentStatusOptions: Array<{ value: string; label: string }>;
 }
 
 const props = defineProps<Props>();
 const api = useApi();
 const confirmDialog = useGlobalConfirmDialog();
 
-// Common batch settings (mirrors single DNG create form)
+const { filters, hasActiveFilters, clearFilters, applySearch, setFilter, apply, handlePageChange, handlePageSizeChange } =
+    useServerTableQuery<BatchDngFilters>({
+        baseUrl: route('finance.operations.batch-dng'),
+        initialFilters: {
+            search: props.filters.search ?? '',
+            dng_status: props.filters.dng_status ?? 'all',
+            student_status: props.filters.student_status ?? '',
+            per_page: props.filters.per_page ?? 50,
+            page: props.filters.page ?? 1,
+        },
+        defaultValues: {
+            search: '',
+            dng_status: 'all',
+            student_status: '',
+            per_page: 50,
+            page: 1,
+        },
+        only: ['students', 'summary', 'filters'],
+    });
+
+// Common batch settings
 const now = new Date();
 const commonType = ref('HP');
 const feeDescription = ref('');
@@ -55,12 +96,9 @@ const amountOverrides = ref<Record<number, number>>({});
 const selectedIds = ref<number[]>([]);
 const isSubmitting = ref(false);
 
-const eligibleStudents = computed(() =>
-    props.students.data.filter((s) => s.net_amount_to_collect > 0),
-);
+const eligibleStudents = computed(() => props.students.data.filter((s) => s.net_amount_to_collect > 0));
 
-const getAmount = (student: BatchStudent): number =>
-    amountOverrides.value[student.student_id] ?? student.net_amount_to_collect;
+const getAmount = (student: BatchStudent): number => amountOverrides.value[student.student_id] ?? student.net_amount_to_collect;
 
 const setAmount = (student: BatchStudent, val: string) => {
     const num = parseFloat(val);
@@ -98,28 +136,23 @@ const totalAmount = computed(() =>
 );
 
 const estimateMonthOptions = [
-    { value: '01', label: 'Tháng 01' },
-    { value: '02', label: 'Tháng 02' },
-    { value: '03', label: 'Tháng 03' },
-    { value: '04', label: 'Tháng 04' },
-    { value: '05', label: 'Tháng 05' },
-    { value: '06', label: 'Tháng 06' },
-    { value: '07', label: 'Tháng 07' },
-    { value: '08', label: 'Tháng 08' },
-    { value: '09', label: 'Tháng 09' },
-    { value: '10', label: 'Tháng 10' },
-    { value: '11', label: 'Tháng 11' },
-    { value: '12', label: 'Tháng 12' },
+    { value: '01', label: 'Tháng 01' }, { value: '02', label: 'Tháng 02' },
+    { value: '03', label: 'Tháng 03' }, { value: '04', label: 'Tháng 04' },
+    { value: '05', label: 'Tháng 05' }, { value: '06', label: 'Tháng 06' },
+    { value: '07', label: 'Tháng 07' }, { value: '08', label: 'Tháng 08' },
+    { value: '09', label: 'Tháng 09' }, { value: '10', label: 'Tháng 10' },
+    { value: '11', label: 'Tháng 11' }, { value: '12', label: 'Tháng 12' },
 ];
 
 const estimateYearOptions = Array.from({ length: 6 }, (_, index) => {
     const year = now.getFullYear() - 1 + index;
-
-    return {
-        value: String(year),
-        label: `Năm ${year}`,
-    };
+    return { value: String(year), label: `Năm ${year}` };
 });
+
+const dngStatusOptions = [
+    { value: 'no_dng', label: 'Chưa tạo DNG' },
+    { value: 'has_dng', label: 'Đã tạo DNG' },
+];
 
 const applyEstimateTimeSelection = () => {
     estimateTime.value = `${estimateMonth.value}/${estimateYear.value.slice(-2)}`;
@@ -127,25 +160,20 @@ const applyEstimateTimeSelection = () => {
 };
 
 const validateBatchSettings = (): boolean => {
-    if (selectedIds.value.length === 0) {
-        return false;
-    }
+    if (selectedIds.value.length === 0) return false;
 
     if (!feeDescription.value.trim()) {
         toast.error('Vui lòng nhập mô tả khoản phí');
         return false;
     }
-
     if (!commonSemesterId.value) {
         toast.error('Vui lòng chọn kỳ học nội bộ');
         return false;
     }
-
     if (!commonDueDate.value) {
         toast.error('Vui lòng chọn hạn thanh toán nội bộ');
         return false;
     }
-
     return true;
 };
 
@@ -155,7 +183,6 @@ const submitBatchDng = async () => {
     try {
         const records = selectedIds.value.map((id) => {
             const s = props.students.data.find((s) => s.student_id === id)!;
-
             return {
                 student_id: id,
                 amount: getAmount(s),
@@ -170,12 +197,14 @@ const submitBatchDng = async () => {
         const res = await api.post('/api/v1/finance/dng/batch', { records });
         if (res.error.value) throw new Error(String(res.error.value));
 
-        const data = (res.data.value as any)?.data;
+        const data = (res.data.value as { data?: { created?: number } })?.data;
         toast.success(`Đã tạo ${data?.created ?? selectedIds.value.length} DNG request thành công`);
         selectedIds.value = [];
         amountOverrides.value = {};
-    } catch (e: any) {
-        toast.error(e.message ?? 'Không thể tạo DNG hàng loạt');
+        router.reload({ only: ['students', 'summary', 'filters'] });
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Không thể tạo DNG hàng loạt';
+        toast.error(msg);
         throw e;
     } finally {
         isSubmitting.value = false;
@@ -183,9 +212,7 @@ const submitBatchDng = async () => {
 };
 
 const handleSubmit = () => {
-    if (!validateBatchSettings() || isSubmitting.value) {
-        return;
-    }
+    if (!validateBatchSettings() || isSubmitting.value) return;
 
     confirmDialog.showConfirmDialog(
         {
@@ -194,10 +221,12 @@ const handleSubmit = () => {
             confirmText: 'Xác nhận tạo',
             cancelText: 'Hủy',
         },
-        {
-            onConfirm: submitBatchDng,
-        },
+        { onConfirm: submitBatchDng },
     );
+};
+
+const handlePaginationNavigate = (url: string) => {
+    router.visit(url, { preserveState: true, only: ['students', 'summary', 'filters'] });
 };
 </script>
 
@@ -215,7 +244,9 @@ const handleSubmit = () => {
                 </Link>
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight">Tạo DNG hàng loạt</h1>
-                    <p class="text-muted-foreground text-sm">Tạo yêu cầu thanh toán DNG cho sinh viên chưa có tiền trong tài khoản.</p>
+                    <p class="text-muted-foreground text-sm">
+                        Tạo yêu cầu thanh toán DNG cho sinh viên chưa có tiền trong tài khoản.
+                    </p>
                 </div>
             </div>
             <Button :disabled="selectedIds.length === 0 || isSubmitting" @click="handleSubmit">
@@ -314,12 +345,42 @@ const handleSubmit = () => {
         <!-- Students table -->
         <Card>
             <CardHeader>
-                <CardTitle class="text-base">
-                    Sinh viên cần thu tiền
-                    <span class="text-muted-foreground ml-2 font-normal text-sm">({{ eligibleStudents.length }} sinh viên)</span>
-                </CardTitle>
+                <div class="flex items-center justify-between">
+                    <CardTitle class="text-base">
+                        Sinh viên cần thu tiền
+                        <span class="text-muted-foreground ml-2 font-normal text-sm">
+                            ({{ students.total }} sinh viên · trang {{ students.current_page }}/{{ students.last_page }})
+                        </span>
+                    </CardTitle>
+                </div>
             </CardHeader>
-            <CardContent>
+            <CardContent class="space-y-4">
+                <!-- Filters -->
+                <FilterPanel :has-active-filters="hasActiveFilters" :columns="3" @clear="clearFilters">
+                    <FilterSearchInput
+                        :model-value="filters.search ?? ''"
+                        placeholder="Tìm sinh viên..."
+                        @update:model-value="(v) => setFilter('search', v)"
+                        @search="applySearch"
+                    />
+                    <FilterSelect
+                        :model-value="filters.dng_status ?? 'all'"
+                        :options="dngStatusOptions"
+                        placeholder="Trạng thái DNG"
+                        all-label="Tất cả DNG"
+                        @update:model-value="(v) => setFilter('dng_status', v || 'all')"
+                        @change="() => apply({ dng_status: filters.dng_status, page: 1 })"
+                    />
+                    <FilterSelect
+                        :model-value="filters.student_status ?? ''"
+                        :options="studentStatusOptions.filter((o) => o.value !== '')"
+                        placeholder="Trạng thái sinh viên"
+                        all-label="Tất cả trạng thái"
+                        @update:model-value="(v) => setFilter('student_status', v)"
+                        @change="() => apply({ student_status: filters.student_status, page: 1 })"
+                    />
+                </FilterPanel>
+
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -327,11 +388,12 @@ const handleSubmit = () => {
                                 <Checkbox
                                     :model-value="isAllSelected"
                                     :disabled="eligibleStudents.length === 0"
-                                    aria-label="Chọn tất cả"
+                                    aria-label="Chọn tất cả trên trang"
                                     @update:model-value="toggleAll"
                                 />
                             </TableHead>
                             <TableHead>Sinh viên</TableHead>
+                            <TableHead>Trạng thái</TableHead>
                             <TableHead class="text-right">Cần thu</TableHead>
                             <TableHead class="w-44">Số tiền DNG</TableHead>
                             <TableHead>DNG hiện tại</TableHead>
@@ -349,6 +411,16 @@ const handleSubmit = () => {
                             <TableCell>
                                 <div class="font-medium">{{ student.student_name }}</div>
                                 <div class="text-muted-foreground text-xs">{{ student.student_code }}</div>
+                            </TableCell>
+                            <TableCell>
+                                <span
+                                    v-if="student.student_status"
+                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                                    :class="getStudentStatusBadgeClass(student.student_status)"
+                                >
+                                    {{ getStudentStatusLabel(student.student_status) }}
+                                </span>
+                                <span v-else class="text-muted-foreground text-xs">—</span>
                             </TableCell>
                             <TableCell class="text-right font-medium text-red-600">
                                 {{ formatCurrency(student.net_amount_to_collect) }}
@@ -370,12 +442,20 @@ const handleSubmit = () => {
                             </TableCell>
                         </TableRow>
                         <TableRow v-if="eligibleStudents.length === 0">
-                            <TableCell colspan="5" class="text-muted-foreground py-8 text-center">
-                                Không có sinh viên nào cần tạo DNG.
+                            <TableCell colspan="6" class="text-muted-foreground py-8 text-center">
+                                Không có sinh viên nào phù hợp với bộ lọc hiện tại.
                             </TableCell>
                         </TableRow>
                     </TableBody>
                 </Table>
+
+                <DataPagination
+                    :pagination-data="students"
+                    item-name="sinh viên"
+                    :page-size-options="[25, 50, 100, 200]"
+                    @navigate="handlePaginationNavigate"
+                    @page-size-change="handlePageSizeChange"
+                />
             </CardContent>
         </Card>
     </div>

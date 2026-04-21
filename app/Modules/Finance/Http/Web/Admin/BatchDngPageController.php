@@ -20,8 +20,8 @@ class BatchDngPageController extends Controller
 
     public function show(Request $request): Response
     {
-        // Force no_cash filter: batch DNG targets students without unapplied cash
-        $request->merge(['readiness' => 'no_cash', 'per_page' => 50]);
+        // Force no_cash readiness: batch DNG targets students without unapplied cash
+        $request->merge(['readiness' => 'no_cash']);
 
         $data = $this->settlementQuery->handle($request);
 
@@ -39,6 +39,16 @@ class BatchDngPageController extends Controller
                 ])
                 ->all(),
             'feeTypes' => DngFeeTypeOptions::all(),
+            'studentStatusOptions' => [
+                ['value' => '', 'label' => 'Tất cả trạng thái'],
+                ['value' => 'intake_pre_uni_gc', 'label' => 'EGC (intake_pre_uni_gc)'],
+                ['value' => 'intake_course', 'label' => 'Intake Course'],
+                ['value' => 'active', 'label' => 'Active'],
+                ['value' => 'inactive', 'label' => 'Inactive'],
+                ['value' => 'suspended', 'label' => 'Suspended'],
+                ['value' => 'deferred', 'label' => 'Deferred'],
+                ['value' => 'dropout', 'label' => 'Dropout'],
+            ],
         ]);
     }
 }
