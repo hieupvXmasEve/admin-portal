@@ -20,6 +20,7 @@ final class DngFeeTypeOptions
             ['value' => 'THHB', 'label' => 'THHB: Thu hồi học bổng'],
             ['value' => 'GC', 'label' => 'GC: Học phí GC'],
             ['value' => 'F1', 'label' => 'F1: Phí giữ chỗ học bổng'],
+            ['value' => 'PTL', 'label' => 'PTL: Phí Thi lại']
         ];
     }
 }
