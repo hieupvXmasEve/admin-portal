@@ -206,7 +206,7 @@ const formatDateOnly = (dateStr: string | null | undefined): string => {
                             </div>
                             <div>
                                 <p class="text-muted-foreground text-sm">Người tạo</p>
-                                <p class="font-medium">{{ charge.created_by?.name ?? 'Hệ thống' }}</p>
+                                <p class="font-medium">{{ charge.created_by?.name ?? charge.voided_by?.name ?? 'Hệ thống' }}</p>
                             </div>
                         </div>
 
@@ -251,7 +251,7 @@ const formatDateOnly = (dateStr: string | null | undefined): string => {
                             <p v-else class="mt-1">{{ charge.description }}</p>
                         </div>
 
-                        <div v-if="charge.status === 'voided'" class="rounded-lg border border-red-200 bg-red-50 p-4">
+                        <div v-if="charge.status === 'void'" class="rounded-lg border border-red-200 bg-red-50 p-4">
                             <div class="flex items-center gap-2 text-red-800">
                                 <Ban class="h-4 w-4" />
                                 <span class="font-medium">Đã hủy</span>

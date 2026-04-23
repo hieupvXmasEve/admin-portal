@@ -11,7 +11,7 @@ import { PaginatedResponse } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/format';
 import { Head, Link } from '@inertiajs/vue3';
 import { debounce } from 'lodash-es';
-import { Plus, Sparkles } from 'lucide-vue-next';
+import { ArrowDown, ArrowUp, ChevronsUpDown, Plus, Sparkles } from 'lucide-vue-next';
 import { route } from 'ziggy-js';
 
 interface Payment {
@@ -36,8 +36,9 @@ interface PaymentFilters {
     status: string;
     date_range: string | null;
     per_page: number;
-    sort: string | null;
+    sort: 'amount' | 'paid_at' | 'status' | 'student_id' | 'student_name' | 'unapplied_amount' | null;
     direction: 'asc' | 'desc' | null;
+    page?: number;
 }
 
 interface PaymentStats {
@@ -53,7 +54,7 @@ const props = defineProps<{
     filters?: Partial<PaymentFilters>;
 }>();
 
-const { filters, handleSearch, handleSelectFilter, handlePageSizeChange, handlePaginationNavigate } = useInertiaFilters<PaymentFilters>({
+const { filters, handleSearch, handleSelectFilter, handlePageSizeChange, handlePaginationNavigate, handleSortChange } = useInertiaFilters<PaymentFilters>({
     baseUrl: route('finance.payments.index'),
     initialFilters: {
         search: (typeof props.filters?.search === 'string' ? props.filters.search : '') || '',
@@ -75,6 +76,19 @@ const { filters, handleSearch, handleSelectFilter, handlePageSizeChange, handleP
 });
 
 const onSearch = debounce((val) => handleSearch(val), 500);
+
+const toggleSort = (column: NonNullable<PaymentFilters['sort']>) => {
+    const nextDirection = filters.sort === column && filters.direction === 'asc' ? 'desc' : 'asc';
+    handleSortChange(column, nextDirection);
+};
+
+const getSortIcon = (column: NonNullable<PaymentFilters['sort']>) => {
+    if (filters.sort !== column) {
+        return ChevronsUpDown;
+    }
+
+    return filters.direction === 'asc' ? ArrowUp : ArrowDown;
+};
 
 const getStatusColor = (status: string) => {
     switch (status) {
@@ -103,6 +117,18 @@ const getSourceLabel = (source: string) => {
             return source ?? '-';
     }
 };
+
+const sortableHeaders: Array<{
+    key: NonNullable<PaymentFilters['sort']>;
+    label: string;
+    align?: 'left' | 'right';
+}> = [
+    { key: 'paid_at', label: 'Date' },
+    { key: 'student_id', label: 'Student ID' },
+    { key: 'student_name', label: 'Student' },
+    { key: 'amount', label: 'Amount' },
+    { key: 'unapplied_amount', label: 'Unallocated' },
+];
 </script>
 
 <template>
@@ -197,33 +223,49 @@ const getSourceLabel = (source: string) => {
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead class="cursor-pointer"> Date </TableHead>
-                        <TableHead>Student</TableHead>
+                        <TableHead
+                            v-for="header in sortableHeaders"
+                            :key="header.key"
+                            :class="header.align === 'right' ? 'text-right' : ''"
+                        >
+                            <button
+                                type="button"
+                                class="inline-flex items-center gap-1 font-medium hover:text-foreground"
+                                :class="header.align === 'right' ? 'ml-auto flex' : ''"
+                                @click="toggleSort(header.key)"
+                            >
+                                <span>{{ header.label }}</span>
+                                <component :is="getSortIcon(header.key)" class="h-4 w-4" />
+                            </button>
+                        </TableHead>
                         <TableHead>Ref</TableHead>
-                        <TableHead class="cursor-pointer"> Amount </TableHead>
-                        <TableHead>Unallocated</TableHead>
                         <TableHead>Source</TableHead>
-                        <TableHead class="cursor-pointer"> Status </TableHead>
+                        <TableHead>
+                            <button type="button" class="inline-flex items-center gap-1 font-medium hover:text-foreground" @click="toggleSort('status')">
+                                <span>Status</span>
+                                <component :is="getSortIcon('status')" class="h-4 w-4" />
+                            </button>
+                        </TableHead>
                         <TableHead class="text-right">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     <TableRow v-for="payment in items.data" :key="payment.id">
                         <TableCell>{{ formatDate(payment.paid_at) }}</TableCell>
+                        <TableCell class="font-mono text-xs">{{ payment.student?.student_id ?? '-' }}</TableCell>
                         <TableCell>
                             <div v-if="payment.student">
                                 <div class="font-medium">{{ payment.student.full_name }}</div>
-                                <div class="text-muted-foreground text-xs">{{ payment.student.student_id }}</div>
                             </div>
                             <span v-else class="text-muted-foreground">-</span>
                         </TableCell>
-                        <TableCell class="font-mono text-xs">{{ payment.external_ref }}</TableCell>
                         <TableCell>{{ formatCurrency(payment.amount) }}</TableCell>
                         <TableCell>
                             <span :class="{ 'font-bold text-green-600': payment.unapplied_amount > 0 }">
                                 {{ formatCurrency(payment.unapplied_amount) }}
                             </span>
                         </TableCell>
+                        <TableCell class="font-mono text-xs">{{ payment.external_ref }}</TableCell>
                         <TableCell>
                             <Badge variant="outline">
                                 {{ getSourceLabel(payment.source) }}
@@ -241,7 +283,7 @@ const getSourceLabel = (source: string) => {
                         </TableCell>
                     </TableRow>
                     <TableRow v-if="items.data.length === 0">
-                        <TableCell colspan="8" class="h-24 text-center"> No payments found. </TableCell>
+                        <TableCell colspan="9" class="h-24 text-center"> No payments found. </TableCell>
                     </TableRow>
                 </TableBody>
             </Table>

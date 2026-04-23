@@ -142,7 +142,19 @@ class FinanceChargeController extends Controller
         ]);
 
         return Inertia::render('Finance/Charges/Show', [
-            'charge' => $charge,
+            'charge' => [
+                ...$charge->toArray(),
+                'created_by' => $charge->createdBy ? [
+                    'id' => $charge->createdBy->id,
+                    'name' => $charge->createdBy->name,
+                    'email' => $charge->createdBy->email,
+                ] : null,
+                'voided_by' => $charge->voidedBy ? [
+                    'id' => $charge->voidedBy->id,
+                    'name' => $charge->voidedBy->name,
+                    'email' => $charge->voidedBy->email,
+                ] : null,
+            ],
         ]);
     }
 

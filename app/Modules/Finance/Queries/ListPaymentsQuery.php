@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries;
 
 use App\Models\Payment;
+use App\Models\Student;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -18,22 +19,17 @@ class ListPaymentsQuery
 
         $stats = $this->buildStats($this->buildFilteredQuery($request));
 
-        // Sorting
         $sort = $request->input('sort', 'paid_at');
         $direction = $request->input('direction', 'desc');
+        $direction = $direction === 'asc' ? 'asc' : 'desc';
 
-        // Allowed sort columns
-        if (in_array($sort, ['amount', 'paid_at', 'status', 'created_at'])) {
-            $query->orderBy($sort, $direction === 'asc' ? 'asc' : 'desc');
-        } else {
-            $query->orderBy('paid_at', 'desc');
-        }
+        $this->applySorting($query, is_string($sort) ? $sort : 'paid_at', $direction);
 
         $payments = $query->paginate($request->input('per_page', 15))
             ->withQueryString();
 
         $payments->through(function (Payment $payment): array {
-            $allocatedAmount = max(0, (float) ($payment->applied_amount_total ?? 0));
+            $allocatedAmount = max(0.0, (float) ($payment->applied_amount_total ?? 0));
 
             return [
                 'id' => $payment->id,
@@ -43,8 +39,8 @@ class ListPaymentsQuery
                 'external_ref' => $payment->external_ref,
                 'status' => $payment->status,
                 'method' => $payment->method,
-                'allocated_amount' => $allocatedAmount,
-                'unapplied_amount' => max(0, (float) $payment->amount - $allocatedAmount),
+                'allocated_amount' => (float) $allocatedAmount,
+                'unapplied_amount' => (float) max(0.0, (float) $payment->amount - $allocatedAmount),
                 'student' => $payment->student ? [
                     'id' => $payment->student->id,
                     'full_name' => $payment->student->full_name,
@@ -109,13 +105,40 @@ class ListPaymentsQuery
             ->get(['id', 'amount']);
 
         $totalPaid = (float) $payments->sum(fn (Payment $payment) => (float) $payment->amount);
-        $totalApplied = (float) $payments->sum(fn (Payment $payment) => max(0, (float) ($payment->applied_amount_total ?? 0)));
+        $totalApplied = (float) $payments->sum(fn (Payment $payment) => max(0.0, (float) ($payment->applied_amount_total ?? 0)));
 
         return [
             'payment_count' => $payments->count(),
             'total_paid' => $totalPaid,
             'total_applied' => $totalApplied,
-            'total_unapplied' => max(0, $totalPaid - $totalApplied),
+            'total_unapplied' => (float) max(0.0, $totalPaid - $totalApplied),
         ];
+    }
+
+    private function applySorting(Builder $query, string $sort, string $direction): void
+    {
+        match ($sort) {
+            'amount', 'paid_at', 'status', 'created_at' => $query->orderBy("payments.{$sort}", $direction),
+            'student_id' => $query->orderBy(
+                Student::query()
+                    ->select('student_id')
+                    ->whereColumn('students.id', 'payments.student_id')
+                    ->limit(1),
+                $direction
+            ),
+            'student_name' => $query->orderBy(
+                Student::query()
+                    ->select('full_name')
+                    ->whereColumn('students.id', 'payments.student_id')
+                    ->limit(1),
+                $direction
+            ),
+            'unapplied_amount' => $query->orderByRaw(
+                sprintf('(payments.amount - COALESCE(applied_amount_total, 0)) %s', $direction)
+            ),
+            default => $query->orderBy('payments.paid_at', 'desc'),
+        };
+
+        $query->orderBy('payments.id', 'desc');
     }
 }

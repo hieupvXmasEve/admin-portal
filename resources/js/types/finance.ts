@@ -88,7 +88,7 @@ export interface User {
 // Enums
 export type ChargeType = 'tuition_term' | 'egc_level_fee' | 'retake_fee' | 'course_fee' | 'manual_fee' | 'defer_credit' | 'egc_exempt_credit' | 'scholarship_credit' | 'voucher_credit' | 'adjustment';
 
-export type ChargeStatus = 'active' | 'voided' | 'transferred';
+export type ChargeStatus = 'active' | 'void' | 'transferred';
 
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'gateway' | 'wallet' | 'import' | 'other';
 
@@ -110,7 +110,7 @@ export const CHARGE_TYPE_LABELS: Record<ChargeType, string> = {
 
 export const CHARGE_STATUS_LABELS: Record<ChargeStatus, string> = {
     active: 'Hoạt động (Active)',
-    voided: 'Đã hủy (Voided)',
+    void: 'Đã hủy (Voided)',
     transferred: 'Đã chuyển (Transferred)',
 };
 
@@ -146,7 +146,7 @@ export const CHARGE_TYPE_BADGE_CLASSES: Record<ChargeType, string> = {
 
 export const CHARGE_STATUS_BADGE_CLASSES: Record<ChargeStatus, string> = {
     active: 'bg-green-100 text-green-800',
-    voided: 'bg-red-100 text-red-800',
+    void: 'bg-red-100 text-red-800',
     transferred: 'bg-purple-100 text-purple-800',
 };
 
