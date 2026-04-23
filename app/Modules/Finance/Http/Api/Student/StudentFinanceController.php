@@ -241,7 +241,9 @@ class StudentFinanceController extends Controller
     }
 
     /**
-     * List student's DNG payment requests.
+     * Get student's DNG payment summary.
+     * Pending requests are consolidated into one object (total + breakdown by fee_type).
+     * Paid history is returned as a flat list for display.
      */
     public function dngRequests(Request $request): JsonResponse
     {
@@ -250,19 +252,6 @@ class StudentFinanceController extends Controller
         if (! $student) {
             return ApiResponse::error('Unauthorized', [], 401);
         }
-
-        $validated = $request->validate([
-            'status' => 'nullable|string|in:pending,pushed_to_dng,paid_uninvoiced,paid_invoiced,reconciled,failed,cancelled',
-        ]);
-
-        $query = DngPaymentRequest::where('student_id', $student->id)
-            ->orderBy('created_at', 'desc');
-
-        if (! empty($validated['status'])) {
-            $query->where('status', $validated['status']);
-        }
-
-        $requests = $query->get();
 
         $pendingStatuses = [
             DngPaymentRequest::STATUS_PENDING,
@@ -275,23 +264,42 @@ class StudentFinanceController extends Controller
             DngPaymentRequest::STATUS_RECONCILED,
         ];
 
-        $pendingItems = $requests->filter(fn ($r) => in_array($r->status, $pendingStatuses, true));
-        $paidItems = $requests->filter(fn ($r) => in_array($r->status, $paidStatuses, true));
+        $allRequests = DngPaymentRequest::where('student_id', $student->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $pendingItems = $allRequests->filter(fn ($r) => in_array($r->status, $pendingStatuses, true));
+        $paidItems = $allRequests->filter(fn ($r) => in_array($r->status, $paidStatuses, true));
+
+        // Consolidate pending: group by fee_type, keep latest per type
+        $pendingBreakdown = $pendingItems
+            ->groupBy('fee_type')
+            ->map(fn ($group) => $group->sortByDesc('created_at')->first())
+            ->map(fn ($r) => [
+                'fee_type' => $r->fee_type,
+                'amount' => (float) $r->amount,
+                'description' => $r->description,
+                'status' => $r->status,
+            ])
+            ->values();
 
         return ApiResponse::success([
-            'dng_requests' => $requests->map(fn ($r) => [
+            'pending' => [
+                'total_amount' => (float) $pendingItems->sum('amount'),
+                'count' => $pendingItems->count(),
+                'breakdown' => $pendingBreakdown,
+            ],
+            'paid_requests' => $paidItems->map(fn ($r) => [
                 'id' => $r->id,
                 'dng_payment_id' => $r->dng_payment_id,
                 'amount' => (float) $r->amount,
                 'fee_type' => $r->fee_type,
                 'description' => $r->description,
-                'item_id' => $r->item_id,
                 'status' => $r->status,
                 'paid_at' => $r->paid_at?->toIso8601String(),
                 'invoice_serial_number' => $r->invoice_serial_number,
                 'invoice_date' => $r->invoice_date?->toDateString(),
-                'created_at' => $r->created_at?->toIso8601String(),
-            ]),
+            ])->values(),
             'summary' => [
                 'total_pending' => (float) $pendingItems->sum('amount'),
                 'total_paid' => (float) $paidItems->sum('amount'),
@@ -343,7 +351,74 @@ class StudentFinanceController extends Controller
     }
 
     /**
+     * Create QR/virtual-account access for all pushed_to_dng requests of the authenticated student.
+     * No request ID needed — BE consolidates all pending fee_types automatically.
+     */
+    public function dngQr(Request $request, DngPaymentService $dngPaymentService): JsonResponse
+    {
+        $student = $request->user('student');
+
+        if (! $student) {
+            return ApiResponse::error('Unauthorized', [], 401);
+        }
+
+        $anchor = DngPaymentRequest::where('student_id', $student->id)
+            ->where('status', DngPaymentRequest::STATUS_PUSHED_TO_DNG)
+            ->latest('created_at')
+            ->first();
+
+        if (! $anchor) {
+            return ApiResponse::error('Không có khoản phí nào đang chờ thanh toán.', [], 422);
+        }
+
+        $feeTypes = DngPaymentRequest::where('student_id', $student->id)
+            ->where('status', DngPaymentRequest::STATUS_PUSHED_TO_DNG)
+            ->pluck('fee_type')
+            ->unique()
+            ->values()
+            ->all();
+
+        $providerResponse = $dngPaymentService->createQrAccess($anchor, $feeTypes);
+
+        return ApiResponse::success($this->formatConsolidatedPaymentAccessResponse('qr', $providerResponse));
+    }
+
+    /**
+     * Create installment/Foxpay access for all pushed_to_dng requests of the authenticated student.
+     * No request ID needed — BE consolidates all pending fee_types automatically.
+     */
+    public function dngInstallment(Request $request, DngPaymentService $dngPaymentService): JsonResponse
+    {
+        $student = $request->user('student');
+
+        if (! $student) {
+            return ApiResponse::error('Unauthorized', [], 401);
+        }
+
+        $anchor = DngPaymentRequest::where('student_id', $student->id)
+            ->where('status', DngPaymentRequest::STATUS_PUSHED_TO_DNG)
+            ->latest('created_at')
+            ->first();
+
+        if (! $anchor) {
+            return ApiResponse::error('Không có khoản phí nào đang chờ thanh toán.', [], 422);
+        }
+
+        $feeTypes = DngPaymentRequest::where('student_id', $student->id)
+            ->where('status', DngPaymentRequest::STATUS_PUSHED_TO_DNG)
+            ->pluck('fee_type')
+            ->unique()
+            ->values()
+            ->all();
+
+        $providerResponse = $dngPaymentService->createInstallmentAccess($anchor, $feeTypes);
+
+        return ApiResponse::success($this->formatConsolidatedPaymentAccessResponse('installment', $providerResponse));
+    }
+
+    /**
      * Create QR/virtual-account access data for the student's DNG request.
+     * All awaitingPayment fee_types for this student are included so DNG consolidates them into one payment.
      */
     public function dngRequestQr(Request $request, int $dngRequestId, DngPaymentService $dngPaymentService): JsonResponse
     {
@@ -353,13 +428,15 @@ class StudentFinanceController extends Controller
             return ApiResponse::notFound('DNG request not found');
         }
 
-        $providerResponse = $dngPaymentService->createQrAccess($dngRequest, [$dngRequest->fee_type]);
+        $feeTypes = $this->resolveAllPendingFeeTypes($dngRequest);
+        $providerResponse = $dngPaymentService->createQrAccess($dngRequest, $feeTypes);
 
         return ApiResponse::success($this->formatPaymentAccessResponse('qr', $dngRequest, $providerResponse));
     }
 
     /**
      * Create installment/Foxpay access data for the student's DNG request.
+     * All awaitingPayment fee_types for this student are included so DNG consolidates them into one payment.
      */
     public function dngRequestInstallment(Request $request, int $dngRequestId, DngPaymentService $dngPaymentService): JsonResponse
     {
@@ -369,7 +446,9 @@ class StudentFinanceController extends Controller
             return ApiResponse::notFound('DNG request not found');
         }
 
-        $providerResponse = $dngPaymentService->createInstallmentAccess($dngRequest, [$dngRequest->fee_type]);
+        $feeTypes = $this->resolveAllPendingFeeTypes($dngRequest);
+
+        $providerResponse = $dngPaymentService->createInstallmentAccess($dngRequest, $feeTypes);
 
         return ApiResponse::success($this->formatPaymentAccessResponse('installment', $dngRequest, $providerResponse));
     }
@@ -431,6 +510,25 @@ class StudentFinanceController extends Controller
         ]);
     }
 
+    /**
+     * Collect all unique fee_types from awaitingPayment DNG requests for the same student.
+     * Always includes the triggering request's fee_type, even if its status has just changed.
+     *
+     * @return array<int, string>
+     */
+    private function resolveAllPendingFeeTypes(DngPaymentRequest $dngRequest): array
+    {
+        $feeTypes = DngPaymentRequest::where('student_id', $dngRequest->student_id)
+            ->awaitingPayment()
+            ->pluck('fee_type')
+            ->push($dngRequest->fee_type)
+            ->unique()
+            ->values()
+            ->all();
+
+        return $feeTypes;
+    }
+
     private function resolveOwnedDngRequest(Request $request, int $dngRequestId): ?DngPaymentRequest
     {
         $student = $request->user('student');
@@ -443,6 +541,22 @@ class StudentFinanceController extends Controller
             ->where('id', $dngRequestId)
             ->where('student_id', $student->id)
             ->first();
+    }
+
+    /**
+     * @param  array<string, mixed>  $providerResponse
+     * @return array<string, mixed>
+     */
+    private function formatConsolidatedPaymentAccessResponse(string $paymentMethod, array $providerResponse): array
+    {
+        $providerData = is_array($providerResponse['data'] ?? null) ? $providerResponse['data'] : [];
+        $paymentUrl = $providerData['PaymentUrl'] ?? $providerData['payment_url'] ?? $providerData['LinkQRCode'] ?? null;
+
+        return [
+            'payment_method' => $paymentMethod,
+            'payment_url' => $paymentUrl,
+            'provider_response' => $providerResponse,
+        ];
     }
 
     /**

@@ -30,7 +30,6 @@ const form = useForm({
     amount: null as number | null,
     semester_id: null as number | null,
     due_date: '',
-    invoice_id: null as number | null,
 });
 
 // Student search
@@ -42,7 +41,6 @@ const {
 } = useStudentSearch({ limit: 5 });
 
 const selectedStudent = ref<StudentBasic | null>(props.student ?? null);
-const selectedInvoiceId = ref<number | null>(null);
 
 const selectStudent = (student: any) => {
     selectedStudent.value = student;
@@ -54,8 +52,6 @@ const clearStudent = () => {
     selectedStudent.value = null;
     form.student_id = null;
     form.semester_id = null;
-    selectedInvoiceId.value = null;
-    form.invoice_id = null;
 };
 
 

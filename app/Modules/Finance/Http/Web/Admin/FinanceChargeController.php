@@ -8,8 +8,8 @@ use App\Http\Controllers\Controller;
 use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
+use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -21,12 +21,19 @@ class FinanceChargeController extends Controller
         FinanceCharge::TYPE_TUITION_TERM,
         FinanceCharge::TYPE_EGC_LEVEL_FEE,
         FinanceCharge::TYPE_RETAKE_FEE,
-        FinanceCharge::TYPE_COURSE_FEE,
         FinanceCharge::TYPE_MANUAL_FEE,
         FinanceCharge::TYPE_ADMISSION_FEE,
         FinanceCharge::TYPE_DEFER_CREDIT,
         FinanceCharge::TYPE_EGC_EXEMPT_CREDIT,
         FinanceCharge::TYPE_ADJUSTMENT,
+    ];
+
+    private const MANUAL_CREATE_CHARGE_TYPE_DNG_LABELS = [
+        FinanceCharge::TYPE_TUITION_TERM => 'HP',
+        FinanceCharge::TYPE_EGC_LEVEL_FEE => 'GC',
+        FinanceCharge::TYPE_RETAKE_FEE => 'PTL',
+        FinanceCharge::TYPE_MANUAL_FEE => 'KHAC',
+        FinanceCharge::TYPE_ADMISSION_FEE => 'PRE',
     ];
 
     public function __construct(
@@ -165,43 +172,41 @@ class FinanceChargeController extends Controller
     {
         $semesters = Semester::orderBy('start_date', 'desc')->get();
 
-        $chargeTypes = collect(FinanceCharge::CHARGE_TYPES)->map(fn ($type) => [
+        $chargeTypes = collect(self::MANUAL_CREATE_CHARGE_TYPES)->map(fn ($type) => [
             'value' => $type,
-            'label' => ucwords(str_replace('_', ' ', $type)),
+            'label' => $this->getManualCreateChargeTypeLabel($type),
         ]);
 
         $student = null;
-        $draftInvoices = [];
 
         if ($request->has('student_id')) {
             $student = Student::find($request->get('student_id'));
-
-            // Check if there's a semester selected
-            if ($request->has('semester_id') && $student) {
-                $semesterId = (int) $request->get('semester_id');
-
-                // Find all draft invoices for this student and semester
-                $draftInvoices = StudentInvoice::where('student_id', $student->id)
-                    ->where('semester_id', $semesterId)
-                    ->where('status', 'draft')
-                    ->orderBy('created_at', 'desc')
-                    ->get()
-                    ->map(fn ($invoice) => [
-                        'id' => $invoice->id,
-                        'invoice_number' => $invoice->invoice_number,
-                        'status' => $invoice->status,
-                        'created_at' => $invoice->created_at->format('Y-m-d H:i:s'),
-                    ])
-                    ->toArray();
-            }
         }
 
         return Inertia::render('Finance/Charges/Create', [
             'semesters' => $semesters,
             'chargeTypes' => $chargeTypes,
             'student' => $student,
-            'draftInvoices' => $draftInvoices,
         ]);
+    }
+
+    private function getManualCreateChargeTypeLabel(string $type): string
+    {
+        $dngLabels = collect(DngFeeTypeOptions::all())
+            ->mapWithKeys(fn (array $option) => [$option['value'] => $option['label']]);
+
+        $dngCode = self::MANUAL_CREATE_CHARGE_TYPE_DNG_LABELS[$type] ?? null;
+
+        if ($dngCode && $dngLabels->has($dngCode)) {
+            return $dngLabels->get($dngCode);
+        }
+
+        return match ($type) {
+            FinanceCharge::TYPE_DEFER_CREDIT => 'Lệ phí bảo lưu',
+            FinanceCharge::TYPE_EGC_EXEMPT_CREDIT => 'GC: Miễn trừ phí egc',
+            FinanceCharge::TYPE_ADJUSTMENT => 'Điều chỉnh',
+            default => ucwords(str_replace('_', ' ', $type)),
+        };
     }
 
     /**

@@ -7,17 +7,21 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import DatePicker from '@/components/ui/DatePicker.vue';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useApi } from '@/composables';
 import { usePermission } from '@/composables/usePermission';
 import { useServerTableQuery } from '@/composables/useServerTableQuery';
 import { createColumns } from '@/lib/table-utils';
 import type { PaginatedResponse } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { ArrowLeft, CheckCircle2, ExternalLink, Send, Wallet, Zap } from 'lucide-vue-next';
-import { h, ref, watch } from 'vue';
+import { ArrowLeft, CalendarIcon, CheckCircle2, ExternalLink, Loader2, Send, Wallet, Zap } from 'lucide-vue-next';
+import { computed, h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
 
@@ -31,6 +35,16 @@ interface SettlementInvoice {
     total_amount: number;
     paid_amount: number;
     remaining_amount: number;
+}
+
+interface FeeTypeBreakdownEntry {
+    fee_type: string;
+    label: string;
+    gross: number;
+    discount: number;
+    net_remaining: number;
+    semester_id: number | null;
+    active_dng: { id: number; amount: number; status: string } | null;
 }
 
 interface SettlementStudent {
@@ -53,6 +67,7 @@ interface SettlementStudent {
         created_at: string | null;
     } | null;
     invoices: SettlementInvoice[];
+    fee_type_breakdown: FeeTypeBreakdownEntry[];
 }
 
 interface SettlementFilters {
@@ -118,11 +133,36 @@ const { filters, hasActiveFilters, clearFilters, applySearch, setFilter, apply, 
     only: ['students', 'summary', 'filters'],
 });
 
+const api = useApi();
+
+const now = new Date();
 const selectedStudentIds = ref<number[]>(props.students.data.filter((student) => student.actionable).map((student) => student.student_id));
 const isApplying = ref(false);
-const isCreateDngDialogOpen = ref(false);
-const dngTargetStudent = ref<SettlementStudent | null>(null);
-const dngFeeDescription = ref('');
+
+// Batch DNG dialog state
+const dngBatchDialogOpen = ref(false);
+const dngBatchStudent = ref<SettlementStudent | null>(null);
+const dngBatchDescription = ref('');
+const dngBatchDueDate = ref('');
+const dngBatchSubmitting = ref(false);
+const estimateTimePickerOpen = ref(false);
+const estimateMonth = ref(String(now.getMonth() + 1).padStart(2, '0'));
+const estimateYear = ref(String(now.getFullYear()));
+const estimateTime = ref(`${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}`);
+
+const estimateMonthOptions = [
+    { value: '01', label: 'Tháng 01' }, { value: '02', label: 'Tháng 02' },
+    { value: '03', label: 'Tháng 03' }, { value: '04', label: 'Tháng 04' },
+    { value: '05', label: 'Tháng 05' }, { value: '06', label: 'Tháng 06' },
+    { value: '07', label: 'Tháng 07' }, { value: '08', label: 'Tháng 08' },
+    { value: '09', label: 'Tháng 09' }, { value: '10', label: 'Tháng 10' },
+    { value: '11', label: 'Tháng 11' }, { value: '12', label: 'Tháng 12' },
+];
+
+const estimateYearOptions = Array.from({ length: 6 }, (_, i) => {
+    const year = now.getFullYear() - 1 + i;
+    return { value: String(year), label: `Năm ${year}` };
+});
 
 watch(
     () => props.students.data,
@@ -186,38 +226,69 @@ const getReadinessBadge = (student: SettlementStudent) => {
     return { label: 'No cash', class: 'bg-amber-50 text-amber-700 border-amber-200' };
 };
 
-const openCreateDngDialog = (student: SettlementStudent) => {
-    dngTargetStudent.value = student;
-    dngFeeDescription.value = '';
-    isCreateDngDialogOpen.value = true;
+const getRecordsToCreateForStudent = (student: SettlementStudent) =>
+    student.fee_type_breakdown.filter(
+        (entry) => entry.semester_id !== null && (!entry.active_dng || entry.active_dng.amount !== entry.net_remaining),
+    );
+
+const recordsToCreate = computed(() => (dngBatchStudent.value ? getRecordsToCreateForStudent(dngBatchStudent.value) : []));
+
+const openDngBatchDialog = (student: SettlementStudent) => {
+    dngBatchStudent.value = student;
+    dngBatchDescription.value = '';
+    dngBatchDueDate.value = '';
+    dngBatchDialogOpen.value = true;
 };
 
-const getDefaultDngInvoice = (student: SettlementStudent): SettlementInvoice | null =>
-    student.invoices.find((invoice) => invoice.remaining_amount > 0) ?? null;
+const applyEstimateTimeSelection = () => {
+    estimateTime.value = `${estimateMonth.value}/${estimateYear.value.slice(-2)}`;
+    estimateTimePickerOpen.value = false;
+};
 
-const redirectToCreateDngRequest = () => {
-    if (!dngTargetStudent.value) {
+const submitDngBatch = async () => {
+    if (!dngBatchStudent.value) return;
+
+    if (!dngBatchDescription.value.trim()) {
+        toast.error('Vui lòng nhập mô tả khoản phí.');
         return;
     }
 
-    const description = dngFeeDescription.value.trim();
-
-    if (description.length === 0) {
-        toast.error('Please enter a fee description.');
-
+    if (!dngBatchDueDate.value) {
+        toast.error('Vui lòng chọn hạn thanh toán.');
         return;
     }
 
-    const defaultInvoice = getDefaultDngInvoice(dngTargetStudent.value);
+    if (recordsToCreate.value.length === 0) {
+        toast.error('Không có khoản phí nào cần tạo.');
+        return;
+    }
 
-    router.get(route('finance.payments.create'), {
-        student_id: dngTargetStudent.value.student_id,
-        amount: dngTargetStudent.value.net_amount_to_collect,
-        description,
-        semester_id: defaultInvoice?.semester_id,
-        due_date: defaultInvoice?.due_date ?? undefined,
-        source_context: 'settlement_no_cash',
-    });
+    dngBatchSubmitting.value = true;
+
+    try {
+        const records = recordsToCreate.value.map((entry) => ({
+            student_id: dngBatchStudent.value!.student_id,
+            amount: entry.net_remaining,
+            type: entry.fee_type,
+            description: dngBatchDescription.value.trim(),
+            semester_id: entry.semester_id!,
+            due_date: dngBatchDueDate.value,
+            estimate_time: estimateTime.value,
+        }));
+
+        const res = await api.post('/api/v1/finance/dng/batch', { records });
+
+        if (res.error.value) throw new Error(String(res.error.value));
+
+        const data = (res.data.value as { data?: { created?: number } })?.data;
+        toast.success(`Đã tạo ${data?.created ?? records.length} DNG request thành công`);
+        dngBatchDialogOpen.value = false;
+        router.reload({ only: ['students', 'summary', 'filters'] });
+    } catch {
+        toast.error('Không thể tạo DNG. Vui lòng thử lại.');
+    } finally {
+        dngBatchSubmitting.value = false;
+    }
 };
 
 const columns: ColumnDef<SettlementStudent>[] = createColumns<SettlementStudent>([
@@ -331,32 +402,90 @@ const columns: ColumnDef<SettlementStudent>[] = createColumns<SettlementStudent>
             </div>
         </div>
 
-        <Dialog v-model:open="isCreateDngDialogOpen">
+        <Dialog v-model:open="dngBatchDialogOpen">
             <DialogContent class="sm:max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Create DNG request</DialogTitle>
-                    <DialogDescription> Enter the fee description before continuing to the DNG payment form. </DialogDescription>
+                    <DialogTitle>Tạo DNG request</DialogTitle>
+                    <DialogDescription v-if="dngBatchStudent">
+                        {{ dngBatchStudent.student_name }} · {{ dngBatchStudent.student_code }}
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div class="space-y-4">
-                    <div v-if="dngTargetStudent" class="bg-muted/30 rounded-lg border p-3 text-sm">
-                        <div class="font-medium">{{ dngTargetStudent.student_name }}</div>
-                        <div class="text-muted-foreground">{{ dngTargetStudent.student_code }}</div>
-                        <div class="mt-2">
-                            <span class="text-muted-foreground">Suggested amount:</span>
-                            <span class="ml-1 font-medium">{{ formatCurrency(dngTargetStudent.net_amount_to_collect) }}</span>
+                    <!-- Records to create list -->
+                    <div v-if="recordsToCreate.length > 0" class="space-y-1.5">
+                        <p class="text-sm font-medium">Khoản phí sẽ tạo ({{ recordsToCreate.length }})</p>
+                        <div
+                            v-for="entry in recordsToCreate"
+                            :key="entry.fee_type"
+                            class="bg-muted/30 flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                        >
+                            <span>{{ entry.label }}</span>
+                            <div class="flex items-center gap-2">
+                                <Badge
+                                    v-if="entry.active_dng && entry.active_dng.amount !== entry.net_remaining"
+                                    variant="outline"
+                                    class="border-orange-200 bg-orange-50 text-xs text-orange-700"
+                                >
+                                    Tạo lại ↻
+                                </Badge>
+                                <span class="font-semibold text-red-600">{{ formatCurrency(entry.net_remaining) }}</span>
+                            </div>
                         </div>
+                    </div>
+                    <p v-else class="text-muted-foreground text-sm">Tất cả khoản phí đã có DNG đúng số tiền.</p>
+
+                    <!-- Shared fields -->
+                    <div class="space-y-2">
+                        <Label for="batch-dng-description">Mô tả khoản phí *</Label>
+                        <Input id="batch-dng-description" v-model="dngBatchDescription" placeholder="Ví dụ: Thu học phí còn thiếu của invoice chưa thanh toán" />
                     </div>
 
                     <div class="space-y-2">
-                        <Label for="settlement-dng-description">Fee description *</Label>
-                        <Input id="settlement-dng-description" v-model="dngFeeDescription" placeholder="Example: Outstanding tuition for unpaid invoices" />
+                        <Label>Hạn thanh toán nội bộ *</Label>
+                        <DatePicker v-model="dngBatchDueDate" placeholder="Chọn hạn thanh toán" />
+                    </div>
+
+                    <div class="space-y-2">
+                        <Label>Thời hạn thanh toán (MM/YY)</Label>
+                        <Popover v-model:open="estimateTimePickerOpen">
+                            <PopoverTrigger as-child>
+                                <Button variant="outline" class="w-full justify-start font-normal">
+                                    <CalendarIcon class="mr-2 h-4 w-4" />
+                                    {{ estimateTime }}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent class="w-64 space-y-3 p-4" align="start">
+                                <div class="space-y-1">
+                                    <Label>Tháng</Label>
+                                    <Select v-model="estimateMonth">
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem v-for="m in estimateMonthOptions" :key="m.value" :value="m.value">{{ m.label }}</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div class="space-y-1">
+                                    <Label>Năm</Label>
+                                    <Select v-model="estimateYear">
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem v-for="y in estimateYearOptions" :key="y.value" :value="y.value">{{ y.label }}</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <Button class="w-full" @click="applyEstimateTimeSelection">Áp dụng</Button>
+                            </PopoverContent>
+                        </Popover>
                     </div>
                 </div>
 
                 <DialogFooter>
-                    <Button variant="outline" @click="isCreateDngDialogOpen = false">Cancel</Button>
-                    <Button @click="redirectToCreateDngRequest"> Continue to payment form </Button>
+                    <Button variant="outline" @click="dngBatchDialogOpen = false">Hủy</Button>
+                    <Button :disabled="dngBatchSubmitting || recordsToCreate.length === 0" @click="submitDngBatch">
+                        <Loader2 v-if="dngBatchSubmitting" class="mr-2 h-4 w-4 animate-spin" />
+                        Gửi {{ recordsToCreate.length }} khoản phí → DNG
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -419,7 +548,43 @@ const columns: ColumnDef<SettlementStudent>[] = createColumns<SettlementStudent>
                     @page-size-change="handlePageSizeChange"
                 >
                     <template #cell-invoices="{ row }">
-                        <div class="min-w-[320px] space-y-2">
+                        <div class="min-w-[340px] space-y-3">
+                            <!-- Fee-type breakdown (shown when available) -->
+                            <div v-if="row.original.fee_type_breakdown.length > 0">
+                                <div class="mb-1 flex items-center gap-1">
+                                    <span class="text-muted-foreground text-xs font-medium">Phân loại phí</span>
+                                    <span class="text-muted-foreground/60 text-xs" title="latest_dng_request là thông tin cấp student, không phản ánh trạng thái DNG từng loại phí">ⓘ</span>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <div
+                                        v-for="entry in row.original.fee_type_breakdown"
+                                        :key="entry.fee_type"
+                                        class="bg-muted/30 flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs"
+                                    >
+                                        <div class="space-y-0.5">
+                                            <div class="font-medium">{{ entry.label }}</div>
+                                            <div class="text-muted-foreground">
+                                                Gốc: {{ formatCurrency(entry.gross) }}
+                                                <template v-if="entry.discount > 0">
+                                                    · Giảm: {{ formatCurrency(entry.discount) }}
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-semibold text-red-600">{{ formatCurrency(entry.net_remaining) }}</span>
+                                            <Badge
+                                                v-if="entry.active_dng !== null && entry.active_dng.amount === entry.net_remaining"
+                                                variant="outline"
+                                                class="border-amber-200 bg-amber-50 text-xs text-amber-700"
+                                            >
+                                                DNG đang chờ
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Invoice list -->
                             <div v-for="invoice in row.original.invoices" :key="invoice.id" class="bg-background rounded-md border p-3">
                                 <div class="flex items-start justify-between gap-3">
                                     <div>
@@ -465,7 +630,13 @@ const columns: ColumnDef<SettlementStudent>[] = createColumns<SettlementStudent>
                                 Apply
                             </Button>
 
-                            <Button v-else-if="permission.can('create_finance_payments')" size="sm" variant="outline" @click="openCreateDngDialog(row.original)">
+                            <Button
+                                v-else-if="permission.can('create_finance_payments')"
+                                size="sm"
+                                variant="outline"
+                                :disabled="getRecordsToCreateForStudent(row.original).length === 0"
+                                @click="openDngBatchDialog(row.original)"
+                            >
                                 <Wallet class="mr-2 h-4 w-4" />
                                 Create DNG request
                             </Button>

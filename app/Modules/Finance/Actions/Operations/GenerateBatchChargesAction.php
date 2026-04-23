@@ -312,24 +312,6 @@ class GenerateBatchChargesAction
                         }
                     }
 
-                    // 4. Manual Adjustment
-                    if (! empty($data['custom_amount'])) {
-                        $charge = self::createChargeIfNotExists(
-                            $student, $semesterId,
-                            FinanceCharge::TYPE_COURSE_FEE,
-                            (float) $data['custom_amount'],
-                            'Manual',
-                            0, // source_id 0
-                            $createdByUserId
-                        );
-                        if ($charge) {
-                            $charge->update(['description' => 'Manual Adjustment']);
-                            $charge->refresh();
-                            $chargesToLink[] = $charge;
-                            $hasInvoiceMutation = true;
-                        }
-                    }
-
                     if (! $hasInvoiceMutation) {
                         if (! $reusableInvoice) {
                             $invoice->delete();
@@ -426,7 +408,6 @@ class GenerateBatchChargesAction
             FinanceCharge::TYPE_TUITION_TERM => 'Tuition Fee',
             FinanceCharge::TYPE_EGC_LEVEL_FEE => 'EGC Level Fee',
             FinanceCharge::TYPE_SCHOLARSHIP_CREDIT => 'Scholarship Credit',
-            FinanceCharge::TYPE_COURSE_FEE => 'Course/Voucher Fee',
             default => 'Charge'
         };
 

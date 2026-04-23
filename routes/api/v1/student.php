@@ -14,13 +14,13 @@ use App\Http\Controllers\Api\V1\Student\CourseRegistrationController;
 use App\Http\Controllers\Api\V1\Student\CurriculumController;
 use App\Http\Controllers\Api\V1\Student\DashboardController;
 use App\Http\Controllers\Api\V1\Student\FinanceController;
-use App\Modules\Finance\Http\Api\Student\StudentFinanceController;
 use App\Http\Controllers\Api\V1\Student\GradeController;
 use App\Http\Controllers\Api\V1\Student\ModuleController;
 use App\Http\Controllers\Api\V1\Student\NotificationController;
 use App\Http\Controllers\Api\V1\Student\ProfileController;
 use App\Http\Controllers\Api\V1\Student\QueryTicketController;
 use App\Http\Controllers\Api\V1\Student\TimetableController;
+use App\Modules\Finance\Http\Api\Student\StudentFinanceController;
 use Illuminate\Support\Facades\Route;
 
 // Protected student API routes
@@ -245,6 +245,8 @@ Route::middleware([
             Route::get('/dng-requests/{dngRequestId}', [StudentFinanceController::class, 'dngRequestDetail'])->name('dng-requests.show');
             Route::post('/dng-requests/{dngRequestId}/qr', [StudentFinanceController::class, 'dngRequestQr'])->name('dng-requests.qr');
             Route::post('/dng-requests/{dngRequestId}/installment', [StudentFinanceController::class, 'dngRequestInstallment'])->name('dng-requests.installment');
+            Route::post('/dng/qr', [StudentFinanceController::class, 'dngQr'])->name('dng.qr');
+            Route::post('/dng/installment', [StudentFinanceController::class, 'dngInstallment'])->name('dng.installment');
             Route::get('/invoices', [StudentFinanceController::class, 'invoices'])->name('invoices');
             Route::get('/invoices/{invoiceId}', [StudentFinanceController::class, 'invoiceDetail'])->name('invoices.show');
             Route::get('/overview', [StudentFinanceController::class, 'overview'])->name('overview');

@@ -47,6 +47,17 @@ class DngPaymentService
      */
     public function createAndPush(Student $student, array $chargeData): DngPaymentRequest
     {
+        $duplicate = DngPaymentRequest::query()
+            ->where('student_id', $student->id)
+            ->where('fee_type', $chargeData['fee_type'])
+            ->where('amount', $chargeData['amount'])
+            ->awaitingPayment()
+            ->exists();
+
+        if ($duplicate) {
+            throw new \RuntimeException("DNG đang chờ với loại phí {$chargeData['fee_type']} và số tiền {$chargeData['amount']} đã tồn tại cho student này.");
+        }
+
         $previousRequestIds = DngPaymentRequest::query()
             ->where('student_id', $student->id)
             ->where('fee_type', $chargeData['fee_type'])
@@ -138,13 +149,27 @@ class DngPaymentService
      *     note_einvoice?: string|null,
      *     cccd?: string|null,
      * }>  $records
-     * @return array{created: int, failed: int}
+     * @return array{created: int, skipped: int, failed: int}
      */
     public function createAndPushBatch(array $records, string $campusCode): array
     {
         // Step 1: Persist all local records before calling DNG
         $created = [];
+        $skipped = 0;
         foreach ($records as $record) {
+            $duplicate = DngPaymentRequest::query()
+                ->where('student_id', $record['student_id'])
+                ->where('fee_type', $record['type'])
+                ->where('amount', $record['amount'])
+                ->awaitingPayment()
+                ->exists();
+
+            if ($duplicate) {
+                $skipped++;
+
+                continue;
+            }
+
             $previousRequestIds = DngPaymentRequest::query()
                 ->where('student_id', $record['student_id'])
                 ->where('fee_type', $record['type'])
@@ -209,7 +234,7 @@ class DngPaymentService
                 );
             }
 
-            return ['created' => count($created), 'failed' => 0];
+            return ['created' => count($created), 'skipped' => $skipped, 'failed' => 0];
         } catch (\Throwable $e) {
             foreach ($created as $item) {
                 $item['request']->update([

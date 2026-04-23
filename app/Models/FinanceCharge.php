@@ -69,7 +69,6 @@ class FinanceCharge extends Model
         self::TYPE_TUITION_TERM,
         self::TYPE_EGC_LEVEL_FEE,
         self::TYPE_RETAKE_FEE,
-        self::TYPE_COURSE_FEE,
         self::TYPE_MANUAL_FEE,
         self::TYPE_ADMISSION_FEE,
         self::TYPE_DEFER_CREDIT,

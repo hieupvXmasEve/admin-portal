@@ -8,6 +8,7 @@ use App\Models\InvoiceLine;
 use App\Models\Payment;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -46,7 +47,7 @@ class ListSettlementWorklistQuery
         $direction = ($validated['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
 
         $invoiceQuery = StudentInvoice::query()
-            ->with(['student', 'semester', 'invoiceLines.paymentApplications', 'invoiceLines.discountAllocations'])
+            ->with(['student', 'semester', 'invoiceLines.charge', 'invoiceLines.paymentApplications', 'invoiceLines.discountAllocations'])
             ->whereNotIn('status', ['paid', 'cancelled'])
             ->orderBy('due_date');
 
@@ -106,9 +107,19 @@ class ListSettlementWorklistQuery
             ->groupBy('student_id')
             ->map(fn (Collection $requests) => $requests->first());
 
+        // Batch query: latest awaitingPayment DNG per (student_id, fee_type) — 1 query, no N+1
+        $activeDngByStudentAndFeeType = DngPaymentRequest::query()
+            ->whereIn('student_id', $studentIds)
+            ->awaitingPayment()
+            ->latest('created_at')
+            ->get(['id', 'student_id', 'fee_type', 'amount', 'status'])
+            ->groupBy('student_id')
+            ->map(fn (Collection $requests) => $requests->groupBy('fee_type')
+                ->map(fn (Collection $byType) => $byType->first()));
+
         $students = $invoices
             ->groupBy('student_id')
-            ->map(function (Collection $studentInvoices, int $studentId) use ($paymentsByStudent, $latestDngRequestsByStudent) {
+            ->map(function (Collection $studentInvoices, int $studentId) use ($paymentsByStudent, $latestDngRequestsByStudent, $activeDngByStudentAndFeeType) {
                 $student = $studentInvoices->first()?->student;
                 $payments = $paymentsByStudent->get($studentId, collect());
                 $latestDngRequest = $latestDngRequestsByStudent->get($studentId);
@@ -142,6 +153,7 @@ class ListSettlementWorklistQuery
                         'description' => $latestDngRequest->description,
                         'created_at' => $latestDngRequest->created_at?->toIso8601String(),
                     ] : null,
+                    'fee_type_breakdown' => $this->computeFeeTypeBreakdown($studentInvoices, $activeDngByStudentAndFeeType->get($studentId, collect())),
                     'invoices' => $studentInvoices->map(function (StudentInvoice $invoice) {
                         $snapshot = $this->deriveInvoiceSnapshot($invoice);
 
@@ -218,6 +230,78 @@ class ListSettlementWorklistQuery
                 'direction' => $direction,
             ],
         ];
+    }
+
+    /**
+     * @param  Collection<int, StudentInvoice>  $studentInvoices
+     * @param  Collection<string, DngPaymentRequest>  $activeDngByFeeType  fee_type => latest awaitingPayment DNG
+     * @return array<int, array{fee_type: string, label: string, gross: float, discount: float, net_remaining: float, semester_id: int|null, active_dng: array{id: int, amount: float, status: string}|null}>
+     */
+    private function computeFeeTypeBreakdown(Collection $studentInvoices, Collection $activeDngByFeeType): array
+    {
+        $feeTypeLabelMap = collect(DngFeeTypeOptions::all())->pluck('label', 'value')->all();
+
+        // groups: fee_type => [gross, discount, paid, semester_id]
+        $groups = [];
+
+        foreach ($studentInvoices as $invoice) {
+            foreach ($invoice->invoiceLines as $line) {
+                if (! $this->isBillableActiveLine($line)) {
+                    continue;
+                }
+
+                $amountSnapshot = (float) $line->amount_snapshot;
+
+                // Only positive charge lines contribute to fee_type rows
+                if ($amountSnapshot <= 0) {
+                    continue;
+                }
+
+                $chargeType = $line->charge?->charge_type ?? '';
+                $feeType = DngFeeTypeOptions::fromChargeType($chargeType);
+
+                if (! isset($groups[$feeType])) {
+                    $groups[$feeType] = [
+                        'gross' => 0.0,
+                        'discount' => 0.0,
+                        'paid' => 0.0,
+                        'semester_id' => $invoice->semester_id,
+                    ];
+                }
+
+                $groups[$feeType]['gross'] += $amountSnapshot;
+                $groups[$feeType]['discount'] += (float) $line->discountAllocations->sum('amount');
+                $groups[$feeType]['paid'] += (float) $line->paymentApplications->sum('amount');
+            }
+        }
+
+        $result = [];
+
+        foreach ($groups as $feeType => $data) {
+            $netRemaining = max(0.0, $data['gross'] - $data['discount'] - $data['paid']);
+
+            if ($netRemaining <= 0) {
+                continue;
+            }
+
+            $activeDng = $activeDngByFeeType->get($feeType);
+
+            $result[] = [
+                'fee_type' => $feeType,
+                'label' => $feeTypeLabelMap[$feeType] ?? $feeType,
+                'gross' => $data['gross'],
+                'discount' => $data['discount'],
+                'net_remaining' => $netRemaining,
+                'semester_id' => $data['semester_id'],
+                'active_dng' => $activeDng !== null ? [
+                    'id' => $activeDng->id,
+                    'amount' => (float) $activeDng->amount,
+                    'status' => $activeDng->status,
+                ] : null,
+            ];
+        }
+
+        return $result;
     }
 
     private function paginateCollection(Collection $items, int $perPage, int $page, string $path, array $query): LengthAwarePaginator
