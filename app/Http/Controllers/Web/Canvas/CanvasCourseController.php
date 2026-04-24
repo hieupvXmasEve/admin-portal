@@ -10,7 +10,9 @@ use App\Http\Resources\CanvasCourseResource;
 use App\Models\CanvasCourseMapping;
 use App\Models\CanvasIntegration;
 use App\Models\CourseOffering;
+use App\Models\Semester;
 use App\Services\Canvas\CanvasSyncService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -51,6 +53,7 @@ class CanvasCourseController extends Controller
                 ],
                 'filters' => $request->only(['search', 'sync_status', 'sort', 'direction', 'per_page']),
                 'integration' => null,
+                'semesters' => $this->getSemesterOptions(),
             ]);
         }
 
@@ -102,6 +105,7 @@ class CanvasCourseController extends Controller
                 'sync_status' => $integration->sync_status,
                 'last_sync_at' => $integration->last_sync_at?->toIso8601String(),
             ],
+            'semesters' => $this->getSemesterOptions(),
         ]);
     }
 
@@ -140,20 +144,28 @@ class CanvasCourseController extends Controller
         }
     }
 
-    public function getAvailableCourseOfferings(Request $request)
+    public function getAvailableCourseOfferings(Request $request): JsonResponse
     {
         $campusId = session('current_campus_id');
         $search = $request->input('search', '');
+        $semesterId = $request->integer('semester_id');
 
         $offerings = CourseOffering::with(['unit', 'semester'])
             ->where('campus_id', $campusId)
             ->where('is_active', true)
+            ->when($semesterId, function ($q) use ($semesterId) {
+                $q->where('semester_id', $semesterId);
+            })
             ->when($search, function ($q) use ($search) {
-                $q->whereHas('unit', function ($unitQuery) use ($search) {
-                    $unitQuery->where('code', 'like', "%{$search}%")
-                        ->orWhere('name', 'like', "%{$search}%");
+                $q->where(function ($query) use ($search) {
+                    $query->where('section_code', 'like', "%{$search}%")
+                        ->orWhereHas('unit', function ($unitQuery) use ($search) {
+                            $unitQuery->where('code', 'like', "%{$search}%")
+                                ->orWhere('name', 'like', "%{$search}%");
+                        });
                 });
             })
+            ->orderByDesc('semester_id')
             ->limit(50)
             ->get()
             ->map(function ($offering) {
@@ -170,9 +182,17 @@ class CanvasCourseController extends Controller
                     'course_title' => $offering->course_title,
                     'section_code' => $offering->section_code,
                     'semester' => $offering->semester->name,
+                    'semester_id' => $offering->semester_id,
                 ];
             });
 
         return response()->json($offerings);
+    }
+
+    private function getSemesterOptions()
+    {
+        return Semester::where('is_archived', false)
+            ->orderBy('start_date', 'desc')
+            ->get(['id', 'name', 'code']);
     }
 }

@@ -241,9 +241,8 @@ class StudentFinanceController extends Controller
     }
 
     /**
-     * Get student's DNG payment summary.
-     * Pending requests are consolidated into one object (total + breakdown by fee_type).
-     * Paid history is returned as a flat list for display.
+     * List student's DNG payment requests (individual records).
+     * Use for displaying each request separately with per-request QR/installment actions.
      */
     public function dngRequests(Request $request): JsonResponse
     {
@@ -253,16 +252,62 @@ class StudentFinanceController extends Controller
             return ApiResponse::error('Unauthorized', [], 401);
         }
 
-        $pendingStatuses = [
-            DngPaymentRequest::STATUS_PENDING,
-            DngPaymentRequest::STATUS_PUSHED_TO_DNG,
-        ];
+        $validated = $request->validate([
+            'status' => 'nullable|string|in:pending,pushed_to_dng,paid_uninvoiced,paid_invoiced,reconciled,failed,cancelled',
+        ]);
 
-        $paidStatuses = [
-            DngPaymentRequest::STATUS_PAID_UNINVOICED,
-            DngPaymentRequest::STATUS_PAID_INVOICED,
-            DngPaymentRequest::STATUS_RECONCILED,
-        ];
+        $query = DngPaymentRequest::where('student_id', $student->id)
+            ->orderBy('created_at', 'desc');
+
+        if (! empty($validated['status'])) {
+            $query->where('status', $validated['status']);
+        }
+
+        $requests = $query->get();
+
+        $pendingStatuses = [DngPaymentRequest::STATUS_PENDING, DngPaymentRequest::STATUS_PUSHED_TO_DNG];
+        $paidStatuses = [DngPaymentRequest::STATUS_PAID_UNINVOICED, DngPaymentRequest::STATUS_PAID_INVOICED, DngPaymentRequest::STATUS_RECONCILED];
+
+        $pendingItems = $requests->filter(fn ($r) => in_array($r->status, $pendingStatuses, true));
+        $paidItems = $requests->filter(fn ($r) => in_array($r->status, $paidStatuses, true));
+
+        return ApiResponse::success([
+            'dng_requests' => $requests->map(fn ($r) => [
+                'id' => $r->id,
+                'dng_payment_id' => $r->dng_payment_id,
+                'amount' => (float) $r->amount,
+                'fee_type' => $r->fee_type,
+                'description' => $r->description,
+                'item_id' => $r->item_id,
+                'status' => $r->status,
+                'paid_at' => $r->paid_at?->toIso8601String(),
+                'invoice_serial_number' => $r->invoice_serial_number,
+                'invoice_date' => $r->invoice_date?->toDateString(),
+                'created_at' => $r->created_at?->toIso8601String(),
+            ]),
+            'summary' => [
+                'total_pending' => (float) $pendingItems->sum('amount'),
+                'total_paid' => (float) $paidItems->sum('amount'),
+                'count_pending' => $pendingItems->count(),
+                'count_paid' => $paidItems->count(),
+            ],
+        ]);
+    }
+
+    /**
+     * Get consolidated pending DNG summary for paying all outstanding fees at once.
+     * Use POST /dng/qr or /dng/installment to generate a single payment link covering all fee_types.
+     */
+    public function dngRequestsAll(Request $request): JsonResponse
+    {
+        $student = $request->user('student');
+
+        if (! $student) {
+            return ApiResponse::error('Unauthorized', [], 401);
+        }
+
+        $pendingStatuses = [DngPaymentRequest::STATUS_PENDING, DngPaymentRequest::STATUS_PUSHED_TO_DNG];
+        $paidStatuses = [DngPaymentRequest::STATUS_PAID_UNINVOICED, DngPaymentRequest::STATUS_PAID_INVOICED, DngPaymentRequest::STATUS_RECONCILED];
 
         $allRequests = DngPaymentRequest::where('student_id', $student->id)
             ->orderBy('created_at', 'desc')
@@ -271,7 +316,6 @@ class StudentFinanceController extends Controller
         $pendingItems = $allRequests->filter(fn ($r) => in_array($r->status, $pendingStatuses, true));
         $paidItems = $allRequests->filter(fn ($r) => in_array($r->status, $paidStatuses, true));
 
-        // Consolidate pending: group by fee_type, keep latest per type
         $pendingBreakdown = $pendingItems
             ->groupBy('fee_type')
             ->map(fn ($group) => $group->sortByDesc('created_at')->first())

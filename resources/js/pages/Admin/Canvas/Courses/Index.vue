@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxItemIndicator, ComboboxTrigger, ComboboxViewport } from '@/components/ui/combobox';
+import ComboboxListInline from '@/components/ui/combobox/ComboboxListInline.vue';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
@@ -16,8 +18,8 @@ import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import type { PaginatedResponse } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ColumnDef } from '@tanstack/vue-table';
-import { AlertCircle, Award, BarChart3, CheckCircle2, Clock, ExternalLink, EyeOff, Link2, Link2Off, ListChecks, MoreHorizontal, RefreshCw } from 'lucide-vue-next';
-import { computed, h, ref } from 'vue';
+import { AlertCircle, Award, BarChart3, Check, CheckCircle2, ChevronsUpDown, Clock, ExternalLink, EyeOff, Link2, Link2Off, ListChecks, MoreHorizontal, RefreshCw, Search } from 'lucide-vue-next';
+import { computed, h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
 interface CanvasCourseMapping {
@@ -59,8 +61,15 @@ interface CourseOffering {
     label: string;
     course_code: string;
     course_title: string;
-    section_code: string;
+    section_code: string | null;
     semester: string;
+    semester_id: number;
+}
+
+interface SemesterOption {
+    id: number;
+    name: string;
+    code: string;
 }
 
 interface Props {
@@ -73,10 +82,10 @@ interface Props {
         per_page?: number;
     };
     integration: CanvasIntegration | null;
+    semesters: SemesterOption[];
 }
 
 const props = defineProps<Props>();
-console.log(props.integration);
 const { showConfirmDialog } = useGlobalConfirmDialog();
 const api = useApi();
 
@@ -90,10 +99,12 @@ const filters = ref({
 
 const showMappingDialog = ref(false);
 const selectedMapping = ref<CanvasCourseMapping | null>(null);
-const selectedCourseOffering = ref<number | null>(null);
+const selectedCourseOffering = ref<CourseOffering | null>(null);
+const selectedMappingSemester = ref('all');
 const searchCourseOffering = ref('');
 const availableCourseOfferings = ref<CourseOffering[]>([]);
 const isLoadingCourseOfferings = ref(false);
+let courseOfferingSearchTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Sync Syllabus
 
@@ -172,17 +183,58 @@ const syncCourses = () => {
 
 const openMappingDialog = async (mapping: CanvasCourseMapping) => {
     selectedMapping.value = mapping;
-    selectedCourseOffering.value = mapping.course_offering?.id || null;
+    selectedCourseOffering.value = mapping.course_offering?.id
+        ? {
+              id: mapping.course_offering.id,
+              label: `${mapping.course_offering.course_code} - ${mapping.course_offering.course_title} (Section ${mapping.course_offering.section_code ?? 'N/A'}, ${mapping.course_offering.semester?.code ?? mapping.course_offering.semester?.name ?? 'N/A'})`,
+              course_code: mapping.course_offering.course_code,
+              course_title: mapping.course_offering.course_title,
+              section_code: mapping.course_offering.section_code,
+              semester: mapping.course_offering.semester?.name ?? '',
+              semester_id: mapping.course_offering.semester?.id ?? 0,
+          }
+        : null;
+    selectedMappingSemester.value = mapping.course_offering?.semester?.id ? String(mapping.course_offering.semester.id) : 'all';
+    searchCourseOffering.value = '';
     showMappingDialog.value = true;
 
-    // Load available course offerings
     await loadCourseOfferings();
+};
+
+const handleCourseOfferingSelect = (value: unknown) => {
+    if (value && typeof value === 'object' && 'id' in value) {
+        selectedCourseOffering.value = value as CourseOffering;
+        searchCourseOffering.value = '';
+        return;
+    }
+
+    selectedCourseOffering.value = null;
+};
+
+const getCourseOfferingDisplayValue = (value: unknown) => {
+    return value && typeof value === 'object' && 'label' in value ? String(value.label ?? '') : '';
 };
 
 const loadCourseOfferings = async () => {
     isLoadingCourseOfferings.value = true;
     try {
-        const response = await fetch(`/admin/canvas/api/course-offerings?search=${searchCourseOffering.value}`);
+        const params = new URLSearchParams();
+
+        if (searchCourseOffering.value.trim()) {
+            params.set('search', searchCourseOffering.value.trim());
+        }
+
+        if (selectedMappingSemester.value !== 'all') {
+            params.set('semester_id', selectedMappingSemester.value);
+        }
+
+        const queryString = params.toString();
+        const response = await fetch(`${route('admin.canvas.api.course-offerings')}${queryString ? `?${queryString}` : ''}`);
+
+        if (!response.ok) {
+            throw new Error('Course offerings request failed');
+        }
+
         const data = await response.json();
         availableCourseOfferings.value = data;
     } catch (error) {
@@ -192,6 +244,40 @@ const loadCourseOfferings = async () => {
         isLoadingCourseOfferings.value = false;
     }
 };
+
+watch([searchCourseOffering, selectedMappingSemester], () => {
+    if (!showMappingDialog.value) {
+        return;
+    }
+
+    if (selectedCourseOffering.value && selectedMappingSemester.value !== 'all' && String(selectedCourseOffering.value.semester_id) !== selectedMappingSemester.value) {
+        selectedCourseOffering.value = null;
+    }
+
+    if (courseOfferingSearchTimer) {
+        clearTimeout(courseOfferingSearchTimer);
+    }
+
+    courseOfferingSearchTimer = setTimeout(() => {
+        loadCourseOfferings();
+    }, 300);
+});
+
+watch(showMappingDialog, (isOpen) => {
+    if (isOpen) {
+        return;
+    }
+
+    if (courseOfferingSearchTimer) {
+        clearTimeout(courseOfferingSearchTimer);
+        courseOfferingSearchTimer = null;
+    }
+
+    selectedMapping.value = null;
+    selectedCourseOffering.value = null;
+    selectedMappingSemester.value = 'all';
+    searchCourseOffering.value = '';
+});
 
 const mapCourse = () => {
     if (!selectedMapping.value || !selectedCourseOffering.value) {
@@ -203,7 +289,7 @@ const mapCourse = () => {
         '/admin/canvas/courses/map',
         {
             mapping_id: selectedMapping.value.id,
-            course_offering_id: selectedCourseOffering.value,
+            course_offering_id: selectedCourseOffering.value.id,
         },
         {
             preserveScroll: true,
@@ -212,6 +298,8 @@ const mapCourse = () => {
                 showMappingDialog.value = false;
                 selectedMapping.value = null;
                 selectedCourseOffering.value = null;
+                selectedMappingSemester.value = 'all';
+                searchCourseOffering.value = '';
             },
             onError: () => {
                 toast.error('Failed to map course');
@@ -690,17 +778,64 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
                     </div>
 
                     <div class="space-y-2">
-                        <Label>Select Course Offering</Label>
-                        <Select v-model="selectedCourseOffering">
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a course offering" />
+                        <Label>Semester</Label>
+                        <Select v-model="selectedMappingSemester">
+                            <SelectTrigger class="w-full">
+                                <SelectValue placeholder="All semesters" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem v-for="offering in availableCourseOfferings" :key="offering.id" :value="offering.id">
-                                    {{ offering.label }}
-                                </SelectItem>
+                                <SelectItem value="all">All semesters</SelectItem>
+                                <SelectItem v-for="semester in semesters" :key="semester.id" :value="String(semester.id)"> {{ semester.name }} ({{ semester.code }}) </SelectItem>
                             </SelectContent>
                         </Select>
+                    </div>
+
+                    <div class="space-y-2">
+                        <Label>Select Course Offering</Label>
+                        <Combobox :model-value="selectedCourseOffering" v-model:search-term="searchCourseOffering" by="id" :ignore-filter="true" @update:model-value="handleCourseOfferingSelect">
+                            <ComboboxAnchor as-child>
+                                <ComboboxTrigger as-child>
+                                    <Button variant="outline" class="h-auto min-h-10 w-full justify-between">
+                                        <span class="min-w-0 flex-1 truncate text-left">
+                                            {{ selectedCourseOffering ? selectedCourseOffering.label : 'Search by section code, unit code, or unit name...' }}
+                                        </span>
+                                        <ChevronsUpDown class="text-muted-foreground ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </ComboboxTrigger>
+                            </ComboboxAnchor>
+
+                            <ComboboxListInline class="w-[var(--reka-combobox-trigger-width)]">
+                                <div class="relative w-full items-center">
+                                    <ComboboxInput
+                                        class="h-10 rounded-none border-0 border-b pr-4 pl-10 focus-visible:ring-0"
+                                        placeholder="Filter course offerings..."
+                                        :display-value="getCourseOfferingDisplayValue"
+                                        @update:model-value="(value) => (searchCourseOffering = String(value ?? ''))"
+                                    />
+                                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center justify-center px-3">
+                                        <Search class="text-muted-foreground size-4" />
+                                    </span>
+                                </div>
+
+                                <ComboboxViewport class="max-h-[320px] overflow-y-auto">
+                                    <div v-if="isLoadingCourseOfferings" class="text-muted-foreground px-3 py-6 text-center text-sm">Loading course offerings...</div>
+                                    <ComboboxEmpty v-else>
+                                        <div class="text-muted-foreground px-3 py-6 text-center text-sm">No course offerings found.</div>
+                                    </ComboboxEmpty>
+                                    <ComboboxGroup v-if="!isLoadingCourseOfferings && availableCourseOfferings.length > 0">
+                                        <ComboboxItem v-for="offering in availableCourseOfferings" :key="offering.id" :value="offering">
+                                            <div class="flex min-w-0 flex-1 flex-col">
+                                                <span class="truncate font-medium">{{ offering.course_code }} - {{ offering.course_title }}</span>
+                                                <span class="text-muted-foreground truncate text-xs">Section {{ offering.section_code || 'N/A' }} • {{ offering.semester }}</span>
+                                            </div>
+                                            <ComboboxItemIndicator>
+                                                <Check class="ml-2 h-4 w-4" />
+                                            </ComboboxItemIndicator>
+                                        </ComboboxItem>
+                                    </ComboboxGroup>
+                                </ComboboxViewport>
+                            </ComboboxListInline>
+                        </Combobox>
                     </div>
                 </div>
 
