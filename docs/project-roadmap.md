@@ -43,6 +43,10 @@ Recent activity through 2026-04-21:
     - Same `student + fee_type` DNG replacements now cancel older unpaid requests only after the new push succeeds
     - Late webhook/reconciliation events for cancelled requests are skipped
     - Local docs/rules now prefer Docker-first commands via `./scripts/dev.sh`
+- 2026-04-24: DNG payment request admin cancel added
+    - Admin audit page `/finance/dng/payment-requests` can cancel unpaid DNG requests after confirmation
+    - Cancel action uses `create_finance_payments` and only allows `pending` or `pushed_to_dng`
+    - Payment request filters keep explicit debounce on search
 
 - 2026-03-26: DNG payment gateway integration completed
     - Payment Creation UI at `/finance/payments/create`

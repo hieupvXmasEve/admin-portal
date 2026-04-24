@@ -1,6 +1,6 @@
 # DNG Payment Gateway Integration
 
-Last updated: 2026-03-26
+Last updated: 2026-04-24
 Status: Implementation complete
 Owner: Finance Module
 
@@ -12,6 +12,7 @@ DNG is a Vietnamese payment gateway provider. Swinx integrates with DNG to:
 2. Generate QR codes for student payments
 3. Receive webhook notifications when payments are confirmed
 4. Audit all DNG API interactions and webhook events
+5. Allow staff to cancel unpaid DNG requests from the admin audit page
 
 ## Architecture
 
@@ -152,6 +153,24 @@ Expected payload from DNG:
     "CheckSum": "hmac_sha256_hash"
 }
 ```
+
+#### `DngPaymentRequestController`
+
+Admin audit pages for DNG payment requests.
+
+Routes:
+
+- `GET /finance/dng/payment-requests`
+- `GET /finance/dng/payment-requests/{dngPaymentRequest}`
+- `POST /finance/dng/payment-requests/{dngPaymentRequest}/cancel`
+
+Cancel behavior:
+
+- Requires `create_finance_payments`.
+- Only requests in `pending` or `pushed_to_dng` can be cancelled.
+- Cancelled requests are terminal and remain protected from late webhook/reconciliation revival.
+- The admin list uses a confirmation dialog before submitting cancel.
+- Search filters are debounced through shared filter/table components.
 
 Response:
 

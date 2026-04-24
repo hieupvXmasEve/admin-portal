@@ -7,13 +7,14 @@ import ServerPaginatedDataTable from '@/components/tables/ServerPaginatedDataTab
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useGlobalConfirmDialog } from '@/composables';
 import { usePermission } from '@/composables/usePermission';
 import { useServerTableQuery } from '@/composables/useServerTableQuery';
 import type { PaginatedResponse } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/format';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { ArrowLeft, ArrowRight, CheckCircle2, Clock3, Send, XCircle } from 'lucide-vue-next';
+import { ArrowLeft, ArrowRight, Ban, CheckCircle2, Clock3, Send, XCircle } from 'lucide-vue-next';
 import { h } from 'vue';
 import { route } from 'ziggy-js';
 
@@ -86,6 +87,7 @@ interface Props {
 
 const props = defineProps<Props>();
 const permission = usePermission();
+const confirmDialog = useGlobalConfirmDialog();
 
 const statusOptions = [
     { value: 'pending', label: 'Pending' },
@@ -104,6 +106,7 @@ const yesNoOptions = [
 
 const { filters, hasActiveFilters, clearFilters, applySearch, setFilter, apply, handleSortChange, handlePageChange, handlePageSizeChange, currentSort, currentDirection } = useServerTableQuery<Filters>({
     baseUrl: route('finance.dng.payment-requests.index'),
+    searchDebounce: 400,
     initialFilters: {
         search: props.filters.search ?? '',
         status: props.filters.status ?? '',
@@ -141,6 +144,29 @@ const { filters, hasActiveFilters, clearFilters, applySearch, setFilter, apply, 
 
 const onDateChange = (from: string, to: string) => {
     apply({ created_from: from, created_to: to, page: 1 });
+};
+
+const canCancelRequest = (request: DngPaymentRequestRow) => {
+    return permission.can('create_finance_payments') && ['pending', 'pushed_to_dng'].includes(request.status);
+};
+
+const cancelRequest = (request: DngPaymentRequestRow) => {
+    confirmDialog.showConfirmDialog(
+        {
+            title: 'Cancel DNG request',
+            message: `Cancel DNG payment request #${request.id} for ${request.student?.full_name || request.student_code}? This request will become terminal and cannot be paid later.`,
+            confirmText: 'Cancel request',
+            cancelText: 'Back',
+        },
+        {
+            onConfirm: () => {
+                router.post(route('finance.dng.payment-requests.cancel', request.id), {}, {
+                    preserveScroll: true,
+                    only: ['items', 'stats', 'filters'],
+                });
+            },
+        },
+    );
 };
 
 const getRequestStatusClass = (status: string) => {
@@ -282,7 +308,7 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
             </CardHeader>
             <CardContent>
                 <FilterPanel :has-active-filters="hasActiveFilters" :columns="4" @clear="clearFilters">
-                    <FilterSearchInput :model-value="filters.search ?? ''" placeholder="Search student, item, DNG ID..." @update:model-value="(value) => setFilter('search', value)" @search="applySearch" />
+                    <FilterSearchInput :model-value="filters.search ?? ''" placeholder="Search student, item, DNG ID..." :debounce="400" @update:model-value="(value) => setFilter('search', value)" @search="applySearch" />
                     <FilterSelect :model-value="filters.status ?? ''" :options="statusOptions" placeholder="Request status" all-label="All statuses" @change="(value) => apply({ status: value, page: 1 })" />
                     <FilterSelect :model-value="filters.has_payment ?? 'all'" :options="yesNoOptions" placeholder="Bridged payment" all-label="All payment states" @change="(value) => apply({ has_payment: value || 'all', page: 1 })" />
                     <FilterSelect :model-value="filters.has_webhook ?? 'all'" :options="yesNoOptions" placeholder="Webhook received" all-label="All webhook states" @change="(value) => apply({ has_webhook: value || 'all', page: 1 })" />
@@ -366,7 +392,11 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
                     </template>
 
                     <template #cell-actions="{ row }">
-                        <div class="flex justify-end">
+                        <div class="flex justify-end gap-2">
+                            <Button v-if="canCancelRequest(row.original)" variant="ghost" size="sm" class="text-red-700 hover:text-red-800" @click="cancelRequest(row.original)">
+                                Cancel
+                                <Ban class="ml-2 h-4 w-4" />
+                            </Button>
                             <Link :href="route('finance.dng.payment-requests.show', row.original.id)">
                                 <Button variant="ghost" size="sm">
                                     View
