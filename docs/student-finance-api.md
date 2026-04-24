@@ -18,12 +18,13 @@
 | GET    | `/payments/{id}`                 | Payment detail + allocation tree            |
 | GET    | `/invoices`                      | Invoice list + summary                      |
 | GET    | `/invoices/{id}`                 | Invoice detail (lines, payments, discounts) |
-| GET    | `/dng-requests`                  | DNG payment requests                        |
+| GET    | `/dng-requests`                  | List individual DNG requests                |
+| GET    | `/dng-requests/all`              | Consolidated pending summary (pay-all flow) |
 | GET    | `/dng-requests/{id}`             | DNG request detail                          |
-| POST   | `/dng-requests/{id}/qr`          | Get QR link (legacy, single request)        |
-| POST   | `/dng-requests/{id}/installment` | Get installment link (legacy, single request) |
-| POST   | `/dng/qr`                        | **Get consolidated QR link (recommended)**  |
-| POST   | `/dng/installment`               | **Get consolidated installment link (recommended)** |
+| POST   | `/dng-requests/{id}/qr`          | QR link for a single request                |
+| POST   | `/dng-requests/{id}/installment` | Installment link for a single request       |
+| POST   | `/dng/qr`                        | QR link covering all pending fee_types      |
+| POST   | `/dng/installment`               | Installment link covering all pending fee_types |
 
 ---
 
@@ -420,11 +421,79 @@ GET /invoices/{id}
 
 ## 7. DNG Payment Requests
 
+Hỗ trợ hai flow thanh toán:
+
+| Flow | List API | Payment API |
+|---|---|---|
+| Thanh toán từng khoản | `GET /dng-requests` | `POST /dng-requests/{id}/qr` hoặc `/installment` |
+| Thanh toán tất cả 1 lúc | `GET /dng-requests/all` | `POST /dng/qr` hoặc `/dng/installment` |
+
+---
+
+### 7a. List individual requests
+
 ```
-GET /dng-requests
+GET /dng-requests?status=pushed_to_dng
 ```
 
-Pending requests are **consolidated** into one `pending` object — no need to enumerate individual records. Paid history is returned separately for display.
+| Param    | Type    | Description                                                                                         |
+| -------- | ------- | --------------------------------------------------------------------------------------------------- |
+| `status` | string? | `pending`, `pushed_to_dng`, `paid_uninvoiced`, `paid_invoiced`, `reconciled`, `failed`, `cancelled` |
+
+**Response:**
+
+```json
+{
+    "data": {
+        "dng_requests": [
+            {
+                "id": 192,
+                "dng_payment_id": "12345678",
+                "amount": 40500000,
+                "fee_type": "HP",
+                "description": "Học phí HK1/2026",
+                "item_id": "ITEM001",
+                "status": "pushed_to_dng",
+                "paid_at": null,
+                "invoice_serial_number": null,
+                "invoice_date": null,
+                "created_at": "2026-04-20T10:00:00+07:00"
+            }
+        ],
+        "summary": {
+            "total_pending": 40620000,
+            "total_paid": 15000000,
+            "count_pending": 3,
+            "count_paid": 1
+        }
+    }
+}
+```
+
+**UI — thanh toán từng khoản:**
+
+```
+┌─────────────────────────────────────────┐
+│ HP — Học phí HK1/2026  [PENDING]        │
+│ 40,500,000₫                             │
+│     [QR]  [Trả góp]  ← /dng-requests/192/qr
+├─────────────────────────────────────────┤
+│ PTL — Phí thi lại      [PENDING]        │
+│ 100,000₫                                │
+│     [QR]  [Trả góp]  ← /dng-requests/193/qr
+├─────────────────────────────────────────┤
+│ HP — Học phí HK2/2025  [INVOICED ✓]    │
+│ 15,000,000₫  Invoice: 1/001;K23TF      │
+└─────────────────────────────────────────┘
+```
+
+---
+
+### 7b. Consolidated pending summary (pay-all)
+
+```
+GET /dng-requests/all
+```
 
 **Response:**
 
@@ -463,46 +532,73 @@ Pending requests are **consolidated** into one `pending` object — no need to e
 }
 ```
 
-**Khi `pending.total_amount === 0`:** không hiển thị nút thanh toán.
+Khi `pending.total_amount === 0`: ẩn nút thanh toán.
 
-**UI:**
+**UI — thanh toán tất cả:**
 
 ```
 ┌─────────────────────────────────────────┐
 │  Khoản phí đang chờ thanh toán          │
-│  Tổng: 40,620,000₫                     │
 │  ├ HP    40,500,000₫                   │
 │  ├ PTL      100,000₫                   │
 │  └ KHAC      20,000₫                   │
+│  Tổng: 40,620,000₫                     │
 │                                         │
-│     [Thanh toán QR]   [Trả góp]         │
-└─────────────────────────────────────────┘
-┌─────────────────────────────────────────┤
+│   [Thanh toán QR]      [Trả góp]        │
+│   ↑ POST /dng/qr   ↑ POST /dng/installment
+├─────────────────────────────────────────┤
 │  Lịch sử thanh toán                     │
-│  HP  15,000,000₫  Paid 10/01/2026      │
+│  HP  15,000,000₫  10/01/2026           │
 │  Invoice: 1/001;K23TF  [INVOICED ✓]    │
 └─────────────────────────────────────────┘
 ```
 
-**DNG Request Detail:**
+---
+
+### 7c. DNG request detail
 
 ```
 GET /dng-requests/{id}
 ```
 
-Returns single request metadata and linked `payment` if paid.
+Trả về metadata của 1 request và `payment` nếu đã thanh toán.
 
 ---
 
-### Get consolidated QR link _(recommended)_
+### 7d. Per-request QR / installment
+
+```
+POST /dng-requests/{id}/qr
+POST /dng-requests/{id}/installment
+```
+
+Dùng khi student muốn thanh toán riêng 1 khoản (flow 7a). BE vẫn tự động gộp tất cả `fee_types` đang pending của student vào 1 link DNG.
+
+**Response:**
+
+```json
+{
+    "success": true,
+    "data": {
+        "dng_request_id": 192,
+        "payment_method": "qr",
+        "status": "pushed_to_dng",
+        "payment_url": "https://third-party.example/qr-link",
+        "provider_response": { "Code": 200, "data": { "PaymentUrl": "https://third-party.example/qr-link" } }
+    }
+}
+```
+
+---
+
+### 7e. Consolidated QR / installment (pay-all)
 
 ```
 POST /dng/qr
+POST /dng/installment
 ```
 
-**Use for:** Student chooses normal online payment — BE automatically gathers all `pushed_to_dng` requests and passes all `fee_types` to DNG in one call. DNG returns a single link covering the full outstanding amount.
-
-**No request body required.**
+Dùng khi student muốn thanh toán tất cả 1 lúc (flow 7b). Không cần request body — BE tự lấy tất cả `pushed_to_dng` requests và gộp `fee_types`.
 
 **Response:**
 
@@ -512,73 +608,20 @@ POST /dng/qr
     "data": {
         "payment_method": "qr",
         "payment_url": "https://third-party.example/qr-link",
-        "provider_response": {
-            "Code": 200,
-            "Type": "success",
-            "Message": "Thành công!",
-            "data": {
-                "PaymentUrl": "https://third-party.example/qr-link"
-            }
-        }
+        "provider_response": { "Code": 200, "data": { "PaymentUrl": "https://third-party.example/qr-link" } }
     }
 }
 ```
 
-**Error — no pending requests:**
+**Error — không có khoản nào pending:**
 
 ```json
-{
-    "success": false,
-    "message": "Không có khoản phí nào đang chờ thanh toán."
-}
+{ "success": false, "message": "Không có khoản phí nào đang chờ thanh toán." }
 ```
 
 ---
 
-### Get consolidated installment link _(recommended)_
-
-```
-POST /dng/installment
-```
-
-**Use for:** Student chooses installment / Foxpay flow — same consolidation logic as `/dng/qr`.
-
-**No request body required.**
-
-**Response:**
-
-```json
-{
-    "success": true,
-    "data": {
-        "payment_method": "installment",
-        "payment_url": "https://portal-staging.foxpay.vn/payment/checkout?...",
-        "provider_response": {
-            "code": 200,
-            "type": "success",
-            "message": "Thành công!",
-            "data": {
-                "PaymentUrl": "https://portal-staging.foxpay.vn/payment/checkout?..."
-            }
-        }
-    }
-}
-```
-
----
-
-### Legacy: per-request QR / installment
-
-```
-POST /dng-requests/{id}/qr
-POST /dng-requests/{id}/installment
-```
-
-These still work but are superseded by `/dng/qr` and `/dng/installment`. Response shape is the same but includes extra fields `dng_request_id` and `status`.
-
----
-
-**Important error case (both flows):**
+**Error case (tất cả payment flows):**
 
 ```json
 {
@@ -589,49 +632,22 @@ These still work but are superseded by `/dng/qr` and `/dng/installment`. Respons
 }
 ```
 
-Frontend handling:
+- Nếu `success === false` → không redirect, hiển thị `message` cho user.
+- Installment: xử lý riêng lỗi campus chưa hỗ trợ FoxPay.
 
-- If `success === false`, do not redirect. Show `message` directly to the user.
-- For installment flow, handle unsupported-campus (FoxPay not available) specifically.
-
-**UI:**
-
-```
-┌─────────────────────────────────────────┐
-│  Khoản phí đang chờ thanh toán          │
-│  Tổng: 40,620,000₫                     │
-│  (HP 40,500,000  PTL 100,000  KHAC 20k) │
-│                                         │
-│     [Thanh toán QR]   [Trả góp]         │
-│  ↑ gọi POST /dng/qr   ↑ POST /dng/installment
-└─────────────────────────────────────────┘
-```
-
-```
-┌─────────────────────────────────────────┐
-│ DNG-87654321              [PAID ✓]      │
-│ Lab Fee              2,000,000₫         │
-│ Paid: 22/03/2026                        │
-│ Invoice: 1/001;K23TF                   │
-└─────────────────────────────────────────┘
-```
+---
 
 **DNG status mapping:**
 
-- `pending`, `pushed_to_dng` → "Đang xử lý" (yellow) + show QR/installment actions
-- `paid_uninvoiced` → "Đã thanh toán" (green)
-- `paid_invoiced` → "Đã xuất hóa đơn" (green + invoice icon)
-- `reconciled` → "Hoàn tất" (gray)
-- `cancelled` → "Đã hủy" (gray) — do not show payment actions
-- `failed` → "Thất bại" (red)
-
-**Frontend action rules:**
-
-- Use `summary.total_pending` from `/dng-requests` to display total amount.
-- When user taps "Thanh toán QR" → call `POST /dng/qr`, redirect to `data.payment_url`.
-- When user taps "Trả góp" → call `POST /dng/installment`, redirect to `data.payment_url`.
-- Do not enumerate individual requests for payment — call the consolidated endpoints.
-- If a newer DNG request replaces an older unpaid request with the same `fee_type`, the older request appears as `cancelled`.
+| Status | Label | Color | Hành động |
+|---|---|---|---|
+| `pending` | Đang xử lý | yellow | Hiện nút QR / Trả góp |
+| `pushed_to_dng` | Đang xử lý | yellow | Hiện nút QR / Trả góp |
+| `paid_uninvoiced` | Đã thanh toán | green | — |
+| `paid_invoiced` | Đã xuất hóa đơn | green | Hiện số hóa đơn |
+| `reconciled` | Hoàn tất | gray | — |
+| `cancelled` | Đã hủy | gray | Ẩn nút thanh toán |
+| `failed` | Thất bại | red | — |
 
 ---
 
@@ -666,7 +682,10 @@ Dashboard (/overview)
   │     └── Tap row → Invoice Detail (/invoices/{id})
   ├── "Khoản phí" → Charges (/charges)
   │     └── Tap row → Charge Detail (/charges/{id})
-  └── "DNG Pending" card → DNG Requests (/dng-requests)
-        ├── "Thanh toán QR"  → POST /dng/qr        → redirect payment_url
-        └── "Trả góp"        → POST /dng/installment → redirect payment_url
+  └── "DNG Pending" card → chọn flow:
+        ├── Flow A — từng khoản: GET /dng-requests
+        │     └── Tap row → POST /dng-requests/{id}/qr hoặc /installment → redirect payment_url
+        └── Flow B — tất cả 1 lúc: GET /dng-requests/all
+              └── "Thanh toán QR" → POST /dng/qr → redirect payment_url
+              └── "Trả góp"       → POST /dng/installment → redirect payment_url
 ```
