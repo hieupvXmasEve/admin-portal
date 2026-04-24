@@ -20,11 +20,12 @@ class GenerateEgcChargesAction
     /**
      * Generate EGC charges for a list of students in a semester.
      *
-     * @param  array{semester_id: int, students: array<array{student_id: int, block_count: int}>}  $data
+     * @param  array{semester_id: int, due_date: string, students: array<array{student_id: int, block_count: int}>}  $data
      */
     public static function run(array $data): array
     {
         $semesterId = (int) $data['semester_id'];
+        $dueDate = $data['due_date'];
         $createdByUserId = auth()->id();
         $results = ['created' => 0, 'skipped' => 0, 'errors' => []];
 
@@ -65,8 +66,8 @@ class GenerateEgcChargesAction
             }
 
             try {
-                DB::transaction(function () use ($studentId, $semesterId, $blockCount, $effectiveStartLevel, $totalLevels, $existingChargeCount, $createdByUserId, &$results) {
-                    self::generateForStudent($studentId, $semesterId, $blockCount, $effectiveStartLevel, $totalLevels, $existingChargeCount, $createdByUserId, $results);
+                DB::transaction(function () use ($studentId, $semesterId, $dueDate, $blockCount, $effectiveStartLevel, $totalLevels, $existingChargeCount, $createdByUserId, &$results) {
+                    self::generateForStudent($studentId, $semesterId, $dueDate, $blockCount, $effectiveStartLevel, $totalLevels, $existingChargeCount, $createdByUserId, $results);
                 });
             } catch (\Exception $e) {
                 Log::error('GenerateEgcChargesAction failed', [
@@ -84,6 +85,7 @@ class GenerateEgcChargesAction
     private static function generateForStudent(
         int $studentId,
         int $semesterId,
+        string $dueDate,
         int $blockCount,
         int $currentLevel,
         int $totalLevels,
@@ -97,7 +99,7 @@ class GenerateEgcChargesAction
             ->get();
 
         foreach ($deferredBlocks as $block) {
-            $charge = self::createCharge($studentId, $semesterId, $block->level_number, $createdByUserId);
+            $charge = self::createCharge($studentId, $semesterId, $dueDate, $block->level_number, $createdByUserId);
             $block->update(['finance_charge_id' => $charge->id]);
             $results['created']++;
         }
@@ -133,7 +135,7 @@ class GenerateEgcChargesAction
             $isRetake = self::isRetakeEligible($studentId, $levelNumber);
 
             try {
-                $charge = self::createCharge($studentId, $semesterId, $levelNumber, $createdByUserId);
+                $charge = self::createCharge($studentId, $semesterId, $dueDate, $levelNumber, $createdByUserId);
 
                 EgcBlock::create([
                     'student_id' => $studentId,
@@ -204,6 +206,7 @@ class GenerateEgcChargesAction
     private static function createCharge(
         int $studentId,
         int $semesterId,
+        string $dueDate,
         int $levelNumber,
         ?int $createdByUserId
     ): FinanceCharge {
@@ -218,15 +221,20 @@ class GenerateEgcChargesAction
             'created_by_user_id' => $createdByUserId,
         ]);
 
-        // Assign charge to invoice (find draft or create new)
+        // Assign charge to invoice (find draft or create new), always sync due_date
         $invoice = StudentInvoice::firstOrCreate(
             ['student_id' => $studentId, 'semester_id' => $semesterId, 'billing_cycle_id' => null],
             [
                 'invoice_number' => 'EGC-'.$studentId.'-'.$semesterId.'-'.now()->format('mdHis').rand(100, 999),
                 'status' => 'draft',
-                'due_date' => now()->addDays(30),
+                'due_date' => $dueDate,
             ]
         );
+
+        // Keep due_date in sync even if invoice already existed
+        if (! $invoice->wasRecentlyCreated) {
+            $invoice->update(['due_date' => $dueDate]);
+        }
 
         InvoiceLine::updateOrCreate(
             ['invoice_id' => $invoice->id, 'charge_id' => $charge->id],

@@ -67,6 +67,7 @@ class EgcChargeGenerationController extends Controller
     {
         $validated = $request->validate([
             'semester_id' => 'required|integer|exists:semesters,id',
+            'due_date' => 'required|date',
             'search' => 'nullable|string|max:100',
             'ignore_student_ids' => 'nullable|string|max:10000',
             'students' => 'nullable|array',
@@ -108,6 +109,7 @@ class EgcChargeGenerationController extends Controller
 
         $results = GenerateEgcChargesAction::run([
             'semester_id' => (int) $validated['semester_id'],
+            'due_date' => $validated['due_date'],
             'students' => $students,
         ]);
 

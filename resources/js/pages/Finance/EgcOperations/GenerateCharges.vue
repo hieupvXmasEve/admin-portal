@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import DataPagination from '@/components/DataPagination.vue';
+import DatePicker from '@/components/ui/DatePicker.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
@@ -133,8 +135,11 @@ function handleIgnoreStudentIdsChange(value: string | number) {
     filters.page = 1;
 }
 
+const dueDate = ref('');
+
 const form = useForm({
     semester_id: '',
+    due_date: '',
     search: '',
     ignore_student_ids: '',
     students: [] as { student_id: number; block_count: number; current_level: number }[],
@@ -142,6 +147,7 @@ const form = useForm({
 
 function confirmGeneration() {
     form.semester_id = filters.semester_id;
+    form.due_date = dueDate.value;
     form.search = filters.search;
     form.ignore_student_ids = filters.ignore_student_ids;
     form.students = eligibleStudents.value.map((student) => ({
@@ -415,8 +421,13 @@ function rowNumber(index: number): number {
                 Không có EGC students theo điều kiện hiện tại.
             </div>
 
-            <div v-if="preview.summary.eligible_count > 0" class="flex justify-end">
-                <Button :disabled="form.processing" @click="confirmGeneration">
+            <div v-if="preview.summary.eligible_count > 0" class="flex items-end justify-end gap-4">
+                <div class="space-y-1.5">
+                    <Label class="text-sm font-medium">Hạn thanh toán <span class="text-red-500">*</span></Label>
+                    <DatePicker v-model="dueDate" placeholder="Chọn hạn thanh toán" class="w-52" />
+                    <p v-if="form.errors.due_date" class="text-destructive text-xs">{{ form.errors.due_date }}</p>
+                </div>
+                <Button :disabled="form.processing || !dueDate" @click="confirmGeneration">
                     <Play v-if="!form.processing" class="mr-2 h-4 w-4" />
                     <RefreshCw v-else class="mr-2 h-4 w-4 animate-spin" />
                     {{ form.processing ? 'Đang tạo...' : `Xác nhận tạo charge (${preview.summary.eligible_count} students)` }}
