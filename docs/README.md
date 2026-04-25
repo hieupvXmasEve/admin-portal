@@ -1,7 +1,11 @@
 # Docs Index
 
-Last updated: 2026-03-26
+Last updated: 2026-04-26
 Source of truth: `docs/`
+
+## AI Quick-Start
+
+- [AI Context (start here)](./ai-context.md) — task-to-rule mapping + top mistakes
 
 ## Core Baseline
 
@@ -16,27 +20,19 @@ Source of truth: `docs/`
 ## Engineering References
 
 - [DB Flow](./db-flow.md)
-- [useInertiaFilters Example](./EXAMPLE_useInertiaFilters.md)
 - [Vue Form + useApi Rules](./RULES_vue-form-useApi.md)
 - [Excel Export Service](./excel-export-service.md)
 - [Excel Memory Optimization](./excel-memory-optimization.md)
-- [Event Participation Service](./event-participation-service.md)
-- [Course Completion & EGC Progression](./COURSE_COMPLETION_AND_EGC_PROGRESSION.md)
 - Finance engineering: [Tuition Settlement Model v2](./features/finance/tuition-settlement-model-v2.md)
 
 ## Domain Documentation (Folders)
 
+- Rules: `docs/rules/` — see [Rules Index](./rules/README.md)
 - API docs: `docs/api/`
 - Notification docs: `docs/features/notification/`
 - Canvas docs: `docs/features/canvas/`
 - Upload docs: `docs/features/upload/`
 - Logging docs: `docs/features/logs/`
-- Rules docs: `docs/rules/`
-
-## Naming Consistency Notes
-
-- Some docs still use legacy uppercase file names (for example `COURSE_COMPLETION_AND_EGC_PROGRESSION.md`, `EXAMPLE_useInertiaFilters.md`, `RULES_vue-form-useApi.md`).
-- Prefer kebab-case for new docs; keep existing names stable unless a coordinated rename plan updates all links.
 
 ## Maintenance Rules
 
@@ -44,3 +40,4 @@ Source of truth: `docs/`
 - Update docs in the same change window as behavior/route/contract changes.
 - Keep unresolved decisions in an `Unresolved Questions` section.
 - Keep markdown docs concise and below 800 LOC when possible.
+- Prefer kebab-case for new doc filenames.

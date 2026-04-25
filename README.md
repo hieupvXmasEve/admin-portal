@@ -1,8 +1,8 @@
 # Swinx
 
-Swinx is a university operations platform built as a Laravel 12 + Vue 3 + Inertia monolith.
+Swinx is a university operations platform built as a Laravel 13 + Vue 3 + Inertia monolith.
 
-Last updated: 2026-02-25  
+Last updated: 2026-04-26  
 Owner: Platform Team  
 Status: Current-state baseline (code-verified)
 
@@ -16,7 +16,7 @@ Status: Current-state baseline (code-verified)
 
 ## Current Baseline (Code-Verified)
 
-- Backend: Laravel 12 hybrid monolith
+- Backend: Laravel 13 hybrid monolith
   - modular domains: `app/Modules/*`
   - shared legacy/business services: `app/Services/*`
 - Frontend: Vue 3 + TypeScript + Inertia (`resources/js/*`)

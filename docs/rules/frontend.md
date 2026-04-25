@@ -51,23 +51,61 @@ resources/js/
 - **With useForm**: Trigger in `onSuccess` / `onError` callbacks.
 - **Message**: Short, actionable messages.
 
-## 4. Filters & Pagination (useInertiaFilters)
+## 4. Filters & Pagination
 
-- **Composable**: Use `useInertiaFilters` for standardized filtering/pagination.
-- **Features**: Syncs with URL, preserves state on pagination, supports debouncing.
-- **Type Safety**: Always define an interface for your filters.
-- **Reference**: See `docs/rules/filtering.md` for detailed implementation patterns.
-- **Pattern**:
-    ```typescript
-    const { filters, ... } = useInertiaFilters<EntityFilters>({
-        baseUrl: route('admin.entities.index'),
-        initialFilters: { ... },
-        defaultValues: { ... },
-        only: ['items', 'filters'],
-    });
-    ```
+Use `useDataTable` for all list/index pages. It replaces both `useServerTableQuery` and `useInertiaFilters`.
 
-## 5. UI Logic
+### `useDataTable` — STANDARD (all list pages)
+
+- **When:** Any new list/index page, or refactoring an existing one
+- **Behavior:** Explicit control — debounced navigation via `setFilter()`, immediate via `apply()`
+- **Features:** Built-in validation, dependent filters, per-field debounce, performance metrics
+- **Reference:** `docs/useDataTable-examples.md`
+
+```typescript
+import { useDataTable } from '@/composables/useDataTable';
+
+const {
+    state, setFilter, apply, setPage, setPerPage, setSort,
+    clearAllFilters, hasActiveFilters, isLoading,
+    currentPage, totalPages, isFirstPage, isLastPage,
+} = useDataTable<Filters>({
+    baseUrl: route('admin.entities.index'),
+    initialFilters: { search: props.filters?.search ?? '', status: props.filters?.status ?? '' },
+    defaultValues: { status: '', per_page: 15 },
+    only: ['items', 'filters'],
+    debounce: 300,
+});
+```
+
+### Legacy composables — DO NOT USE on new pages
+
+| Composable | Status | Action |
+|---|---|---|
+| `useInertiaFilters` | LEGACY — 26 pages | Bug fix in-place only. Migrate on refactor. |
+| `useServerTableQuery` | LEGACY — 9 pages | Bug fix in-place only. Migrate on refactor. |
+
+See `docs/useDataTable-examples.md` for full usage patterns including validation, dependent filters, and migration guide.
+
+## 5. Form Patterns
+
+Two patterns exist. The choice depends on **whether the form navigates**:
+
+| Form type | Composable | When |
+|---|---|---|
+| Inertia page form (navigates) | `useForm` from `@inertiajs/vue3` | Full-page create/edit/login forms |
+| Modal/drawer form (no navigation) | `vee-validate` + `zod` + `useApi` | Inline create/edit dialogs, drawers |
+
+**Never mix these.** Do not use `vee-validate` on Inertia page forms. Do not use Inertia `useForm` in modals.
+
+## 6. Page Folder Naming
+
+- **New page directories:** Must be `PascalCase` — `resources/js/pages/Finance/`, `resources/js/pages/Rooms/`
+- **Existing legacy dirs:** `kebab-case` (`rooms/`, `curriculum-versions/`) and `lowercase` (`auth/`) are allowed to remain — rename during refactor only
+
+## 7. UI Logic
 
 - **No Business Logic**: Frontend only displays state provided by Backend.
 - **Inertia**: Do not call APIs directly from Pages; receive data via Props.
+- **API calls**: Use `useApi` or `useApiRequest` composables — never raw `axios`.
+- **Routes**: Always use `route('name')` or `systemRoutes.x.y()` — never literal URL strings.

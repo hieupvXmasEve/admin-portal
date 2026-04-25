@@ -1,5 +1,8 @@
 # Cross-Layer Thinking Guide
 
+> **Canonical rules:** `docs/rules/` is the source of truth for coding standards.
+> This file supplements the Trellis workflow context only. When in doubt, defer to `docs/rules/`.
+
 > **Purpose**: Think through data flow across layers before implementing.
 
 ---

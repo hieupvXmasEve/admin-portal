@@ -2,164 +2,219 @@
 paths: '**/*.{php,vue,js,ts}'
 ---
 
-# useInertiaFilters + Laravel Rules
+# useDataTable + Laravel Rules
 
-This guide standardizes how list pages use the `useInertiaFilters` composable together with Laravel controllers. Follow it whenever you implement or update a paginated index that needs filters, sorting, and pagination. Reference examples in `docs/EXAMPLE_useInertiaFilters.md`, `resources/js/pages/rooms/Index.vue`, and `app/Http/Controllers/Web/RoomController.php`.
+This guide standardizes how list pages use the `useDataTable` composable together with Laravel controllers. Follow it whenever you implement or update a paginated index that needs filters, sorting, and pagination.
+
+> **Reference:** `docs/useDataTable-examples.md` for full composable usage, validation, and dependent filter patterns.
+>
+> **Legacy:** `useInertiaFilters` (26 pages) and `useServerTableQuery` (9 pages) are frozen — bug fix in-place only, migrate to `useDataTable` when refactoring.
 
 ## 1. Decide the Contract First
 
-- **Inventory the filters** (search text, selects, booleans, numeric ranges, sort, pagination) and write a TypeScript interface that includes them all.
-- **Define defaults** for every field that should not pollute the query string (e.g., `status: 'all'`, `per_page: 15`, `direction: 'asc'`).
-- **Name consistency matters**: use the same filter keys everywhere (Vue props, composable, Laravel validation, query builder, and response payload).
+- **Inventory the filters** (search text, selects, booleans, date ranges, sort, pagination) and write a TypeScript interface that includes them all.
+- **Define defaults** for every field that should not pollute the query string (e.g., `status: ''`, `per_page: 15`).
+- **Name consistency matters**: use the same filter keys everywhere — TypeScript interface, composable `initialFilters`, Laravel validation, query builder, and Inertia response payload.
 
-## 2. Frontend Pattern (Vue + Inertia)
+## 2. Frontend Pattern (Vue + useDataTable)
 
-1. **Props + interface**
+### 1. Props + interface
 
-    ```ts
-    interface RoomFilters {
-        search: string;
-        type: string;
-        status: string;
-        building_id: string;
-        floor: string;
-        min_capacity: string;
-        max_capacity: string;
-        sort: string | null;
-        direction: 'asc' | 'desc' | null;
-        per_page: number;
-    }
+```ts
+interface StudentFilters {
+    search: string;
+    status: string;
+    campus_id: string;
+    sort: string | null;
+    direction: 'asc' | 'desc' | null;
+    per_page: number;
+}
 
-    const props = defineProps<{
-        rooms: PaginatedResponse<Room>;
-        filters?: Partial<RoomFilters>;
-    }>();
-    ```
+const props = defineProps<{
+    students: PaginatedResponse<Student>;
+    filters?: Partial<StudentFilters>;
+    campuses: Campus[];
+}>();
+```
 
-2. **Initialize `useInertiaFilters`**
+### 2. Initialize `useDataTable`
 
-    ```ts
-    const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilter, handleSortChange, handlePaginationNavigate, handlePageSizeChange } = useInertiaFilters<RoomFilters>({
-        baseUrl: systemRoutes.rooms.index(),
-        initialFilters: {
-            search: props.filters?.search || '',
-            type: props.filters?.type || 'all',
-            // ...
-            min_capacity: props.filters?.min_capacity?.toString() || '',
-            sort: props.filters?.sort || null,
-            direction: (props.filters?.direction as 'asc' | 'desc') || null,
-            per_page: props.filters?.per_page || 15,
-        },
-        defaultValues: {
-            type: 'all',
-            status: 'all',
-            building_id: 'all',
-            floor: 'all',
-            per_page: 15,
-            direction: 'asc',
-        },
-        only: ['rooms', 'filters'],
-        debounce: 400,
-        transform: (filters) => ({
-            ...filters,
-            min_capacity: filters.min_capacity ? Number(filters.min_capacity) : undefined,
-            max_capacity: filters.max_capacity ? Number(filters.max_capacity) : undefined,
-        }),
-    });
-    ```
+```ts
+import { useDataTable } from '@/composables/useDataTable';
 
-    - Always return strings for select inputs and convert them inside `transform`.
-    - Use `defaultValues` for anything that should disappear from the URL when unchanged.
+const {
+    state, setFilter, apply, setPage, setPerPage, setSort, clearAllFilters,
+    hasActiveFilters, isLoading, currentPage, totalPages, isFirstPage, isLastPage,
+} = useDataTable<StudentFilters>({
+    baseUrl: route('academic.students.index'),
+    initialFilters: {
+        search:    props.filters?.search    ?? '',
+        status:    props.filters?.status    ?? '',
+        campus_id: props.filters?.campus_id ?? '',
+        sort:      props.filters?.sort      ?? null,
+        direction: props.filters?.direction ?? null,
+        per_page:  props.filters?.per_page  ?? 15,
+    },
+    defaultValues: {
+        status:    '',
+        campus_id: '',
+        per_page:  15,
+        direction: null,
+    },
+    only: ['students', 'filters'],
+    debounce: 300,
+    // Per-field overrides (optional)
+    fieldDebounce: { search: 400 },
+    immediateFields: ['status', 'campus_id'],
+});
+```
 
-3. **Bind UI components**
+- Use `defaultValues` for anything that should disappear from the URL when unchanged.
+- Use `fieldDebounce` to give text inputs a longer delay than select inputs.
+- Use `immediateFields` for selects/checkboxes that should navigate instantly.
 
-    - `DebouncedInput`: `:model-value="filters.search"` + `@update:model-value="handleSearch"`.
-    - Shadcn Selects: bind `v-model` to `filters.field` and call `handleSelectFilter('field', value)` when you need the "All" semantics.
-    - `DataTable`: pass `:initial-sort="filters.sort"` and `@sort-change="handleSortChange"`.
-    - `DataPagination`: pass the paginated response and hook `@navigate` + `@page-size-change` to the composable handlers.
-    - When numeric inputs should not sync on every keystroke, copy the `rooms/Index.vue` pattern: keep the values in `filters`, but debounce manual updates with `useDebounceFn`.
+### 3. Bind UI components
 
-4. **Clearing filters**
+- **Text search:** `@update:model-value="setFilter('search', $event)"`
+- **Select filters:** `@update:model-value="setFilter('status', $event)"`
+- **Sort:** `setSort(field, direction)` — toggles asc/desc
+- **Pagination:** `setPage(n)`, `setPerPage(n)`
+- **Clear:** show button when `hasActiveFilters`, call `clearAllFilters()`
+- **Loading state:** `:disabled="isLoading"` on inputs; show spinner when `isLoading`
 
-    - Show a clear button only when `hasActiveFilters` is true.
-    - `clearFilters()` resets to `defaultValues` (or `emptyFilters` if you provide one) and triggers a navigation.
+### 4. Apply button pattern (manual mode)
 
-5. **Manual mode**
-    - Set `autoSync: false` if you need an explicit Apply button. Use `applyFilters()` from the composable when the user submits.
+For pages with an explicit "Apply" button, call `apply()` instead of relying on debounced `setFilter`:
+
+```ts
+// Collect filter changes in local state, then:
+const handleApply = () => {
+    apply({ search: localSearch.value, status: localStatus.value });
+};
+```
+
+### 5. Validation (optional)
+
+```ts
+const { addValidationRule } = useDataTable({ ... });
+
+addValidationRule('search', {
+    validate: (value) => value && value.length < 2 ? 'Minimum 2 characters' : null,
+    message: 'Search too short',
+});
+```
+
+### 6. Dependent filters (optional)
+
+```ts
+const { addDependency } = useDataTable({ ... });
+
+addDependency('program_id', {
+    dependsOn: ['campus_id'],
+    resolve: async ([campusId]) => {
+        if (!campusId) return null;
+        const res = await fetch(`/api/campuses/${campusId}/programs`);
+        const data = await res.json();
+        return data[0]?.id ?? null;
+    },
+});
+```
 
 ## 3. Backend Pattern (Laravel Controller)
 
-1. **Validate the request**
+### 1. Validate the request
 
-    ```php
-    $validated = $request->validate([
-        'search' => 'nullable|string|max:255',
-        'type' => 'nullable|string|in:' . implode(',', Room::getTypes()),
-        // ...other filters
-        'min_capacity' => 'nullable|integer|min:1',
-        'max_capacity' => 'nullable|integer|min:1',
-        'sort' => 'nullable|string|in:name,building_id,type,capacity,status,created_at',
-        'direction' => 'nullable|string|in:asc,desc',
-        'per_page' => 'nullable|integer|min:5|max:100',
-    ]);
-    ```
+```php
+$validated = $request->validate([
+    'search'    => 'nullable|string|max:255',
+    'status'    => 'nullable|string|in:active,inactive,graduated',
+    'campus_id' => 'nullable|integer|exists:campuses,id',
+    'sort'      => 'nullable|string|in:name,student_code,status,created_at',
+    'direction' => 'nullable|string|in:asc,desc',
+    'per_page'  => 'nullable|integer|min:5|max:100',
+]);
+```
 
-    - Keep validation keys in lock-step with the TS interface.
-    - Guard sort columns and per-page ranges so malicious values never reach the query.
+- Keep validation keys in lock-step with the TypeScript interface.
+- Guard sort columns and per-page ranges so malicious values never reach the query.
 
-2. **Build the query incrementally**
+### 2. Build the query incrementally
 
-    - Start from a scoped base query (`Room::query()->forCampus(...)`).
-    - Apply each filter only when the validated value exists. The `rooms` controller demonstrates handling search, enums, foreign keys, booleans, numeric ranges, and sort direction safely.
-    - Always add deterministic fallbacks, e.g., `orderBy('created_at', 'desc')` after custom sorts.
+```php
+$query = Student::query()->forCampus($campusId);
 
-3. **Return filters back to Inertia**
+if (!empty($validated['search'])) {
+    $query->where(fn($q) => $q
+        ->where('full_name', 'like', "%{$validated['search']}%")
+        ->orWhere('student_code', 'like', "%{$validated['search']}%")
+    );
+}
 
-    ```php
-    return Inertia::render('rooms/Index', [
-        'rooms' => $rooms,
-        'filters' => [
-            'search' => $validated['search'] ?? null,
-            'type' => $validated['type'] ?? null,
-            // ...
-            'min_capacity' => $validated['min_capacity'] ?? null,
-            'max_capacity' => $validated['max_capacity'] ?? null,
-            'sort' => $validated['sort'] ?? null,
-            'direction' => $validated['direction'] ?? null,
-            'per_page' => $validated['per_page'] ?? null,
-        ],
-        // ...
-    ]);
-    ```
+if (!empty($validated['status'])) {
+    $query->where('status', $validated['status']);
+}
 
-    - Use `null` values so Vue can reapply fallback defaults without polluting URLs.
-    - If you compute extra filter metadata (options for selects, counts, etc.), pass them next to the list data like `room_types`, `buildings`, and `statistics`.
+if (!empty($validated['campus_id'])) {
+    $query->where('campus_id', $validated['campus_id']);
+}
 
-4. **Paginate with `withQueryString()`**
-    - Inertia pagination expects the backend paginator to keep the same query params when navigating.
-    - Enforce integer per-page values from the validated payload.
+$sortColumn    = $validated['sort']      ?? 'created_at';
+$sortDirection = $validated['direction'] ?? 'desc';
+$query->orderBy($sortColumn, $sortDirection)->orderBy('id', 'desc');
+
+$perPage  = $validated['per_page'] ?? 15;
+$students = $query->paginate($perPage)->withQueryString();
+```
+
+- Start from a scoped base query.
+- Apply each filter only when the validated value is present.
+- Always add a deterministic tiebreaker (`orderBy('id', 'desc')`).
+
+### 3. Return filters back to Inertia
+
+```php
+return Inertia::render('Academic/Students/Index', [
+    'students' => StudentResource::collection($students),
+    'filters'  => [
+        'search'    => $validated['search']    ?? null,
+        'status'    => $validated['status']    ?? null,
+        'campus_id' => $validated['campus_id'] ?? null,
+        'sort'      => $validated['sort']      ?? null,
+        'direction' => $validated['direction'] ?? null,
+        'per_page'  => $validated['per_page']  ?? null,
+    ],
+    'campuses' => CampusResource::collection(Campus::all()),
+]);
+```
+
+- Use `null` values so Vue can reapply fallback defaults without polluting URLs.
+- Pass supporting lookup data (select options, counts) alongside the list.
+
+### 4. Paginate with `withQueryString()`
+
+Always chain `->withQueryString()` on the paginator so page links preserve the current filter state.
 
 ## 4. Implementation Checklist
 
-1. **Controller**
-    - Add validation rules for every filter key.
-    - Update the query builder with conditional clauses.
-    - Return the `filters` object plus any supporting lookup data.
-2. **Vue Page**
-    - Declare the TypeScript interface and props.
-    - Pass normalized values to `useInertiaFilters` with `defaultValues`, `only`, and `debounce`.
-    - Wire UI components to the composable handlers.
-    - Use `transform` for any field that must arrive as number/boolean on the server.
-3. **Testing**
-    - Manually verify query strings drop default values (e.g., no `?status=all`).
-    - Trigger search, select filters, sorting, pagination, and ensure the backend receives the converted types.
+**Controller**
+- [ ] Validate every filter key (type, enum values, integer ranges for sort/per_page)
+- [ ] Apply filters conditionally — skip when value is null/empty
+- [ ] Return `filters` object + any supporting lookup data
+- [ ] Chain `withQueryString()` on paginator
+
+**Vue Page**
+- [ ] Declare TypeScript interface for filters
+- [ ] Pass normalized values to `useDataTable` with `defaultValues`, `only`, `debounce`
+- [ ] Wire UI components to `setFilter`, `setSort`, `setPage`, `setPerPage`, `clearAllFilters`
+- [ ] Disable inputs and show loading state via `isLoading`
+- [ ] Show clear button only when `hasActiveFilters`
 
 ## 5. Tips & Gotchas
 
-- Prefer storing select defaults as `'all'` in the UI and convert them to `null`/`undefined` inside `transform` so the controller receives `null`.
-- When adding checkbox filters (booleans) use `filters.is_bookable = value` and let Laravel validation handle `nullable|boolean`.
-- Keep `only` scoped to the resources and filters that actually change to reduce payload sizes (e.g., `['rooms', 'filters']`).
-- If two filters are related (min/max), debounce manual assignments to avoid extra visits (`rooms/Index.vue` shows this with capacity).
-- Reuse helper functions (routes, schema options) so option lists in Vue stay in sync with backend enums.
+- Default select values as `''` (empty string) in `defaultValues` so they disappear from the URL — not `'all'`.
+- Use `immediateFields` for selects/checkboxes; text search should always be debounced (300–500ms).
+- Keep `only` scoped to the resources and filters that actually change to reduce payload size.
+- For numeric inputs (min/max capacity) that shouldn't fire on every keystroke, combine `fieldDebounce` with a longer delay.
+- `clearAllFilters()` resets all filters to empty/null and triggers navigation immediately.
 
-Following these rules ensures every new index page behaves the same way, keeps URLs tidy, and stays in sync with Laravel validation and query logic.
+Following these rules ensures every new index page behaves consistently, keeps URLs tidy, and stays in sync with Laravel validation and query logic.

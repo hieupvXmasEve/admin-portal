@@ -2,48 +2,40 @@
 
 Guidance for Claude Code when working in this repository.
 
+> **For other AI tools** (OpenCode, Devin, Codex, Cursor): see `AGENTS.md`.
+
 ## Purpose
 
-This file is a short operating guide. Keep detailed architecture, standards, and feature contracts in `docs/`; do not duplicate long framework manuals here.
+Short operating guide. Full rules live in `docs/rules/`. Full architecture lives in `docs/system-architecture.md`. Do not duplicate long framework manuals here.
 
 ## Project Context
 
-- Product: Swinx university operations platform.
-- Backend: Laravel 12 monolith, PHP 8.4, MySQL 8, Redis, FrankenPHP.
-- Frontend: Vue 3, TypeScript, Inertia v2, Tailwind CSS 4.
-- Architecture: hybrid modular monolith.
-  - Prefer new business logic in `app/Modules/{Domain}`.
+- **Product:** Swinx — university operations platform.
+- **Backend:** Laravel 12 monolith, PHP 8.4, MySQL 8, Redis, FrankenPHP.
+- **Frontend:** Vue 3, TypeScript, Inertia v2, Tailwind CSS 4.
+- **Architecture:** Hybrid modular monolith.
+  - New business logic → `app/Modules/{Domain}/`.
   - Extend `app/Services/*` only when modifying existing service-led areas.
-- Auth baseline: Sanctum + actor middleware for student/parent/lecturer API surfaces.
-- Local runtime: Docker-first. Prefer `./scripts/dev.sh ...` wrappers.
+- **Auth:** Sanctum + actor middleware for student/parent/lecturer API surfaces.
+- **Runtime:** Docker-first. Always use `./scripts/dev.sh ...` wrappers.
 
-## Source Of Truth
+## Source of Truth
 
 Read these before planning meaningful changes:
 
-- `README.md` - current baseline, commands, operational risks.
-- `docs/code-standards.md` - implementation rules and quality gates.
-- `docs/system-architecture.md` - architecture and module boundaries.
-- `docs/project-overview-pdr.md` - product and domain baseline.
-- `docs/codebase-summary.md` - current codebase snapshot.
-- `docs/design-guidelines.md` - UI and frontend standards.
+- `docs/ai-context.md` — quick-start map: what to read per task type (START HERE)
+- `README.md` — current baseline, entry points, operational risks
+- `docs/code-standards.md` — implementation rules and quality gates
+- `docs/system-architecture.md` — architecture and module boundaries
+- `docs/project-overview-pdr.md` — product and domain baseline
+- `docs/codebase-summary.md` — current codebase snapshot
+- `docs/design-guidelines.md` — UI and frontend standards
 
-Use focused docs under `docs/rules/`, `docs/api/`, and feature folders when the task touches those areas.
-
-## Working Rules
-
-- Inspect existing code and docs before asking for context.
-- Keep changes scoped to the user request.
-- Do not invent database fields, relationships, route names, permissions, props, or API contracts. Verify them in code/schema/docs.
-- Follow YAGNI, KISS, DRY.
-- Update existing files directly. Do not create duplicate "enhanced" files.
-- Preserve user changes in the worktree. Do not revert unrelated edits.
-- Prefer small, reviewable changes over broad rewrites.
-- Keep reports concise. Put unresolved questions at the end.
+Use `docs/rules/` for task-specific rules (see `docs/rules/README.md` for index).
 
 ## Commands
 
-Use Docker wrappers unless there is a documented reason not to:
+Use Docker wrappers — do not assume host binaries exist:
 
 ```bash
 ./scripts/dev.sh start
@@ -55,7 +47,7 @@ Use Docker wrappers unless there is a documented reason not to:
 ./scripts/dev.sh test
 ```
 
-Common checks:
+Quality checks:
 
 ```bash
 ./scripts/dev.sh test
@@ -65,41 +57,104 @@ Common checks:
 ./scripts/dev.sh artisan pint
 ```
 
-If a check cannot be run, state that clearly in the final summary.
+## Architecture Rules
+
+Full details in `docs/rules/architecture.md` and `docs/rules/contracts.md`.
+
+### Module structure (backend)
+
+```
+app/Modules/{Domain}/
+ ├─ Actions/        # Business logic — one file per use-case
+ ├─ Queries/        # Read-only logic — complex joins/reports
+ ├─ Http/
+ │   ├─ Web/Admin/  # Inertia controllers
+ │   ├─ Api/        # JSON API controllers
+ │   └─ Requests/   # FormRequest validation per domain
+ ├─ Policies/
+ └─ routes/
+```
+
+### Cross-module communication
+
+- Module A needing data from Module B → **must use a Contract** in `app/Shared/Contracts/{Domain}/`.
+- Never use Eloquent `join` across module boundaries.
+- Contracts must not accept or return Eloquent Models — use DTOs.
+
+## Naming Conventions
+
+Full details in `docs/rules/naming.md`.
+
+| Type | Format | Example |
+|---|---|---|
+| Module | PascalCase singular | `Academic`, `Finance` |
+| Action | `VerbEntityAction` with `static run(array $data)` | `CreateEventAction` |
+| Query | `VerbEntityContextQuery` with `handle(...$args)` | `ListAcademicRecordsQuery` |
+| Controller (Web) | `Http/Web/Admin/{Entity}Controller` | — |
+| Controller (API) | `Http/Api/Student/{Entity}Controller` | — |
+| Contract | `{Noun}{Verb}{Purpose}` | `StudentAcademicReader` |
+| Vue component | PascalCase | `RecordTable.vue` |
+| Composable | `useXxx.ts` | `useInertiaFilters.ts` |
+| DB table/column | snake_case | `course_offerings` |
+| Route name | dot notation | `academic.records.index` |
 
 ## Backend Guidelines
 
-- Controllers orchestrate only: validate, authorize, call action/query/service, return response.
-- Use FormRequest for request validation.
-- Use transactions for multi-write flows.
-- Keep campus scoping explicit where data is campus-bound.
-- Prefer Eloquent models/relationships; avoid raw queries unless justified by complexity.
-- For APIs, follow the existing route group/auth style in that module unless the task explicitly migrates it.
-- For new module logic, prefer `Actions/` for use cases and `Queries/` for complex reads.
+Full details in `docs/rules/backend.md` and `docs/rules/pattern.md`.
+
+- Controllers orchestrate only: validate → call Action/Query → return response.
+- New business logic → `Actions/` (not `Services/`).
+- Use FormRequest for validation; never validate inline in controllers.
+- Use `DB::transaction()` for multi-write flows.
+- All API responses → `ApiResponse::success()` / `ApiResponse::error()`. Never `response()->json()` directly.
+- Campus scoping must be explicit where data is campus-bound.
 
 ## Frontend Guidelines
 
-- Use `<script setup lang="ts">`.
-- Prefer existing shared components and composables in `resources/js/components` and `resources/js/composables`.
-- Use Inertia props/forms for page workflows.
-- Use JSON API composables only for modal, drawer, inline, or non-navigating interactions that already follow that pattern.
-- Prefer `route(...)` helpers and typed route constants over literal paths.
-- Use `lucide-vue-next` icons and existing UI primitives.
-- For server-driven tables/filters, follow the established shared table/filter patterns documented in `docs/code-standards.md`.
+Full details in `docs/rules/frontend.md`, `docs/rules/filtering.md`, `docs/rules/api-interaction.md`.
+
+- Use `<script setup lang="ts">` for all new components.
+- Inertia page forms → `useForm` from `@inertiajs/vue3`.
+- Modal/drawer non-navigating forms → vee-validate + Zod + `useApi`/`useApiRequest`.
+- Filter/pagination pages → `useDataTable` composable (see `docs/rules/filtering.md` and `docs/useDataTable-examples.md`).
+- Use `route(...)` helpers over literal URL paths.
+- Use `lucide-vue-next` icons and existing `@/components/ui` primitives.
+
+## Forbidden Patterns
+
+These are the top mistakes that break architecture or produce bugs:
+
+| What | Wrong | Correct |
+|---|---|---|
+| New business logic | `app/Services/NewFeature.php` | `app/Modules/{Domain}/Actions/VerbEntityAction.php` |
+| Inertia page forms | vee-validate + Zod | `useForm` from `@inertiajs/vue3` |
+| Filter/pagination pages | `useInertiaFilters` or `useServerTableQuery` | `useDataTable` from `@/composables/useDataTable` |
+| API response | `response()->json([...])` | `ApiResponse::success($data)` |
+| Cross-module data | Direct Eloquent query on another module's table | Contract in `app/Shared/Contracts/` |
+| New finance writes | `payment_allocations` table | `payment_applications` table |
+| Run artisan directly | `php artisan migrate` | `./scripts/dev.sh artisan migrate` |
+| Literal URL in frontend | `router.visit('/academic/records')` | `route('academic.records.index')` |
+| Invent schema fields | Guess column/relation names | Verify in migration files or existing model |
+
+## Security & Authorization
+
+Full details in `docs/rules/security.md`.
+
+- Route with no `{id}` → Gate check.
+- Route with `{id}` → Policy check (`$this->authorize('action', $model)`).
+- Never call `Gate::allows()` directly inside controllers for resource actions.
 
 ## Documentation
 
-Update docs in the same change window when behavior, routes, contracts, auth, deployment, or architecture changes.
+Update docs in the same change window when behavior, routes, contracts, auth, or architecture changes.
 
-Core docs should stay evidence-first and include unresolved questions when decisions remain open.
-
-For documentation-only edits like this file, application tests are not required; do a Markdown/readability sanity check instead.
+For documentation-only edits, application tests are not required; do a Markdown/readability check instead.
 
 ## Done Criteria
 
 Before final response, verify the relevant scope:
 
-- Code compiles or the appropriate targeted checks were run.
-- Tests were run for behavior changes, or the testing gap is explicit.
-- Docs were updated when contracts or behavior changed.
-- Final answer summarizes changed files, validation, and unresolved questions if any.
+- [ ] Code compiles or targeted checks were run (state clearly if checks could not run)
+- [ ] Tests were run for behavior changes, or the gap is explicit
+- [ ] Docs updated when contracts, routes, or architecture changed
+- [ ] Final answer summarizes changed files, validation result, and unresolved questions

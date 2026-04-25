@@ -56,10 +56,11 @@ case "${1:-}" in
         ;;
     artisan) shift; dc exec app php artisan "$@" ;;
     composer) shift; dc exec app composer "$@" ;;
-    npm) shift; dc exec app npm "$@" ;;
+    npm) shift; dc exec app pnpm "$@" ;;
+    pnpm) shift; dc exec app pnpm "$@" ;;
     test) shift; dc exec app php artisan test "$@" ;;
     *)
-        echo "Usage: $0 {start|stop|restart|rebuild|logs|status|shell|mysql|artisan|composer|npm|test}"
+        echo "Usage: $0 {start|stop|restart|rebuild|logs|status|shell|mysql|artisan|composer|npm|pnpm|test}"
         exit 1
         ;;
 esac

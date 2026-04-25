@@ -10,10 +10,13 @@ RUN apt-get update && apt-get install -y \
     curl \
     default-mysql-client \
     git \
-    npm \
     unzip \
     zip \
-    && rm -rf /var/lib/apt/lists/*
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/* \
+    && corepack enable \
+    && corepack prepare pnpm@latest --activate
 
 RUN install-php-extensions \
     bcmath \
@@ -33,7 +36,7 @@ WORKDIR /app
 COPY . .
 RUN composer install --no-interaction --prefer-dist --no-scripts
 
-RUN npm ci
+RUN pnpm install --frozen-lockfile
 
 RUN cp "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini" \
     && mkdir -p /app/storage /app/bootstrap/cache \

@@ -1,63 +1,93 @@
 # AGENTS.md
 
-This file provides guidance to OpenCode when working with code in this repository.
+Guidance for all AI coding agents (OpenCode, Devin, Codex, Cursor, and others) when working in this repository.
 
-## Project Overview
+> **Note for Claude Code users**: see `CLAUDE.md` for the same baseline in Claude's native format.
 
-**Name:** claudekit-engineer
-**Type:** Node.js/TypeScript
-**Description:** A comprehensive boilerplate template for building professional software projects with **CLI Coding Agents** (**Claude Code** and **Open Code**). This template provides a complete development environment with AI-powered agent orchestration, automated workflows, and intelligent project management.
+## Project
 
-## Role & Responsibilities
+**Name:** Swinx
+**Type:** Laravel 12 monolith + Vue 3 SPA (PHP 8.4, MySQL 8, Redis, FrankenPHP)
+**Product:** University operations platform — web admin/staff app + student/lecturer API surfaces.
+**Architecture:** Hybrid modular monolith. New business logic in `app/Modules/{Domain}`. Shared legacy services in `app/Services/*`.
 
-Your role is to analyze user requirements, delegate tasks to appropriate sub-agents, and ensure cohesive delivery of features that meet specifications and architectural standards.
+## Source of Truth
 
-## Workflows
+Read these before planning any change:
 
-- Primary workflow: `./.claude/rules/primary-workflow.md`
-- Development rules: `./.claude/rules/development-rules.md`
-- Orchestration protocols: `./.claude/rules/orchestration-protocol.md`
-- Documentation management: `./.claude/rules/documentation-management.md`
-- And other workflows: `./.claude/rules/*`
+- `docs/ai-context.md` — quick-start: what to read, what not to do (START HERE)
+- `README.md` — current baseline, entry points, operational risks
+- `docs/code-standards.md` — implementation rules and quality gates
+- `docs/system-architecture.md` — architecture and module boundaries
+- `docs/project-overview-pdr.md` — product and domain baseline
+- `docs/codebase-summary.md` — current codebase snapshot
+- `docs/design-guidelines.md` — UI and frontend standards
 
-**IMPORTANT:** Analyze the skills catalog and activate the skills that are needed for the task during the process.
-**IMPORTANT:** DO NOT modify skills in `~/.claude/skills` directory directly. **MUST** modify skills in this current working directory. Unless you are asked to do so.
-**IMPORTANT:** You must follow strictly the development rules in `./.claude/rules/development-rules.md` file.
-**IMPORTANT:** Before you plan or proceed any implementation, always read the `./README.md` file first to get context.
-**IMPORTANT:** This project runs local commands in Docker. Prefer `./scripts/dev.sh ...` wrappers for tests, artisan, composer, and npm instead of assuming host binaries exist.
-**IMPORTANT:** Sacrifice grammar for the sake of concision when writing reports.
-**IMPORTANT:** In reports, list any unresolved questions at the end, if any.
+For task-specific rules, use `docs/rules/` (see `docs/rules/README.md` for index).
+
+## Commands
+
+Project runs inside Docker. Always use the wrapper scripts:
+
+```bash
+./scripts/dev.sh start
+./scripts/dev.sh artisan <command>
+./scripts/dev.sh composer <command>
+./scripts/dev.sh npm <command>
+./scripts/dev.sh test
+```
+
+Quality checks:
+
+```bash
+./scripts/dev.sh test
+./scripts/dev.sh npm run type-check
+./scripts/dev.sh npm run lint
+./scripts/dev.sh npm run format:check
+./scripts/dev.sh artisan pint
+```
+
+## Backend Rules (summary — full rules in `docs/rules/backend.md`)
+
+- Controllers orchestrate only: validate → call Action/Query → return response.
+- New business logic → `app/Modules/{Domain}/Actions/` (not `app/Services/`).
+- Use FormRequest for validation. Use `DB::transaction()` for multi-write flows.
+- Cross-module communication → Contract in `app/Shared/Contracts/{Domain}/` (never direct Eloquent joins).
+- All API responses → `ApiResponse::success()` / `ApiResponse::error()` (never `response()->json()` directly).
+
+## Frontend Rules (summary — full rules in `docs/rules/frontend.md`)
+
+- Use `<script setup lang="ts">` for all new components.
+- Inertia page forms → `useForm` from Inertia (not vee-validate+Zod).
+- Modal/drawer non-navigating forms → vee-validate + Zod + `useApi`.
+- Filter/pagination pages → `useDataTable` composable (see `docs/rules/filtering.md` and `docs/useDataTable-examples.md`).
+- Use `route(...)` helpers over literal URL paths.
+- Use `lucide-vue-next` icons and existing `@/components/ui` primitives.
+
+## Forbidden Patterns
+
+These are the top mistakes AI tools make in this codebase:
+
+| Pattern | Wrong | Correct |
+|---|---|---|
+| Business logic location | `app/Services/NewFeatureService.php` | `app/Modules/{Domain}/Actions/VerbEntityAction.php` |
+| Form validation (pages) | vee-validate + Zod on Inertia pages | `useForm` from `@inertiajs/vue3` |
+| Filter/pagination pages | `useInertiaFilters` or `useServerTableQuery` | `useDataTable` from `@/composables/useDataTable` |
+| API response | `return response()->json([...])` | `return ApiResponse::success($data)` |
+| Cross-module data | `AcademicRecord::where(...)` inside Finance | Contract: `$reader->getStudentGpa($id)` |
+| Run artisan | `php artisan migrate` | `./scripts/dev.sh artisan migrate` |
 
 ## Development Principles
 
-- **YAGNI**: You Aren't Gonna Need It - avoid over-engineering
-- **KISS**: Keep It Simple, Stupid - prefer simple solutions
-- **DRY**: Don't Repeat Yourself - eliminate code duplication
+- **YAGNI** — don't build what is not asked
+- **KISS** — prefer simple solutions
+- **DRY** — no duplicate logic
 
-## Documentation
+## Done Criteria
 
-Keep all important docs in `./docs` folder:
+Before final response:
 
-```
-./docs
-├── project-overview-pdr.md
-├── code-standards.md
-├── codebase-summary.md
-├── design-guidelines.md
-└── system-architecture.md
-```
-
-## External Files
-
-Reference external instruction files in `opencode.json`:
-
-```json
-{
-  "instructions": ["docs/*.md", ".opencode/agents/*.md"]
-}
-```
-
----
-
-*Generated by ClaudeKit OpenCode Generator*
-*Date: 2026-03-16*
+- [ ] Code compiles / targeted checks were run
+- [ ] Tests were run for behavior changes (or gap is explicit)
+- [ ] Docs updated when routes, contracts, auth, or architecture changed
+- [ ] Final answer summarizes changed files, validation result, and unresolved questions
