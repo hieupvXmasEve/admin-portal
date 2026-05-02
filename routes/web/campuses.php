@@ -1,5 +1,10 @@
 <?php
 
+/**
+ * @deprecated Campus routes migrated to App\Modules\Academic\routes\web.php. Remove after 2026-06-01.
+ * This file is no longer required from routes/web.php.
+ */
+
 use App\Constants\CampusRoutes;
 use App\Http\Controllers\Web\CampusController;
 use Illuminate\Support\Facades\Route;

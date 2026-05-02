@@ -3,15 +3,17 @@
 declare(strict_types=1);
 
 use App\Constants\StudentRoutes;
-use App\Modules\Academic\Http\Web\Admin\StudentAcademicSummaryController;
-use App\Modules\Academic\Http\Web\Admin\StudentController;
-use App\Modules\Academic\Http\Web\Admin\StudentStatusController;
 use App\Modules\Academic\Http\Web\Admin\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\Admin\AcademicProgressionAuditController;
-use App\Modules\Academic\Http\Web\Admin\StudentLifecycleYearlyAnalysisController;
-use App\Modules\Academic\Http\Web\Admin\StudentDecisionController;
+use App\Modules\Academic\Http\Web\Admin\BuildingController;
+use App\Modules\Academic\Http\Web\Admin\CampusController;
+use App\Modules\Academic\Http\Web\Admin\StudentAcademicSummaryController;
 use App\Modules\Academic\Http\Web\Admin\StudentActionAuditController;
 use App\Modules\Academic\Http\Web\Admin\StudentActionController;
+use App\Modules\Academic\Http\Web\Admin\StudentController;
+use App\Modules\Academic\Http\Web\Admin\StudentDecisionController;
+use App\Modules\Academic\Http\Web\Admin\StudentLifecycleYearlyAnalysisController;
+use App\Modules\Academic\Http\Web\Admin\StudentStatusController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -25,6 +27,82 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    /**
+     * ==========================================================
+     * Campuses (CRU — no delete)
+     * ==========================================================
+     */
+    Route::prefix('campuses')->name('campuses.')->group(function () {
+        Route::get('/', [CampusController::class, 'index'])
+            ->middleware('can:view_campus')
+            ->name('index');
+
+        Route::get('/create', [CampusController::class, 'create'])
+            ->middleware('can:create_campus')
+            ->name('create');
+
+        Route::post('/', [CampusController::class, 'store'])
+            ->middleware('can:create_campus')
+            ->name('store');
+
+        Route::get('/{campus}', [CampusController::class, 'show'])
+            ->middleware('can:view_campus')
+            ->name('show');
+
+        Route::get('/{campus}/edit', [CampusController::class, 'edit'])
+            ->middleware('can:edit_campus')
+            ->name('edit');
+
+        Route::put('/{campus}', [CampusController::class, 'update'])
+            ->middleware('can:edit_campus')
+            ->name('update');
+    });
+
+    /**
+     * ==========================================================
+     * Buildings
+     * ==========================================================
+     */
+    Route::prefix('buildings')->name('buildings.')->group(function () {
+        Route::get('/', [BuildingController::class, 'index'])
+            ->middleware('can:view_building')
+            ->name('index');
+
+        Route::get('/api', [BuildingController::class, 'api'])
+            ->name('api');
+
+        Route::get('/{building}', [BuildingController::class, 'show'])
+            ->middleware('can:view_building')
+            ->name('show');
+    });
+
+    /**
+     * Campus-scoped building CRUD routes (route-based modals via @inertiaui/modal-vue).
+     * create/edit render an Inertia page that wraps its content in <Modal>.
+     * store/update/destroy perform the mutation and redirect back to campuses.show.
+     */
+    Route::prefix('campuses/{campus}/buildings')->name('campuses.buildings.')->group(function () {
+        Route::get('/create', [BuildingController::class, 'create'])
+            ->middleware('can:create_building')
+            ->name('create');
+
+        Route::post('/', [BuildingController::class, 'store'])
+            ->middleware('can:create_building')
+            ->name('store');
+
+        Route::get('/{building}/edit', [BuildingController::class, 'edit'])
+            ->middleware('can:edit_building')
+            ->name('edit');
+
+        Route::put('/{building}', [BuildingController::class, 'update'])
+            ->middleware('can:edit_building')
+            ->name('update');
+
+        Route::delete('/{building}', [BuildingController::class, 'destroy'])
+            ->middleware('can:delete_building')
+            ->name('destroy');
+    });
+
     /**
      * ==========================================================
      * Students (CRUD / Profile)
@@ -96,7 +174,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/fees', [StudentAcademicSummaryController::class, 'fees'])
             ->middleware('can:view_student_summary')
             ->name('students.academic-summary.fees');
-
 
         Route::get('/attendance-details', [StudentAcademicSummaryController::class, 'getAttendanceDetails'])
             ->middleware('can:view_student_summary')
