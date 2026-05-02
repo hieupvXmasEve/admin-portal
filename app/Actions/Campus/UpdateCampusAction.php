@@ -8,6 +8,9 @@ use App\Models\Campus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * @deprecated Logic moved to App\Modules\Academic\Actions\UpdateCampusAction. Remove after 2026-06-01.
+ */
 class UpdateCampusAction
 {
     public function execute(Campus $campus, array $data): Campus

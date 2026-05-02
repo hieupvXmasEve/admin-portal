@@ -7,6 +7,9 @@ namespace App\Actions\Campus;
 use App\Models\Campus;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
+/**
+ * @deprecated Logic moved to App\Modules\Academic\Queries\ListCampusesQuery. Remove after 2026-06-01.
+ */
 class ListCampusAction
 {
     /**

@@ -59,7 +59,8 @@ Route::get('/health', function () {
     ]);
 });
 // Review code and optimize
-require __DIR__ . '/web/campuses.php';
+// @deprecated Campus routes migrated to App\Modules\Academic\routes\web.php. Remove after 2026-06-01.
+// require __DIR__ . '/web/campuses.php';
 
 require __DIR__ . '/web/rooms.php';
 require __DIR__ . '/web/settings.php';

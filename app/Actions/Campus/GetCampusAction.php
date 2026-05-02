@@ -8,6 +8,9 @@ use App\Models\Campus;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 
+/**
+ * @deprecated Logic moved to App\Modules\Academic\Queries\GetCampusDetailQuery. Remove after 2026-06-01.
+ */
 class GetCampusAction
 {
     /**

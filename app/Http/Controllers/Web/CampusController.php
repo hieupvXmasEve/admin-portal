@@ -18,6 +18,9 @@ use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 
+/**
+ * @deprecated Migrated to App\Modules\Academic\Http\Web\Admin\CampusController. Remove after 2026-06-01.
+ */
 class CampusController extends Controller
 {
     public function __construct()
