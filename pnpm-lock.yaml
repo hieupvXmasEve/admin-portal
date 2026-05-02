@@ -14,6 +14,9 @@ importers:
       '@inertiajs/vue3':
         specifier: ^3.0.0
         version: 3.0.3(vue@3.5.33(typescript@5.8.3))
+      '@inertiaui/modal-vue':
+        specifier: ^3.1.0
+        version: 3.1.0(@inertiajs/vue3@3.0.3(vue@3.5.33(typescript@5.8.3)))(vue@3.5.33(typescript@5.8.3))
       '@internationalized/date':
         specifier: ^3.8.2
         version: 3.8.2
@@ -342,6 +345,15 @@ packages:
     resolution: {integrity: sha512-bhJN+GS66g1tYH1p6flKkG1N8oaT5J7ZLqBkavN9mHC6bVfoQCUG6sCuA07WTDfo9tDaxU89wsSSAf4mhn3SuA==}
     peerDependencies:
       vue: ^3.0.0
+
+  '@inertiaui/modal-vue@3.1.0':
+    resolution: {integrity: sha512-tuMwvBo6bEyudNiieHVA8AkCQEqSUbE6YIcXoW4C4Dv/Yx2SmCse05mUaIeYvg7AMox8Oa+a2EzSlT5f+VbNww==}
+    peerDependencies:
+      '@inertiajs/vue3': ^3.0.0
+      vue: ^3.4.x
+
+  '@inertiaui/vanilla@1.0.0':
+    resolution: {integrity: sha512-SwWmZQdNOqADDl2/PnNk67vGOPdmcBkuYaDfHQm03IloVy0OObcSmWBlO3IQvOPytrzhoj2nE//vjW6DhFi/Mw==}
 
   '@internationalized/date@3.8.2':
     resolution: {integrity: sha512-/wENk7CbvLbkUvX1tu0mwq49CVkkWpkXubGel6birjRPyo6uQ4nQpnq5xZu823zRCwwn82zgHrvgF1vZyvmVgA==}
@@ -2298,6 +2310,14 @@ snapshots:
       vue: 3.5.33(typescript@5.8.3)
     transitivePeerDependencies:
       - axios
+
+  '@inertiaui/modal-vue@3.1.0(@inertiajs/vue3@3.0.3(vue@3.5.33(typescript@5.8.3)))(vue@3.5.33(typescript@5.8.3))':
+    dependencies:
+      '@inertiajs/vue3': 3.0.3(vue@3.5.33(typescript@5.8.3))
+      '@inertiaui/vanilla': 1.0.0
+      vue: 3.5.33(typescript@5.8.3)
+
+  '@inertiaui/vanilla@1.0.0': {}
 
   '@internationalized/date@3.8.2':
     dependencies:
