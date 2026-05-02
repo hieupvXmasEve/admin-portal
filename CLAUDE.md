@@ -12,7 +12,7 @@ Short operating guide. Full rules live in `docs/rules/`. Full architecture lives
 
 - **Product:** Swinx — university operations platform.
 - **Backend:** Laravel 12 monolith, PHP 8.4, MySQL 8, Redis, FrankenPHP.
-- **Frontend:** Vue 3, TypeScript, Inertia v2, Tailwind CSS 4.
+- **Frontend:** Vue 3, TypeScript, Inertia v3, Tailwind CSS 4.
 - **Architecture:** Hybrid modular monolith.
   - New business logic → `app/Modules/{Domain}/`.
   - Extend `app/Services/*` only when modifying existing service-led areas.

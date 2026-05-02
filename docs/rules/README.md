@@ -1,7 +1,7 @@
 # Rules Index
 
 Last updated: 2026-04-26
-Status: Active — 21 rule files
+Status: Active — 22 rule files
 
 This folder contains the canonical coding rules for Swinx.
 All AI tools should use these as the authoritative reference — not tool-specific config files.
@@ -35,9 +35,11 @@ All AI tools should use these as the authoritative reference — not tool-specif
 | File | When to read | File types |
 |---|---|---|
 | `frontend.md` | Creating/modifying Vue components or pages | `**/*.{vue,ts}` |
+| `frontend-gotchas.md` | Known pitfalls: PHP-to-JS serialization, macOS case FS | `**/*.{vue,ts}` |
 | `filtering.md` | Building any list/index page with filters + pagination | `**/*.{vue,ts,php}` |
 | `api-interaction.md` | Calling backend APIs from Vue | `**/*.{vue,ts}` |
 | `shadcn_vue_conventions.md` | Using Reka-UI/Shadcn components (Select, Form, etc.) | `**/*.vue` |
+| `toast-patterns.md` | Implementing toast notifications with Inertia flash | `**/*.{vue,ts,php}` |
 
 ## Cross-cutting Rules
 
@@ -65,8 +67,8 @@ All AI tools should use these as the authoritative reference — not tool-specif
 | **Check code before commit** | `reference-implementations.md` (Anti-patterns section) |
 | Add new feature to existing module | `frozen-zones.md`, `backend.md`, `pattern.md`, `naming.md` |
 | Create a new module | `architecture.md`, `backend.md`, `naming.md`, `contracts.md` |
-| Add list/index page with filters | `frontend.md`, `filtering.md`, `backend.md` |
-| Add modal/drawer form | `frontend.md`, `api-interaction.md`, `shadcn_vue_conventions.md` |
+| Add list/index page with filters | `frontend.md`, `frontend-gotchas.md`, `filtering.md`, `backend.md` |
+| Add modal/drawer form | `frontend.md`, `api-interaction.md`, `shadcn_vue_conventions.md`, `toast-patterns.md` |
 | Cross-module data access | `contracts.md`, `architecture.md` |
 | Add auth/permission check | `security.md` |
 | Add real-time notification | `realtime.md`, `realtime_notification.md` |

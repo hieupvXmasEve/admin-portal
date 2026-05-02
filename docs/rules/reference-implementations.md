@@ -190,14 +190,14 @@ interface Filters {
 const {
     state, setFilter, apply, setPage, setPerPage, setSort,
     clearAllFilters, hasActiveFilters, isLoading,
-    currentPage, totalPages, isFirstPage, isLastPage,
+    currentSort, currentDirection,
 } = useDataTable<Filters>({
     baseUrl: route('admin.entity.index'),
     initialFilters: {
         search:    props.filters?.search    ?? '',
         status:    props.filters?.status    ?? '',
-        sort:      props.filters?.sort      ?? null,
-        direction: props.filters?.direction ?? null,
+        sort:      typeof props.filters?.sort === 'string' ? props.filters.sort : null,  // typeof guard required — see docs/rules/frontend-gotchas.md
+        direction: (props.filters?.direction as 'asc' | 'desc') || null,
         per_page:  props.filters?.per_page  ?? 15,
     },
     defaultValues: { status: '', per_page: 15 },
