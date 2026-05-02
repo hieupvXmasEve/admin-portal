@@ -2,6 +2,7 @@ import '../css/app.css';
 import '../css/tiptap.css';
 
 import { createInertiaApp } from '@inertiajs/vue3';
+import { withInertiaModal } from '@inertiaui/modal-vue';
 import { createPinia } from 'pinia';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
@@ -44,6 +45,7 @@ createInertiaApp({
 
         initializeTheme();
         setupEcho();
+        withInertiaModal(app);
 
         app.use(plugin).use(ZiggyVue).use(pinia).directive('can', vCan).directive('can-any', vCanAny).mount(el);
     },

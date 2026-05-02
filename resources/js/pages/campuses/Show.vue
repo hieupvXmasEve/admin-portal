@@ -4,19 +4,17 @@ import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useApi } from '@/composables/useApiRequest';
-import { useInertiaFilters } from '@/composables/useInertiaFilters';
+import { useDataTable } from '@/composables/useDataTable';
 import { useConfirmDialogStore } from '@/stores/confirmDialog';
 import type { PaginatedResponse } from '@/types';
 import type { Building, Campus } from '@/types/models';
 import { systemRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
+import { ModalLink } from '@inertiaui/modal-vue';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { ArrowLeft, Building2, Edit, MapPin, Plus, Trash2, X } from 'lucide-vue-next';
-import { computed, h, ref } from 'vue';
-import { toast } from 'vue-sonner';
+import { computed, h } from 'vue';
 import { route } from 'ziggy-js';
-import BuildingModal from './components/BuildingModal.vue';
 
 interface BuildingFilters {
     search: string;
@@ -33,13 +31,12 @@ interface Props {
 
 const props = defineProps<Props>();
 const confirmDialog = useConfirmDialogStore();
-const api = useApi();
 
-const { filters, hasActiveFilters, clearFilters, handleSearch, handleSortChange, handlePaginationNavigate, handlePageSizeChange } = useInertiaFilters<BuildingFilters>({
+const { filters, hasActiveFilters, clearAllFilters, handleSearch, handleSortChange, handlePaginationNavigate, handlePageSizeChange, isLoading, currentSort, currentDirection } = useDataTable<BuildingFilters>({
     baseUrl: route('campuses.show', props.campus.id),
     initialFilters: {
         search: props.filters?.search || '',
-        sort: props.filters?.sort || null,
+        sort: typeof props.filters?.sort === 'string' ? props.filters.sort : null,
         direction: (props.filters?.direction as 'asc' | 'desc') || null,
         per_page: props.filters?.per_page || 15,
     },
@@ -87,9 +84,7 @@ const buildingColumns: ColumnDef<Building>[] = [
             const description = row.original.description;
             return h(
                 'div',
-                {
-                    class: 'max-w-xs truncate text-sm text-gray-600 dark:text-gray-300',
-                },
+                { class: 'max-w-xs truncate text-sm text-gray-600 dark:text-gray-300' },
                 description || 'No description',
             );
         },
@@ -102,9 +97,7 @@ const buildingColumns: ColumnDef<Building>[] = [
             const address = row.original.address;
             return h(
                 'div',
-                {
-                    class: 'max-w-xs truncate text-sm text-gray-600 dark:text-gray-300',
-                },
+                { class: 'max-w-xs truncate text-sm text-gray-600 dark:text-gray-300' },
                 address || 'No address',
             );
         },
@@ -126,24 +119,6 @@ const buildingColumns: ColumnDef<Building>[] = [
     },
 ];
 
-const goBack = () => {
-    router.visit(systemRoutes.campuses.index());
-};
-
-// Modal State
-const isBuildingModalOpen = ref(false);
-const selectedBuilding = ref<Building | null>(null);
-
-const openCreateModal = () => {
-    selectedBuilding.value = null;
-    isBuildingModalOpen.value = true;
-};
-
-const openEditModal = (building: Building) => {
-    selectedBuilding.value = building;
-    isBuildingModalOpen.value = true;
-};
-
 const confirmDeleteBuilding = (building: Building) => {
     confirmDialog.showDialog(
         {
@@ -151,24 +126,16 @@ const confirmDeleteBuilding = (building: Building) => {
             message: `Are you sure you want to delete "${building.name}"? This action cannot be undone.`,
         },
         {
-            onConfirm: () => deleteBuilding(building.id),
+            onConfirm: () => deleteBuilding(building),
         },
     );
 };
 
-const deleteBuilding = async (buildingId: number) => {
-    try {
-        const url = systemRoutes.campuses.buildings.destroy(props.campus.id, buildingId);
-        
-        await api.delete(url);
-        
-        confirmDialog.hideDialog();
-        toast.success('Building deleted successfully!');
-        
-        router.reload({ only: ['buildings'] });
-    } catch (error) {
-        toast.error('Failed to delete building');
-    }
+const deleteBuilding = (building: Building) => {
+    router.delete(systemRoutes.campuses.buildings.destroy(props.campus.id, building.id), {
+        preserveScroll: true,
+        onSuccess: () => confirmDialog.hideDialog(),
+    });
 };
 </script>
 
@@ -178,7 +145,7 @@ const deleteBuilding = async (buildingId: number) => {
     <div class="flex flex-col gap-6">
         <!-- Header with back button -->
         <div class="flex items-center gap-4">
-            <Button variant="ghost" size="sm" @click="goBack">
+            <Button variant="ghost" size="sm" @click="router.visit(systemRoutes.campuses.index())">
                 <ArrowLeft class="h-4 w-4" />
                 Back to Campuses
             </Button>
@@ -200,7 +167,7 @@ const deleteBuilding = async (buildingId: number) => {
                         <MapPin class="h-5 w-5" />
                         Campus Information
                     </CardTitle>
-                    <CardDescription> Basic information about this campus </CardDescription>
+                    <CardDescription>Basic information about this campus</CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-4">
                     <div>
@@ -233,7 +200,7 @@ const deleteBuilding = async (buildingId: number) => {
                         <Building2 class="h-5 w-5" />
                         Campus Statistics
                     </CardTitle>
-                    <CardDescription> Overview of campus facilities and resources </CardDescription>
+                    <CardDescription>Overview of campus facilities and resources</CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-4">
                     <div class="flex items-center justify-between">
@@ -256,10 +223,10 @@ const deleteBuilding = async (buildingId: number) => {
                     <h3 class="text-lg font-semibold">Buildings Management</h3>
                     <p class="text-muted-foreground text-sm">Manage buildings for {{ campus.name }}</p>
                 </div>
-                <Button @click="openCreateModal" class="gap-2">
+                <ModalLink :href="systemRoutes.campuses.buildings.create(campus.id)" as="button" class="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">
                     <Plus class="h-4 w-4" />
                     Add Building
-                </Button>
+                </ModalLink>
             </div>
 
             <!-- Building Filters -->
@@ -267,25 +234,30 @@ const deleteBuilding = async (buildingId: number) => {
                 <div class="w-full max-w-sm">
                     <DebouncedInput :model-value="filters.search" @update:model-value="handleSearch" placeholder="Search buildings by name, code, or description..." />
                 </div>
-                <Button variant="outline" size="sm" @click="clearFilters" :disabled="!hasActiveFilters" v-if="hasActiveFilters">
+                <Button variant="outline" size="sm" @click="clearAllFilters" :disabled="!hasActiveFilters" v-if="hasActiveFilters">
                     <X class="h-4 w-4 mr-2" />
                     Clear
                 </Button>
             </div>
 
             <!-- Buildings Table -->
-            <DataTable 
-                :data="buildingData" 
+            <DataTable
+                :data="buildingData"
                 :columns="buildingColumns"
-                :initial-sort="filters.sort || undefined"
-                :initial-direction="filters.direction || undefined"
+                :loading="isLoading"
+                :initial-sort="currentSort ?? undefined"
+                :initial-direction="currentDirection ?? undefined"
                 @sort-change="handleSortChange"
             >
                 <template #cell-actions="{ row }">
                     <div class="flex items-center gap-1">
-                        <Button variant="ghost" size="sm" @click="openEditModal(row.original)">
+                        <ModalLink
+                            :href="systemRoutes.campuses.buildings.edit(campus.id, row.original.id)"
+                            as="button"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground"
+                        >
                             <Edit class="h-4 w-4" />
-                        </Button>
+                        </ModalLink>
                         <Button variant="ghost" size="sm" class="text-red-600 hover:text-red-700" @click="confirmDeleteBuilding(row.original)">
                             <Trash2 class="h-4 w-4" />
                         </Button>
@@ -296,13 +268,5 @@ const deleteBuilding = async (buildingId: number) => {
             <!-- Buildings Pagination -->
             <DataPagination :pagination-data="buildings" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
         </div>
-
-        <!-- Building Create/Edit Modal -->
-        <BuildingModal 
-            :open="isBuildingModalOpen" 
-            @update:open="isBuildingModalOpen = $event"
-            :campus-id="campus.id" 
-            :building="selectedBuilding"
-        />
     </div>
 </template>

@@ -176,7 +176,14 @@ defineExpose({
         </div>
 
         <!-- Table -->
-        <div class="rounded-md border">
+        <div class="relative rounded-md border">
+            <!-- Loading overlay — keeps existing data visible -->
+            <div v-if="loading && table.getRowModel().rows?.length" class="bg-background/60 absolute inset-0 z-10 flex items-center justify-center rounded-md">
+                <div class="flex items-center space-x-2">
+                    <div class="border-primary h-5 w-5 animate-spin rounded-full border-2 border-t-transparent"></div>
+                    <span class="text-muted-foreground text-sm">Loading...</span>
+                </div>
+            </div>
             <Table>
                 <TableHeader>
                     <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
@@ -202,7 +209,7 @@ defineExpose({
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    <template v-if="!loading && table.getRowModel().rows?.length">
+                    <template v-if="table.getRowModel().rows?.length">
                         <template v-for="row in table.getRowModel().rows" :key="row.id">
                             <TableRow :data-state="row.getIsSelected() && 'selected'">
                                 <TableCell
@@ -219,12 +226,12 @@ defineExpose({
                         </template>
                     </template>
 
-                    <!-- Loading State -->
+                    <!-- Loading State (no existing data) -->
                     <TableRow v-else-if="loading">
                         <TableCell :colspan="columns.length" class="h-24 text-center">
                             <div class="flex items-center justify-center space-x-2">
-                                <div class="border-primary h-4 w-4 animate-spin rounded-full border-2 border-t-transparent"></div>
-                                <span>Loading...</span>
+                                <div class="border-primary h-5 w-5 animate-spin rounded-full border-2 border-t-transparent"></div>
+                                <span class="text-muted-foreground text-sm">Loading...</span>
                             </div>
                         </TableCell>
                     </TableRow>

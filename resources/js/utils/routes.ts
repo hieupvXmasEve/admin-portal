@@ -63,10 +63,19 @@ export const systemRoutes = {
         edit: (id: number) => route(CAMPUS_ROUTE_NAMES.EDIT, { campus: id }),
         show: (id: number) => route(CAMPUS_ROUTE_NAMES.SHOW, { campus: id }),
         buildings: {
-            store: (campusId: number) => route('api.admin.campuses.buildings.store', { campus: campusId }),
-            update: (campusId: number, buildingId: number) => route('api.admin.campuses.buildings.update', { campus: campusId, building: buildingId }),
-            destroy: (campusId: number, buildingId: number) => route('api.admin.campuses.buildings.destroy', { campus: campusId, building: buildingId }),
+            // Route-based modal URLs (opened via <ModalLink> from @inertiaui/modal-vue)
+            create: (campusId: number) => route('campuses.buildings.create', { campus: campusId }),
+            edit: (campusId: number, buildingId: number) => route('campuses.buildings.edit', { campus: campusId, building: buildingId }),
+            // Mutation routes (used by useForm.post/put/delete inside modal pages)
+            store: (campusId: number) => route('campuses.buildings.store', { campus: campusId }),
+            update: (campusId: number, buildingId: number) => route('campuses.buildings.update', { campus: campusId, building: buildingId }),
+            destroy: (campusId: number, buildingId: number) => route('campuses.buildings.destroy', { campus: campusId, building: buildingId }),
         },
+    },
+    // Building Management Routes
+    buildings: {
+        index: () => route('buildings.index'),
+        show: (id: number) => route('buildings.show', { building: id }),
     },
     // Department Management Routes
     departments: {

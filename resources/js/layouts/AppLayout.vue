@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { Toaster } from '@/components/ui/sonner';
+import { useFlashToast } from '@/composables/useFlashToast';
 import AppLayout from '@/layouts/app/AppSidebarLayout.vue';
 import type { BreadcrumbItemType } from '@/types';
 import 'vue-sonner/style.css'; // vue-sonner v2 requires this import
+
+useFlashToast();
 
 interface Props {
     breadcrumbs?: BreadcrumbItemType[];

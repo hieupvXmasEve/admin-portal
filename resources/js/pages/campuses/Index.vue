@@ -4,11 +4,12 @@ import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useInertiaFilters } from '@/composables/useInertiaFilters';
+import { useDataTable } from '@/composables/useDataTable';
 import type { PaginatedResponse } from '@/types';
 import type { Campus } from '@/types/models';
 import { systemRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
+import { ModalLink } from '@inertiaui/modal-vue';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { Building, Edit, Eye, Plus } from 'lucide-vue-next';
 import { computed, h } from 'vue';
@@ -28,11 +29,22 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const { filters, handleSearch, handleSortChange, handlePaginationNavigate, handlePageSizeChange } = useInertiaFilters<CampusFilters>({
+const {
+    filters,
+    hasActiveFilters,
+    isLoading,
+    currentSort,
+    currentDirection,
+    handleSearch,
+    handleSortChange,
+    handlePaginationNavigate,
+    handlePageSizeChange,
+    clearAllFilters,
+} = useDataTable<CampusFilters>({
     baseUrl: route('campuses.index'),
     initialFilters: {
         search: props.filters?.search || '',
-        sort: props.filters?.sort || null,
+        sort: typeof props.filters?.sort === 'string' ? props.filters.sort : null,
         direction: (props.filters?.direction as 'asc' | 'desc') || null,
         per_page: props.filters?.per_page || 15,
     },
@@ -47,14 +59,6 @@ const { filters, handleSearch, handleSortChange, handlePaginationNavigate, handl
 });
 
 const data = computed(() => props.campuses.data);
-
-const goToCreatePage = () => {
-    router.visit(systemRoutes.campuses.create());
-};
-
-const goToEditPage = (campus: Campus) => {
-    router.visit(systemRoutes.campuses.edit(campus.id));
-};
 
 const goToViewPage = (campus: Campus) => {
     router.visit(systemRoutes.campuses.show(campus.id));
@@ -136,8 +140,6 @@ const columns: ColumnDef<Campus>[] = [
         cell: 'actions',
     },
 ];
-
-
 </script>
 
 <template>
@@ -147,10 +149,14 @@ const columns: ColumnDef<Campus>[] = [
             <h2 class="text-xl leading-tight font-semibold text-gray-800 dark:text-gray-200">Campuses</h2>
             <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Manage all campus locations.</p>
         </div>
-        <Button size="sm" @click="goToCreatePage">
-            <Plus class="mr-2 h-4 w-4" />
+        <ModalLink
+            :href="route('campuses.create')"
+            as="button"
+            class="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+            <Plus class="h-4 w-4" />
             Add Campus
-        </Button>
+        </ModalLink>
     </div>
 
     <div class="mt-6 flex flex-col gap-4">
@@ -159,13 +165,17 @@ const columns: ColumnDef<Campus>[] = [
             <div class="w-full max-w-sm">
                 <DebouncedInput :model-value="filters.search" @update:model-value="handleSearch" placeholder="Search campuses..." />
             </div>
+            <Button variant="outline" size="sm" @click="clearAllFilters" :disabled="!hasActiveFilters" v-if="hasActiveFilters">
+                Clear
+            </Button>
         </div>
 
-        <DataTable 
-            :data="data" 
-            :columns="columns" 
-            :initial-sort="filters.sort || undefined" 
-            :initial-direction="filters.direction || undefined" 
+        <DataTable
+            :data="data"
+            :columns="columns"
+            :loading="isLoading"
+            :initial-sort="currentSort ?? undefined"
+            :initial-direction="currentDirection ?? undefined"
             @sort-change="handleSortChange"
         >
             <template #cell-actions="{ row }">
@@ -185,9 +195,13 @@ const columns: ColumnDef<Campus>[] = [
                     <TooltipProvider :delay-duration="0">
                         <Tooltip>
                             <TooltipTrigger as-child>
-                                <Button variant="ghost" size="icon" class="h-8 w-8 text-muted-foreground hover:text-primary" @click="goToEditPage(row.original)">
+                                <ModalLink
+                                    :href="route('campuses.edit', row.original.id)"
+                                    as="button"
+                                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-primary"
+                                >
                                     <Edit class="h-4 w-4" />
-                                </Button>
+                                </ModalLink>
                             </TooltipTrigger>
                             <TooltipContent>
                                 <p>Edit Campus</p>

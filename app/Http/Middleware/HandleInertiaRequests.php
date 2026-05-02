@@ -73,6 +73,7 @@ class HandleInertiaRequests extends Middleware
                     'error' => session('error'),
                     'warning' => session('warning'),
                     'info' => session('info'),
+                    'message' => session('message'),
                     'batch_errors' => session('batch_errors'),
                     'conversion_summary' => session('conversion_summary'),
                     'success_details' => session('success_details'),

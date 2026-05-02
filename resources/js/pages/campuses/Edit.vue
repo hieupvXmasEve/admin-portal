@@ -1,158 +1,105 @@
 <script setup lang="ts">
-import type { Campus } from '@/types/models';
-import { systemRoutes } from '@/utils/routes';
-import { Head, router, useForm } from '@inertiajs/vue3';
-import { toTypedSchema } from '@vee-validate/zod';
-import { ArrowLeft, Building, Hash, MapPin } from 'lucide-vue-next';
-import { z } from 'zod';
-
+import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { toast } from 'vue-sonner';
+import { useForm } from '@inertiajs/vue3';
+import { Modal } from '@inertiaui/modal-vue';
+import { ref } from 'vue';
+import { route } from 'ziggy-js';
 
 interface Props {
-    campus: Campus;
+    campus: {
+        id: number;
+        name: string;
+        code: string;
+        dng_code: string | null;
+        address: string;
+    };
 }
 
 const props = defineProps<Props>();
 
-// Validation schema
-const updateCampusSchema = toTypedSchema(
-    z.object({
-        name: z.string().min(1, 'Campus name is required').max(255, 'Campus name must not exceed 255 characters'),
-        code: z.string().min(1, 'Campus code is required').max(255, 'Campus code must not exceed 255 characters'),
-        dng_code: z.string().max(255, 'DNG code must not exceed 255 characters').optional().nullable(),
-        address: z.string().min(1, 'Campus address is required'),
-    }),
-);
+const modalRef = ref<InstanceType<typeof Modal> | null>(null);
 
-// Inertia form for submission
-const inertiaForm = useForm({
+const form = useForm({
     name: props.campus.name,
     code: props.campus.code,
     dng_code: props.campus.dng_code ?? '',
     address: props.campus.address,
 });
 
-const onSubmit = (values: any) => {
-    Object.assign(inertiaForm, values);
-
-    inertiaForm.put(route('campuses.update', props.campus.id), {
+const submit = () => {
+    form.put(route('campuses.update', props.campus.id), {
+        preserveScroll: true,
         onSuccess: () => {
-            toast.success('Campus updated successfully');
-        },
-        onError: (errors) => {
-            console.error('Validation errors:', errors);
+            modalRef.value?.close();
         },
     });
-};
-
-const goBack = () => {
-    router.visit(systemRoutes.campuses.show(props.campus.id));
 };
 </script>
 
 <template>
-    <Head title="Edit Campus" />
-    <div class="flex items-center justify-between">
-        <div>
-            <h2 class="text-xl leading-tight font-semibold text-gray-800 dark:text-gray-200">Edit Campus</h2>
-            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Update campus location details.</p>
-        </div>
-        <Button variant="outline" size="sm" @click="goBack" class="gap-2">
-            <ArrowLeft class="h-4 w-4" />
-            Back
-        </Button>
-    </div>
+    <Modal ref="modalRef">
+        <div class="p-6">
+            <h2 class="mb-1 text-lg font-semibold">Edit Campus</h2>
+            <p class="text-muted-foreground mb-5 text-sm">Update campus location details.</p>
 
-    <Card>
-        <CardHeader>
-            <CardTitle class="flex items-center gap-2">
-                <Building class="h-5 w-5" />
-                Campus Information
-            </CardTitle>
-            <CardDescription> Update the information for this campus location. </CardDescription>
-        </CardHeader>
-        <CardContent>
-            <Form v-slot="{ meta }" :validation-schema="updateCampusSchema" :initial-values="campus" class="space-y-6" @submit="onSubmit">
-                <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <!-- Campus Name -->
-                    <FormField v-slot="{ componentField }" name="name">
-                        <FormItem>
-                            <FormLabel class="flex items-center gap-2">
-                                <Building class="h-4 w-4" />
-                                Campus Name *
-                            </FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" placeholder="e.g., Swinburne Hanoi" :disabled="inertiaForm.processing" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-
-                    <!-- Campus Code -->
-                    <FormField v-slot="{ componentField }" name="code">
-                        <FormItem>
-                            <FormLabel class="flex items-center gap-2">
-                                <Hash class="h-4 w-4" />
-                                Campus Code *
-                            </FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" placeholder="e.g., HN, HCM, DN" class="font-mono" :disabled="inertiaForm.processing" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-
-                    <FormField v-slot="{ componentField }" name="dng_code">
-                        <FormItem>
-                            <FormLabel class="flex items-center gap-2">
-                                <Hash class="h-4 w-4" />
-                                DNG Code
-                            </FormLabel>
-                            <FormControl>
-                                <Input
-                                    v-bind="componentField"
-                                    placeholder="e.g., FAUHN"
-                                    class="font-mono"
-                                    :disabled="inertiaForm.processing"
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+            <form class="grid gap-4" @submit.prevent="submit">
+                <div class="grid gap-1.5">
+                    <Label for="name">Campus Name <span class="text-destructive">*</span></Label>
+                    <Input
+                        id="name"
+                        v-model="form.name"
+                        placeholder="e.g., Swinburne Hanoi"
+                        :class="{ 'border-destructive': form.errors.name }"
+                    />
+                    <InputError :message="form.errors.name" />
                 </div>
 
-                <!-- Campus Address -->
-                <FormField v-slot="{ componentField }" name="address">
-                    <FormItem>
-                        <FormLabel class="flex items-center gap-2">
-                            <MapPin class="h-4 w-4" />
-                            Campus Address *
-                        </FormLabel>
-                        <FormControl>
-                            <Textarea
-                                v-bind="componentField"
-                                placeholder="Enter the full address of the campus..."
-                                rows="3"
-                                :disabled="inertiaForm.processing"
-                            />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                </FormField>
+                <div class="grid gap-1.5">
+                    <Label for="code">Campus Code <span class="text-destructive">*</span></Label>
+                    <Input
+                        id="code"
+                        v-model="form.code"
+                        placeholder="e.g., HN, HCM, DN"
+                        class="font-mono"
+                        :class="{ 'border-destructive': form.errors.code }"
+                    />
+                    <InputError :message="form.errors.code" />
+                </div>
 
-                <div class="flex items-center justify-end gap-4">
-                    <Button type="button" variant="outline" @click="goBack" :disabled="inertiaForm.processing"> Cancel </Button>
-                    <Button type="submit" :disabled="!meta.valid || inertiaForm.processing" class="gap-2">
-                        <Building class="h-4 w-4" />
-                        {{ inertiaForm.processing ? 'Updating...' : 'Update Campus' }}
+                <div class="grid gap-1.5">
+                    <Label for="dng_code">DNG Code</Label>
+                    <Input
+                        id="dng_code"
+                        v-model="form.dng_code"
+                        placeholder="e.g., FAUHN"
+                        class="font-mono"
+                        :class="{ 'border-destructive': form.errors.dng_code }"
+                    />
+                    <InputError :message="form.errors.dng_code" />
+                </div>
+
+                <div class="grid gap-1.5">
+                    <Label for="address">Campus Address <span class="text-destructive">*</span></Label>
+                    <Textarea
+                        id="address"
+                        v-model="form.address"
+                        placeholder="Enter the full address of the campus..."
+                        rows="3"
+                        :class="{ 'border-destructive': form.errors.address }"
+                    />
+                    <InputError :message="form.errors.address" />
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <Button type="submit" :disabled="form.processing">
+                        {{ form.processing ? 'Saving...' : 'Save Changes' }}
                     </Button>
                 </div>
-            </Form>
-        </CardContent>
-    </Card>
+            </form>
+        </div>
+    </Modal>
 </template>
