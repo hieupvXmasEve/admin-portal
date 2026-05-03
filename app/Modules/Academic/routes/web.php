@@ -3,17 +3,17 @@
 declare(strict_types=1);
 
 use App\Constants\StudentRoutes;
-use App\Modules\Academic\Http\Web\Admin\AcademicPlacementController;
-use App\Modules\Academic\Http\Web\Admin\AcademicProgressionAuditController;
-use App\Modules\Academic\Http\Web\Admin\BuildingController;
-use App\Modules\Academic\Http\Web\Admin\CampusController;
-use App\Modules\Academic\Http\Web\Admin\StudentAcademicSummaryController;
-use App\Modules\Academic\Http\Web\Admin\StudentActionAuditController;
-use App\Modules\Academic\Http\Web\Admin\StudentActionController;
-use App\Modules\Academic\Http\Web\Admin\StudentController;
-use App\Modules\Academic\Http\Web\Admin\StudentDecisionController;
-use App\Modules\Academic\Http\Web\Admin\StudentLifecycleYearlyAnalysisController;
-use App\Modules\Academic\Http\Web\Admin\StudentStatusController;
+use App\Modules\Academic\Http\Web\AcademicPlacementController;
+use App\Modules\Academic\Http\Web\AcademicProgressionAuditController;
+use App\Modules\Academic\Http\Web\BuildingController;
+use App\Modules\Academic\Http\Web\CampusController;
+use App\Modules\Academic\Http\Web\StudentAcademicSummaryController;
+use App\Modules\Academic\Http\Web\StudentActionAuditController;
+use App\Modules\Academic\Http\Web\StudentActionController;
+use App\Modules\Academic\Http\Web\StudentController;
+use App\Modules\Academic\Http\Web\StudentDecisionController;
+use App\Modules\Academic\Http\Web\StudentLifecycleYearlyAnalysisController;
+use App\Modules\Academic\Http\Web\StudentStatusController;
 use Illuminate\Support\Facades\Route;
 
 /*

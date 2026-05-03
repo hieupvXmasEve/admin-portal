@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web\Admin;
+namespace App\Modules\Academic\Http\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Campus;

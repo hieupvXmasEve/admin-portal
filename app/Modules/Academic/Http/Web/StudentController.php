@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web\Admin;
+namespace App\Modules\Academic\Http\Web;
 
 use App\Constants\StudentRoutes;
 use App\Exports\StudentExport;
