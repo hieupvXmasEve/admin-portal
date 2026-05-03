@@ -5,28 +5,28 @@
 
 // Route Names - these should match Laravel route names from app/Constants/UserRoutes.php
 export const USER_ROUTE_NAMES = {
-    INDEX: 'users.index',
-    CREATE: 'users.create',
-    STORE: 'users.store',
-    SHOW: 'users.show',
-    EDIT: 'users.edit',
-    UPDATE: 'users.update',
-    DESTROY: 'users.destroy',
+    INDEX: 'identity.users.index',
+    CREATE: 'identity.users.create',
+    STORE: 'identity.users.store',
+    SHOW: 'identity.users.show',
+    EDIT: 'identity.users.edit',
+    UPDATE: 'identity.users.update',
+    DESTROY: 'identity.users.destroy',
 
     // Import
-    IMPORT_FORM: 'users.import.form',
-    IMPORT_UPLOAD: 'users.import.upload',
-    IMPORT_PREVIEW: 'users.import.preview',
-    IMPORT_PROCESS: 'users.import.process',
-    IMPORT_HISTORY: 'users.import.history',
-    IMPORT_DEBUG: 'users.import.debug',
+    IMPORT_FORM: 'identity.users.import.form',
+    IMPORT_UPLOAD: 'identity.users.import.upload',
+    IMPORT_PREVIEW: 'identity.users.import.preview',
+    IMPORT_PROCESS: 'identity.users.import.process',
+    IMPORT_HISTORY: 'identity.users.import.history',
+    IMPORT_DEBUG: 'identity.users.import.debug',
 
     // Template
-    TEMPLATE_DOWNLOAD: 'users.templates.download',
+    TEMPLATE_DOWNLOAD: 'identity.users.templates.download',
 
     // Export
-    EXPORT_EXCEL: 'users.export.excel',
-    EXPORT_EXCEL_FILTERED: 'users.export.excel.filtered',
+    EXPORT_EXCEL: 'identity.users.export.excel',
+    EXPORT_EXCEL_FILTERED: 'identity.users.export.excel.filtered',
 } as const;
 
 // Route Paths - for frontend routing and navigation

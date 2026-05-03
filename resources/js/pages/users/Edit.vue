@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 // Badge component inline since it doesn't exist in UI components
 import type { User } from '@/types/User';
-import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, ChevronDown, ChevronRight, Shield, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -103,17 +102,17 @@ const allSelectedPermissions = computed(() => {
 
 // Submit form
 const handleSubmit = () => {
-    form.put(`/users/${props.user.id}`, {
+    form.put(route('identity.users.update', props.user.id), {
         onSuccess: () => {
             toast.success('User updated successfully');
-            router.visit(systemRoutes.users.index());
+            router.visit(route('identity.users.index'));
         },
     });
 };
 
 // Go back to users list
 const goBack = () => {
-    router.visit(systemRoutes.users.index());
+    router.visit(route('identity.users.index'));
 };
 </script>
 
@@ -248,17 +247,20 @@ const goBack = () => {
                                     <TableCell>
                                         <div class="flex flex-wrap gap-1">
                                             <span
-                                                v-for="permission in role.permissions.slice(0, 3)"
+                                                v-for="permission in (role.permissions || []).slice(0, 3)"
                                                 :key="permission.id"
                                                 class="bg-muted text-muted-foreground inline-flex items-center rounded border px-2 py-1 text-xs font-medium"
                                             >
                                                 {{ permission.name }}
                                             </span>
                                             <span
-                                                v-if="role.permissions.length > 3"
+                                                v-if="(role.permissions || []).length > 3"
                                                 class="bg-secondary text-secondary-foreground inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
                                             >
-                                                +{{ role.permissions.length - 3 }} more
+                                                +{{ (role.permissions || []).length - 3 }} more
+                                            </span>
+                                            <span v-if="!role.permissions?.length" class="text-muted-foreground text-xs">
+                                                No permissions
                                             </span>
                                         </div>
                                     </TableCell>

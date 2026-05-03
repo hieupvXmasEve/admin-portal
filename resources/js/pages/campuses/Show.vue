@@ -153,10 +153,6 @@ const deleteBuilding = (building: Building) => {
                 <h1 class="text-2xl font-semibold">{{ campus.name }}</h1>
                 <p class="text-muted-foreground text-sm">Campus details and building management</p>
             </div>
-            <Button @click="router.visit(systemRoutes.campuses.edit(campus.id))" variant="outline" class="gap-2">
-                <Edit class="h-4 w-4" />
-                Edit Campus
-            </Button>
         </div>
 
         <div class="grid gap-6 md:grid-cols-2">

@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { PaginatedResponse } from '@/types';
 import type { Role, User } from '@/types/User';
-import { systemRoutes } from '@/utils/routes';
+import { useDataTable } from '@/composables/useDataTable';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { FileSpreadsheet, Upload, X } from 'lucide-vue-next';
@@ -21,60 +22,72 @@ const props = defineProps<{
     filters?: {
         search?: string;
         role_id?: number | null;
+        type?: string | null;
+        per_page?: number;
+        sort?: string;
+        direction?: 'asc' | 'desc';
     };
 }>();
+
+interface Filters {
+    search: string;
+    role_id: string;
+    type: string;
+    per_page: number;
+    sort: string | null;
+    direction: 'asc' | 'desc' | null;
+}
+
+const {
+    filters,
+    setFilter,
+    clearFilter,
+    clearAllFilters,
+    setSort,
+    setPage,
+    setPerPage,
+    apply,
+    refresh,
+    handleSearch,
+    handleSortChange,
+    handlePaginationNavigate,
+    handlePageSizeChange,
+    hasActiveFilters,
+    isLoading,
+    currentSort,
+    currentDirection,
+} = useDataTable<Filters>({
+    baseUrl: route('identity.users.index'),
+    initialFilters: {
+        search: props.filters?.search ?? '',
+        role_id: props.filters?.role_id?.toString() ?? 'all',
+        type: props.filters?.type ?? 'all',
+        per_page: props.filters?.per_page ?? 10,
+        sort: typeof props.filters?.sort === 'string' ? props.filters.sort : null,
+        direction: (props.filters?.direction as 'asc' | 'desc') || null,
+    },
+    defaultValues: { search: '', role_id: 'all', type: 'all', per_page: 10, sort: null, direction: null },
+    only: ['users', 'filters'],
+    debounce: 300,
+    fieldDebounce: { search: 400 },
+});
 
 // Reactive data
 const data = computed(() => props.users.data);
 
-// Filter state - khởi tạo từ props
-const filters = ref({
-    search: props.filters?.search || '',
-    role_id: props.filters?.role_id?.toString() || 'all',
-});
+// User type options
+const userTypeOptions = [
+    { value: 'all', label: 'All Types' },
+    { value: 'staff', label: 'Staff' },
+    { value: 'student', label: 'Student' },
+    { value: 'lecturer', label: 'Lecturer' },
+    { value: 'parent', label: 'Parent' },
+];
 
 // Edit user function
 const editUser = (user: User) => {
-    router.visit(systemRoutes.users.edit(user.id));
+    router.visit(route('identity.users.edit', user.id));
 };
-
-// Server-side filtering functions
-const applyFilters = (newFilters: typeof filters.value) => {
-    const params = new URLSearchParams();
-
-    // Add filters to URL params
-    if (newFilters.search) params.set('search', newFilters.search);
-    if (newFilters.role_id && newFilters.role_id !== 'all') params.set('role_id', newFilters.role_id);
-
-    const url = `${systemRoutes.users.index()}${params.toString() ? '?' + params.toString() : ''}`;
-
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['users', 'filters'],
-    });
-};
-
-const handleSearch = (value: string | number) => {
-    filters.value.search = String(value);
-    applyFilters(filters.value);
-};
-
-const clearFilters = () => {
-    filters.value = {
-        search: '',
-        role_id: 'all',
-    };
-    router.visit(systemRoutes.users.index(), {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['users', 'filters'],
-    });
-};
-
-const hasActiveFilters = computed(() => {
-    return filters.value.search || filters.value.role_id !== 'all';
-});
 
 // Export functionality
 const isExporting = ref(false);
@@ -90,8 +103,10 @@ const exportToExcel = async () => {
 
         if (filters.value.search) params.set('search', filters.value.search);
         if (filters.value.role_id && filters.value.role_id !== 'all') params.set('role_id', filters.value.role_id);
+        if (filters.value.type && filters.value.type !== 'all') params.set('type', filters.value.type);
 
-        const exportUrl = `${systemRoutes.users.exportFiltered()}${params.toString() ? '?' + params.toString() : ''}`;
+        // Note: This will need to be updated to use the new export routes
+        const exportUrl = `/users/export/excel/filtered${params.toString() ? '?' + params.toString() : ''}`;
 
         // Create a temporary link to trigger download
         const link = document.createElement('a');
@@ -146,35 +161,10 @@ const columns: ColumnDef<User>[] = [
         cell: 'actions',
     },
 ];
-
-// Pagination navigation
-const handlePaginationNavigate = (url: string) => {
-    console.log(url);
-
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['users'],
-    });
-};
-
-const handlePageSizeChange = (pageSize: number) => {
-    const params = new URLSearchParams(window.location.search);
-    params.set('per_page', pageSize.toString());
-    params.delete('page'); // Reset to first page when changing page size
-
-    const url = `${systemRoutes.users.index()}?${params.toString()}`;
-
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['users', 'filters'],
-    });
-};
 </script>
 
 <template>
-    <Head title="List Users" />
+    <Head title="Users" />
     <!-- Header with Add User Button -->
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-semibold">Users</h1>
@@ -183,11 +173,11 @@ const handlePageSizeChange = (pageSize: number) => {
                 <FileSpreadsheet class="h-4 w-4" />
                 {{ isExporting ? 'Exporting...' : 'Export Excel' }}
             </Button>
-            <Button @click="router.visit(systemRoutes.users.import())" variant="outline" class="flex items-center gap-2">
+            <Button @click="router.visit('/users/import')" variant="outline" class="flex items-center gap-2">
                 <Upload class="h-4 w-4" />
                 Import Excel
             </Button>
-            <Button @click="router.visit(systemRoutes.users.create())" class="flex items-center gap-2">
+            <Button @click="router.visit(route('identity.users.create'))" class="flex items-center gap-2">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
@@ -209,7 +199,7 @@ const handlePageSizeChange = (pageSize: number) => {
             <!-- Role Filter -->
             <div class="flex flex-col gap-1">
                 <Label class="text-muted-foreground text-xs">Role</Label>
-                <Select v-model="filters.role_id" @update:model-value="applyFilters(filters)">
+                <Select :model-value="filters.role_id" @update:model-value="(v) => setFilter('role_id', v)">
                     <SelectTrigger class="w-48">
                         <SelectValue placeholder="All roles" />
                     </SelectTrigger>
@@ -222,10 +212,25 @@ const handlePageSizeChange = (pageSize: number) => {
                 </Select>
             </div>
 
+            <!-- User Type Filter -->
+            <div class="flex flex-col gap-1">
+                <Label class="text-muted-foreground text-xs">Type</Label>
+                <Select :model-value="filters.type" @update:model-value="(v) => setFilter('type', v)">
+                    <SelectTrigger class="w-40">
+                        <SelectValue placeholder="All types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem v-for="type in userTypeOptions" :key="type.value" :value="type.value">
+                            {{ type.label }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+
             <!-- Clear Filters Button -->
             <div class="flex flex-col gap-1">
                 <Label class="text-xs text-transparent">Clear</Label>
-                <Button variant="outline" size="default" @click="clearFilters" :disabled="!hasActiveFilters" class="flex items-center gap-2">
+                <Button variant="outline" size="default" @click="clearAllFilters" :disabled="!hasActiveFilters" class="flex items-center gap-2">
                     <X class="h-4 w-4" />
                     Clear
                 </Button>
@@ -238,14 +243,21 @@ const handlePageSizeChange = (pageSize: number) => {
 
             <div v-if="filters.search" class="bg-secondary flex items-center gap-1 rounded-md px-2 py-1 text-sm">
                 <span>Search: "{{ filters.search }}"</span>
-                <Button variant="ghost" size="icon" class="h-4 w-4 p-0" @click="handleSearch('')">
+                <Button variant="ghost" size="icon" class="h-4 w-4 p-0" @click="clearFilter('search')">
                     <X class="h-3 w-3" />
                 </Button>
             </div>
 
             <div v-if="filters.role_id !== 'all'" class="bg-secondary flex items-center gap-1 rounded-md px-2 py-1 text-sm">
                 <span>Role: "{{ roles.find(r => r.id.toString() === filters.role_id)?.name }}"</span>
-                <Button variant="ghost" size="icon" class="h-4 w-4 p-0" @click="filters.role_id = 'all'; applyFilters(filters)">
+                <Button variant="ghost" size="icon" class="h-4 w-4 p-0" @click="clearFilter('role_id')">
+                    <X class="h-3 w-3" />
+                </Button>
+            </div>
+
+            <div v-if="filters.type !== 'all'" class="bg-secondary flex items-center gap-1 rounded-md px-2 py-1 text-sm">
+                <span>Type: "{{ userTypeOptions.find(t => t.value === filters.type)?.label }}"</span>
+                <Button variant="ghost" size="icon" class="h-4 w-4 p-0" @click="clearFilter('type')">
                     <X class="h-3 w-3" />
                 </Button>
             </div>
@@ -253,7 +265,14 @@ const handlePageSizeChange = (pageSize: number) => {
     </div>
 
     <!-- Data Table -->
-    <DataTable :data="data" :columns="columns" :show-column-toggle="false">
+    <DataTable 
+        :data="data" 
+        :columns="columns" 
+        :show-column-toggle="false"
+        :initial-sort="currentSort ?? undefined"
+        :initial-direction="currentDirection ?? undefined"
+        @sort-change="handleSortChange"
+    >
         <template #cell-roles="{ row }">
             <div class="flex flex-wrap gap-1">
                 <Badge v-for="role in row.original.campus_roles" :key="role.id" variant="secondary">
@@ -263,10 +282,38 @@ const handlePageSizeChange = (pageSize: number) => {
             </div>
         </template>
         <template #cell-actions="{ row }">
-            <TableActions @edit="editUser(row.original)" />
+            <TableActions @edit="editUser(row.original)">
+                <template #default>
+                    <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                        <Tooltip>
+                            <TooltipTrigger as-child>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    @click="router.visit(route('identity.users.show', row.original.id))"
+                                    class="cursor-pointer"
+                                >
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>View Details</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </template>
+            </TableActions>
         </template>
     </DataTable>
 
     <!-- Pagination -->
-    <DataPagination :pagination-data="users" item-name="users" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+    <DataPagination 
+        :pagination-data="users" 
+        item-name="users" 
+        @navigate="handlePaginationNavigate" 
+        @page-size-change="handlePageSizeChange" 
+    />
 </template>

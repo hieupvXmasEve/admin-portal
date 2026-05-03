@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 // Badge component inline since it doesn't exist in UI components
-import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, ChevronDown, ChevronRight, Shield, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -102,16 +101,16 @@ const handleSubmit = () => {
         email: form.email.trim().toLowerCase(),
         selectedRoles: form.selectedRoles,
     };
-    form.transform(() => formData).post('/users', {
+    form.transform(() => formData).post(route('identity.users.store'), {
         onSuccess: () => {
-            router.visit(systemRoutes.users.index());
+            router.visit(route('identity.users.index'));
         },
     });
 };
 
 // Go back to users list
 const goBack = () => {
-    router.visit(systemRoutes.users.index());
+    router.visit(route('identity.users.index'));
 };
 </script>
 
