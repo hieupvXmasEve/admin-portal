@@ -103,6 +103,7 @@ class ClassSessionController extends Controller
             'online_meeting_url' => 'nullable|url',
             'instructor_notes' => 'nullable|string',
             'lecture_id' => 'nullable|exists:lectures,id',
+            'room_id' => ['nullable', Rule::exists('rooms', 'id')->where('campus_id', app('campus')->id)],
         ]);
 
         $classSession = $this->classSessionService->createClassSession($validated);
@@ -115,8 +116,9 @@ class ClassSessionController extends Controller
             ]);
         }
 
-        return redirect()->route('class-sessions.index')
-            ->with('success', 'Class session created successfully');
+        Inertia::flash('message', 'Class session created successfully.');
+
+        return redirect()->back();
     }
 
     /**
@@ -252,8 +254,9 @@ class ClassSessionController extends Controller
             ]);
         }
 
-        return redirect()->route('class-sessions.index')
-            ->with('success', 'Class session updated successfully');
+        Inertia::flash('message', 'Class session updated successfully.');
+
+        return redirect()->back();
     }
 
     /**
@@ -338,7 +341,7 @@ class ClassSessionController extends Controller
 
         return response($csvContent, 200, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
@@ -353,7 +356,7 @@ class ClassSessionController extends Controller
 
         // Escape quotes by doubling them and wrap in quotes if contains comma, quote, or newline
         if (str_contains($field, ',') || str_contains($field, '"') || str_contains($field, "\n")) {
-            return '"' . str_replace('"', '""', $field) . '"';
+            return '"'.str_replace('"', '""', $field).'"';
         }
 
         return $field;
@@ -373,7 +376,8 @@ class ClassSessionController extends Controller
             ]);
         }
 
-        return redirect()->route('class-sessions.index')
-            ->with('success', 'Class session deleted successfully');
+        Inertia::flash('message', 'Class session deleted successfully.');
+
+        return redirect()->back();
     }
 }
