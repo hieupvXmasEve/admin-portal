@@ -33,6 +33,7 @@ const emit = defineEmits<{
     'selection-change': [selectedRows: TData[]];
     'select-all': [isSelected: boolean];
     'sort-change': [sort: string | null, direction: 'asc' | 'desc' | null];
+    'row-click': [row: TData, event: MouseEvent];
 }>();
 
 // Table state
@@ -211,7 +212,7 @@ defineExpose({
                 <TableBody>
                     <template v-if="table.getRowModel().rows?.length">
                         <template v-for="row in table.getRowModel().rows" :key="row.id">
-                            <TableRow :data-state="row.getIsSelected() && 'selected'">
+                            <TableRow :data-state="row.getIsSelected() && 'selected'" @click="(e: MouseEvent) => emit('row-click', row.original, e)">
                                 <TableCell
                                     v-for="cell in row.getVisibleCells()"
                                     :key="cell.id"

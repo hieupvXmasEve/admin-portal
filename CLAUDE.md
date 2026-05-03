@@ -11,13 +11,15 @@ Short operating guide. Full rules live in `docs/rules/`. Full architecture lives
 ## Project Context
 
 - **Product:** Swinx — university operations platform.
-- **Backend:** Laravel 12 monolith, PHP 8.4, MySQL 8, Redis, FrankenPHP.
-- **Frontend:** Vue 3, TypeScript, Inertia v3, Tailwind CSS 4.
+- **Backend:** **Laravel 13** monolith, PHP 8.4, MySQL 8, Redis, FrankenPHP.
+- **Frontend:** Vue 3, TypeScript, **Inertia v3** (`@inertiajs/vue3 ^3.0`, `inertiajs/inertia-laravel 3.x`), Tailwind CSS 4.
 - **Architecture:** Hybrid modular monolith.
   - New business logic → `app/Modules/{Domain}/`.
   - Extend `app/Services/*` only when modifying existing service-led areas.
 - **Auth:** Sanctum + actor middleware for student/parent/lecturer API surfaces.
 - **Runtime:** Docker-first. Always use `./scripts/dev.sh ...` wrappers.
+
+> **CRITICAL — Version awareness:** This project runs **Laravel 13** and **Inertia v3**. Many Inertia v2 / Laravel 12 APIs are removed or renamed. Before writing any Inertia or Laravel code, consult `docs/inertiajs-vue-info.md` and `.devin/skills/swinx-frontend/`. Never use deprecated patterns from older versions.
 
 ## Source of Truth
 
@@ -30,6 +32,7 @@ Read these before planning meaningful changes:
 - `docs/project-overview-pdr.md` — product and domain baseline
 - `docs/codebase-summary.md` — current codebase snapshot
 - `docs/design-guidelines.md` — UI and frontend standards
+- `docs/inertiajs-vue-info.md` — **Inertia v3 API reference** (must-read for any frontend work)
 
 Use `docs/rules/` for task-specific rules (see `docs/rules/README.md` for index).
 
@@ -120,6 +123,29 @@ Full details in `docs/rules/frontend.md`, `docs/rules/filtering.md`, `docs/rules
 - Use `route(...)` helpers over literal URL paths.
 - Use `lucide-vue-next` icons and existing `@/components/ui` primitives.
 
+## Inertia v3 API Rules (mandatory)
+
+These rules reflect breaking changes from Inertia v2 → v3. Violating these will produce runtime errors.
+
+### Backend (Laravel)
+- **Deferred props:** `Inertia::defer(fn () => ...)` — lazy-loaded after initial page render.
+- **Static props:** `Inertia::once(fn () => ...)` — sent only on first visit, never on partial reloads.
+- **Flash messages:** `Inertia::flash('success', 'message')` — not `->with('success', ...)`.
+
+### Frontend (Vue)
+- **`<Deferred>` component:** Uses a **string** `data` prop, not an array bind.
+  - Correct: `<Deferred data="scoresData">`
+  - Wrong: `<Deferred :data="['scoresData']">`
+- **`<Deferred>` slots:** `#fallback` for skeleton, `#default="{ reloading }"` for loaded state with refresh indicator.
+- **Props are snake_case:** Laravel JSON serialization sends `class_sessions`, not `classSessions`. TypeScript interfaces must match.
+
+### Removed / renamed APIs (do NOT use)
+- `Inertia::lazy()` → use `Inertia::defer()` or `Inertia::optional()`
+- `$page.props.flash` → use `usePage().props.flash` with `Inertia::flash()`
+- `<Link>` `preserve-state` attribute → check v3 docs for new API
+
+> Full reference: `docs/inertiajs-vue-info.md` | Project patterns: `.devin/skills/swinx-frontend/`
+
 ## Forbidden Patterns
 
 These are the top mistakes that break architecture or produce bugs:
@@ -135,6 +161,10 @@ These are the top mistakes that break architecture or produce bugs:
 | Run artisan directly | `php artisan migrate` | `./scripts/dev.sh artisan migrate` |
 | Literal URL in frontend | `router.visit('/academic/records')` | `route('academic.records.index')` |
 | Invent schema fields | Guess column/relation names | Verify in migration files or existing model |
+| Inertia deferred prop | `Inertia::lazy(fn () => ...)` | `Inertia::defer(fn () => ...)` |
+| Deferred component bind | `<Deferred :data="['x']">` | `<Deferred data="x">` |
+| Flash message | `->with('success', 'msg')` | `Inertia::flash('success', 'msg')` |
+| Prop casing in TS | `classSessions: Session[]` | `class_sessions: Session[]` (snake_case) |
 
 ## Security & Authorization
 

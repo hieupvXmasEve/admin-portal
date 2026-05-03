@@ -20,6 +20,7 @@ import { AlertCircle, ArrowLeft, Calendar, CheckSquare, Edit, MapPin, UserPlus, 
 import { useForm } from 'vee-validate';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
+import { route } from 'ziggy-js';
 import { z } from 'zod';
 
 interface Props {
@@ -327,7 +328,7 @@ const getDeliveryModeIcon = (mode: string) => {
 
 // Navigation functions
 const navigateBack = () => {
-    router.visit(`/course-offerings/${props.session.course_offering_id}`);
+    router.visit(route('course-offerings.show', props.session.course_offering_id));
 };
 
 const editSession = () => {
@@ -379,7 +380,7 @@ const generateAttendance = () => {
             <div class="flex items-center gap-4">
                 <Button variant="ghost" size="sm" @click="navigateBack">
                     <ArrowLeft class="mr-2 h-4 w-4" />
-                    Back to
+                    Back to {{ session.course_offering?.curriculum_unit?.unit?.code || session.course_offering?.course_code || 'Course' }}
                 </Button>
                 <div>
                     <h1 class="text-3xl font-bold tracking-tight">{{ session.session_title }}</h1>

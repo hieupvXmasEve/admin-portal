@@ -9,6 +9,7 @@ import { formatSubmissionTypes } from '@/utils/canvasGradeFormatter';
 import { Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft, BarChart3, BookOpen, Calendar, CheckCircle, User, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import { route } from 'ziggy-js';
 
 interface AssessmentDetail {
     id: number;
@@ -279,12 +280,20 @@ const getGradeStatusLabel = (status: string): string => {
                     </p>
                 </div>
             </div>
-            <Link :href="`/course-statistics/${course_offering.id}/students`">
-                <Button variant="outline" size="sm">
-                    <CheckCircle class="mr-2 h-4 w-4" />
-                    Attendance
-                </Button>
-            </Link>
+            <div class="flex items-center gap-2">
+                <Link :href="route('course-offerings.show', course_offering.id) + '?tab=scores'">
+                    <Button variant="outline" size="sm">
+                        <BookOpen class="mr-2 h-4 w-4" />
+                        View in Course Offering
+                    </Button>
+                </Link>
+                <Link :href="`/course-statistics/${course_offering.id}/students`">
+                    <Button variant="outline" size="sm">
+                        <CheckCircle class="mr-2 h-4 w-4" />
+                        Attendance
+                    </Button>
+                </Link>
+            </div>
         </div>
 
         <!-- Statistics Cards -->

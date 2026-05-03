@@ -15,11 +15,13 @@ import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import type { PaginatedResponse } from '@/types';
 import type { CourseOffering, Semester } from '@/types/models';
+import { courseRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ColumnDef } from '@tanstack/vue-table';
-import { BarChart3, Calculator, CheckCircle, Copy, Edit, Eye, MoreHorizontal, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
+import { BarChart3, CheckCircle, Copy, Edit, Eye, MoreHorizontal, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
 import { h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
+import { route } from 'ziggy-js';
 
 interface CourseOfferingFilters {
     search: string;
@@ -50,7 +52,6 @@ interface Props {
         warning?: string;
         info?: string;
     };
-    surveyForms: { id: number; title: string; code: string }[];
 }
 const props = defineProps<Props>();
 
@@ -82,8 +83,6 @@ const isLoading = ref(false);
 const statistics = ref<any>(null);
 const showStatusDialog = ref(false);
 const selectedCourse = ref<CourseOffering | null>(null);
-const showSurveyDialog = ref(false);
-const selectedFormId = ref<string>('');
 
 // Initialize the confirm dialog composable
 const confirmDialog = useGlobalConfirmDialog();
@@ -130,7 +129,7 @@ loadStatistics();
 
 const toggleStatus = (courseOffering: CourseOffering) => {
     router.patch(
-        `/course-offerings/${courseOffering.id}/toggle-status`,
+        route('course-offerings.toggle-status', courseOffering.id),
         {},
         {
             onSuccess: () => {
@@ -150,7 +149,7 @@ const deleteCourseOffering = (courseOffering: CourseOffering) => {
 
     confirmDialog.confirmDelete(itemName, 'course offering', () => {
         return new Promise((resolve, reject) => {
-            router.delete(`/course-offerings/${courseOffering.id}`, {
+            router.delete(route('course-offerings.destroy', courseOffering.id), {
                 onSuccess: (page) => {
                     // Check if there's a flash error message (indicates deletion failed)
                     if ((page.props as any).flash?.error) {
@@ -187,7 +186,7 @@ const duplicateCourseOffering = (courseOffering: CourseOffering) => {
             onConfirm: () => {
                 return new Promise((resolve, reject) => {
                     router.post(
-                        `/course-offerings/${courseOffering.id}/duplicate`,
+                        route('course-offerings.duplicate', courseOffering.id),
                         {},
                         {
                             onSuccess: () => {
@@ -201,45 +200,6 @@ const duplicateCourseOffering = (courseOffering: CourseOffering) => {
                         },
                     );
                 });
-            },
-        },
-    );
-};
-
-const openSurveyDialog = (courseOffering: CourseOffering) => {
-    selectedCourse.value = courseOffering;
-    // Auto select if only one form available
-    if (props.surveyForms.length === 1) {
-        selectedFormId.value = props.surveyForms[0].id.toString();
-    } else {
-        selectedFormId.value = '';
-    }
-    showSurveyDialog.value = true;
-};
-
-const closeSurveyDialog = () => {
-    showSurveyDialog.value = false;
-    selectedCourse.value = null;
-    selectedFormId.value = '';
-};
-
-const handleCreateSurvey = () => {
-    if (!selectedCourse.value || !selectedFormId.value) {
-        toast.error('Please select a survey form');
-        return;
-    }
-
-    router.post(
-        `/course-offerings/${selectedCourse.value.id}/survey`,
-        { form_id: selectedFormId.value },
-        {
-            onSuccess: () => {
-                toast.success('Survey created and assigned successfully');
-                closeSurveyDialog();
-            },
-            onError: (errors) => {
-                const firstError = Object.values(errors)[0];
-                toast.error(Array.isArray(firstError) ? firstError[0] : (firstError as string) || 'Failed to create survey');
             },
         },
     );
@@ -271,11 +231,7 @@ const updateCourseStatus = async () => {
         router.reload();
         loadStatistics();
     } else {
-        const errorMessage =
-            apiData.value?.message ||
-            apiData.value?.error ||
-            apiData.value?.data?.message ||
-            'Failed to update course status';
+        const errorMessage = apiData.value?.message || apiData.value?.error || apiData.value?.data?.message || 'Failed to update course status';
         toast.error('Failed to update course status', {
             description: h(HeadlessToastWithProps, { message: errorMessage }),
         });
@@ -327,21 +283,6 @@ const bulkDelete = () => {
     );
 };
 
-const getCourseStatusBadge = (status: string) => {
-    switch (status) {
-        case 'not_started':
-            return { label: 'Not Started', variant: 'secondary' as const };
-        case 'in_progress':
-            return { label: 'In Progress', variant: 'default' as const };
-        case 'completed':
-            return { label: 'Completed', variant: 'outline' as const };
-        case 'cancelled':
-            return { label: 'Cancelled', variant: 'destructive' as const };
-        default:
-            return { label: status, variant: 'outline' as const };
-    }
-};
-
 const getDeliveryModeBadge = (mode: string) => {
     switch (mode) {
         case 'in_person':
@@ -357,45 +298,17 @@ const getDeliveryModeBadge = (mode: string) => {
     }
 };
 
-const recalculateCourseResult = (course: CourseOffering) => {
-    confirmDialog.showConfirmDialog(
-        {
-            title: 'Recalculate Course Results',
-            message: `Are you sure you want to recalculate results for "${course.unit?.code || course.course_code}"? This will update student grades and only send notifications to students whose pass/fail status has changed.`,
-            confirmText: 'Recalculate',
-        },
-        {
-            onConfirm: async () => {
-                isLoading.value = true;
-                try {
-                    const { data: apiData } = await api.post(`/api/course-offerings/${course.id}/recalculate`, {});
+// ---- Lifecycle badge helper ----
+const getLifecycleBadge = (course: CourseOffering): { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' } => {
+    const courseStatus = course.course_status || 'not_started';
+    const enrollmentStatus = course.enrollment_status || 'closed';
 
-                    if (apiData.value?.success) {
-                        const message = apiData.value.data?.message || 'Course results recalculated successfully';
-                        toast.success('Course results recalculated successfully', {
-                            description: h(HeadlessToastWithProps, { message }),
-                        });
-                        router.reload();
-                        loadStatistics();
-                    } else {
-                        console.log('apiData.value', apiData.value);
-                        const errorMessage = apiData.value?.message || 'Failed to recalculate course results';
-                        toast.error('Failed to recalculate course results', {
-                            description: h(HeadlessToastWithProps, { message: errorMessage }),
-                        });
-                    }
-                } catch (error: any) {
-                    console.log('error', error);
-                    const errorMessage = error?.response?.data?.message || error?.message || 'Failed to recalculate course results';
-                    toast.error('Failed to recalculate course results', {
-                        description: h(HeadlessToastWithProps, { message: errorMessage }),
-                    });
-                } finally {
-                    isLoading.value = false;
-                }
-            },
-        },
-    );
+    if (courseStatus === 'cancelled') return { label: 'Cancelled', variant: 'destructive' };
+    if (courseStatus === 'completed') return { label: 'Completed', variant: 'outline' };
+    if (courseStatus === 'in_progress') return { label: 'Teaching', variant: 'secondary' };
+    // not_started
+    if (enrollmentStatus === 'open') return { label: 'Enrolling', variant: 'default' };
+    return { label: 'Scheduled', variant: 'secondary' };
 };
 
 // Table columns definition
@@ -467,42 +380,6 @@ const columns: ColumnDef<CourseOffering>[] = [
         },
     },
     {
-        id: 'survey',
-        header: 'Survey',
-        cell: ({ row }) => {
-            const course = row.original;
-
-            // Don't show survey column for EGC units
-            if (course.unit?.unit_type === 'egc') {
-                return h('span', { class: 'text-xs text-muted-foreground' }, '-');
-            }
-
-            const hasSurvey = course.form_targets && course.form_targets.length > 0;
-
-            if (hasSurvey) {
-                return h(Badge, { variant: 'outline', class: 'bg-green-50 text-green-700 border-green-200' }, () => 'Created');
-            }
-
-            if (!props.surveyForms || props.surveyForms.length === 0) {
-                return h('span', { class: 'text-xs text-muted-foreground' }, 'No Forms');
-            }
-
-            return h(
-                Button,
-                {
-                    variant: 'outline',
-                    size: 'sm',
-                    class: 'h-7 text-xs',
-                    onClick: (e: Event) => {
-                        e.stopPropagation(); // Prevent row click
-                        openSurveyDialog(course);
-                    },
-                },
-                () => 'Create Survey',
-            );
-        },
-    },
-    {
         accessorKey: 'enrollment',
         header: 'Enrollment',
         cell: ({ row }) => {
@@ -520,11 +397,10 @@ const columns: ColumnDef<CourseOffering>[] = [
         },
     },
     {
-        accessorKey: 'course_status',
-        header: 'Course Status',
+        id: 'lifecycle',
+        header: 'Lifecycle',
         cell: ({ row }) => {
-            const status = row.original.course_status || 'not_started';
-            const badge = getCourseStatusBadge(status);
+            const badge = getLifecycleBadge(row.original);
             return h(Badge, { variant: badge.variant }, () => badge.label);
         },
     },
@@ -548,83 +424,45 @@ const columns: ColumnDef<CourseOffering>[] = [
             const isCancelled = courseStatus === 'cancelled';
             const canModify = !isCompleted && !isCancelled;
 
-            const menuItems = [
-                h(
-                    DropdownMenuItem,
-                    {
-                        onClick: () => router.visit(`/course-offerings/${course.id}`),
-                    },
-                    () => [h(Eye, { class: 'mr-2 h-4 w-4' }), 'View Details'],
-                ),
-                h(
-                    DropdownMenuItem,
-                    {
-                        onClick: () => {
-                            const statisticsUrl = `/course-statistics/${course.id}/assessment-scores`;
-                            router.visit(statisticsUrl);
-                        },
-                    },
-                    () => [h(BarChart3, { class: 'mr-2 h-4 w-4' }), 'View Statistics'],
-                ),
-                h(
-                    DropdownMenuItem,
-                    {
-                        onClick: () => duplicateCourseOffering(course),
-                    },
-                    () => [h(Copy, { class: 'mr-2 h-4 w-4' }), 'Duplicate'],
-                ),
-                // Recalculate Course Result (if course is completed)
-                isCompleted &&
-                    h(
-                        DropdownMenuItem,
-                        {
-                            onClick: () => recalculateCourseResult(course),
-                        },
-                        () => [h(Calculator, { class: 'mr-2 h-4 w-4' }), 'Recalculate Course Result'],
-                    ),
-            ];
+            // Mutation-only dropdown items
+            const menuItems: any[] = [h(DropdownMenuItem, { onClick: () => duplicateCourseOffering(course) }, () => [h(Copy, { class: 'mr-2 h-4 w-4' }), 'Duplicate'])];
 
             if (canModify) {
                 menuItems.push(
-                    h(
-                        DropdownMenuItem,
-                        {
-                            onClick: () => router.visit(`/course-offerings/${course.id}/edit`),
-                        },
-                        () => [h(Edit, { class: 'mr-2 h-4 w-4' }), 'Edit'],
-                    ),
-                    h(
-                        DropdownMenuItem,
-                        {
-                            onClick: () => openStatusDialog(course),
-                        },
-                        () => [h(CheckCircle, { class: 'mr-2 h-4 w-4 text-green-600' }), 'Mark as Completed'],
-                    ),
-                    h(
-                        DropdownMenuItem,
-                        {
-                            onClick: () => toggleStatus(course),
-                        },
-                        () => [course.enrollment_status === 'open' ? h(ToggleLeft, { class: 'mr-2 h-4 w-4' }) : h(ToggleRight, { class: 'mr-2 h-4 w-4' }), course.enrollment_status === 'open' ? 'Close Registration' : 'Open Registration'],
-                    ),
-                    h(
-                        DropdownMenuItem,
-                        {
-                            onClick: () => deleteCourseOffering(course),
-                            class: 'text-destructive',
-                        },
-                        () => [h(Trash2, { class: 'mr-2 h-4 w-4' }), 'Delete'],
-                    ),
+                    h(DropdownMenuItem, { onClick: () => router.visit(route('course-offerings.edit', course.id)) }, () => [h(Edit, { class: 'mr-2 h-4 w-4' }), 'Edit']),
+                    h(DropdownMenuItem, { onClick: () => openStatusDialog(course) }, () => [h(CheckCircle, { class: 'mr-2 h-4 w-4 text-green-600' }), 'Mark as Completed']),
+                    h(DropdownMenuItem, { onClick: () => toggleStatus(course) }, () => [
+                        course.enrollment_status === 'open' ? h(ToggleLeft, { class: 'mr-2 h-4 w-4' }) : h(ToggleRight, { class: 'mr-2 h-4 w-4' }),
+                        course.enrollment_status === 'open' ? 'Close Registration' : 'Open Registration',
+                    ]),
+                    h(DropdownMenuItem, { onClick: () => deleteCourseOffering(course), class: 'text-destructive' }, () => [h(Trash2, { class: 'mr-2 h-4 w-4' }), 'Delete']),
                 );
             }
 
-            return h(
+            // Eye icon (always visible, outside dropdown)
+            const eyeButton = h(
+                Button,
+                {
+                    variant: 'ghost',
+                    size: 'sm',
+                    title: 'View Details',
+                    onClick: (e: Event) => {
+                        e.stopPropagation();
+                        router.visit(route('course-offerings.show', course.id));
+                    },
+                },
+                () => h(Eye, { class: 'h-4 w-4' }),
+            );
+
+            const dropdownMenu = h(
                 DropdownMenu,
                 {},
                 {
                     default: () => [h(DropdownMenuTrigger, { asChild: true }, () => h(Button, { variant: 'ghost', class: 'h-8 w-8 p-0' }, () => h(MoreHorizontal, { class: 'h-4 w-4' }))), h(DropdownMenuContent, { align: 'end' }, () => menuItems)],
                 },
             );
+
+            return h('div', { class: 'flex items-center gap-1' }, [eyeButton, dropdownMenu]);
         },
     },
 ];
@@ -643,7 +481,7 @@ const columns: ColumnDef<CourseOffering>[] = [
                 <BarChart3 class="mr-2 h-4 w-4" />
                 Refresh Stats
             </Button>
-            <Link href="/course-offerings/create">
+            <Link :href="courseRoutes.offerings.create()">
                 <Button>
                     <Plus class="mr-2 h-4 w-4" />
                     Create Course Offering
@@ -792,7 +630,21 @@ const columns: ColumnDef<CourseOffering>[] = [
     <!-- Data Table -->
     <Card>
         <CardContent class="px-4">
-            <DataTable :data="courseOfferings.data" :columns="columns" :loading="isLoading" v-model:selected="selectedItems" row-key="id" />
+            <DataTable
+                :data="courseOfferings.data"
+                :columns="columns"
+                :loading="isLoading"
+                v-model:selected="selectedItems"
+                row-key="id"
+                @row-click="
+                    (row, e) => {
+                        // Ignore clicks on action buttons (target closest button/a)
+                        const target = e.target as HTMLElement;
+                        if (target.closest('button') || target.closest('a') || target.closest('[role=menuitem]')) return;
+                        router.visit(route('course-offerings.show', row.id));
+                    }
+                "
+            />
         </CardContent>
     </Card>
 
@@ -835,45 +687,6 @@ const columns: ColumnDef<CourseOffering>[] = [
                     <LoadingSpinner v-if="isLoading" size="sm" />
                     {{ isLoading ? 'Processing...' : 'Confirm Completion' }}
                 </Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
-
-    <!-- Create Survey Dialog -->
-    <Dialog v-model:open="showSurveyDialog">
-        <DialogContent class="sm:max-w-md">
-            <DialogHeader>
-                <DialogTitle>Create Course Survey</DialogTitle>
-                <DialogDescription>
-                    <template v-if="selectedCourse">
-                        Select a survey form for <strong>{{ selectedCourse.unit?.code }}</strong>
-                        <span v-if="selectedCourse.section_code"> - Section {{ selectedCourse.section_code }}</span>
-                    </template>
-                </DialogDescription>
-            </DialogHeader>
-            <div class="min-w-0 space-y-4 overflow-hidden py-4">
-                <div class="min-w-0 space-y-2 overflow-hidden">
-                    <label class="text-sm font-medium">Select Survey Form</label>
-                    <div class="grid w-full min-w-0 grid-cols-1 overflow-hidden">
-                        <Select v-model="selectedFormId">
-                            <SelectTrigger class="w-full min-w-0 overflow-hidden">
-                                <SelectValue placeholder="Select a form" class="block truncate text-left" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem v-for="form in surveyForms" :key="form.id" :value="form.id.toString()">
-                                    <span class="block max-w-[280px] truncate" :title="`${form.title} (${form.code})`"> {{ form.title }} ({{ form.code }}) </span>
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-                <div class="space-y-3 rounded-md border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
-                    <p class="text-sm text-blue-800 dark:text-blue-200">This will create a survey target for this course and automatically assign it to all enrolled students.</p>
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" @click="closeSurveyDialog">Cancel</Button>
-                <Button :disabled="!selectedFormId" @click="handleCreateSurvey">Create Survey</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>

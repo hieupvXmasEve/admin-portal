@@ -12,6 +12,7 @@ use App\Http\Resources\CourseStatisticsResource;
 use App\Models\CourseOffering;
 use App\Http\Resources\UnitStatisticsResource;
 use App\Models\Semester;
+use App\Modules\Academic\Queries\GetCourseOfferingScoresQuery;
 use App\Services\CourseStatisticsService;
 use App\Services\ExcelExportService;
 use Inertia\Inertia;
@@ -98,7 +99,7 @@ class CourseStatisticsController extends Controller
 
     public function assessmentScores(CourseOffering $courseOffering): Response
     {
-        $data = $this->service->getAssessmentScoresGrid($courseOffering->id);
+        $data = GetCourseOfferingScoresQuery::handle($courseOffering);
 
         return Inertia::render('CourseStatistics/AssessmentScores', $data);
     }

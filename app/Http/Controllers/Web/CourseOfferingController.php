@@ -20,6 +20,8 @@ use App\Models\Student;
 use App\Models\Unit;
 use App\Modules\Academic\Actions\MoveStudentToSectionAction;
 use App\Modules\Academic\Http\Requests\MoveStudentRequest;
+use App\Modules\Academic\Queries\GetCourseOfferingScoresQuery;
+use App\Modules\Academic\Queries\GetCourseOfferingSurveyQuery;
 use App\Services\CourseSurveyService;
 use App\Services\SystemConfigService;
 use App\Support\CampusLogContext;
@@ -267,12 +269,16 @@ class CourseOfferingController extends Controller
 
             DB::commit();
 
-            return Redirect::back()->with('success', 'Survey created and assigned to students successfully.');
+            Inertia::flash('message', 'Survey created and assigned to students successfully.');
+
+            return Redirect::back();
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Failed to create survey: '.$e->getMessage());
 
-            return Redirect::back()->with('error', 'Failed to create survey: '.$e->getMessage());
+            Inertia::flash('error', 'Failed to create survey: '.$e->getMessage());
+
+            return Redirect::back();
         }
     }
 
@@ -455,11 +461,29 @@ class CourseOfferingController extends Controller
             ->with(['lecture:id,first_name,last_name'])
             ->get(['id', 'section_code', 'current_enrollment', 'max_capacity', 'schedule_days', 'schedule_time_start', 'schedule_time_end', 'lecture_id']);
 
+        // Survey forms for the SurveyTab create dialog
+        $surveyForms = Form::where('type', 'survey')
+            ->where('status', 'active')
+            ->get(['id', 'title', 'code']);
+
         return Inertia::render('course-offerings/Show', [
+            // Eager — needed by Overview, Sessions, Students tabs
             'courseOffering' => $courseOffering,
-            'availableRooms' => $availableRooms,
-            'siblingOfferings' => $siblings,
-            // 'canGenerateClassSessions' => $canGenerateClassSessions,
+
+            // Once — rarely change during page session, skip on partial reloads
+            'availableRooms' => Inertia::once(fn () => $availableRooms),
+            'siblingOfferings' => Inertia::once(fn () => $siblings),
+            'surveyForms' => Inertia::once(fn () => $surveyForms),
+
+            // Deferred — loaded after initial render, in separate named groups (parallel)
+            'scoresData' => Inertia::defer(
+                fn () => GetCourseOfferingScoresQuery::handle($courseOffering),
+                'scores'
+            ),
+            'surveyData' => Inertia::defer(
+                fn () => GetCourseOfferingSurveyQuery::handle($courseOffering),
+                'survey'
+            ),
         ]);
     }
 

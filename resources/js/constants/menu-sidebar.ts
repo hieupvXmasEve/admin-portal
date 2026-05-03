@@ -259,25 +259,6 @@ export const mainNavItems: NavItem[] = [
         ],
     },
     {
-        title: 'Attendance Management',
-        href: '#',
-        icon: CheckSquare,
-        children: [
-            {
-                title: 'Class Sessions',
-                href: attendanceRoutes.classSessions.index(),
-                icon: CalendarIcon,
-                requiredPermissions: ['view_attendance'], // Will be implemented later
-            },
-            {
-                title: 'Attendance Reports',
-                href: attendanceRoutes.attendance.index(),
-                icon: FileText,
-                requiredPermissions: ['view_attendance'], // Will be implemented later
-            },
-        ],
-    },
-    {
         title: 'Reports & Analytics',
         href: '#',
         icon: BarChart3,
@@ -286,6 +267,12 @@ export const mainNavItems: NavItem[] = [
                 title: 'Course Statistics',
                 href: '/course-statistics',
                 icon: BarChart3,
+                requiredPermissions: ['view_attendance'],
+            },
+            {
+                title: 'Attendance Summary',
+                href: attendanceRoutes.attendance.index(),
+                icon: FileText,
                 requiredPermissions: ['view_attendance'],
             },
             {

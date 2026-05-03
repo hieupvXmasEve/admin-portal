@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft, BarChart3, Calendar, CheckCircle, Clock, Download, User, Users, XCircle } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import { route } from 'ziggy-js';
 
 interface Session {
     id: number;
@@ -138,12 +139,20 @@ const getStatusLabel = (status: string) => {
                     </p>
                 </div>
             </div>
-            <Link :href="`/course-statistics/${course_offering.id}/assessment-scores`">
-                <Button variant="outline" size="sm">
-                    <BarChart3 class="mr-2 h-4 w-4" />
-                    Assessment Scores
-                </Button>
-            </Link>
+            <div class="flex items-center gap-2">
+                <Link :href="route('course-offerings.show', course_offering.id) + '?tab=sessions'">
+                    <Button variant="outline" size="sm">
+                        <CheckCircle class="mr-2 h-4 w-4" />
+                        View in Course Offering
+                    </Button>
+                </Link>
+                <Link :href="`/course-statistics/${course_offering.id}/assessment-scores`">
+                    <Button variant="outline" size="sm">
+                        <BarChart3 class="mr-2 h-4 w-4" />
+                        Assessment Scores
+                    </Button>
+                </Link>
+            </div>
         </div>
 
         <!-- Statistics Cards -->
