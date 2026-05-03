@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
+use App\Actions\Form\CreateFormTargetAction;
+use App\Actions\Form\GenerateStudentAssignmentsAction;
 use App\Constants\CourseOfferingRoutes;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCourseOfferingRequest;
 use App\Http\Requests\UpdateCourseOfferingRequest;
 use App\Http\Responses\ApiResponse;
+use App\Models\AcademicRecord;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
@@ -17,6 +20,7 @@ use App\Models\Lecture;
 use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Modules\Academic\Actions\MoveStudentToSectionAction;
 use App\Modules\Academic\Http\Requests\MoveStudentRequest;
@@ -25,6 +29,7 @@ use App\Modules\Academic\Queries\GetCourseOfferingSurveyQuery;
 use App\Services\CourseSurveyService;
 use App\Services\SystemConfigService;
 use App\Support\CampusLogContext;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -32,6 +37,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -226,8 +232,8 @@ class CourseOfferingController extends Controller
     public function createSurvey(
         Request $request,
         CourseOffering $courseOffering,
-        \App\Actions\Form\CreateFormTargetAction $createFormTargetAction,
-        \App\Actions\Form\GenerateStudentAssignmentsAction $generateStudentAssignmentsAction
+        CreateFormTargetAction $createFormTargetAction,
+        GenerateStudentAssignmentsAction $generateStudentAssignmentsAction
     ): RedirectResponse {
         // Ensure the course offering belongs to current campus
         if ($courseOffering->campus_id !== app('campus')->id) {
@@ -249,7 +255,7 @@ class CourseOfferingController extends Controller
             $semester = $courseOffering->semester;
             $startAt = now();
             // Default end_at to 2 weeks after semester end, or 4 weeks from now if no semester end
-            $endAt = $semester ? \Carbon\Carbon::parse($semester->end_date)->addWeeks(2) : now()->addWeeks(4);
+            $endAt = $semester ? Carbon::parse($semester->end_date)->addWeeks(2) : now()->addWeeks(4);
 
             $formTarget = $createFormTargetAction->execute([
                 'form_id' => $validated['form_id'],
@@ -321,7 +327,7 @@ class CourseOfferingController extends Controller
             ->get(['id', 'first_name', 'last_name', 'email', 'academic_rank']);
 
         // Get available syllabus templates (now loaded dynamically when unit is selected)
-        $syllabusTemplates = \App\Models\SyllabusTemplate::where('is_active', true)
+        $syllabusTemplates = SyllabusTemplate::where('is_active', true)
             ->with(['unit:id,code,name', 'applicableCampus:id,name', 'applicableProgram:id,name'])
             ->orderBy('title')
             ->get(['id', 'unit_id', 'title', 'version', 'description', 'applicable_campus_id', 'applicable_program_id', 'delivery_mode']);
@@ -501,7 +507,7 @@ class CourseOfferingController extends Controller
             MoveStudentToSectionAction::run($request->validated());
 
             return ApiResponse::success(null, [], 'Student moved successfully.');
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             throw $e;
         } catch (\Exception $e) {
             Log::error('Failed to move student: '.$e->getMessage());
@@ -540,7 +546,7 @@ class CourseOfferingController extends Controller
             ->get(['id', 'first_name', 'last_name', 'email', 'academic_rank']);
 
         // Get available syllabus templates of unit
-        $syllabusTemplates = \App\Models\SyllabusTemplate::where('is_active', true)
+        $syllabusTemplates = SyllabusTemplate::where('is_active', true)
             ->where('unit_id', $courseOffering->unit_id)
             ->with(['unit:id,code,name', 'applicableCampus:id,name', 'applicableProgram:id,name'])
             ->orderBy('title')
@@ -766,8 +772,8 @@ class CourseOfferingController extends Controller
                 'date_format:H:i',
                 function ($attribute, $value, $fail) use ($request) {
                     if ($value && $request->start_time) {
-                        $start = \Carbon\Carbon::createFromFormat('H:i', $request->start_time);
-                        $end = \Carbon\Carbon::createFromFormat('H:i', $value);
+                        $start = Carbon::createFromFormat('H:i', $request->start_time);
+                        $end = Carbon::createFromFormat('H:i', $value);
                         if ($end->lte($start)) {
                             $fail('The end time must be after start time.');
                         }
@@ -821,8 +827,8 @@ class CourseOfferingController extends Controller
             // Calculate duration if times are being updated
             if (isset($updateData['start_time']) && isset($updateData['end_time'])) {
                 // Both times provided - calculate duration once
-                $start = \Carbon\Carbon::createFromFormat('H:i:s', $updateData['start_time']);
-                $end = \Carbon\Carbon::createFromFormat('H:i:s', $updateData['end_time']);
+                $start = Carbon::createFromFormat('H:i:s', $updateData['start_time']);
+                $end = Carbon::createFromFormat('H:i:s', $updateData['end_time']);
                 $updateData['duration_minutes'] = $start->diffInMinutes($end);
 
                 // Update all sessions using mass update (better performance)
@@ -840,8 +846,8 @@ class CourseOfferingController extends Controller
                         : ($session->end_time ? $session->end_time->format('H:i:s') : null);
 
                     if ($sessionStart && $sessionEnd) {
-                        $start = \Carbon\Carbon::createFromFormat('H:i:s', $sessionStart);
-                        $end = \Carbon\Carbon::createFromFormat('H:i:s', $sessionEnd);
+                        $start = Carbon::createFromFormat('H:i:s', $sessionStart);
+                        $end = Carbon::createFromFormat('H:i:s', $sessionEnd);
                         $sessionUpdateData['duration_minutes'] = $start->diffInMinutes($end);
                     }
 
@@ -858,14 +864,26 @@ class CourseOfferingController extends Controller
             // Log bulk update activity (single log entry for the entire operation)
             $this->logBulkUpdateActivity($courseOffering, $sessions, $updateData);
 
-            return ApiResponse::success([
-                'updated_count' => $sessions->count(),
-            ], [], "Successfully updated {$sessions->count()} class session(s).");
+            $count = $sessions->count();
+
+            if ($request->expectsJson()) {
+                return ApiResponse::success(['updated_count' => $count], [], "Successfully updated {$count} class session(s).");
+            }
+
+            Inertia::flash('message', "Successfully updated {$count} class session(s).");
+
+            return redirect()->back();
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Failed to bulk update class sessions: '.$e->getMessage());
 
-            return ApiResponse::error('Failed to update class sessions: '.$e->getMessage(), [], 500);
+            if ($request->expectsJson()) {
+                return ApiResponse::error('Failed to update class sessions: '.$e->getMessage(), [], 500);
+            }
+
+            Inertia::flash('error', 'Failed to update class sessions: '.$e->getMessage());
+
+            return redirect()->back();
         }
     }
 
@@ -1339,7 +1357,7 @@ class CourseOfferingController extends Controller
                     }
 
                     // Check if academic record already exists and force delete any soft-deleted ones
-                    $existingAcademicRecord = \App\Models\AcademicRecord::withTrashed()
+                    $existingAcademicRecord = AcademicRecord::withTrashed()
                         ->where('student_id', $student->id)
                         ->where('course_offering_id', $courseOffering->id)
                         ->first();
@@ -1405,7 +1423,7 @@ class CourseOfferingController extends Controller
                     }
 
                     // Check previous attempts from academic_records to determine if this is a retake
-                    $previousAttempts = \App\Models\AcademicRecord::where('student_id', $student->id)
+                    $previousAttempts = AcademicRecord::where('student_id', $student->id)
                         ->where('unit_id', $courseOffering->unit_id)
                         ->orderBy('attempt_number', 'desc')
                         ->get();
@@ -1430,7 +1448,7 @@ class CourseOfferingController extends Controller
                     ]);
 
                     // Create academic record immediately with proper retake tracking
-                    \App\Models\AcademicRecord::create([
+                    AcademicRecord::create([
                         'student_id' => $student->id,
                         'course_offering_id' => $courseOffering->id,
                         'semester_id' => $courseOffering->semester_id,
@@ -1896,7 +1914,7 @@ class CourseOfferingController extends Controller
 
             // Force delete ALL academic records for this student + offering (including soft-deleted ones)
             // After removing unique constraints, there might be multiple records
-            $academicRecords = \App\Models\AcademicRecord::withTrashed()
+            $academicRecords = AcademicRecord::withTrashed()
                 ->where('course_offering_id', $courseOffering->id)
                 ->where('student_id', $studentDbId)
                 ->get();

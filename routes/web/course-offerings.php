@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Constants\CourseOfferingRoutes;
+use App\Http\Controllers\Api\ClassSessionController;
 use App\Http\Controllers\Web\CourseOfferingController;
 use Illuminate\Support\Facades\Route;
 
@@ -126,13 +127,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Class Session Management
         // ============================================
         Route::prefix('/{courseOffering}/class-sessions')->group(function () {
-            Route::get('/', [\App\Http\Controllers\Api\ClassSessionController::class, 'index'])
+            Route::get('/', [ClassSessionController::class, 'index'])
                 ->middleware('can:view_course_offering');
-            Route::post('/generate', [\App\Http\Controllers\Api\ClassSessionController::class, 'generate'])
+            Route::post('/generate', [ClassSessionController::class, 'generate'])
                 ->middleware('can:edit_course_offering');
             Route::post('/bulk-update', [CourseOfferingController::class, 'bulkUpdateClassSessions'])
-                ->middleware('can:edit_course_offering');
-            Route::delete('/', [\App\Http\Controllers\Api\ClassSessionController::class, 'destroy'])
+                ->middleware('can:edit_course_offering')
+                ->name('course-offerings.bulk-update-class-sessions');
+            Route::delete('/', [ClassSessionController::class, 'destroy'])
                 ->middleware('can:edit_course_offering');
         });
     });
@@ -140,15 +142,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ============================================
     // Individual Class Session Management (API)
     // ============================================
-    Route::post('api/class-sessions', [\App\Http\Controllers\Api\ClassSessionController::class, 'store'])
+    Route::post('api/class-sessions', [ClassSessionController::class, 'store'])
         ->middleware('can:edit_course_offering')
         ->name('api.class-sessions.store');
 
-    Route::delete('api/class-sessions/bulk', [\App\Http\Controllers\Api\ClassSessionController::class, 'bulkDestroy'])
+    Route::delete('api/class-sessions/bulk', [ClassSessionController::class, 'bulkDestroy'])
         ->middleware('can:edit_course_offering')
         ->name('api.class-sessions.bulk-destroy');
 
-    Route::delete('api/class-sessions/{classSession}', [\App\Http\Controllers\Api\ClassSessionController::class, 'destroySingle'])
+    Route::delete('api/class-sessions/{classSession}', [ClassSessionController::class, 'destroySingle'])
         ->middleware('can:edit_course_offering')
         ->name('api.class-sessions.destroy');
 });

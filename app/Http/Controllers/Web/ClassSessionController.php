@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\GenerateClassSessionsRequest;
 use App\Models\ClassSession;
+use App\Models\CourseOffering;
+use App\Models\Lecture;
 use App\Models\Room;
 use App\Services\ClassSessionService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Validation\Rule;
@@ -377,6 +381,154 @@ class ClassSessionController extends Controller
         }
 
         Inertia::flash('message', 'Class session deleted successfully.');
+
+        return redirect()->back();
+    }
+
+    /**
+     * Show the Add Session modal for a specific course offering.
+     * Props are minimal — rooms + lecturers for the campus.
+     */
+    public function createForOffering(CourseOffering $courseOffering): Response
+    {
+        if ($courseOffering->campus_id !== app('campus')->id) {
+            abort(404);
+        }
+
+        $rooms = Room::bookable()
+            ->withStatus(Room::STATUS_AVAILABLE)
+            ->forCampus($courseOffering->campus_id)
+            ->with('building:id,name')
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'capacity', 'type', 'building_id']);
+
+        $lecturers = Lecture::active()
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'display_name']);
+
+        return Inertia::render('class-sessions/modals/Add', [
+            'courseOffering' => [
+                'id' => $courseOffering->id,
+                'course_code' => $courseOffering->course_code,
+                'course_title' => $courseOffering->course_title,
+                'campus_id' => $courseOffering->campus_id,
+                'schedule_time_start' => $courseOffering->schedule_time_start?->format('H:i'),
+                'schedule_time_end' => $courseOffering->schedule_time_end?->format('H:i'),
+                'syllabus_template' => $courseOffering->syllabusTemplate
+                    ? ['total_sessions' => $courseOffering->syllabusTemplate->total_sessions]
+                    : null,
+                'class_sessions_count' => $courseOffering->classSessions()->count(),
+            ],
+            'rooms' => $rooms,
+            'lecturers' => $lecturers,
+        ]);
+    }
+
+    /**
+     * Show the QuickEdit Session modal.
+     */
+    public function editModal(ClassSession $classSession): Response
+    {
+        $courseOffering = $classSession->courseOffering;
+        if ($courseOffering->campus_id !== app('campus')->id) {
+            abort(404);
+        }
+
+        $rooms = Room::bookable()
+            ->withStatus(Room::STATUS_AVAILABLE)
+            ->forCampus($courseOffering->campus_id)
+            ->with('building:id,name')
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'capacity', 'type', 'building_id']);
+
+        $lecturers = Lecture::active()
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'display_name']);
+
+        $classSession->load('room:id,name', 'lecture:id,first_name,last_name,display_name');
+
+        return Inertia::render('class-sessions/modals/QuickEdit', [
+            'session' => $classSession,
+            'rooms' => $rooms,
+            'lecturers' => $lecturers,
+        ]);
+    }
+
+    /**
+     * Show the BulkEdit modal for selected sessions.
+     * Sessions are passed as query param IDs — loaded server-side.
+     */
+    public function bulkEditModal(Request $request, CourseOffering $courseOffering): Response
+    {
+        if ($courseOffering->campus_id !== app('campus')->id) {
+            abort(404);
+        }
+
+        $sessionIds = array_filter(explode(',', $request->query('ids', '')));
+
+        $sessions = ClassSession::whereIn('id', $sessionIds)
+            ->where('course_offering_id', $courseOffering->id)
+            ->get(['id', 'session_title', 'session_date', 'start_time', 'end_time', 'course_offering_id']);
+
+        $rooms = Room::bookable()
+            ->withStatus(Room::STATUS_AVAILABLE)
+            ->forCampus($courseOffering->campus_id)
+            ->with('building:id,name')
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'capacity', 'type', 'building_id']);
+
+        $lecturers = Lecture::active()
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'display_name']);
+
+        return Inertia::render('class-sessions/modals/BulkEdit', [
+            'courseOffering' => ['id' => $courseOffering->id],
+            'sessions' => $sessions,
+            'rooms' => $rooms,
+            'lecturers' => $lecturers,
+        ]);
+    }
+
+    /**
+     * Bulk delete class sessions (web route for Inertia router.delete)
+     */
+    public function bulkDestroy(Request $request)
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer|exists:class_sessions,id',
+        ]);
+
+        $count = 0;
+        foreach ($validated['ids'] as $id) {
+            $session = ClassSession::find($id);
+            if ($session) {
+                $this->classSessionService->deleteClassSession($session);
+                $count++;
+            }
+        }
+
+        Inertia::flash('message', "{$count} session(s) deleted successfully.");
+
+        return redirect()->back();
+    }
+
+    /**
+     * Generate class sessions for a course offering (web route for Inertia useForm)
+     */
+    public function generate(GenerateClassSessionsRequest $request, CourseOffering $courseOffering)
+    {
+        $validated = $request->validated();
+
+        $sessions = $this->classSessionService->generateClassSessions(
+            $courseOffering,
+            $validated['room_id'],
+            isset($validated['start_date']) ? Carbon::parse($validated['start_date']) : null,
+            $validated['weekly_schedule'],
+            $validated['excluded_dates'] ?? []
+        );
+
+        Inertia::flash('message', "{$sessions->count()} class sessions generated successfully.");
 
         return redirect()->back();
     }

@@ -36,6 +36,29 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('can:delete_course_offering')
         ->name('class-sessions.destroy');
 
+    // Bulk delete (web route — for Inertia router.delete with only:[])
+    Route::delete('class-sessions', [ClassSessionController::class, 'bulkDestroy'])
+        ->middleware('can:delete_course_offering')
+        ->name('class-sessions.bulk-destroy');
+
+    // Generate sessions for a course offering (web route — for Inertia useForm)
+    Route::post('course-offerings/{courseOffering}/class-sessions/generate', [ClassSessionController::class, 'generate'])
+        ->middleware('can:edit_course_offering')
+        ->name('class-sessions.generate');
+
+    // Modal pages — route-based modals via @inertiaui/modal-vue
+    Route::get('course-offerings/{courseOffering}/class-sessions/add', [ClassSessionController::class, 'createForOffering'])
+        ->middleware('can:create_course_offering')
+        ->name('class-sessions.add-for-offering');
+
+    Route::get('class-sessions/{classSession}/quick-edit', [ClassSessionController::class, 'editModal'])
+        ->middleware('can:edit_course_offering')
+        ->name('class-sessions.quick-edit');
+
+    Route::get('course-offerings/{courseOffering}/class-sessions/bulk-edit', [ClassSessionController::class, 'bulkEditModal'])
+        ->middleware('can:edit_course_offering')
+        ->name('class-sessions.bulk-edit');
+
     // Generate attendance for a class session
     Route::post('class-sessions/{classSession}/generate-attendance', [ClassSessionController::class, 'generateAttendance'])
         ->middleware('can:create_course_offering')
