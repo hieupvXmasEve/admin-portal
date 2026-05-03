@@ -404,7 +404,7 @@ class ClassSessionController extends Controller
 
         $lecturers = Lecture::active()
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name', 'display_name']);
+            ->get(['id', 'first_name', 'last_name']);
 
         return Inertia::render('class-sessions/modals/Add', [
             'courseOffering' => [
@@ -443,9 +443,9 @@ class ClassSessionController extends Controller
 
         $lecturers = Lecture::active()
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name', 'display_name']);
+            ->get(['id', 'first_name', 'last_name']);
 
-        $classSession->load('room:id,name', 'lecture:id,first_name,last_name,display_name');
+        $classSession->load('room:id,name', 'lecture:id,first_name,last_name');
 
         return Inertia::render('class-sessions/modals/QuickEdit', [
             'session' => $classSession,
@@ -479,7 +479,7 @@ class ClassSessionController extends Controller
 
         $lecturers = Lecture::active()
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name', 'display_name']);
+            ->get(['id', 'first_name', 'last_name']);
 
         return Inertia::render('class-sessions/modals/BulkEdit', [
             'courseOffering' => ['id' => $courseOffering->id],
