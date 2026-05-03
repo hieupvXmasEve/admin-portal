@@ -51,12 +51,10 @@ const updateTabInURL = (newTab: ValidTab) => {
     } else {
         url.searchParams.set('tab', newTab);
     }
-    router.visit(url.pathname + url.search, {
-        preserveState: true,
-        preserveScroll: true,
-        replace: true,
-        only: [],
-    });
+    // Use history.replaceState — pure client-side URL update, zero BE round-trip.
+    // router.visit() always sends an HTTP request even with only:[], which is wasteful
+    // for pure UI tab switching where no new data is needed from the server.
+    history.replaceState(history.state, '', url.pathname + url.search);
 };
 
 const handleTabChange = (newTab: string | number) => {
