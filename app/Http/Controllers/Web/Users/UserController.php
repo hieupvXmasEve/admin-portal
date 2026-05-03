@@ -19,6 +19,7 @@ class UserController extends Controller
         protected RoleAssignmentService $roleAssignmentService
     ) {}
 
+    /** @deprecated Migrated to App\Modules\Identity\Http\Web\Admin\UserController. Remove after 2024-12-31. */
     public function index(Request $request, User $user)
     {
         // Validate input
@@ -77,6 +78,7 @@ class UserController extends Controller
         ]);
     }
 
+    /** @deprecated Migrated to App\Modules\Identity\Http\Web\Admin\UserController. Remove after 2024-12-31. */
     public function create()
     {
         $roleController = new \App\Http\Controllers\Web\RoleController(
@@ -90,6 +92,7 @@ class UserController extends Controller
         ]);
     }
 
+    /** @deprecated Migrated to App\Modules\Identity\Http\Web\Admin\UserController. Remove after 2024-12-31. */
     public function store(StoreUserRequest $request)
     {
         $this->userService->createUser($request->validated());
@@ -97,6 +100,7 @@ class UserController extends Controller
         return redirect()->route(UserRoutes::INDEX)->with('success', 'User created successfully!');
     }
 
+    /** @deprecated Migrated to App\Modules\Identity\Http\Web\Admin\UserController. Remove after 2024-12-31. */
     public function edit(User $user)
     {
         $roleController = new \App\Http\Controllers\Web\RoleController(
@@ -121,6 +125,7 @@ class UserController extends Controller
         ]);
     }
 
+    /** @deprecated Migrated to App\Modules\Identity\Http\Web\Admin\UserController. Remove after 2024-12-31. */
     public function update(UpdateUserRequest $request, User $user)
     {
         $this->userService->updateUser($user, $request->validated());
@@ -128,6 +133,7 @@ class UserController extends Controller
         return redirect()->route(UserRoutes::INDEX)->with('success', 'User updated successfully!');
     }
 
+    /** @deprecated Migrated to App\Modules\Identity\Http\Web\Admin\UserController. Remove after 2024-12-31. */
     public function destroy(User $user)
     {
         $this->userService->deleteUser($user);

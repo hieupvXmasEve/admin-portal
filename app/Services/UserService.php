@@ -15,11 +15,7 @@ class UserService
     {
         $this->roleAssignmentService = $roleAssignmentService;
     }
-    /**
-     * Create a new user.
-     *
-     * @param  array  $data  Validated data.
-     */
+    /** @deprecated Logic moved to App\Modules\Identity\Actions\CreateUserAction. Remove after 2024-12-31. */
     public function createUser(array $data): User
     {
         $userData = collect($data)->except('selectedRoles')->toArray();
@@ -37,12 +33,7 @@ class UserService
         return $user;
     }
 
-    /**
-     * Update an existing user.
-     *
-     * @param  User  $user  The user to update.
-     * @param  array  $data  Validated data.
-     */
+    /** @deprecated Logic moved to App\Modules\Identity\Actions\UpdateUserAction. Remove after 2024-12-31. */
     public function updateUser(User $user, array $data): User
     {
         $userData = collect($data)->except('selectedRoles')->toArray();
@@ -90,11 +81,7 @@ class UserService
         Log::info("Synced roles for user {$user->id} on campus {$currentCampusId}");
     }
 
-    /**
-     * Delete a user.
-     *
-     * @param  User  $user  The user to delete.
-     */
+    /** @deprecated Logic moved to App\Modules\Identity\Actions\DeleteUserAction. Remove after 2024-12-31. */
     public function deleteUser(User $user): void
     {
         $currentCampusId = session('current_campus_id');
