@@ -13,7 +13,7 @@ import type { FormTarget, Form } from '@/types/forms';
 import type { Semester } from '@/types/models';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { BarChart3, FileText, Search, X } from 'lucide-vue-next';
+import { BarChart3, X } from 'lucide-vue-next';
 import { computed, h } from 'vue';
 
 interface RunWithStats extends FormTarget {
@@ -46,7 +46,7 @@ const props = defineProps<{
 
 const data = computed(() => props.runs.data);
 
-const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilter, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection } = useInertiaFilters<ResultFilters>({
+const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilter, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection, buildUrl } = useInertiaFilters<ResultFilters>({
     baseUrl: '/forms/admin/results',
     initialFilters: {
         search: props.filters?.search || '',
@@ -69,6 +69,18 @@ const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilte
     only: ['runs', 'filters'],
     debounce: 400,
 });
+
+// Build the ?return= param to preserve filter state when navigating to Aggregate
+const buildReturnParam = () => {
+    const url = buildUrl(filters);
+    const qs = url.includes('?') ? url.split('?')[1] : '';
+    return qs ? encodeURIComponent(qs) : '';
+};
+
+const navigateToAggregate = (id: number) => {
+    const ret = buildReturnParam();
+    router.visit(`/forms/admin/results/${id}/aggregate${ret ? `?return=${ret}` : ''}`);
+};
 
 const getStatusBadgeVariant = (status: string): 'default' | 'secondary' | 'outline' | 'destructive' => {
     switch (status) {
@@ -130,18 +142,11 @@ const columns: ColumnDef<RunWithStats>[] = [
     {
         id: 'actions',
         header: 'Actions',
-        cell: ({ row }) => h('div', { class: 'flex items-center space-x-2' }, [
-            h(Button, {
-                variant: 'ghost',
-                size: 'sm',
-                onClick: () => router.visit(`/forms/admin/results/${row.original.id}/aggregate`)
-            }, () => [h(BarChart3, { class: 'w-4 h-4 mr-1' }), 'Aggregate']),
-            h(Button, {
-                variant: 'ghost',
-                size: 'sm',
-                onClick: () => router.visit(`/forms/admin/results/${row.original.id}/raw`)
-            }, () => [h(FileText, { class: 'w-4 h-4 mr-1' }), 'Raw']),
-        ]),
+        cell: ({ row }) => h(Button, {
+            variant: 'ghost',
+            size: 'sm',
+            onClick: () => navigateToAggregate(row.original.id),
+        }, () => [h(BarChart3, { class: 'w-4 h-4 mr-1' }), 'View']),
     }
 ];
 

@@ -11,7 +11,126 @@ use Illuminate\Support\Facades\DB;
 class GetSurveyRunAggregateAction
 {
     /**
-     * Get aggregated data for a specific survey run.
+     * Get header/KPI data only — cheap, always eager.
+     * Loads course info + response counts + overall sentiment KPIs.
+     */
+    public function executeHeader(FormTarget $target): array
+    {
+        $target->load(['form', 'semester', 'formVersion']);
+
+        $courseInfo = null;
+        if ($target->scope_type === 'course') {
+            $offering = CourseOffering::with(['unit', 'lecture'])->find($target->scope_id);
+            if ($offering) {
+                $instructor = $offering->lecture
+                    ? trim(($offering->lecture->title ? $offering->lecture->title . ' ' : '') . $offering->lecture->first_name . ' ' . $offering->lecture->last_name)
+                    : null;
+                $courseInfo = [
+                    'code'       => $offering->unit?->code,
+                    'name'       => $offering->unit?->name,
+                    'section'    => $offering->section_code,
+                    'instructor' => $instructor,
+                ];
+            }
+        }
+
+        $assignments    = DB::table('student_form_assignments')->where('form_target_id', $target->id)->get();
+        $responsesTotal = $assignments->count();
+        $responseIds    = $assignments->whereNotNull('response_id')->pluck('response_id');
+        $responsesDone  = $responseIds->count();
+        $responsePercent = $responsesTotal > 0 ? round(($responsesDone / $responsesTotal) * 100) : 0;
+
+        // Overall rating KPIs
+        $ratingAnswers  = Answer::whereIn('response_id', $responseIds)->whereNotNull('answer_number')->where('answer_number', '>', 0)->get();
+        $overallTotal   = $ratingAnswers->count();
+        $overallAvg     = $ratingAnswers->avg('answer_number');
+        $overallPositive = $ratingAnswers->where('answer_number', '>=', 4)->count();
+        $overallNeutral  = $ratingAnswers->where('answer_number', 3)->count();
+        $overallNegative = $ratingAnswers->where('answer_number', '<=', 2)->count();
+
+        return [
+            'header' => [
+                'course_info'       => $courseInfo,
+                'semester'          => $target->semester?->name,
+                'form_title'        => $target->form?->title,
+                'form_version'      => $target->formVersion?->version_name ?? '#' . $target->formVersion?->id,
+                'responses_done'    => $responsesDone,
+                'responses_total'   => $responsesTotal,
+                'responses_percent' => (int) $responsePercent,
+            ],
+            'overall' => [
+                'average'          => (float) round($overallAvg, 1),
+                'positive_percent' => $overallTotal > 0 ? (int) round(($overallPositive / $overallTotal) * 100) : 0,
+                'neutral_percent'  => $overallTotal > 0 ? (int) round(($overallNeutral  / $overallTotal) * 100) : 0,
+                'negative_percent' => $overallTotal > 0 ? (int) round(($overallNegative / $overallTotal) * 100) : 0,
+            ],
+        ];
+    }
+
+    /**
+     * Get per-section / per-question chart data — heavy, always deferred.
+     */
+    public function executeSections(FormTarget $target): array
+    {
+        $target->loadMissing(['formVersion']);
+
+        $assignments = DB::table('student_form_assignments')->where('form_target_id', $target->id)->get();
+        $responseIds = $assignments->whereNotNull('response_id')->pluck('response_id');
+
+        $version = $target->formVersion()->with(['sections.questions.options'])->first();
+        if (!$version) return ['sections' => []];
+
+        $allAnswers = Answer::whereIn('response_id', $responseIds)->with(['selectedOptions'])->get();
+
+        $sections = [];
+        foreach ($version->sections as $section) {
+            $questionsData          = [];
+            $sectionRatingQuestionIds = $section->questions->where('type', 'rating')->pluck('id');
+            $sectionRatingAnswers   = $allAnswers->whereIn('question_id', $sectionRatingQuestionIds)->whereNotNull('answer_number');
+            $sectionStats           = null;
+
+            if ($sectionRatingAnswers->isNotEmpty()) {
+                $count = $sectionRatingAnswers->count();
+                $sectionStats = [
+                    'average'          => (float) round($sectionRatingAnswers->avg('answer_number'), 1),
+                    'positive_percent' => $count > 0 ? round(($sectionRatingAnswers->where('answer_number', '>=', 4)->count() / $count) * 100) : 0,
+                    'negative_percent' => $count > 0 ? round(($sectionRatingAnswers->where('answer_number', '<=', 2)->count() / $count) * 100) : 0,
+                    'distribution'     => $this->getRatingDistribution($sectionRatingAnswers),
+                ];
+            }
+
+            foreach ($section->questions as $question) {
+                $qAnswers    = $allAnswers->where('question_id', $question->id);
+                $aggregation = $this->aggregateQuestion($question, $qAnswers);
+                if ($aggregation) {
+                    $questionsData[] = [
+                        'id'              => $question->id,
+                        'text'            => $question->text,
+                        'type'            => $question->type,
+                        'order'           => $question->order_index,
+                        'total_responses' => $qAnswers->count(),
+                        'data'            => $aggregation,
+                    ];
+                }
+            }
+
+            if (count($questionsData) > 0) {
+                $sections[] = [
+                    'id'        => $section->id,
+                    'title'     => $section->title,
+                    'stats'     => $sectionStats,
+                    'questions' => $questionsData,
+                ];
+            }
+        }
+
+        return ['sections' => $sections];
+    }
+
+    /**
+     * Full execute (kept for backward compatibility).
+     *
+     * @deprecated Prefer executeHeader() + executeSections() separately.
      */
     public function execute(FormTarget $target): array
     {
