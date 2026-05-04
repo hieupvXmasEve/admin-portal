@@ -241,6 +241,8 @@ Mistakes the agent will make without these corrections:
 17. **`DatePicker` inside modal → must pass `:portal-to="modalContentRef"`** — `useNativeDialog: false` creates a focus trap; without `portalTo`, `PopoverPortal` teleports outside the trap and the calendar closes immediately on open. See `references/modal-inertiaui.md` § UI Component Gotchas.
 18. **`Select` inside modal → needs `useNativeDialog: false` in app.ts** — already set globally in Swinx; don't revert it. Native `<dialog>` top-layer puts `SelectPortal` (teleported to `body`) behind the modal.
 19. **`TimePicker` (reka-ui `TimeFieldRoot`) inside modal** — works with no extra setup (no Popover/portal involved).
+20. **No `toast.success()` in `onSuccess` for full-page or modal forms** — when the backend uses `Inertia::flash()`, `useFlashToast()` in AppLayout fires the toast automatically. Calling `toast.success()` manually causes a duplicate. Only use manual toast for client-side-only feedback that has no backend flash (rare).
+21. **`vee-validate` + Zod on Inertia pages is a hard violation** — vee-validate is only for non-navigating modal/drawer forms that call JSON APIs. Inertia page forms (`students/Edit.vue`, `students/Create.vue`, etc.) **must** use `useForm` from `@inertiajs/vue3`. The server-side `FormRequest` errors land in `form.errors.*` automatically on any 422 response.
 
 ---
 
@@ -270,6 +272,8 @@ Mistakes the agent will make without these corrections:
 | `DatePicker` in modal without `portalTo` | `<DatePicker :portal-to="modalContentRef ?? undefined">` |
 | Revert `useNativeDialog: false` in app.ts | Keep it — required for Select dropdowns above modal |
 | `input[type=date]` / `input[type=time]` in forms | `<DatePicker>` / `<TimePicker>` from `@/components/ui` |
+| `toast.success()` in form `onSuccess` | Remove — `Inertia::flash()` + `useFlashToast()` handles it automatically |
+| `vee-validate` + Zod on Inertia page forms | `useForm` from `@inertiajs/vue3` + `form.errors.*` for validation display |
 
 ---
 
