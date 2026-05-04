@@ -23,7 +23,7 @@ class GetCourseOfferingSurveyQuery
     public static function handle(CourseOffering $courseOffering): ?array
     {
         /** @var FormTarget|null $target */
-        $target = FormTarget::with(['form', 'studentFormAssignments'])
+        $target = FormTarget::with(['form', 'assignments'])
             ->where('scope_type', 'course')
             ->where('scope_id', $courseOffering->id)
             ->latest()
@@ -36,8 +36,8 @@ class GetCourseOfferingSurveyQuery
         $form = $target->form;
 
         // Completion stats from student assignments
-        $total = $target->studentFormAssignments()->count();
-        $completed = $target->studentFormAssignments()->where('status', 'completed')->count();
+        $total = $target->assignments()->count();
+        $completed = $target->assignments()->where('status', 'completed')->count();
         $pending = $total - $completed;
 
         return [

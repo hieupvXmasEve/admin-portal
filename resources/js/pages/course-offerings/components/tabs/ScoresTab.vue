@@ -15,6 +15,7 @@ import { Link, router } from '@inertiajs/vue3';
 import { BarChart3, BookOpen, Calculator, Calendar, User, Users } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
+import { route } from 'ziggy-js';
 
 // ---- Type definitions (matches GetCourseOfferingScoresQuery output) ----
 interface AssessmentDetail {
@@ -262,47 +263,55 @@ const recalculateCourseResult = () => {
             </div>
 
             <!-- Statistics Cards -->
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-5">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-5">
                 <Card>
                     <CardContent class="p-4">
-                        <div class="flex items-center gap-3">
-                            <Calendar class="h-8 w-8 text-blue-600" />
-                            <div>
-                                <p class="text-muted-foreground text-sm">Semester</p>
-                                <p class="text-lg font-bold">{{ scoresData.statistics.semester }}</p>
+                        <div class="flex items-start gap-3">
+                            <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
+                                <Calendar class="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-muted-foreground text-xs font-medium uppercase tracking-wide">Semester</p>
+                                <p class="mt-0.5 truncate font-bold">{{ scoresData.statistics.semester }}</p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardContent class="p-4">
-                        <div class="flex items-center gap-3">
-                            <User class="h-8 w-8 text-purple-600" />
-                            <div>
-                                <p class="text-muted-foreground text-sm">Instructor</p>
-                                <p class="text-lg font-bold">{{ scoresData.statistics.instructor_name || 'N/A' }}</p>
+                        <div class="flex items-start gap-3">
+                            <div class="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
+                                <User class="h-5 w-5 text-purple-600" />
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-muted-foreground text-xs font-medium uppercase tracking-wide">Instructor</p>
+                                <p class="mt-0.5 truncate font-bold">{{ scoresData.statistics.instructor_name || 'N/A' }}</p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardContent class="p-4">
-                        <div class="flex items-center gap-3">
-                            <Users class="h-8 w-8 text-green-600" />
+                        <div class="flex items-start gap-3">
+                            <div class="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
+                                <Users class="h-5 w-5 text-green-600" />
+                            </div>
                             <div>
-                                <p class="text-muted-foreground text-sm">Total Students</p>
-                                <p class="text-lg font-bold">{{ scoresData.statistics.total_students }}</p>
+                                <p class="text-muted-foreground text-xs font-medium uppercase tracking-wide">Students</p>
+                                <p class="mt-0.5 text-xl font-bold">{{ scoresData.statistics.total_students }}</p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardContent class="p-4">
-                        <div class="flex items-center gap-3">
-                            <BookOpen class="h-8 w-8 text-orange-600" />
+                        <div class="flex items-start gap-3">
+                            <div class="rounded-lg bg-orange-100 p-2 dark:bg-orange-900/30">
+                                <BookOpen class="h-5 w-5 text-orange-600" />
+                            </div>
                             <div>
-                                <p class="text-muted-foreground text-sm">Components</p>
-                                <p class="text-lg font-bold">{{ scoresData.statistics.total_components }}</p>
+                                <p class="text-muted-foreground text-xs font-medium uppercase tracking-wide">Components</p>
+                                <p class="mt-0.5 text-xl font-bold">{{ scoresData.statistics.total_components }}</p>
                                 <p class="text-muted-foreground text-xs">{{ scoresData.statistics.total_details }} details</p>
                             </div>
                         </div>
@@ -310,11 +319,22 @@ const recalculateCourseResult = () => {
                 </Card>
                 <Card>
                     <CardContent class="p-4">
-                        <div class="flex items-center gap-3">
-                            <BarChart3 class="h-8 w-8 text-indigo-600" />
+                        <div class="flex items-start gap-3">
+                            <div class="rounded-lg bg-indigo-100 p-2 dark:bg-indigo-900/30">
+                                <BarChart3 class="h-5 w-5 text-indigo-600" />
+                            </div>
                             <div>
-                                <p class="text-muted-foreground text-sm">Average Score</p>
-                                <p class="text-lg font-bold" :class="[scoresData.statistics.average_score >= 80 ? 'text-green-600' : scoresData.statistics.average_score >= 60 ? 'text-yellow-600' : 'text-red-600']">
+                                <p class="text-muted-foreground text-xs font-medium uppercase tracking-wide">Average</p>
+                                <p
+                                    class="mt-0.5 text-xl font-bold"
+                                    :class="[
+                                        scoresData.statistics.average_score >= 80
+                                            ? 'text-green-600'
+                                            : scoresData.statistics.average_score >= 60
+                                              ? 'text-yellow-600'
+                                              : 'text-red-600',
+                                    ]"
+                                >
                                     {{ scoresData.statistics.average_score.toFixed(1) }}%
                                 </p>
                             </div>
@@ -416,7 +436,7 @@ const recalculateCourseResult = () => {
                                     <TableCell class="sticky left-0 z-10 bg-white dark:bg-gray-950">
                                         <div class="space-y-1">
                                             <div class="font-medium">
-                                                <Link :href="`/students/${student.id}/academic-summary/scores`" class="text-primary hover:underline">
+                                                <Link :href="route('students.academic-summary.scores', { student: student.id })" class="text-primary hover:underline">
                                                     {{ student.full_name }}
                                                 </Link>
                                             </div>

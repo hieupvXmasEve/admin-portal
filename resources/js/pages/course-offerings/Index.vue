@@ -636,14 +636,6 @@ const columns: ColumnDef<CourseOffering>[] = [
                 :loading="isLoading"
                 v-model:selected="selectedItems"
                 row-key="id"
-                @row-click="
-                    (row, e) => {
-                        // Ignore clicks on action buttons (target closest button/a)
-                        const target = e.target as HTMLElement;
-                        if (target.closest('button') || target.closest('a') || target.closest('[role=menuitem]')) return;
-                        router.visit(route('course-offerings.show', row.id));
-                    }
-                "
             />
         </CardContent>
     </Card>

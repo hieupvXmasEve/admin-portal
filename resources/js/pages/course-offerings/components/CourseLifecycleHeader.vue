@@ -133,20 +133,18 @@ const warnings = computed<Warning[]>(() => {
             </div>
 
             <!-- Normal state -->
-            <div v-else class="space-y-2">
-                <div class="flex items-center gap-1">
+            <div v-else class="space-y-3">
+                <div class="flex items-center">
                     <template v-for="(stage, index) in stages" :key="stage.key">
                         <!-- Stage indicator -->
-                        <div class="flex flex-1 flex-col items-center gap-1">
-                            <!-- Progress segment (bar before this stage, skip for first) -->
-                            <div v-if="index > 0" class="mb-1 hidden"></div>
+                        <div class="flex flex-1 flex-col items-center gap-1.5">
                             <!-- Circle indicator -->
                             <div
                                 class="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-all"
                                 :class="{
-                                    'bg-primary text-primary-foreground': getStageState(stage.key) === 'active',
+                                    'bg-primary text-primary-foreground ring-primary/30 ring-2 ring-offset-1': getStageState(stage.key) === 'active',
                                     'bg-green-500 text-white': getStageState(stage.key) === 'completed',
-                                    'bg-gray-200 text-gray-500': getStageState(stage.key) === 'pending',
+                                    'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400': getStageState(stage.key) === 'pending',
                                 }"
                             >
                                 <span v-if="getStageState(stage.key) === 'completed'">✓</span>
@@ -166,20 +164,20 @@ const warnings = computed<Warning[]>(() => {
                         <!-- Connector line between stages -->
                         <div
                             v-if="index < stages.length - 1"
-                            class="mb-5 h-0.5 flex-1 rounded-full transition-all"
+                            class="mb-6 h-0.5 flex-1 rounded-full transition-all duration-300"
                             :class="{
                                 'bg-green-500': currentStageIndex > stageOrder[stage.key],
-                                'bg-primary/40': currentStageIndex === stageOrder[stage.key],
-                                'bg-gray-200': currentStageIndex < stageOrder[stage.key],
+                                'bg-primary/30': currentStageIndex === stageOrder[stage.key],
+                                'bg-gray-200 dark:bg-gray-700': currentStageIndex < stageOrder[stage.key],
                             }"
                         ></div>
                     </template>
                 </div>
 
                 <!-- Progress text -->
-                <div v-if="sessionProgressText" class="text-muted-foreground text-center text-sm">
+                <p v-if="sessionProgressText" class="text-muted-foreground text-center text-xs">
                     {{ sessionProgressText }}
-                </div>
+                </p>
             </div>
         </div>
 

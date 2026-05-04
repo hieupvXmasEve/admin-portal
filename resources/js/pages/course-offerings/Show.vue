@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CourseLifecycleHeader from '@/pages/course-offerings/components/CourseLifecycleHeader.vue';
@@ -30,7 +32,7 @@ interface Props {
     surveyForms?: { id: number; title: string; code: string }[];
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 
 // ---- URL-synced tab state (following clubs/Show.vue pattern) ----
 const validTabs = ['overview', 'sessions', 'students', 'scores', 'survey'] as const;
@@ -51,10 +53,11 @@ const updateTabInURL = (newTab: ValidTab) => {
     } else {
         url.searchParams.set('tab', newTab);
     }
-    // Use history.replaceState — pure client-side URL update, zero BE round-trip.
-    // router.visit() always sends an HTTP request even with only:[], which is wasteful
-    // for pure UI tab switching where no new data is needed from the server.
-    history.replaceState(history.state, '', url.pathname + url.search);
+    // Use history.pushState so each tab switch creates a real history entry.
+    // When the user navigates to a child page and presses Back, the browser
+    // restores the exact URL (with ?tab=sessions etc.) and the component
+    // re-reads the tab from the URL on mount — no extra wiring required.
+    history.pushState(history.state, '', url.pathname + url.search);
 };
 
 const handleTabChange = (newTab: string | number) => {
@@ -75,8 +78,17 @@ onMounted(() => {
     });
 });
 
-const editCourseOffering = () => {
-    router.visit(route('course-offerings.edit', props.courseOffering.id));
+const courseStatusVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
+    switch (status) {
+        case 'active':
+            return 'default';
+        case 'completed':
+            return 'outline';
+        case 'cancelled':
+            return 'destructive';
+        default:
+            return 'secondary';
+    }
 };
 </script>
 
@@ -84,30 +96,53 @@ const editCourseOffering = () => {
     <Head title="Course Offering Details" />
 
     <!-- Header -->
-    <div class="flex flex-col items-center md:flex-row md:justify-between">
-        <div class="flex items-center justify-between gap-4">
-            <div>
-                <h1 class="text-3xl font-bold tracking-tight">{{ courseOffering.course_code }} - {{ courseOffering.course_title }}</h1>
-                <p class="text-muted-foreground">Course offering details and enrollment information</p>
+    <div class="space-y-1 pb-2">
+        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <!-- Title + meta -->
+            <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h1 class="text-2xl font-bold tracking-tight">
+                        {{ courseOffering.course_code }}
+                        <span class="text-muted-foreground font-normal">—</span>
+                        {{ courseOffering.course_title }}
+                    </h1>
+                    <Badge v-if="courseOffering.section_code" variant="secondary" class="shrink-0">
+                        Section {{ courseOffering.section_code }}
+                    </Badge>
+                    <Badge :variant="courseStatusVariant(courseOffering.course_status)" class="shrink-0 capitalize">
+                        {{ courseOffering.course_status }}
+                    </Badge>
+                </div>
+                <p class="text-muted-foreground mt-1 text-sm">
+                    {{ courseOffering.semester?.name }} · {{ courseOffering.current_enrollment }}/{{ courseOffering.max_capacity }} students
+                </p>
             </div>
-        </div>
-        <div class="flex items-center gap-2">
-            <Link v-if="!courseOffering.section_code && courseOffering.current_enrollment > 0 && !courseOffering.class_sessions?.length" :href="route('course-offerings.split.show', courseOffering.id)">
-                <Button variant="outline">
-                    <Users class="mr-2 h-4 w-4" />
-                    Split into Sections
+
+            <!-- Actions -->
+            <div class="flex shrink-0 items-center gap-2">
+                <Link
+                    v-if="!courseOffering.section_code && courseOffering.current_enrollment > 0 && !courseOffering.class_sessions?.length"
+                    :href="route('course-offerings.split.show', courseOffering.id)"
+                >
+                    <Button variant="outline" size="sm">
+                        <Users class="mr-1.5 h-3.5 w-3.5" />
+                        Split into Sections
+                    </Button>
+                </Link>
+
+                <Separator orientation="vertical" class="h-6" />
+
+                <Button variant="outline" size="sm" @click="router.visit(route('course-offerings.edit', courseOffering.id))">
+                    <Edit class="mr-1.5 h-3.5 w-3.5" />
+                    Edit
                 </Button>
-            </Link>
-            <Button variant="outline" size="sm" @click="editCourseOffering">
-                <Edit class="mr-2 h-4 w-4" />
-                Edit
-            </Button>
-            <Link :href="courseRoutes.offerings.index()">
-                <Button variant="outline" size="sm">
-                    <ArrowLeft class="mr-2 h-4 w-4" />
-                    Back
-                </Button>
-            </Link>
+                <Link :href="courseRoutes.offerings.index()">
+                    <Button variant="ghost" size="sm">
+                        <ArrowLeft class="mr-1.5 h-3.5 w-3.5" />
+                        Back
+                    </Button>
+                </Link>
+            </div>
         </div>
     </div>
 
@@ -115,11 +150,16 @@ const editCourseOffering = () => {
     <CourseLifecycleHeader :course-offering="courseOffering" />
 
     <!-- Tabs -->
-    <Tabs :model-value="currentTab" @update:model-value="handleTabChange" class="w-full">
+    <Tabs :model-value="currentTab" class="mt-2 w-full" @update:model-value="handleTabChange">
         <TabsList class="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="sessions">Sessions</TabsTrigger>
-            <TabsTrigger value="students">Students</TabsTrigger>
+            <TabsTrigger value="students">
+                Students
+                <Badge variant="secondary" class="ml-1.5 px-1.5 py-0 text-[11px]">
+                    {{ courseOffering.current_enrollment }}
+                </Badge>
+            </TabsTrigger>
             <TabsTrigger value="scores">Scores</TabsTrigger>
             <TabsTrigger value="survey">Survey</TabsTrigger>
         </TabsList>
@@ -165,7 +205,12 @@ const editCourseOffering = () => {
                     </div>
                 </template>
                 <template #default="{ reloading }">
-                    <SurveyTab :course-offering="courseOffering" :survey-data="surveyData" :survey-forms="surveyForms" :class="{ 'opacity-50': reloading }" />
+                    <SurveyTab
+                        :course-offering="courseOffering"
+                        :survey-data="surveyData"
+                        :survey-forms="surveyForms"
+                        :class="{ 'opacity-50': reloading }"
+                    />
                 </template>
             </Deferred>
         </TabsContent>
