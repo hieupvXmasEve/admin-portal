@@ -28,6 +28,7 @@ use App\Modules\Academic\Queries\GetCourseOfferingScoresQuery;
 use App\Modules\Academic\Queries\GetCourseOfferingSurveyQuery;
 use App\Services\CourseSurveyService;
 use App\Services\SystemConfigService;
+use App\Services\V1\Student\CurriculumService;
 use App\Support\CampusLogContext;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -45,7 +46,8 @@ class CourseOfferingController extends Controller
 {
     public function __construct(
         protected SystemConfigService $systemConfigService,
-        protected CourseSurveyService $courseSurveyService
+        protected CourseSurveyService $courseSurveyService,
+        protected CurriculumService $curriculumService
     ) {}
 
     /**
@@ -392,6 +394,9 @@ class CourseOfferingController extends Controller
                     ->orderBy('session_date')
                     ->orderBy('start_time');
             },
+            'formTargets' => function ($query) {
+                $query->select(['id', 'scope_type', 'scope_id']);
+            },
         ]);
 
         // Get available rooms for class session generation
@@ -478,8 +483,10 @@ class CourseOfferingController extends Controller
 
             // Once — rarely change during page session, skip on partial reloads
             'availableRooms' => Inertia::once(fn () => $availableRooms),
-            'siblingOfferings' => Inertia::once(fn () => $siblings),
             'surveyForms' => Inertia::once(fn () => $surveyForms),
+
+            // Eager — must reload on every visit because siblings differ per course offering
+            'siblingOfferings' => $siblings,
 
             // Deferred — loaded after initial render, in separate named groups (parallel)
             'scoresData' => Inertia::defer(
@@ -1202,6 +1209,13 @@ class CourseOfferingController extends Controller
                             $reasons[] = 'Student has active academic holds';
                         }
 
+                        // Check if unit is in student's curriculum
+                        $curriculumCheck = $this->curriculumService->isUnitInStudentCurriculum($student, $courseOffering->unit_id);
+                        if ($isEligible && !$curriculumCheck['is_in_curriculum']) {
+                            $isEligible = false;
+                            $reasons[] = $curriculumCheck['reason'];
+                        }
+
                         // Check course offering capacity
                         if ($isEligible && $courseOffering->isFull()) {
                             $isEligible = false;
@@ -1411,6 +1425,16 @@ class CourseOfferingController extends Controller
                     // Check for academic holds (if method exists)
                     if (method_exists($student, 'hasActiveHolds') && $student->hasActiveHolds()) {
                         $result['message'] = 'Student has active academic holds';
+                        $failureCount++;
+                        $results[] = $result;
+
+                        continue;
+                    }
+
+                    // Check if unit is in student's curriculum
+                    $curriculumCheck = $this->curriculumService->isUnitInStudentCurriculum($student, $courseOffering->unit_id);
+                    if (!$curriculumCheck['is_in_curriculum']) {
+                        $result['message'] = $curriculumCheck['reason'];
                         $failureCount++;
                         $results[] = $result;
 

@@ -1191,4 +1191,55 @@ class CurriculumService
             'prior_learning_assessment' => 'Get credit for prior learning and experience',
         ];
     }
+
+    /**
+     * Check if a unit is in the student's curriculum
+     *
+     * @param Student $student
+     * @param int $unitId
+     * @return array{is_in_curriculum: bool, curriculum_unit: ?CurriculumUnit, reason: string}
+     */
+    public function isUnitInStudentCurriculum(Student $student, int $unitId): array
+    {
+        // Check if student has curriculum version assigned
+        if (!$student->curriculum_version_id) {
+            return [
+                'is_in_curriculum' => false,
+                'curriculum_unit' => null,
+                'reason' => 'Student is not assigned to any curriculum version'
+            ];
+        }
+
+        // Get curriculum unit for this student and unit
+        $curriculumUnit = CurriculumUnit::where('curriculum_version_id', $student->curriculum_version_id)
+            ->where('unit_id', $unitId)
+            ->with(['unit', 'curriculumVersion'])
+            ->first();
+
+        if (!$curriculumUnit) {
+            return [
+                'is_in_curriculum' => false,
+                'curriculum_unit' => null,
+                'reason' => 'Unit is not in the student\'s curriculum'
+            ];
+        }
+
+        return [
+            'is_in_curriculum' => true,
+            'curriculum_unit' => $curriculumUnit,
+            'reason' => 'Unit is found in student\'s curriculum'
+        ];
+    }
+
+    /**
+     * Check if a unit is in the student's curriculum (simple boolean version)
+     *
+     * @param Student $student
+     * @param int $unitId
+     * @return bool
+     */
+    public function isUnitInCurriculum(Student $student, int $unitId): bool
+    {
+        return $this->isUnitInStudentCurriculum($student, $unitId)['is_in_curriculum'];
+    }
 }
