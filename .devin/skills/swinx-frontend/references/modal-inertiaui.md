@@ -293,3 +293,95 @@ const maxWidth = getConfig('modal.maxWidth') // Read config
 8. **`navigate` is false** — Swinx does not update URL on modal open (no `Inertia::modal()` backend).
 9. **`<ModalLink>` events**: Use `@close` on `<ModalLink>` to trigger parent page refresh when child modal closes.
 10. **Confirmation dialogs**: Use `useConfirmDialogStore` (Pinia) for simple confirms — NOT `<Modal>` component.
+
+---
+
+## UI Component Gotchas Inside Modals
+
+### Global config (app.ts)
+
+Swinx disables the native `<dialog>` element globally to prevent z-index and teleport conflicts:
+
+```typescript
+// resources/js/app.ts
+import { withInertiaModal, putConfig } from '@inertiaui/modal-vue';
+
+putConfig({
+    useNativeDialog: false,
+    modal:     { closeOnClickOutside: false },
+    slideover: { closeOnClickOutside: false },
+});
+withInertiaModal(app);
+```
+
+**Why `useNativeDialog: false`**: The browser's native `<dialog>` creates a top-layer stacking context. `SelectPortal` from reka-ui teleports to `document.body`, which is outside the top-layer — making Select dropdowns appear behind the modal.
+
+**Why `closeOnClickOutside: false`**: Swinx modals require the explicit X button to close (prevents accidental close on mis-click).
+
+---
+
+### Select dropdowns inside modals
+
+`useNativeDialog: false` fixes this automatically. No per-modal code needed.
+
+**Root cause (for reference)**: Native `<dialog>` top-layer + `SelectPortal` teleporting to `document.body` = dropdown behind modal. Disabling native dialog eliminates the top-layer isolation.
+
+---
+
+### DatePicker (and any Popover) inside modals
+
+`@inertiaui/modal-vue` with `useNativeDialog: false` creates a focus trap via `createFocusTrap` on the modal wrapper. When `PopoverPortal` teleports the calendar to `document.body`, focus leaving the modal triggers the trap to force focus back — dismissing the Popover immediately.
+
+**Fix**: teleport the Popover content *inside* the modal DOM (inside the focus trap container).
+
+`DatePicker` supports a `portalTo` prop for this:
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+const modalContentRef = ref<HTMLElement | null>(null);
+</script>
+
+<template>
+    <Modal ref="modalRef">
+        <div ref="modalContentRef" class="p-6">
+            <DatePicker
+                v-model="form.date"
+                :portal-to="modalContentRef ?? undefined"
+            />
+        </div>
+    </Modal>
+</template>
+```
+
+**Why it works**: calendar teleports inside `modalContentRef` (which is inside the focus trap) → focus stays in trap → Popover stays open.
+
+**Note**: Reka-ui uses `position: fixed` (Floating UI default) so no overflow clipping occurs even when rendered inside a scrollable parent.
+
+**Do NOT** omit `portalTo` when using `DatePicker` inside a modal — the calendar will open and immediately close due to the focus trap.
+
+---
+
+### TimePicker inside modals
+
+`TimePicker` uses `TimeFieldRoot` + `TimeFieldInput` from reka-ui — no Popover, no portal. Works inside modals with no extra setup.
+
+Usage:
+
+```vue
+<TimePicker v-model="form.start_time" />
+<!-- v-model accepts/emits HH:mm string (24-hour, matches DB format) -->
+```
+
+Props: `modelValue?: string`, `disabled?: boolean`, `granularity?: 'hour'|'minute'|'second'` (default `minute`), `class?: string`.
+
+---
+
+### Summary table
+
+| Component | Works inside modal? | Extra setup needed |
+|-----------|--------------------|--------------------|
+| `Select` / `SelectContent` | Yes (after `useNativeDialog: false`) | None |
+| `DatePicker` | Yes | Pass `:portal-to="modalContentRef"` |
+| `TimePicker` | Yes | None |
+| Any `Popover`-based component | Needs fix | Pass `:to="modalContentRef"` to `PopoverContent` |

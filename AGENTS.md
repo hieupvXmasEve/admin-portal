@@ -104,6 +104,9 @@ These are the top mistakes AI tools make in this codebase:
 | Deferred component bind | `<Deferred :data="['x']">` | `<Deferred data="x">` |
 | Flash message | `->with('success', 'msg')` | `Inertia::flash('success', 'msg')` |
 | Prop casing in TS | `classSessions: Session[]` | `class_sessions: Session[]` (snake_case) |
+| `DatePicker` in modal without `portalTo` | `<DatePicker v-model="..." />` | `<DatePicker :portal-to="modalContentRef ?? undefined">` |
+| `useNativeDialog: true` (reverting) | Remove `putConfig` or set `true` | Keep `useNativeDialog: false` in app.ts — required for Select above modal |
+| `input[type=date]` or `input[type=time]` in forms | `<Input type="date">` | `<DatePicker>` / `<TimePicker>` from `@/components/ui` |
 
 ## Development Principles
 

@@ -238,6 +238,9 @@ Mistakes the agent will make without these corrections:
 14. **`Inertia::modal()` not available** — Swinx has no backend package. Use `Inertia::render()` for modal pages.
 15. **`router.post()` in nested modals** — closes ALL stacked modals. Use Axios for nested modal form submissions.
 16. **Confirm dialogs ≠ `<Modal>`** — use `useConfirmDialogStore` (Pinia) for simple confirms. `<Modal>` is for route-based CRUD forms.
+17. **`DatePicker` inside modal → must pass `:portal-to="modalContentRef"`** — `useNativeDialog: false` creates a focus trap; without `portalTo`, `PopoverPortal` teleports outside the trap and the calendar closes immediately on open. See `references/modal-inertiaui.md` § UI Component Gotchas.
+18. **`Select` inside modal → needs `useNativeDialog: false` in app.ts** — already set globally in Swinx; don't revert it. Native `<dialog>` top-layer puts `SelectPortal` (teleported to `body`) behind the modal.
+19. **`TimePicker` (reka-ui `TimeFieldRoot`) inside modal** — works with no extra setup (no Popover/portal involved).
 
 ---
 
@@ -264,6 +267,9 @@ Mistakes the agent will make without these corrections:
 | `Inertia::modal()` in controller | `Inertia::render()` (no backend package) |
 | `router.post()` in nested modal | `axios.post()` + `modalRef.close()` |
 | `<Modal>` for confirm dialogs | `useConfirmDialogStore` (Pinia) |
+| `DatePicker` in modal without `portalTo` | `<DatePicker :portal-to="modalContentRef ?? undefined">` |
+| Revert `useNativeDialog: false` in app.ts | Keep it — required for Select dropdowns above modal |
+| `input[type=date]` / `input[type=time]` in forms | `<DatePicker>` / `<TimePicker>` from `@/components/ui` |
 
 ---
 
