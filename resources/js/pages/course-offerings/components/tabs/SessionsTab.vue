@@ -24,6 +24,11 @@ interface Props {
 const props = defineProps<Props>();
 const { showConfirmDialog } = useGlobalConfirmDialog();
 
+// Build the return URL pointing to this tab so Back from a child page lands here.
+// window.location is accessed as a getter (not inline in template) to avoid SSR errors.
+const getSessionsTabUrl = () =>
+    `${window.location.pathname}?tab=sessions`;
+
 const classSessionsTable = ref();
 const isAllSessionsCompleted = computed(() => props.courseOffering.class_sessions?.every((s) => s.status === 'completed') ?? true);
 const selectedSessions = ref<ClassSession[]>([]);
@@ -324,8 +329,8 @@ const columns: ColumnDef<ClassSession>[] = [
                             <Settings class="h-4 w-4" />
                         </ModalLink>
 
-                        <!-- View attendance detail -->
-                        <Link :href="attendanceRoutes.classSessions.show(row.original.id)">
+                        <!-- View attendance detail — pass ?return= so Back lands on sessions tab -->
+                        <Link :href="attendanceRoutes.classSessions.show(row.original.id) + '?return=' + encodeURIComponent(getSessionsTabUrl())">
                             <Button variant="ghost" size="sm" title="View attendance">
                                 <Eye class="h-4 w-4" />
                             </Button>

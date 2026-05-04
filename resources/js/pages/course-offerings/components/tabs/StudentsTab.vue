@@ -13,6 +13,7 @@ import { router } from '@inertiajs/vue3';
 import { ArrowRightLeft, Trash2, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
+import { route } from 'ziggy-js';
 
 interface Props {
     courseOffering: CourseOffering & {
@@ -70,7 +71,7 @@ const deleteStudentRegistration = (registration: CourseRegistration) => {
         {
             onConfirm: async () => {
                 try {
-                    const result = await api.post(`/course-offerings/${props.courseOffering.id}/delete-student-registration`, {
+                    const result = await api.post(route('course-offerings.delete-student-registration', props.courseOffering.id), {
                         registration_id: registration.id,
                     });
                     if (result.data?.value?.success) {
@@ -104,9 +105,11 @@ const handleMoveSuccess = () => {
         <StudentSearchModal :course-offering-id="courseOffering.id" :on-success="handleStudentAddSuccess" />
 
         <!-- Empty state -->
-        <div v-if="!courseOffering.course_registrations || courseOffering.course_registrations.length === 0" class="py-8 text-center">
-            <Users class="text-muted-foreground mx-auto h-12 w-12" />
-            <h3 class="mt-2 text-sm font-semibold text-gray-900">No students enrolled</h3>
+        <div v-if="!courseOffering.course_registrations || courseOffering.course_registrations.length === 0" class="py-12 text-center">
+            <div class="bg-muted mx-auto flex h-14 w-14 items-center justify-center rounded-full">
+                <Users class="text-muted-foreground h-7 w-7" />
+            </div>
+            <h3 class="mt-3 text-sm font-semibold">No students enrolled</h3>
             <p class="text-muted-foreground mt-1 text-sm">No students have registered for this course offering yet.</p>
         </div>
 
@@ -133,8 +136,8 @@ const handleMoveSuccess = () => {
                         <TableCell>{{ registration.student?.full_name }}</TableCell>
                         <TableCell class="text-muted-foreground">{{ registration.student?.email }}</TableCell>
                         <TableCell>
-                            <Badge :variant="getRegistrationStatusVariant(registration.registration_status)">
-                                {{ registration.registration_status.toUpperCase() }}
+                            <Badge :variant="getRegistrationStatusVariant(registration.registration_status)" class="capitalize">
+                                {{ registration.registration_status.replace('_', ' ') }}
                             </Badge>
                         </TableCell>
                         <TableCell>

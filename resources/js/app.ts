@@ -2,7 +2,7 @@ import '../css/app.css';
 import '../css/tiptap.css';
 
 import { createInertiaApp } from '@inertiajs/vue3';
-import { withInertiaModal } from '@inertiaui/modal-vue';
+import { withInertiaModal, putConfig } from '@inertiaui/modal-vue';
 import { createPinia } from 'pinia';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
@@ -45,6 +45,10 @@ createInertiaApp({
 
         initializeTheme();
         setupEcho();
+        // Disable native <dialog> so portaled dropdowns (Select, Combobox, etc.)
+        // are not clipped by the browser top-layer.
+        // Require explicit close (X button) instead of clicking outside.
+        putConfig({ useNativeDialog: false, modal: { closeOnClickOutside: false }, slideover: { closeOnClickOutside: false } });
         withInertiaModal(app);
 
         app.use(plugin).use(ZiggyVue).use(pinia).directive('can', vCan).directive('can-any', vCanAny).mount(el);

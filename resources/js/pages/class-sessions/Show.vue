@@ -328,7 +328,8 @@ const getDeliveryModeIcon = (mode: string) => {
 
 // Navigation functions
 const navigateBack = () => {
-    router.visit(route('course-offerings.show', props.session.course_offering_id));
+    const returnUrl = new URLSearchParams(window.location.search).get('return');
+    router.visit(returnUrl ?? route('course-offerings.show', props.session.course_offering_id));
 };
 
 const editSession = () => {

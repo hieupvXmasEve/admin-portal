@@ -54,12 +54,10 @@ const updateTabInURL = (newTab: ValidTab) => {
     } else {
         url.searchParams.set('tab', newTab);
     }
-    router.visit(url.pathname + url.search, {
-        preserveState: true,
-        preserveScroll: true,
-        replace: true,
-        only: [],
-    });
+    // pushState creates a real history entry so Back from a child page
+    // restores the correct URL (with ?tab=...) and the component re-reads
+    // the tab on mount — no extra wiring needed.
+    history.pushState(history.state, '', url.pathname + url.search);
 };
 
 const handleTabChange = (newTab: string | number) => {

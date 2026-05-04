@@ -3,11 +3,13 @@ import InputError from '@/components/InputError.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import DatePicker from '@/components/ui/DatePicker.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import TimePicker from '@/components/ui/TimePicker.vue';
 import type { Lecture, Room } from '@/types/models';
 import { useForm } from '@inertiajs/vue3';
 import { Modal } from '@inertiaui/modal-vue';
@@ -32,6 +34,7 @@ interface Props {
 
 const props = defineProps<Props>();
 const modalRef = ref<InstanceType<typeof Modal> | null>(null);
+const modalContentRef = ref<HTMLElement | null>(null);
 
 const form = useForm({
     course_offering_id: props.courseOffering.id,
@@ -81,7 +84,7 @@ const submit = () => {
 
 <template>
     <Modal ref="modalRef" max-width="2xl">
-        <div class="p-6">
+        <div ref="modalContentRef" class="p-6">
             <div class="mb-5">
                 <h2 class="text-lg font-semibold">Add Class Session</h2>
                 <p class="text-muted-foreground text-sm">
@@ -116,7 +119,12 @@ const submit = () => {
                             <Calendar class="h-3.5 w-3.5" />
                             Date <span class="text-destructive">*</span>
                         </Label>
-                        <Input v-model="form.session_date" type="date" :class="{ 'border-destructive': form.errors.session_date }" :disabled="atLimit" />
+                        <DatePicker
+                            v-model="form.session_date"
+                            :disabled="atLimit"
+                            :class="{ 'border-destructive': form.errors.session_date }"
+                            :portal-to="modalContentRef ?? undefined"
+                        />
                         <InputError :message="form.errors.session_date" />
                     </div>
                     <div class="space-y-1.5">
@@ -124,12 +132,23 @@ const submit = () => {
                             <Clock class="h-3.5 w-3.5" />
                             Start <span class="text-destructive">*</span>
                         </Label>
-                        <Input v-model="form.start_time" type="time" :class="{ 'border-destructive': form.errors.start_time }" :disabled="atLimit" />
+                        <TimePicker
+                            v-model="form.start_time"
+                            :disabled="atLimit"
+                            :class="{ 'border-destructive': form.errors.start_time }"
+                        />
                         <InputError :message="form.errors.start_time" />
                     </div>
                     <div class="space-y-1.5">
-                        <Label>End <span class="text-destructive">*</span></Label>
-                        <Input v-model="form.end_time" type="time" :class="{ 'border-destructive': form.errors.end_time }" :disabled="atLimit" />
+                        <Label class="flex items-center gap-1.5">
+                            <Clock class="h-3.5 w-3.5" />
+                            End <span class="text-destructive">*</span>
+                        </Label>
+                        <TimePicker
+                            v-model="form.end_time"
+                            :disabled="atLimit"
+                            :class="{ 'border-destructive': form.errors.end_time }"
+                        />
                         <InputError :message="form.errors.end_time" />
                     </div>
                 </div>

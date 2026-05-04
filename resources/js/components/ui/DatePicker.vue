@@ -11,6 +11,8 @@ interface Props {
     placeholder?: string;
     disabled?: boolean;
     class?: string;
+    /** Pass a portal target to avoid focus-trap conflicts (e.g. inside @inertiaui/modal-vue). */
+    portalTo?: string | HTMLElement;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -83,6 +85,7 @@ const clearDate = () => {
     <Popover v-model:open="open">
         <PopoverTrigger as-child>
             <Button
+                type="button"
                 variant="outline"
                 :class="[
                     'w-full justify-start text-left font-normal',
@@ -95,7 +98,7 @@ const clearDate = () => {
                 {{ displayValue }}
             </Button>
         </PopoverTrigger>
-        <PopoverContent class="w-auto p-0" align="start">
+        <PopoverContent class="w-auto p-0" align="start" :to="portalTo">
             <Calendar
                 v-model="selectedDate"
                 :locale="'en-US'"
