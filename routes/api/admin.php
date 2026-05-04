@@ -9,7 +9,7 @@ use App\Http\Controllers\Api\V1\Admin\EmailConfigurationController;
 use App\Http\Controllers\Api\V1\Admin\EmailController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Web\StudentApplicationController as WebStudentApplicationController;
-use App\Modules\Academic\Http\Web\Admin\StudentController as WebStudentController;
+use App\Modules\Academic\Http\Web\StudentController as WebStudentController;
 use App\Http\Controllers\Web\FormController;
 use App\Http\Controllers\Api\StudentWalletController;
 use Illuminate\Support\Facades\Route;
