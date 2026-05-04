@@ -124,6 +124,8 @@ const onSubmit = handleSubmit((values) => {
     });
 });
 
+const goBack = () => window.history.back();
+
 const deliveryModeOptions = [
     { value: 'in_person', label: 'In Person' },
     { value: 'online', label: 'Online' },
@@ -147,12 +149,10 @@ const enrollmentStatusOptions = [
             <h1 class="text-3xl font-bold tracking-tight">Edit Course Offering</h1>
             <p class="text-muted-foreground">Update course offering details and registration settings</p>
         </div>
-        <Link href="/course-offerings">
-            <Button variant="outline" size="sm">
-                <ArrowLeft class="mr-2 h-4 w-4" />
-                Back to Course Offerings
-            </Button>
-        </Link>
+        <Button variant="outline" size="sm" @click="goBack">
+            <ArrowLeft class="mr-2 h-4 w-4" />
+            Back
+        </Button>
     </div>
 
     <form @submit="onSubmit" class="space-y-6">

@@ -90,6 +90,8 @@ const courseStatusVariant = (status: string): 'default' | 'secondary' | 'destruc
             return 'secondary';
     }
 };
+
+const goBack = () => window.history.back();
 </script>
 
 <template>
@@ -136,12 +138,10 @@ const courseStatusVariant = (status: string): 'default' | 'secondary' | 'destruc
                     <Edit class="mr-1.5 h-3.5 w-3.5" />
                     Edit
                 </Button>
-                <Link :href="courseRoutes.offerings.index()">
-                    <Button variant="ghost" size="sm">
-                        <ArrowLeft class="mr-1.5 h-3.5 w-3.5" />
-                        Back
-                    </Button>
-                </Link>
+                <Button variant="ghost" size="sm" @click="goBack">
+                    <ArrowLeft class="mr-1.5 h-3.5 w-3.5" />
+                    Back
+                </Button>
             </div>
         </div>
     </div>

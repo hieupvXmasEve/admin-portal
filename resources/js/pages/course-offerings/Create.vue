@@ -203,6 +203,8 @@ const dayOptions = [
     { value: 'Saturday', label: 'Saturday' },
     { value: 'Sunday', label: 'Sunday' },
 ];
+
+const goBack = () => window.history.back();
 </script>
 
 <template>
@@ -213,12 +215,10 @@ const dayOptions = [
             <h1 class="text-3xl font-bold tracking-tight">Create Course Offering</h1>
             <p class="text-muted-foreground">Set up a new course offering for student registration</p>
         </div>
-        <Link href="/course-offerings">
-            <Button variant="outline" size="sm">
-                <ArrowLeft class="mr-2 h-4 w-4" />
-                Back to Course Offerings
-            </Button>
-        </Link>
+        <Button variant="outline" size="sm" @click="goBack">
+            <ArrowLeft class="mr-2 h-4 w-4" />
+            Back
+        </Button>
     </div>
 
     <!-- No Active Semester State -->
