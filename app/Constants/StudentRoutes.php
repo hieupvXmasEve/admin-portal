@@ -37,7 +37,7 @@ class StudentRoutes
     public const BULK_ONBOARDING = 'students.new-students.bulk-onboarding';
 
     // Academic Summary Routes
-    public const ACADEMIC_SUMMARY_SHOW = 'students.academic-summary.show';
+    public const ACADEMIC_SUMMARY_SHOW = 'students.academic-summary.overview';
 
 
     public const ACADEMIC_SUMMARY_ATTENDANCE_DETAILS = 'students.academic-summary.attendance-details';

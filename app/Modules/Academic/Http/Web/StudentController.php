@@ -163,9 +163,9 @@ class StudentController extends Controller
             $student = $this->studentService->createAdmittedStudent($request->validated());
 
             // Return redirect for web requests
-            return redirect()
-                ->route(StudentRoutes::ACADEMIC_SUMMARY_SHOW, $student)
-                ->with('success', 'Student created and admitted successfully');
+            Inertia::flash('success', 'Student created and admitted successfully');
+
+            return redirect()->route(StudentRoutes::ACADEMIC_SUMMARY_SHOW, $student);
         } catch (\Exception $e) {
             Log::error('Failed to create student', [
                 'error' => $e->getMessage(),
@@ -253,9 +253,9 @@ class StudentController extends Controller
             $updatedStudent = $this->studentService->updateStudent($student, $request->validated());
 
             // Return redirect for web requests
-            return redirect()
-                ->route(StudentRoutes::ACADEMIC_SUMMARY_SHOW, $updatedStudent)
-                ->with('success', 'Student updated successfully');
+            Inertia::flash('success', 'Student updated successfully');
+
+            return redirect()->route(StudentRoutes::ACADEMIC_SUMMARY_SHOW, $updatedStudent);
         } catch (\Exception $e) {
             Log::error('Failed to update student', [
                 'student_id' => $student->id,
@@ -294,9 +294,9 @@ class StudentController extends Controller
             }
 
             // Return redirect for web requests
-            return redirect()
-                ->route(StudentRoutes::INDEX)
-                ->with('success', 'Student and all related data have been permanently deleted from database');
+            Inertia::flash('success', 'Student and all related data have been permanently deleted from database');
+
+            return redirect()->route(StudentRoutes::INDEX);
         } catch (\Exception $e) {
             Log::error('Failed to delete student', [
                 'student_id' => $student->id,
