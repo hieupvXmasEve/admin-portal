@@ -16,7 +16,8 @@ import {
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { PaginatedResponse } from '@/types';
 import { formatCurrency, type Semester } from '@/types/finance';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { formatDateTime } from '@/utils/date';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     ArrowRight,
@@ -69,6 +70,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const page = usePage();
 
 // Local filter state
 const semesterId = ref(props.filters.semester_id || (props.currentSemester?.id ? String(props.currentSemester.id) : 'all'));
@@ -181,81 +183,56 @@ const isSendingStudentReminders = ref(false);
 const isSendingParentReminders = ref(false);
 const isExporting = ref(false);
 
-const handleReminderResponse = async (response: Response, defaultErrorMessage: string) => {
-    if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-            if ((data.data.sent_count || 0) > 0) {
-                toast.success(data.data.message || `Đã gửi ${data.data.sent_count} email`);
-            } else {
-                toast.warning(data.data.message || 'Không có email nào được gửi');
-            }
+// Flash messages are handled by router.post callbacks
+
+const sendStudentReminders = () => {
+    if (selectedInvoices.value.length === 0) {
+        toast.error('Vui lòng chọn ít nhất một mục');
+        return;
+    }
+
+    // Convert selected IDs to item_ids format (dng_request:id)
+    const itemIds = selectedInvoices.value.map(id => `dng_request:${id}`);
+
+    router.post(route('api.finance.operations.send-due-item-reminders'), {
+        item_ids: itemIds,
+    }, {
+        preserveScroll: true,
+        onStart: () => { isSendingStudentReminders.value = true; },
+        onFinish: () => { isSendingStudentReminders.value = false; },
+        onSuccess: () => {
+            // Flash messages are handled automatically by useFlashToast in AppLayout
             selectedInvoices.value = [];
-            router.reload({ only: ['invoices'] });
-        } else {
-            toast.error(data.message || defaultErrorMessage);
-        }
-    } else {
-        toast.error('Lỗi kết nối server');
-    }
+        },
+        onError: () => {
+            toast.error('Lỗi khi gửi nhắc nợ cho sinh viên');
+        },
+    });
 };
 
-const sendStudentReminders = async () => {
+const sendParentReminders = () => {
     if (selectedInvoices.value.length === 0) {
-        toast.error('Vui lòng chọn ít nhất một hóa đơn');
+        toast.error('Vui lòng chọn ít nhất một mục');
         return;
     }
 
-    isSendingStudentReminders.value = true;
+    // Convert selected IDs to item_ids format (dng_request:id)
+    const itemIds = selectedInvoices.value.map(id => `dng_request:${id}`);
 
-    try {
-        const response = await fetch(route('api.finance.operations.send-reminders'), {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-            },
-            body: JSON.stringify({
-                invoice_ids: selectedInvoices.value,
-            }),
-        });
-
-        await handleReminderResponse(response, 'Không thể gửi nhắc nợ cho sinh viên');
-    } catch (error) {
-        console.error('Send student reminders error:', error);
-        toast.error('Lỗi khi gửi nhắc nợ cho sinh viên');
-    } finally {
-        isSendingStudentReminders.value = false;
-    }
-};
-
-const sendParentReminders = async () => {
-    if (selectedInvoices.value.length === 0) {
-        toast.error('Vui lòng chọn ít nhất một hóa đơn');
-        return;
-    }
-
-    isSendingParentReminders.value = true;
-
-    try {
-        const response = await fetch(route('api.finance.operations.send-parent-reminders'), {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-            },
-            body: JSON.stringify({
-                invoice_ids: selectedInvoices.value,
-            }),
-        });
-
-        await handleReminderResponse(response, 'Không thể gửi thông báo cho phụ huynh');
-    } catch (error) {
-        console.error('Send parent reminders error:', error);
-        toast.error('Lỗi khi gửi thông báo cho phụ huynh');
-    } finally {
-        isSendingParentReminders.value = false;
-    }
+    router.post(route('api.finance.operations.send-due-item-parent-reminders'), {
+        item_ids: itemIds,
+    }, {
+        preserveScroll: true,
+        onStart: () => { isSendingParentReminders.value = true; },
+        onFinish: () => { isSendingParentReminders.value = false; },
+        onSuccess: () => {
+            // Flash messages are handled automatically by useFlashToast in AppLayout
+            selectedInvoices.value = [];
+        },
+        onError: () => {
+            toast.error('Lỗi khi gửi thông báo cho phụ huynh');
+        },
+    });
 };
 
 const exportList = async () => {
@@ -322,7 +299,7 @@ defineOptions({
                 </CardHeader>
                 <CardContent>
                     <div class="text-2xl font-bold text-blue-600">{{ summary.upcoming_count }}</div>
-                    <p class="text-muted-foreground text-xs">Invoice trong 7 ngày tới</p>
+                    <p class="text-muted-foreground text-xs">DNG Request trong 7 ngày tới</p>
                 </CardContent>
             </Card>
 
@@ -370,7 +347,7 @@ defineOptions({
                     <div class="flex items-center gap-3">
                         <div class="relative">
                             <Search class="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-                            <Input v-model="search" placeholder="Tìm sinh viên, mã hóa đơn..."
+                            <Input v-model="search" placeholder="Tìm sinh viên, mã DNG request..."
                                 class="w-[250px] pl-10" />
                         </div>
                         <Select v-model="statusFilter">
@@ -407,7 +384,7 @@ defineOptions({
         <Card>
             <CardHeader>
                 <CardTitle>
-                    Danh sách Invoice
+                    Danh sách DNG Request đến hạn
                     <Badge variant="outline" class="ml-2">{{ invoices.total || 0 }}</Badge>
                 </CardTitle>
             </CardHeader>
@@ -421,7 +398,7 @@ defineOptions({
                                     :indeterminate="selectedInvoices.length > 0 && selectedInvoices.length < invoices.data.length"
                                     class="h-4 w-4 rounded border-gray-300" @change="toggleSelectAll" />
                             </TableHead>
-                            <TableHead>Invoice</TableHead>
+                            <TableHead>DNG Request</TableHead>
                             <TableHead>Sinh viên</TableHead>
                             <TableHead class="text-right">Số tiền</TableHead>
                             <TableHead class="text-right">Đã trả</TableHead>
@@ -437,7 +414,7 @@ defineOptions({
                             <TableCell colspan="10" class="py-12 text-center">
                                 <div class="flex flex-col items-center gap-2">
                                     <Calendar class="text-muted-foreground h-12 w-12" />
-                                    <p class="text-muted-foreground">Không có invoice nào phù hợp</p>
+                                    <p class="text-muted-foreground">Không có DNG request nào phù hợp</p>
                                 </div>
                             </TableCell>
                         </TableRow>
@@ -495,14 +472,13 @@ defineOptions({
                             <TableCell>
                                 <div v-if="invoice.last_reminder_at" class="flex items-center gap-1 text-green-600">
                                     <Bell class="h-3 w-3" />
-                                    <span class="text-xs">{{ new
-                                        Date(invoice.last_reminder_at).toLocaleDateString('vi-VN') }}</span>
+                                    <span class="text-xs">{{ formatDateTime(invoice.last_reminder_at) }}</span>
                                 </div>
                                 <div v-else class="text-muted-foreground text-xs">Chưa gửi</div>
                             </TableCell>
                             <TableCell class="text-right">
                                 <div class="flex justify-end gap-2">
-                                    <Link :href="route('finance.invoices.show', invoice.id)">
+                                    <Link :href="route('finance.dng.payment-requests.show', invoice.id)">
                                         <Button variant="ghost" size="sm">
                                             <ArrowRight class="h-4 w-4" />
                                         </Button>

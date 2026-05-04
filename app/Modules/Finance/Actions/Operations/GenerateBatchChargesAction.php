@@ -25,6 +25,7 @@ class GenerateBatchChargesAction
         $semesterId = (int) $data['semester_id'];
         $chargeTypes = $data['charge_types'];
         $createdByUserId = auth()->id();
+        $dueDate = isset($data['due_date']) ? \Carbon\Carbon::parse($data['due_date']) : now()->addDays(30);
 
         // 1. Strict Scope: Only specific statuses and current campus
         $query = BillingScopeHelper::getEligibleStudentsQuery(
@@ -170,7 +171,7 @@ class GenerateBatchChargesAction
                     }
 
                     // 1. Resolve target invoice. Finalized invoices must never block newly generated charges.
-                    $invoice = $reusableInvoice ?? self::createDraftInvoice($student, $semesterId);
+                    $invoice = $reusableInvoice ?? self::createDraftInvoice($student, $semesterId, $dueDate);
 
                     $chargesToLink = [];
                     $pendingDiscounts = [];
@@ -378,13 +379,13 @@ class GenerateBatchChargesAction
             ->first();
     }
 
-    private static function createDraftInvoice(Student $student, int $semesterId): StudentInvoice
+    private static function createDraftInvoice(Student $student, int $semesterId, \Carbon\Carbon $dueDate): StudentInvoice
     {
         return StudentInvoice::create([
             'student_id' => $student->id,
             'semester_id' => $semesterId,
             'invoice_number' => 'INV-'.time().'-'.$student->student_id.'-'.$semesterId,
-            'due_date' => now()->addDays(30),
+            'due_date' => $dueDate,
             'opened_at' => now(),
             'status' => 'draft',
         ]);

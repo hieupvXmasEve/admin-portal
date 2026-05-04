@@ -64,6 +64,7 @@ class DngPaymentRequest extends Model
         'qr_payload',
         'last_callback_payload',
         'error_message',
+        'last_reminder_at',
     ];
 
     protected function casts(): array

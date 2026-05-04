@@ -22,7 +22,8 @@ class InvoiceGenerationService
     public function generateInvoice(
         int $studentId,
         int $semesterId,
-        ?int $billingCycleId = null
+        ?int $billingCycleId = null,
+        ?\Carbon\Carbon $dueDate = null
     ): StudentInvoice {
         // Find existing invoice or create new
         $invoice = StudentInvoice::firstOrNew([
@@ -35,7 +36,7 @@ class InvoiceGenerationService
         if (! $invoice->exists) {
             $invoice->invoice_number = $this->generateInvoiceNumber($studentId, $semesterId);
             $invoice->status = 'draft';
-            $invoice->due_date = now()->addDays(30); // Default 30 days
+            $invoice->due_date = $dueDate ?? now()->addDays(30); // Use provided due_date or default 30 days
             $invoice->save();
         }
 
@@ -195,13 +196,13 @@ class InvoiceGenerationService
     /**
      * Generate invoices for multiple students in a semester.
      */
-    public function bulkGenerateInvoices(array $studentIds, int $semesterId, ?int $billingCycleId = null): array
+    public function bulkGenerateInvoices(array $studentIds, int $semesterId, ?int $billingCycleId = null, ?\Carbon\Carbon $dueDate = null): array
     {
         $results = [];
 
         foreach ($studentIds as $studentId) {
             try {
-                $invoice = $this->generateInvoice($studentId, $semesterId, $billingCycleId);
+                $invoice = $this->generateInvoice($studentId, $semesterId, $billingCycleId, $dueDate);
                 $results[$studentId] = [
                     'success' => true,
                     'invoice_id' => $invoice->id,

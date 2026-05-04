@@ -10,9 +10,9 @@ use App\Models\Semester;
 use App\Modules\Finance\Queries\Operations\GetBillingDashboardStatsQuery;
 use App\Modules\Finance\Queries\Operations\GetBillingDashboardStudentsQuery;
 use App\Modules\Finance\Queries\Operations\GetBillingExceptionCountsQuery;
-use App\Modules\Finance\Queries\Operations\GetDueInvoicesSummaryQuery;
+use App\Modules\Finance\Queries\Operations\GetDueItemsSummaryQuery;
 use App\Modules\Finance\Queries\Operations\ListBillingExceptionsQuery;
-use App\Modules\Finance\Queries\Operations\ListDueInvoicesQuery;
+use App\Modules\Finance\Queries\Operations\ListDueItemsQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -139,8 +139,8 @@ class BillingOperationsController extends Controller
 
     public function dueCalendar(
         Request $request,
-        GetDueInvoicesSummaryQuery $summaryQuery,
-        ListDueInvoicesQuery $listQuery
+        GetDueItemsSummaryQuery $summaryQuery,
+        ListDueItemsQuery $listQuery
     ): Response {
         $validated = $request->validate([
             'semester_id' => 'nullable|integer|exists:semesters,id',

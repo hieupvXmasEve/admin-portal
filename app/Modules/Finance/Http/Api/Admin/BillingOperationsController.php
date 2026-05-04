@@ -6,8 +6,11 @@ namespace App\Modules\Finance\Http\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
+use Inertia\Inertia;
 use App\Modules\Finance\Actions\Operations\FixBillingExceptionAction;
 use App\Modules\Finance\Actions\Operations\GenerateBatchChargesAction;
+use App\Modules\Finance\Actions\Operations\SendDueItemParentRemindersAction;
+use App\Modules\Finance\Actions\Operations\SendDueItemRemindersAction;
 use App\Modules\Finance\Actions\Operations\SendParentPaymentRemindersAction;
 use App\Modules\Finance\Actions\Operations\SendPaymentRemindersAction;
 use App\Modules\Finance\Exports\GenerateChargesPreviewExport;
@@ -76,6 +79,7 @@ class BillingOperationsController extends Controller
             'charge_types' => 'required|array|min:1',
             'charge_types.*' => 'string',
             'custom_amount' => 'nullable|numeric|min:0',
+            'due_date' => 'nullable|date',
             'skip_if_issued_or_paid' => 'boolean',
             'only_update_draft' => 'boolean',
             'merge_invoice' => 'boolean',
@@ -117,5 +121,45 @@ class BillingOperationsController extends Controller
         $result = SendParentPaymentRemindersAction::run($validated);
 
         return ApiResponse::success($result);
+    }
+
+    public function sendDueItemReminders(Request $request)
+    {
+        $validated = $request->validate([
+            'item_ids' => 'required|array|min:1',
+            'item_ids.*' => 'string',
+        ]);
+
+        $result = SendDueItemRemindersAction::run($validated);
+
+        // Use flash messages for Inertia
+        if ($result['sent_count'] > 0) {
+            Inertia::flash('success', $result['message']);
+        } else {
+            Inertia::flash('warning', $result['message']);
+        }
+
+        // Return back for Inertia requests
+        return back();
+    }
+
+    public function sendDueItemParentReminders(Request $request)
+    {
+        $validated = $request->validate([
+            'item_ids' => 'required|array|min:1',
+            'item_ids.*' => 'string',
+        ]);
+
+        $result = SendDueItemParentRemindersAction::run($validated);
+
+        // Use flash messages for Inertia
+        if ($result['sent_count'] > 0) {
+            Inertia::flash('success', $result['message']);
+        } else {
+            Inertia::flash('warning', $result['message']);
+        }
+
+        // Return back for Inertia requests
+        return back();
     }
 }
