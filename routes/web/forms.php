@@ -43,6 +43,10 @@ Route::middleware(['auth'])->group(function () {
                 Route::get('/', [\App\Http\Controllers\Web\Admin\SurveyResultController::class, 'index'])
                     ->name('index')
                     ->middleware('can:view_survey');
+                // Program stats (must be before /{target} routes)
+                Route::get('/stats', [\App\Http\Controllers\Web\Admin\SurveyResultController::class, 'stats'])
+                    ->name('stats')
+                    ->middleware('can:view_survey_results_aggregate');
                 // Aggregate survey results
                 Route::get('/{target}/aggregate', [\App\Http\Controllers\Web\Admin\SurveyResultController::class, 'aggregate'])
                     ->name('aggregate')

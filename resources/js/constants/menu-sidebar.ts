@@ -410,6 +410,12 @@ export const mainNavItems: NavItem[] = [
                         icon: BarChart3,
                         requiredPermissions: ['view_survey_results_aggregate'],
                     },
+                    {
+                        title: 'Program Stats',
+                        href: '/forms/admin/results/stats',
+                        icon: TrendingUp,
+                        requiredPermissions: ['view_survey_results_aggregate'],
+                    },
                 ],
             },
             {

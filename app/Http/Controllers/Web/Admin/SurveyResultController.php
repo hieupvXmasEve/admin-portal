@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\FormTarget;
 use App\Models\Semester;
+use App\Queries\Form\GetSurveyProgramStatsQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -153,6 +154,28 @@ class SurveyResultController extends Controller
                 'sort' => $validated['sort'] ?? null,
                 'direction' => $validated['direction'] ?? null,
                 'per_page' => $validated['per_page'] ?? 15,
+            ],
+        ]);
+    }
+
+    /**
+     * Display survey stats aggregated by academic program.
+     */
+    public function stats(Request $request, GetSurveyProgramStatsQuery $query): Response
+    {
+        $this->authorize('view_survey_results_aggregate');
+
+        $validated = $request->validate([
+            'semester_id' => 'nullable|string',
+        ]);
+
+        $stats = $query->handle($validated);
+
+        return Inertia::render('Forms/Admin/results/Stats', [
+            'stats' => $stats,
+            'semesters' => Semester::orderBy('start_date', 'desc')->get(['id', 'name']),
+            'filters' => [
+                'semester_id' => $validated['semester_id'] ?? 'all',
             ],
         ]);
     }
