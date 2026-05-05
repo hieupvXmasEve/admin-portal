@@ -8,7 +8,7 @@ use App\Models\Unit;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Unit>
+ * @extends Factory<Unit>
  */
 class UnitFactory extends Factory
 {
@@ -34,6 +34,7 @@ class UnitFactory extends Factory
             'code' => sprintf('%s%d%02d', $department, $level, $number),
             'name' => fake()->sentence(3, true),
             'credit_points' => fake()->randomElement([2.0, 3.0, 4.0, 6.0]),
+            'retake_fee' => fake()->randomElement([3000000, 5000000, 7500000]),
         ];
     }
 }

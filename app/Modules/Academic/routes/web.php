@@ -7,6 +7,7 @@ use App\Modules\Academic\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\AcademicProgressionAuditController;
 use App\Modules\Academic\Http\Web\BuildingController;
 use App\Modules\Academic\Http\Web\CampusController;
+use App\Modules\Academic\Http\Web\RetakeCourseRegistrationController;
 use App\Modules\Academic\Http\Web\StudentAcademicSummaryController;
 use App\Modules\Academic\Http\Web\StudentActionAuditController;
 use App\Modules\Academic\Http\Web\StudentActionController;
@@ -318,5 +319,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/{studentDecision}', [StudentDecisionController::class, 'update'])
             ->middleware('can:change_student_status')
             ->name('update');
+    });
+
+    /**
+     * ==========================================================
+     * Retake Course Registration (Đào tạo)
+     * ==========================================================
+     */
+    Route::prefix('retake-course')->name('academic.retake-course.')->group(function () {
+        Route::get('/', [RetakeCourseRegistrationController::class, 'index'])
+            ->middleware('can:view_retake_course')
+            ->name('index');
+
+        Route::get('/create', [RetakeCourseRegistrationController::class, 'create'])
+            ->middleware('can:create_retake_course')
+            ->name('create');
+
+        Route::post('/', [RetakeCourseRegistrationController::class, 'store'])
+            ->middleware('can:create_retake_course')
+            ->name('store');
+
+        Route::post('/{registration}/cancel', [RetakeCourseRegistrationController::class, 'cancel'])
+            ->middleware('can:cancel_retake_course')
+            ->name('cancel');
     });
 });

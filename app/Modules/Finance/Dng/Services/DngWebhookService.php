@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Dng\Services;
 
+use App\Models\CourseRetakeRegistration;
+use App\Models\FinanceCharge;
+use App\Modules\Academic\Actions\AutoEnrollRetakeCourseAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
@@ -134,6 +137,9 @@ class DngWebhookService
 
         $this->ensurePaymentBridge($freshRequest);
 
+        // Auto-enroll retake course registrations when payment confirmed
+        $this->handleRetakeCourseAutoEnroll($freshRequest);
+
         $event->markProcessed();
 
         $this->publishPaymentReceivedNotification($freshRequest->fresh());
@@ -213,6 +219,32 @@ class DngWebhookService
     {
         if (! $request->hasBridgedPayment()) {
             $this->dngPaymentService->bridgeToPayment($request);
+        }
+    }
+
+    /**
+     * Handle auto-enrollment for retake course registrations after payment confirmation.
+     */
+    private function handleRetakeCourseAutoEnroll(DngPaymentRequest $request): void
+    {
+        try {
+            // Find FinanceCharge linked to this student with retake_fee type and CourseRetakeRegistration source
+            $charge = FinanceCharge::query()
+                ->where('student_id', $request->student_id)
+                ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
+                ->where('source_type', CourseRetakeRegistration::class)
+                ->where('status', FinanceCharge::STATUS_ACTIVE)
+                ->latest()
+                ->first();
+
+            if ($charge) {
+                AutoEnrollRetakeCourseAction::handlePaymentConfirmed($charge);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('DNG webhook: retake course auto-enroll failed', [
+                'dng_payment_request_id' => $request->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

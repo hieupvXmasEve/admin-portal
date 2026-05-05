@@ -11,7 +11,7 @@ use App\Models\Semester;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\CourseOffering>
+ * @extends Factory<CourseOffering>
  */
 class CourseOfferingFactory extends Factory
 {
@@ -25,7 +25,7 @@ class CourseOfferingFactory extends Factory
     public function definition(): array
     {
         $curriculumUnit = CurriculumUnit::factory()->create();
-        
+
         return [
             'semester_id' => Semester::factory(),
             'curriculum_unit_id' => $curriculumUnit->id,
@@ -45,8 +45,6 @@ class CourseOfferingFactory extends Factory
             'enrollment_status' => $this->faker->randomElement(['open', 'closed', 'waitlist_only', 'cancelled']),
             'registration_start_date' => $this->faker->date(),
             'registration_end_date' => $this->faker->date(),
-            'drop_deadline' => $this->faker->optional()->date(),
-            'withdrawal_deadline' => $this->faker->optional()->date(),
             'special_requirements' => $this->faker->optional()->sentence(),
             'notes' => $this->faker->optional()->paragraph(),
         ];

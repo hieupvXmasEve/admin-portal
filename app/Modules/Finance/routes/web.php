@@ -12,6 +12,7 @@ use App\Modules\Finance\Http\Web\Admin\EgcChargeGenerationController;
 use App\Modules\Finance\Http\Web\Admin\EgcRetakeAdjustmentsController;
 use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
 use App\Modules\Finance\Http\Web\Admin\PaymentController;
+use App\Modules\Finance\Http\Web\Admin\RetakeCourseChargeController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(function () {
@@ -187,5 +188,15 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
                 ->middleware('can:view_finance_dng_webhook_events')
                 ->name('show');
         });
+    });
+
+    // Retake Course Charge (HQ Finance)
+    Route::prefix('retake-course')->name('retake-course.')->group(function () {
+        Route::get('/', [RetakeCourseChargeController::class, 'index'])
+            ->middleware('can:view_retake_course_charge')
+            ->name('index');
+        Route::post('/charge', [RetakeCourseChargeController::class, 'store'])
+            ->middleware('can:create_retake_course_charge')
+            ->name('charge.store');
     });
 });

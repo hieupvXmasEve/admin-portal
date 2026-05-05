@@ -125,6 +125,11 @@ return [
             'edit_course_registration' => 'edit_course_registration',
             'delete_course_registration' => 'delete_course_registration',
         ],
+        'retake_course_registrations' => [
+            'view_retake_course' => 'view_retake_course',
+            'create_retake_course' => 'create_retake_course',
+            'cancel_retake_course' => 'cancel_retake_course',
+        ],
         'gpa_management' => [
             'view_gpa_finalization' => 'view_gpa_finalization',
             'create_gpa_finalization' => 'create_gpa_finalization',
@@ -344,6 +349,9 @@ return [
             'create_finance_payments' => 'create_finance_payments',
             'view_finance_dng_payment_requests' => 'view_finance_dng_payment_requests',
             'view_finance_dng_webhook_events' => 'view_finance_dng_webhook_events',
+            // Retake Course Charges
+            'view_retake_course_charge' => 'view_retake_course_charge',
+            'create_retake_course_charge' => 'create_retake_course_charge',
         ],
         'modules' => [
             'view_module' => 'view_module',

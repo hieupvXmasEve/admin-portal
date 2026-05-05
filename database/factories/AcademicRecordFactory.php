@@ -40,6 +40,7 @@ class AcademicRecordFactory extends Factory
             'credit_hours_earned' => 3,
             'credit_points' => 10,
             'credit_points_earned' => 10,
+            'enrollment_date' => now(),
             'grade_status' => 'final',
             'completion_status' => 'completed',
             'completion_date' => now(),

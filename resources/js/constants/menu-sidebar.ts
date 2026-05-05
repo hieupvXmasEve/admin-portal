@@ -31,6 +31,7 @@ import {
     Package,
     Play,
     Receipt,
+    RefreshCcw,
     School,
     Send,
     Settings,
@@ -255,6 +256,12 @@ export const mainNavItems: NavItem[] = [
                 href: courseRoutes.registrations.index(),
                 icon: UserPlus,
                 requiredPermissions: ['view_course_registration'],
+            },
+            {
+                title: 'Retake Registration',
+                href: '/retake-course',
+                icon: RefreshCcw,
+                requiredPermissions: ['view_retake_course'],
             },
         ],
     },
@@ -609,19 +616,12 @@ export const mainNavItems: NavItem[] = [
                 ],
             },
 
-            // {
-            //     title: 'Billing Cycles',
-            //     href: '/billing-cycles',
-            //     icon: Clock,
-            //     requiredPermissions: ['view_billing_cycle'],
-            // },
-
-            // {
-            //     title: 'Student Wallets',
-            //     href: '/wallets',
-            //     icon: Wallet,
-            //     requiredPermissions: ['view_student_wallet'],
-            // },
+            {
+                title: 'Retake Course Charges',
+                href: '/finance/retake-course',
+                icon: RefreshCcw,
+                requiredPermissions: ['view_retake_course_charge'],
+            },
             {
                 title: 'Tuition Plans',
                 href: '/tuition-plans',
