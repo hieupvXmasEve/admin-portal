@@ -19,7 +19,7 @@ class ListDueItemsQuery
 
         // Get DNG Payment Requests
         $dngQuery = DngPaymentRequest::query()
-            ->with(['student:id,student_id,full_name,email'])
+            ->with(['student:id,student_id,full_name,email,status'])
             ->when($campusId, fn ($q) => $q->whereHas('student', fn ($sq) => $sq->where('campus_id', $campusId)))
             ->when($semesterId, fn ($q) => $q->where('semester_id', $semesterId))
             ->where('status', 'pushed_to_dng')
@@ -76,6 +76,8 @@ class ListDueItemsQuery
                 'due_date' => $dueDate->toDateString(),
                 'days_until_due' => $daysUntilDue,
                 'status' => $requestStatus,
+                'student_status_label' => $request->student?->status_label,
+                'student_status_color' => $request->student?->status_color,
                 'last_reminder_at' => $request->last_reminder_at,
             ];
         });

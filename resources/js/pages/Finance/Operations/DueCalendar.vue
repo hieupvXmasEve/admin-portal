@@ -41,6 +41,8 @@ interface InvoiceDueItem {
     student_code: string;
     student_name: string;
     student_email: string;
+    student_status_label: string | null;
+    student_status_color: string | null;
     total_amount: number;
     paid_amount: number;
     balance: number;
@@ -150,6 +152,19 @@ const getStatusIcon = (status: string) => {
         default:
             return Calendar;
     }
+};
+
+const getStudentStatusClass = (color: string) => {
+    const map: Record<string, string> = {
+        red: 'bg-red-50 text-red-700 border-red-200',
+        blue: 'bg-blue-50 text-blue-700 border-blue-200',
+        yellow: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+        indigo: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+        green: 'bg-green-50 text-green-700 border-green-200',
+        orange: 'bg-orange-50 text-orange-700 border-orange-200',
+        gray: 'bg-slate-50 text-slate-700 border-slate-200',
+    };
+    return map[color] ?? map.gray;
 };
 
 // Format days remaining
@@ -400,6 +415,7 @@ defineOptions({
                             </TableHead>
                             <TableHead>DNG Request</TableHead>
                             <TableHead>Sinh viên</TableHead>
+                            <TableHead>Trạng thái SV</TableHead>
                             <TableHead class="text-right">Số tiền</TableHead>
                             <TableHead class="text-right">Đã trả</TableHead>
                             <TableHead class="text-right">Còn nợ</TableHead>
@@ -411,7 +427,7 @@ defineOptions({
                     </TableHeader>
                     <TableBody>
                         <TableRow v-if="invoices.data.length === 0">
-                            <TableCell colspan="10" class="py-12 text-center">
+                            <TableCell colspan="11" class="py-12 text-center">
                                 <div class="flex flex-col items-center gap-2">
                                     <Calendar class="text-muted-foreground h-12 w-12" />
                                     <p class="text-muted-foreground">Không có DNG request nào phù hợp</p>
@@ -432,6 +448,12 @@ defineOptions({
                                     <div class="font-medium">{{ invoice.student_name }}</div>
                                     <div class="text-muted-foreground text-xs">{{ invoice.student_code }}</div>
                                 </div>
+                            </TableCell>
+                            <TableCell>
+                                <Badge v-if="invoice.student_status_label" variant="outline" :class="getStudentStatusClass(invoice.student_status_color ?? 'gray')">
+                                    {{ invoice.student_status_label }}
+                                </Badge>
+                                <span v-else class="text-muted-foreground text-xs">—</span>
                             </TableCell>
                             <TableCell class="text-right font-medium">
                                 {{ formatCurrency(invoice.total_amount) }}
