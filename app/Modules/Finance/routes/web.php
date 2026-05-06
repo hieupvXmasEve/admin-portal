@@ -1,6 +1,6 @@
 <?php
 
-use App\Modules\Finance\Http\Web\Admin\BatchDngPageController;
+use App\Modules\Finance\Http\Web\Admin\DngWorklistController;
 use App\Modules\Finance\Http\Web\Admin\BillingInvoiceController;
 use App\Modules\Finance\Http\Web\Admin\BillingOperationsController;
 use App\Modules\Finance\Http\Web\Admin\BillingSettlementController;
@@ -12,7 +12,6 @@ use App\Modules\Finance\Http\Web\Admin\EgcChargeGenerationController;
 use App\Modules\Finance\Http\Web\Admin\EgcRetakeAdjustmentsController;
 use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
 use App\Modules\Finance\Http\Web\Admin\PaymentController;
-use App\Modules\Finance\Http\Web\Admin\RetakeCourseChargeController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(function () {
@@ -87,9 +86,16 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::post('/settlement/apply', [BillingSettlementController::class, 'apply'])
             ->middleware('can:allocate_finance_payment')
             ->name('settlement.apply');
-        Route::get('/batch-dng', [BatchDngPageController::class, 'show'])
+        // /finance/operations/batch-dng removed — replaced by DNG Worklist below
+        // Route kept commented for redirect reference only
+
+        // Unified DNG Worklist — replaces BatchDng, RetakeCourse DNG, Settlement DNG dialog
+        Route::get('/dng-worklist', [DngWorklistController::class, 'index'])
             ->middleware('can:create_finance_payments')
-            ->name('batch-dng');
+            ->name('dng-worklist');
+        Route::post('/dng-worklist', [DngWorklistController::class, 'store'])
+            ->middleware('can:create_finance_payments')
+            ->name('dng-worklist.store');
     });
 
     // Invoices
@@ -144,12 +150,8 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::get('/', [PaymentController::class, 'index'])
             ->middleware('can:view_finance_payments')
             ->name('index');
-        Route::get('/create', [PaymentController::class, 'create'])
-            ->middleware('can:create_finance_payments')
-            ->name('create');
-        Route::get('/{student}/dng-data', [PaymentController::class, 'getStudentDngData'])
-            ->middleware('can:create_finance_payments')
-            ->name('student-dng-data');
+        // /finance/payments/create removed — DNG creation unified in DNG Worklist
+        // /finance/payments/{student}/dng-data removed — no longer needed
         Route::get('/auto-allocate', [PaymentController::class, 'showAutoAllocate'])
             ->middleware('can:allocate_finance_payment')
             ->name('auto-allocate.show');
@@ -190,16 +192,6 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         });
     });
 
-    // Retake Course Charge (HQ Finance)
-    Route::prefix('retake-course')->name('retake-course.')->group(function () {
-        Route::get('/', [RetakeCourseChargeController::class, 'index'])
-            ->middleware('can:view_retake_course_charge')
-            ->name('index');
-        Route::post('/charge', [RetakeCourseChargeController::class, 'store'])
-            ->middleware('can:create_retake_course_charge')
-            ->name('charge.store');
-        Route::post('/charge/simple', [RetakeCourseChargeController::class, 'storeSimple'])
-            ->middleware('can:create_retake_course_charge')
-            ->name('charge.store-simple');
-    });
+    // Retake Course Charge routes removed — absorbed by DNG Worklist (fee_type=HL)
+    // See: DngWorklistController + CreateBatchDngFromChargesAction (auto-creates charges for approved registrations)
 });

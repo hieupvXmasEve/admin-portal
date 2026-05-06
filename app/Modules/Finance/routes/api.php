@@ -1,7 +1,5 @@
 <?php
 
-use App\Modules\Finance\Dng\Http\Controllers\BatchDngApiController;
-use App\Modules\Finance\Dng\Http\Controllers\DngPaymentController;
 use App\Modules\Finance\Http\Api\Admin\BillingOperationsController;
 use Illuminate\Support\Facades\Route;
 
@@ -34,15 +32,3 @@ Route::prefix('api/v1/finance/operations')
         Route::post('/send-due-item-parent-reminders', [BillingOperationsController::class, 'sendDueItemParentReminders'])->name('send-due-item-parent-reminders');
     });
 
-/*
-|--------------------------------------------------------------------------
-| DNG Payment Gateway Routes
-|--------------------------------------------------------------------------
-*/
-Route::prefix('api/v1/finance/dng')
-    ->middleware(['web', 'auth'])
-    ->name('api.finance.dng.')
-    ->group(function () {
-        Route::post('/payment-requests', [DngPaymentController::class, 'store'])->name('payment-requests.store');
-        Route::post('/batch', [BatchDngApiController::class, 'store'])->name('batch.store');
-    });
