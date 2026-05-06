@@ -8,6 +8,9 @@ use App\Models\CourseOffering;
 use App\Models\CourseRetakeRegistration;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Models\Unit;
+use App\Models\UnitPrerequisiteCondition;
+use App\Models\UnitPrerequisiteGroup;
 use App\Models\User;
 use App\Modules\Academic\Actions\CreateRetakeCourseRegistrationAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -205,4 +208,75 @@ it('snapshots retake_fee from unit', function () {
     ]);
 
     expect((float) $result->retake_fee)->toBe(7500000.00);
+});
+
+it('rejects retake when student has not passed prerequisite unit', function () {
+    $prereqUnit = Unit::factory()->create(['retake_fee' => 500000]);
+    $targetUnit = $this->courseOffering->unit;
+
+    // Create prerequisite group: targetUnit requires prereqUnit
+    $group = UnitPrerequisiteGroup::create([
+        'unit_id' => $targetUnit->id,
+        'logic_operator' => 'AND',
+        'description' => 'Must pass prereq unit first',
+    ]);
+    UnitPrerequisiteCondition::create([
+        'group_id' => $group->id,
+        'type' => 'prerequisite',
+        'required_unit_id' => $prereqUnit->id,
+    ]);
+
+    // Student has NOT completed prereqUnit (no academic_record with completion_status=completed)
+
+    CreateRetakeCourseRegistrationAction::run([
+        'student_id' => $this->student->id,
+        'unit_id' => $targetUnit->id,
+        'original_academic_record_id' => $this->academicRecord->id,
+        'course_offering_id' => $this->courseOffering->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+    ]);
+})->throws(ValidationException::class);
+
+it('allows retake when student has passed prerequisite unit', function () {
+    $prereqUnit = Unit::factory()->create(['retake_fee' => 500000]);
+    $targetUnit = $this->courseOffering->unit;
+
+    // Create prerequisite group: targetUnit requires prereqUnit
+    $group = UnitPrerequisiteGroup::create([
+        'unit_id' => $targetUnit->id,
+        'logic_operator' => 'AND',
+        'description' => 'Must pass prereq unit first',
+    ]);
+    UnitPrerequisiteCondition::create([
+        'group_id' => $group->id,
+        'type' => 'prerequisite',
+        'required_unit_id' => $prereqUnit->id,
+    ]);
+
+    // Student HAS completed prereqUnit — create a course offering for the prereq unit
+    $prereqOffering = CourseOffering::factory()->create([
+        'semester_id' => $this->semester->id,
+        'unit_id' => $prereqUnit->id,
+    ]);
+    AcademicRecord::factory()->create([
+        'student_id' => $this->student->id,
+        'campus_id' => $this->campus->id,
+        'unit_id' => $prereqUnit->id,
+        'course_offering_id' => $prereqOffering->id,
+        'completion_status' => 'completed',
+        'is_passed' => true,
+    ]);
+
+    $result = CreateRetakeCourseRegistrationAction::run([
+        'student_id' => $this->student->id,
+        'unit_id' => $targetUnit->id,
+        'original_academic_record_id' => $this->academicRecord->id,
+        'course_offering_id' => $this->courseOffering->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+    ]);
+
+    expect($result)->toBeInstanceOf(CourseRetakeRegistration::class);
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
 });

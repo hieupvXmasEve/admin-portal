@@ -43,7 +43,7 @@ class RetakeCourseRegistrationController extends Controller
             })
             ->when($validated['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($validated['semester_id'] ?? null, fn ($q, $id) => $q->where('semester_id', $id))
-            ->when($validated['campus_id'] ?? null, fn ($q, $id) => $q->where('campus_id', $id))
+            ->where('campus_id', session('current_campus_id'))
             ->when($validated['unit_id'] ?? null, fn ($q, $id) => $q->where('unit_id', $id))
             ->orderBy($validated['sort'] ?? 'created_at', $validated['direction'] ?? 'desc')
             ->paginate($validated['per_page'] ?? 15)
@@ -51,9 +51,8 @@ class RetakeCourseRegistrationController extends Controller
 
         return Inertia::render('Academic/RetakeCourse/Index', [
             'registrations' => $query,
-            'filters' => $request->only(['search', 'status', 'semester_id', 'campus_id', 'unit_id', 'sort', 'direction', 'per_page']),
+            'filters' => $request->only(['search', 'status', 'semester_id', 'unit_id', 'sort', 'direction', 'per_page']),
             'semesters' => Semester::orderByDesc('start_date')->get(['id', 'name', 'code']),
-            'campuses' => Campus::orderBy('name')->get(['id', 'name', 'code']),
         ]);
     }
 

@@ -11,6 +11,7 @@ use App\Models\FinanceCharge;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
+use App\Services\V1\Student\PrerequisiteValidationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -78,6 +79,26 @@ class CreateRetakeCourseRegistrationAction
                 throw ValidationException::withMessages([
                     'student_id' => ['Sinh viên đã có đăng ký học lại đang xử lý cho môn này trong kỳ này.'],
                 ]);
+            }
+
+            // Validate prerequisites for the target course offering
+            $prereqMet = app(PrerequisiteValidationService::class)
+                ->hasMetPrerequisites($student, $courseOffering);
+            if (! $prereqMet) {
+                $prereqDetails = app(PrerequisiteValidationService::class)
+                    ->getPrerequisiteValidation($student, $courseOffering);
+                $missingCodes = collect($prereqDetails['missing_groups'])
+                    ->flatMap(fn ($g) => collect($g['conditions'])
+                        ->where('met', false)
+                        ->pluck('unit.code')
+                        ->filter()
+                    )
+                    ->unique()
+                    ->implode(', ');
+                $msg = $missingCodes
+                    ? "Sinh viên chưa hoàn thành điều kiện tiên quyết cho môn {$unit->code}: {$missingCodes}"
+                    : "Sinh viên chưa đáp ứng điều kiện tiên quyết cho môn {$unit->code}";
+                throw ValidationException::withMessages(['unit_id' => [$msg]]);
             }
 
             // Calculate attempt_number: count existing academic records + 1

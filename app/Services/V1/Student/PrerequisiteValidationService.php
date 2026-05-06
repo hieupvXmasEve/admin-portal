@@ -150,17 +150,20 @@ class PrerequisiteValidationService
         if ($condition->type === 'prerequisite' && $condition->requiredUnit) {
             $unit = $condition->requiredUnit;
 
-            // Get student's academic record for this unit
+            // Find any record where student passed: is_passed=true or override_pass=true
             $academicRecord = $student->academicRecords()
                 ->where('unit_id', $unit->id)
-                ->where('completion_status', 'completed')
+                ->where(function ($q) {
+                    $q->where('is_passed', true)
+                        ->orWhere('override_pass', true);
+                })
                 ->orderBy('completion_date', 'desc')
                 ->first();
 
             if ($academicRecord) {
                 $gradeAchieved = $academicRecord->final_letter_grade;
                 $completionDate = $academicRecord->completion_date;
-                $met = true; // For now, just check completion. Can add grade requirements later
+                $met = true;
             }
         } elseif ($condition->type === 'credit_requirement') {
             // Check if student has required credit points

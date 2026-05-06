@@ -29,6 +29,7 @@ use App\Modules\Academic\Queries\GetCourseOfferingSurveyQuery;
 use App\Services\CourseSurveyService;
 use App\Services\SystemConfigService;
 use App\Services\V1\Student\CurriculumService;
+use App\Services\V1\Student\PrerequisiteValidationService;
 use App\Support\CampusLogContext;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -1216,6 +1217,26 @@ class CourseOfferingController extends Controller
                             $reasons[] = $curriculumCheck['reason'];
                         }
 
+                        // Check prerequisites using UnitPrerequisiteGroup system
+                        if ($isEligible) {
+                            $prereqService = app(PrerequisiteValidationService::class);
+                            if (!$prereqService->hasMetPrerequisites($student, $courseOffering)) {
+                                $prereqDetails = $prereqService->getPrerequisiteValidation($student, $courseOffering);
+                                $missingCodes = collect($prereqDetails['missing_groups'])
+                                    ->flatMap(fn ($g) => collect($g['conditions'])
+                                        ->where('met', false)
+                                        ->pluck('unit.code')
+                                        ->filter()
+                                    )
+                                    ->unique()
+                                    ->implode(', ');
+                                $isEligible = false;
+                                $reasons[] = $missingCodes
+                                    ? "Chưa hoàn thành điều kiện tiên quyết: {$missingCodes}"
+                                    : 'Sinh viên chưa đáp ứng điều kiện tiên quyết cho môn này';
+                            }
+                        }
+
                         // Check course offering capacity
                         if ($isEligible && $courseOffering->isFull()) {
                             $isEligible = false;
@@ -1435,6 +1456,29 @@ class CourseOfferingController extends Controller
                     $curriculumCheck = $this->curriculumService->isUnitInStudentCurriculum($student, $courseOffering->unit_id);
                     if (!$curriculumCheck['is_in_curriculum']) {
                         $result['message'] = $curriculumCheck['reason'];
+                        $failureCount++;
+                        $results[] = $result;
+
+                        continue;
+                    }
+
+                    // Check prerequisites using UnitPrerequisiteGroup system
+                    $prereqMet = app(PrerequisiteValidationService::class)
+                        ->hasMetPrerequisites($student, $courseOffering);
+                    if (! $prereqMet) {
+                        $prereqDetails = app(PrerequisiteValidationService::class)
+                            ->getPrerequisiteValidation($student, $courseOffering);
+                        $missingCodes = collect($prereqDetails['missing_groups'])
+                            ->flatMap(fn ($g) => collect($g['conditions'])
+                                ->where('met', false)
+                                ->pluck('unit.code')
+                                ->filter()
+                            )
+                            ->unique()
+                            ->implode(', ');
+                        $result['message'] = $missingCodes
+                            ? "Chưa hoàn thành điều kiện tiên quyết: {$missingCodes}"
+                            : 'Sinh viên chưa đáp ứng điều kiện tiên quyết cho môn này';
                         $failureCount++;
                         $results[] = $result;
 
