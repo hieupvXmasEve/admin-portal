@@ -66,6 +66,8 @@ final class DngPaymentPushedEmailContent implements EmailContentProvider
 
             {$semesterLineVi}
 
+            <p><em>Vui lòng bỏ qua email này nếu sinh viên đã thanh toán học phí.</em></p>
+
             <p>Vui lòng xem chi tiết thông tin học phí như sau:</p>
 
             <table style="border-collapse: collapse; width: 100%; margin-bottom: 16px;">
@@ -100,6 +102,8 @@ final class DngPaymentPushedEmailContent implements EmailContentProvider
             <p>Dear <strong>{$studentNameCode}</strong>,</p>
 
             {$semesterLineEn}
+
+            <p><em>Please disregard this email if the tuition fee has already been paid.</em></p>
 
             <p>Please find the detailed tuition information below:</p>
 
