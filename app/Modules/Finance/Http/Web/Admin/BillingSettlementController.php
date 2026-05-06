@@ -6,6 +6,7 @@ namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
+use App\Modules\Finance\Http\Requests\Operations\ApplySettlementRequest;
 use App\Modules\Finance\Queries\Operations\ListSettlementWorklistQuery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,15 +20,9 @@ class BillingSettlementController extends Controller
         return Inertia::render('Finance/Operations/Settlement', $query->handle($request));
     }
 
-    public function apply(Request $request, AutoAllocatePaymentsAction $action): RedirectResponse
+    public function apply(ApplySettlementRequest $request, AutoAllocatePaymentsAction $action): RedirectResponse
     {
-        $validated = $request->validate([
-            'priority_order' => 'required|array',
-            'priority_order.*' => 'string',
-            'student_ids' => 'nullable|array',
-            'student_ids.*' => 'integer|exists:students,id',
-        ]);
-
+        $validated = $request->validated();
         $studentIds = $validated['student_ids'] ?? [];
 
         $stats = $studentIds === []
@@ -36,8 +31,8 @@ class BillingSettlementController extends Controller
 
         $message = "Settlement complete. Processed {$stats['students_processed']} students, created {$stats['allocations_created']} payment applications.";
 
-        return redirect()
-            ->route('finance.operations.settlement.index')
-            ->with('success', $message);
+        Inertia::flash('success', $message);
+
+        return redirect()->route('finance.operations.settlement.index');
     }
 }

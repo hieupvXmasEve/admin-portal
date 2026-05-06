@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import FilterPanel from '@/components/filters/FilterPanel.vue';
-import FilterSearchInput from '@/components/filters/FilterSearchInput.vue';
-import FilterSelect from '@/components/filters/FilterSelect.vue';
-import ServerPaginatedDataTable from '@/components/tables/ServerPaginatedDataTable.vue';
+import DataPagination from '@/components/DataPagination.vue';
+import DataTable from '@/components/DataTable.vue';
+import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,13 +13,13 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApi } from '@/composables';
+import { useDataTable } from '@/composables/useDataTable';
 import { usePermission } from '@/composables/usePermission';
-import { useServerTableQuery } from '@/composables/useServerTableQuery';
 import { createColumns } from '@/lib/table-utils';
 import type { PaginatedResponse } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { ArrowLeft, CalendarIcon, CheckCircle2, ExternalLink, Loader2, Send, Wallet, Zap } from 'lucide-vue-next';
+import { ArrowLeft, CalendarIcon, CheckCircle2, ExternalLink, Loader2, Send, Wallet, X, Zap } from 'lucide-vue-next';
 import { computed, h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
@@ -71,12 +70,11 @@ interface SettlementStudent {
 }
 
 interface SettlementFilters {
-    search?: string;
-    readiness?: 'all' | 'ready' | 'no_cash';
-    per_page?: number;
-    page?: number;
-    sort?: string | null;
-    direction?: 'asc' | 'desc' | null;
+    search: string;
+    readiness: string;
+    per_page: number;
+    sort: string | null;
+    direction: 'asc' | 'desc' | null;
 }
 
 interface Props {
@@ -87,7 +85,13 @@ interface Props {
         total_active_due: number;
         total_unapplied_balance: number;
     };
-    filters: SettlementFilters;
+    filters?: {
+        search?: string;
+        readiness?: string;
+        per_page?: number;
+        sort?: string;
+        direction?: 'asc' | 'desc';
+    };
 }
 
 const props = defineProps<Props>();
@@ -101,36 +105,31 @@ const formatCurrency = (value: number) =>
     }).format(value);
 
 const readinessOptions = [
+    { value: 'all', label: 'All unpaid students' },
     { value: 'ready', label: 'Ready to settle' },
     { value: 'no_cash', label: 'No unapplied cash' },
 ];
 
-const { filters, hasActiveFilters, clearFilters, applySearch, setFilter, apply, handleSortChange, handlePageChange, handlePageSizeChange, currentSort, currentDirection } = useServerTableQuery<SettlementFilters>({
+const { filters, setFilter, clearAllFilters, handleSearch, handleSortChange, handlePaginationNavigate, handlePageSizeChange, hasActiveFilters, isLoading, currentSort, currentDirection } = useDataTable<SettlementFilters>({
     baseUrl: route('finance.operations.settlement.index'),
     initialFilters: {
-        search: props.filters.search ?? '',
-        readiness: props.filters.readiness ?? 'all',
-        per_page: props.filters.per_page ?? 15,
-        page: props.filters.page ?? 1,
-        sort: props.filters.sort ?? 'active_due',
-        direction: props.filters.direction ?? 'desc',
-    },
-    emptyFilters: {
-        search: '',
-        readiness: 'all',
-        per_page: 15,
-        page: 1,
-        sort: 'active_due',
-        direction: 'desc',
+        search: props.filters?.search ?? '',
+        readiness: props.filters?.readiness ?? 'all',
+        per_page: props.filters?.per_page ?? 50,
+        sort: typeof props.filters?.sort === 'string' ? props.filters.sort : 'active_due',
+        direction: (props.filters?.direction as 'asc' | 'desc') || 'desc',
     },
     defaultValues: {
+        search: '',
         readiness: 'all',
-        per_page: 15,
-        page: 1,
+        per_page: 50,
         sort: 'active_due',
         direction: 'desc',
     },
     only: ['students', 'summary', 'filters'],
+    debounce: 300,
+    fieldDebounce: { search: 400 },
+    immediateFields: ['readiness'],
 });
 
 const api = useApi();
@@ -151,12 +150,18 @@ const estimateYear = ref(String(now.getFullYear()));
 const estimateTime = ref(`${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}`);
 
 const estimateMonthOptions = [
-    { value: '01', label: 'Tháng 01' }, { value: '02', label: 'Tháng 02' },
-    { value: '03', label: 'Tháng 03' }, { value: '04', label: 'Tháng 04' },
-    { value: '05', label: 'Tháng 05' }, { value: '06', label: 'Tháng 06' },
-    { value: '07', label: 'Tháng 07' }, { value: '08', label: 'Tháng 08' },
-    { value: '09', label: 'Tháng 09' }, { value: '10', label: 'Tháng 10' },
-    { value: '11', label: 'Tháng 11' }, { value: '12', label: 'Tháng 12' },
+    { value: '01', label: 'Tháng 01' },
+    { value: '02', label: 'Tháng 02' },
+    { value: '03', label: 'Tháng 03' },
+    { value: '04', label: 'Tháng 04' },
+    { value: '05', label: 'Tháng 05' },
+    { value: '06', label: 'Tháng 06' },
+    { value: '07', label: 'Tháng 07' },
+    { value: '08', label: 'Tháng 08' },
+    { value: '09', label: 'Tháng 09' },
+    { value: '10', label: 'Tháng 10' },
+    { value: '11', label: 'Tháng 11' },
+    { value: '12', label: 'Tháng 12' },
 ];
 
 const estimateYearOptions = Array.from({ length: 6 }, (_, i) => {
@@ -205,12 +210,6 @@ const applySettlement = (studentIds: number[]) => {
         },
         {
             preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Settlement completed successfully.');
-            },
-            onError: () => {
-                toast.error('Settlement failed.');
-            },
             onFinish: () => {
                 isApplying.value = false;
             },
@@ -226,10 +225,7 @@ const getReadinessBadge = (student: SettlementStudent) => {
     return { label: 'No cash', class: 'bg-amber-50 text-amber-700 border-amber-200' };
 };
 
-const getRecordsToCreateForStudent = (student: SettlementStudent) =>
-    student.fee_type_breakdown.filter(
-        (entry) => entry.semester_id !== null && (!entry.active_dng || entry.active_dng.amount !== entry.net_remaining),
-    );
+const getRecordsToCreateForStudent = (student: SettlementStudent) => student.fee_type_breakdown.filter((entry) => entry.semester_id !== null && (!entry.active_dng || entry.active_dng.amount !== entry.net_remaining));
 
 const recordsToCreate = computed(() => (dngBatchStudent.value ? getRecordsToCreateForStudent(dngBatchStudent.value) : []));
 
@@ -406,29 +402,17 @@ const columns: ColumnDef<SettlementStudent>[] = createColumns<SettlementStudent>
             <DialogContent class="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Tạo DNG request</DialogTitle>
-                    <DialogDescription v-if="dngBatchStudent">
-                        {{ dngBatchStudent.student_name }} · {{ dngBatchStudent.student_code }}
-                    </DialogDescription>
+                    <DialogDescription v-if="dngBatchStudent"> {{ dngBatchStudent.student_name }} · {{ dngBatchStudent.student_code }} </DialogDescription>
                 </DialogHeader>
 
                 <div class="space-y-4">
                     <!-- Records to create list -->
                     <div v-if="recordsToCreate.length > 0" class="space-y-1.5">
                         <p class="text-sm font-medium">Khoản phí sẽ tạo ({{ recordsToCreate.length }})</p>
-                        <div
-                            v-for="entry in recordsToCreate"
-                            :key="entry.fee_type"
-                            class="bg-muted/30 flex items-center justify-between rounded-md border px-3 py-2 text-sm"
-                        >
+                        <div v-for="entry in recordsToCreate" :key="entry.fee_type" class="bg-muted/30 flex items-center justify-between rounded-md border px-3 py-2 text-sm">
                             <span>{{ entry.label }}</span>
                             <div class="flex items-center gap-2">
-                                <Badge
-                                    v-if="entry.active_dng && entry.active_dng.amount !== entry.net_remaining"
-                                    variant="outline"
-                                    class="border-orange-200 bg-orange-50 text-xs text-orange-700"
-                                >
-                                    Tạo lại ↻
-                                </Badge>
+                                <Badge v-if="entry.active_dng && entry.active_dng.amount !== entry.net_remaining" variant="outline" class="border-orange-200 bg-orange-50 text-xs text-orange-700"> Tạo lại ↻ </Badge>
                                 <span class="font-semibold text-red-600">{{ formatCurrency(entry.net_remaining) }}</span>
                             </div>
                         </div>
@@ -523,29 +507,40 @@ const columns: ColumnDef<SettlementStudent>[] = createColumns<SettlementStudent>
                 <CardDescription>Settlement chạy trực tiếp theo rule priority hiện tại, không còn bước preview.</CardDescription>
             </CardHeader>
             <CardContent class="space-y-4">
-                <FilterPanel :has-active-filters="hasActiveFilters" :columns="4" @clear="clearFilters">
-                    <FilterSearchInput :model-value="filters.search ?? ''" placeholder="Search student or invoice..." @update:model-value="(value) => setFilter('search', value)" @search="applySearch" />
-                    <FilterSelect
-                        :model-value="filters.readiness ?? 'all'"
-                        :options="readinessOptions"
-                        placeholder="Readiness"
-                        all-label="All unpaid students"
-                        @update:model-value="(value) => setFilter('readiness', (value || 'all') as SettlementFilters['readiness'])"
-                        @change="() => apply({ readiness: filters.readiness, page: 1 })"
-                    />
-                </FilterPanel>
+                <div class="flex flex-wrap items-end gap-3">
+                    <div class="flex flex-col gap-1">
+                        <Label class="text-muted-foreground text-xs">Search</Label>
+                        <DebouncedInput :model-value="filters.search" @update:model-value="handleSearch" placeholder="Search student or invoice..." class="w-64" />
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <Label class="text-muted-foreground text-xs">Readiness</Label>
+                        <Select :model-value="filters.readiness" @update:model-value="(v) => setFilter('readiness', v)">
+                            <SelectTrigger class="w-48">
+                                <SelectValue placeholder="All unpaid students" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="opt in readinessOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <Label class="text-xs text-transparent">Clear</Label>
+                        <Button variant="outline" size="default" @click="clearAllFilters" :disabled="!hasActiveFilters">
+                            <X class="mr-2 h-4 w-4" />
+                            Clear
+                        </Button>
+                    </div>
+                </div>
 
-                <ServerPaginatedDataTable
+                <DataTable
                     :data="props.students.data"
                     :columns="columns"
-                    :pagination-data="props.students"
-                    :initial-sort="currentSort"
-                    :initial-direction="currentDirection"
-                    item-name="students"
+                    :loading="isLoading"
+                    :show-column-toggle="false"
+                    :initial-sort="currentSort ?? undefined"
+                    :initial-direction="currentDirection ?? undefined"
                     empty-message="No unpaid invoice candidates matched the current filter."
                     @sort-change="handleSortChange"
-                    @page-change="handlePageChange"
-                    @page-size-change="handlePageSizeChange"
                 >
                     <template #cell-invoices="{ row }">
                         <div class="min-w-[340px] space-y-3">
@@ -556,29 +551,17 @@ const columns: ColumnDef<SettlementStudent>[] = createColumns<SettlementStudent>
                                     <span class="text-muted-foreground/60 text-xs" title="latest_dng_request là thông tin cấp student, không phản ánh trạng thái DNG từng loại phí">ⓘ</span>
                                 </div>
                                 <div class="space-y-1.5">
-                                    <div
-                                        v-for="entry in row.original.fee_type_breakdown"
-                                        :key="entry.fee_type"
-                                        class="bg-muted/30 flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs"
-                                    >
+                                    <div v-for="entry in row.original.fee_type_breakdown" :key="entry.fee_type" class="bg-muted/30 flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs">
                                         <div class="space-y-0.5">
                                             <div class="font-medium">{{ entry.label }}</div>
                                             <div class="text-muted-foreground">
                                                 Gốc: {{ formatCurrency(entry.gross) }}
-                                                <template v-if="entry.discount > 0">
-                                                    · Giảm: {{ formatCurrency(entry.discount) }}
-                                                </template>
+                                                <template v-if="entry.discount > 0"> · Giảm: {{ formatCurrency(entry.discount) }} </template>
                                             </div>
                                         </div>
                                         <div class="flex items-center gap-2">
                                             <span class="font-semibold text-red-600">{{ formatCurrency(entry.net_remaining) }}</span>
-                                            <Badge
-                                                v-if="entry.active_dng !== null && entry.active_dng.amount === entry.net_remaining"
-                                                variant="outline"
-                                                class="border-amber-200 bg-amber-50 text-xs text-amber-700"
-                                            >
-                                                DNG đang chờ
-                                            </Badge>
+                                            <Badge v-if="entry.active_dng !== null && entry.active_dng.amount === entry.net_remaining" variant="outline" class="border-amber-200 bg-amber-50 text-xs text-amber-700"> DNG đang chờ </Badge>
                                         </div>
                                     </div>
                                 </div>
@@ -630,19 +613,15 @@ const columns: ColumnDef<SettlementStudent>[] = createColumns<SettlementStudent>
                                 Apply
                             </Button>
 
-                            <Button
-                                v-else-if="permission.can('create_finance_payments')"
-                                size="sm"
-                                variant="outline"
-                                :disabled="getRecordsToCreateForStudent(row.original).length === 0"
-                                @click="openDngBatchDialog(row.original)"
-                            >
+                            <Button v-else-if="permission.can('create_finance_payments')" size="sm" variant="outline" :disabled="getRecordsToCreateForStudent(row.original).length === 0" @click="openDngBatchDialog(row.original)">
                                 <Wallet class="mr-2 h-4 w-4" />
                                 Create DNG request
                             </Button>
                         </div>
                     </template>
-                </ServerPaginatedDataTable>
+                </DataTable>
+
+                <DataPagination :pagination-data="props.students" item-name="students" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
             </CardContent>
         </Card>
     </div>
