@@ -42,7 +42,7 @@ beforeEach(function () {
     ]);
 });
 
-it('creates a retake course registration successfully', function () {
+it('creates a retake course registration with auto charge', function () {
     $result = CreateRetakeCourseRegistrationAction::run([
         'student_id' => $this->student->id,
         'unit_id' => $this->courseOffering->unit_id,
@@ -53,11 +53,24 @@ it('creates a retake course registration successfully', function () {
     ]);
 
     expect($result)->toBeInstanceOf(CourseRetakeRegistration::class);
-    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_APPROVED);
+    // Registration auto-transitions to payment_pending after charge creation
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
     expect($result->student_id)->toBe($this->student->id);
     expect($result->unit_id)->toBe($this->courseOffering->unit_id);
     expect($result->approved_by_user_id)->toBe($this->user->id);
     expect($result->approved_at)->not->toBeNull();
+    expect($result->finance_charge_id)->not->toBeNull();
+
+    // Verify charge was created
+    $charge = \App\Models\FinanceCharge::find($result->finance_charge_id);
+    expect($charge)->not->toBeNull();
+    expect($charge->charge_type)->toBe(\App\Models\FinanceCharge::TYPE_RETAKE_FEE);
+    expect($charge->status)->toBe(\App\Models\FinanceCharge::STATUS_ACTIVE);
+    expect((float) $charge->amount)->toBe((float) $result->retake_fee);
+
+    // Verify invoice line was created
+    $line = \App\Models\InvoiceLine::where('charge_id', $charge->id)->first();
+    expect($line)->not->toBeNull();
 });
 
 it('calculates attempt_number from existing academic records', function () {
@@ -111,7 +124,7 @@ it('rejects duplicate active registration for same student+unit+semester', funct
 })->throws(ValidationException::class);
 
 it('allows registration after previous one was cancelled', function () {
-    // Create and cancel first registration
+    // Create and cancel first registration (auto-creates charge at payment_pending)
     $first = CreateRetakeCourseRegistrationAction::run([
         'student_id' => $this->student->id,
         'unit_id' => $this->courseOffering->unit_id,
@@ -121,7 +134,11 @@ it('allows registration after previous one was cancelled', function () {
         'campus_id' => $this->campus->id,
     ]);
 
-    $first->cancel($this->user->id, 'Test cancellation');
+    // Use full cancel action to properly void charge + cancel registration
+    \App\Modules\Academic\Actions\CancelRetakeCourseRegistrationAction::run([
+        'registration_id' => $first->id,
+        'reason' => 'Test cancellation',
+    ]);
 
     // Should succeed because previous was cancelled (terminal)
     $second = CreateRetakeCourseRegistrationAction::run([
@@ -133,7 +150,16 @@ it('allows registration after previous one was cancelled', function () {
         'campus_id' => $this->campus->id,
     ]);
 
-    expect($second->status)->toBe(CourseRetakeRegistration::STATUS_APPROVED);
+    // Second registration also auto-creates charge
+    expect($second->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
+    expect($second->finance_charge_id)->not->toBeNull();
+
+    // Verify: 1 void charge (from cancelled) + 1 active charge (from new registration)
+    $charges = \App\Models\FinanceCharge::where('student_id', $this->student->id)
+        ->where('source_type', \App\Models\CourseRetakeRegistration::class)
+        ->get();
+    expect($charges->where('status', 'active')->count())->toBe(1);
+    expect($charges->where('status', 'void')->count())->toBe(1);
 });
 
 it('rejects registration when unit has zero retake_fee', function () {

@@ -774,3 +774,352 @@ it('stores last_callback_payload from webhook', function () {
     expect($dngPaymentRequest->last_callback_payload)->toBe($payload);
     expect($dngPaymentRequest->psp_code)->toBe('PSP123');
 });
+
+// =====================
+// Retake auto-enroll via finance_charge_id
+// =====================
+
+it('auto-enrolls the correct retake registration via finance_charge_id when HL webhook received', function () {
+    // Setup two retake registrations for the same student to verify the right one is enrolled
+    $campus = $this->campus;
+    $semester = $this->semester;
+    $student = $this->student;
+
+    $courseOfferingA = \App\Models\CourseOffering::factory()->create([
+        'semester_id' => $semester->id,
+        'max_capacity' => 50,
+        'current_enrollment' => 5,
+    ]);
+    $courseOfferingB = \App\Models\CourseOffering::factory()->create([
+        'semester_id' => $semester->id,
+        'max_capacity' => 50,
+        'current_enrollment' => 5,
+    ]);
+
+    $user = \App\Models\User::factory()->create();
+
+    // Academic records (failed) for each unit
+    $academicRecordA = \App\Models\AcademicRecord::factory()->create([
+        'student_id' => $student->id,
+        'campus_id' => $campus->id,
+        'unit_id' => $courseOfferingA->unit_id,
+        'course_offering_id' => $courseOfferingA->id,
+        'completion_status' => 'failed',
+        'is_passed' => false,
+    ]);
+    $academicRecordB = \App\Models\AcademicRecord::factory()->create([
+        'student_id' => $student->id,
+        'campus_id' => $campus->id,
+        'unit_id' => $courseOfferingB->unit_id,
+        'course_offering_id' => $courseOfferingB->id,
+        'completion_status' => 'failed',
+        'is_passed' => false,
+    ]);
+
+    // Registration A — the one being paid
+    $regA = \App\Models\CourseRetakeRegistration::create([
+        'student_id' => $student->id,
+        'unit_id' => $courseOfferingA->unit_id,
+        'original_academic_record_id' => $academicRecordA->id,
+        'course_offering_id' => $courseOfferingA->id,
+        'semester_id' => $semester->id,
+        'campus_id' => $campus->id,
+        'status' => \App\Models\CourseRetakeRegistration::STATUS_PAYMENT_PENDING,
+        'attempt_number' => 2,
+        'retake_fee' => 5000000,
+        'approved_by_user_id' => $user->id,
+        'approved_at' => now(),
+    ]);
+    $chargeA = \App\Models\FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'charge_type' => \App\Models\FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 5000000,
+        'description' => 'Retake A',
+        'effective_at' => now(),
+        'status' => \App\Models\FinanceCharge::STATUS_ACTIVE,
+        'source_type' => \App\Models\CourseRetakeRegistration::class,
+        'source_id' => $regA->id,
+    ]);
+    $regA->update(['finance_charge_id' => $chargeA->id]);
+
+    // Registration B — newer, should NOT be enrolled by this payment
+    $regB = \App\Models\CourseRetakeRegistration::create([
+        'student_id' => $student->id,
+        'unit_id' => $courseOfferingB->unit_id,
+        'original_academic_record_id' => $academicRecordB->id,
+        'course_offering_id' => $courseOfferingB->id,
+        'semester_id' => $semester->id,
+        'campus_id' => $campus->id,
+        'status' => \App\Models\CourseRetakeRegistration::STATUS_PAYMENT_PENDING,
+        'attempt_number' => 2,
+        'retake_fee' => 7000000,
+        'approved_by_user_id' => $user->id,
+        'approved_at' => now(),
+    ]);
+    $chargeB = \App\Models\FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'charge_type' => \App\Models\FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 7000000,
+        'description' => 'Retake B',
+        'effective_at' => now()->addSecond(), // newer
+        'status' => \App\Models\FinanceCharge::STATUS_ACTIVE,
+        'source_type' => \App\Models\CourseRetakeRegistration::class,
+        'source_id' => $regB->id,
+    ]);
+    $regB->update(['finance_charge_id' => $chargeB->id]);
+
+    // DNG request linked explicitly to chargeA (the one being paid)
+    $dngRequest = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'CAMPUS001',
+        'student_code' => 'STU001',
+        'fee_type' => 'HL',
+        'item_id' => 'ITEM-RETAKE-A',
+        'amount' => 5000000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+        'dng_payment_id' => 'PAY-RETAKE-A',
+        'finance_charge_id' => $chargeA->id,
+    ]);
+
+    $payload = [
+        'PaymentId' => 'PAY-RETAKE-A',
+        'ItemId' => 'ITEM-RETAKE-A',
+        'StudentId' => 'STU001',
+        'Amount' => '5000000',
+        'FeeType' => 'HL',
+        'CampusCode' => 'CAMPUS001',
+    ];
+
+    $event = DngWebhookEvent::create([
+        'dng_payment_id' => 'PAY-RETAKE-A',
+        'event_type' => DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE,
+        'payload_hash' => DngWebhookEvent::computePayloadHash($payload),
+        'headers' => [],
+        'payload' => $payload,
+        'dng_payment_request_id' => $dngRequest->id,
+        'is_valid_checksum' => false,
+        'processing_status' => DngWebhookEvent::STATUS_RECEIVED,
+        'received_at' => now(),
+    ]);
+
+    $mockPaymentService = Mockery::mock(\App\Modules\Finance\Dng\Services\DngPaymentService::class);
+    $mockPaymentService->shouldReceive('bridgeToPayment')->once();
+    app()->instance(\App\Modules\Finance\Dng\Services\DngPaymentService::class, $mockPaymentService);
+
+    $job = new ProcessDngWebhookJob($event->id);
+    $job->handle(app(\App\Modules\Finance\Dng\Services\DngWebhookService::class));
+
+    $regA->refresh();
+    $regB->refresh();
+
+    // Only registration A should be enrolled
+    expect($regA->status)->toBe(\App\Models\CourseRetakeRegistration::STATUS_ENROLLED);
+    // Registration B must remain untouched
+    expect($regB->status)->toBe(\App\Models\CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
+});
+
+it('does not trigger auto-enroll for non-HL fee type webhooks', function () {
+    $campus = $this->campus;
+    $semester = $this->semester;
+    $student = $this->student;
+
+    $courseOffering = \App\Models\CourseOffering::factory()->create(['semester_id' => $semester->id]);
+    $user = \App\Models\User::factory()->create();
+    $academicRecord = \App\Models\AcademicRecord::factory()->create([
+        'student_id' => $student->id,
+        'campus_id' => $campus->id,
+        'unit_id' => $courseOffering->unit_id,
+        'course_offering_id' => $courseOffering->id,
+        'completion_status' => 'failed',
+        'is_passed' => false,
+    ]);
+
+    $reg = \App\Models\CourseRetakeRegistration::create([
+        'student_id' => $student->id,
+        'unit_id' => $courseOffering->unit_id,
+        'original_academic_record_id' => $academicRecord->id,
+        'course_offering_id' => $courseOffering->id,
+        'semester_id' => $semester->id,
+        'campus_id' => $campus->id,
+        'status' => \App\Models\CourseRetakeRegistration::STATUS_PAYMENT_PENDING,
+        'attempt_number' => 2,
+        'retake_fee' => 5000000,
+        'approved_by_user_id' => $user->id,
+        'approved_at' => now(),
+    ]);
+
+    // DNG request with HP fee_type (not HL) — should not trigger auto-enroll
+    $dngRequest = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'CAMPUS001',
+        'student_code' => 'STU001',
+        'fee_type' => 'HP',
+        'item_id' => 'ITEM-HP-001',
+        'amount' => 5000000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+        'dng_payment_id' => 'PAY-HP-001',
+    ]);
+
+    $payload = [
+        'PaymentId' => 'PAY-HP-001',
+        'ItemId' => 'ITEM-HP-001',
+        'StudentId' => 'STU001',
+        'Amount' => '5000000',
+        'FeeType' => 'HP',
+        'CampusCode' => 'CAMPUS001',
+    ];
+
+    $event = DngWebhookEvent::create([
+        'dng_payment_id' => 'PAY-HP-001',
+        'event_type' => DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE,
+        'payload_hash' => DngWebhookEvent::computePayloadHash($payload),
+        'headers' => [],
+        'payload' => $payload,
+        'dng_payment_request_id' => $dngRequest->id,
+        'is_valid_checksum' => false,
+        'processing_status' => DngWebhookEvent::STATUS_RECEIVED,
+        'received_at' => now(),
+    ]);
+
+    $mockPaymentService = Mockery::mock(\App\Modules\Finance\Dng\Services\DngPaymentService::class);
+    $mockPaymentService->shouldReceive('bridgeToPayment')->once();
+    app()->instance(\App\Modules\Finance\Dng\Services\DngPaymentService::class, $mockPaymentService);
+
+    $job = new ProcessDngWebhookJob($event->id);
+    $job->handle(app(\App\Modules\Finance\Dng\Services\DngWebhookService::class));
+
+    $reg->refresh();
+    // Must NOT be enrolled — HP webhook doesn't affect retake registrations
+    expect($reg->status)->toBe(\App\Models\CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
+});
+
+it('auto-enrolls ALL retake registrations covered by aggregate HL DNG request via chargeLinks pivot', function () {
+    // A student has 2 pending retake courses — both covered by ONE aggregate DNG request
+    $campus = $this->campus;
+    $semester = $this->semester;
+    $student = $this->student;
+    $user = \App\Models\User::factory()->create();
+
+    // Set up two course offerings + academic records (failed)
+    $courseOfferingA = \App\Models\CourseOffering::factory()->create(['semester_id' => $semester->id, 'max_capacity' => 50, 'current_enrollment' => 5]);
+    $courseOfferingB = \App\Models\CourseOffering::factory()->create(['semester_id' => $semester->id, 'max_capacity' => 50, 'current_enrollment' => 5]);
+
+    $academicRecordA = \App\Models\AcademicRecord::factory()->create([
+        'student_id' => $student->id, 'campus_id' => $campus->id,
+        'unit_id' => $courseOfferingA->unit_id, 'course_offering_id' => $courseOfferingA->id,
+        'completion_status' => 'failed', 'is_passed' => false,
+    ]);
+    $academicRecordB = \App\Models\AcademicRecord::factory()->create([
+        'student_id' => $student->id, 'campus_id' => $campus->id,
+        'unit_id' => $courseOfferingB->unit_id, 'course_offering_id' => $courseOfferingB->id,
+        'completion_status' => 'failed', 'is_passed' => false,
+    ]);
+
+    // Two payment_pending registrations
+    $regA = \App\Models\CourseRetakeRegistration::create([
+        'student_id' => $student->id,
+        'unit_id' => $courseOfferingA->unit_id,
+        'original_academic_record_id' => $academicRecordA->id,
+        'course_offering_id' => $courseOfferingA->id,
+        'semester_id' => $semester->id,
+        'campus_id' => $campus->id,
+        'status' => \App\Models\CourseRetakeRegistration::STATUS_PAYMENT_PENDING,
+        'attempt_number' => 2,
+        'retake_fee' => 5000000,
+        'approved_by_user_id' => $user->id,
+        'approved_at' => now(),
+    ]);
+    $regB = \App\Models\CourseRetakeRegistration::create([
+        'student_id' => $student->id,
+        'unit_id' => $courseOfferingB->unit_id,
+        'original_academic_record_id' => $academicRecordB->id,
+        'course_offering_id' => $courseOfferingB->id,
+        'semester_id' => $semester->id,
+        'campus_id' => $campus->id,
+        'status' => \App\Models\CourseRetakeRegistration::STATUS_PAYMENT_PENDING,
+        'attempt_number' => 2,
+        'retake_fee' => 7000000,
+        'approved_by_user_id' => $user->id,
+        'approved_at' => now(),
+    ]);
+
+    // One FinanceCharge per registration
+    $chargeA = \App\Models\FinanceCharge::create([
+        'student_id' => $student->id, 'semester_id' => $semester->id,
+        'charge_type' => \App\Models\FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 5000000, 'description' => 'Retake A',
+        'effective_at' => now(), 'status' => \App\Models\FinanceCharge::STATUS_ACTIVE,
+        'source_type' => \App\Models\CourseRetakeRegistration::class, 'source_id' => $regA->id,
+    ]);
+    $chargeB = \App\Models\FinanceCharge::create([
+        'student_id' => $student->id, 'semester_id' => $semester->id,
+        'charge_type' => \App\Models\FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 7000000, 'description' => 'Retake B',
+        'effective_at' => now(), 'status' => \App\Models\FinanceCharge::STATUS_ACTIVE,
+        'source_type' => \App\Models\CourseRetakeRegistration::class, 'source_id' => $regB->id,
+    ]);
+    $regA->update(['finance_charge_id' => $chargeA->id]);
+    $regB->update(['finance_charge_id' => $chargeB->id]);
+
+    // Aggregate DNG request — finance_charge_id is NULL; links are via pivot
+    $dngRequest = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'CAMPUS001',
+        'student_code' => 'STU001',
+        'fee_type' => 'HL',
+        'item_id' => 'ITEM-AGG-001',
+        'amount' => 12000000, // 5M + 7M
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+        'dng_payment_id' => 'PAY-AGG-001',
+        'finance_charge_id' => null,
+    ]);
+
+    // Insert pivot rows
+    \App\Modules\Finance\Dng\Models\DngPaymentRequestCharge::create([
+        'dng_payment_request_id' => $dngRequest->id,
+        'finance_charge_id' => $chargeA->id,
+        'amount' => 5000000,
+    ]);
+    \App\Modules\Finance\Dng\Models\DngPaymentRequestCharge::create([
+        'dng_payment_request_id' => $dngRequest->id,
+        'finance_charge_id' => $chargeB->id,
+        'amount' => 7000000,
+    ]);
+
+    $payload = [
+        'PaymentId' => 'PAY-AGG-001',
+        'ItemId' => 'ITEM-AGG-001',
+        'StudentId' => 'STU001',
+        'Amount' => '12000000',
+        'FeeType' => 'HL',
+        'CampusCode' => 'CAMPUS001',
+    ];
+
+    $event = DngWebhookEvent::create([
+        'dng_payment_id' => 'PAY-AGG-001',
+        'event_type' => DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE,
+        'payload_hash' => DngWebhookEvent::computePayloadHash($payload),
+        'headers' => [],
+        'payload' => $payload,
+        'dng_payment_request_id' => $dngRequest->id,
+        'is_valid_checksum' => false,
+        'processing_status' => DngWebhookEvent::STATUS_RECEIVED,
+        'received_at' => now(),
+    ]);
+
+    $mockPaymentService = Mockery::mock(\App\Modules\Finance\Dng\Services\DngPaymentService::class);
+    $mockPaymentService->shouldReceive('bridgeToPayment')->once();
+    app()->instance(\App\Modules\Finance\Dng\Services\DngPaymentService::class, $mockPaymentService);
+
+    $job = new ProcessDngWebhookJob($event->id);
+    $job->handle(app(\App\Modules\Finance\Dng\Services\DngWebhookService::class));
+
+    $regA->refresh();
+    $regB->refresh();
+
+    // BOTH registrations must be enrolled after the single DNG payment
+    expect($regA->status)->toBe(\App\Models\CourseRetakeRegistration::STATUS_ENROLLED);
+    expect($regB->status)->toBe(\App\Models\CourseRetakeRegistration::STATUS_ENROLLED);
+});

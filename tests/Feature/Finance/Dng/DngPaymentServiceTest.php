@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\CurriculumVersion;
+use App\Models\FinanceCharge;
+use App\Models\Payment;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
@@ -327,6 +329,102 @@ it('returns qr access data without storing qr payload', function () {
     expect($response['data']['PaymentUrl'])->toBe('https://example.test/qr')
         ->and($request->fresh()->qr_payload)->toBeNull()
         ->and($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+});
+
+it('allocates payment to specific charge when finance_charge_id is set on DNG request', function () {
+    $charge = FinanceCharge::create([
+        'student_id' => $this->student->id,
+        'semester_id' => $this->semester->id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'description' => 'Retake fee',
+        'amount' => 2500000,
+        'status' => FinanceCharge::STATUS_ACTIVE,
+        'effective_at' => now(),
+    ]);
+
+    $request = DngPaymentRequest::create([
+        'student_id' => $this->student->id,
+        'campus_code' => 'CAMPUS001',
+        'student_code' => 'STU001',
+        'fee_type' => 'HL',
+        'item_id' => 'ITEM-HL-001',
+        'amount' => 2500000,
+        'status' => DngPaymentRequest::STATUS_PAID_UNINVOICED,
+        'dng_payment_id' => 'PAY-HL-001',
+        'paid_at' => now(),
+        'finance_charge_id' => $charge->id,
+    ]);
+
+    $payment = Payment::create([
+        'student_id' => $this->student->id,
+        'amount' => 2500000,
+        'method' => Payment::METHOD_GATEWAY,
+        'source' => 'dng',
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+    ]);
+
+    $paymentServiceMock = Mockery::mock(PaymentService::class);
+    $paymentServiceMock->shouldReceive('recordPayment')->andReturn($payment);
+    // Must call allocatePayment with the specific charge, NOT autoAllocatePayment
+    $paymentServiceMock->shouldReceive('allocatePayment')
+        ->once()
+        ->with($payment->id, [$charge->id => 2500000])
+        ->andReturn(collect());
+    $paymentServiceMock->shouldNotReceive('autoAllocatePayment');
+
+    $dngClientMock = Mockery::mock(DngClient::class);
+    $publishMock = Mockery::mock(PublishDomainEventAction::class);
+    $publishMock->shouldIgnoreMissing();
+
+    $service = new DngPaymentService($dngClientMock, $paymentServiceMock, $publishMock);
+    $result = $service->bridgeToPayment($request);
+
+    expect($result)->not->toBeNull()
+        ->and($request->fresh()->payment_id)->toBe($payment->id);
+});
+
+it('falls back to auto-allocate when finance_charge_id is not set on DNG request', function () {
+    $request = DngPaymentRequest::create([
+        'student_id' => $this->student->id,
+        'campus_code' => 'CAMPUS001',
+        'student_code' => 'STU001',
+        'fee_type' => 'HP',
+        'item_id' => 'ITEM-HP-001',
+        'amount' => 11000000,
+        'status' => DngPaymentRequest::STATUS_PAID_UNINVOICED,
+        'dng_payment_id' => 'PAY-HP-001',
+        'paid_at' => now(),
+        'finance_charge_id' => null,
+    ]);
+
+    $payment = Payment::create([
+        'student_id' => $this->student->id,
+        'amount' => 11000000,
+        'method' => Payment::METHOD_GATEWAY,
+        'source' => 'dng',
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+    ]);
+
+    $paymentServiceMock = Mockery::mock(PaymentService::class);
+    $paymentServiceMock->shouldReceive('recordPayment')->andReturn($payment);
+    // Must fall back to auto-allocate, NOT allocatePayment
+    $paymentServiceMock->shouldReceive('autoAllocatePayment')
+        ->once()
+        ->with($payment->id)
+        ->andReturn(collect());
+    $paymentServiceMock->shouldNotReceive('allocatePayment');
+
+    $dngClientMock = Mockery::mock(DngClient::class);
+    $publishMock = Mockery::mock(PublishDomainEventAction::class);
+    $publishMock->shouldIgnoreMissing();
+
+    $service = new DngPaymentService($dngClientMock, $paymentServiceMock, $publishMock);
+    $result = $service->bridgeToPayment($request);
+
+    expect($result)->not->toBeNull()
+        ->and($request->fresh()->payment_id)->toBe($payment->id);
 });
 
 it('returns installment access data without storing qr payload', function () {

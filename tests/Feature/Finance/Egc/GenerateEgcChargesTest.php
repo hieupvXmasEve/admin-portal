@@ -10,7 +10,6 @@ use App\Models\AcademicRecord;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentInvoice;
-use App\Models\CurriculumUnit;
 use App\Models\Unit;
 use App\Modules\Finance\Actions\Egc\GenerateEgcChargesAction;
 use App\Modules\Finance\Queries\Egc\PreviewEgcChargeGenerationQuery;
@@ -39,12 +38,8 @@ function makeInProgressAcademicRecord(Student $student, Semester $semester, int 
         'unit_type' => 'egc',
         'level' => $level,
     ])->create();
-    $curriculumUnit = CurriculumUnit::factory()->create([
-        'unit_id' => $unit->id,
-    ]);
     $courseOfferingId = DB::table('course_offerings')->insertGetId([
         'semester_id' => $semester->id,
-        'curriculum_unit_id' => $curriculumUnit->id,
         'unit_id' => $unit->id,
         'syllabus_template_id' => null,
         'lecture_id' => null,

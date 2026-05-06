@@ -73,7 +73,7 @@ it('cancels a pending dng payment request', function () {
         ->from(route('finance.dng.payment-requests.index'))
         ->post(route('finance.dng.payment-requests.cancel', $request), ['_token' => 'test-token'])
         ->assertRedirect(route('finance.dng.payment-requests.index'))
-        ->assertSessionHas('success', 'DNG payment request cancelled.');
+        ->assertSessionHas('inertia.flash_data', ['success' => 'DNG payment request cancelled.']);
 
     expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED);
 });
@@ -86,7 +86,7 @@ it('does not cancel a paid dng payment request', function () {
         ->from(route('finance.dng.payment-requests.index'))
         ->post(route('finance.dng.payment-requests.cancel', $request), ['_token' => 'test-token'])
         ->assertRedirect(route('finance.dng.payment-requests.index'))
-        ->assertSessionHas('error', 'This DNG payment request cannot be cancelled.');
+        ->assertSessionHas('inertia.flash_data', ['error' => 'This DNG payment request cannot be cancelled.']);
 
     expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_PAID_UNINVOICED);
 });
