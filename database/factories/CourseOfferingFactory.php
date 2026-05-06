@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\CourseOffering;
-use App\Models\CurriculumUnit;
 use App\Models\Lecture;
 use App\Models\Semester;
+use App\Models\Unit;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -24,12 +24,9 @@ class CourseOfferingFactory extends Factory
      */
     public function definition(): array
     {
-        $curriculumUnit = CurriculumUnit::factory()->create();
-
         return [
             'semester_id' => Semester::factory(),
-            'curriculum_unit_id' => $curriculumUnit->id,
-            'unit_id' => $curriculumUnit->unit_id, // Auto-fill unit_id from curriculum_unit
+            'unit_id' => Unit::factory(),
             'lecture_id' => Lecture::factory(),
             'section_code' => $this->faker->optional()->bothify('SEC-?##'),
             'max_capacity' => $this->faker->numberBetween(20, 100),

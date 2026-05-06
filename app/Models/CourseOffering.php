@@ -19,7 +19,6 @@ class CourseOffering extends AuditableModel
 
     protected $fillable = [
         'semester_id',
-        'curriculum_unit_id',
         'unit_id',
         'syllabus_template_id',
         'grading_type',
@@ -147,11 +146,6 @@ class CourseOffering extends AuditableModel
         return $this->belongsTo(Unit::class);
     }
 
-    public function curriculumUnit(): BelongsTo
-    {
-        return $this->belongsTo(CurriculumUnit::class, 'curriculum_unit_id');
-    }
-
     public function lecture(): BelongsTo
     {
         return $this->belongsTo(Lecture::class, 'lecture_id');
@@ -171,13 +165,6 @@ class CourseOffering extends AuditableModel
     {
         return $this->hasMany(AcademicRecord::class, 'course_offering_id');
     }
-
-    // Deprecated: Syllabus relationship removed - use syllabusTemplate instead
-    // public function syllabus(): HasOne
-    // {
-    //     return $this->hasOne(Syllabus::class, 'curriculum_unit_id', 'curriculum_unit_id')
-    //         ->where('syllabus.is_active', true);
-    // }
 
     public function syllabusTemplate(): BelongsTo
     {
@@ -576,7 +563,7 @@ class CourseOffering extends AuditableModel
     {
         return [
             'semester_id',
-            'curriculum_unit_id',
+            'unit_id',
             'lecture_id',
             'campus_id',
             'section_code',

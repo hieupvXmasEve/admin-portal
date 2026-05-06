@@ -74,14 +74,11 @@ class ClassSessionResource extends JsonResource
             'course_offering' => $this->whenLoaded('courseOffering', function () {
                 return [
                     'id' => $this->courseOffering->id,
-                    'curriculum_unit' => $this->courseOffering->curriculumUnit ? [
-                        'id' => $this->courseOffering->curriculumUnit->id,
-                        'unit' => $this->courseOffering->curriculumUnit->unit ? [
-                            'id' => $this->courseOffering->curriculumUnit->unit->id,
-                            'code' => $this->courseOffering->curriculumUnit->unit->code,
-                            'name' => $this->courseOffering->curriculumUnit->unit->name,
-                            'credit_points' => $this->courseOffering->curriculumUnit->unit->credit_points,
-                        ] : null,
+                    'unit' => $this->courseOffering->unit ? [
+                        'id' => $this->courseOffering->unit->id,
+                        'code' => $this->courseOffering->unit->code,
+                        'name' => $this->courseOffering->unit->name,
+                        'credit_points' => $this->courseOffering->unit->credit_points,
                     ] : null,
                 ];
             }),

@@ -309,12 +309,12 @@ class SemesterEnrollmentController extends Controller
             }
 
             // Get existing course offerings for this semester
-            $existingOfferings = CourseOffering::where('course_offerings.semester_id', $semester->id)
+            $existingOfferings = CourseOffering::where('semester_id', $semester->id)
                 ->where('campus_id', $currentCampusId)
-                ->join('curriculum_units', 'course_offerings.curriculum_unit_id', '=', 'curriculum_units.id')
-                ->groupBy('curriculum_units.unit_id')
-                ->selectRaw('curriculum_units.unit_id, count(*) as offering_count')
-                ->pluck('offering_count', 'curriculum_units.unit_id')
+                ->whereNotNull('unit_id')
+                ->groupBy('unit_id')
+                ->selectRaw('unit_id, count(*) as offering_count')
+                ->pluck('offering_count', 'unit_id')
                 ->toArray();
 
             // Update existing offerings count
@@ -383,20 +383,9 @@ class SemesterEnrollmentController extends Controller
                         continue;
                     }
 
-                    // Find any curriculum unit for this unit (we'll use the first one as representative)
-                    $representativeCurriculumUnit = CurriculumUnit::where('unit_id', $unitId)
-                        ->with('unit')
-                        ->first();
-
-                    if (!$representativeCurriculumUnit) {
-                        $errors[] = "No curriculum unit found for unit ID {$unitId}";
-                        continue;
-                    }
-
                     $courseOffering = CourseOffering::create([
                         'campus_id' => app('campus')->id,
                         'semester_id' => $semester->id,
-                        'curriculum_unit_id' => $representativeCurriculumUnit->id,
                         'unit_id' => $unitId,
                         'max_capacity' => $defaultCapacity,
                         'current_enrollment' => 0,
@@ -464,19 +453,9 @@ class SemesterEnrollmentController extends Controller
         ]);
 
         try {
-            // Find curriculum unit for this unit
-            $curriculumUnit = CurriculumUnit::where('unit_id', $validated['unit_id'])->first();
-
-            if (!$curriculumUnit) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No curriculum unit found for this unit',
-                ], 400);
-            }
-
             // Check if offering already exists
             $existingOffering = CourseOffering::where('semester_id', $semester->id)
-                ->where('curriculum_unit_id', $curriculumUnit->id)
+                ->where('unit_id', $validated['unit_id'])
                 ->where('section_code', $validated['section_code'] ?? null)
                 ->first();
 
@@ -489,7 +468,7 @@ class SemesterEnrollmentController extends Controller
 
             $courseOffering = CourseOffering::create([
                 'semester_id' => $semester->id,
-                'curriculum_unit_id' => $curriculumUnit->id,
+                'unit_id' => $validated['unit_id'],
                 'lecture_id' => $validated['lecture_id'] ?? null,
                 'section_code' => $validated['section_code'] ?? null,
                 'max_capacity' => $validated['max_capacity'],
@@ -790,7 +769,7 @@ class SemesterEnrollmentController extends Controller
                             ->where('student_id', $student->id)
                             ->where('semester_id', $semester->id)
                             ->whereIn('registration_status', ['pending', 'registered', 'confirmed'])
-                            ->with(['courseOffering:id,semester_id,curriculum_unit_id,schedule_days,schedule_time_start,schedule_time_end,lecture_id'])
+                            ->with(['courseOffering:id,semester_id,unit_id,schedule_days,schedule_time_start,schedule_time_end,lecture_id'])
                             ->get();
 
                         foreach ($curriculumUnits as $curriculumUnit) {
@@ -1221,7 +1200,7 @@ class SemesterEnrollmentController extends Controller
                 foreach ($curriculumUnits as $curriculumUnit) {
                     // Find available course offering for this unit
                     $courseOffering = CourseOffering::where('semester_id', $semester->id)
-                        ->where('curriculum_unit_id', $curriculumUnit->id)
+                        ->where('unit_id', $curriculumUnit->unit_id)
                         ->where('is_active', true)
                         ->where('enrollment_status', 'open')
                         ->first();

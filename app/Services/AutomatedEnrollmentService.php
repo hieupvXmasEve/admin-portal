@@ -148,7 +148,8 @@ class AutomatedEnrollmentService
                 return $enrollment->curriculum_version_id . '_' . $enrollment->semester_number;
             });
 
-            $curriculumUnitDemand = [];
+            // unit_id => estimated student count
+            $unitDemand = [];
 
             foreach ($enrollmentGroups as $group) {
                 $firstEnrollment = $group->first();
@@ -159,26 +160,25 @@ class AutomatedEnrollmentService
                 // Get curriculum units for this group
                 $curriculumUnits = CurriculumUnit::where('curriculum_version_id', $curriculumVersionId)
                     ->where('semester_number', $semesterNumber)
-                    ->with('unit')
                     ->get();
 
                 foreach ($curriculumUnits as $curriculumUnit) {
-                    $curriculumUnitId = $curriculumUnit->id;
+                    $unitId = $curriculumUnit->unit_id;
 
-                    if (! isset($curriculumUnitDemand[$curriculumUnitId])) {
-                        $curriculumUnitDemand[$curriculumUnitId] = $studentCount;
+                    if (! isset($unitDemand[$unitId])) {
+                        $unitDemand[$unitId] = $studentCount;
                     } else {
-                        $curriculumUnitDemand[$curriculumUnitId] += $studentCount;
+                        $unitDemand[$unitId] += $studentCount;
                     }
                 }
             }
 
-            // Create course offerings for curriculum units with demand
-            foreach ($curriculumUnitDemand as $curriculumUnitId => $estimatedStudents) {
+            // Create course offerings for units with demand
+            foreach ($unitDemand as $unitId => $estimatedStudents) {
                 try {
                     // Check if offering already exists
                     $existingOffering = CourseOffering::where('semester_id', $semesterId)
-                        ->where('curriculum_unit_id', $curriculumUnitId)
+                        ->where('unit_id', $unitId)
                         ->first();
 
                     if ($existingOffering) {
@@ -192,7 +192,7 @@ class AutomatedEnrollmentService
 
                     CourseOffering::create([
                         'semester_id' => $semesterId,
-                        'curriculum_unit_id' => $curriculumUnitId,
+                        'unit_id' => $unitId,
                         'max_capacity' => $maxCapacity,
                         'current_enrollment' => 0,
                         'waitlist_capacity' => 10,
@@ -204,10 +204,10 @@ class AutomatedEnrollmentService
 
                     $result['created']++;
                 } catch (Exception $e) {
-                    $result['errors'][] = "Failed to create offering for curriculum unit ID {$curriculumUnitId}: {$e->getMessage()}";
+                    $result['errors'][] = "Failed to create offering for unit ID {$unitId}: {$e->getMessage()}";
                     Log::error('Course offering creation failed', [
                         'semester_id' => $semesterId,
-                        'curriculum_unit_id' => $curriculumUnitId,
+                        'unit_id' => $unitId,
                         'error' => $e->getMessage(),
                     ]);
                 }
@@ -265,7 +265,7 @@ class AutomatedEnrollmentService
                     try {
                         // Find available course offering for this unit
                         $courseOffering = CourseOffering::where('semester_id', $semesterId)
-                            ->where('curriculum_unit_id', $curriculumUnit->id)
+                            ->where('unit_id', $curriculumUnit->unit_id)
                             ->where('is_active', true)
                             ->where('enrollment_status', 'open')
                             ->first();

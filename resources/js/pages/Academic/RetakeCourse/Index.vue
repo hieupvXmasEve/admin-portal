@@ -4,13 +4,16 @@ import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { useDataTable } from '@/composables/useDataTable';
 import type { PaginatedResponse } from '@/types';
-import { Head, router } from '@inertiajs/vue3';
+import { Head, router, useForm } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { Ban, Plus } from 'lucide-vue-next';
-import { computed, h } from 'vue';
+import { computed, h, ref } from 'vue';
 import { route } from 'ziggy-js';
 
 interface RetakeRegistration {
@@ -123,17 +126,28 @@ const statusLabel = (status: string) => {
     }
 };
 
-const handleCancel = (id: number) => {
-    const reason = prompt('Nhập lý do hủy (bắt buộc):');
-    if (!reason || reason.length < 5) {
-        alert('Lý do hủy phải có ít nhất 5 ký tự.');
-        return;
-    }
-    router.post(
-        route('academic.retake-course.cancel', id),
-        { reason },
-        { preserveScroll: true },
-    );
+// Cancel dialog state
+const cancelDialogOpen = ref(false);
+const cancelTarget = ref<RetakeRegistration | null>(null);
+const cancelForm = useForm({ reason: '' });
+
+const openCancelDialog = (registration: RetakeRegistration) => {
+    cancelTarget.value = registration;
+    cancelForm.reset();
+    cancelForm.clearErrors();
+    cancelDialogOpen.value = true;
+};
+
+const submitCancel = () => {
+    if (!cancelTarget.value) return;
+    cancelForm.post(route('academic.retake-course.cancel', cancelTarget.value.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            cancelDialogOpen.value = false;
+            cancelTarget.value = null;
+            cancelForm.reset();
+        },
+    });
 };
 
 const columns: ColumnDef<RetakeRegistration>[] = [
@@ -205,7 +219,7 @@ const columns: ColumnDef<RetakeRegistration>[] = [
     },
     {
         id: 'actions',
-        header: '',
+        header: 'Actions',
         enableSorting: false,
         cell: 'actions',
     },
@@ -283,13 +297,44 @@ const columns: ColumnDef<RetakeRegistration>[] = [
                     variant="ghost"
                     size="icon"
                     class="h-8 w-8 text-destructive hover:text-destructive"
-                    @click="handleCancel(row.original.id)"
+                    @click="openCancelDialog(row.original)"
                 >
                     <Ban class="h-4 w-4" />
                 </Button>
+                <span v-else></span>
             </template>
         </DataTable>
     </div>
 
     <DataPagination :pagination-data="registrations" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+
+    <!-- Cancel Dialog -->
+    <Dialog v-model:open="cancelDialogOpen">
+        <DialogContent class="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Hủy đăng ký học lại</DialogTitle>
+                <DialogDescription v-if="cancelTarget">
+                    {{ cancelTarget.student.full_name }} ({{ cancelTarget.student.student_id }})
+                    — {{ cancelTarget.unit.code }}
+                    <template v-if="cancelTarget.status === 'payment_pending'">
+                        <br />
+                        <span class="text-destructive font-medium">Charge và invoice liên quan sẽ bị hủy.</span>
+                    </template>
+                </DialogDescription>
+            </DialogHeader>
+            <form @submit.prevent="submitCancel" class="space-y-4">
+                <div class="space-y-1.5">
+                    <Label>Lý do hủy <span class="text-destructive">*</span></Label>
+                    <Textarea v-model="cancelForm.reason" placeholder="Nhập lý do hủy (tối thiểu 5 ký tự)..." rows="3" />
+                    <p v-if="cancelForm.errors.reason" class="text-xs text-destructive">{{ cancelForm.errors.reason }}</p>
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="outline" @click="cancelDialogOpen = false">Đóng</Button>
+                    <Button type="submit" variant="destructive" :disabled="cancelForm.processing">
+                        {{ cancelForm.processing ? 'Đang xử lý...' : 'Xác nhận hủy' }}
+                    </Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
 </template>

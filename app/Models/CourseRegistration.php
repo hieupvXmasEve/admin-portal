@@ -212,7 +212,7 @@ class CourseRegistration extends AuditableModel
     protected function getIdentifierForLog(): string
     {
         $student = $this->student?->full_name ?? $this->student_id;
-        $course = $this->courseOffering?->curriculumUnit?->unit?->code ?? $this->course_offering_id;
+        $course = $this->courseOffering?->unit?->code ?? $this->course_offering_id;
 
         return "{$student} - {$course}";
     }

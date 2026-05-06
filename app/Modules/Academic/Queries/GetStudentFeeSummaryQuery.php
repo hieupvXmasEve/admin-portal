@@ -9,6 +9,7 @@ use App\Models\InvoiceDiscount;
 use App\Models\InvoiceLine;
 use App\Models\Payment;
 use App\Models\PaymentApplication;
+use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentInvoice;
 use App\Models\StudentScholarshipAward;
@@ -95,8 +96,11 @@ class GetStudentFeeSummaryQuery
 
     private function buildBillingBySemester(Collection $invoices): Collection
     {
-        $groupedInvoices = $invoices->groupBy('semester_id');
-        $semesters = $invoices->pluck('semester')->filter()->unique('id')->sortBy('start_date');
+        // Exclude cancelled invoices from billing display — they carry no financial obligation
+        $activeInvoices = $invoices->reject(fn (StudentInvoice $invoice) => $invoice->status === 'cancelled');
+
+        $groupedInvoices = $activeInvoices->groupBy('semester_id');
+        $semesters = $activeInvoices->pluck('semester')->filter()->unique('id')->sortBy('start_date');
 
         return $semesters->map(function ($semester) use ($groupedInvoices) {
             $semesterInvoices = $groupedInvoices->get($semester->id, collect());
@@ -280,7 +284,7 @@ class GetStudentFeeSummaryQuery
             ->with('scholarshipDefinition')
             ->first();
 
-        $intakeMajorSemester = \App\Models\Semester::find($student->intake_major);
+        $intakeMajorSemester = Semester::find($student->intake_major);
         $planTermsById = $tuitionPlan->terms->keyBy('id');
         $planTermsByNumber = $tuitionPlan->terms->keyBy('term_number');
 
@@ -301,7 +305,7 @@ class GetStudentFeeSummaryQuery
                 $linkedTerm = $planTermsById->get((int) $charge->source_id);
             }
             if (! $linkedTerm && $intakeMajorSemester && $charge->semester) {
-                $termNumber = \App\Models\Semester::query()
+                $termNumber = Semester::query()
                     ->where('start_date', '>=', $intakeMajorSemester->start_date)
                     ->where('start_date', '<=', $charge->semester->start_date)
                     ->count();
@@ -611,6 +615,11 @@ class GetStudentFeeSummaryQuery
 
     private function deriveInvoiceSnapshot(StudentInvoice $invoice): array
     {
+        // Cancelled invoices contribute nothing to the fee summary
+        if ($invoice->status === 'cancelled') {
+            return ['subtotal' => 0.0, 'discount' => 0.0, 'total' => 0.0, 'paid' => 0.0, 'remaining' => 0.0];
+        }
+
         $subtotal = max(
             (float) $invoice->subtotal,
             (float) $invoice->invoiceLines

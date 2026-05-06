@@ -7,15 +7,21 @@ namespace App\Modules\Academic\Actions;
 use App\Models\AcademicRecord;
 use App\Models\CourseOffering;
 use App\Models\CourseRetakeRegistration;
+use App\Models\FinanceCharge;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class CreateRetakeCourseRegistrationAction
 {
     /**
-     * Create a new retake course registration.
+     * Create a new retake course registration and automatically create a FinanceCharge.
+     *
+     * Flow: validate → create registration (approved) → create FinanceCharge →
+     *       transition registration to payment_pending.
+     * Finance team can create a DNG payment request separately via /finance/retake-course if needed.
      *
      * @param  array{
      *   student_id: int,
@@ -84,7 +90,7 @@ class CreateRetakeCourseRegistrationAction
             // Snapshot retake_fee from unit
             $retakeFee = $unit->retake_fee ?? 0;
 
-            return CourseRetakeRegistration::create([
+            $registration = CourseRetakeRegistration::create([
                 'student_id' => $data['student_id'],
                 'unit_id' => $data['unit_id'],
                 'original_academic_record_id' => $data['original_academic_record_id'],
@@ -100,6 +106,23 @@ class CreateRetakeCourseRegistrationAction
                 'approved_by_user_id' => auth()->id(),
                 'approved_at' => now(),
             ]);
+
+            // Automatically create a FinanceCharge (no DNG request).
+            // Finance team can create the DNG payment request later via /finance/retake-course.
+            $charge = app(CreateFinanceChargeAction::class)->handle([
+                'student_id' => $registration->student_id,
+                'semester_id' => $registration->semester_id,
+                'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+                'amount' => $retakeFee,
+                'description' => "Phí học lại: {$unit->code} - {$unit->name}",
+                'source_type' => CourseRetakeRegistration::class,
+                'source_id' => $registration->id,
+                'created_by_user_id' => auth()->id(),
+            ]);
+
+            $registration->transitionToPaymentPending($charge->id, auth()->id());
+
+            return $registration->fresh();
         });
     }
 }

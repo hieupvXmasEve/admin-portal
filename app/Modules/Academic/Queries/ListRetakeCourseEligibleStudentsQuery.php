@@ -97,13 +97,14 @@ class ListRetakeCourseEligibleStudentsQuery
                     continue;
                 }
 
-                // Find available course offerings for this unit
-                // Exclude completed/cancelled courses — only show active teaching courses
+                // Find available course offerings for this unit.
+                // Use unit_id directly — curriculum_unit_id may be NULL on legacy offerings.
+                // Exclude only cancelled; completed offerings with enrollment_status=open are valid for retake.
                 $offeringsQuery = CourseOffering::query()
                     ->where('is_active', true)
                     ->where('enrollment_status', 'open')
                     ->whereNotIn('course_status', ['completed', 'cancelled'])
-                    ->whereHas('curriculumUnit', fn ($q) => $q->where('unit_id', $record->unit_id))
+                    ->where('unit_id', $record->unit_id)
                     ->when($semesterId, fn ($q) => $q->where('semester_id', $semesterId))
                     ->when($campusId, fn ($q) => $q->where('campus_id', $campusId));
 

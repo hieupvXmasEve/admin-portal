@@ -19,10 +19,10 @@ class ConflictResource extends JsonResource
         return [
             'conflicting_course_id' => $this->id,
             'unit' => [
-                'id' => $this->curriculumUnit?->unit?->id,
-                'code' => $this->curriculumUnit?->unit?->code,
-                'name' => $this->curriculumUnit?->unit?->name,
-                'credit_points' => $this->curriculumUnit?->unit?->credit_points,
+                'id' => $this->unit?->id,
+                'code' => $this->unit?->code,
+                'name' => $this->unit?->name,
+                'credit_points' => $this->unit?->credit_points,
             ],
             'section_code' => $this->section_code,
             'semester' => [
@@ -69,8 +69,8 @@ class ConflictResource extends JsonResource
      */
     private function getConflictDescription(): string
     {
-        $unitCode = $this->curriculumUnit?->unit?->code ?? 'Unknown';
-        $unitName = $this->curriculumUnit?->unit?->name ?? 'Unknown Course';
+        $unitCode = $this->unit?->code ?? 'Unknown';
+        $unitName = $this->unit?->name ?? 'Unknown Course';
         $sectionCode = $this->section_code ? " (Section {$this->section_code})" : '';
         $timeStart = $this->schedule_time_start?->format('H:i') ?? 'Unknown';
         $timeEnd = $this->schedule_time_end?->format('H:i') ?? 'Unknown';
