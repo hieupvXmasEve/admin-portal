@@ -135,6 +135,7 @@ class VoidFinanceChargeAction
 
     /**
      * Recalculate statuses for invoices that had charges removed.
+     * If an invoice has no remaining active lines, cancel it.
      */
     protected function recalculateAffectedInvoices(array $invoiceIds): void
     {
@@ -142,9 +143,19 @@ class VoidFinanceChargeAction
             return;
         }
 
-        $invoices = \App\Models\StudentInvoice::whereIn('id', array_unique($invoiceIds))->get();
+        $invoices = \App\Models\StudentInvoice::whereIn('id', array_unique($invoiceIds))
+            ->with('invoiceLines')
+            ->get();
+
         foreach ($invoices as $invoice) {
-            $this->settlementService->recalculateInvoiceSnapshot($invoice);
+            $hasActiveLines = $invoice->invoiceLines
+                ->contains(fn (InvoiceLine $line) => ($line->status ?? 'active') === 'active');
+
+            if (! $hasActiveLines && $invoice->status !== 'cancelled') {
+                $invoice->update(['status' => 'cancelled']);
+            } else {
+                $this->settlementService->recalculateInvoiceSnapshot($invoice);
+            }
         }
     }
 }

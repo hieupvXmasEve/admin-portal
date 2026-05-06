@@ -224,18 +224,48 @@ class DngWebhookService
 
     /**
      * Handle auto-enrollment for retake course registrations after payment confirmation.
+     *
+     * Resolution order:
+     * 1. chargeLinks pivot (aggregate request covering N charges — one per unit)
+     * 2. finance_charge_id (single-charge precise link — legacy single-unit requests)
+     * 3. Legacy fallback: latest active retake_fee charge (old requests before finance_charge_id column)
      */
     private function handleRetakeCourseAutoEnroll(DngPaymentRequest $request): void
     {
         try {
-            // Find FinanceCharge linked to this student with retake_fee type and CourseRetakeRegistration source
-            $charge = FinanceCharge::query()
-                ->where('student_id', $request->student_id)
-                ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
-                ->where('source_type', CourseRetakeRegistration::class)
-                ->where('status', FinanceCharge::STATUS_ACTIVE)
-                ->latest()
-                ->first();
+            // Only applicable to retake fee DNG requests
+            if ($request->fee_type !== 'HL') {
+                return;
+            }
+
+            // Priority 1: pivot chargeLinks — aggregate request covers multiple charges
+            $chargeLinks = $request->chargeLinks()->get();
+            if ($chargeLinks->isNotEmpty()) {
+                foreach ($chargeLinks as $link) {
+                    $charge = FinanceCharge::find($link->finance_charge_id);
+                    if ($charge) {
+                        AutoEnrollRetakeCourseAction::handlePaymentConfirmed($charge);
+                    }
+                }
+
+                return;
+            }
+
+            // Priority 2: single precise charge link (single-unit DNG request)
+            $charge = $request->finance_charge_id
+                ? FinanceCharge::find($request->finance_charge_id)
+                : null;
+
+            // Priority 3: legacy fallback for old requests without any charge link
+            if (! $charge) {
+                $charge = FinanceCharge::query()
+                    ->where('student_id', $request->student_id)
+                    ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
+                    ->where('source_type', CourseRetakeRegistration::class)
+                    ->where('status', FinanceCharge::STATUS_ACTIVE)
+                    ->latest()
+                    ->first();
+            }
 
             if ($charge) {
                 AutoEnrollRetakeCourseAction::handlePaymentConfirmed($charge);
@@ -243,6 +273,7 @@ class DngWebhookService
         } catch (\Throwable $e) {
             Log::warning('DNG webhook: retake course auto-enroll failed', [
                 'dng_payment_request_id' => $request->id,
+                'finance_charge_id' => $request->finance_charge_id,
                 'error' => $e->getMessage(),
             ]);
         }

@@ -198,5 +198,8 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::post('/charge', [RetakeCourseChargeController::class, 'store'])
             ->middleware('can:create_retake_course_charge')
             ->name('charge.store');
+        Route::post('/charge/simple', [RetakeCourseChargeController::class, 'storeSimple'])
+            ->middleware('can:create_retake_course_charge')
+            ->name('charge.store-simple');
     });
 });

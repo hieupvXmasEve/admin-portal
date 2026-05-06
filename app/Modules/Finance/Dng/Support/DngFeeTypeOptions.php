@@ -83,8 +83,9 @@ final class DngFeeTypeOptions
      * Chuyển đổi charge_type nội bộ (finance_charges.charge_type) sang mã fee_type DNG.
      *
      * Quy tắc hiện tại:
-     *   - tuition_term, egc_level_fee, course_fee → HP  (học phí chính)
-     *   - retake_fee                              → PTL (phí thi lại)
+     *   - tuition_term, egc_level_fee, course_fee → HP   (học phí chính)
+     *   - retake_fee                              → HL   (học lại môn)
+     *   - exam_resit_fee                          → PTL  (phí thi lại)
      *   - manual_fee, adjustment                  → KHAC (phí khác)
      *   - các loại credit (âm) KHÔNG được map tại đây;
      *     caller phải lọc amount_snapshot > 0 trước khi gọi hàm này.
@@ -95,7 +96,8 @@ final class DngFeeTypeOptions
             FinanceCharge::TYPE_TUITION_TERM,
             FinanceCharge::TYPE_COURSE_FEE,
             FinanceCharge::TYPE_EGC_LEVEL_FEE => 'HP',
-            FinanceCharge::TYPE_RETAKE_FEE    => 'PTL',
+            FinanceCharge::TYPE_RETAKE_FEE    => 'HL',
+            FinanceCharge::TYPE_EXAM_RESIT_FEE => 'PTL',
             FinanceCharge::TYPE_MANUAL_FEE,
             FinanceCharge::TYPE_ADJUSTMENT    => 'KHAC',
             default                           => 'KHAC',

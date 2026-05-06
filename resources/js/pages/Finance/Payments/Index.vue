@@ -143,12 +143,12 @@ const sortableHeaders: Array<{
                     Settlement Worklist
                 </Button>
             </Link>
-            <Link :href="route('finance.payments.create')">
+            <!-- <Link :href="route('finance.payments.create')">
                 <Button>
                     <Plus class="mr-2 h-4 w-4" />
                     Create Payment
                 </Button>
-            </Link>
+            </Link> -->
         </div>
     </div>
 

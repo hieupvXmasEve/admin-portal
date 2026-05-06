@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Dng\Models;
 
+use App\Models\FinanceCharge;
 use App\Models\Payment;
 use App\Models\Semester;
 use App\Models\Student;
@@ -29,16 +30,23 @@ class DngPaymentRequest extends Model
     public const STATUS_CANCELLED = 'cancelled';
 
     /**
+     * Request was cancelled by calling DNG API with amount = -1.
+     * Distinguishes from `cancelled` (local-only, never reached DNG).
+     */
+    public const STATUS_CANCEL_PUSHED_TO_DNG = 'cancel_pushed_to_dng';
+
+    /**
      * Allowed forward transitions. Key = current status, value = allowed next statuses.
      */
     public const TRANSITIONS = [
         self::STATUS_PENDING => [self::STATUS_PUSHED_TO_DNG, self::STATUS_FAILED, self::STATUS_CANCELLED],
-        self::STATUS_PUSHED_TO_DNG => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_FAILED, self::STATUS_CANCELLED],
+        self::STATUS_PUSHED_TO_DNG => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_FAILED, self::STATUS_CANCELLED, self::STATUS_CANCEL_PUSHED_TO_DNG],
         self::STATUS_PAID_UNINVOICED => [self::STATUS_PAID_INVOICED, self::STATUS_RECONCILED],
         self::STATUS_PAID_INVOICED => [self::STATUS_RECONCILED],
         self::STATUS_RECONCILED => [],
         self::STATUS_FAILED => [self::STATUS_PENDING],
         self::STATUS_CANCELLED => [],
+        self::STATUS_CANCEL_PUSHED_TO_DNG => [],
     ];
 
     protected $fillable = [
@@ -65,6 +73,9 @@ class DngPaymentRequest extends Model
         'last_callback_payload',
         'error_message',
         'last_reminder_at',
+        'finance_charge_id',
+        'cancel_push_payload',
+        'cancel_push_response',
     ];
 
     protected function casts(): array
@@ -78,6 +89,8 @@ class DngPaymentRequest extends Model
             'push_response' => 'array',
             'qr_payload' => 'array',
             'last_callback_payload' => 'array',
+            'cancel_push_payload' => 'array',
+            'cancel_push_response' => 'array',
         ];
     }
 
@@ -100,9 +113,27 @@ class DngPaymentRequest extends Model
         return $this->belongsTo(Semester::class);
     }
 
+    /**
+     * The FinanceCharge this DNG request covers (nullable for non-charge requests).
+     */
+    public function financeCharge(): BelongsTo
+    {
+        return $this->belongsTo(FinanceCharge::class);
+    }
+
     public function webhookEvents(): HasMany
     {
         return $this->hasMany(DngWebhookEvent::class);
+    }
+
+    /**
+     * Pivot links to all FinanceCharges covered by this DNG request.
+     * Used for multi-charge (aggregate) DNG requests where one request covers
+     * multiple retake-fee charges (one per unit for the same student).
+     */
+    public function chargeLinks(): HasMany
+    {
+        return $this->hasMany(DngPaymentRequestCharge::class);
     }
 
     // =====================

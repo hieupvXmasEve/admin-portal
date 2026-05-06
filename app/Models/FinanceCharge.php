@@ -45,6 +45,8 @@ class FinanceCharge extends Model
 
     public const TYPE_RETAKE_FEE = 'retake_fee';
 
+    public const TYPE_EXAM_RESIT_FEE = 'exam_resit_fee';
+
     public const TYPE_COURSE_FEE = 'course_fee';
 
     public const TYPE_MANUAL_FEE = 'manual_fee';
@@ -69,6 +71,7 @@ class FinanceCharge extends Model
         self::TYPE_TUITION_TERM,
         self::TYPE_EGC_LEVEL_FEE,
         self::TYPE_RETAKE_FEE,
+        self::TYPE_EXAM_RESIT_FEE,
         self::TYPE_MANUAL_FEE,
         self::TYPE_ADMISSION_FEE,
         self::TYPE_DEFER_CREDIT,

@@ -86,7 +86,7 @@ export interface User {
 }
 
 // Enums
-export type ChargeType = 'tuition_term' | 'egc_level_fee' | 'retake_fee' | 'manual_fee' | 'admission_fee' | 'defer_credit' | 'egc_exempt_credit' | 'scholarship_credit' | 'voucher_credit' | 'adjustment';
+export type ChargeType = 'tuition_term' | 'egc_level_fee' | 'retake_fee' | 'exam_resit_fee' | 'manual_fee' | 'admission_fee' | 'defer_credit' | 'egc_exempt_credit' | 'scholarship_credit' | 'voucher_credit' | 'adjustment';
 
 export type ChargeStatus = 'active' | 'void' | 'transferred';
 
@@ -98,7 +98,8 @@ export type PaymentStatus = 'pending' | 'completed' | 'refunded' | 'cancelled';
 export const CHARGE_TYPE_LABELS: Record<ChargeType, string> = {
     tuition_term: 'Học phí kỳ (Tuition)',
     egc_level_fee: 'Phí EGC (EGC Level Fee)',
-    retake_fee: 'Phí thi lại (Retake Fee)',
+    retake_fee: 'Phí học lại môn (Course Retake)',
+    exam_resit_fee: 'Phí thi lại (Exam Resit)',
     manual_fee: 'Phí thủ công (Manual Fee)',
     admission_fee: 'Lệ phí xét tuyển (Admission Fee)',
     defer_credit: 'Hoàn phí bảo lưu (Defer Credit)',
@@ -135,6 +136,7 @@ export const CHARGE_TYPE_BADGE_CLASSES: Record<ChargeType, string> = {
     tuition_term: 'bg-blue-100 text-blue-800',
     egc_level_fee: 'bg-indigo-100 text-indigo-800',
     retake_fee: 'bg-orange-100 text-orange-800',
+    exam_resit_fee: 'bg-red-100 text-red-800',
     manual_fee: 'bg-gray-100 text-gray-800',
     admission_fee: 'bg-pink-100 text-pink-800',
     defer_credit: 'bg-green-100 text-green-800',

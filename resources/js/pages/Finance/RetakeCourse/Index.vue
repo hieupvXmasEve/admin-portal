@@ -3,7 +3,6 @@ import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Button } from '@/components/ui/button';
-import DatePicker from '@/components/ui/DatePicker.vue';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +11,7 @@ import { useDataTable } from '@/composables/useDataTable';
 import type { PaginatedResponse } from '@/types';
 import { Head, useForm } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { CreditCard } from 'lucide-vue-next';
+import { AlertCircle, CreditCard, Layers } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { route } from 'ziggy-js';
 
@@ -28,6 +27,9 @@ interface RetakeRegistration {
     approved_at: string | null;
     created_at: string;
     approved_by: { name: string } | null;
+    // Appended by controller: summary across all pending registrations for this student
+    pending_units_count: number;
+    pending_total_fee: number;
 }
 
 interface Filters {
@@ -44,6 +46,7 @@ interface Props {
     filters?: Partial<Filters>;
     semesters: { id: number; name: string; code: string }[];
     campuses: { id: number; name: string; code: string }[];
+    chargeTypeOptions: { value: string; label: string }[];
 }
 
 const props = defineProps<Props>();
@@ -84,31 +87,29 @@ const {
 
 const data = computed(() => props.registrations.data);
 
-// Charge creation dialog
-const showChargeDialog = ref(false);
+// DNG creation dialog — triggers aggregate DNG for ALL pending charges of the student
+const showDngDialog = ref(false);
 const selectedRegistration = ref<RetakeRegistration | null>(null);
-const datePickerPortalTargetRef = ref<HTMLElement | null>(null);
 
-const chargeForm = useForm({
+const dngForm = useForm({
     registration_id: null as number | null,
-    amount: '',
     payment_deadline: '',
 });
 
-const openChargeDialog = (registration: RetakeRegistration) => {
+const openDngDialog = (registration: RetakeRegistration) => {
     selectedRegistration.value = registration;
-    chargeForm.registration_id = registration.id;
-    chargeForm.amount = registration.retake_fee;
-    chargeForm.payment_deadline = '';
-    showChargeDialog.value = true;
+    dngForm.registration_id = registration.id;
+    dngForm.payment_deadline = '';
+    showDngDialog.value = true;
 };
 
-const submitCharge = () => {
-    chargeForm.post(route('finance.retake-course.charge.store'), {
+const submitDng = () => {
+    dngForm.post(route('finance.retake-course.charge.store'), {
         preserveScroll: true,
         onSuccess: () => {
-            showChargeDialog.value = false;
+            showDngDialog.value = false;
             selectedRegistration.value = null;
+            dngForm.reset();
         },
     });
 };
@@ -157,12 +158,32 @@ const columns: ColumnDef<RetakeRegistration>[] = [
         cell: ({ row }) => row.original.semester.name,
     },
     {
-        header: 'Phí học lại',
+        header: 'Phí môn này',
         accessorKey: 'retake_fee',
         enableSorting: true,
         cell: ({ row }) => {
             const fee = parseFloat(row.original.retake_fee);
-            return h('div', { class: 'font-mono text-sm font-medium' }, fee.toLocaleString('vi-VN') + ' đ');
+            return h('div', { class: 'font-mono text-sm' }, fee.toLocaleString('vi-VN') + ' đ');
+        },
+    },
+    {
+        header: 'Tổng DNG sẽ tạo',
+        id: 'pending_total',
+        enableSorting: false,
+        cell: ({ row }) => {
+            const count = row.original.pending_units_count;
+            const total = row.original.pending_total_fee;
+            const isMulti = count > 1;
+            return h('div', { class: 'space-y-0.5' }, [
+                h('div', { class: 'font-mono text-sm font-medium' + (isMulti ? ' text-amber-600' : '') },
+                    total.toLocaleString('vi-VN') + ' đ'),
+                isMulti
+                    ? h('div', { class: 'flex items-center gap-1 text-xs text-amber-600' }, [
+                        h(Layers, { class: 'h-3 w-3' }),
+                        `${count} môn gộp`,
+                    ])
+                    : null,
+            ]);
         },
     },
     {
@@ -187,6 +208,16 @@ const columns: ColumnDef<RetakeRegistration>[] = [
             <h2 class="text-xl leading-tight font-semibold text-gray-800 dark:text-gray-200">Học lại - Tạo phí</h2>
             <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Danh sách đăng ký học lại đã duyệt chờ tạo phí thanh toán.</p>
         </div>
+    </div>
+
+    <!-- Info banner explaining aggregate DNG behavior -->
+    <div class="mt-4 flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
+        <AlertCircle class="mt-0.5 h-4 w-4 shrink-0" />
+        <span>
+            Khi bấm <strong>Tạo DNG</strong>, hệ thống sẽ tự động gộp <strong>tất cả môn học lại đang chờ</strong>
+            của sinh viên đó thành <strong>1 yêu cầu thanh toán DNG duy nhất</strong>.
+            Sinh viên thanh toán 1 lần, hệ thống tự động ghi nhận và enroll từng môn.
+        </span>
     </div>
 
     <div class="mt-6 flex flex-col gap-4">
@@ -225,9 +256,9 @@ const columns: ColumnDef<RetakeRegistration>[] = [
             @sort-change="handleSortChange"
         >
             <template #cell-actions="{ row }">
-                <Button variant="outline" size="sm" class="gap-1.5" @click="openChargeDialog(row.original)">
+                <Button variant="outline" size="sm" class="gap-1.5" @click="openDngDialog(row.original)">
                     <CreditCard class="h-3.5 w-3.5" />
-                    Tạo phí
+                    Tạo DNG
                 </Button>
             </template>
         </DataTable>
@@ -235,30 +266,48 @@ const columns: ColumnDef<RetakeRegistration>[] = [
 
     <DataPagination :pagination-data="registrations" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
 
-    <!-- Charge Creation Dialog -->
-    <Dialog v-model:open="showChargeDialog">
+    <!-- DNG Creation Dialog -->
+    <Dialog v-model:open="showDngDialog">
         <DialogContent class="sm:max-w-md">
             <DialogHeader>
-                <DialogTitle>Tạo phí học lại</DialogTitle>
+                <DialogTitle>Tạo yêu cầu thanh toán DNG</DialogTitle>
                 <DialogDescription v-if="selectedRegistration">
-                    {{ selectedRegistration.student.full_name }} - {{ selectedRegistration.unit.code }}
+                    {{ selectedRegistration.student.full_name }} ({{ selectedRegistration.student.student_id }})
                 </DialogDescription>
             </DialogHeader>
-            <form ref="datePickerPortalTargetRef" @submit.prevent="submitCharge" class="space-y-4">
+
+            <!-- Multi-unit warning -->
+            <div
+                v-if="selectedRegistration && selectedRegistration.pending_units_count > 1"
+                class="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+            >
+                <Layers class="mt-0.5 h-4 w-4 shrink-0" />
                 <div>
-                    <Label>Số tiền (VNĐ) <span class="text-destructive">*</span></Label>
-                    <Input v-model="chargeForm.amount" type="number" min="0" placeholder="Số tiền phí học lại" />
-                    <p v-if="chargeForm.errors.amount" class="text-xs text-destructive mt-1">{{ chargeForm.errors.amount }}</p>
+                    Sinh viên này có <strong>{{ selectedRegistration.pending_units_count }} môn</strong> đang chờ thanh toán.
+                    Hệ thống sẽ gộp tất cả thành
+                    <strong>1 DNG: {{ selectedRegistration.pending_total_fee.toLocaleString('vi-VN') }} đ</strong>.
                 </div>
-                <div>
+            </div>
+
+            <!-- Single unit info -->
+            <div v-else-if="selectedRegistration" class="rounded-md border bg-muted/50 p-3 text-sm">
+                <div class="font-medium">{{ selectedRegistration.unit.code }} — {{ selectedRegistration.unit.name }}</div>
+                <div class="mt-1 text-muted-foreground">
+                    Phí: <span class="font-mono font-medium">{{ parseFloat(selectedRegistration.retake_fee).toLocaleString('vi-VN') }} đ</span>
+                </div>
+            </div>
+
+            <form @submit.prevent="submitDng" class="space-y-4">
+                <!-- Hạn thanh toán -->
+                <div class="space-y-1.5">
                     <Label>Hạn thanh toán <span class="text-destructive">*</span></Label>
-                    <DatePicker v-model="chargeForm.payment_deadline" placeholder="Chọn hạn thanh toán" :portal-to="datePickerPortalTargetRef ?? undefined" />
-                    <p v-if="chargeForm.errors.payment_deadline" class="text-xs text-destructive mt-1">{{ chargeForm.errors.payment_deadline }}</p>
+                    <Input v-model="dngForm.payment_deadline" type="date" :min="new Date().toISOString().split('T')[0]" />
+                    <p v-if="dngForm.errors.payment_deadline" class="text-xs text-destructive">{{ dngForm.errors.payment_deadline }}</p>
                 </div>
                 <DialogFooter>
-                    <Button type="button" variant="outline" @click="showChargeDialog = false">Hủy</Button>
-                    <Button type="submit" :disabled="chargeForm.processing">
-                        {{ chargeForm.processing ? 'Đang xử lý...' : 'Xác nhận tạo phí' }}
+                    <Button type="button" variant="outline" @click="showDngDialog = false">Hủy</Button>
+                    <Button type="submit" :disabled="dngForm.processing || !dngForm.payment_deadline">
+                        {{ dngForm.processing ? 'Đang xử lý...' : 'Xác nhận tạo DNG' }}
                     </Button>
                 </DialogFooter>
             </form>

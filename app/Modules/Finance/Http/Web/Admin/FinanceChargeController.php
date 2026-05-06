@@ -21,6 +21,7 @@ class FinanceChargeController extends Controller
         FinanceCharge::TYPE_TUITION_TERM,
         FinanceCharge::TYPE_EGC_LEVEL_FEE,
         FinanceCharge::TYPE_RETAKE_FEE,
+        FinanceCharge::TYPE_EXAM_RESIT_FEE,
         FinanceCharge::TYPE_MANUAL_FEE,
         FinanceCharge::TYPE_ADMISSION_FEE,
         FinanceCharge::TYPE_DEFER_CREDIT,
@@ -31,7 +32,8 @@ class FinanceChargeController extends Controller
     private const MANUAL_CREATE_CHARGE_TYPE_DNG_LABELS = [
         FinanceCharge::TYPE_TUITION_TERM => 'HP',
         FinanceCharge::TYPE_EGC_LEVEL_FEE => 'GC',
-        FinanceCharge::TYPE_RETAKE_FEE => 'PTL',
+        FinanceCharge::TYPE_RETAKE_FEE => 'HL',
+        FinanceCharge::TYPE_EXAM_RESIT_FEE => 'PTL',
         FinanceCharge::TYPE_MANUAL_FEE => 'KHAC',
         FinanceCharge::TYPE_ADMISSION_FEE => 'PRE',
     ];

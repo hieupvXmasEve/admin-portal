@@ -225,6 +225,32 @@ class DngClient
     }
 
     /**
+     * Cancel a previously-pushed DNG record by re-inserting it with Amount = -1.
+     *
+     * The DNG system treats a record identical to the original but with a negative
+     * amount as a reversal/cancellation of the original charge.
+     *
+     * @param  array{
+     *     student_code: string,
+     *     campus_code: string,
+     *     type: string,
+     *     item_id: string,
+     *     student_name: string,
+     *     email: string,
+     *     estimate_time: string,
+     *     student_address: string,
+     *     cccd?: string|null,
+     * }  $originalData  Same fields as insertNewRecord but without `amount` (forced to -1)
+     * @return array{Code: int, Type: string, Message: string, data: mixed}
+     */
+    public function cancelRecord(array $originalData): array
+    {
+        $payload = $this->buildInsertNewRecordPayload(array_merge($originalData, ['amount' => -1]));
+
+        return $this->post('/api/apiv2/InsertNewRecord', $payload);
+    }
+
+    /**
      * Check paid transactions for a given campus and date.
      *
      * @return array{Code: int, Type: string, Message: string, data: mixed}

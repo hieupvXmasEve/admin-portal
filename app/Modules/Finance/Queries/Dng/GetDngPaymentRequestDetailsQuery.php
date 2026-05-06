@@ -70,6 +70,8 @@ class GetDngPaymentRequestDetailsQuery
                 'push_payload' => $paymentRequest->push_payload,
                 'push_response' => $paymentRequest->push_response,
                 'last_callback_payload' => $paymentRequest->last_callback_payload,
+                'cancel_push_payload' => $paymentRequest->cancel_push_payload,
+                'cancel_push_response' => $paymentRequest->cancel_push_response,
             ],
             'webhook_events' => $paymentRequest->webhookEvents->map(fn ($event) => [
                 'id' => $event->id,

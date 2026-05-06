@@ -43,6 +43,7 @@ class DngPaymentService
      *     estimate_time: string,
      *     student_address: string,
      *     cccd?: string|null,
+     *     finance_charge_id?: int|null,
      * }  $chargeData
      */
     public function createAndPush(Student $student, array $chargeData): DngPaymentRequest
@@ -77,6 +78,7 @@ class DngPaymentService
             'item_id' => $chargeData['item_id'],
             'amount' => $chargeData['amount'],
             'status' => DngPaymentRequest::STATUS_PENDING,
+            'finance_charge_id' => $chargeData['finance_charge_id'] ?? null,
         ]);
 
         // Step 2: Push to DNG
@@ -432,8 +434,29 @@ class DngPaymentService
 
             $request->update(['payment_id' => $payment->id]);
 
-            // Auto-allocate the payment to outstanding charges
-            $allocations = $this->paymentService->autoAllocatePayment($payment->id);
+            // Allocation strategy (in priority order):
+            // 1. Pivot chargeLinks → multi-charge aggregate request; allocate per-charge amount exactly
+            // 2. finance_charge_id (single-charge legacy) → allocate full amount to that one charge
+            // 3. No link → oldest-first auto-allocate (tuition and other non-linked fee types)
+            $chargeLinks = $request->chargeLinks()->with('financeCharge')->get();
+
+            if ($chargeLinks->isNotEmpty()) {
+                $allocations = collect();
+                foreach ($chargeLinks as $link) {
+                    $result = $this->paymentService->allocatePayment(
+                        $payment->id,
+                        [$link->finance_charge_id => (float) $link->amount],
+                    );
+                    $allocations = $allocations->merge($result);
+                }
+            } elseif ($request->finance_charge_id) {
+                $allocations = $this->paymentService->allocatePayment(
+                    $payment->id,
+                    [$request->finance_charge_id => (float) $request->amount],
+                );
+            } else {
+                $allocations = $this->paymentService->autoAllocatePayment($payment->id);
+            }
 
             $this->publishAllocationNotification($request, $payment, $allocations);
 
