@@ -276,11 +276,24 @@ const getStudentStatusIcon = (student: StudentEligibilityInfo) => {
                                     </div>
 
                                     <!-- Eligibility Reasons -->
-                                    <div class="text-muted-foreground mt-1 text-xs">
-                                        <span v-for="(reason, index) in student.eligibility_reasons" :key="index">
-                                            {{ reason }}
-                                            <span v-if="index < student.eligibility_reasons.length - 1"> • </span>
-                                        </span>
+                                    <div class="mt-1 space-y-0.5 text-xs">
+                                        <template v-if="student.exists && !student.is_eligible && !student.is_already_registered">
+                                            <div v-for="(reason, index) in student.eligibility_reasons" :key="index" class="flex items-start gap-1 text-orange-600 dark:text-orange-400">
+                                                <AlertCircle class="mt-0.5 h-3 w-3 shrink-0" />
+                                                <span>{{ reason }}</span>
+                                            </div>
+                                        </template>
+                                        <template v-else-if="student.is_already_registered">
+                                            <div v-for="(reason, index) in student.eligibility_reasons" :key="index" class="flex items-start gap-1 text-yellow-600 dark:text-yellow-500">
+                                                <AlertCircle class="mt-0.5 h-3 w-3 shrink-0" />
+                                                <span>{{ reason }}</span>
+                                            </div>
+                                        </template>
+                                        <template v-else>
+                                            <div v-for="(reason, index) in student.eligibility_reasons" :key="index" class="text-muted-foreground">
+                                                {{ reason }}
+                                            </div>
+                                        </template>
                                     </div>
                                 </div>
                             </div>

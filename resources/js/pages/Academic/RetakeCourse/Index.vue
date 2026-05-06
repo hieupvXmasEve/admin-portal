@@ -36,7 +36,6 @@ interface Filters {
     search: string;
     status: string | null;
     semester_id: number | null;
-    campus_id: number | null;
     unit_id: number | null;
     sort: string | null;
     direction: 'asc' | 'desc' | null;
@@ -47,7 +46,6 @@ interface Props {
     registrations: PaginatedResponse<RetakeRegistration>;
     filters?: Partial<Filters>;
     semesters: { id: number; name: string; code: string }[];
-    campuses: { id: number; name: string; code: string }[];
 }
 
 const props = defineProps<Props>();
@@ -62,7 +60,7 @@ const {
     handleSortChange,
     handlePaginationNavigate,
     handlePageSizeChange,
-    handleFilterChange,
+    setFilter,
     clearAllFilters,
 } = useDataTable<Filters>({
     baseUrl: route('academic.retake-course.index'),
@@ -70,7 +68,6 @@ const {
         search: props.filters?.search || '',
         status: props.filters?.status || null,
         semester_id: props.filters?.semester_id || null,
-        campus_id: props.filters?.campus_id || null,
         unit_id: props.filters?.unit_id || null,
         sort: props.filters?.sort || null,
         direction: (props.filters?.direction as 'asc' | 'desc') || null,
@@ -82,7 +79,6 @@ const {
         search: '',
         status: null,
         semester_id: null,
-        campus_id: null,
         unit_id: null,
         sort: null,
     },
@@ -245,7 +241,7 @@ const columns: ColumnDef<RetakeRegistration>[] = [
             <div class="w-full max-w-xs">
                 <DebouncedInput :model-value="filters.search" @update:model-value="handleSearch" placeholder="Tìm SV, MSSV, mã môn..." />
             </div>
-            <Select :model-value="filters.status ?? undefined" @update:model-value="(v: string) => handleFilterChange('status', v || null)">
+            <Select :model-value="filters.status ?? undefined" @update:model-value="(v: string) => setFilter('status', v || null)">
                 <SelectTrigger class="w-[160px]">
                     <SelectValue placeholder="Trạng thái" />
                 </SelectTrigger>
@@ -257,20 +253,12 @@ const columns: ColumnDef<RetakeRegistration>[] = [
                     <SelectItem value="cancelled">Đã hủy</SelectItem>
                 </SelectContent>
             </Select>
-            <Select :model-value="filters.semester_id?.toString() ?? undefined" @update:model-value="(v: string) => handleFilterChange('semester_id', v ? Number(v) : null)">
+            <Select :model-value="filters.semester_id?.toString() ?? undefined" @update:model-value="(v: string) => setFilter('semester_id', v ? Number(v) : null)">
                 <SelectTrigger class="w-[160px]">
                     <SelectValue placeholder="Học kỳ" />
                 </SelectTrigger>
                 <SelectContent>
                     <SelectItem v-for="sem in semesters" :key="sem.id" :value="sem.id.toString()">{{ sem.name }}</SelectItem>
-                </SelectContent>
-            </Select>
-            <Select :model-value="filters.campus_id?.toString() ?? undefined" @update:model-value="(v: string) => handleFilterChange('campus_id', v ? Number(v) : null)">
-                <SelectTrigger class="w-[140px]">
-                    <SelectValue placeholder="Cơ sở" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem v-for="c in campuses" :key="c.id" :value="c.id.toString()">{{ c.name }}</SelectItem>
                 </SelectContent>
             </Select>
             <Button variant="outline" size="sm" @click="clearAllFilters" :disabled="!hasActiveFilters" v-if="hasActiveFilters">
