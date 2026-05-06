@@ -35,7 +35,7 @@ class ListDngPaymentRequestsQuery
 
         $query = $this->buildFilteredQuery($validated)
             ->with([
-                'student:id,student_id,full_name',
+                'student:id,student_id,full_name,status',
                 'semester:id,name,code',
                 'payment:id,external_ref,status,amount,paid_at',
                 'webhookEvents' => fn ($builder) => $builder
@@ -69,6 +69,8 @@ class ListDngPaymentRequestsQuery
                     'id' => $paymentRequest->student->id,
                     'student_code' => $paymentRequest->student->student_id,
                     'full_name' => $paymentRequest->student->full_name,
+                    'status_label' => $paymentRequest->student->status_label,
+                    'status_color' => $paymentRequest->student->status_color,
                 ] : null,
                 'campus_code' => $paymentRequest->campus_code,
                 'student_code' => $paymentRequest->student_code,
