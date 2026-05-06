@@ -19,7 +19,7 @@ class PrerequisiteValidationService
      */
     public function hasMetPrerequisites(Student $student, CourseOffering $courseOffering): bool
     {
-        $unit = $courseOffering->curriculumUnit->unit;
+        $unit = $courseOffering->unit;
         $prerequisiteGroups = $this->getPrerequisiteGroups($unit);
 
         if ($prerequisiteGroups->isEmpty()) {
@@ -34,7 +34,7 @@ class PrerequisiteValidationService
      */
     public function getPrerequisiteValidation(Student $student, CourseOffering $courseOffering): array
     {
-        $unit = $courseOffering->curriculumUnit->unit;
+        $unit = $courseOffering->unit;
         $prerequisiteGroups = $this->getPrerequisiteGroups($unit);
 
         if ($prerequisiteGroups->isEmpty()) {
@@ -292,8 +292,8 @@ class PrerequisiteValidationService
      */
     public function canEnrollConcurrently(Student $student, CourseOffering $courseOffering, CourseOffering $prerequisiteCourseOffering): bool
     {
-        $unit = $courseOffering->curriculumUnit->unit;
-        $prerequisiteUnit = $prerequisiteCourseOffering->curriculumUnit->unit;
+        $unit = $courseOffering->unit;
+        $prerequisiteUnit = $prerequisiteCourseOffering->unit;
 
         // Check if the prerequisite unit is required by any condition in any group for this unit
         $condition = UnitPrerequisiteCondition::whereHas('group', function ($query) use ($unit) {

@@ -95,7 +95,7 @@ class FinanceChargeService
         }
 
         $amount = $registration->retake_fee ?? 0;
-        $courseName = $registration->courseOffering?->curriculumUnit?->unit?->name ?? 'Unknown Course';
+        $courseName = $registration->courseOffering?->unit?->name ?? 'Unknown Course';
 
         return $this->createCharge([
             'student_id' => $registration->student_id,

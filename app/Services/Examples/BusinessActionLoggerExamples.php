@@ -155,7 +155,7 @@ class BusinessActionLoggerExamples
                     BusinessActionLogger::financial('refund', $registration->student, $refundAmount, 'course_withdrawal')
                         ->withProperties([
                             'related_registration_id' => $registration->id,
-                            'course_code' => $registration->courseOffering->curriculumUnit->unit->code ?? 'Unknown',
+                            'course_code' => $registration->courseOffering->unit->code ?? 'Unknown',
                         ])
                         ->log();
                 }

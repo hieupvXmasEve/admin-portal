@@ -943,8 +943,7 @@ class StudentAcademicSummaryService
         $attendanceData = DB::table('attendances')
             ->join('class_sessions', 'attendances.class_session_id', '=', 'class_sessions.id')
             ->join('course_offerings', 'class_sessions.course_offering_id', '=', 'course_offerings.id')
-            ->join('curriculum_units', 'course_offerings.curriculum_unit_id', '=', 'curriculum_units.id')
-            ->join('units', 'curriculum_units.unit_id', '=', 'units.id')
+            ->join('units', 'course_offerings.unit_id', '=', 'units.id')
             ->join('semesters', 'course_offerings.semester_id', '=', 'semesters.id')
             ->where('attendances.student_id', $student->id)
             ->select([
@@ -1310,8 +1309,7 @@ class StudentAcademicSummaryService
         $query = DB::table('attendances')
             ->join('class_sessions', 'attendances.class_session_id', '=', 'class_sessions.id')
             ->join('course_offerings', 'class_sessions.course_offering_id', '=', 'course_offerings.id')
-            ->join('curriculum_units', 'course_offerings.curriculum_unit_id', '=', 'curriculum_units.id')
-            ->join('units', 'curriculum_units.unit_id', '=', 'units.id')
+            ->join('units', 'course_offerings.unit_id', '=', 'units.id')
             ->join('semesters', 'course_offerings.semester_id', '=', 'semesters.id')
             ->where('attendances.student_id', $studentId)
             ->where('units.id', $unitId);

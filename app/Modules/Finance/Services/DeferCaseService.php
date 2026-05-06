@@ -226,7 +226,7 @@ class DeferCaseService
             'actionLog',
             'student',
             'semester',
-            'items.courseRegistration.courseOffering.curriculumUnit.unit',
+            'items.courseRegistration.courseOffering.unit',
             'creditCharge',
             'uploadRecord',
             'changedBy',

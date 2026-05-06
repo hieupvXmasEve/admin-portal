@@ -143,7 +143,7 @@ class EnrollmentCapacityService
             'semester_id' => $courseOffering->semester_id,
             'registration_status' => 'waitlisted',
             'registration_date' => now(),
-            'credit_hours' => $courseOffering->curriculumUnit->credit_hours,
+            'credit_hours' => $courseOffering->unit->credit_points,
             'registration_type' => 'waitlist',
             'waitlist_position' => $waitlistPosition,
         ]);

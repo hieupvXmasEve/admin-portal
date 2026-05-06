@@ -273,7 +273,7 @@ class CourseRegistrationService
             ->where('registration_status', 'registered')
             ->sum('credit_hours');
 
-        $newTotalCredits = $currentCredits + $courseOffering->curriculumUnit->unit->credit_points;
+        $newTotalCredits = $currentCredits + $courseOffering->unit->credit_points;
 
         // Standard limits (can be made configurable)
         $maxCredits = 100; // Maximum credits per semester
