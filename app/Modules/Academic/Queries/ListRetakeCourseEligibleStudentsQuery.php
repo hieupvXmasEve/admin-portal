@@ -68,6 +68,15 @@ class ListRetakeCourseEligibleStudentsQuery
         $results = collect();
 
         foreach ($students as $student) {
+            // Unit IDs the student has already passed — exclude from retake eligibility
+            $passedUnitIds = AcademicRecord::query()
+                ->where('student_id', $student->id)
+                ->where(function ($q) {
+                    $q->where('is_passed', true)
+                        ->orWhere('override_pass', true);
+                })
+                ->pluck('unit_id');
+
             // Get failed academic records for units in student's curriculum version
             // Uses is_passed + override_pass instead of completion_status for pass/fail logic
             $failedRecords = AcademicRecord::query()
@@ -75,6 +84,7 @@ class ListRetakeCourseEligibleStudentsQuery
                 ->where('is_passed', false)
                 ->where('completion_status', '!=', 'in_progress')
                 ->where(fn ($q) => $q->where('override_pass', false)->orWhereNull('override_pass'))
+                ->whereNotIn('unit_id', $passedUnitIds)
                 ->when($unitId, fn ($q) => $q->where('unit_id', $unitId))
                 ->whereIn('unit_id', function ($subQuery) use ($student) {
                     $subQuery->select('unit_id')

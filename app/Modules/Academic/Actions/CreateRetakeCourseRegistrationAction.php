@@ -57,6 +57,18 @@ class CreateRetakeCourseRegistrationAction
                 ]);
             }
 
+            // Block retake if student already passed this unit in any record
+            $alreadyPassed = AcademicRecord::where('student_id', $data['student_id'])
+                ->where('unit_id', $data['unit_id'])
+                ->where(fn ($q) => $q->where('is_passed', true)->orWhere('override_pass', true))
+                ->exists();
+
+            if ($alreadyPassed) {
+                throw ValidationException::withMessages([
+                    'unit_id' => ['Sinh viên đã pass môn này, không thể đăng ký học lại.'],
+                ]);
+            }
+
             // Validate academic record exists and student did not pass
             // Uses is_passed field (not completion_status which indicates finalization state)
             $academicRecord = AcademicRecord::where('id', $data['original_academic_record_id'])
