@@ -569,12 +569,7 @@ export const mainNavItems: NavItem[] = [
                         icon: Sparkles,
                         requiredPermissions: ['allocate_finance_payment'],
                     },
-                    {
-                        title: 'DNG Worklist',
-                        href: '/finance/operations/dng-worklist',
-                        icon: Send,
-                        requiredPermissions: ['create_finance_payments'],
-                    },
+                   
                 ],
             },
             // Group: charges, invoices, payments
@@ -616,6 +611,12 @@ export const mainNavItems: NavItem[] = [
                 ],
             },
 
+            {
+                title: 'DNG Worklist',
+                href: '/finance/operations/dng-worklist',
+                icon: Send,
+                requiredPermissions: ['create_finance_payments'],
+            },
             // Retake Course Charges menu removed — use DNG Worklist (fee_type=HL) instead
             {
                 title: 'Tuition Plans',
