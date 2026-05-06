@@ -6,6 +6,7 @@ namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Campus;
+use App\Modules\Finance\Actions\CancelDngPaymentRequestAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Queries\Dng\GetDngPaymentRequestDetailsQuery;
 use App\Modules\Finance\Queries\Dng\ListDngPaymentRequestsQuery;
@@ -35,18 +36,29 @@ class DngPaymentRequestController extends Controller
         ]);
     }
 
-    public function cancel(DngPaymentRequest $dngPaymentRequest): RedirectResponse
+    public function cancel(DngPaymentRequest $dngPaymentRequest, CancelDngPaymentRequestAction $action): RedirectResponse
     {
         $dngPaymentRequest->loadMissing('student:id,campus_id');
         $this->assertCampusAccess($dngPaymentRequest);
 
-        if (! $dngPaymentRequest->canTransitionTo(DngPaymentRequest::STATUS_CANCELLED)) {
-            return back()->with('error', 'This DNG payment request cannot be cancelled.');
+        $cancellableStatuses = [DngPaymentRequest::STATUS_PENDING, DngPaymentRequest::STATUS_PUSHED_TO_DNG];
+        if (! in_array($dngPaymentRequest->status, $cancellableStatuses, true)) {
+            Inertia::flash('error', 'This DNG payment request cannot be cancelled.');
+
+            return back();
         }
 
-        $dngPaymentRequest->transitionTo(DngPaymentRequest::STATUS_CANCELLED);
+        try {
+            $action->run($dngPaymentRequest);
+        } catch (\Throwable $e) {
+            Inertia::flash('error', 'Failed to cancel DNG payment request: '.$e->getMessage());
 
-        return back()->with('success', 'DNG payment request cancelled.');
+            return back();
+        }
+
+        Inertia::flash('success', 'DNG payment request cancelled.');
+
+        return back();
     }
 
     private function assertCampusAccess(DngPaymentRequest $paymentRequest): void

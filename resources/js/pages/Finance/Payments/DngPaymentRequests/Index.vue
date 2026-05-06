@@ -1,15 +1,16 @@
 <script setup lang="ts">
+import DataPagination from '@/components/DataPagination.vue';
+import DataTable from '@/components/DataTable.vue';
 import FilterDateRange from '@/components/filters/FilterDateRange.vue';
 import FilterPanel from '@/components/filters/FilterPanel.vue';
 import FilterSearchInput from '@/components/filters/FilterSearchInput.vue';
 import FilterSelect from '@/components/filters/FilterSelect.vue';
-import ServerPaginatedDataTable from '@/components/tables/ServerPaginatedDataTable.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useGlobalConfirmDialog } from '@/composables';
+import { useDataTable } from '@/composables/useDataTable';
 import { usePermission } from '@/composables/usePermission';
-import { useServerTableQuery } from '@/composables/useServerTableQuery';
 import type { PaginatedResponse } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/format';
 import { Head, Link, router } from '@inertiajs/vue3';
@@ -97,6 +98,7 @@ const statusOptions = [
     { value: 'reconciled', label: 'Reconciled' },
     { value: 'failed', label: 'Failed' },
     { value: 'cancelled', label: 'Cancelled' },
+    { value: 'cancel_pushed_to_dng', label: 'Cancel Pushed to DNG' },
 ];
 
 const yesNoOptions = [
@@ -104,9 +106,19 @@ const yesNoOptions = [
     { value: 'no', label: 'No' },
 ];
 
-const { filters, hasActiveFilters, clearFilters, applySearch, setFilter, apply, handleSortChange, handlePageChange, handlePageSizeChange, currentSort, currentDirection } = useServerTableQuery<Filters>({
+const {
+    filters,
+    hasActiveFilters,
+    clearAllFilters,
+    setFilter,
+    apply,
+    handleSortChange,
+    handlePaginationNavigate,
+    handlePageSizeChange,
+    currentSort,
+    currentDirection,
+} = useDataTable<Filters>({
     baseUrl: route('finance.dng.payment-requests.index'),
-    searchDebounce: 400,
     initialFilters: {
         search: props.filters.search ?? '',
         status: props.filters.status ?? '',
@@ -115,11 +127,10 @@ const { filters, hasActiveFilters, clearFilters, applySearch, setFilter, apply, 
         created_from: props.filters.created_from ?? '',
         created_to: props.filters.created_to ?? '',
         per_page: props.filters.per_page ?? 15,
-        page: props.items.current_page ?? 1,
-        sort: props.filters.sort ?? 'created_at',
-        direction: props.filters.direction ?? 'desc',
+        sort: typeof props.filters.sort === 'string' ? props.filters.sort : 'created_at',
+        direction: (props.filters.direction as 'asc' | 'desc') || 'desc',
     },
-    emptyFilters: {
+    defaultValues: {
         search: '',
         status: '',
         has_payment: 'all',
@@ -127,19 +138,12 @@ const { filters, hasActiveFilters, clearFilters, applySearch, setFilter, apply, 
         created_from: '',
         created_to: '',
         per_page: 15,
-        page: 1,
-        sort: 'created_at',
-        direction: 'desc',
-    },
-    defaultValues: {
-        has_payment: 'all',
-        has_webhook: 'all',
-        per_page: 15,
-        page: 1,
         sort: 'created_at',
         direction: 'desc',
     },
     only: ['items', 'stats', 'filters'],
+    fieldDebounce: { search: 400 },
+    immediateFields: ['status', 'has_payment', 'has_webhook'],
 });
 
 const onDateChange = (from: string, to: string) => {
@@ -151,20 +155,25 @@ const canCancelRequest = (request: DngPaymentRequestRow) => {
 };
 
 const cancelRequest = (request: DngPaymentRequestRow) => {
+    const isPushed = request.status === 'pushed_to_dng';
+    const extraNote = isPushed ? ' A reversal call (amount = -1) will be sent to DNG to remove the charge.' : '';
     confirmDialog.showConfirmDialog(
         {
             title: 'Cancel DNG request',
-            message: `Cancel DNG payment request #${request.id} for ${request.student?.full_name || request.student_code}? This request will become terminal and cannot be paid later.`,
+            message: `Cancel DNG payment request #${request.id} for ${request.student?.full_name || request.student_code}? This request will become terminal and cannot be paid later.${extraNote}`,
             confirmText: 'Cancel request',
             cancelText: 'Back',
         },
         {
-            onConfirm: () => {
-                router.post(route('finance.dng.payment-requests.cancel', request.id), {}, {
-                    preserveScroll: true,
-                    only: ['items', 'stats', 'filters'],
-                });
-            },
+            onConfirm: () =>
+                new Promise<void>((resolve, reject) => {
+                    router.post(route('finance.dng.payment-requests.cancel', request.id), {}, {
+                        preserveScroll: true,
+                        only: ['items', 'stats', 'filters'],
+                        onSuccess: () => resolve(),
+                        onError: (errors) => reject(new Error(Object.values(errors).join(', '))),
+                    });
+                }),
         },
     );
 };
@@ -175,6 +184,8 @@ const getRequestStatusClass = (status: string) => {
             return 'bg-red-50 text-red-700 border-red-200';
         case 'cancelled':
             return 'bg-slate-100 text-slate-700 border-slate-300';
+        case 'cancel_pushed_to_dng':
+            return 'bg-orange-50 text-orange-700 border-orange-200';
         case 'reconciled':
         case 'paid_invoiced':
             return 'bg-green-50 text-green-700 border-green-200';
@@ -307,11 +318,11 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
                 <CardTitle>Filters</CardTitle>
             </CardHeader>
             <CardContent>
-                <FilterPanel :has-active-filters="hasActiveFilters" :columns="4" @clear="clearFilters">
-                    <FilterSearchInput :model-value="filters.search ?? ''" placeholder="Search student, item, DNG ID..." :debounce="400" @update:model-value="(value) => setFilter('search', value)" @search="applySearch" />
-                    <FilterSelect :model-value="filters.status ?? ''" :options="statusOptions" placeholder="Request status" all-label="All statuses" @change="(value) => apply({ status: value, page: 1 })" />
-                    <FilterSelect :model-value="filters.has_payment ?? 'all'" :options="yesNoOptions" placeholder="Bridged payment" all-label="All payment states" @change="(value) => apply({ has_payment: value || 'all', page: 1 })" />
-                    <FilterSelect :model-value="filters.has_webhook ?? 'all'" :options="yesNoOptions" placeholder="Webhook received" all-label="All webhook states" @change="(value) => apply({ has_webhook: value || 'all', page: 1 })" />
+                <FilterPanel :has-active-filters="hasActiveFilters" :columns="4" @clear="clearAllFilters">
+                    <FilterSearchInput :model-value="filters.search ?? ''" placeholder="Search student, item, DNG ID..." :debounce="400" @update:model-value="(value) => setFilter('search', value)" />
+                    <FilterSelect :model-value="filters.status ?? ''" :options="statusOptions" placeholder="Request status" all-label="All statuses" @change="(value) => setFilter('status', value)" />
+                    <FilterSelect :model-value="filters.has_payment ?? 'all'" :options="yesNoOptions" placeholder="Bridged payment" all-label="All payment states" @change="(value) => setFilter('has_payment', value || 'all')" />
+                    <FilterSelect :model-value="filters.has_webhook ?? 'all'" :options="yesNoOptions" placeholder="Webhook received" all-label="All webhook states" @change="(value) => setFilter('has_webhook', value || 'all')" />
                     <FilterDateRange :from-value="filters.created_from ?? ''" :to-value="filters.created_to ?? ''" @change="onDateChange" />
                 </FilterPanel>
             </CardContent>
@@ -321,17 +332,13 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
             <CardHeader>
                 <CardTitle>Requests</CardTitle>
             </CardHeader>
-            <CardContent>
-                <ServerPaginatedDataTable
+            <CardContent class="space-y-4">
+                <DataTable
                     :data="items.data"
                     :columns="columns"
-                    :pagination-data="items"
-                    :initial-sort="currentSort"
-                    :initial-direction="currentDirection"
-                    item-name="requests"
+                    :initial-sort="currentSort ?? undefined"
+                    :initial-direction="currentDirection ?? undefined"
                     @sort-change="handleSortChange"
-                    @page-change="handlePageChange"
-                    @page-size-change="handlePageSizeChange"
                 >
                     <template #cell-student="{ row }">
                         <div class="space-y-1">
@@ -405,7 +412,9 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
                             </Link>
                         </div>
                     </template>
-                </ServerPaginatedDataTable>
+                </DataTable>
+
+                <DataPagination :pagination-data="items" item-name="requests" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
             </CardContent>
         </Card>
     </div>

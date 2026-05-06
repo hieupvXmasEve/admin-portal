@@ -48,7 +48,13 @@ interface Props {
             external_ref: string | null;
             paid_at: string | null;
         } | null;
-        payloads: Record<string, unknown>;
+        payloads: {
+            push_payload: Record<string, unknown> | null;
+            push_response: Record<string, unknown> | null;
+            last_callback_payload: Record<string, unknown> | null;
+            cancel_push_payload: Record<string, unknown> | null;
+            cancel_push_response: Record<string, unknown> | null;
+        };
         webhook_events: Array<{
             id: number;
             event_type: string;
@@ -70,6 +76,8 @@ const getStatusClass = (status: string) => {
             return 'bg-red-50 text-red-700 border-red-200';
         case 'cancelled':
             return 'bg-slate-100 text-slate-700 border-slate-300';
+        case 'cancel_pushed_to_dng':
+            return 'bg-orange-50 text-orange-700 border-orange-200';
         case 'reconciled':
         case 'paid_invoiced':
             return 'bg-green-50 text-green-700 border-green-200';
@@ -232,6 +240,8 @@ const getStatusClass = (status: string) => {
             <JsonPayloadCard title="Push Payload" :payload="request.payloads.push_payload" />
             <JsonPayloadCard title="Push Response" :payload="request.payloads.push_response" />
             <JsonPayloadCard title="Last Callback Payload" :payload="request.payloads.last_callback_payload" />
+            <JsonPayloadCard v-if="request.payloads.cancel_push_payload" title="Cancel Push Payload" :payload="request.payloads.cancel_push_payload" />
+            <JsonPayloadCard v-if="request.payloads.cancel_push_response" title="Cancel Push Response" :payload="request.payloads.cancel_push_response" />
         </div>
     </div>
 </template>
