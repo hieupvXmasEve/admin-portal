@@ -189,6 +189,9 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
             Route::get('/{dngWebhookEvent}', [DngWebhookEventController::class, 'show'])
                 ->middleware('can:view_finance_dng_webhook_events')
                 ->name('show');
+            Route::post('/{dngWebhookEvent}/retry', [DngWebhookEventController::class, 'retry'])
+                ->middleware('can:create_finance_payments')
+                ->name('retry');
         });
     });
 

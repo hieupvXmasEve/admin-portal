@@ -6,7 +6,7 @@ namespace App\Modules\Finance\Dng\Jobs;
 
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
 use App\Modules\Finance\Dng\Services\DngWebhookService;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -15,7 +15,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-class ProcessDngWebhookJob implements ShouldBeUnique, ShouldQueue
+class ProcessDngWebhookJob implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -80,7 +80,7 @@ class ProcessDngWebhookJob implements ShouldBeUnique, ShouldQueue
         }
     }
 
-    public function failed(\Throwable $exception): void
+    public function failed(Throwable $exception): void
     {
         $event = DngWebhookEvent::find($this->eventId);
         $event?->markFailedTerminal($exception->getMessage(), DngWebhookEvent::ERROR_CATEGORY_PROCESSING);

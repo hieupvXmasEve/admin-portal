@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePermission } from '@/composables/usePermission';
 import { formatCurrency, formatDate } from '@/utils/format';
-import { Head, Link } from '@inertiajs/vue3';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Link2, ReceiptText, ShieldAlert, Wallet } from 'lucide-vue-next';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { AlertTriangle, ArrowLeft, CheckCircle2, Info, Link2, ReceiptText, RotateCw, ShieldAlert, Wallet } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
 
 interface Props {
     event: {
@@ -46,9 +47,40 @@ interface Props {
     };
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 const permission = usePermission();
+
+const isRetrying = ref(false);
+
+const canRetry = computed(() => props.event.processing_status !== 'processed' && permission.can('create_finance_payments'));
+
+type DiagnosisVariant = 'success' | 'skipped' | 'error' | 'pending';
+
+const diagnosisVariant = computed<DiagnosisVariant | null>(() => {
+    const status = props.event.processing_status;
+    if (status === 'processed') return 'success';
+    if (status === 'skipped') return 'skipped';
+    if (status === 'mismatch' || status === 'failed_terminal' || status === 'failed_retryable') return 'error';
+    if ((status === 'received' || status === 'processing') && !props.event.is_valid_checksum && props.event.error_message) return 'error';
+    return null;
+});
+
+const handleRetry = () => {
+    if (!canRetry.value || isRetrying.value) return;
+    if (!window.confirm(`Retry webhook event #${props.event.id}? Service will re-run synchronously.`)) return;
+    isRetrying.value = true;
+    router.post(
+        route('finance.dng.webhook-events.retry', props.event.id),
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                isRetrying.value = false;
+            },
+        },
+    );
+};
 </script>
 
 <template>
@@ -61,7 +93,7 @@ const permission = usePermission();
                     <ArrowLeft class="h-4 w-4" />
                 </Button>
             </Link>
-            <div>
+            <div class="flex-1">
                 <div class="flex items-center gap-3">
                     <h1 class="text-2xl font-semibold">DNG Webhook Event #{{ event.id }}</h1>
                     <Badge variant="outline">{{ event.processing_status }}</Badge>
@@ -71,6 +103,10 @@ const permission = usePermission();
                 </div>
                 <p class="text-muted-foreground text-sm">Created {{ formatDate(event.created_at) }} · Processed {{ formatDate(event.processed_at) }}</p>
             </div>
+            <Button v-if="canRetry" variant="outline" :disabled="isRetrying" @click="handleRetry">
+                <RotateCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': isRetrying }" />
+                {{ isRetrying ? 'Retrying...' : 'Retry' }}
+            </Button>
         </div>
 
         <div class="grid gap-6 lg:grid-cols-3">
@@ -134,13 +170,28 @@ const permission = usePermission();
                 </CardContent>
             </Card>
 
-            <Card v-if="event.error_message" class="border-red-200">
+            <Card v-if="diagnosisVariant === 'success'" class="border-green-200">
+                <CardHeader
+                    ><CardTitle class="flex items-center gap-2 text-green-700"><CheckCircle2 class="h-4 w-4" />Processed</CardTitle></CardHeader
+                >
+                <CardContent class="text-sm text-green-700">Event processed successfully — payment created/updated and request transitioned forward.</CardContent>
+            </Card>
+            <Card v-else-if="diagnosisVariant === 'skipped'" class="border-blue-200">
+                <CardHeader
+                    ><CardTitle class="flex items-center gap-2 text-blue-700"><Info class="h-4 w-4" />Skipped (idempotent)</CardTitle></CardHeader
+                >
+                <CardContent class="space-y-1 text-sm text-blue-700">
+                    <p>{{ event.error_message || 'Event was skipped because the request had already progressed past this state.' }}</p>
+                    <p class="text-xs text-blue-600">This is expected behaviour for duplicate or late callbacks. No action required.</p>
+                </CardContent>
+            </Card>
+            <Card v-else-if="diagnosisVariant === 'error'" class="border-red-200">
                 <CardHeader
                     ><CardTitle class="flex items-center gap-2 text-red-700"><AlertTriangle class="h-4 w-4" />Diagnosis</CardTitle></CardHeader
                 >
-                <CardContent class="text-sm text-red-700">{{ event.error_message }}</CardContent>
+                <CardContent class="text-sm text-red-700">{{ event.error_message || 'Event failed without an explicit error message.' }}</CardContent>
             </Card>
-            <Card v-else-if="!event.is_valid_checksum" class="border-red-200">
+            <Card v-else-if="!event.is_valid_checksum && event.processing_status !== 'received'" class="border-red-200">
                 <CardHeader
                     ><CardTitle class="flex items-center gap-2 text-red-700"><ShieldAlert class="h-4 w-4" />Checksum Failure</CardTitle></CardHeader
                 >

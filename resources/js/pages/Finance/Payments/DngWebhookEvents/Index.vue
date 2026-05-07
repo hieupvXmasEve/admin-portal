@@ -72,11 +72,13 @@ const props = defineProps<Props>();
 const permission = usePermission();
 
 const statusOptions = [
-    { value: 'pending', label: 'Pending' },
+    { value: 'received', label: 'Received' },
+    { value: 'processing', label: 'Processing' },
     { value: 'processed', label: 'Processed' },
-    { value: 'failed', label: 'Failed' },
     { value: 'skipped', label: 'Skipped' },
     { value: 'mismatch', label: 'Mismatch' },
+    { value: 'failed_retryable', label: 'Failed (retryable)' },
+    { value: 'failed_terminal', label: 'Failed (terminal)' },
 ];
 
 const eventTypeOptions = [
@@ -141,10 +143,14 @@ const getStatusClass = (status: string) => {
     switch (status) {
         case 'processed':
             return 'bg-green-50 text-green-700 border-green-200';
-        case 'failed':
+        case 'failed_terminal':
+        case 'failed_retryable':
         case 'mismatch':
             return 'bg-red-50 text-red-700 border-red-200';
-        case 'pending':
+        case 'skipped':
+            return 'bg-blue-50 text-blue-700 border-blue-200';
+        case 'received':
+        case 'processing':
             return 'bg-amber-50 text-amber-700 border-amber-200';
         default:
             return 'bg-slate-50 text-slate-700 border-slate-200';
