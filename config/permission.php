@@ -119,6 +119,15 @@ return [
             'delete_student_registration' => 'delete_student_registration',
 
         ],
+        'class_sessions' => [
+            'view_class_session' => 'view_class_session',
+            'create_class_session' => 'create_class_session',
+            'edit_class_session' => 'edit_class_session',
+            'delete_class_session' => 'delete_class_session',
+            'generate_class_session' => 'generate_class_session',
+            'generate_class_session_attendance' => 'generate_class_session_attendance',
+            'export_class_session_attendance' => 'export_class_session_attendance',
+        ],
         'course_registrations' => [
             'view_course_registration' => 'view_course_registration',
             'create_course_registration' => 'create_course_registration',
