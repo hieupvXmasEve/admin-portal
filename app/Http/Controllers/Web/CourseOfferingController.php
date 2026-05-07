@@ -1210,11 +1210,13 @@ class CourseOfferingController extends Controller
                             $reasons[] = 'Student has active academic holds';
                         }
 
-                        // Check if unit is in student's curriculum
-                        $curriculumCheck = $this->curriculumService->isUnitInStudentCurriculum($student, $courseOffering->unit_id);
-                        if ($isEligible && !$curriculumCheck['is_in_curriculum']) {
-                            $isEligible = false;
-                            $reasons[] = $curriculumCheck['reason'];
+                        // Check if unit is in student's curriculum (skip for EGC units — only level matching is required)
+                        if ($isEligible && ! $isEgcUnit) {
+                            $curriculumCheck = $this->curriculumService->isUnitInStudentCurriculum($student, $courseOffering->unit_id);
+                            if (! $curriculumCheck['is_in_curriculum']) {
+                                $isEligible = false;
+                                $reasons[] = $curriculumCheck['reason'];
+                            }
                         }
 
                         // Check prerequisites using UnitPrerequisiteGroup system
@@ -1452,14 +1454,16 @@ class CourseOfferingController extends Controller
                         continue;
                     }
 
-                    // Check if unit is in student's curriculum
-                    $curriculumCheck = $this->curriculumService->isUnitInStudentCurriculum($student, $courseOffering->unit_id);
-                    if (!$curriculumCheck['is_in_curriculum']) {
-                        $result['message'] = $curriculumCheck['reason'];
-                        $failureCount++;
-                        $results[] = $result;
+                    // Check if unit is in student's curriculum (skip for EGC units — only level matching is required)
+                    if (! $isEgcUnit) {
+                        $curriculumCheck = $this->curriculumService->isUnitInStudentCurriculum($student, $courseOffering->unit_id);
+                        if (! $curriculumCheck['is_in_curriculum']) {
+                            $result['message'] = $curriculumCheck['reason'];
+                            $failureCount++;
+                            $results[] = $result;
 
-                        continue;
+                            continue;
+                        }
                     }
 
                     // Check prerequisites using UnitPrerequisiteGroup system
