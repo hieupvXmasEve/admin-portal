@@ -64,6 +64,7 @@ const replyForm = useForm({
 const replies = computed(() => props.ticket.query_ticket?.replies || []);
 const isClosed = computed(() => props.ticket.query_status === 'closed');
 const auditHistory = computed(() => props.ticket.assignments || []);
+const displayId = computed(() => props.ticket.query_ticket?.id ?? props.ticket.id);
 
 // Methods
 const formatDate = (date: string) => format(new Date(date), 'dd/MM/yyyy HH:mm');
@@ -121,7 +122,7 @@ const getActionBadge = (action: string) => {
 
 <template>
 
-    <Head :title="`Query #${ticket.id}`" />
+    <Head :title="`Query #${displayId}`" />
 
     <div class="space-y-6">
         <!-- Header Section -->
@@ -132,7 +133,7 @@ const getActionBadge = (action: string) => {
                 </Button>
                 <div>
                     <div class="flex items-center gap-3">
-                        <h1 class="text-2xl font-bold tracking-tight">Query #{{ ticket.id }}</h1>
+                        <h1 class="text-2xl font-bold tracking-tight">Query #{{ displayId }}</h1>
                         <Badge :variant="statusVariantMap[ticket.query_status]">{{ statusLabelMap[ticket.query_status]
                             }}</Badge>
                     </div>

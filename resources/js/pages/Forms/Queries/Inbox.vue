@@ -14,9 +14,10 @@ import { route } from 'ziggy-js';
 // Interfaces
 interface Ticket {
     id: number;
+    query_ticket?: { id: number } | null;
     student?: { full_name: string; student_id: string };
     form: { title: string };
-    query_status: string; 
+    query_status: string;
     assigned_to?: { name: string };
     created_at: string;
 }
@@ -60,7 +61,11 @@ const columns: ColumnDef<Ticket>[] = [
     {
         accessorKey: 'id',
         header: '#',
-        cell: ({ row }) => h('span', { class: 'font-mono text-xs text-muted-foreground' }, `#${row.original.id}`)
+        cell: ({ row }) => h(
+            'span',
+            { class: 'font-mono text-xs text-muted-foreground' },
+            row.original.query_ticket?.id ? `#${row.original.query_ticket.id}` : '—'
+        )
     },
     {
         accessorKey: 'form.title',
