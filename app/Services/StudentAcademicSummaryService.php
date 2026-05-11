@@ -620,6 +620,11 @@ class StudentAcademicSummaryService
                     'all_scores_count' => $allScores->count(),
                     'has_more_scores' => $allScores->count() > $limit,
                     'course_average' => $academicRecord?->final_percentage ?? 0,
+                    'credit_points' => $academicRecord ? (float) $academicRecord->credit_points : 0.0,
+                    'credit_points_earned' => $academicRecord ? (float) $academicRecord->credit_points_earned : 0.0,
+                    'is_passed' => $academicRecord ? (bool) $academicRecord->is_passed : null,
+                    'final_letter_grade' => $academicRecord?->final_letter_grade,
+                    'grade_status' => $academicRecord?->grade_status,
                     'total_assessments' => $courseScores->count(),
                     'completed_assessments' => $courseScores->where('status', 'graded')->count(),
                 ];

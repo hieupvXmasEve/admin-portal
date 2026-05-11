@@ -629,6 +629,11 @@ export interface CourseScores {
     semester: string;
     scores: AssessmentScore[];
     course_average: number;
+    credit_points?: number;
+    credit_points_earned?: number;
+    is_passed?: boolean | null;
+    final_letter_grade?: string | null;
+    grade_status?: string | null;
     total_assessments: number;
     completed_assessments: number;
 }

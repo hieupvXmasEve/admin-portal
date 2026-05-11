@@ -70,6 +70,19 @@ const assessmentStatusToneClass = (status: string): string => {
     }
 };
 
+const passFailBadge = (course: CourseScores): { label: string; class: string } => {
+    if (course.grade_status && course.grade_status !== 'final') {
+        return { label: 'In progress', class: 'border-border bg-muted/50 text-muted-foreground' };
+    }
+    if (course.is_passed === true) {
+        return { label: 'Passed', class: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300' };
+    }
+    if (course.is_passed === false) {
+        return { label: 'Failed', class: 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-300' };
+    }
+    return { label: '—', class: 'border-border bg-muted/50 text-muted-foreground' };
+};
+
 const standingTone = (standing: string | null | undefined): { label: string; class: string } => {
     const value = (standing ?? 'unknown').toLowerCase();
     if (value === 'normal') {
@@ -306,11 +319,14 @@ const openScoreDetails = (course: CourseScores): void => {
                     <Table>
                         <TableHeader>
                             <TableRow class="bg-transparent">
-                                <TableHead class="w-[140px] text-[11px] uppercase tracking-wider text-muted-foreground">Code</TableHead>
+                                <TableHead class="w-[120px] text-[11px] uppercase tracking-wider text-muted-foreground">Code</TableHead>
                                 <TableHead class="text-[11px] uppercase tracking-wider text-muted-foreground">Course</TableHead>
-                                <TableHead class="w-[120px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Assessments</TableHead>
-                                <TableHead class="w-[140px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Final %</TableHead>
-                                <TableHead class="w-[120px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Action</TableHead>
+                                <TableHead class="w-[80px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Credit</TableHead>
+                                <TableHead class="w-[110px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Assessments</TableHead>
+                                <TableHead class="w-[120px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Final</TableHead>
+                                <TableHead class="w-[70px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Letter</TableHead>
+                                <TableHead class="w-[110px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Result</TableHead>
+                                <TableHead class="w-[110px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Action</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -321,9 +337,18 @@ const openScoreDetails = (course: CourseScores): void => {
                             >
                                 <TableCell class="font-mono text-sm font-medium tabular-nums">{{ course.course_code }}</TableCell>
                                 <TableCell>
-                                    <div class="max-w-[480px]">
+                                    <div class="max-w-[420px]">
                                         <p class="truncate font-medium">{{ course.course_name }}</p>
                                     </div>
+                                </TableCell>
+                                <TableCell class="text-right">
+                                    <span
+                                        v-if="course.credit_points !== undefined && course.credit_points > 0"
+                                        class="font-mono text-sm font-medium tabular-nums"
+                                    >
+                                        {{ formatNumber(course.credit_points, 1) }}
+                                    </span>
+                                    <span v-else class="text-sm text-muted-foreground">—</span>
                                 </TableCell>
                                 <TableCell class="text-right">
                                     <span class="font-mono text-sm tabular-nums text-muted-foreground">
@@ -334,10 +359,29 @@ const openScoreDetails = (course: CourseScores): void => {
                                 </TableCell>
                                 <TableCell class="text-right">
                                     <span
-                                        class="inline-flex min-w-[80px] justify-end rounded-md border px-2.5 py-1 font-mono text-sm font-semibold tabular-nums"
+                                        class="inline-flex min-w-[72px] justify-end rounded-md border px-2.5 py-1 font-mono text-sm font-semibold tabular-nums"
                                         :class="courseAverageBadgeClass(course.course_average)"
                                     >
-                                        {{ formatPercentage(course.course_average) }}
+                                        {{ formatNumber(course.course_average, 2) }}
+                                    </span>
+                                </TableCell>
+                                <TableCell class="text-right">
+                                    <span
+                                        v-if="course.final_letter_grade"
+                                        class="font-mono text-sm font-semibold tabular-nums"
+                                        :class="gpaToneClass(course.course_average)"
+                                    >
+                                        {{ course.final_letter_grade }}
+                                    </span>
+                                    <span v-else class="text-sm text-muted-foreground">—</span>
+                                </TableCell>
+                                <TableCell class="text-right">
+                                    <span
+                                        class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider"
+                                        :class="passFailBadge(course).class"
+                                    >
+                                        <span class="size-1.5 rounded-full bg-current"></span>
+                                        {{ passFailBadge(course).label }}
                                     </span>
                                 </TableCell>
                                 <TableCell class="text-right">
