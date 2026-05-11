@@ -5,7 +5,7 @@ import { Head } from '@inertiajs/vue3';
 import ScoresTab from '../AcademicSummary/ScoresTab.vue';
 
 interface Props {
-    student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status'>;
+    student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status' | 'email' | 'intake'>;
     scores: ScoresData;
 }
 

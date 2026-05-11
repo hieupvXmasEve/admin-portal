@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\Attendance;
 use App\Models\CourseOffering;
+use App\Models\GpaCalculation;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
@@ -628,6 +629,38 @@ class StudentAcademicSummaryService
         // Get module scores
         $moduleScores = $this->getModuleScores($student);
 
+        // Per-semester GPA snapshots + cumulative (sources of truth for the transcript view).
+        $gpaRows = GpaCalculation::where('student_id', $student->id)
+            ->with(['semester:id,name,code,start_date'])
+            ->orderBy('semester_id', 'asc')
+            ->get();
+
+        $semesterGpa = $gpaRows->map(function (GpaCalculation $g): array {
+            return [
+                'semester_id' => $g->semester_id,
+                'semester_name' => $g->semester?->name ?? 'N/A',
+                'semester_code' => $g->semester?->code ?? '',
+                'start_date' => optional($g->semester?->start_date)->toDateString(),
+                'semester_gpa' => (float) $g->semester_gpa,
+                'credit_points_attempted' => (float) $g->semester_credit_points,
+                'credit_points_earned' => (float) $g->semester_credit_points_earned,
+                'academic_standing' => $g->academic_standing,
+                'is_finalized' => (bool) $g->is_finalized,
+                'finalized_at' => optional($g->finalized_at)->toIso8601String(),
+            ];
+        })->values();
+
+        $currentGpa = $gpaRows->firstWhere('is_current', true) ?? $gpaRows->last();
+
+        $cumulative = $currentGpa ? [
+            'gpa' => (float) $currentGpa->cumulative_gpa,
+            'credit_points_attempted' => (float) $currentGpa->cumulative_credit_points,
+            'credit_points_earned' => (float) $currentGpa->cumulative_credit_points_earned,
+            'academic_standing' => $currentGpa->academic_standing,
+            'last_finalized_at' => optional($currentGpa->finalized_at)->toIso8601String(),
+            'semesters_count' => $gpaRows->count(),
+        ] : null;
+
         return [
             'standalone_units' => [
                 'data' => $scores,
@@ -648,6 +681,8 @@ class StudentAcademicSummaryService
                     'average_grade' => $moduleScores->where('module_grade', '!=', null)->avg('module_grade'),
                 ],
             ] : null,
+            'semesters' => $semesterGpa,
+            'cumulative' => $cumulative,
             'summary' => [
                 'total_courses' => $scores->count(),
                 'total_modules' => $moduleScores->count(),

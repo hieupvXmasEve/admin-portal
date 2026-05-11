@@ -2,14 +2,10 @@
 import ModuleScoreCard from '@/components/student/ModuleScoreCard.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Progress } from '@/components/ui/progress';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { CourseScores, ScoresData } from '@/types/models';
-import { BarChart3, BookOpen, ChevronDown, ChevronRight, Eye, Filter, Package, Search, Target, TrendingUp, X } from 'lucide-vue-next';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { CourseScores, ScoresData, SemesterGpaSnapshot } from '@/types/models';
+import { BookOpen, Eye, ListChecks, Target } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 interface Props {
@@ -17,429 +13,428 @@ interface Props {
     loading?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), {
-    loading: false,
-});
+const props = withDefaults(defineProps<Props>(), { loading: false });
 
-// Reactive filters
-const searchQuery = ref('');
-const selectedSemester = ref<string>('');
-const selectedCourse = ref<string>('');
-const expandedCourses = ref<Set<number>>(new Set());
 const selectedScoreDetails = ref<CourseScores | null>(null);
 const showScoreDialog = ref(false);
 
-// Computed filtered data
-const filteredScores = computed(() => {
-    let filtered = props.scores.standalone_units.data;
+// ───────────────────────────── helpers ─────────────────────────────
 
-    // Search filter
-    if (searchQuery.value) {
-        const query = searchQuery.value.toLowerCase();
-        filtered = filtered.filter((course) => course.course_name.toLowerCase().includes(query) || course.course_code.toLowerCase().includes(query) || course.semester.toLowerCase().includes(query));
-    }
-
-    // Semester filter
-    if (selectedSemester.value) {
-        filtered = filtered.filter((course) => course.semester === selectedSemester.value);
-    }
-
-    // Course filter
-    if (selectedCourse.value) {
-        filtered = filtered.filter((course) => course.course_code === selectedCourse.value);
-    }
-
-    return filtered;
-});
-
-// Toggle course expansion
-const toggleCourseExpansion = (courseId: number) => {
-    if (expandedCourses.value.has(courseId)) {
-        expandedCourses.value.delete(courseId);
-    } else {
-        expandedCourses.value.add(courseId);
-    }
+const formatNumber = (value: number | null | undefined, fractionDigits = 2): string => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
+    return Number(value).toFixed(fractionDigits);
 };
 
-// Score badge styling
-const getScoreBadgeVariant = (percentage: number) => {
-    if (percentage >= 90) return 'default';
-    if (percentage >= 80) return 'secondary';
-    if (percentage >= 70) return 'outline';
-    return 'destructive';
+const formatPercentage = (value: number | null | undefined): string => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
+    return `${Number(value).toFixed(2)}%`;
 };
 
-const getScoreColor = (percentage: number) => {
-    if (percentage >= 90) return 'text-green-600';
-    if (percentage >= 80) return 'text-blue-600';
-    if (percentage >= 70) return 'text-yellow-600';
-    return 'text-red-600';
-};
-
-const getStatusBadgeVariant = (status: string) => {
-    const variants: Record<string, string> = {
-        graded: 'default',
-        submitted: 'secondary',
-        pending: 'outline',
-        missing: 'destructive',
-    };
-    return variants[status] || 'outline';
-};
-
-const formatDate = (date: string | undefined) => {
-    if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('en-US', {
+const formatDate = (date: string | null | undefined): string => {
+    if (!date) return '—';
+    return new Date(date).toLocaleDateString('en-GB', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
     });
 };
 
-const formatPercentage = (value: number) => {
-    if (!value) return 'N/A';
-    return `${Number(value).toFixed(1)}%`;
+const gpaToneClass = (gpa: number | null | undefined): string => {
+    if (gpa === null || gpa === undefined) return 'text-muted-foreground';
+    if (gpa >= 85) return 'text-emerald-700 dark:text-emerald-400';
+    if (gpa >= 70) return 'text-sky-700 dark:text-sky-400';
+    if (gpa >= 50) return 'text-amber-700 dark:text-amber-400';
+    return 'text-rose-700 dark:text-rose-400';
 };
 
-const clearFilters = () => {
-    searchQuery.value = '';
-    selectedSemester.value = '';
-    selectedCourse.value = '';
+const courseAverageBadgeClass = (pct: number | null | undefined): string => {
+    if (pct === null || pct === undefined) return 'border-border bg-muted/50 text-muted-foreground';
+    if (pct >= 85) return 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300';
+    if (pct >= 70) return 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/40 dark:text-sky-300';
+    if (pct >= 50) return 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300';
+    return 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300';
 };
 
-const hasActiveFilters = computed(() => {
-    return searchQuery.value || selectedSemester.value || selectedCourse.value;
+const assessmentStatusToneClass = (status: string): string => {
+    switch (status) {
+        case 'graded':
+            return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300';
+        case 'submitted':
+            return 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-300';
+        case 'pending':
+            return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300';
+        case 'missing':
+            return 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300';
+        default:
+            return 'border-border bg-muted/50 text-muted-foreground';
+    }
+};
+
+const standingTone = (standing: string | null | undefined): { label: string; class: string } => {
+    const value = (standing ?? 'unknown').toLowerCase();
+    if (value === 'normal') {
+        return { label: 'Normal', class: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300' };
+    }
+    if (value === 'warning') {
+        return { label: 'Warning', class: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-300' };
+    }
+    if (value === 'probation') {
+        return { label: 'Probation', class: 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-300' };
+    }
+    return { label: standing ?? 'Unknown', class: 'border-border bg-muted/50 text-muted-foreground' };
+};
+
+// ───────────────────────────── grouping ─────────────────────────────
+
+interface SemesterGroup {
+    semester_name: string;
+    semester_gpa: number | null;
+    credit_points_attempted: number | null;
+    credit_points_earned: number | null;
+    academic_standing: string | null;
+    is_finalized: boolean;
+    courses: CourseScores[];
+}
+
+const courseGroups = computed<SemesterGroup[]>(() => {
+    const byName = new Map<string, CourseScores[]>();
+    for (const course of props.scores.standalone_units.data) {
+        const arr = byName.get(course.semester) ?? [];
+        arr.push(course);
+        byName.set(course.semester, arr);
+    }
+
+    const semesterIndex = new Map<string, SemesterGpaSnapshot>();
+    for (const sem of props.scores.semesters ?? []) {
+        semesterIndex.set(sem.semester_name, sem);
+    }
+
+    const names = Array.from(byName.keys());
+    names.sort((a, b) => {
+        const sa = semesterIndex.get(a)?.start_date ?? null;
+        const sb = semesterIndex.get(b)?.start_date ?? null;
+        if (sa && sb) return sb.localeCompare(sa); // most-recent first
+        if (sa) return -1;
+        if (sb) return 1;
+        return a.localeCompare(b);
+    });
+
+    return names.map((name) => {
+        const snapshot = semesterIndex.get(name);
+        return {
+            semester_name: name,
+            semester_gpa: snapshot ? snapshot.semester_gpa : null,
+            credit_points_attempted: snapshot ? snapshot.credit_points_attempted : null,
+            credit_points_earned: snapshot ? snapshot.credit_points_earned : null,
+            academic_standing: snapshot?.academic_standing ?? null,
+            is_finalized: snapshot?.is_finalized ?? false,
+            courses: (byName.get(name) ?? []).slice().sort((a, b) => a.course_code.localeCompare(b.course_code)),
+        };
+    });
 });
 
-// Get unique semesters for filter dropdown
-const availableSemesters = computed(() => {
-    const semesters = new Set(props.scores.standalone_units.data.map((course) => course.semester));
-    return Array.from(semesters).sort();
-});
+const cumulative = computed(() => props.scores.cumulative ?? null);
 
-// Get unique courses for filter dropdown
-const availableCourses = computed(() => {
-    const courses = new Set(props.scores.standalone_units.data.map((course) => course.course_code));
-    return Array.from(courses).sort();
-});
+// ───────────────────────────── actions ─────────────────────────────
 
-const openScoreDetails = (course: CourseScores) => {
-    console.log('ok', course);
-
+const openScoreDetails = (course: CourseScores): void => {
     selectedScoreDetails.value = course;
     showScoreDialog.value = true;
 };
 </script>
 
 <template>
-    <div class="space-y-6">
-        <!-- Loading State -->
-        <div v-if="loading" class="space-y-4">
-            <div class="animate-pulse">
-                <div class="mb-4 h-8 w-1/3 rounded bg-gray-200"></div>
-                <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-                    <div v-for="i in 4" :key="i" class="h-24 rounded bg-gray-200"></div>
-                </div>
-                <div class="space-y-4">
-                    <div v-for="i in 3" :key="i" class="h-32 rounded bg-gray-200"></div>
-                </div>
+    <div class="space-y-8">
+        <!-- Loading skeleton -->
+        <div v-if="loading" class="space-y-6">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div v-for="i in 4" :key="i" class="h-24 animate-pulse rounded-lg bg-muted/40"></div>
             </div>
+            <div class="h-96 animate-pulse rounded-lg bg-muted/30"></div>
         </div>
 
-        <!-- Content -->
-        <div v-else class="space-y-4">
-            <!-- Summary Cards -->
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                <Card>
-                    <CardContent class="p-4">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-muted-foreground text-sm">Course Units</p>
-                                <p class="text-2xl font-bold">{{ scores.summary.total_courses }}</p>
-                            </div>
-                            <BookOpen class="h-8 w-8 text-blue-600" />
+        <template v-else>
+            <!-- ────────── Cumulative GPA panel ────────── -->
+            <section
+                aria-labelledby="cumulative-heading"
+                class="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-card via-card to-muted/40 dark:to-muted/20"
+            >
+                <!-- decorative grid -->
+                <div
+                    aria-hidden="true"
+                    class="pointer-events-none absolute inset-0 opacity-[0.04] dark:opacity-[0.06]"
+                    style="background-image: linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px); background-size: 32px 32px;"
+                ></div>
+
+                <div class="relative p-6 sm:p-8">
+                    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+                        <div>
+                            <p class="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Academic transcript</p>
+                            <h2 id="cumulative-heading" class="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Cumulative GPA</h2>
                         </div>
-                    </CardContent>
-                </Card>
-
-                <Card v-if="scores.modules">
-                    <CardContent class="p-4">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-muted-foreground text-sm">Modules</p>
-                                <p class="text-2xl font-bold">{{ scores.summary.total_modules }}</p>
-                            </div>
-                            <Package class="h-8 w-8 text-indigo-600" />
+                        <div v-if="cumulative?.last_finalized_at" class="text-right text-xs text-muted-foreground">
+                            <span class="block">Last finalized</span>
+                            <span class="mt-0.5 block font-medium text-foreground">{{ formatDate(cumulative.last_finalized_at) }}</span>
                         </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent class="p-4">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-muted-foreground text-sm">Total Assessments</p>
-                                <p class="text-2xl font-bold">{{ scores.summary.total_assessments }}</p>
-                            </div>
-                            <Target class="h-8 w-8 text-purple-600" />
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent class="p-4">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-muted-foreground text-sm">Completed</p>
-                                <p class="text-2xl font-bold text-green-600">{{ scores.summary.completed_assessments }}</p>
-                            </div>
-                            <TrendingUp class="h-8 w-8 text-green-600" />
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent class="p-4">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-muted-foreground text-sm">Overall Average</p>
-                                <p class="text-2xl font-bold" :class="getScoreColor(scores.summary.overall_average)">
-                                    {{ formatPercentage(scores.summary.overall_average) }}
-                                </p>
-                            </div>
-                            <BarChart3 class="h-8 w-8 text-orange-600" />
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <!-- Filters -->
-            <Card>
-                <CardHeader>
-                    <CardTitle class="flex items-center justify-between">
-                        <span class="flex items-center gap-2">
-                            <Filter class="h-5 w-5" />
-                            Filters
-                        </span>
-                        <Button v-if="hasActiveFilters" variant="outline" size="sm" @click="clearFilters" class="flex items-center gap-2">
-                            <X class="h-4 w-4" />
-                            Clear
-                        </Button>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        <!-- Search -->
-                        <div class="relative">
-                            <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
-                            <Input v-model="searchQuery" placeholder="Search courses..." class="pl-10" />
-                        </div>
-
-                        <!-- Semester Filter -->
-                        <Select v-model="selectedSemester">
-                            <SelectTrigger>
-                                <SelectValue placeholder="All Semesters" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Semesters</SelectItem>
-                                <SelectItem v-for="semester in availableSemesters" :key="semester" :value="semester">
-                                    {{ semester }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        <!-- Course Filter -->
-                        <Select v-model="selectedCourse">
-                            <SelectTrigger>
-                                <SelectValue placeholder="All Courses" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Courses</SelectItem>
-                                <SelectItem v-for="course in availableCourses" :key="course" :value="course">
-                                    {{ course }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        <!-- Results Count -->
-                        <div class="text-muted-foreground flex items-center text-sm">{{ filteredScores.length }} of {{ scores.standalone_units.data.length }} courses</div>
                     </div>
-                </CardContent>
-            </Card>
 
-            <!-- Modules Section -->
-            <div v-if="scores.modules && scores.modules.data.length > 0" class="space-y-4">
+                    <div v-if="cumulative" class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border lg:grid-cols-4">
+                        <div class="bg-card p-5">
+                            <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Cumulative</p>
+                            <p class="mt-2 font-mono text-3xl font-semibold tabular-nums sm:text-4xl" :class="gpaToneClass(cumulative.gpa)">
+                                {{ formatNumber(cumulative.gpa, 3) }}
+                            </p>
+                            <p class="mt-1 text-xs text-muted-foreground">
+                                Over {{ cumulative.semesters_count }} semester{{ cumulative.semesters_count === 1 ? '' : 's' }}
+                            </p>
+                        </div>
+                        <div class="bg-card p-5">
+                            <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Credits attempted</p>
+                            <p class="mt-2 font-mono text-3xl font-semibold tabular-nums sm:text-4xl">{{ formatNumber(cumulative.credit_points_attempted, 1) }}</p>
+                            <p class="mt-1 text-xs text-muted-foreground">All graded units</p>
+                        </div>
+                        <div class="bg-card p-5">
+                            <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Credits earned</p>
+                            <p class="mt-2 font-mono text-3xl font-semibold tabular-nums text-emerald-700 dark:text-emerald-400 sm:text-4xl">
+                                {{ formatNumber(cumulative.credit_points_earned, 1) }}
+                            </p>
+                            <p class="mt-1 text-xs text-muted-foreground">Passed units only</p>
+                        </div>
+                        <div class="bg-card p-5">
+                            <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Academic standing</p>
+                            <div class="mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-medium" :class="standingTone(cumulative.academic_standing).class">
+                                <span class="size-1.5 rounded-full bg-current"></span>
+                                {{ standingTone(cumulative.academic_standing).label }}
+                            </div>
+                            <p class="mt-2 text-xs text-muted-foreground">Threshold ≥ 50.00</p>
+                        </div>
+                    </div>
+
+                    <div v-else class="rounded-lg border border-dashed border-border bg-card p-6 text-center">
+                        <p class="text-sm text-muted-foreground">No GPA has been finalized yet for this student.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ────────── Summary chips (Total Assessments removed per spec) ────────── -->
+            <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div class="rounded-lg border border-border bg-card p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Course units</p>
+                            <p class="mt-1 font-mono text-2xl font-semibold tabular-nums">{{ scores.summary.total_courses }}</p>
+                        </div>
+                        <BookOpen class="size-7 text-sky-600 dark:text-sky-400" />
+                    </div>
+                </div>
+
+                <div v-if="scores.modules" class="rounded-lg border border-border bg-card p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Modules</p>
+                            <p class="mt-1 font-mono text-2xl font-semibold tabular-nums">{{ scores.summary.total_modules }}</p>
+                        </div>
+                        <ListChecks class="size-7 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                </div>
+
+                <div class="rounded-lg border border-border bg-card p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Overall average</p>
+                            <p class="mt-1 font-mono text-2xl font-semibold tabular-nums" :class="gpaToneClass(scores.summary.overall_average)">
+                                {{ formatPercentage(scores.summary.overall_average) }}
+                            </p>
+                        </div>
+                        <Target class="size-7 text-orange-600 dark:text-orange-400" />
+                    </div>
+                </div>
+            </section>
+
+            <!-- ────────── Modules (unchanged) ────────── -->
+            <section v-if="scores.modules && scores.modules.data.length > 0" class="space-y-4">
                 <div class="flex items-center justify-between">
-                    <h2 class="text-xl font-semibold">Modules</h2>
+                    <h2 class="text-xl font-semibold tracking-tight">Modules</h2>
                     <Badge variant="secondary">{{ scores.modules.data.length }} module(s)</Badge>
                 </div>
+                <ModuleScoreCard v-for="moduleItem in scores.modules.data" :key="moduleItem.module_id" :module="moduleItem" />
+            </section>
 
-                <ModuleScoreCard v-for="module in scores.modules.data" :key="module.module_id" :module="module" />
-            </div>
+            <!-- ────────── Semester tables ────────── -->
+            <section v-if="courseGroups.length > 0" class="space-y-8">
+                <div
+                    v-for="group in courseGroups"
+                    :key="group.semester_name"
+                    class="overflow-hidden rounded-xl border border-border bg-card"
+                >
+                    <!-- Semester header -->
+                    <header class="flex flex-wrap items-center justify-between gap-4 border-b border-border bg-muted/30 px-5 py-4">
+                        <div class="flex items-baseline gap-3">
+                            <p class="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Semester</p>
+                            <h3 class="text-lg font-semibold tracking-tight">{{ group.semester_name }}</h3>
+                            <Badge v-if="!group.is_finalized && group.semester_gpa !== null" variant="outline" class="text-[10px] uppercase tracking-wider">Pending</Badge>
+                        </div>
 
-            <!-- Standalone Units Section -->
-            <div class="space-y-4">
-                <h2 class="text-xl font-semibold">Course Units</h2>
-                <div v-if="filteredScores.length === 0" class="py-12 text-center">
-                    <Target class="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-                    <h3 class="mb-2 text-lg font-semibold">No Scores Found</h3>
-                    <p class="text-muted-foreground">No assessment scores match your current filters.</p>
-                </div>
-
-                <Card v-for="course in filteredScores" :key="course.course_offering_id">
-                    <CardHeader>
-                        <div class="flex items-center justify-between">
-                            <div class="flex-1">
-                                <CardTitle class="flex items-center gap-3">
-                                    <BookOpen class="h-5 w-5" />
-                                    <div>
-                                        <h3 class="text-lg font-semibold">{{ course.course_name }}</h3>
-                                        <p class="text-muted-foreground text-sm font-normal">{{ course.course_code }} • {{ course.semester }}</p>
-                                    </div>
-                                </CardTitle>
+                        <div class="flex flex-wrap items-center gap-4 sm:gap-6">
+                            <div class="flex flex-col">
+                                <span class="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Semester GPA</span>
+                                <span class="font-mono text-lg font-semibold tabular-nums" :class="gpaToneClass(group.semester_gpa)">
+                                    {{ group.semester_gpa !== null ? formatNumber(group.semester_gpa, 3) : '—' }}
+                                </span>
                             </div>
-                            <div class="flex items-center gap-3">
-                                <div class="text-right">
-                                    <p class="text-muted-foreground text-sm">Course Average</p>
-                                    <p class="text-xl font-bold" :class="getScoreColor(course.course_average)">
+                            <div class="hidden h-8 w-px bg-border sm:block"></div>
+                            <div class="flex flex-col">
+                                <span class="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Credits</span>
+                                <span class="font-mono text-sm font-medium tabular-nums">
+                                    <span class="text-emerald-700 dark:text-emerald-400">{{ formatNumber(group.credit_points_earned, 1) }}</span>
+                                    <span class="text-muted-foreground"> / </span>
+                                    <span>{{ formatNumber(group.credit_points_attempted, 1) }}</span>
+                                </span>
+                            </div>
+                            <div class="hidden h-8 w-px bg-border sm:block"></div>
+                            <div class="flex flex-col">
+                                <span class="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Standing</span>
+                                <Badge v-if="group.academic_standing" variant="outline" class="mt-0.5 w-fit border" :class="standingTone(group.academic_standing).class">
+                                    {{ standingTone(group.academic_standing).label }}
+                                </Badge>
+                                <span v-else class="text-sm text-muted-foreground">—</span>
+                            </div>
+                        </div>
+                    </header>
+
+                    <!-- Course table -->
+                    <Table>
+                        <TableHeader>
+                            <TableRow class="bg-transparent">
+                                <TableHead class="w-[140px] text-[11px] uppercase tracking-wider text-muted-foreground">Code</TableHead>
+                                <TableHead class="text-[11px] uppercase tracking-wider text-muted-foreground">Course</TableHead>
+                                <TableHead class="w-[120px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Assessments</TableHead>
+                                <TableHead class="w-[140px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Final %</TableHead>
+                                <TableHead class="w-[120px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Action</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow
+                                v-for="course in group.courses"
+                                :key="course.course_offering_id"
+                                class="group/row transition-colors hover:bg-muted/40"
+                            >
+                                <TableCell class="font-mono text-sm font-medium tabular-nums">{{ course.course_code }}</TableCell>
+                                <TableCell>
+                                    <div class="max-w-[480px]">
+                                        <p class="truncate font-medium">{{ course.course_name }}</p>
+                                    </div>
+                                </TableCell>
+                                <TableCell class="text-right">
+                                    <span class="font-mono text-sm tabular-nums text-muted-foreground">
+                                        <span class="text-foreground">{{ course.completed_assessments }}</span>
+                                        <span> / </span>
+                                        <span>{{ course.total_assessments }}</span>
+                                    </span>
+                                </TableCell>
+                                <TableCell class="text-right">
+                                    <span
+                                        class="inline-flex min-w-[80px] justify-end rounded-md border px-2.5 py-1 font-mono text-sm font-semibold tabular-nums"
+                                        :class="courseAverageBadgeClass(course.course_average)"
+                                    >
                                         {{ formatPercentage(course.course_average) }}
-                                    </p>
-                                </div>
-                                <Button variant="ghost" size="sm" @click="toggleCourseExpansion(course.course_offering_id)" class="flex items-center gap-2">
-                                    <ChevronDown v-if="expandedCourses.has(course.course_offering_id)" class="h-4 w-4" />
-                                    <ChevronRight v-else class="h-4 w-4" />
-                                    {{ expandedCourses.has(course.course_offering_id) ? 'Collapse' : 'Expand' }}
-                                </Button>
-                                <Button variant="outline" size="sm" @click="openScoreDetails(course)" class="flex items-center gap-2">
-                                    <Eye class="h-4 w-4" />
-                                    Details
-                                </Button>
-                            </div>
-                        </div>
-                    </CardHeader>
+                                    </span>
+                                </TableCell>
+                                <TableCell class="text-right">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        class="opacity-70 transition-opacity group-hover/row:opacity-100"
+                                        @click="openScoreDetails(course)"
+                                    >
+                                        <Eye class="mr-1.5 size-3.5" />
+                                        Details
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </div>
+            </section>
 
-                    <Collapsible :open="expandedCourses.has(course.course_offering_id)">
-                        <CollapsibleContent>
-                            <CardContent>
-                                <div class="space-y-4">
-                                    <!-- Course Statistics -->
-                                    <div class="bg-muted grid grid-cols-1 gap-4 rounded-lg p-4 md:grid-cols-3">
-                                        <div class="text-center">
-                                            <p class="text-muted-foreground text-sm">Total Assessments</p>
-                                            <p class="text-xl font-bold">{{ course.total_assessments }}</p>
-                                        </div>
-                                        <div class="text-center">
-                                            <p class="text-muted-foreground text-sm">Completed</p>
-                                            <p class="text-xl font-bold text-green-600">{{ course.completed_assessments }}</p>
-                                        </div>
-                                        <div class="text-center">
-                                            <p class="text-muted-foreground text-sm">Completion Rate</p>
-                                            <p class="text-xl font-bold">{{ Math.round((course.completed_assessments / course.total_assessments) * 100) }}%</p>
-                                        </div>
-                                    </div>
+            <!-- Empty state -->
+            <section v-else class="rounded-xl border border-dashed border-border bg-card py-14 text-center">
+                <Target class="mx-auto mb-3 size-10 text-muted-foreground" />
+                <h3 class="mb-1 text-lg font-semibold tracking-tight">No course scores yet</h3>
+                <p class="text-sm text-muted-foreground">There are no graded courses recorded for this student.</p>
+            </section>
+        </template>
 
-                                    <!-- Progress Bar -->
-                                    <div>
-                                        <div class="mb-2 flex items-center justify-between">
-                                            <span class="text-sm font-medium">Assessment Progress</span>
-                                            <span class="text-muted-foreground text-sm"> {{ course.completed_assessments }}/{{ course.total_assessments }} </span>
-                                        </div>
-                                        <Progress :value="(course.completed_assessments / course.total_assessments) * 100" class="h-2" />
-                                    </div>
-
-                                    <!-- Recent Assessments -->
-                                    <div>
-                                        <h4 class="mb-3 font-semibold">Recent Assessments</h4>
-                                        <div class="space-y-2">
-                                            <div v-for="score in course.scores.slice(0, 5)" :key="score.id" class="flex items-center justify-between rounded-lg border p-3">
-                                                <div class="flex-1">
-                                                    <p class="font-medium">{{ score.assessment_name }}</p>
-                                                    <p class="text-muted-foreground text-sm">
-                                                        {{ score.assessment_type }}
-                                                        <span v-if="score.is_late" class="ml-2 text-red-600">(Late)</span>
-                                                    </p>
-                                                </div>
-                                                <div class="flex items-center gap-3">
-                                                    <div class="text-right">
-                                                        <p class="font-medium">{{ score.points_earned }}/{{ score.max_points }}</p>
-                                                        <p class="text-sm" :class="getScoreColor(score.percentage_score)">
-                                                            {{ formatPercentage(score.percentage_score) }}
-                                                        </p>
-                                                    </div>
-                                                    <Badge :variant="getStatusBadgeVariant(score.status) as any">
-                                                        {{ score.status.toUpperCase() }}
-                                                    </Badge>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div v-if="course.scores.length > 5" class="mt-3 text-center">
-                                            <Button variant="outline" size="sm" @click="openScoreDetails(course)" class="flex items-center gap-2">
-                                                <Eye class="h-4 w-4" />
-                                                View All {{ course.scores.length }} Assessments
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </CollapsibleContent>
-                    </Collapsible>
-                </Card>
-            </div>
-        </div>
-
-        <!-- Score Details Dialog -->
+        <!-- ────────── Score detail dialog ────────── -->
         <Dialog v-model:open="showScoreDialog">
-            <DialogContent class="max-h-[80vh] max-w-4xl overflow-y-auto">
+            <DialogContent class="max-h-[80vh] !max-w-5xl overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle v-if="selectedScoreDetails">{{ selectedScoreDetails.course_name }} - Detailed Scores</DialogTitle>
+                    <DialogTitle v-if="selectedScoreDetails" class="flex items-center gap-2">
+                        <span class="font-mono text-sm font-medium text-muted-foreground">{{ selectedScoreDetails.course_code }}</span>
+                        <span class="text-base font-semibold">{{ selectedScoreDetails.course_name }}</span>
+                    </DialogTitle>
                 </DialogHeader>
-                <div v-if="selectedScoreDetails" class="space-y-4">
-                    <!-- Course Info -->
-                    <div class="bg-muted grid grid-cols-2 gap-4 rounded-lg p-4">
-                        <div>
-                            <p class="text-muted-foreground text-sm">Course Code</p>
-                            <p class="font-medium">{{ selectedScoreDetails.course_code }}</p>
+
+                <div v-if="selectedScoreDetails" class="space-y-5">
+                    <!-- Course header strip -->
+                    <div class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-4">
+                        <div class="bg-card p-3">
+                            <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Semester</p>
+                            <p class="mt-1 truncate font-medium">{{ selectedScoreDetails.semester }}</p>
                         </div>
-                        <div>
-                            <p class="text-muted-foreground text-sm">Semester</p>
-                            <p class="font-medium">{{ selectedScoreDetails.semester }}</p>
-                        </div>
-                        <div>
-                            <p class="text-muted-foreground text-sm">Total Assessments</p>
-                            <p class="font-medium">{{ selectedScoreDetails.total_assessments }}</p>
-                        </div>
-                        <div>
-                            <p class="text-muted-foreground text-sm">Course Average</p>
-                            <p class="text-lg font-medium" :class="getScoreColor(selectedScoreDetails.course_average)">
+                        <div class="bg-card p-3">
+                            <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Course average</p>
+                            <p class="mt-1 font-mono font-semibold tabular-nums" :class="gpaToneClass(selectedScoreDetails.course_average)">
                                 {{ formatPercentage(selectedScoreDetails.course_average) }}
+                            </p>
+                        </div>
+                        <div class="bg-card p-3">
+                            <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Assessments</p>
+                            <p class="mt-1 font-mono font-medium tabular-nums">{{ selectedScoreDetails.total_assessments }}</p>
+                        </div>
+                        <div class="bg-card p-3">
+                            <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Completed</p>
+                            <p class="mt-1 font-mono font-medium tabular-nums text-emerald-700 dark:text-emerald-400">
+                                {{ selectedScoreDetails.completed_assessments }}
                             </p>
                         </div>
                     </div>
 
-                    <!-- Assessment Scores -->
-                    <div class="space-y-3">
-                        <h4 class="font-semibold">Assessment Scores</h4>
-                        <div class="space-y-2">
-                            <div v-for="score in selectedScoreDetails.scores" :key="score.id" class="flex items-center justify-between rounded-lg border p-3">
-                                <div class="flex-1">
-                                    <p class="font-medium">{{ score.assessment_name }}</p>
-                                    <p class="text-muted-foreground text-sm">{{ score.assessment_type }} • Due: {{ formatDate(score.due_date) }}</p>
-                                </div>
-                                <div class="flex items-center gap-3">
-                                    <div class="text-right">
-                                        <p class="font-medium">{{ score.points_earned }}/{{ score.max_points }}</p>
-                                        <p class="text-sm" :class="getScoreColor(score.percentage_score)">
-                                            {{ formatPercentage(score.percentage_score) }}
-                                        </p>
-                                    </div>
-                                    <Badge :variant="getStatusBadgeVariant(score.status) as any">
-                                        {{ score.status.toUpperCase() }}
-                                    </Badge>
-                                    <Badge v-if="score.letter_grade" :variant="getScoreBadgeVariant(score.percentage_score) as any">
-                                        {{ score.letter_grade }}
-                                    </Badge>
-                                </div>
-                            </div>
-                        </div>
+                    <!-- Assessment table -->
+                    <div class="overflow-hidden rounded-lg border border-border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead class="text-[11px] uppercase tracking-wider text-muted-foreground">Assessment</TableHead>
+                                    <TableHead class="text-[11px] uppercase tracking-wider text-muted-foreground">Type</TableHead>
+                                    <TableHead class="text-[11px] uppercase tracking-wider text-muted-foreground">Due</TableHead>
+                                    <TableHead class="text-right text-[11px] uppercase tracking-wider text-muted-foreground">Score</TableHead>
+                                    <TableHead class="text-right text-[11px] uppercase tracking-wider text-muted-foreground">%</TableHead>
+                                    <TableHead class="text-right text-[11px] uppercase tracking-wider text-muted-foreground">Status</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow v-for="score in selectedScoreDetails.scores" :key="score.id">
+                                    <TableCell>
+                                        <p class="font-medium">{{ score.assessment_name }}</p>
+                                        <p v-if="score.is_late" class="text-xs text-rose-600">Late submission</p>
+                                    </TableCell>
+                                    <TableCell class="text-muted-foreground">{{ score.assessment_type }}</TableCell>
+                                    <TableCell class="text-sm text-muted-foreground">{{ formatDate(score.due_date) }}</TableCell>
+                                    <TableCell class="text-right font-mono tabular-nums">
+                                        {{ score.points_earned }} / {{ score.max_points }}
+                                    </TableCell>
+                                    <TableCell class="text-right font-mono font-medium tabular-nums" :class="gpaToneClass(score.percentage_score)">
+                                        {{ formatPercentage(score.percentage_score) }}
+                                    </TableCell>
+                                    <TableCell class="text-right">
+                                        <span class="inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider" :class="assessmentStatusToneClass(score.status)">
+                                            {{ score.status }}
+                                        </span>
+                                    </TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
                     </div>
                 </div>
             </DialogContent>

@@ -673,6 +673,28 @@ export interface ModuleScore {
     sub_units: SubUnitScore[];
 }
 
+export interface SemesterGpaSnapshot {
+    semester_id: number;
+    semester_name: string;
+    semester_code: string;
+    start_date: string | null;
+    semester_gpa: number;
+    credit_points_attempted: number;
+    credit_points_earned: number;
+    academic_standing: string | null;
+    is_finalized: boolean;
+    finalized_at: string | null;
+}
+
+export interface CumulativeGpaSnapshot {
+    gpa: number;
+    credit_points_attempted: number;
+    credit_points_earned: number;
+    academic_standing: string | null;
+    last_finalized_at: string | null;
+    semesters_count: number;
+}
+
 export interface ScoresData {
     standalone_units: {
         data: CourseScores[];
@@ -693,6 +715,8 @@ export interface ScoresData {
             average_grade: number;
         };
     } | null;
+    semesters?: SemesterGpaSnapshot[];
+    cumulative?: CumulativeGpaSnapshot | null;
     summary: {
         total_courses: number;
         total_modules: number;
