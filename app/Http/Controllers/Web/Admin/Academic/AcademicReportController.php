@@ -27,7 +27,6 @@ class AcademicReportController extends Controller
             'campus_id' => ['nullable', 'integer'],
             'semester_id' => ['nullable', 'integer'],
             'program_id' => ['nullable', 'integer'],
-            'status' => ['nullable', 'string'],
             'keyword' => ['nullable', 'string'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
@@ -51,7 +50,6 @@ class AcademicReportController extends Controller
                     'campus_id' => isset($filters['campus_id']) ? (int) $filters['campus_id'] : null,
                     'semester_id' => isset($filters['semester_id']) ? (int) $filters['semester_id'] : null,
                     'program_id' => isset($filters['program_id']) ? (int) $filters['program_id'] : null,
-                    'status' => $filters['status'] ?? 'all',
                     'keyword' => $filters['keyword'] ?? '',
                     'per_page' => (int) ($filters['per_page'] ?? 15),
                 ],
@@ -59,15 +57,6 @@ class AcademicReportController extends Controller
                     'campuses' => Campus::select('id', 'name')->get(),
                     'semesters' => Semester::select('id', 'name')->orderBy('start_date', 'desc')->get(),
                     'programs' => Program::select('id', 'name')->get(),
-                    'statuses' => [
-                        ['value' => 'active', 'label' => 'Active'],
-                        ['value' => 'inactive', 'label' => 'Inactive'],
-                        ['value' => 'graduated', 'label' => 'Graduated'],
-                        ['value' => 'suspended', 'label' => 'Suspended'],
-                        ['value' => 'intake_course', 'label' => 'In Course'],
-                        ['value' => 'intake_pre_uni_gc', 'label' => 'In GC'],
-                        ['value' => 'dropout', 'label' => 'Dropout'],
-                    ],
                 ]
             ]
         ]);

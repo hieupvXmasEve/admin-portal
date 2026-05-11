@@ -16,7 +16,6 @@ interface FilterOptions {
     campuses: { id: number; name: string }[];
     semesters: { id: number; name: string }[];
     programs: { id: number; name: string }[];
-    statuses: { value: string; label: string }[];
 }
 
 interface AcademicReport {
@@ -36,7 +35,6 @@ const props = defineProps<{
             campus_id: string | null;
             semester_id: number | null;
             program_id: string | null;
-            status: string;
             keyword: string;
             per_page: number;
         };
@@ -55,12 +53,10 @@ const {
     initialFilters: {
         semester_id: props.filters.active.semester_id,
         program_id: props.filters.active.program_id,
-        status: props.filters.active.status,
         keyword: props.filters.active.keyword,
         per_page: props.filters.active.per_page,
     },
     defaultValues: {
-        status: 'all',
         per_page: 15,
     },
     only: ['report', 'filters'],
@@ -129,7 +125,6 @@ const handleExport = (format: 'xlsx' | 'csv') => {
     const params = new URLSearchParams({
         semester_id: String(filters.semester_id),
         program_id: filters.program_id === 'all' || !filters.program_id ? '' : String(filters.program_id),
-        status: filters.status === 'all' ? '' : filters.status,
         keyword: filters.keyword,
         export: format,
     });
@@ -217,7 +212,7 @@ const barPlugins = [barLabelPlugin];
             </CardTitle>
         </CardHeader>
         <CardContent class="p-6">
-            <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                 <div class="space-y-2">
                     <label class="text-xs font-bold tracking-wider text-slate-500 uppercase">Semester</label>
                     <Select :model-value="String(filters.semester_id)" @update:model-value="(v) => handleSelectFilter('semester_id', v)">
@@ -239,21 +234,6 @@ const barPlugins = [barLabelPlugin];
                         <SelectContent>
                             <SelectItem value="all">All Programs</SelectItem>
                             <SelectItem v-for="p in props.filters.options.programs" :key="p.id" :value="String(p.id)">{{ p.name }} </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <div class="space-y-2">
-                    <label class="text-xs font-bold tracking-wider text-slate-500 uppercase">Status</label>
-                    <Select :model-value="filters.status" @update:model-value="(v) => handleSelectFilter('status', v)">
-                        <SelectTrigger class="border-slate-200 bg-white">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Statuses</SelectItem>
-                            <SelectItem v-for="s in props.filters.options.statuses" :key="s.value" :value="s.value">
-                                {{ s.label }}
-                            </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>

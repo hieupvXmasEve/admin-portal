@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Academic;
 
 use App\Models\AcademicRecord;
+use App\Models\CurriculumUnit;
 use App\Models\GpaCalculation;
 use App\Models\Program;
 use App\Models\Semester;
@@ -27,29 +28,16 @@ class GetAcademicReportAction
         $semesterId = $filters['semester_id'];
         $isExport = isset($filters['export']);
 
-        // 1. Get all units associated with this semester (to define columns)
-        $units = Unit::whereHas('academicRecords', function (Builder $query) use ($semesterId) {
-            $query->where('semester_id', $semesterId);
-        })->orderBy('code')->get(['id', 'code', 'name']);
         $campusId = session('current_campus_id');
-        // 2. Build student query
+
+        // 1. Build student query — only intake_course students with records in this semester
         $studentsQuery = Student::query()
             ->where('campus_id', $campusId)
-            ->with([
-                'academicRecords' => function ($query) use ($semesterId) {
-                    $query->where('semester_id', $semesterId);
-                },
-                'gpaCalculations' => function ($query) {
-                    $query->where('is_current', true);
-                }
-            ]);
+            ->where('status', 'intake_course');
 
         // Apply filters
         if (!empty($filters['program_id'])) {
             $studentsQuery->where('program_id', $filters['program_id']);
-        }
-        if (!empty($filters['status'])) {
-            $studentsQuery->where('status', $filters['status']);
         }
         if (!empty($filters['keyword'])) {
             $keyword = $filters['keyword'];
@@ -64,7 +52,41 @@ class GetAcademicReportAction
             $query->where('semester_id', $semesterId);
         });
 
-        // 3. Calculate statistics for ALL filtered records (ignoring pagination)
+        // 2. Map curriculum_version_id => unit_ids[] for the filtered students
+        $curriculumVersionIds = (clone $studentsQuery)
+            ->whereNotNull('curriculum_version_id')
+            ->distinct()
+            ->pluck('curriculum_version_id');
+
+        $curriculumUnitsByVersion = CurriculumUnit::query()
+            ->whereIn('curriculum_version_id', $curriculumVersionIds)
+            ->get(['curriculum_version_id', 'unit_id'])
+            ->groupBy('curriculum_version_id')
+            ->map(fn ($items) => $items->pluck('unit_id')->all());
+
+        $curriculumUnitIds = $curriculumUnitsByVersion->flatten()->unique()->values();
+
+        // 3. Eager-load academic records constrained to curriculum unit_ids
+        $studentsQuery->with([
+            'academicRecords' => function ($query) use ($semesterId, $curriculumUnitIds) {
+                $query->where('semester_id', $semesterId)
+                    ->whereIn('unit_id', $curriculumUnitIds);
+            },
+            'gpaCalculations' => function ($query) {
+                $query->where('is_current', true);
+            },
+        ]);
+
+        // 4. Units = curriculum units that have academic records in this semester
+        $units = Unit::query()
+            ->whereIn('id', $curriculumUnitIds)
+            ->whereHas('academicRecords', function (Builder $query) use ($semesterId) {
+                $query->where('semester_id', $semesterId);
+            })
+            ->orderBy('code')
+            ->get(['id', 'code', 'name']);
+
+        // 5. Calculate statistics — only for records on curriculum units of filtered students
         $gradeDistribution = [
             'A+' => 0,
             'A' => 0,
@@ -81,6 +103,13 @@ class GetAcademicReportAction
         $allStats = AcademicRecord::query()
             ->where('semester_id', $semesterId)
             ->whereIn('student_id', (clone $studentsQuery)->select('students.id'))
+            ->whereExists(function ($q) {
+                $q->select(\DB::raw(1))
+                    ->from('students as s2')
+                    ->join('curriculum_units as cu', 'cu.curriculum_version_id', '=', 's2.curriculum_version_id')
+                    ->whereColumn('s2.id', 'academic_records.student_id')
+                    ->whereColumn('cu.unit_id', 'academic_records.unit_id');
+            })
             ->select('final_letter_grade', \DB::raw('count(*) as count'))
             ->groupBy('final_letter_grade')
             ->pluck('count', 'final_letter_grade')
@@ -90,28 +119,33 @@ class GetAcademicReportAction
             $gradeDistribution[$grade] = (int) ($allStats[$grade] ?? 0);
         }
 
-        // 4. Fetch paginated/export data
+        // 6. Fetch paginated/export data
         if ($isExport) {
             $students = $studentsQuery->get();
         } else {
             $students = $studentsQuery->paginate($filters['per_page'] ?? 15);
         }
 
-        // 5. Transform into pivoted format
+        // 7. Transform into pivoted format — restrict cells to student's own curriculum
         $items = $isExport ? $students : $students->getCollection();
 
-        $reportData = $items->map(function (Student $student) use ($units) {
+        $reportData = $items->map(function (Student $student) use ($units, $curriculumUnitsByVersion) {
             $row = [
                 'full_name' => $student->full_name,
                 'student_id' => $student->student_id,
                 'course_results' => [],
             ];
 
+            $studentUnitIds = $curriculumUnitsByVersion->get($student->curriculum_version_id, []);
+
             $totalAttendance = 0;
             $unitCount = 0;
 
             foreach ($units as $unit) {
-                $record = $student->academicRecords->firstWhere('unit_id', $unit->id);
+                $inCurriculum = in_array($unit->id, $studentUnitIds, true);
+                $record = $inCurriculum
+                    ? $student->academicRecords->firstWhere('unit_id', $unit->id)
+                    : null;
 
                 $row['course_results'][$unit->id] = [
                     'attendance' => $record ? $record->attendance_percentage : null,
@@ -119,11 +153,9 @@ class GetAcademicReportAction
                     'grade' => $record ? $record->final_letter_grade : null,
                 ];
 
-                if ($record) {
-                    if ($record->attendance_percentage !== null) {
-                        $totalAttendance += (float) $record->attendance_percentage;
-                        $unitCount++;
-                    }
+                if ($record && $record->attendance_percentage !== null) {
+                    $totalAttendance += (float) $record->attendance_percentage;
+                    $unitCount++;
                 }
             }
 
@@ -148,7 +180,7 @@ class GetAcademicReportAction
             $filterContext = [
                 'semester' => $semester?->name ?? 'N/A',
                 'program' => $program?->name ?? 'All Programs',
-                'status' => !empty($filters['status']) ? ucfirst($filters['status']) : 'All Statuses',
+                'status' => 'In Course',
                 'keyword' => !empty($filters['keyword']) ? $filters['keyword'] : null,
             ];
 
