@@ -193,6 +193,8 @@ class FixAcademicRecordRetakeData extends Command
                         // Credit info
                         'credit_hours' => $registration->credit_hours ?? $unit->credit_points ?? 3,
                         'credit_hours_earned' => 0.00,
+                        'credit_points' => $unit->credit_points ?? $registration->credit_hours ?? 3,
+                        'credit_points_earned' => 0.00,
 
                         // Instructor
                         'instructor_id' => $courseOffering->lecture_id,

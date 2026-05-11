@@ -446,6 +446,7 @@ class CanvasGradeSyncService
 
                     if ($creditHours !== null && $creditHours >= 0) {
                         $academicRecordData['credit_hours'] = $creditHours;
+                        $academicRecordData['credit_points'] = $creditHours;
 
                         // Get program_id
                         $programId = $student->program_id ?? null;

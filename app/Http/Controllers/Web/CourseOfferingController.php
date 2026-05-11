@@ -1541,6 +1541,8 @@ class CourseOfferingController extends Controller
                         // Credit info
                         'credit_hours' => $courseOffering->unit->credit_points ?? 3,
                         'credit_hours_earned' => 0.00,
+                        'credit_points' => $courseOffering->unit->credit_points ?? 3,
+                        'credit_points_earned' => 0.00,
 
                         // Instructor
                         'instructor_id' => $courseOffering->lecture_id,

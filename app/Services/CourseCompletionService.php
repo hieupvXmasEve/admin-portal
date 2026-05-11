@@ -192,6 +192,13 @@ class CourseCompletionService
             // Determine final pass status (respect override if present)
             $finalPassed = $record->override_pass ? $record->is_passed : $isPassing;
 
+            // Snapshot credit_points at finalize time. Falls back to credit_hours
+            // when credit_points is missing (legacy AR created before the
+            // 2026_05_11_180000 backfill ran).
+            $creditPoints = (float) $record->credit_points > 0
+                ? (float) $record->credit_points
+                : (float) $record->credit_hours;
+
             $record->update([
                 'grade_status' => 'final',
                 'grade_finalized_date' => now(),
@@ -199,12 +206,13 @@ class CourseCompletionService
                 'grade_points' => $gradePoints,
                 'completion_status' => 'completed',
                 'is_passed' => $finalPassed,
-                'credit_points_earned' => $finalPassed ? $record->credit_points : 0,
+                'credit_points' => $creditPoints,
+                'credit_points_earned' => $finalPassed ? $creditPoints : 0,
                 'credit_hours_earned' => $finalPassed ? $record->credit_hours : 0,
                 'affects_graduation_requirement' => true,
                 'satisfies_prerequisite' => $finalPassed,
                 'administrative_notes' => $cleanNotes ?: null,
-                'quality_points' => $finalPercentage * $record->credit_points,
+                'quality_points' => $finalPercentage * $creditPoints,
             ]);
         }
 
