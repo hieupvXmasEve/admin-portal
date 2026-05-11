@@ -64,7 +64,7 @@ class GpaCalculation extends AuditableModel
 
     public function finalizedBy(): BelongsTo
     {
-        return $this->belongsTo(Lecture::class, 'finalized_by_id');
+        return $this->belongsTo(User::class, 'finalized_by_id');
     }
 
     // Scopes
