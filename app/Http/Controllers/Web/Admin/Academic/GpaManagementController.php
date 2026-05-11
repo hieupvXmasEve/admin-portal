@@ -64,6 +64,10 @@ class GpaManagementController extends Controller
 
         $result = $action->execute($request->semester_id, (int) $adminId, (int) $campusId);
 
+        if (($result['success'] ?? true) === false) {
+            return back()->withErrors(['finalize' => $result['message']]);
+        }
+
         return back()->with('success', $result['message']);
     }
 }

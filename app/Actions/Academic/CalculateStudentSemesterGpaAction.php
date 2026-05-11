@@ -10,16 +10,19 @@ use App\Models\Student;
 class CalculateStudentSemesterGpaAction
 {
     /**
-     * Calculate GPA for a student in a specific semester.
+     * Calculate GPA for a student in a specific semester (100-point scale).
+     * Every final, credit-bearing attempt counts — including failed attempts
+     * and any retake within the semester. credit_points_earned only counts
+     * passing attempts.
      */
     public function execute(Student $student, int|string $semesterId): array
     {
-        $baseQuery = AcademicRecord::where('student_id', $student->id)
+        $records = AcademicRecord::where('student_id', $student->id)
             ->where('semester_id', $semesterId)
             ->where('excluded_from_gpa', false)
-            ->where('credit_points', '>', 0);
-
-        $records = $baseQuery->get();
+            ->where('credit_points', '>', 0)
+            ->where('grade_status', 'final')
+            ->get();
 
         if ($records->isEmpty()) {
             return [
@@ -30,19 +33,14 @@ class CalculateStudentSemesterGpaAction
             ];
         }
 
-        // Weight = credit_points
-        // Quality Points should technically be Grade points * credit_points if we use points for weighting GPA
-        // If we still use quality_points from record, we must ensure it was calculated using credit_points
-        // For now, let's calculate them dynamically to be safe
         $totalQualityPoints = $records->sum(function ($record) {
             return (float) $record->final_percentage * (float) $record->credit_points;
         });
         $totalCreditPoints = (float) $records->sum('credit_points');
-
-        // Credits earned are from passed records
         $creditPointsEarned = (float) $records->where('is_passed', true)->sum('credit_points');
 
         $gpa = $totalCreditPoints > 0 ? $totalQualityPoints / $totalCreditPoints : 0.0;
+
         return [
             'gpa' => round((float) $gpa, 3),
             'quality_points' => round((float) $totalQualityPoints, 3),

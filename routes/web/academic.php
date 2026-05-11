@@ -7,8 +7,8 @@ namespace App\Http\Controllers\Web\Admin\Academic;
 use App\Http\Controllers\Web\Admin\Academic\AcademicReportController;
 use App\Http\Controllers\Web\Admin\Academic\CourseRankingController;
 use App\Http\Controllers\Web\Admin\Academic\GpaManagementController;
-use App\Modules\Academic\Http\Web\Admin\GpaHistoryController;
-use App\Modules\Academic\Http\Web\Admin\PerformanceDashboardController;
+use App\Modules\Academic\Http\Web\GpaHistoryController;
+use App\Modules\Academic\Http\Web\PerformanceDashboardController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->prefix('academic')->name('academic.')->group(function () {
