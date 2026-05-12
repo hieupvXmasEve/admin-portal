@@ -177,7 +177,7 @@ defineExpose({
         </div>
 
         <!-- Table -->
-        <div class="relative rounded-md border">
+        <div class="bg-card relative overflow-hidden rounded-lg border border-border shadow-sm">
             <!-- Loading overlay — keeps existing data visible -->
             <div v-if="loading && table.getRowModel().rows?.length" class="bg-background/60 absolute inset-0 z-10 flex items-center justify-center rounded-md">
                 <div class="flex items-center space-x-2">
