@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Notification\EmailContent\Types;
 
 use App\Modules\Notification\EmailContent\Contracts\EmailContentProvider;
-use App\Modules\Notification\EmailContent\Contracts\EmailVariableSchema;
 
-final class DngPaymentReceivedEmailContent implements EmailContentProvider, EmailVariableSchema
+final class DngPaymentReceivedEmailContent implements EmailContentProvider
 {
     public function subject(array $data): string
     {
@@ -106,16 +105,5 @@ final class DngPaymentReceivedEmailContent implements EmailContentProvider, Emai
     public function textBody(array $data): ?string
     {
         return null;
-    }
-
-    public function availableVariables(): array
-    {
-        return [
-            'student_name' => ['label' => 'Student name', 'sample' => 'Nguyễn Văn A'],
-            'student_code' => ['label' => 'Student code', 'sample' => 'SE12345'],
-            'semester_code' => ['label' => 'Semester code', 'sample' => 'SP2026'],
-            'amount_formatted' => ['label' => 'Amount paid (formatted)', 'sample' => '12.500.000 VNĐ'],
-            'paid_at' => ['label' => 'Paid at', 'sample' => '15/06/2026 14:30'],
-        ];
     }
 }

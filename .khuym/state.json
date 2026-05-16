@@ -2,113 +2,36 @@
   "schema_version": "1.1",
   "feature_slug": "dynamic-email-templates",
   "mode": "standard_feature",
-  "active_skill": "compounding",
-  "phase": "compounding-complete",
-  "phase_number": 1,
-  "current_work": "phase-1-db-backed-render-parity",
-  "epic_id": "dynamic-email-templates-p1",
+  "active_skill": "swarming",
+  "phase": "swarming-b1-complete",
+  "phase_number": 2,
+  "current_work": "phase-2-story-B1-variable-allow-list-relocation",
+  "epic_id": "dynamic-email-templates-p2",
   "approved_gates": {
     "context": true,
     "work_shape": true,
     "phase_plan": true,
     "execution": true,
-    "review": true
+    "review": false
   },
   "active_beads": [],
   "active_workers": [],
   "blockers": [],
-  "focus": "idle",
-  "summary": "Compounding complete. Learnings captured for the next feature. The ecosystem now has 13 accumulated learnings across patterns/decisions/failures (5 patterns + 3 decisions + 5 failures including 1 process-win). 4 critical promotions seeded history/learnings/critical-patterns.md (parity-tests-need-unsafe-fixtures, per-tenant-invariants-need-observer, singleton-stateful-providers-under-octane, storage-decisions-are-about-lifecycle). 11 P2/P3 deferred_beads remain for the next planning pass (P2 admin editor or pre-shipping cleanup).",
-  "next_action": "Start the next feature (likely Phase 2 — Super Admin editor at /admin/notification-templates) OR reopen the deferred follow-up beads (REV-P2-01 through REV-P2-11) as small fix-it work. Optionally run git commit (Option A: single squash commit on dev) now since reviewing approved and compounding archived the snapshot.",
+  "focus": "history/dynamic-email-templates/epic-map-p2.md",
+  "summary": "P2 Story B1 EXECUTED + COMMITTED as 01809a36. 8 file ops (5 edit + 2 delete + 1 create + 3 planning artifacts captured). All 6 verification steps green: grep zero-match on EmailVariableSchema; pint clean on new files; new enum test 5/156 green; tests/Unit/Notification 17/194 green; tests/Feature/Notification/EmailContent 8/14 green (P1 parity intact); artisan boot sanity exit 0. NotificationTemplateTypeKey enum now sole source of truth for variable allow-list; legacy classes drop the interface implementation; EmailVariableSchema interface retired. Resolves deferred bead REV-P2-05. Unblocks downstream B5 + A2 + A3 + C1.",
+  "next_action": "P2 has 12 stories remaining (B2 purifier, B3 policy, B4 Octane, B5 FormRequest, A1-A3 admin UI, C1-C2 preview/send-test, D1-D3 P1 cleanup). Per epic-map-p2.md critical-path, B4 + B2 + B3 + D1/D2/D3 are next-ready (no story prerequisites). Invoke khuym:planning to write the next current-story-pack (recommend B4 Octane safety next — Critical Pattern #3 carry-over; OR D1+D2+D3 batch since they're all small & parallel). Then khuym:validating → execute as before. Alternative: continue inline P1-style for the remaining sequential chain B5 → A2 → A3 → C1 → C2.",
   "deferred_beads": [
-    {
-      "id": "REV-P2-01",
-      "title": "SendParentPaymentRemindersAction resolves wrong type_key payment_reminder",
-      "severity": "P2",
-      "source": "review/code-quality",
-      "evidence": "app/Modules/Finance/Actions/Operations/SendParentPaymentRemindersAction.php:35 — pre-existing bug, parents currently get student-addressed template.",
-      "fix": "Change to ->resolve('parent_payment_reminder'); ensure parent_name reaches $contentData."
-    },
-    {
-      "id": "REV-P2-02",
-      "title": "Bind EmailContentRegistry scoped or document Octane lifecycle",
-      "severity": "P2",
-      "source": "review/architecture",
-      "evidence": "Singleton + memoized providers persist across requests under FrankenPHP/queue workers; admin edits in P2 will be stale until restart.",
-      "fix": "scoped() binding with request-boundary reset, OR key resolved cache on (typeKey, flag-value)."
-    },
-    {
-      "id": "REV-P2-03",
-      "title": "cascadeOnDelete on notification_email_templates.campus_id silently wipes admin-edited rows",
-      "severity": "P2",
-      "source": "review/security",
-      "evidence": "Migration line 23-25 uses cascadeOnDelete; in P2 admin-edit flow this becomes silent data loss on campus deletion.",
-      "fix": "Follow-up migration changes to restrictOnDelete() or nullOnDelete()."
-    },
-    {
-      "id": "REV-P2-04",
-      "title": "EmailContentProvider interface does not advertise $data['campus_id'] requirement",
-      "severity": "P2",
-      "source": "review/architecture",
-      "evidence": "DbEmailContentProvider throws InvalidArgumentException at runtime; interface signature subject(array $data) doesn't surface the contract.",
-      "fix": "Introduce RenderContext value object; refactor interface methods to accept (array $data, RenderContext $ctx)."
-    },
-    {
-      "id": "REV-P2-05",
-      "title": "EmailVariableSchema impls live on legacy classes scheduled for deletion",
-      "severity": "P2",
-      "source": "review/architecture",
-      "evidence": "P2 admin picker + FormRequest validator depend on availableVariables(); cleanup task deletes the implementing classes.",
-      "fix": "Move availableVariables() into NotificationTemplateTypeKey enum methods or a dedicated VariableSchemaRegistry before P2 ships."
-    },
-    {
-      "id": "REV-P2-06",
-      "title": "Memoization key in EmailContentRegistry does not include the flag value",
-      "severity": "P2",
-      "source": "review/code-quality",
-      "evidence": "Mid-request config flip returns the first-resolved instance; breaks test isolation when toggling flag.",
-      "fix": "Key resolved cache on typeKey + flag-state."
-    },
-    {
-      "id": "REV-P2-07",
-      "title": "DbEmailContentProvider InvalidArgumentException / RuntimeException paths untested",
-      "severity": "P2",
-      "source": "review/test-coverage",
-      "evidence": "resolveTemplate's two error branches (missing campus_id, no row for (type,campus)) have zero coverage.",
-      "fix": "Add 2 test cases exercising each guard."
-    },
-    {
-      "id": "REV-P2-08",
-      "title": "S1.6 campus_id assertion missing from finance Action tests",
-      "severity": "P2",
-      "source": "review/test-coverage",
-      "evidence": "Story S1.6 Done-When required assertion that provider was called with campus_id in $data; existing tests don't.",
-      "fix": "Each Action test sets use_db_templates=true, asserts rendered subject/body contains seeded content."
-    },
-    {
-      "id": "REV-P2-09",
-      "title": "SendDueItem* Actions have zero test files",
-      "severity": "P2",
-      "source": "review/test-coverage",
-      "evidence": "Two of the four finance Actions that received campus_id injection have no tests.",
-      "fix": "Add minimal feature tests for DNG + invoice branches."
-    },
-    {
-      "id": "REV-P2-10",
-      "title": "SendDueItemParentRemindersAction invoice branch silently swallows exceptions",
-      "severity": "P2",
-      "source": "review/code-quality",
-      "evidence": "Catch block at line 140-151 has no Log::error; DNG branch on same file does log.",
-      "fix": "Add Log::error inside catch mirroring DNG branch."
-    },
-    {
-      "id": "REV-P2-11",
-      "title": "Bare \\Log:: facade calls in SendDueItemParentRemindersAction",
-      "severity": "P3",
-      "source": "review/code-quality",
-      "evidence": "Lines 55, 87, 97 use fully-qualified \\Log::; sibling file uses 'use Log;'.",
-      "fix": "Add use Illuminate\\Support\\Facades\\Log; replace \\Log:: with Log::."
-    }
+    {"id":"REV-P2-01","title":"SendParentPaymentRemindersAction resolves wrong type_key payment_reminder","severity":"P2","absorbed_into_p2_story":"D1","status":"open"},
+    {"id":"REV-P2-02","title":"Bind EmailContentRegistry scoped or document Octane lifecycle","severity":"P2","absorbed_into_p2_story":"B4","status":"open"},
+    {"id":"REV-P2-03","title":"cascadeOnDelete on notification_email_templates.campus_id silently wipes admin-edited rows","severity":"P2","absorbed_into_p2_story":"D2","status":"open"},
+    {"id":"REV-P2-04","title":"EmailContentProvider interface does not advertise $data['campus_id'] requirement","severity":"P2","absorbed_into_p2_story":null,"scope_note":"OUT OF SCOPE for P2; revisit after P2 ships.","status":"deferred"},
+    {"id":"REV-P2-05","title":"EmailVariableSchema impls live on legacy classes scheduled for deletion","severity":"P2","absorbed_into_p2_story":"B1","status":"RESOLVED in 01809a36"},
+    {"id":"REV-P2-06","title":"Memoization key in EmailContentRegistry does not include the flag value","severity":"P2","absorbed_into_p2_story":"B4","status":"open"},
+    {"id":"REV-P2-07","title":"DbEmailContentProvider InvalidArgumentException / RuntimeException paths untested","severity":"P2","absorbed_into_p2_story":"D3","status":"open"},
+    {"id":"REV-P2-08","title":"S1.6 campus_id assertion missing from finance Action tests","severity":"P2","absorbed_into_p2_story":"D3","status":"open"},
+    {"id":"REV-P2-09","title":"SendDueItem* Actions have zero test files","severity":"P2","absorbed_into_p2_story":"D3","status":"open"},
+    {"id":"REV-P2-10","title":"SendDueItemParentRemindersAction invoice branch silently swallows exceptions","severity":"P2","absorbed_into_p2_story":"D3","status":"open"},
+    {"id":"REV-P2-11","title":"Bare \\Log:: facade calls in SendDueItemParentRemindersAction","severity":"P3","absorbed_into_p2_story":"D3","status":"open"}
   ],
   "last_compounding_run": {
     "feature": "dynamic-email-templates",
@@ -116,5 +39,5 @@
     "learnings_file": "history/learnings/20260516-dynamic-email-templates.md",
     "critical_promotions": 4
   },
-  "last_updated": "2026-05-16T19:45:00.000Z"
+  "last_updated": "2026-05-16T20:55:00.000Z"
 }

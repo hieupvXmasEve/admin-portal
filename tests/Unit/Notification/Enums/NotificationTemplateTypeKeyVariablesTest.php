@@ -2,15 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Modules\Notification\EmailContent\Contracts\EmailVariableSchema;
-use App\Modules\Notification\EmailContent\Types\DngPaymentPushedEmailContent;
-use App\Modules\Notification\EmailContent\Types\DngPaymentReceivedEmailContent;
-use App\Modules\Notification\EmailContent\Types\ParentPaymentReminderEmailContent;
-use App\Modules\Notification\EmailContent\Types\PaymentReminderEmailContent;
+use App\Modules\Notification\Enums\NotificationTemplateTypeKey;
 
-dataset('email_variable_schemas', [
+dataset('notification_template_type_keys', [
     'payment_reminder' => [
-        PaymentReminderEmailContent::class,
+        NotificationTemplateTypeKey::PaymentReminder,
         [
             'student_name',
             'student_code',
@@ -21,7 +17,7 @@ dataset('email_variable_schemas', [
         ],
     ],
     'parent_payment_reminder' => [
-        ParentPaymentReminderEmailContent::class,
+        NotificationTemplateTypeKey::ParentPaymentReminder,
         [
             'parent_name',
             'student_name',
@@ -33,7 +29,7 @@ dataset('email_variable_schemas', [
         ],
     ],
     'dng_payment_pushed' => [
-        DngPaymentPushedEmailContent::class,
+        NotificationTemplateTypeKey::DngPaymentPushed,
         [
             'student_name',
             'student_code',
@@ -45,7 +41,7 @@ dataset('email_variable_schemas', [
         ],
     ],
     'dng_payment_received' => [
-        DngPaymentReceivedEmailContent::class,
+        NotificationTemplateTypeKey::DngPaymentReceived,
         [
             'student_name',
             'student_code',
@@ -56,12 +52,8 @@ dataset('email_variable_schemas', [
     ],
 ]);
 
-it('implements EmailVariableSchema and exposes the documented allow-list', function (string $className, array $expectedKeys) {
-    $instance = new $className;
-
-    expect($instance)->toBeInstanceOf(EmailVariableSchema::class);
-
-    $variables = $instance->availableVariables();
+it('exposes the documented variable allow-list per case', function (NotificationTemplateTypeKey $case, array $expectedKeys) {
+    $variables = $case->availableVariables();
 
     expect(array_keys($variables))
         ->toEqualCanonicalizing($expectedKeys);
@@ -78,4 +70,11 @@ it('implements EmailVariableSchema and exposes the documented allow-list', funct
         expect($entry['sample'])
             ->not->toBeNull("Variable {$key} sample must not be null");
     }
-})->with('email_variable_schemas');
+})->with('notification_template_type_keys');
+
+it('keeps the PaymentReminder student_name sample stable for S1.3 parity', function () {
+    $variables = NotificationTemplateTypeKey::PaymentReminder->availableVariables();
+
+    expect($variables)->toHaveKey('student_name');
+    expect($variables['student_name']['sample'])->toBe('Nguyễn Văn A');
+});
