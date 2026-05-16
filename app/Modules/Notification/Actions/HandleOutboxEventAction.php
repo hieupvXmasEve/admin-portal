@@ -145,6 +145,7 @@ class HandleOutboxEventAction
     private function buildEmailData(NotificationIntent $intent, DomainEventEnvelope $envelope): array
     {
         $data = $intent->data;
+        $data['campus_id'] = $envelope->campusId;
 
         $requestId = $data['dng_payment_request_id'] ?? null;
 

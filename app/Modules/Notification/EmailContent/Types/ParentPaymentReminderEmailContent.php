@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Notification\EmailContent\Types;
 
 use App\Modules\Notification\EmailContent\Contracts\EmailContentProvider;
+use App\Modules\Notification\EmailContent\Contracts\EmailVariableSchema;
 
-final class ParentPaymentReminderEmailContent implements EmailContentProvider
+final class ParentPaymentReminderEmailContent implements EmailContentProvider, EmailVariableSchema
 {
     public function subject(array $data): string
     {
@@ -118,5 +119,18 @@ final class ParentPaymentReminderEmailContent implements EmailContentProvider
     public function textBody(array $data): ?string
     {
         return null;
+    }
+
+    public function availableVariables(): array
+    {
+        return [
+            'parent_name' => ['label' => 'Parent name', 'sample' => 'Quý Phụ Huynh'],
+            'student_name' => ['label' => 'Student name', 'sample' => 'Nguyễn Văn A'],
+            'student_code' => ['label' => 'Student code', 'sample' => 'SE12345'],
+            'semester_code' => ['label' => 'Semester code', 'sample' => 'SP2026'],
+            'invoice_code' => ['label' => 'Invoice code', 'sample' => 'INV-2026-00123'],
+            'balance_formatted' => ['label' => 'Outstanding balance (formatted)', 'sample' => '5.000.000'],
+            'due_date' => ['label' => 'Payment deadline', 'sample' => '15/06/2026'],
+        ];
     }
 }

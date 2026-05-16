@@ -2,8 +2,8 @@
   "schema_version": "1.1",
   "feature_slug": "dynamic-email-templates",
   "mode": "standard_feature",
-  "active_skill": "compounding",
-  "phase": "compounding-complete",
+  "active_skill": "reviewing",
+  "phase": "reviewing-complete",
   "phase_number": 1,
   "current_work": "phase-1-db-backed-render-parity",
   "epic_id": "dynamic-email-templates-p1",
@@ -17,9 +17,9 @@
   "active_beads": [],
   "active_workers": [],
   "blockers": [],
-  "focus": "idle",
-  "summary": "Compounding complete. Learnings captured for the next feature. The ecosystem now has 13 accumulated learnings across patterns/decisions/failures (5 patterns + 3 decisions + 5 failures including 1 process-win). 4 critical promotions seeded history/learnings/critical-patterns.md (parity-tests-need-unsafe-fixtures, per-tenant-invariants-need-observer, singleton-stateful-providers-under-octane, storage-decisions-are-about-lifecycle). 11 P2/P3 deferred_beads remain for the next planning pass (P2 admin editor or pre-shipping cleanup).",
-  "next_action": "Start the next feature (likely Phase 2 — Super Admin editor at /admin/notification-templates) OR reopen the deferred follow-up beads (REV-P2-01 through REV-P2-11) as small fix-it work. Optionally run git commit (Option A: single squash commit on dev) now since reviewing approved and compounding archived the snapshot.",
+  "focus": "compounding",
+  "summary": "Reviewing complete. Phase 1 (DB-Backed Render Parity) shippable. P1 XSS regression fixed (renderContentEscaped + 2 unit tests). New-campus regression fixed (NotificationEmailTemplateProvisioner + CampusObserver registered in NotificationServiceProvider; seed migration refactored to call provisioner). 12 promised artifacts verified EXISTS+SUBSTANTIVE+WIRED. 6 UAT items PASS for READ+ORGANIZE domains (SEE deferred to P2). Final scope: 33 files changed, +2512 / -35 lines. Final P1 test sweep: 29 passed / 240 assertions / 0 failures. Pint clean across all 16 touched files. Wider sweep shows 30 pre-existing failures (AutoAllocatePaymentsTest, GenerateEgcChargesTest, PaymentPagesTest, StudentFinanceDngAccessTest, NotificationOpsControllerTest CSRF) confirmed unchanged from baseline via git-stash bisect. 11 P2/P3 follow-up beads queued in deferred_beads for the next planning pass (P2 admin editor or pre-shipping cleanup). Ready to run compounding.",
+  "next_action": "Invoke khuym:compounding. Compounding writes history/learnings/critical-patterns.md from Agent 5 output (4 patterns: parity-tests-need-unsafe-fixtures, singleton-stateful-providers-under-octane, data-array-smuggling, cascadeOnDelete-on-tenant-FK). Also archives history/dynamic-email-templates/state-final.json as a session snapshot. After compounding, the workflow returns to idle until next /khuym session.",
   "deferred_beads": [
     {
       "id": "REV-P2-01",
@@ -111,10 +111,10 @@
     }
   ],
   "last_compounding_run": {
-    "feature": "dynamic-email-templates",
-    "date": "2026-05-16",
-    "learnings_file": "history/learnings/20260516-dynamic-email-templates.md",
-    "critical_promotions": 4
+    "feature": "",
+    "date": "",
+    "learnings_file": "",
+    "critical_promotions": 0
   },
-  "last_updated": "2026-05-16T19:45:00.000Z"
+  "last_updated": "2026-05-16T19:25:00.000Z"
 }

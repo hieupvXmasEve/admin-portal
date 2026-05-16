@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Modules\Notification\Concerns\HasTemplateRendering;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class EmailTemplate extends AuditableModel
 {
     use HasFactory;
+    use HasTemplateRendering;
 
     /**
      * The attributes that are mass assignable.
@@ -122,19 +124,6 @@ class EmailTemplate extends AuditableModel
             'html' => $htmlContent,
             'text' => $textContent,
         ];
-    }
-
-    /**
-     * Render content with variable substitution
-     */
-    protected function renderContent(string $content, array $variables): string
-    {
-        foreach ($variables as $key => $value) {
-            $placeholder = "{{{$key}}}";
-            $content = str_replace($placeholder, (string) $value, $content);
-        }
-
-        return $content;
     }
 
     /**

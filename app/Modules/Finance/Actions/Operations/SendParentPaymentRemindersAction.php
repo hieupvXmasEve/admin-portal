@@ -55,6 +55,7 @@ class SendParentPaymentRemindersAction
             }
 
             $contentData = [
+                'campus_id' => $student->campus_id,
                 'student_name' => $student->full_name,
                 'student_code' => $student->student_id,
                 'semester_code' => $invoice->semester?->code ?? '',

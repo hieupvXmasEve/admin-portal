@@ -61,6 +61,7 @@ class SendDueItemParentRemindersAction
                 }
 
                 $contentData = [
+                    'campus_id' => $student->campus_id,
                     'parent_name' => 'Quý Phụ Huynh',
                     'student_name' => $student->full_name,
                     'student_code' => $student->student_id,
@@ -126,6 +127,7 @@ class SendDueItemParentRemindersAction
                 }
 
                 $contentData = [
+                    'campus_id' => $student->campus_id,
                     'parent_name' => $student->parent_name ?? 'Quý Phụ Huynh',
                     'student_name' => $student->full_name,
                     'student_code' => $student->student_id,
