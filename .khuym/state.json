@@ -3,9 +3,9 @@
   "feature_slug": "dynamic-email-templates",
   "mode": "standard_feature",
   "active_skill": "swarming",
-  "phase": "swarming-b1-complete",
+  "phase": "swarming-b4-complete",
   "phase_number": 2,
-  "current_work": "phase-2-story-B1-variable-allow-list-relocation",
+  "current_work": "phase-2-story-B4-octane-queue-safety",
   "epic_id": "dynamic-email-templates-p2",
   "approved_gates": {
     "context": true,
@@ -18,15 +18,15 @@
   "active_workers": [],
   "blockers": [],
   "focus": "history/dynamic-email-templates/epic-map-p2.md",
-  "summary": "P2 Story B1 EXECUTED + COMMITTED as 01809a36. 8 file ops (5 edit + 2 delete + 1 create + 3 planning artifacts captured). All 6 verification steps green: grep zero-match on EmailVariableSchema; pint clean on new files; new enum test 5/156 green; tests/Unit/Notification 17/194 green; tests/Feature/Notification/EmailContent 8/14 green (P1 parity intact); artisan boot sanity exit 0. NotificationTemplateTypeKey enum now sole source of truth for variable allow-list; legacy classes drop the interface implementation; EmailVariableSchema interface retired. Resolves deferred bead REV-P2-05. Unblocks downstream B5 + A2 + A3 + C1.",
-  "next_action": "P2 has 12 stories remaining (B2 purifier, B3 policy, B4 Octane, B5 FormRequest, A1-A3 admin UI, C1-C2 preview/send-test, D1-D3 P1 cleanup). Per epic-map-p2.md critical-path, B4 + B2 + B3 + D1/D2/D3 are next-ready (no story prerequisites). Invoke khuym:planning to write the next current-story-pack (recommend B4 Octane safety next — Critical Pattern #3 carry-over; OR D1+D2+D3 batch since they're all small & parallel). Then khuym:validating → execute as before. Alternative: continue inline P1-style for the remaining sequential chain B5 → A2 → A3 → C1 → C2.",
+  "summary": "P2 Story B4 EXECUTED + COMMITTED as 625da2fb. 6 file ops (3 edit + 2 create + 1 story-pack capture). All 6 verification steps green. Resolves REV-P2-02 + REV-P2-06; honors Critical Pattern #3. EmailContentRegistry now flag-aware in its cache key + has reset() hook; DbEmailContentProvider has reset() that clears the per-(typeKey, campusId) row cache; NotificationServiceProvider listens on RequestHandled + JobProcessed to clear the registry at request/job boundaries. Octane-specific events deliberately out of scope (config/octane.php doesn't exist). Gotcha learned: Mockery for JobProcessed needs ->shouldIgnoreMissing() because Telescope's JobWatcher also listens and calls $event->job->payload(). Test suite now 31 tests / 215 assertions green on notification surfaces.",
+  "next_action": "P2 has 11 stories remaining. Recommended next based on dependency graph: (a) D-batch (D1 wrong type_key + D2 cascadeOnDelete migration + D3 test backfill) — fully parallel, low-risk, clears 7 of remaining 9 deferred_beads; OR (b) B2 (purifier install + config + round-trip test) — needed for B5 FormRequest; OR (c) B3 (NotificationTemplatePolicy super-admin) — needed for A1 admin controller. Logical critical-path order from epic-map: B2 → B3 → B5 → A1 → A2 → A3 → C1 → C2. D-batch in parallel. Invoke khuym:planning for the chosen next story.",
   "deferred_beads": [
     {"id":"REV-P2-01","title":"SendParentPaymentRemindersAction resolves wrong type_key payment_reminder","severity":"P2","absorbed_into_p2_story":"D1","status":"open"},
-    {"id":"REV-P2-02","title":"Bind EmailContentRegistry scoped or document Octane lifecycle","severity":"P2","absorbed_into_p2_story":"B4","status":"open"},
+    {"id":"REV-P2-02","title":"Bind EmailContentRegistry scoped or document Octane lifecycle","severity":"P2","absorbed_into_p2_story":"B4","status":"RESOLVED in 625da2fb"},
     {"id":"REV-P2-03","title":"cascadeOnDelete on notification_email_templates.campus_id silently wipes admin-edited rows","severity":"P2","absorbed_into_p2_story":"D2","status":"open"},
     {"id":"REV-P2-04","title":"EmailContentProvider interface does not advertise $data['campus_id'] requirement","severity":"P2","absorbed_into_p2_story":null,"scope_note":"OUT OF SCOPE for P2; revisit after P2 ships.","status":"deferred"},
     {"id":"REV-P2-05","title":"EmailVariableSchema impls live on legacy classes scheduled for deletion","severity":"P2","absorbed_into_p2_story":"B1","status":"RESOLVED in 01809a36"},
-    {"id":"REV-P2-06","title":"Memoization key in EmailContentRegistry does not include the flag value","severity":"P2","absorbed_into_p2_story":"B4","status":"open"},
+    {"id":"REV-P2-06","title":"Memoization key in EmailContentRegistry does not include the flag value","severity":"P2","absorbed_into_p2_story":"B4","status":"RESOLVED in 625da2fb"},
     {"id":"REV-P2-07","title":"DbEmailContentProvider InvalidArgumentException / RuntimeException paths untested","severity":"P2","absorbed_into_p2_story":"D3","status":"open"},
     {"id":"REV-P2-08","title":"S1.6 campus_id assertion missing from finance Action tests","severity":"P2","absorbed_into_p2_story":"D3","status":"open"},
     {"id":"REV-P2-09","title":"SendDueItem* Actions have zero test files","severity":"P2","absorbed_into_p2_story":"D3","status":"open"},
@@ -39,5 +39,5 @@
     "learnings_file": "history/learnings/20260516-dynamic-email-templates.md",
     "critical_promotions": 4
   },
-  "last_updated": "2026-05-16T20:55:00.000Z"
+  "last_updated": "2026-05-16T21:55:00.000Z"
 }

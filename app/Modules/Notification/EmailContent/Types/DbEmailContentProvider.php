@@ -6,6 +6,7 @@ namespace App\Modules\Notification\EmailContent\Types;
 
 use App\Modules\Notification\Concerns\HasTemplateRendering;
 use App\Modules\Notification\EmailContent\Contracts\EmailContentProvider;
+use App\Modules\Notification\EmailContent\EmailContentRegistry;
 use App\Modules\Notification\Enums\NotificationTemplateTypeKey;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
 use InvalidArgumentException;
@@ -54,6 +55,18 @@ final class DbEmailContentProvider implements EmailContentProvider
     public function textBody(array $data): ?string
     {
         return null;
+    }
+
+    /**
+     * Clear the per-(typeKey, campusId) row cache. Invoked by
+     * {@see EmailContentRegistry::reset()} via duck-typed `method_exists` so
+     * cached NotificationEmailTemplate rows do not survive across HTTP
+     * requests or queued-job boundaries under long-running PHP runtimes
+     * (FrankenPHP / Octane).
+     */
+    public function reset(): void
+    {
+        $this->cache = [];
     }
 
     private function resolveTemplate(array $data): NotificationEmailTemplate

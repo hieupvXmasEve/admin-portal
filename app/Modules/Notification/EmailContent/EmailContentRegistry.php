@@ -23,9 +23,17 @@ use InvalidArgumentException;
  * exists for the P1 -> P2 transition window and will be removed in the
  * post-P2 cleanup (see config/notifications.php).
  *
- * Resolved providers are memoised per `type_key` so the
+ * Resolved providers are memoised per composite key `"$typeKey:$flagState"`
+ * (where `$flagState` is `'db'` or `'legacy'`) so toggling the flag mid-
+ * request rebuilds the binding rather than returning a stale provider. The
  * {@see DbEmailContentProvider} per-(typeKey, campusId) row cache persists
  * across multiple `resolve()` calls in the same request.
+ *
+ * To prevent stale state under long-running PHP runtimes (FrankenPHP today,
+ * Octane in the future), {@see self::reset()} is invoked by listeners
+ * registered in NotificationServiceProvider on Laravel's `RequestHandled`
+ * and `JobProcessed` events. The reset clears the local memo and forwards
+ * `reset()` to any cached provider that implements it.
  */
 final class EmailContentRegistry
 {
@@ -51,11 +59,32 @@ final class EmailContentRegistry
             throw new InvalidArgumentException("No EmailContentProvider registered for type_key: {$typeKey}");
         }
 
-        if (isset($this->resolved[$typeKey])) {
-            return $this->resolved[$typeKey];
+        $cacheKey = $typeKey.':'.$this->flagState();
+
+        if (isset($this->resolved[$cacheKey])) {
+            return $this->resolved[$cacheKey];
         }
 
-        return $this->resolved[$typeKey] = $this->build($typeKey);
+        return $this->resolved[$cacheKey] = $this->build($typeKey);
+    }
+
+    /**
+     * Clear the resolved-provider memo and forward the reset to any cached
+     * provider that implements its own `reset()` (e.g. DbEmailContentProvider's
+     * per-(typeKey, campusId) row cache). Wired to `RequestHandled` and
+     * `JobProcessed` listeners in NotificationServiceProvider so long-running
+     * runtimes (FrankenPHP / Octane / queue workers) do not leak cached state
+     * across request/job boundaries.
+     */
+    public function reset(): void
+    {
+        foreach ($this->resolved as $provider) {
+            if (method_exists($provider, 'reset')) {
+                $provider->reset();
+            }
+        }
+
+        $this->resolved = [];
     }
 
     private function build(string $typeKey): EmailContentProvider
@@ -65,5 +94,10 @@ final class EmailContentRegistry
         }
 
         return app($this->legacyMap[$typeKey]);
+    }
+
+    private function flagState(): string
+    {
+        return (bool) config('notifications.use_db_templates', true) ? 'db' : 'legacy';
     }
 }
