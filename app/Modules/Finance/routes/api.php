@@ -22,6 +22,10 @@ Route::prefix('api/v1/finance/operations')
     ->middleware(['web', 'auth']) // Assuming sanctum for admin API access
     ->name('api.finance.operations.')
     ->group(function () {
+        // Non-academic charge generation (CSV upload → bulk charge creation).
+        Route::post('/generate-non-academic-charges', [BillingOperationsController::class, 'generateNonAcademic'])->name('generate-non-academic-charges');
+
+        // @deprecated — bulk EGC flow. Retained per Q9 decision; remove after confirming no consumers.
         Route::post('/preview-charges', [BillingOperationsController::class, 'previewCharges'])->name('preview-charges');
         Route::post('/export-preview-charges', [BillingOperationsController::class, 'exportPreviewCharges'])->name('export-preview-charges');
         Route::post('/run-generate', [BillingOperationsController::class, 'runGenerate'])->name('run-generate');
@@ -31,4 +35,3 @@ Route::prefix('api/v1/finance/operations')
         Route::post('/send-due-item-reminders', [BillingOperationsController::class, 'sendDueItemReminders'])->name('send-due-item-reminders');
         Route::post('/send-due-item-parent-reminders', [BillingOperationsController::class, 'sendDueItemParentReminders'])->name('send-due-item-parent-reminders');
     });
-

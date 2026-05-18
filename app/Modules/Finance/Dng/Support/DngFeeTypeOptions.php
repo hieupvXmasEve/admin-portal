@@ -96,11 +96,12 @@ final class DngFeeTypeOptions
             FinanceCharge::TYPE_TUITION_TERM,
             FinanceCharge::TYPE_COURSE_FEE,
             FinanceCharge::TYPE_EGC_LEVEL_FEE => 'HP',
-            FinanceCharge::TYPE_RETAKE_FEE    => 'HL',
+            FinanceCharge::TYPE_RETAKE_FEE => 'HL',
             FinanceCharge::TYPE_EXAM_RESIT_FEE => 'PTL',
+            FinanceCharge::TYPE_BHYT => 'BHYT',
             FinanceCharge::TYPE_MANUAL_FEE,
-            FinanceCharge::TYPE_ADJUSTMENT    => 'KHAC',
-            default                           => 'KHAC',
+            FinanceCharge::TYPE_ADJUSTMENT => 'KHAC',
+            default => 'KHAC',
         };
     }
 }

@@ -1,43 +1,60 @@
 {
   "schema_version": "1.1",
-  "feature_slug": "dynamic-email-templates",
-  "mode": "standard_feature",
-  "active_skill": "swarming",
-  "phase": "swarming-b4-complete",
-  "phase_number": 2,
-  "current_work": "phase-2-story-B4-octane-queue-safety",
-  "epic_id": "dynamic-email-templates-p2",
+  "feature_slug": "non-academic-charge-generation",
+  "mode": "small",
+  "active_skill": "compounding",
+  "phase": "compounding-complete",
+  "current_work": "NAC-1",
+  "epic_id": "non-academic-charge-generation",
   "approved_gates": {
     "context": true,
     "work_shape": true,
     "phase_plan": true,
     "execution": true,
-    "review": false
+    "review": true
   },
   "active_beads": [],
   "active_workers": [],
   "blockers": [],
-  "focus": "history/dynamic-email-templates/epic-map-p2.md",
-  "summary": "P2 Story B4 EXECUTED + COMMITTED as 625da2fb. 6 file ops (3 edit + 2 create + 1 story-pack capture). All 6 verification steps green. Resolves REV-P2-02 + REV-P2-06; honors Critical Pattern #3. EmailContentRegistry now flag-aware in its cache key + has reset() hook; DbEmailContentProvider has reset() that clears the per-(typeKey, campusId) row cache; NotificationServiceProvider listens on RequestHandled + JobProcessed to clear the registry at request/job boundaries. Octane-specific events deliberately out of scope (config/octane.php doesn't exist). Gotcha learned: Mockery for JobProcessed needs ->shouldIgnoreMissing() because Telescope's JobWatcher also listens and calls $event->job->payload(). Test suite now 31 tests / 215 assertions green on notification surfaces.",
-  "next_action": "P2 has 11 stories remaining. Recommended next based on dependency graph: (a) D-batch (D1 wrong type_key + D2 cascadeOnDelete migration + D3 test backfill) — fully parallel, low-risk, clears 7 of remaining 9 deferred_beads; OR (b) B2 (purifier install + config + round-trip test) — needed for B5 FormRequest; OR (c) B3 (NotificationTemplatePolicy super-admin) — needed for A1 admin controller. Logical critical-path order from epic-map: B2 → B3 → B5 → A1 → A2 → A3 → C1 → C2. D-batch in parallel. Invoke khuym:planning for the chosen next story.",
-  "deferred_beads": [
-    {"id":"REV-P2-01","title":"SendParentPaymentRemindersAction resolves wrong type_key payment_reminder","severity":"P2","absorbed_into_p2_story":"D1","status":"open"},
-    {"id":"REV-P2-02","title":"Bind EmailContentRegistry scoped or document Octane lifecycle","severity":"P2","absorbed_into_p2_story":"B4","status":"RESOLVED in 625da2fb"},
-    {"id":"REV-P2-03","title":"cascadeOnDelete on notification_email_templates.campus_id silently wipes admin-edited rows","severity":"P2","absorbed_into_p2_story":"D2","status":"open"},
-    {"id":"REV-P2-04","title":"EmailContentProvider interface does not advertise $data['campus_id'] requirement","severity":"P2","absorbed_into_p2_story":null,"scope_note":"OUT OF SCOPE for P2; revisit after P2 ships.","status":"deferred"},
-    {"id":"REV-P2-05","title":"EmailVariableSchema impls live on legacy classes scheduled for deletion","severity":"P2","absorbed_into_p2_story":"B1","status":"RESOLVED in 01809a36"},
-    {"id":"REV-P2-06","title":"Memoization key in EmailContentRegistry does not include the flag value","severity":"P2","absorbed_into_p2_story":"B4","status":"RESOLVED in 625da2fb"},
-    {"id":"REV-P2-07","title":"DbEmailContentProvider InvalidArgumentException / RuntimeException paths untested","severity":"P2","absorbed_into_p2_story":"D3","status":"open"},
-    {"id":"REV-P2-08","title":"S1.6 campus_id assertion missing from finance Action tests","severity":"P2","absorbed_into_p2_story":"D3","status":"open"},
-    {"id":"REV-P2-09","title":"SendDueItem* Actions have zero test files","severity":"P2","absorbed_into_p2_story":"D3","status":"open"},
-    {"id":"REV-P2-10","title":"SendDueItemParentRemindersAction invoice branch silently swallows exceptions","severity":"P2","absorbed_into_p2_story":"D3","status":"open"},
-    {"id":"REV-P2-11","title":"Bare \\Log:: facade calls in SendDueItemParentRemindersAction","severity":"P3","absorbed_into_p2_story":"D3","status":"open"}
-  ],
+  "focus": "history/learnings/20260519-non-academic-charge-generation.md",
+  "summary": "Feature non-academic-charge-generation closed end-to-end (exploring → planning → validating → swarming → reviewing → compounding). 6 learnings synthesized, 3 promoted to critical-patterns.md. Total ecosystem accumulation: 3 learnings files, 13 critical patterns.",
+  "next_action": "Feature closed. Next: resume queued pending feature `dynamic-email-templates` P3 planning (was paused mid-flight by parallel session) — start by reading history/dynamic-email-templates/ artifacts.",
+  "last_updated": "2026-05-19T00:35:00.000Z",
   "last_compounding_run": {
-    "feature": "dynamic-email-templates",
-    "date": "2026-05-16",
-    "learnings_file": "history/learnings/20260516-dynamic-email-templates.md",
-    "critical_promotions": 4
+    "feature": "non-academic-charge-generation",
+    "date": "2026-05-19",
+    "learnings_file": "history/learnings/20260519-non-academic-charge-generation.md",
+    "findings_synthesized": 6,
+    "critical_promotions": 3,
+    "categories": {"patterns": 2, "decisions": 1, "failures": 3},
+    "promoted_titles": [
+      "Validating's grep-step must scout schema precedent before approving 'use existing pattern'",
+      "TypeScript wrapper signatures lag transport capability — 'useApi can't do X' is usually a type-widening tax",
+      "Campus scope fallback to `null` is a silent cross-tenant write"
+    ]
   },
-  "last_updated": "2026-05-16T21:55:00.000Z"
+  "deferred_p3_findings": [
+    "Migration rollback fails if bhyt rows exist; add guard",
+    "source_id permanently null — audit can't distinguish batches (D9 deferred)",
+    "Vue: key={i} on skipped table; use student_code",
+    "Vue: DatePicker label not linked (a11y)",
+    "Vue: no client-side amount integer check",
+    "Vue: CheckCircle2 shown even when created === 0",
+    "Test duplication (403 in both Request + Endpoint)",
+    "Action test 1 has 1 created row + test 2 has 2 — combined OK, individually partial"
+  ],
+  "pending_features": [
+    {
+      "feature_slug": "dynamic-email-templates",
+      "phase": "planning-in-progress-p3",
+      "focus": "history/dynamic-email-templates/CONTEXT-p3.md",
+      "note": "P3 planning đã chạy song song bởi session khác. Sẵn sàng resume planning hoặc validating tuỳ artifacts hiện có."
+    }
+  ],
+  "previous_feature": {
+    "feature_slug": "non-academic-charge-generation",
+    "phase": "compounding-complete",
+    "completed": true,
+    "note": "Closed 2026-05-19. Only bhyt added to enum this phase; future non-academic types defer."
+  }
 }

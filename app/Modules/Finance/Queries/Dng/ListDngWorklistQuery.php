@@ -246,6 +246,7 @@ class ListDngWorklistQuery
             'HP' => [FinanceCharge::TYPE_TUITION_TERM, FinanceCharge::TYPE_EGC_LEVEL_FEE, FinanceCharge::TYPE_COURSE_FEE],
             'HL' => [FinanceCharge::TYPE_RETAKE_FEE],
             'PTL' => [FinanceCharge::TYPE_EXAM_RESIT_FEE],
+            'BHYT' => [FinanceCharge::TYPE_BHYT],
             'KHAC' => [FinanceCharge::TYPE_MANUAL_FEE, FinanceCharge::TYPE_ADJUSTMENT],
             default => throw new \InvalidArgumentException("Unknown DNG fee type: {$dngFeeType}"),
         };

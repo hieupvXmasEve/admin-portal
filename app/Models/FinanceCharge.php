@@ -63,6 +63,8 @@ class FinanceCharge extends Model
 
     public const TYPE_ADJUSTMENT = 'adjustment';
 
+    public const TYPE_BHYT = 'bhyt';
+
     public const STATUS_ACTIVE = 'active';
 
     public const STATUS_VOID = 'void';

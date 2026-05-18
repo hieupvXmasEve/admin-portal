@@ -1,11 +1,11 @@
 <?php
 
-use App\Modules\Finance\Http\Web\Admin\DngWorklistController;
 use App\Modules\Finance\Http\Web\Admin\BillingInvoiceController;
 use App\Modules\Finance\Http\Web\Admin\BillingOperationsController;
 use App\Modules\Finance\Http\Web\Admin\BillingSettlementController;
 use App\Modules\Finance\Http\Web\Admin\DngPaymentRequestController;
 use App\Modules\Finance\Http\Web\Admin\DngWebhookEventController;
+use App\Modules\Finance\Http\Web\Admin\DngWorklistController;
 use App\Modules\Finance\Http\Web\Admin\EgcBlockResultsController;
 use App\Modules\Finance\Http\Web\Admin\EgcCarryForwardController;
 use App\Modules\Finance\Http\Web\Admin\EgcChargeGenerationController;
@@ -71,6 +71,10 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::get('/generate-charges', [BillingOperationsController::class, 'showGenerateCharges'])
             ->middleware('can:view_finance_operations_generate_charges')
             ->name('generate-charges');
+
+        Route::get('/non-academic-charges-template', [BillingOperationsController::class, 'downloadNonAcademicChargesTemplate'])
+            ->middleware('can:view_finance_operations_generate_charges')
+            ->name('non-academic-charges-template');
 
         Route::get('/exceptions', [BillingOperationsController::class, 'exceptions'])
             ->middleware('can:view_finance_operations_exceptions')
