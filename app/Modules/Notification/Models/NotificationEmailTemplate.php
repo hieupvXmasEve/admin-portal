@@ -39,6 +39,29 @@ class NotificationEmailTemplate extends AuditableModel
         ];
     }
 
+    /**
+     * Pin per-row identity (campus_id, type_key) as immutable AT THE MODEL LAYER.
+     *
+     * These two columns are mass-assignable on CREATE (the provisioner, the seed
+     * migration, test fixtures, and the transient render path all rely on it),
+     * but must never change on an existing row. Allowing them to be reassigned
+     * would let a future FormRequest rule addition silently cross-tenant write
+     * or flip a template's type.
+     *
+     * The guard runs on `updating` (not `saving`) so initial CREATE goes through
+     * untouched.
+     */
+    protected static function booted(): void
+    {
+        static::updating(function (NotificationEmailTemplate $template): void {
+            if ($template->isDirty('campus_id') || $template->isDirty('type_key')) {
+                throw new \LogicException(
+                    'NotificationEmailTemplate.campus_id and type_key are immutable after creation.',
+                );
+            }
+        });
+    }
+
     public function campus(): BelongsTo
     {
         return $this->belongsTo(Campus::class);

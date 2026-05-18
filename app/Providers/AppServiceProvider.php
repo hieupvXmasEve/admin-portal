@@ -2,17 +2,20 @@
 
 namespace App\Providers;
 
+use App\Models\CourseOffering;
+use App\Models\Department;
 use App\Models\Lecture;
 use App\Models\RoomBooking;
+use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
 use App\Policies\ApiActorPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Database\Eloquent\Relations\Relation;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -54,9 +57,9 @@ class AppServiceProvider extends ServiceProvider
             RoomBooking::BOOKED_BY_STUDENT => Student::class,
             RoomBooking::BOOKED_BY_LECTURER => User::class, // Lecturer is typically a User with lecturer role
             RoomBooking::BOOKED_BY_LECTURE => Lecture::class,
-            'course' => \App\Models\CourseOffering::class,
-            'semester' => \App\Models\Semester::class,
-            'department' => \App\Models\Department::class,
+            'course' => CourseOffering::class,
+            'semester' => Semester::class,
+            'department' => Department::class,
         ]);
     }
 
@@ -142,5 +145,8 @@ class AppServiceProvider extends ServiceProvider
                     ], 429, $headers);
                 });
         });
+
+        // Notification template test-send: limit admin self-testing to 5 per minute (C2).
+        RateLimiter::for('notification-template-test-send', fn (Request $r) => Limit::perMinute(5)->by($r->user()?->id ?: $r->ip()));
     }
 }

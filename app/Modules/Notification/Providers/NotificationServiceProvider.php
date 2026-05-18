@@ -7,11 +7,14 @@ namespace App\Modules\Notification\Providers;
 use App\Models\Campus;
 use App\Modules\Notification\Console\ProcessNotificationOutboxCommand;
 use App\Modules\Notification\EmailContent\EmailContentRegistry;
+use App\Modules\Notification\Models\NotificationEmailTemplate;
 use App\Modules\Notification\Observers\CampusObserver;
+use App\Modules\Notification\Policies\NotificationTemplatePolicy;
 use App\Modules\Notification\Support\NotificationMetrics;
 use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 class NotificationServiceProvider extends ServiceProvider
@@ -34,6 +37,10 @@ class NotificationServiceProvider extends ServiceProvider
         Event::listen(JobProcessed::class, function () {
             app(EmailContentRegistry::class)->reset();
         });
+
+        // Explicit registration required: Laravel 13 auto-discovery does not
+        // resolve policies in module namespaces (App\Modules\*) automatically.
+        Gate::policy(NotificationEmailTemplate::class, NotificationTemplatePolicy::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([

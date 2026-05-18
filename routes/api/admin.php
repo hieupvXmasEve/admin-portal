@@ -174,3 +174,12 @@ Route::middleware(['web', 'auth'])->prefix('dashboard')->name('api.admin.dashboa
 Route::middleware(['web', 'auth'])->prefix('admin')->name('api.admin.')->group(function () {
     require __DIR__ . '/admin/notification.php';
 });
+
+use App\Modules\Notification\Http\Api\V1\Admin\NotificationTemplateController as NotificationTemplateApiController;
+
+Route::middleware(['web', 'auth'])->prefix('admin/notification-templates')->name('api.admin.notification-templates.')->group(function () {
+    Route::put('/{template}', [NotificationTemplateApiController::class, 'update'])->name('update');
+    Route::get('/variables/{type_key}', [NotificationTemplateApiController::class, 'variables'])->name('variables');
+    Route::post('/{template}/preview', [NotificationTemplateApiController::class, 'preview'])->name('preview');
+    Route::post('/{template}/test-send', [NotificationTemplateApiController::class, 'testSend'])->middleware('throttle:notification-template-test-send')->name('test-send');
+});
