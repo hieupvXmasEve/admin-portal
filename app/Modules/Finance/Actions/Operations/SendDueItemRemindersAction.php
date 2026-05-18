@@ -30,12 +30,13 @@ class SendDueItemRemindersAction
             if (count($parts) !== 2) {
                 \Log::warning('Invalid item ID format', ['item_id' => $itemId]);
                 $failedCount++;
+
                 continue;
             }
 
             [$type, $id] = $parts;
             $id = (int) $id;
-            
+
             \Log::info('Processing reminder item', ['type' => $type, 'id' => $id]);
 
             if ($type === 'dng_request') {
@@ -43,6 +44,7 @@ class SendDueItemRemindersAction
                 $dngRequest = DngPaymentRequest::find($id);
                 if (! $dngRequest || $dngRequest->status !== 'pushed_to_dng') {
                     $failedCount++;
+
                     continue;
                 }
 
@@ -52,6 +54,7 @@ class SendDueItemRemindersAction
                 if (! $student) {
                     \Log::warning('DNG request has no student', ['dng_request_id' => $id]);
                     $failedCount++;
+
                     continue;
                 }
 
@@ -61,6 +64,7 @@ class SendDueItemRemindersAction
                         'student_id' => $student->id,
                     ]);
                     $skippedNoStudentEmailCount++;
+
                     continue;
                 }
 
@@ -69,7 +73,7 @@ class SendDueItemRemindersAction
                     'student_name' => $student->full_name,
                     'student_code' => $student->student_id,
                     'semester_code' => $dngRequest->semester?->code ?? '',
-                    'invoice_code' => 'DNG-' . $dngRequest->id,
+                    'invoice_code' => 'DNG-'.$dngRequest->id,
                     'balance_formatted' => number_format($balance, 0, ',', '.'),
                     'due_date' => $dngRequest->due_date?->format('d/m/Y') ?? '',
                 ];
@@ -84,7 +88,7 @@ class SendDueItemRemindersAction
 
                     // Update last_reminder_at for DNG request
                     $dngRequest->update(['last_reminder_at' => $now]);
-                    
+
                     $sentCount++;
                 } catch (\Throwable $e) {
                     \Log::error('Failed to send DNG reminder', [
@@ -99,6 +103,7 @@ class SendDueItemRemindersAction
                 $invoice = StudentInvoice::find($id);
                 if (! $invoice) {
                     $failedCount++;
+
                     continue;
                 }
 
@@ -109,6 +114,7 @@ class SendDueItemRemindersAction
                 if (! $student) {
                     \Log::warning('Invoice has no student', ['invoice_id' => $id]);
                     $failedCount++;
+
                     continue;
                 }
 
@@ -118,6 +124,7 @@ class SendDueItemRemindersAction
                         'balance' => $balance,
                     ]);
                     $skippedNoDebtCount++;
+
                     continue;
                 }
 
@@ -127,6 +134,7 @@ class SendDueItemRemindersAction
                         'student_id' => $student->id,
                     ]);
                     $skippedNoStudentEmailCount++;
+
                     continue;
                 }
 

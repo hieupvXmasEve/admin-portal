@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Operations;
 
+use App\Models\ParentProfile;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Notification\EmailContent\EmailContentRegistry;
-use App\Models\ParentProfile;
 use App\Services\EmailService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -32,6 +32,7 @@ class SendDueItemParentRemindersAction
             $parts = explode(':', $itemId);
             if (count($parts) !== 2) {
                 $failedCount++;
+
                 continue;
             }
 
@@ -43,6 +44,7 @@ class SendDueItemParentRemindersAction
                 $dngRequest = DngPaymentRequest::find($id);
                 if (! $dngRequest || $dngRequest->status !== 'pushed_to_dng') {
                     $failedCount++;
+
                     continue;
                 }
 
@@ -52,11 +54,12 @@ class SendDueItemParentRemindersAction
                 $parentEmails = self::extractParentEmails($student?->parentProfiles);
 
                 if ($parentEmails->isEmpty()) {
-                    \Log::info('Skipping DNG parent reminder - no parent emails', [
+                    Log::info('Skipping DNG parent reminder - no parent emails', [
                         'dng_request_id' => $id,
                         'student_id' => $student->id,
                     ]);
                     $skippedNoParentEmailCount++;
+
                     continue;
                 }
 
@@ -66,7 +69,7 @@ class SendDueItemParentRemindersAction
                     'student_name' => $student->full_name,
                     'student_code' => $student->student_id,
                     'semester_code' => $dngRequest->semester?->code ?? '',
-                    'invoice_code' => 'DNG-' . $dngRequest->id,
+                    'invoice_code' => 'DNG-'.$dngRequest->id,
                     'balance_formatted' => number_format($balance, 0, ',', '.'),
                     'due_date' => $dngRequest->due_date?->format('d/m/Y') ?? '',
                 ];
@@ -84,13 +87,13 @@ class SendDueItemParentRemindersAction
 
                         $sentCount++;
                         $sentAnyParent = true;
-                        \Log::info('Parent reminder sent successfully', [
+                        Log::info('Parent reminder sent successfully', [
                             'dng_request_id' => $id,
                             'student_id' => $student->id,
                             'parent_email' => $parentEmail,
                         ]);
                     } catch (\Throwable $e) {
-                        \Log::error('Failed to send parent reminder email', [
+                        Log::error('Failed to send parent reminder email', [
                             'dng_request_id' => $id,
                             'student_id' => $student->id,
                             'parent_email' => $parentEmail,
@@ -109,6 +112,7 @@ class SendDueItemParentRemindersAction
                 $invoice = StudentInvoice::find($id);
                 if (! $invoice) {
                     $failedCount++;
+
                     continue;
                 }
 
@@ -118,11 +122,13 @@ class SendDueItemParentRemindersAction
 
                 if ($balance <= 0) {
                     $skippedNoDebtCount++;
+
                     continue;
                 }
 
                 if (! is_string($student?->parent_email) || trim($student->parent_email) === '') {
                     $skippedNoParentEmailCount++;
+
                     continue;
                 }
 
@@ -148,6 +154,11 @@ class SendDueItemParentRemindersAction
                     $invoice->update(['last_reminder_at' => $now]);
                     $sentCount++;
                 } catch (\Throwable $e) {
+                    Log::error('Failed to send invoice parent reminder', [
+                        'invoice_id' => $id,
+                        'student_id' => $student->id ?? null,
+                        'error' => $e->getMessage(),
+                    ]);
                     $failedCount++;
                 }
             } else {

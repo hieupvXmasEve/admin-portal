@@ -32,7 +32,7 @@ class SendParentPaymentRemindersAction
 
         $settlementService = app(SettlementService::class);
         $emailService = app(EmailService::class);
-        $emailContent = app(EmailContentRegistry::class)->resolve('payment_reminder');
+        $emailContent = app(EmailContentRegistry::class)->resolve('parent_payment_reminder');
         $now = now();
 
         foreach ($invoices as $invoice) {
@@ -46,15 +46,19 @@ class SendParentPaymentRemindersAction
                 continue;
             }
 
-            $parentEmails = self::extractParentEmails($student?->parentProfiles);
+            // Pair each parent profile with their email + display name so the
+            // greeting addresses the actual recipient (not just the first
+            // parent in the relation). Previously parent_name was hard-coded
+            // to the first profile regardless of which email was sent.
+            $parentRecipients = self::extractParentRecipients($student?->parentProfiles);
 
-            if ($parentEmails->isEmpty()) {
+            if ($parentRecipients->isEmpty()) {
                 $skippedNoParentEmailCount++;
 
                 continue;
             }
 
-            $contentData = [
+            $sharedContentData = [
                 'campus_id' => $student->campus_id,
                 'student_name' => $student->full_name,
                 'student_code' => $student->student_id,
@@ -66,10 +70,12 @@ class SendParentPaymentRemindersAction
 
             $sentAnyParent = false;
 
-            foreach ($parentEmails as $parentEmail) {
+            foreach ($parentRecipients as $recipient) {
+                $contentData = $sharedContentData + ['parent_name' => $recipient['name']];
+
                 try {
                     $emailService->sendSingleEmail(
-                        recipient: $parentEmail,
+                        recipient: $recipient['email'],
                         subject: $emailContent->subject($contentData),
                         content: $emailContent->htmlBody($contentData),
                         campusId: $student->campus_id,
@@ -101,7 +107,15 @@ class SendParentPaymentRemindersAction
         ];
     }
 
-    private static function extractParentEmails(?Collection $parentProfiles): Collection
+    /**
+     * Build a deduped collection of {email, name} pairs from a student's active
+     * parent profiles. Pairing the name with the email avoids the bug where a
+     * shared parent_name (taken from $parentProfiles->first()) addresses the
+     * wrong parent when a student has multiple profiles.
+     *
+     * @return Collection<int, array{email: string, name: string}>
+     */
+    private static function extractParentRecipients(?Collection $parentProfiles): Collection
     {
         if ($parentProfiles === null) {
             return collect();
@@ -116,10 +130,25 @@ class SendParentPaymentRemindersAction
                     && $user->isParent()
                     && $user->isActive();
             })
-            ->map(fn (ParentProfile $profile) => $profile->user?->email)
-            ->filter(fn ($email) => is_string($email) && trim($email) !== '')
-            ->map(fn (string $email) => mb_strtolower(trim($email)))
-            ->unique()
+            ->map(function (ParentProfile $profile): ?array {
+                $email = $profile->user?->email;
+
+                if (! is_string($email) || trim($email) === '') {
+                    return null;
+                }
+
+                $name = $profile->user?->full_name;
+                $name = (is_string($name) && trim($name) !== '')
+                    ? trim($name)
+                    : 'Quý Phụ Huynh';
+
+                return [
+                    'email' => mb_strtolower(trim($email)),
+                    'name' => $name,
+                ];
+            })
+            ->filter()
+            ->unique('email')
             ->values();
     }
 
