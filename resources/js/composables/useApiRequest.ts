@@ -8,7 +8,6 @@ const useApiRequest = createFetch({
     baseUrl: '',
     options: {
         updateDataOnError: true,
-        credentials: 'include', // Include cookies for Laravel Sanctum session auth
         beforeFetch({ options }) {
             const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
@@ -41,12 +40,13 @@ const useApiRequest = createFetch({
 });
 
 /**
- * Standard Laravel API response structure
+ * Standard Laravel API response structure.
+ * `data` is T | null — the backend returns data: null on error responses.
  */
 export interface ApiResponse<T = any> {
     success: boolean;
     message: string;
-    data: T;
+    data: T | null;
     error?: string;
     errors?: string[];
 }
@@ -57,12 +57,14 @@ export interface ApiResponse<T = any> {
  */
 export function useApi() {
     /**
-     * POST request with JSON payload
+     * POST request with JSON or FormData payload.
+     * When FormData is passed the transport layer omits Content-Type so the
+     * browser sets multipart/form-data with the correct boundary automatically.
      * @param url - API endpoint URL
-     * @param data - Request payload
+     * @param data - JSON payload or FormData (e.g. file uploads)
      * @returns Promise with standardized API response
      */
-    const post = async <T = any>(url: string, data: Record<string, any>) => {
+    const post = async <T = any>(url: string, data: FormData | Record<string, any>) => {
         return useApiRequest(url, {
             method: 'POST',
         })
