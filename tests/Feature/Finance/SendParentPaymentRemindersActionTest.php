@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
+use App\Models\EmailLog;
 use App\Models\FinanceCharge;
 use App\Models\InvoiceLine;
 use App\Models\ParentProfile;
@@ -11,8 +12,10 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentInvoice;
 use App\Models\User;
-use App\Services\EmailService;
 use App\Modules\Finance\Actions\Operations\SendParentPaymentRemindersAction;
+use App\Modules\Notification\Models\NotificationEmailTemplate;
+use App\Services\EmailService;
+use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -80,12 +83,12 @@ it('sends reminders to all linked parent emails for unpaid invoices and updates 
 
     $parentUserOne = User::factory()->create([
         'email' => 'parent.one@example.com',
-        'type' => \App\Shared\Support\Enums\UserType::PARENT,
+        'type' => UserType::PARENT,
         'status' => User::STATUS_ACTIVE,
     ]);
     $parentUserTwo = User::factory()->create([
         'email' => 'parent.two@example.com',
-        'type' => \App\Shared\Support\Enums\UserType::PARENT,
+        'type' => UserType::PARENT,
         'status' => User::STATUS_ACTIVE,
     ]);
 
@@ -99,11 +102,11 @@ it('sends reminders to all linked parent emails for unpaid invoices and updates 
     $emailService->shouldReceive('sendSingleEmail')
         ->once()
         ->withArgs(fn (...$args) => $args[0] === 'parent.one@example.com')
-        ->andReturn(Mockery::mock(\App\Models\EmailLog::class));
+        ->andReturn(Mockery::mock(EmailLog::class));
     $emailService->shouldReceive('sendSingleEmail')
         ->once()
         ->withArgs(fn (...$args) => $args[0] === 'parent.two@example.com')
-        ->andReturn(Mockery::mock(\App\Models\EmailLog::class));
+        ->andReturn(Mockery::mock(EmailLog::class));
     app()->instance(EmailService::class, $emailService);
 
     $result = SendParentPaymentRemindersAction::run([
@@ -116,6 +119,58 @@ it('sends reminders to all linked parent emails for unpaid invoices and updates 
         ->and($result['skipped_no_parent_email_count'])->toBe(0);
 
     expect($invoice->fresh()->last_reminder_at)->not->toBeNull();
+});
+
+it('routes campus_id to the db email provider and renders campus-specific template text', function () {
+    config(['notifications.use_db_templates' => true]);
+
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $program = Program::factory()->create();
+
+    $student = makeParentReminderStudent($campus, $program, $semester, 'STU199', 'Campus Test Student');
+
+    NotificationEmailTemplate::updateOrCreate(
+        ['campus_id' => $campus->id, 'type_key' => 'parent_payment_reminder'],
+        ['subject' => 'Reminder campus_id_ok', 'body_html' => '<p>campus_id_ok {{parent_name}}</p>'],
+    );
+
+    $invoice = StudentInvoice::create([
+        'invoice_number' => 'PINV-199',
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'status' => 'pending',
+        'due_date' => now()->addDays(3),
+        'subtotal' => 1000000,
+        'discount_total' => 0,
+        'total_amount' => 1000000,
+        'paid_amount' => 0,
+    ]);
+
+    addParentReminderInvoiceLine($invoice, $student, $semester, 1000000, 'Tuition fee');
+
+    $parentUser = User::factory()->create([
+        'email' => 'parent.campustest@example.com',
+        'type' => UserType::PARENT,
+        'status' => User::STATUS_ACTIVE,
+    ]);
+    $parentProfile = ParentProfile::factory()->create(['user_id' => $parentUser->id]);
+    $student->parentProfiles()->attach($parentProfile->id, ['relationship' => 'father']);
+
+    $capturedContent = null;
+    $emailService = Mockery::mock(EmailService::class);
+    $emailService->shouldReceive('sendSingleEmail')
+        ->once()
+        ->andReturnUsing(function ($recipient, $subject, $content) use (&$capturedContent) {
+            $capturedContent = $content;
+
+            return Mockery::mock(EmailLog::class);
+        });
+    app()->instance(EmailService::class, $emailService);
+
+    SendParentPaymentRemindersAction::run(['invoice_ids' => [$invoice->id]]);
+
+    expect($capturedContent)->toContain('campus_id_ok');
 });
 
 it('skips parent reminders when invoice has no parent email or no outstanding balance', function () {
@@ -191,17 +246,17 @@ it('dedupes duplicate parent emails and still updates reminder marker when one d
 
     $duplicateEmailUser = User::factory()->create([
         'email' => 'shared-parent@example.com',
-        'type' => \App\Shared\Support\Enums\UserType::PARENT,
+        'type' => UserType::PARENT,
         'status' => User::STATUS_ACTIVE,
     ]);
     $successfulParentUser = User::factory()->create([
         'email' => 'active-parent@example.com',
-        'type' => \App\Shared\Support\Enums\UserType::PARENT,
+        'type' => UserType::PARENT,
         'status' => User::STATUS_ACTIVE,
     ]);
     $inactiveParentUser = User::factory()->create([
         'email' => 'inactive-parent@example.com',
-        'type' => \App\Shared\Support\Enums\UserType::PARENT,
+        'type' => UserType::PARENT,
         'status' => User::STATUS_INACTIVE,
     ]);
 
@@ -230,7 +285,7 @@ it('dedupes duplicate parent emails and still updates reminder marker when one d
     $emailService->shouldReceive('sendSingleEmail')
         ->once()
         ->withArgs(fn (...$args) => $args[0] === 'active-parent@example.com')
-        ->andReturn(Mockery::mock(\App\Models\EmailLog::class));
+        ->andReturn(Mockery::mock(EmailLog::class));
     app()->instance(EmailService::class, $emailService);
 
     $result = SendParentPaymentRemindersAction::run([

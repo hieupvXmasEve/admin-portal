@@ -122,3 +122,22 @@ it('issues a separate DB query for each distinct campus_id', function () {
 
     expect($selects)->toHaveCount(2);
 });
+
+// (e) Missing campus_id → InvalidArgumentException
+it('throws InvalidArgumentException when campus_id is absent from contentData', function () {
+    config(['notifications.use_db_templates' => true]);
+
+    $provider = new DbEmailContentProvider(NotificationTemplateTypeKey::PaymentReminder);
+
+    expect(fn () => $provider->htmlBody([]))->toThrow(InvalidArgumentException::class);
+});
+
+// (f) No seeded row for (type, campus) → RuntimeException
+it('throws RuntimeException when no template row exists for the given campus', function () {
+    config(['notifications.use_db_templates' => true]);
+
+    $provider = new DbEmailContentProvider(NotificationTemplateTypeKey::PaymentReminder);
+
+    expect(fn () => $provider->htmlBody(['campus_id' => 99999, 'student_name' => 'Test']))
+        ->toThrow(RuntimeException::class);
+});
