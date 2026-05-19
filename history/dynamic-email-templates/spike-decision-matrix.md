@@ -3,7 +3,7 @@
 **Run date:** 2026-05-19
 **Pack:** [current-story-pack-S-batch.md](current-story-pack-S-batch.md)
 **Inputs:**
-- [spike-S1-payload-coverage.md](spike-S1-payload-coverage.md) — ⏸️ BLOCKED (operator)
+- [spike-S1-payload-coverage.md](spike-S1-payload-coverage.md) — ✅ COMPLETE (local dev, 0.00% empty; staging follow-up recommended)
 - [spike-S2-emailservice-callers.md](spike-S2-emailservice-callers.md) — ✅ COMPLETE
 - [spike-S3-test-fail-root-cause.md](spike-S3-test-fail-root-cause.md) — ✅ COMPLETE
 
@@ -11,9 +11,9 @@
 
 | Downstream story | S1 | S2 | S3 | Status | Notes |
 |---|---|---|---|---|---|
-| **R1** (RetryDeliveryAction wiring) | PENDING-OPERATOR | n/a | n/a | ⏸️ **PARKED** | Operator must run staging payload-coverage query before R1 leaves planning |
-| **R2** (API + UI) | (inherits R1) | n/a | n/a | ⏸️ PARKED | Blocked on R1 |
-| **R3** (UI gate + tests) | (inherits R1) | n/a | n/a | ⏸️ PARKED | Blocked on R1 |
+| **R1** (RetryDeliveryAction wiring) | ✅ GO (local dev, 0% empty) | n/a | n/a | ✅ **GO with caveat** | Local dev evidence 11/11 populated. Recommend staging confirmation before production deploy. R1 must filter type_keys to email-capable enum cases. |
+| **R2** (API + UI) | (inherits R1) | n/a | n/a | ✅ GO | Inherits R1 GO |
+| **R3** (UI gate + tests) | (inherits R1) | n/a | n/a | ✅ GO | Inherits R1 GO |
 | **M1** (ListDeliveriesQuery) | n/a | ✅ GO | n/a | ✅ **GO** | Read-only query construction, no S1/S3 dependency |
 | **M2** (controller re-point) | n/a | ✅ GO | n/a | ✅ GO | Inherits M1 |
 | **M3** (EmailService outbox emit) | n/a | ⚠️ **GO with C1 hard-blocked first** | n/a | ⚠️ **REVISIT-SCOPE** | S2 found 6 Finance Actions reaching EmailService across module boundary; C1 promoted from parallel to hard predecessor |

@@ -263,3 +263,61 @@ An Action fell back to `null` campus_id when `app()->bound('campus')` was false:
 **Future rule:** for any Action that writes campus-bound (or any tenant-scoped) rows: resolve the scope via `app('campus')->id` and let the container's missing-binding exception propagate, OR add an explicit `if (!app()->bound('campus')) throw new RuntimeException(...)` at the top. Never `?? null` on a required scope variable. Validating gate for any Action touching tenant-scoped tables: "name the scope resolution line and confirm it throws (not nulls) on missing binding."
 
 **Full entry:** [history/learnings/20260519-non-academic-charge-generation.md](20260519-non-academic-charge-generation.md)
+
+---
+
+## [20260519] When ≥3 cross-module callers exist for an "internal" Action, document the exception — don't add a single-impl Contract
+
+**Category:** decision
+**Feature:** dynamic-email-templates / P3 / M3a
+**Tags:** [contracts, cross-module, claude-md, yagni, cleanup-epic]
+
+CLAUDE.md forbids cross-module reach into another module's internal Actions. M3b needed Finance to emit notifications via `App\Modules\Notification\Actions\PublishDomainEventAction` — but 6 cross-module callers already do this (Academic, Finance/Services, Finance/Dng, Form, 3× Query Actions). Adding a Shared Contract with a single implementation would have produced a YAGNI interface that didn't migrate the 6 existing violations, so CLAUDE.md compliance was performative.
+
+**Future rule:** when an "internal" Action has accumulated **≥3 established cross-module callers**, the de-facto contract IS the Action. Document the exception in `docs/rules/contracts.md` (one paragraph naming the Action + the precedent callers). A separate cleanup epic migrates ALL callers together when a second implementation actually appears. Validating must NOT block on "CLAUDE.md letter compliance" when the precedent count exceeds the threshold — escalate the decision to the user with Option A (accept) vs Option B (add Contract now) framing.
+
+**Full entry:** [history/learnings/20260519-dynamic-email-templates-p3-m3a.md](20260519-dynamic-email-templates-p3-m3a.md)
+
+---
+
+## [20260519] Validation's "BLOCKING" verdict requires a code-citation that proves the gap, or it must downgrade on re-grep
+
+**Category:** failure
+**Feature:** dynamic-email-templates / P3 / M3a
+**Tags:** [validating, false-positives, scout-discipline, planning-pingpong]
+
+Initial validation of the M3 pack produced 3 BLOCKING findings. Two (F1 missing type_keys, F2 handler payload clobber) were invalidated on re-grep against `app/Modules/Finance/Actions/Operations/Send*Reminders*.php` and `HandleOutboxEventAction.php:150`. Sending the pack back to planning for repairs that weren't real findings cost a planning + validation round-trip.
+
+Root cause: I treated grep-light "the pack assumes X" findings as BLOCKING without running the grep that proves X is actually missing. The pack's silence on a topic became a finding rather than a prompt to scout.
+
+**Future rule:** validating's "BLOCKING" verdict on a finding of the shape "pack assumes X exists/is-safe/is-registered" MUST cite at least one grep or read result that proves the gap. If a re-grep invalidates the finding, downgrade or drop it BEFORE writing the validation report — don't ping-pong the pack. Validating-gate checklist: every BLOCKING line in the report must have a `file:line` proof of the missing thing. No proof → not blocking.
+
+**Full entry:** [history/learnings/20260519-dynamic-email-templates-p3-m3a.md](20260519-dynamic-email-templates-p3-m3a.md)
+
+---
+
+## [20260519] User-controlled input flowing to SMTP headers needs CRLF rejection at validator, not driver
+
+**Category:** failure → pattern
+**Feature:** dynamic-email-templates / P3 / M3a
+**Tags:** [security, smtp-injection, owasp-a03, validator, email-flow]
+
+M3a routed admin-controlled `subject` from `$request->input('subject')` into `payload.rendered_email.rendered_subject` → `EmailService::sendSingleEmail` → SMTP `Subject:` header. Validator was `'subject' => ['nullable', 'string', 'max:500']`. No CRLF check. Symfony Mailer often rejects CRLF in headers since 5.x, but relying on driver-specific behavior is brittle — different drivers, future driver swaps, or direct Symfony Mime constructions all bypass the implicit defense.
+
+**Future rule:** when user-controlled input flows into ANY SMTP header (`Subject:`, `To:`, `From:`, `Reply-To:`, `Cc:`, `Bcc:`, custom headers), enforce CRLF rejection at FormRequest / inline validator level: `'subject' => [..., 'not_regex:/[\r\n]/']`. Validating + security-review must check this whenever a controller's email-flow path changes (new path, new caller, new validator). One-line fix; uniform across email-emitting controllers. Audit existing email controllers in repo for the same gap.
+
+**Full entry:** [history/learnings/20260519-dynamic-email-templates-p3-m3a.md](20260519-dynamic-email-templates-p3-m3a.md)
+
+---
+
+## [20260519] Outbox pipelines should accept a pre-rendered envelope key — don't force registry rendering for ad-hoc content
+
+**Category:** pattern
+**Feature:** dynamic-email-templates / P3 / M3a
+**Tags:** [outbox, rendering, registry-bypass, infrastructure-primitive]
+
+Notification outbox pipeline (`HandleOutboxEventAction → PersistIntentAction → SendNotificationDeliveryJob → RenderedEmailChannelAdapter`) re-rendered every email via `EmailContentRegistry` keyed on `type_key`. The admin test-send button renders the admin's DRAFT content via a transient template, NOT via the registry — routing through the existing handler would have delivered persisted-template content. Solution (Option α): handler short-circuit at the top of `buildRenderedEmail` returns `payload.rendered_email` directly when present, bypassing the registry. ~10-line guard; behavior-preserving for all existing callers (they don't set `payload.rendered_email`).
+
+**Future rule:** outbox-style pipelines (event → persist intent → channel adapter) should support an **ad-hoc rendered envelope key** that bypasses the registry. Use cases multiply: admin previews/test-sends, AI-composed messages, imported campaigns, replay-with-override flows. Avoids polluting the type_key registry with one-off keys (`test_send_adhoc` is an anti-pattern). Validating-gate when a new emitter is introduced: confirm whether content is registry-derivable from `type_key + data`, or pre-rendered → set `payload.rendered_email` if pre-rendered. Caller-contract: pre-renderers MUST sanitize HTML before placing in envelope; handler is a passthrough, not a sanitizer.
+
+**Full entry:** [history/learnings/20260519-dynamic-email-templates-p3-m3a.md](20260519-dynamic-email-templates-p3-m3a.md)

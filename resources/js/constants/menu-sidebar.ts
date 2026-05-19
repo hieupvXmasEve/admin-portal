@@ -704,7 +704,7 @@ export const mainNavItems: NavItem[] = [
                 title: 'Email Templates',
                 href: '/admin/notification-templates',
                 icon: FileText,
-                requiredPermissions: ['view_notification_ops'],
+                requiredPermissions: ['view_notification_email_template'],
             },
             {
                 title: 'Ops',

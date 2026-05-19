@@ -1,4 +1,8 @@
-# Current Story Pack: M3 — EmailService → outbox emit
+# Current Story Pack: M3 — EmailService → outbox emit  *(SUPERSEDED 2026-05-19)*
+
+> **Status:** SUPERSEDED. Split into `current-story-pack-M3a.md` (test-send button) and `current-story-pack-M3b.md` (Finance Actions) per validation report 2026-05-19 + `m3-repair-memo.md`. Reason: original pack misclaimed C1 (content Contract) resolved the cross-module dispatcher gap; F3 decision required Option A (accept `PublishDomainEventAction` precedent) which is now documented in M3b.
+>
+> Keep this file as historical record. Do not execute against it.
 
 **Feature:** dynamic-email-templates · **Phase:** P3 · **Epic:** M · **Wave:** 3 (critical path)
 **Mode:** high-risk (parent) · **Story risk:** HIGH (cross-module rewrite, production traffic)

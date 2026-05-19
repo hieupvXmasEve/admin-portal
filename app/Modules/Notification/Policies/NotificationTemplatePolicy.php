@@ -9,11 +9,16 @@ use App\Modules\Notification\Models\NotificationEmailTemplate;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 /**
- * Gates all admin read/write actions on NotificationEmailTemplate to
- * users with the `super_admin` system role.
+ * Gates all admin read/write actions on NotificationEmailTemplate via
+ * the `notification_email_templates` permission bucket
+ * (config/permission.php). Permissions are seeded by
+ * UpdatePermissionsSeeder and granted to super_admin by default;
+ * admins may grant per-action permissions to other roles at runtime
+ * to share viewer / editor / tester responsibilities.
  *
- * Decision anchor: CONTEXT.md D7 — Super Admin only; no campus scoping
- * (Super Admin edits templates for ANY campus).
+ * Decision anchor: CONTEXT.md D7 — originally super_admin only; the
+ * permission split keeps the default behavior identical (super_admin
+ * holds all four permissions) but unlocks finer-grained delegation.
  */
 class NotificationTemplatePolicy
 {
@@ -21,26 +26,26 @@ class NotificationTemplatePolicy
 
     public function viewAny(User $user): bool
     {
-        return $user->hasSystemRole('super_admin');
+        return $user->hasPermission('view_notification_email_template');
     }
 
     public function view(User $user, NotificationEmailTemplate $template): bool
     {
-        return $user->hasSystemRole('super_admin');
+        return $user->hasPermission('view_notification_email_template');
     }
 
     public function update(User $user, NotificationEmailTemplate $template): bool
     {
-        return $user->hasSystemRole('super_admin');
+        return $user->hasPermission('edit_notification_email_template');
     }
 
     public function preview(User $user, NotificationEmailTemplate $template): bool
     {
-        return $user->hasSystemRole('super_admin');
+        return $user->hasPermission('preview_notification_email_template');
     }
 
     public function testSend(User $user, NotificationEmailTemplate $template): bool
     {
-        return $user->hasSystemRole('super_admin');
+        return $user->hasPermission('test_send_notification_email_template');
     }
 }
