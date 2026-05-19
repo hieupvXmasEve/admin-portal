@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\VerifyCsrfToken;
 use App\Models\Campus;
 use App\Models\User;
 use App\Modules\Notification\Actions\RetryDeliveryAction;
@@ -14,12 +15,18 @@ use App\Modules\Notification\Models\NotificationDelivery;
 use App\Modules\Notification\Models\NotificationEventOutbox;
 use App\Modules\Notification\Models\NotificationMessage;
 use App\Services\PermissionService;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->withoutMiddleware([
+        VerifyCsrfToken::class,
+        PreventRequestForgery::class,
+    ]);
+
     $this->authorizedUser = User::factory()->create();
     $this->unauthorizedUser = User::factory()->create();
 

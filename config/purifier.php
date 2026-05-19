@@ -96,6 +96,13 @@ return [
                 ['tr', 'border', 'Text'],
             ],
         ],
+        /**
+         * Global custom attribute declarations registered with HTMLPurifier's
+         * HTMLDefinition. These apply to ALL profiles (including 'email_body'),
+         * not just the 'default' profile. Note: HTMLPurifier does not auto-inject
+         * rel="noopener noreferrer" for target="_blank"; admin-authored HTML must
+         * include rel explicitly (allowed via Attr.AllowedRel in 'email_body').
+         */
         'custom_attributes' => [
             ['a', 'target', 'Enum#_blank,_self,_target,_top'],
         ],

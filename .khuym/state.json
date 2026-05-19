@@ -1,25 +1,29 @@
 {
   "schema_version": "1.1",
-  "feature_slug": "non-academic-charge-generation",
-  "mode": "small",
-  "active_skill": "compounding",
-  "phase": "compounding-complete",
-  "current_work": "NAC-1",
-  "epic_id": "non-academic-charge-generation",
+  "feature_slug": "dynamic-email-templates",
+  "mode": "high-risk",
+  "active_skill": "swarming",
+  "phase": "swarming-complete-wave-2",
+  "current_work": "C1 + T1a + F1 SHIPPED",
+  "epic_id": "dynamic-email-templates-p3",
   "approved_gates": {
     "context": true,
     "work_shape": true,
     "phase_plan": true,
     "execution": true,
-    "review": true
+    "review": false
   },
   "active_beads": [],
   "active_workers": [],
-  "blockers": [],
-  "focus": "history/learnings/20260519-non-academic-charge-generation.md",
-  "summary": "Feature non-academic-charge-generation closed end-to-end (exploring → planning → validating → swarming → reviewing → compounding). 6 learnings synthesized, 3 promoted to critical-patterns.md. Total ecosystem accumulation: 3 learnings files, 13 critical patterns.",
-  "next_action": "Feature closed. Next: resume queued pending feature `dynamic-email-templates` P3 planning (was paused mid-flight by parallel session) — start by reading history/dynamic-email-templates/ artifacts.",
-  "last_updated": "2026-05-19T00:35:00.000Z",
+  "blockers": [
+    "S1 payload-coverage query requires operator staging DB access — R-epic remains parked",
+    "F15 behavioral rel auto-inject deferred — HTMLPurifier needs custom URI filter (separate ~30min pack if security demands)",
+    "F16 deferred to F-tests pack (multi-test grab-bag)"
+  ],
+  "focus": "history/dynamic-email-templates/spike-decision-matrix.md",
+  "summary": "Wave-2 swarming COMPLETE. C1 (Contract), T1a (CSRF test bypass: 28/0 green), F1 (F12a closed, F12b/F13 already-done, F14 nested, F15 partial w/ docblock, F16 deferred). All Pint+tests green. R-epic still parked on operator S1.",
+  "next_action": "Three choices: (1) Wave-3 planning (M3, C2, M2, T1b) once R-epic blocker S1 resolves OR independently — M3 unblocked by C1; (2) Invoke khuym:reviewing for shipped Wave-2 quality check; (3) Pause and commit current diffs (M=many).",
+  "last_updated": "2026-05-19T02:45:00.000Z",
   "last_compounding_run": {
     "feature": "non-academic-charge-generation",
     "date": "2026-05-19",

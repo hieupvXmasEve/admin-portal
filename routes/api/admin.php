@@ -1,17 +1,23 @@
 <?php
 
-use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AdminLecturerImpersonationController;
 use App\Http\Controllers\Api\AdminScheduleController;
 use App\Http\Controllers\Api\AdminStudentImpersonationController;
-use App\Http\Controllers\Api\AdminLecturerImpersonationController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\EventCheckinController;
 use App\Http\Controllers\Api\StudentController;
+use App\Http\Controllers\Api\StudentWalletController;
 use App\Http\Controllers\Api\V1\Admin\EmailConfigurationController;
 use App\Http\Controllers\Api\V1\Admin\EmailController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
+use App\Http\Controllers\Api\V1\EventParticipantController;
+use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\FormController;
+use App\Http\Controllers\Web\LectureController;
+use App\Http\Controllers\Web\RoomController;
 use App\Http\Controllers\Web\StudentApplicationController as WebStudentApplicationController;
 use App\Modules\Academic\Http\Web\StudentController as WebStudentController;
-use App\Http\Controllers\Web\FormController;
-use App\Http\Controllers\Api\StudentWalletController;
+use App\Modules\Notification\Http\Api\V1\Admin\NotificationTemplateController as NotificationTemplateApiController;
 use Illuminate\Support\Facades\Route;
 
 // Public authentication routes (Password-based login only - Google login moved to specific controllers)
@@ -90,10 +96,10 @@ Route::middleware(['web', 'auth'])->name('api.admin.')->group(function () {
     });
 
     // Rooms API - for dropdowns and quick edits
-    Route::get('/rooms', [\App\Http\Controllers\Web\RoomController::class, 'apiIndex'])->name('rooms.api-index');
+    Route::get('/rooms', [RoomController::class, 'apiIndex'])->name('rooms.api-index');
 
     // Lectures API - for dropdowns and quick edits
-    Route::get('/lectures', [\App\Http\Controllers\Web\LectureController::class, 'apiIndex'])->name('lectures.api-index');
+    Route::get('/lectures', [LectureController::class, 'apiIndex'])->name('lectures.api-index');
 
     // Form management API routes
     Route::prefix('forms')->name('api.forms.')->group(function () {
@@ -123,20 +129,20 @@ Route::middleware(['web', 'auth'])->name('api.admin.')->group(function () {
 
     // Event Check-in Management (Admin)
     Route::prefix('events')->name('events.')->group(function () {
-        Route::post('/search-student', [\App\Http\Controllers\Api\EventCheckinController::class, 'searchStudent'])->name('search-student');
-        Route::post('/checkin', [\App\Http\Controllers\Api\EventCheckinController::class, 'checkinStudent'])->name('checkin');
-        Route::get('/{event}/participants', [\App\Http\Controllers\Api\EventCheckinController::class, 'getParticipants'])->name('participants');
-        Route::get('/{event}/statistics', [\App\Http\Controllers\Api\EventCheckinController::class, 'getStatistics'])->name('statistics');
+        Route::post('/search-student', [EventCheckinController::class, 'searchStudent'])->name('search-student');
+        Route::post('/checkin', [EventCheckinController::class, 'checkinStudent'])->name('checkin');
+        Route::get('/{event}/participants', [EventCheckinController::class, 'getParticipants'])->name('participants');
+        Route::get('/{event}/statistics', [EventCheckinController::class, 'getStatistics'])->name('statistics');
 
         // Manual participant management
         Route::prefix('{event}/manual-participants')->name('manual-participants.')->group(function () {
-            Route::get('/filter-options', [\App\Http\Controllers\Api\V1\EventParticipantController::class, 'getFilterOptions'])->name('filter-options');
-            Route::post('/search-students', [\App\Http\Controllers\Api\V1\EventParticipantController::class, 'searchStudents'])->name('search-students');
-            Route::post('/add', [\App\Http\Controllers\Api\V1\EventParticipantController::class, 'addParticipants'])->name('add');
-            Route::get('/list', [\App\Http\Controllers\Api\V1\EventParticipantController::class, 'getParticipants'])->name('list');
-            Route::put('/bulk-update-status', [\App\Http\Controllers\Api\V1\EventParticipantController::class, 'bulkUpdateStatus'])->name('bulk-update-status');
-            Route::delete('/remove', [\App\Http\Controllers\Api\V1\EventParticipantController::class, 'removeParticipants'])->name('remove');
-            Route::get('/statistics', [\App\Http\Controllers\Api\V1\EventParticipantController::class, 'getStatistics'])->name('statistics');
+            Route::get('/filter-options', [EventParticipantController::class, 'getFilterOptions'])->name('filter-options');
+            Route::post('/search-students', [EventParticipantController::class, 'searchStudents'])->name('search-students');
+            Route::post('/add', [EventParticipantController::class, 'addParticipants'])->name('add');
+            Route::get('/list', [EventParticipantController::class, 'getParticipants'])->name('list');
+            Route::put('/bulk-update-status', [EventParticipantController::class, 'bulkUpdateStatus'])->name('bulk-update-status');
+            Route::delete('/remove', [EventParticipantController::class, 'removeParticipants'])->name('remove');
+            Route::get('/statistics', [EventParticipantController::class, 'getStatistics'])->name('statistics');
         });
     });
 
@@ -150,36 +156,34 @@ Route::middleware(['web', 'auth'])->name('api.admin.')->group(function () {
     });
 
     // API for Web Modals
-    require __DIR__ . '/admin/academic.php';
+    require __DIR__.'/admin/academic.php';
 });
 
 // Dashboard API routes - Separated for performance
 Route::middleware(['web', 'auth'])->prefix('dashboard')->name('api.admin.dashboard.')->group(function () {
     // Chart 1: Student distribution by campus/program
-    Route::get('/student-distribution', [\App\Http\Controllers\Web\DashboardController::class, 'studentDistribution'])->name('student-distribution');
+    Route::get('/student-distribution', [DashboardController::class, 'studentDistribution'])->name('student-distribution');
 
     // Chart 2: Enrollment growth/trend by term
-    Route::get('/enrollment-growth', [\App\Http\Controllers\Web\DashboardController::class, 'enrollmentGrowth'])->name('enrollment-growth');
+    Route::get('/enrollment-growth', [DashboardController::class, 'enrollmentGrowth'])->name('enrollment-growth');
 
     // Chart 3: Academic standings distribution
-    Route::get('/academic-standing', [\App\Http\Controllers\Web\DashboardController::class, 'academicStanding'])->name('academic-standing');
+    Route::get('/academic-standing', [DashboardController::class, 'academicStanding'])->name('academic-standing');
 
     // Chart 4: Graduation rate analysis
-    Route::get('/graduation-rate', [\App\Http\Controllers\Web\DashboardController::class, 'graduationRate'])->name('graduation-rate');
+    Route::get('/graduation-rate', [DashboardController::class, 'graduationRate'])->name('graduation-rate');
 
     // Additional dashboard endpoints
-    Route::get('/recent-activities', [\App\Http\Controllers\Web\DashboardController::class, 'recentActivities'])->name('recent-activities');
+    Route::get('/recent-activities', [DashboardController::class, 'recentActivities'])->name('recent-activities');
 });
 
 Route::middleware(['web', 'auth'])->prefix('admin')->name('api.admin.')->group(function () {
-    require __DIR__ . '/admin/notification.php';
-});
+    require __DIR__.'/admin/notification.php';
 
-use App\Modules\Notification\Http\Api\V1\Admin\NotificationTemplateController as NotificationTemplateApiController;
-
-Route::middleware(['web', 'auth'])->prefix('admin/notification-templates')->name('api.admin.notification-templates.')->group(function () {
-    Route::put('/{template}', [NotificationTemplateApiController::class, 'update'])->name('update');
-    Route::get('/variables/{type_key}', [NotificationTemplateApiController::class, 'variables'])->name('variables');
-    Route::post('/{template}/preview', [NotificationTemplateApiController::class, 'preview'])->name('preview');
-    Route::post('/{template}/test-send', [NotificationTemplateApiController::class, 'testSend'])->middleware('throttle:notification-template-test-send')->name('test-send');
+    Route::prefix('notification-templates')->name('notification-templates.')->group(function () {
+        Route::put('/{template}', [NotificationTemplateApiController::class, 'update'])->name('update');
+        Route::get('/variables/{type_key}', [NotificationTemplateApiController::class, 'variables'])->name('variables');
+        Route::post('/{template}/preview', [NotificationTemplateApiController::class, 'preview'])->name('preview');
+        Route::post('/{template}/test-send', [NotificationTemplateApiController::class, 'testSend'])->middleware('throttle:notification-template-test-send')->name('test-send');
+    });
 });

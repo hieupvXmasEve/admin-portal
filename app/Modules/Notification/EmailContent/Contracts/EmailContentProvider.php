@@ -4,20 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Notification\EmailContent\Contracts;
 
-interface EmailContentProvider
-{
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    public function subject(array $data): string;
+use App\Shared\Contracts\Notification\EmailContentProvider as SharedEmailContentProvider;
 
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    public function htmlBody(array $data): string;
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    public function textBody(array $data): ?string;
-}
+/**
+ * Back-compat shim. Concrete providers inside the Notification module continue
+ * to implement this interface; new cross-module consumers should depend on
+ * {@see SharedEmailContentProvider} directly.
+ */
+interface EmailContentProvider extends SharedEmailContentProvider {}

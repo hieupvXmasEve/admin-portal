@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Notification\EmailContent;
 
-use App\Modules\Notification\EmailContent\Contracts\EmailContentProvider;
 use App\Modules\Notification\EmailContent\Types\DbEmailContentProvider;
 use App\Modules\Notification\EmailContent\Types\DngPaymentPushedEmailContent;
 use App\Modules\Notification\EmailContent\Types\DngPaymentReceivedEmailContent;
 use App\Modules\Notification\EmailContent\Types\ParentPaymentReminderEmailContent;
 use App\Modules\Notification\EmailContent\Types\PaymentReminderEmailContent;
 use App\Modules\Notification\Enums\NotificationTemplateTypeKey;
+use App\Shared\Contracts\Notification\EmailContentProvider;
 use InvalidArgumentException;
 
 /**
