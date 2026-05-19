@@ -2,9 +2,9 @@
   "schema_version": "1.1",
   "feature_slug": "dynamic-email-templates",
   "mode": "high-risk",
-  "active_skill": "swarming",
-  "phase": "swarming-complete-wave-2",
-  "current_work": "C1 + T1a + F1 SHIPPED",
+  "active_skill": "planning",
+  "phase": "planning-wave-3-packs-ready",
+  "current_work": "Wave-3 batch (M3, C2, M2, T1b)",
   "epic_id": "dynamic-email-templates-p3",
   "approved_gates": {
     "context": true,
@@ -20,10 +20,10 @@
     "F15 behavioral rel auto-inject deferred — HTMLPurifier needs custom URI filter (separate ~30min pack if security demands)",
     "F16 deferred to F-tests pack (multi-test grab-bag)"
   ],
-  "focus": "history/dynamic-email-templates/spike-decision-matrix.md",
-  "summary": "Wave-2 swarming COMPLETE. C1 (Contract), T1a (CSRF test bypass: 28/0 green), F1 (F12a closed, F12b/F13 already-done, F14 nested, F15 partial w/ docblock, F16 deferred). All Pint+tests green. R-epic still parked on operator S1.",
-  "next_action": "Three choices: (1) Wave-3 planning (M3, C2, M2, T1b) once R-epic blocker S1 resolves OR independently — M3 unblocked by C1; (2) Invoke khuym:reviewing for shipped Wave-2 quality check; (3) Pause and commit current diffs (M=many).",
-  "last_updated": "2026-05-19T02:45:00.000Z",
+  "focus": "history/dynamic-email-templates/current-story-pack-M3.md",
+  "summary": "Wave-3 packs authored: M3 (HIGH risk — EmailService outbox emit), C2 (RenderDraftEmailTemplateAction), M2 (EmailLogController re-point, R3 dep removed), T1b (Finance auth backfill with batch/per-test phase gate). All carry entry/exit/file-ops/DAG/feasibility per Critical Pattern #8.",
+  "next_action": "Invoke khuym:validating for Wave-3 packs (M3 first — critical path). Recommended sequence: validate M3 → swarm; validate C2 + M2 + T1b in parallel.",
+  "last_updated": "2026-05-19T03:00:00.000Z",
   "last_compounding_run": {
     "feature": "non-academic-charge-generation",
     "date": "2026-05-19",
