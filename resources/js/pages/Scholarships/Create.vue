@@ -1,100 +1,119 @@
 <script setup lang="ts">
-import { Head, Link, router, useForm as useInertiaForm } from '@inertiajs/vue3';
-import { toTypedSchema } from '@vee-validate/zod';
-import { Loader2 } from 'lucide-vue-next';
-import { useForm } from 'vee-validate';
-import { toast } from 'vue-sonner';
-import { route } from 'ziggy-js';
-
+import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { getScholarshipTypeOptions, scholarshipFormSchema, type ScholarshipFormData } from '@/schemas/scholarship';
-import { ref, watch } from 'vue';
+import { calculateFixedScholarshipAmount, getScholarshipTypeOptions, type ScholarshipFormData } from '@/schemas/scholarship';
 import { generateCodeFromName } from '@/utils/string';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Loader2 } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
+import { route } from 'ziggy-js';
 
-// Validation schema
-const validationSchema = toTypedSchema(scholarshipFormSchema);
-
-// Initial form values
-const initialValues: ScholarshipFormData = {
+const form = useForm<ScholarshipFormData>({
     code: '',
     name: '',
     description: '',
     type: 'fixed_amount',
     amount: 0,
+    total_amount: null,
+    total_terms: null,
     valid_from: '',
     valid_until: '',
     is_active: true,
-};
-
-// vee-validate form
-const { handleSubmit, values, setFieldValue } = useForm({
-    validationSchema,
-    initialValues,
 });
 
-// Inertia form for submission
-const inertiaForm = useInertiaForm(initialValues);
-
-// Options
 const scholarshipTypeOptions = getScholarshipTypeOptions();
-
-// Track if code has been manually edited
 const codeManuallyEdited = ref(false);
+const isFixedAmount = computed(() => form.type === 'fixed_amount');
+const calculatedFixedAmount = computed(() => calculateFixedScholarshipAmount(form.total_amount, form.total_terms));
+const formattedCalculatedAmount = computed(() => formatCurrency(calculatedFixedAmount.value));
 
-// Auto-generate code from name
+const formatCurrency = (amount: number): string =>
+    new Intl.NumberFormat('vi-VN', {
+        style: 'currency',
+        currency: 'VND',
+        maximumFractionDigits: 0,
+    }).format(amount);
+
+const parseOptionalNumberInput = (event: Event): number | null => {
+    const value = (event.target as HTMLInputElement).value;
+
+    if (value === '') {
+        return null;
+    }
+
+    const parsed = Number(value);
+
+    return Number.isFinite(parsed) ? parsed : null;
+};
+
+const parseRequiredNumberInput = (event: Event): number => {
+    const value = (event.target as HTMLInputElement).value;
+
+    if (value === '') {
+        return 0;
+    }
+
+    const parsed = Number(value);
+
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const syncFixedAmount = () => {
+    if (isFixedAmount.value) {
+        form.amount = calculatedFixedAmount.value;
+    }
+};
+
 watch(
-    () => values.name,
+    () => form.name,
     (newName) => {
-        // Only auto-generate if code hasn't been manually edited
         if (!codeManuallyEdited.value && newName) {
-            const generatedCode = generateCodeFromName(newName);
-            setFieldValue('code', generatedCode);
+            form.code = generateCodeFromName(newName);
         }
     },
 );
 
-// Mark code as manually edited when user types in it
-const handleCodeInput = () => {
-    codeManuallyEdited.value = true;
+watch(
+    () => [form.type, form.total_amount, form.total_terms],
+    () => {
+        syncFixedAmount();
+
+        if (!isFixedAmount.value) {
+            form.total_amount = null;
+            form.total_terms = null;
+        }
+    },
+    { immediate: true },
+);
+
+const handleAmountInput = (event: Event) => {
+    if (!isFixedAmount.value) {
+        form.amount = parseRequiredNumberInput(event);
+    }
 };
 
-// Form submission handler - wrap with handleSubmit
-const onSubmit = handleSubmit((formValues) => {
-    // Convert and prepare data for submission
-    const submitData = {
-        ...formValues,
-        code: formValues.code.toUpperCase(), // Ensure uppercase
-        description: formValues.description || null,
-    };
+const submit = () => {
+    syncFixedAmount();
 
-    // Assign data to Inertia form
-    Object.assign(inertiaForm, submitData);
-
-    // Submit to server
-    inertiaForm.post(route('scholarships.store'), {
+    form.transform((data) => ({
+        ...data,
+        code: data.code.toUpperCase(),
+        description: data.description || null,
+        amount: data.type === 'fixed_amount' ? calculateFixedScholarshipAmount(data.total_amount, data.total_terms) : data.amount,
+        total_amount: data.type === 'fixed_amount' ? data.total_amount : null,
+        total_terms: data.type === 'fixed_amount' ? data.total_terms : null,
+    })).post(route('scholarships.store'), {
         onSuccess: () => {
-            toast.success('Scholarship created successfully!');
             router.visit(route('scholarships.index'));
         },
-        onError: (errors) => {
-            console.error('Validation errors:', errors);
-            const firstErrorKey = Object.keys(errors)[0];
-            const firstError = errors[firstErrorKey];
-
-            if (firstError) {
-                toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
-            } else {
-                toast.error('Failed to create scholarship. Please check the form for errors.');
-            }
-        },
     });
-});
+};
 </script>
 
 <template>
@@ -116,132 +135,118 @@ const onSubmit = handleSubmit((formValues) => {
             <CardDescription>Provide the scholarship information including code, amount, and validity period</CardDescription>
         </CardHeader>
         <CardContent>
-            <form class="space-y-6" @submit.prevent="onSubmit">
+            <form class="space-y-6" @submit.prevent="submit">
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <!-- Code -->
-                    <FormField v-slot="{ componentField }" name="code">
-                        <FormItem>
-                            <FormLabel>Scholarship Code *</FormLabel>
-                            <FormControl>
-                                <Input 
-                                    v-bind="componentField" 
-                                    placeholder="e.g., MERIT2024" 
-                                    class="font-mono" 
-                                    :disabled="inertiaForm.processing"
-                                    @input="handleCodeInput"
-                                />
-                            </FormControl>
-                            <p class="text-muted-foreground text-xs">Auto-generated from name, or enter manually</p>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                    <div class="space-y-2">
+                        <Label for="code">Scholarship Code *</Label>
+                        <Input id="code" v-model="form.code" placeholder="e.g., MERIT2024" class="font-mono" :disabled="form.processing" :class="{ 'border-red-500': form.errors.code }" @input="codeManuallyEdited = true" />
+                        <p class="text-muted-foreground text-xs">Auto-generated from name, or enter manually</p>
+                        <InputError :message="form.errors.code" />
+                    </div>
 
-                    <!-- Name -->
-                    <FormField v-slot="{ componentField }" name="name">
-                        <FormItem>
-                            <FormLabel>Scholarship Name *</FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" placeholder="e.g., Merit Scholarship 2024" :disabled="inertiaForm.processing" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                    <div class="space-y-2">
+                        <Label for="name">Scholarship Name *</Label>
+                        <Input id="name" v-model="form.name" placeholder="e.g., Merit Scholarship 2024" :disabled="form.processing" :class="{ 'border-red-500': form.errors.name }" />
+                        <InputError :message="form.errors.name" />
+                    </div>
 
-                    <!-- Description -->
-                    <FormField v-slot="{ componentField }" name="description" class="md:col-span-2">
-                        <FormItem>
-                            <FormLabel>Description</FormLabel>
-                            <FormControl>
-                                <Textarea v-bind="componentField" rows="3" placeholder="Describe the scholarship purpose and eligibility" :disabled="inertiaForm.processing" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                    <div class="space-y-2 md:col-span-2">
+                        <Label for="description">Description</Label>
+                        <Textarea id="description" v-model="form.description" rows="3" placeholder="Describe the scholarship purpose and eligibility" :disabled="form.processing" :class="{ 'border-red-500': form.errors.description }" />
+                        <InputError :message="form.errors.description" />
+                    </div>
 
-                    <!-- Type -->
-                    <FormField v-slot="{ componentField }" name="type">
-                        <FormItem>
-                            <FormLabel>Discount Type *</FormLabel>
-                            <Select v-bind="componentField" :disabled="inertiaForm.processing">
-                                <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select type" />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    <SelectItem v-for="option in scholarshipTypeOptions" :key="option.value" :value="option.value">
-                                        {{ option.label }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                    <div class="space-y-2">
+                        <Label for="type">Discount Type *</Label>
+                        <Select v-model="form.type" :disabled="form.processing">
+                            <SelectTrigger id="type" :class="{ 'border-red-500': form.errors.type }">
+                                <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="option in scholarshipTypeOptions" :key="option.value" :value="option.value">
+                                    {{ option.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <InputError :message="form.errors.type" />
+                    </div>
 
-                    <!-- Amount -->
-                    <FormField v-slot="{ componentField }" name="amount">
-                        <FormItem>
-                            <FormLabel>
-                                {{ values.type === 'percentage' ? 'Discount Percentage *' : 'Discount Amount (VND) *' }}
-                            </FormLabel>
-                            <FormControl>
-                                <Input
-                                    v-bind="componentField"
-                                    type="number"
-                                    step="0.01"
-                                    min="0.01"
-                                    :placeholder="values.type === 'percentage' ? 'e.g., 50' : 'e.g., 5000000'"
-                                    :disabled="inertiaForm.processing"
-                                    @input="(e) => componentField['onInput'](parseFloat((e.target as HTMLInputElement).value) || 0)"
-                                />
-                            </FormControl>
-                            <p class="text-muted-foreground text-xs">
-                                {{ values.type === 'percentage' ? 'Enter percentage value (e.g., 50 for 50%)' : 'Enter amount in Vietnamese Dong' }}
-                            </p>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                    <div v-if="isFixedAmount" class="space-y-2">
+                        <Label for="total_amount">Total Amount (VND) *</Label>
+                        <Input
+                            id="total_amount"
+                            :model-value="form.total_amount ?? ''"
+                            type="number"
+                            placeholder="e.g., 175000000"
+                            :disabled="form.processing"
+                            :class="{ 'border-red-500': form.errors.total_amount }"
+                            @input="form.total_amount = parseOptionalNumberInput($event)"
+                        />
+                        <InputError :message="form.errors.total_amount" />
+                    </div>
 
-                    <!-- Valid From -->
-                    <FormField v-slot="{ componentField }" name="valid_from">
-                        <FormItem>
-                            <FormLabel>Valid From *</FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" type="date" :disabled="inertiaForm.processing" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                    <div v-if="isFixedAmount" class="space-y-2">
+                        <Label for="total_terms">Total Terms *</Label>
+                        <Input
+                            id="total_terms"
+                            :model-value="form.total_terms ?? ''"
+                            type="number"
+                            step="1"
+                            min="1"
+                            placeholder="e.g., 9"
+                            :disabled="form.processing"
+                            :class="{ 'border-red-500': form.errors.total_terms }"
+                            @input="form.total_terms = parseOptionalNumberInput($event)"
+                        />
+                        <InputError :message="form.errors.total_terms" />
+                    </div>
 
-                    <!-- Valid Until -->
-                    <FormField v-slot="{ componentField }" name="valid_until">
-                        <FormItem>
-                            <FormLabel>Valid Until *</FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" type="date" :disabled="inertiaForm.processing" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                    <div class="space-y-2" :class="{ 'md:col-span-2': !isFixedAmount }">
+                        <Label for="amount">
+                            {{ isFixedAmount ? 'Calculated Discount Amount (VND) *' : 'Discount Percentage *' }}
+                        </Label>
+                        <Input
+                            id="amount"
+                            :model-value="form.amount"
+                            type="number"
+                            :step="isFixedAmount ? 1000 : 0.01"
+                            min="0.01"
+                            :readonly="isFixedAmount"
+                            :placeholder="isFixedAmount ? 'Auto calculated from total amount and terms' : 'e.g., 50'"
+                            :disabled="form.processing"
+                            :class="{ 'border-red-500': form.errors.amount, 'bg-muted': isFixedAmount }"
+                            @input="handleAmountInput"
+                        />
+                        <p class="text-muted-foreground text-xs">
+                            {{ isFixedAmount ? `Preview: ${formattedCalculatedAmount} = total amount / total terms, rounded up to 1,000 VND` : 'Enter percentage value (e.g., 50 for 50%)' }}
+                        </p>
+                        <InputError :message="form.errors.amount" />
+                    </div>
 
-                    <!-- Is Active -->
-                    <FormField v-slot="{ value: fieldValue, handleChange }" name="is_active" class="md:col-span-2">
-                        <FormItem class="flex flex-row items-center space-x-2 space-y-0">
-                            <FormControl>
-                                <Checkbox :model-value="fieldValue" @update:model-value="handleChange" :disabled="inertiaForm.processing" />
-                            </FormControl>
-                            <FormLabel class="cursor-pointer font-normal">Active (scholarship can be assigned to students)</FormLabel>
-                        </FormItem>
-                    </FormField>
+                    <div class="space-y-2">
+                        <Label for="valid_from">Valid From *</Label>
+                        <Input id="valid_from" v-model="form.valid_from" type="date" :disabled="form.processing" :class="{ 'border-red-500': form.errors.valid_from }" />
+                        <InputError :message="form.errors.valid_from" />
+                    </div>
+
+                    <div class="space-y-2">
+                        <Label for="valid_until">Valid Until *</Label>
+                        <Input id="valid_until" v-model="form.valid_until" type="date" :disabled="form.processing" :class="{ 'border-red-500': form.errors.valid_until }" />
+                        <InputError :message="form.errors.valid_until" />
+                    </div>
+
+                    <div class="flex flex-row items-center space-y-0 space-x-2 md:col-span-2">
+                        <Checkbox :model-value="form.is_active" :disabled="form.processing" @update:model-value="form.is_active = Boolean($event)" />
+                        <Label class="cursor-pointer font-normal">Active (scholarship can be assigned to students)</Label>
+                    </div>
                 </div>
 
-                <!-- Submit Button -->
                 <div class="flex justify-end gap-2">
-                    <Button type="button" variant="outline" as-child :disabled="inertiaForm.processing">
+                    <Button type="button" variant="outline" as-child :disabled="form.processing">
                         <Link :href="route('scholarships.index')">Cancel</Link>
                     </Button>
-                    <Button type="submit" :disabled="inertiaForm.processing">
-                        <Loader2 v-if="inertiaForm.processing" class="mr-2 h-4 w-4 animate-spin" />
+                    <Button type="submit" :disabled="form.processing">
+                        <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
                         Create Scholarship
                     </Button>
                 </div>

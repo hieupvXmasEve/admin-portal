@@ -8,6 +8,8 @@ export interface ScholarshipDefinition {
     description: string | null;
     type: 'percentage' | 'fixed_amount';
     amount: number;
+    total_amount?: number | string | null;
+    total_terms?: number | null;
     valid_from: string;
     valid_until: string;
     is_active: boolean;
@@ -55,6 +57,8 @@ export const scholarshipFormSchema = z
             })
             .positive('Amount must be greater than zero')
             .max(999999999.99, 'Amount is too large'),
+        total_amount: z.number().positive('Total amount must be greater than zero').nullable().optional(),
+        total_terms: z.number().int('Total terms must be a whole number').min(1, 'Total terms must be at least one').nullable().optional(),
         valid_from: z.string().min(1, 'Valid from date is required'),
         valid_until: z.string().min(1, 'Valid until date is required'),
         is_active: z.boolean().default(true),
@@ -68,7 +72,7 @@ export const scholarshipFormSchema = z
         {
             message: 'Valid until date must be after valid from date',
             path: ['valid_until'],
-        }
+        },
     )
     .refine(
         (data) => {
@@ -80,8 +84,16 @@ export const scholarshipFormSchema = z
         {
             message: 'Percentage discount cannot exceed 100%',
             path: ['amount'],
-        }
-    );
+        },
+    )
+    .refine((data) => data.type !== 'fixed_amount' || (data.total_amount !== null && data.total_amount !== undefined), {
+        message: 'Total amount is required for fixed amount scholarships',
+        path: ['total_amount'],
+    })
+    .refine((data) => data.type !== 'fixed_amount' || (data.total_terms !== null && data.total_terms !== undefined), {
+        message: 'Total terms is required for fixed amount scholarships',
+        path: ['total_terms'],
+    });
 
 export type ScholarshipFormData = z.infer<typeof scholarshipFormSchema>;
 
@@ -102,6 +114,14 @@ export const ScholarshipValidationRules = {
     amount: {
         min: 0.01,
         max: 999999999.99,
+    },
+    totalAmount: {
+        min: 0.01,
+        max: 999999999999.99,
+    },
+    totalTerms: {
+        min: 1,
+        max: 1000,
     },
     percentage: {
         min: 0.01,
@@ -133,6 +153,16 @@ export const ScholarshipValidationMessages = {
         positive: 'Scholarship amount must be greater than zero',
         max: 'Scholarship amount is too large',
         percentageMax: 'Percentage discount cannot exceed 100%',
+    },
+    totalAmount: {
+        required: 'Total amount is required for fixed amount scholarships',
+        positive: 'Total amount must be greater than zero',
+        max: 'Total amount is too large',
+    },
+    totalTerms: {
+        required: 'Total terms is required for fixed amount scholarships',
+        positive: 'Total terms must be at least one',
+        max: 'Total terms is too large',
     },
     valid_from: {
         required: 'Valid from date is required',

@@ -4,29 +4,12 @@ import { AlertCircle, Calendar, DollarSign, Hash, Loader2, Trash2, Users, X } fr
 import { route } from 'ziggy-js';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ref } from 'vue';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 
 interface Student {
     id: number;
@@ -49,7 +32,9 @@ interface Scholarship {
     name: string;
     description: string | null;
     type: 'percentage' | 'fixed_amount';
-    amount: number;
+    amount: number | string;
+    total_amount: number | string | null;
+    total_terms: number | null;
     valid_from: string;
     valid_until: string;
     is_active: boolean;
@@ -76,14 +61,26 @@ const formatDate = (date: string) => {
     });
 };
 
-const formatAmount = (amount: number, type: string) => {
+const formatAmount = (amount: number | string | null, type: string) => {
+    const numericAmount = Number(amount ?? 0);
+
     if (type === 'percentage') {
-        return `${amount}%`;
+        return `${numericAmount}%`;
     }
+
+    return formatCurrency(numericAmount);
+};
+
+const formatCurrency = (amount: number | string | null) => {
     return new Intl.NumberFormat('vi-VN', {
         style: 'currency',
         currency: 'VND',
-    }).format(amount);
+        maximumFractionDigits: 0,
+    }).format(Number(amount ?? 0));
+};
+
+const hasFixedCalculation = (scholarship: Scholarship): boolean => {
+    return scholarship.type === 'fixed_amount' && scholarship.total_amount !== null && scholarship.total_terms !== null;
 };
 
 const getStatusVariant = (): 'default' | 'destructive' | 'outline' | 'secondary' => {
@@ -141,7 +138,6 @@ const removeAssignment = () => {
 </script>
 
 <template>
-
     <Head :title="`Scholarship: ${scholarship.code}`" />
 
     <div class="flex items-center justify-between">
@@ -162,10 +158,7 @@ const removeAssignment = () => {
     <!-- Expired Warning -->
     <Alert v-if="isExpired()" variant="destructive" class="mt-6">
         <AlertCircle class="h-4 w-4" />
-        <AlertDescription>
-            This scholarship has expired and can no longer be assigned to students. Consider updating the validity
-            period or creating a new scholarship.
-        </AlertDescription>
+        <AlertDescription> This scholarship has expired and can no longer be assigned to students. Consider updating the validity period or creating a new scholarship. </AlertDescription>
     </Alert>
 
     <!-- Scholarship Information -->
@@ -220,6 +213,14 @@ const removeAssignment = () => {
                     </div>
                 </div>
 
+                <div v-if="hasFixedCalculation(scholarship)" class="flex items-start gap-3">
+                    <DollarSign class="text-muted-foreground mt-0.5 h-5 w-5" />
+                    <div class="flex-1">
+                        <p class="text-muted-foreground text-sm">Fixed Amount Calculation</p>
+                        <p class="text-sm">{{ formatCurrency(scholarship.total_amount) }} / {{ scholarship.total_terms }} terms</p>
+                    </div>
+                </div>
+
                 <div class="flex items-start gap-3">
                     <Calendar class="text-muted-foreground mt-0.5 h-5 w-5" />
                     <div class="flex-1">
@@ -237,8 +238,7 @@ const removeAssignment = () => {
                     <Users class="h-5 w-5" />
                     Assigned Students
                 </CardTitle>
-                <CardDescription>Students currently receiving this scholarship ({{ students.length }} total)
-                </CardDescription>
+                <CardDescription>Students currently receiving this scholarship ({{ students.length }} total) </CardDescription>
             </CardHeader>
             <CardContent>
                 <div v-if="students.length > 0" class="rounded-md border">
@@ -266,7 +266,7 @@ const removeAssignment = () => {
                                 </TableCell>
                                 <TableCell class="text-right">
                                     <Button variant="ghost" size="sm" @click="confirmRemoveAssignment(award)">
-                                        <X class="h-4 w-4 text-destructive" />
+                                        <X class="text-destructive h-4 w-4" />
                                     </Button>
                                 </TableCell>
                             </TableRow>
@@ -292,8 +292,7 @@ const removeAssignment = () => {
                 <div>
                     <p class="font-medium">Delete Scholarship</p>
                     <p class="text-muted-foreground text-sm">Permanently remove this scholarship from the system</p>
-                    <p v-if="students.length > 0" class="text-destructive mt-1 text-sm">⚠️ Cannot delete: {{
-                        students.length }} student(s) are assigned to this scholarship</p>
+                    <p v-if="students.length > 0" class="text-destructive mt-1 text-sm">⚠️ Cannot delete: {{ students.length }} student(s) are assigned to this scholarship</p>
                 </div>
                 <AlertDialog>
                     <AlertDialogTrigger as-child>
@@ -306,14 +305,12 @@ const removeAssignment = () => {
                         <AlertDialogHeader>
                             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the scholarship <strong>{{
-                                    scholarship.code }}</strong> from the system.
+                                This action cannot be undone. This will permanently delete the scholarship <strong>{{ scholarship.code }}</strong> from the system.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction @click="deleteScholarship"
-                                class="bg-destructive hover:bg-destructive/90">
+                            <AlertDialogAction @click="deleteScholarship" class="bg-destructive hover:bg-destructive/90">
                                 <Loader2 v-if="isDeleting" class="mr-2 h-4 w-4 animate-spin" />
                                 Delete Scholarship
                             </AlertDialogAction>
@@ -331,8 +328,8 @@ const removeAssignment = () => {
                 <AlertDialogTitle>Remove Scholarship Assignment?</AlertDialogTitle>
                 <AlertDialogDescription>
                     Are you sure you want to remove the scholarship assignment for
-                    <strong>{{ assignmentToRemove?.student.full_name }}</strong>?
-                    This action cannot be undone.
+                    <strong>{{ assignmentToRemove?.student.full_name }}</strong
+                    >? This action cannot be undone.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

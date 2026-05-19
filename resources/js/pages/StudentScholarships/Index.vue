@@ -1,37 +1,21 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { Calendar, FileUp, Plus, Trash2 } from 'lucide-vue-next';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { debounce } from 'lodash-es';
+import { Calendar, FileUp, Plus, Trash2 } from 'lucide-vue-next';
 import { reactive, ref } from 'vue';
 import { route } from 'ziggy-js';
 
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PaginatedResponse } from '@/types';
-
 
 interface Student {
     id: number;
@@ -45,7 +29,9 @@ interface ScholarshipDefinition {
     code: string;
     name: string;
     type: 'percentage' | 'fixed_amount';
-    amount: number;
+    amount: number | string;
+    total_amount?: number | string | null;
+    total_terms?: number | null;
     valid_from: string;
     valid_until: string;
     is_active: boolean;
@@ -95,8 +81,7 @@ const applyFilters = () => {
 
     // Only add params if they have meaningful values
     if (searchForm.search) params.set('search', searchForm.search);
-    if (searchForm.scholarship_code && searchForm.scholarship_code !== 'all')
-        params.set('scholarship_code', searchForm.scholarship_code);
+    if (searchForm.scholarship_code && searchForm.scholarship_code !== 'all') params.set('scholarship_code', searchForm.scholarship_code);
     if (searchForm.per_page) params.set('per_page', searchForm.per_page.toString());
 
     const url = `/student-scholarships${params.toString() ? '?' + params.toString() : ''}`;
@@ -120,23 +105,24 @@ const formatDate = (date: string) => {
     });
 };
 
-const formatAmount = (amount: number, type: string) => {
+const formatAmount = (amount: number | string, type: string) => {
+    const numericAmount = Number(amount);
+
     if (type === 'percentage') {
-        return `${amount}%`;
+        return `${numericAmount}%`;
     }
     return new Intl.NumberFormat('vi-VN', {
         style: 'currency',
         currency: 'VND',
-    }).format(amount);
+        maximumFractionDigits: 0,
+    }).format(numericAmount);
 };
 
 const isScholarshipExpired = (scholarship: ScholarshipDefinition): boolean => {
     return new Date() > new Date(scholarship.valid_until);
 };
 
-const getStatusVariant = (
-    scholarship: ScholarshipDefinition
-): 'default' | 'destructive' | 'secondary' => {
+const getStatusVariant = (scholarship: ScholarshipDefinition): 'default' | 'destructive' | 'secondary' => {
     if (isScholarshipExpired(scholarship)) return 'destructive';
     if (!scholarship.is_active) return 'secondary';
     return 'default';
@@ -211,12 +197,8 @@ const columns: ColumnDef<StudentScholarshipAward>[] = [
 
     <div class="flex items-center justify-between">
         <div>
-            <h2 class="text-foreground text-xl leading-tight font-semibold">
-                Student Scholarship Assignments
-            </h2>
-            <p class="text-muted-foreground mt-1 text-sm">
-                View and manage scholarship assignments to students
-            </p>
+            <h2 class="text-foreground text-xl leading-tight font-semibold">Student Scholarship Assignments</h2>
+            <p class="text-muted-foreground mt-1 text-sm">View and manage scholarship assignments to students</p>
         </div>
         <div class="flex gap-2">
             <Button variant="outline" as-child>
@@ -242,13 +224,7 @@ const columns: ColumnDef<StudentScholarshipAward>[] = [
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div class="space-y-2">
                     <Label for="search">Search Student</Label>
-                    <Input
-                        id="search"
-                        v-model="searchForm.search"
-                        type="text"
-                        placeholder="Search by name, ID, or email..."
-                        @input="debouncedSearch"
-                    />
+                    <Input id="search" v-model="searchForm.search" type="text" placeholder="Search by name, ID, or email..." @input="debouncedSearch" />
                 </div>
 
                 <div class="space-y-2">
@@ -259,13 +235,7 @@ const columns: ColumnDef<StudentScholarshipAward>[] = [
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Scholarships</SelectItem>
-                            <SelectItem
-                                v-for="scholarship in scholarships"
-                                :key="scholarship.id"
-                                :value="scholarship.code"
-                            >
-                                {{ scholarship.code }} - {{ scholarship.name }}
-                            </SelectItem>
+                            <SelectItem v-for="scholarship in scholarships" :key="scholarship.id" :value="scholarship.code"> {{ scholarship.code }} - {{ scholarship.name }} </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -277,10 +247,7 @@ const columns: ColumnDef<StudentScholarshipAward>[] = [
         <CardContent class="pt-6">
             <DataTable :columns="columns" :data="assignments.data">
                 <template #cell-student="{ row }">
-                    <Link
-                        :href="route('students.academic-summary.overview', row.original.student.id)"
-                        class="block transition-colors hover:text-blue-600"
-                    >
+                    <Link :href="route('students.academic-summary.overview', row.original.student.id)" class="block transition-colors hover:text-blue-600">
                         <p class="font-medium">{{ row.original.student.full_name }}</p>
                         <p class="text-muted-foreground text-sm">
                             {{ row.original.student.student_id }}
@@ -301,12 +268,7 @@ const columns: ColumnDef<StudentScholarshipAward>[] = [
 
                 <template #cell-discount="{ row }">
                     <span class="font-semibold">
-                        {{
-                            formatAmount(
-                                row.original.scholarship_definition.amount,
-                                row.original.scholarship_definition.type
-                            )
-                        }}
+                        {{ formatAmount(row.original.scholarship_definition.amount, row.original.scholarship_definition.type) }}
                     </span>
                 </template>
 
@@ -326,26 +288,18 @@ const columns: ColumnDef<StudentScholarshipAward>[] = [
                 <template #cell-actions="{ row }">
                     <div class="flex justify-start">
                         <Button variant="ghost" size="sm" @click="confirmDelete(row.original)">
-                            <Trash2 class="h-4 w-4 text-destructive" />
+                            <Trash2 class="text-destructive h-4 w-4" />
                         </Button>
                     </div>
                 </template>
             </DataTable>
 
-            <DataPagination
-                v-if="assignments.data.length > 0"
-                :pagination-data="assignments"
-                @navigate="handlePaginationNavigate"
-                @page-size-change="handlePageSizeChange"
-                class="mt-4"
-            />
+            <DataPagination v-if="assignments.data.length > 0" :pagination-data="assignments" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" class="mt-4" />
 
             <div v-if="assignments.data.length === 0" class="text-muted-foreground py-8 text-center">
                 <p>No scholarship assignments found.</p>
                 <Button class="mt-4" as-child>
-                    <Link :href="route('student-scholarships.create')">
-                        Assign Your First Scholarship
-                    </Link>
+                    <Link :href="route('student-scholarships.create')"> Assign Your First Scholarship </Link>
                 </Button>
             </div>
         </CardContent>
@@ -358,15 +312,13 @@ const columns: ColumnDef<StudentScholarshipAward>[] = [
                 <AlertDialogTitle>Remove Scholarship Assignment?</AlertDialogTitle>
                 <AlertDialogDescription>
                     Are you sure you want to remove the scholarship assignment for
-                    <strong>{{ assignmentToDelete?.student.full_name }}</strong>?
-                    This action cannot be undone.
+                    <strong>{{ assignmentToDelete?.student.full_name }}</strong
+                    >? This action cannot be undone.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction @click="deleteAssignment" class="bg-destructive hover:bg-destructive/90">
-                    Remove Assignment
-                </AlertDialogAction>
+                <AlertDialogAction @click="deleteAssignment" class="bg-destructive hover:bg-destructive/90"> Remove Assignment </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>

@@ -11,16 +11,18 @@ import { PaginatedResponse } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { debounce } from 'lodash-es';
+import { Edit, Eye } from 'lucide-vue-next';
 import { reactive } from 'vue';
 import { route } from 'ziggy-js';
-import { Edit, Eye } from 'lucide-vue-next';
 
 interface Scholarship {
     id: number;
     code: string;
     name: string;
     type: 'percentage' | 'fixed_amount';
-    amount: number;
+    amount: number | string;
+    total_amount: number | string | null;
+    total_terms: number | null;
     valid_from: string;
     valid_until: string;
     is_active: boolean;
@@ -72,14 +74,26 @@ const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString();
 };
 
-const formatAmount = (amount: number, type: string) => {
+const formatAmount = (amount: number | string | null, type: string) => {
+    const numericAmount = Number(amount ?? 0);
+
     if (type === 'percentage') {
-        return `${amount}%`;
+        return `${numericAmount}%`;
     }
+
+    return formatCurrency(numericAmount);
+};
+
+const formatCurrency = (amount: number | string | null) => {
     return new Intl.NumberFormat('vi-VN', {
         style: 'currency',
         currency: 'VND',
-    }).format(amount);
+        maximumFractionDigits: 0,
+    }).format(Number(amount ?? 0));
+};
+
+const hasFixedCalculation = (scholarship: Scholarship): boolean => {
+    return scholarship.type === 'fixed_amount' && scholarship.total_amount !== null && scholarship.total_terms !== null;
 };
 
 const getStatusVariant = (scholarship: Scholarship): 'default' | 'destructive' | 'outline' | 'secondary' => {
@@ -162,9 +176,9 @@ const handlePageSizeChange = (pageSize: number) => {
             <p class="text-muted-foreground mt-1 text-sm">Manage scholarship definitions and assignments</p>
         </div>
         <div class="flex gap-2">
-<!--            <Button variant="outline" as-child>-->
-<!--                <Link :href="route('scholarships.import')">Import Scholarships</Link>-->
-<!--            </Button>-->
+            <!--            <Button variant="outline" as-child>-->
+            <!--                <Link :href="route('scholarships.import')">Import Scholarships</Link>-->
+            <!--            </Button>-->
             <Button as-child>
                 <Link :href="route('scholarships.create')">Create Scholarship</Link>
             </Button>
@@ -225,7 +239,10 @@ const handlePageSizeChange = (pageSize: number) => {
                 </template>
 
                 <template #cell-amount="{ row }">
-                    <span class="font-medium">{{ formatAmount(row.original.amount, row.original.type) }}</span>
+                    <div>
+                        <span class="font-medium">{{ formatAmount(row.original.amount, row.original.type) }}</span>
+                        <div v-if="hasFixedCalculation(row.original)" class="text-muted-foreground text-xs">{{ formatCurrency(row.original.total_amount) }} / {{ row.original.total_terms }} terms</div>
+                    </div>
                 </template>
 
                 <template #cell-valid_from="{ row }">
@@ -249,7 +266,7 @@ const handlePageSizeChange = (pageSize: number) => {
                     <div class="flex gap-2">
                         <Button variant="ghost" size="sm" as-child>
                             <Link :href="route('scholarships.show', row.original.id)">
-                                <Eye class="size-4"/>
+                                <Eye class="size-4" />
                             </Link>
                         </Button>
                         <Button variant="ghost" size="sm" as-child>

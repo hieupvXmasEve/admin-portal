@@ -13,18 +13,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import {
-    studentScholarshipAssignmentSchema,
-    type StudentScholarshipAssignmentData,
-} from '@/schemas/scholarship';
+import { studentScholarshipAssignmentSchema, type StudentScholarshipAssignmentData } from '@/schemas/scholarship';
 
 interface Scholarship {
     id: number;
@@ -32,7 +23,9 @@ interface Scholarship {
     name: string;
     description: string | null;
     type: 'percentage' | 'fixed_amount';
-    amount: number;
+    amount: number | string;
+    total_amount?: number | string | null;
+    total_terms?: number | null;
     valid_from: string;
     valid_until: string;
     is_active: boolean;
@@ -74,14 +67,17 @@ const formatDate = (date: string) => {
     });
 };
 
-const formatAmount = (amount: number, type: string) => {
+const formatAmount = (amount: number | string, type: string) => {
+    const numericAmount = Number(amount);
+
     if (type === 'percentage') {
-        return `${amount}%`;
+        return `${numericAmount}%`;
     }
     return new Intl.NumberFormat('vi-VN', {
         style: 'currency',
         currency: 'VND',
-    }).format(amount);
+        maximumFractionDigits: 0,
+    }).format(numericAmount);
 };
 
 const isScholarshipExpired = (scholarship: Scholarship): boolean => {
@@ -90,11 +86,7 @@ const isScholarshipExpired = (scholarship: Scholarship): boolean => {
 
 const isScholarshipValid = (scholarship: Scholarship): boolean => {
     const now = new Date();
-    return (
-        scholarship.is_active &&
-        now >= new Date(scholarship.valid_from) &&
-        now <= new Date(scholarship.valid_until)
-    );
+    return scholarship.is_active && now >= new Date(scholarship.valid_from) && now <= new Date(scholarship.valid_until);
 };
 
 const activeScholarships = computed(() => {
@@ -105,7 +97,7 @@ watch(
     () => values.scholarship_code,
     (code) => {
         selectedScholarship.value = props.scholarships.find((s) => s.code === code) || null;
-    }
+    },
 );
 
 // Form submission handler
@@ -168,15 +160,9 @@ const onSubmit = handleSubmit((formValues) => {
                             <FormItem>
                                 <FormLabel>Student Email or ID *</FormLabel>
                                 <FormControl>
-                                    <Input
-                                        v-bind="componentField"
-                                        placeholder="e.g., student@example.com or S12345"
-                                        :disabled="inertiaForm.processing"
-                                    />
+                                    <Input v-bind="componentField" placeholder="e.g., student@example.com or S12345" :disabled="inertiaForm.processing" />
                                 </FormControl>
-                                <p class="text-muted-foreground text-xs">
-                                    Enter student email or student ID
-                                </p>
+                                <p class="text-muted-foreground text-xs">Enter student email or student ID</p>
                                 <FormMessage />
                             </FormItem>
                         </FormField>
@@ -192,13 +178,7 @@ const onSubmit = handleSubmit((formValues) => {
                                         </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                        <SelectItem
-                                            v-for="scholarship in activeScholarships"
-                                            :key="scholarship.id"
-                                            :value="scholarship.code"
-                                        >
-                                            {{ scholarship.code }} - {{ scholarship.name }}
-                                        </SelectItem>
+                                        <SelectItem v-for="scholarship in activeScholarships" :key="scholarship.id" :value="scholarship.code"> {{ scholarship.code }} - {{ scholarship.name }} </SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -210,11 +190,7 @@ const onSubmit = handleSubmit((formValues) => {
                             <FormItem>
                                 <FormLabel>Awarded Date</FormLabel>
                                 <FormControl>
-                                    <Input
-                                        v-bind="componentField"
-                                        type="date"
-                                        :disabled="inertiaForm.processing"
-                                    />
+                                    <Input v-bind="componentField" type="date" :disabled="inertiaForm.processing" />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -225,12 +201,7 @@ const onSubmit = handleSubmit((formValues) => {
                             <FormItem>
                                 <FormLabel>Notes</FormLabel>
                                 <FormControl>
-                                    <Textarea
-                                        v-bind="componentField"
-                                        placeholder="Optional notes about this assignment..."
-                                        rows="3"
-                                        :disabled="inertiaForm.processing"
-                                    />
+                                    <Textarea v-bind="componentField" placeholder="Optional notes about this assignment..." rows="3" :disabled="inertiaForm.processing" />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -313,9 +284,7 @@ const onSubmit = handleSubmit((formValues) => {
 
                     <Alert v-if="!isScholarshipValid(selectedScholarship)" variant="destructive">
                         <AlertCircle class="h-4 w-4" />
-                        <AlertDescription>
-                            This scholarship is not currently valid. It may be expired or not yet active.
-                        </AlertDescription>
+                        <AlertDescription> This scholarship is not currently valid. It may be expired or not yet active. </AlertDescription>
                     </Alert>
                 </CardContent>
             </Card>

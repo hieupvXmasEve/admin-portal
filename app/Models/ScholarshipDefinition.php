@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Carbon\Carbon;
 
 class ScholarshipDefinition extends Model
 {
@@ -22,6 +22,8 @@ class ScholarshipDefinition extends Model
         'description',
         'type',
         'amount',
+        'total_amount',
+        'total_terms',
         'valid_from',
         'valid_until',
         'is_active',
@@ -34,6 +36,8 @@ class ScholarshipDefinition extends Model
      */
     protected $casts = [
         'amount' => 'decimal:0',
+        'total_amount' => 'decimal:2',
+        'total_terms' => 'integer',
         'valid_from' => 'date',
         'valid_until' => 'date',
         'is_active' => 'boolean',
