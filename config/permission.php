@@ -384,6 +384,19 @@ return [
             'manage_email_system' => 'manage_email_system',
             'view_notification_ops' => 'view_notification_ops',
         ],
+
+        // Notification Templates — per-channel template management.
+        // Currently covers email templates (NotificationEmailTemplate); future
+        // channels (SMS, push, in-app) will add sibling buckets here, e.g.
+        // notification_sms_templates, notification_push_templates.
+        'notification_email_templates' => [
+            'view_notification_email_template' => 'view_notification_email_template',
+            'edit_notification_email_template' => 'edit_notification_email_template',
+            'preview_notification_email_template' => 'preview_notification_email_template',
+            'test_send_notification_email_template' => 'test_send_notification_email_template',
+            // No create/delete — per CONTEXT.md D4 the template set is fixed
+            // (rows seeded from NotificationTemplateTypeKey enum × campuses).
+        ],
     ],
 
     'actions' => [

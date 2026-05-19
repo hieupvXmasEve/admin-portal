@@ -569,7 +569,6 @@ export const mainNavItems: NavItem[] = [
                         icon: Sparkles,
                         requiredPermissions: ['allocate_finance_payment'],
                     },
-                   
                 ],
             },
             // Group: charges, invoices, payments
@@ -700,6 +699,12 @@ export const mainNavItems: NavItem[] = [
                 href: systemRoutes.notifications.send(),
                 icon: Send,
                 requiredPermissions: ['send_manual_notification'],
+            },
+            {
+                title: 'Email Templates',
+                href: '/admin/notification-templates',
+                icon: FileText,
+                requiredPermissions: ['view_notification_ops'],
             },
             {
                 title: 'Ops',

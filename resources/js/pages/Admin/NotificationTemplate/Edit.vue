@@ -81,9 +81,6 @@ const save = () => {
     // wire to form.errors via the standard Inertia error bag.
     form.put(route('admin.notification-templates.update', { template: props.template.id }), {
         preserveScroll: true,
-        onSuccess: () => {
-            toast.success('Template saved successfully.');
-        },
         onError: () => {
             toast.error('Failed to save template. Please check the errors below.');
         },
