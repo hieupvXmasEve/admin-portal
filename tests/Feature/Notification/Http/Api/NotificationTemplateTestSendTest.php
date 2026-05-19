@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Jobs\SendSingleEmailJob;
 use App\Models\Campus;
 use App\Models\Role;
 use App\Models\User;
+use App\Modules\Notification\Jobs\DispatchSingleOutboxEventJob;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
+use App\Modules\Notification\Models\NotificationEventOutbox;
 use App\Services\PermissionService;
 use Database\Seeders\InitialSetup\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -81,9 +82,18 @@ it('super admin can send a test email and a job is dispatched with TEST prefix',
     $response->assertOk();
     $response->assertJsonPath('success', true);
     $response->assertJsonPath('data.sent_to', $user->email);
+    $response->assertJsonPath('data.queued', true);
 
-    // Verify a SendSingleEmailJob was dispatched (EmailService::sendSingleEmail dispatches it)
-    Bus::assertDispatched(SendSingleEmailJob::class);
+    // Verify the outbox row was created and the job was dispatched via PublishDomainEventAction
+    Bus::assertDispatched(DispatchSingleOutboxEventJob::class);
+
+    $outbox = NotificationEventOutbox::query()
+        ->where('event_name', 'notification.test_send_requested')
+        ->first();
+
+    expect($outbox)->not->toBeNull()
+        ->and($outbox->payload['rendered_email']['rendered_subject'])->toStartWith('[TEST] ')
+        ->and($outbox->payload['type_key'])->toBe($template->type_key->value);
 });
 
 // (b) 6th send within 1 minute → 429 rate limit response.

@@ -6,14 +6,17 @@ namespace App\Modules\Notification\Http\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
+use App\Modules\Notification\Actions\PublishDomainEventAction;
+use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use App\Modules\Notification\Enums\NotificationTemplateTypeKey;
 use App\Modules\Notification\Http\Requests\UpdateNotificationTemplateRequest;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
-use App\Services\EmailService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Mews\Purifier\Facades\Purifier;
 
 /**
@@ -127,7 +130,7 @@ class NotificationTemplateController extends Controller
         $this->authorize('testSend', $template);
 
         $validator = Validator::make($request->all(), [
-            'subject' => ['nullable', 'string', 'max:500'],
+            'subject' => ['nullable', 'string', 'max:500', 'not_regex:/[\r\n]/'],
             'body_html' => ['nullable', 'string'],
         ]);
 
@@ -157,17 +160,30 @@ class NotificationTemplateController extends Controller
 
         $rendered = $transient->render($sampleVariables);
 
-        app(EmailService::class)->sendSingleEmail(
-            $request->user()->email,
-            '[TEST] '.$rendered['subject'],
-            $rendered['html'],
-            null,
-            [],
-            null,
-            [],
-            $template->campus_id,
+        $envelope = new DomainEventEnvelope(
+            eventId: (string) Str::uuid(),
+            eventName: 'notification.test_send_requested',
+            eventVersion: 1,
+            occurredAt: CarbonImmutable::now(),
+            aggregateType: 'notification_template',
+            aggregateId: (string) $template->id,
+            campusId: $template->campus_id,
+            actorUserId: $request->user()->id,
+            payload: [
+                'type_key' => $template->type_key->value,
+                'channels' => ['email'],
+                'recipient_targets' => [['type' => 'user', 'id' => $request->user()->id]],
+                'rendered_email' => [
+                    'rendered_subject' => '[TEST] '.$rendered['subject'],
+                    'rendered_html' => $rendered['html'],
+                    'rendered_text' => null,
+                ],
+                'data' => $sampleVariables,
+            ],
         );
 
-        return ApiResponse::success(['sent_to' => $request->user()->email]);
+        app(PublishDomainEventAction::class)->run($envelope);
+
+        return ApiResponse::success(['sent_to' => $request->user()->email, 'queued' => true]);
     }
 }

@@ -105,13 +105,64 @@ class HandleOutboxEventAction
     }
 
     /**
-     * Build rendered email content if a provider is registered for this type_key.
-     * Returns empty array if no provider registered (old path).
+     * Build rendered email content for a notification intent.
+     *
+     * Option α short-circuit: if the envelope's payload already carries a
+     * pre-rendered email (rendered_subject + rendered_html), return those
+     * values verbatim without consulting the EmailContentRegistry. This path
+     * is taken when the test-send button emits a notification.test_send_requested
+     * event that bundles the admin's draft content directly in the payload.
+     *
+     * Guard conditions for Option α: payload.rendered_email must be an array,
+     * rendered_subject and rendered_html must both be non-empty strings. Empty
+     * strings, null values, missing keys, and non-array payload entries all fall
+     * through to the registry path. The guard is symmetric: it rejects any form
+     * of "blank" subject or html rather than delivering a silent empty-subject email.
+     *
+     * Fallback (all existing callers — Finance reminders, DNG events, etc.):
+     * when payload.rendered_email is absent or fails the guard, resolve via
+     * registry as before.
+     *
+     * -------------------------------------------------------------------------
+     * CALLER-SANITIZE CONTRACT
+     * -------------------------------------------------------------------------
+     * Callers MUST sanitize `rendered_html` before placing it in the envelope.
+     * The handler is a passthrough, not a sanitizer. RenderedEmailChannelAdapter
+     * will deliver the HTML verbatim to the mail driver.
+     *
+     * - HTML body: apply `\Mews\Purifier\Facades\Purifier::clean($html, 'email_body')`
+     *   before constructing the outbox payload. Never place raw request input
+     *   directly into payload.rendered_email.rendered_html.
+     *
+     * - Subject: reject CRLF sequences at the FormRequest / validator layer:
+     *   `'subject' => ['string', 'not_regex:/[\r\n]/']`. The handler does NOT
+     *   strip header-injection sequences — relying on driver-level rejection is
+     *   brittle across mail driver swaps.
+     *
+     * For registry-resolved content (the else branch below),
+     * DbEmailContentProvider::htmlBody() already escapes per-variable via
+     * htmlspecialchars() — no additional Purifier call is needed on that path.
+     *
+     * Critical patterns: F3 CRLF SMTP guard, P1 pre-rendered envelope primitive.
+     * -------------------------------------------------------------------------
      *
      * @return array{rendered_subject?: string, rendered_html?: string, rendered_text?: string|null}
      */
     private function buildRenderedEmail(NotificationIntent $intent, DomainEventEnvelope $envelope): array
     {
+        $preRendered = $envelope->payload['rendered_email'] ?? null;
+
+        if (is_array($preRendered)
+            && isset($preRendered['rendered_subject'], $preRendered['rendered_html'])
+            && is_string($preRendered['rendered_subject']) && $preRendered['rendered_subject'] !== ''
+            && is_string($preRendered['rendered_html']) && $preRendered['rendered_html'] !== '') {
+            return [
+                'rendered_subject' => $preRendered['rendered_subject'],
+                'rendered_html' => $preRendered['rendered_html'],
+                'rendered_text' => $preRendered['rendered_text'] ?? null,
+            ];
+        }
+
         if (! $this->emailContentRegistry->has($intent->typeKey)) {
             return [];
         }
@@ -159,7 +210,7 @@ class HandleOutboxEventAction
                 $data['semester_code'] = $request->semester?->code ?? '';
                 $data['program_name'] = $student?->program?->name ?? '';
                 $data['invoice_code'] = $request->item_id;
-                $data['amount_formatted'] = number_format((float) $request->amount, 0, ',', '.') . ' VNĐ';
+                $data['amount_formatted'] = number_format((float) $request->amount, 0, ',', '.').' VNĐ';
                 $data['due_date'] = $request->due_date?->format('d/m/Y') ?? null;
             }
         }
