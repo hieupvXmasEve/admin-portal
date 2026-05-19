@@ -63,8 +63,7 @@ class EgcChargeGenerationController extends Controller
     public function store(
         Request $request,
         PreviewEgcChargeGenerationQuery $previewQuery
-    ): RedirectResponse
-    {
+    ): RedirectResponse {
         $validated = $request->validate([
             'semester_id' => 'required|integer|exists:semesters,id',
             'due_date' => 'required|date',

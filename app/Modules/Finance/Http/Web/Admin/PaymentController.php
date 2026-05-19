@@ -9,10 +9,11 @@ use App\Models\FinanceCharge as FinanceChargeModel;
 use App\Models\Payment;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Modules\Finance\Dng\Models\DngPaymentRequest;
-use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
-use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Actions\AllocatePaymentAction;
+use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
+use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
 use App\Modules\Finance\Queries\GetPaymentDetailsQuery;
 use App\Modules\Finance\Queries\ListPaymentsQuery;
 use App\Modules\Finance\Queries\Operations\PreviewAutoAllocateQuery;
@@ -230,7 +231,7 @@ class PaymentController extends Controller
         return response()->json($preview);
     }
 
-    public function autoAllocate(Request $request, \App\Modules\Finance\Actions\AutoAllocatePaymentsAction $action)
+    public function autoAllocate(Request $request, AutoAllocatePaymentsAction $action)
     {
         $request->validate([
             'priority_order' => 'required|array',

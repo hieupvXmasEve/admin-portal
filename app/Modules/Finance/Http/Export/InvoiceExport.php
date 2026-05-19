@@ -6,7 +6,6 @@ use App\Models\StudentInvoice;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Illuminate\Http\Request;
 
 class InvoiceExport implements FromQuery, WithHeadings, WithMapping
 {
@@ -27,15 +26,15 @@ class InvoiceExport implements FromQuery, WithHeadings, WithMapping
             $query->forCampus($campusId);
         }
 
-        if (!empty($this->filters['semester_id'])) {
+        if (! empty($this->filters['semester_id'])) {
             $query->forSemester($this->filters['semester_id']);
         }
 
-        if (!empty($this->filters['search'])) {
+        if (! empty($this->filters['search'])) {
             $query->search($this->filters['search']);
         }
 
-        if (!empty($this->filters['status']) && $this->filters['status'] !== 'all') {
+        if (! empty($this->filters['status']) && $this->filters['status'] !== 'all') {
             $query->filterByStatus($this->filters['status']);
         }
 

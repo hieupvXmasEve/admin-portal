@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Operations;
 
 use App\Models\StudentInvoice;
-use Illuminate\Support\Facades\DB;
 
 class GetDueInvoicesSummaryQuery
 {
@@ -14,9 +13,9 @@ class GetDueInvoicesSummaryQuery
         $campusId = app('campus')?->id;
         $today = now()->startOfDay();
 
-        $baseQuery = fn() => StudentInvoice::query()
-            ->when($semesterId, fn($q) => $q->where('semester_id', $semesterId))
-            ->when($campusId, fn($q) => $q->whereHas('student', fn($sq) => $sq->where('campus_id', $campusId)));
+        $baseQuery = fn () => StudentInvoice::query()
+            ->when($semesterId, fn ($q) => $q->where('semester_id', $semesterId))
+            ->when($campusId, fn ($q) => $q->whereHas('student', fn ($sq) => $sq->where('campus_id', $campusId)));
 
         return [
             'upcoming_count' => $baseQuery()
@@ -39,7 +38,7 @@ class GetDueInvoicesSummaryQuery
                 ->whereNotNull('due_date')
                 ->where('due_date', '<', $today)
                 ->get()
-                ->sum(fn($invoice) => $invoice->outstanding_balance),
+                ->sum(fn ($invoice) => $invoice->outstanding_balance),
         ];
     }
 }

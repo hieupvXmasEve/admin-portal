@@ -9,7 +9,9 @@ use App\Models\InvoiceDiscount;
 use App\Models\Student;
 use App\Models\StudentInvoice;
 use App\Models\StudentScholarshipAward;
+use App\Models\Unit;
 use App\Modules\Finance\Services\DeferChargeResolver;
+use App\Modules\Finance\Support\BillingScopeHelper;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 
@@ -20,7 +22,7 @@ class PreviewChargeGenerationQuery
         $semesterId = (int) $params['semester_id'];
         $chargeTypes = $params['charge_types'];
 
-        $query = \App\Modules\Finance\Support\BillingScopeHelper::getEligibleStudentsQuery(
+        $query = BillingScopeHelper::getEligibleStudentsQuery(
             (int) $semesterId,
             $params['scope_type'],
             [
@@ -124,7 +126,7 @@ class PreviewChargeGenerationQuery
                         }
 
                         foreach ($levelsToCharge as $level) {
-                            $unit = \App\Models\Unit::where('unit_type', 'egc')->where('level', $level)->first();
+                            $unit = Unit::where('unit_type', 'egc')->where('level', $level)->first();
                             $fee = $unit ? (float) $unit->base_fee : 0;
 
                             if ($fee > 0) {

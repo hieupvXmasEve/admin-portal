@@ -10,11 +10,13 @@ use App\Models\InvoiceLine;
 use App\Models\Student;
 use App\Models\StudentInvoice;
 use App\Models\StudentScholarshipAward;
+use App\Models\Unit;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\BillingScopeHelper;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -25,7 +27,7 @@ class GenerateBatchChargesAction
         $semesterId = (int) $data['semester_id'];
         $chargeTypes = $data['charge_types'];
         $createdByUserId = auth()->id();
-        $dueDate = isset($data['due_date']) ? \Carbon\Carbon::parse($data['due_date']) : now()->addDays(30);
+        $dueDate = isset($data['due_date']) ? Carbon::parse($data['due_date']) : now()->addDays(30);
 
         // 1. Strict Scope: Only specific statuses and current campus
         $query = BillingScopeHelper::getEligibleStudentsQuery(
@@ -128,7 +130,7 @@ class GenerateBatchChargesAction
                                 }
 
                                 foreach ($lvls as $l) {
-                                    $u = \App\Models\Unit::where('unit_type', 'egc')->where('level', $l)->first();
+                                    $u = Unit::where('unit_type', 'egc')->where('level', $l)->first();
                                     if ($u) {
                                         $potentialAmount += $u->base_fee;
                                     }
@@ -205,7 +207,7 @@ class GenerateBatchChargesAction
                                 }
 
                                 foreach ($levelsToCharge as $level) {
-                                    $unit = \App\Models\Unit::where('unit_type', 'egc')->where('level', $level)->first();
+                                    $unit = Unit::where('unit_type', 'egc')->where('level', $level)->first();
                                     $fee = $unit ? (float) $unit->base_fee : 0;
 
                                     if ($fee > 0) {
@@ -379,7 +381,7 @@ class GenerateBatchChargesAction
             ->first();
     }
 
-    private static function createDraftInvoice(Student $student, int $semesterId, \Carbon\Carbon $dueDate): StudentInvoice
+    private static function createDraftInvoice(Student $student, int $semesterId, Carbon $dueDate): StudentInvoice
     {
         return StudentInvoice::create([
             'student_id' => $student->id,

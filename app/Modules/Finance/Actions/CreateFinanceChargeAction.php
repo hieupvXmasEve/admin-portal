@@ -9,6 +9,7 @@ use App\Models\InvoiceLine;
 use App\Models\StudentInvoice;
 use App\Models\StudentScholarshipAward;
 use App\Modules\Finance\Services\InvoiceGenerationService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class CreateFinanceChargeAction
@@ -39,7 +40,7 @@ class CreateFinanceChargeAction
             ]);
 
             // All charges (positive & negative) get assigned to invoice
-            $dueDate = isset($data['due_date']) ? \Carbon\Carbon::parse($data['due_date']) : null;
+            $dueDate = isset($data['due_date']) ? Carbon::parse($data['due_date']) : null;
             $invoice = $this->getInvoiceForCharge($charge, $data['invoice_id'] ?? null, $dueDate);
             $this->assignChargeToInvoice($charge, $invoice);
 
@@ -98,7 +99,7 @@ class CreateFinanceChargeAction
     /**
      * Get invoice for charge - use selected invoice or find/create one.
      */
-    protected function getInvoiceForCharge(FinanceCharge $charge, ?int $invoiceId = null, ?\Carbon\Carbon $dueDate = null): StudentInvoice
+    protected function getInvoiceForCharge(FinanceCharge $charge, ?int $invoiceId = null, ?Carbon $dueDate = null): StudentInvoice
     {
         // If user selected an invoice, use it (but verify it's draft and matches student/semester)
         if ($invoiceId) {
@@ -120,7 +121,7 @@ class CreateFinanceChargeAction
     /**
      * Find or create an invoice for a charge.
      */
-    protected function findOrCreateInvoiceForCharge(FinanceCharge $charge, ?\Carbon\Carbon $dueDate = null): StudentInvoice
+    protected function findOrCreateInvoiceForCharge(FinanceCharge $charge, ?Carbon $dueDate = null): StudentInvoice
     {
         // Find existing draft invoice for this student and semester
         $invoice = StudentInvoice::where('student_id', $charge->student_id)
@@ -139,7 +140,7 @@ class CreateFinanceChargeAction
     /**
      * Create a new invoice for a student in a semester.
      */
-    protected function createInvoiceForSemester(int $studentId, int $semesterId, ?\Carbon\Carbon $dueDate = null): StudentInvoice
+    protected function createInvoiceForSemester(int $studentId, int $semesterId, ?Carbon $dueDate = null): StudentInvoice
     {
         // Generate invoice number
         $invoiceNumber = $this->generateInvoiceNumber($studentId, $semesterId);

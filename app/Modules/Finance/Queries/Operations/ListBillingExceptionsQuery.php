@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Operations;
 
-use App\Models\CourseRegistration;
-use App\Models\FinanceCharge;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
 
 class ListBillingExceptionsQuery
 {

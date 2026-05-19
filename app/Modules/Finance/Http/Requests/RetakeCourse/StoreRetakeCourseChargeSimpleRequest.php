@@ -24,13 +24,13 @@ class StoreRetakeCourseChargeSimpleRequest extends FormRequest
     {
         return [
             'registration_id' => ['required', 'integer', 'exists:course_retake_registrations,id'],
-            'charge_type'     => ['required', 'string', Rule::in([
+            'charge_type' => ['required', 'string', Rule::in([
                 FinanceCharge::TYPE_RETAKE_FEE,
                 FinanceCharge::TYPE_EXAM_RESIT_FEE,
                 FinanceCharge::TYPE_MANUAL_FEE,
             ])],
-            'amount'          => ['required', 'numeric', 'min:0'],
-            'description'     => ['required', 'string', 'max:255'],
+            'amount' => ['required', 'numeric', 'min:0'],
+            'description' => ['required', 'string', 'max:255'],
         ];
     }
 
@@ -38,13 +38,13 @@ class StoreRetakeCourseChargeSimpleRequest extends FormRequest
     {
         return [
             'registration_id.required' => 'Đăng ký học lại là bắt buộc.',
-            'registration_id.exists'   => 'Đăng ký học lại không tồn tại.',
-            'charge_type.required'     => 'Loại phí là bắt buộc.',
-            'charge_type.in'           => 'Loại phí không hợp lệ.',
-            'amount.required'          => 'Số tiền là bắt buộc.',
-            'amount.min'               => 'Số tiền phải lớn hơn hoặc bằng 0.',
-            'description.required'     => 'Mô tả khoản phí là bắt buộc.',
-            'description.max'          => 'Mô tả không được vượt quá 255 ký tự.',
+            'registration_id.exists' => 'Đăng ký học lại không tồn tại.',
+            'charge_type.required' => 'Loại phí là bắt buộc.',
+            'charge_type.in' => 'Loại phí không hợp lệ.',
+            'amount.required' => 'Số tiền là bắt buộc.',
+            'amount.min' => 'Số tiền phải lớn hơn hoặc bằng 0.',
+            'description.required' => 'Mô tả khoản phí là bắt buộc.',
+            'description.max' => 'Mô tả không được vượt quá 255 ký tự.',
         ];
     }
 }

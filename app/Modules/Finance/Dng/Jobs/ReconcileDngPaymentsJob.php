@@ -31,8 +31,7 @@ class ReconcileDngPaymentsJob implements ShouldQueue
     public function handle(
         DngReconciliationService $reconciliationService,
         DngCampusCodeResolver $dngCampusCodeResolver,
-    ): void
-    {
+    ): void {
         $date = $this->date ?? now()->format('Y-m-d H:i:s');
         $campusCodes = $dngCampusCodeResolver->allConfiguredCampusCodes();
 

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Actions;
 
 use App\Models\FinanceCharge;
+use App\Models\InvoiceDiscount;
 use App\Models\InvoiceLine;
+use App\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Support\Facades\DB;
 
@@ -72,7 +74,7 @@ class VoidFinanceChargeAction
                 ]);
 
                 foreach ($releasedDiscountIds as $discountId) {
-                    $discount = \App\Models\InvoiceDiscount::query()->find($discountId);
+                    $discount = InvoiceDiscount::query()->find($discountId);
 
                     if ($discount) {
                         $this->settlementService->synchronizeDiscountAllocations($discount);
@@ -143,7 +145,7 @@ class VoidFinanceChargeAction
             return;
         }
 
-        $invoices = \App\Models\StudentInvoice::whereIn('id', array_unique($invoiceIds))
+        $invoices = StudentInvoice::whereIn('id', array_unique($invoiceIds))
             ->with('invoiceLines')
             ->get();
 

@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Dng;
 
-use App\Models\Campus;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
-use Illuminate\Auth\Access\AuthorizationException;
 
 class GetDngWebhookEventDetailsQuery
 {

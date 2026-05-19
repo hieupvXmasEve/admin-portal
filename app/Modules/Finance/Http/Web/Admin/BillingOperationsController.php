@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\FinanceCharge;
 use App\Models\Semester;
+use App\Modules\Finance\Enums\NonAcademicChargeTypeEnum;
+use App\Modules\Finance\Exports\NonAcademicChargesTemplateExport;
 use App\Modules\Finance\Queries\Operations\GetBillingDashboardStatsQuery;
 use App\Modules\Finance\Queries\Operations\GetBillingDashboardStudentsQuery;
 use App\Modules\Finance\Queries\Operations\GetBillingExceptionCountsQuery;
@@ -16,6 +17,8 @@ use App\Modules\Finance\Queries\Operations\ListDueItemsQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class BillingOperationsController extends Controller
 {
@@ -71,37 +74,28 @@ class BillingOperationsController extends Controller
     public function showGenerateCharges(Request $request): Response
     {
         $semesters = Semester::orderBy('start_date', 'desc')->get();
-        $currentSemester = Semester::where('is_active', true)->first();
-
-        // Updated Charge Types based on Use Cases
-        $chargeTypes = [
-            [
-                'value' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-                'label' => 'GC Fee (EGC Level)',
-                'description' => 'Áp dụng cho sinh viên status "intake_pre_uni_gc"',
-                'is_credit' => false,
-            ],
-            [
-                'value' => FinanceCharge::TYPE_TUITION_TERM,
-                'label' => 'Course Tuition Fee (Học phí khóa)',
-                'description' => 'Áp dụng cho sinh viên status "intake_course"',
-                'is_credit' => false,
-            ],
-            [
-                'value' => 'voucher',
-                'label' => 'Voucher',
-                'description' => 'Tự động áp dụng voucher khả dụng (chưa dùng)',
-                'is_credit' => true,
-            ],
-            // Retake fee can be added if logic supports it, currently logic focuses on status-based fee.
-            // Keeping it out for now as prompt focused on status-based generation.
-        ];
+        $currentCampus = app()->bound('campus') ? app('campus') : null;
 
         return Inertia::render('Finance/Operations/GenerateCharges', [
+            'feeTypes' => NonAcademicChargeTypeEnum::forSelect(),
             'semesters' => $semesters,
-            'chargeTypes' => $chargeTypes,
-            'currentSemester' => $currentSemester,
+            'currentCampus' => $currentCampus ? ['id' => $currentCampus->id, 'name' => $currentCampus->name ?? null] : null,
         ]);
+    }
+
+    /**
+     * Download the CSV template for non-academic charge generation.
+     *
+     * Requires the same permission as the generate-charges page (view_finance_operations_generate_charges).
+     * Returns a CSV file with a single `student_code` column and one example row.
+     */
+    public function downloadNonAcademicChargesTemplate(): BinaryFileResponse
+    {
+        return Excel::download(
+            new NonAcademicChargesTemplateExport,
+            'non_academic_charges_template.csv',
+            \Maatwebsite\Excel\Excel::CSV,
+        );
     }
 
     public function exceptions(

@@ -9,6 +9,7 @@ use App\Models\EgcBlock;
 use App\Models\FinanceCharge;
 use App\Models\Payment;
 use App\Models\Student;
+use Illuminate\Support\Collection;
 
 class BuildEgcCarryForwardPlanAction
 {
@@ -94,6 +95,7 @@ class BuildEgcCarryForwardPlanAction
 
             if ($activeLines->count() !== 1) {
                 $issues[] = "Charge #{$charge->id} must have exactly one active invoice line.";
+
                 continue;
             }
 
@@ -102,6 +104,7 @@ class BuildEgcCarryForwardPlanAction
 
             if ($netDiscount > 0) {
                 $issues[] = "Charge #{$charge->id} has discount allocations and needs manual review.";
+
                 continue;
             }
 
@@ -169,9 +172,9 @@ class BuildEgcCarryForwardPlanAction
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, CourseRegistration>>  $registrationsBySemester
+     * @param  Collection<int, Collection<int, CourseRegistration>>  $registrationsBySemester
      */
-    private function hasMatchedRegistration(EgcBlock $block, \Illuminate\Support\Collection $registrationsBySemester): bool
+    private function hasMatchedRegistration(EgcBlock $block, Collection $registrationsBySemester): bool
     {
         $registrations = $registrationsBySemester->get($block->semester_id, collect());
 

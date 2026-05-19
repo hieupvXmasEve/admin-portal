@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Operations;
 
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
-use Illuminate\Support\Facades\DB;
 
 class GetDueItemsSummaryQuery
 {
@@ -17,9 +16,9 @@ class GetDueItemsSummaryQuery
         // Only DNG requests - no need to check for student exclusion
 
         // DNG Requests summary
-        $dngBaseQuery = fn() => DngPaymentRequest::query()
-            ->when($semesterId, fn($q) => $q->where('semester_id', $semesterId))
-            ->when($campusId, fn($q) => $q->whereHas('student', fn($sq) => $sq->where('campus_id', $campusId)))
+        $dngBaseQuery = fn () => DngPaymentRequest::query()
+            ->when($semesterId, fn ($q) => $q->where('semester_id', $semesterId))
+            ->when($campusId, fn ($q) => $q->whereHas('student', fn ($sq) => $sq->where('campus_id', $campusId)))
             ->where('status', 'pushed_to_dng')
             ->whereNotNull('due_date');
 

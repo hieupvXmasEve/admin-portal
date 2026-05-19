@@ -6,7 +6,6 @@ namespace App\Modules\Finance\Queries\Operations;
 
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
 
 class ListDueItemsQuery
 {
@@ -65,7 +64,7 @@ class ListDueItemsQuery
             return [
                 'id' => $request->id,
                 'type' => 'dng_request',
-                'invoice_number' => 'DNG-' . $request->id,
+                'invoice_number' => 'DNG-'.$request->id,
                 'student_id' => $request->student_id,
                 'student_code' => $request->student?->student_id,
                 'student_name' => $request->student?->full_name,

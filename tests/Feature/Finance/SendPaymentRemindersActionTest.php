@@ -3,14 +3,16 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
+use App\Models\EmailLog;
 use App\Models\FinanceCharge;
 use App\Models\InvoiceLine;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentInvoice;
-use App\Services\EmailService;
 use App\Modules\Finance\Actions\Operations\SendPaymentRemindersAction;
+use App\Modules\Notification\Models\NotificationEmailTemplate;
+use App\Services\EmailService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -81,7 +83,7 @@ it('sends reminders to student emails for unpaid invoices and updates invoice ma
     $emailService->shouldReceive('sendSingleEmail')
         ->once()
         ->withArgs(fn (...$args) => $args[0] === 'student.one@example.com')
-        ->andReturn(Mockery::mock(\App\Models\EmailLog::class));
+        ->andReturn(Mockery::mock(EmailLog::class));
     app()->instance(EmailService::class, $emailService);
 
     $result = SendPaymentRemindersAction::run([
@@ -94,6 +96,50 @@ it('sends reminders to student emails for unpaid invoices and updates invoice ma
         ->and($result['skipped_no_student_email_count'])->toBe(0);
 
     expect($invoice->fresh()->last_reminder_at)->not->toBeNull();
+});
+
+it('routes campus_id to the db email provider and renders campus-specific template text', function () {
+    config(['notifications.use_db_templates' => true]);
+
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $program = Program::factory()->create();
+
+    $student = makeStudentReminderStudent($campus, $program, $semester, 'STU099', 'Campus Student', 'campus.student@example.com');
+
+    NotificationEmailTemplate::updateOrCreate(
+        ['campus_id' => $campus->id, 'type_key' => 'payment_reminder'],
+        ['subject' => 'campus_id_ok subject', 'body_html' => '<p>campus_id_ok {{student_name}}</p>'],
+    );
+
+    $invoice = StudentInvoice::create([
+        'invoice_number' => 'INV-099',
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'status' => 'pending',
+        'due_date' => now()->addDays(3),
+        'subtotal' => 1000000,
+        'discount_total' => 0,
+        'total_amount' => 1000000,
+        'paid_amount' => 0,
+    ]);
+
+    addStudentReminderInvoiceLine($invoice, $student, $semester, 1000000, 'Tuition fee');
+
+    $capturedContent = null;
+    $emailService = Mockery::mock(EmailService::class);
+    $emailService->shouldReceive('sendSingleEmail')
+        ->once()
+        ->andReturnUsing(function ($recipient, $subject, $content) use (&$capturedContent) {
+            $capturedContent = $content;
+
+            return Mockery::mock(EmailLog::class);
+        });
+    app()->instance(EmailService::class, $emailService);
+
+    SendPaymentRemindersAction::run(['invoice_ids' => [$invoice->id]]);
+
+    expect($capturedContent)->toContain('campus_id_ok');
 });
 
 it('skips student reminders when invoice has no debt or student email is missing', function () {

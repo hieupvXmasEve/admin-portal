@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Operations;
 
+use App\Models\FinanceCharge;
 use App\Models\InvoiceLine;
 use App\Models\Payment;
 use App\Models\StudentInvoice;
@@ -346,6 +347,6 @@ class ListSettlementWorklistQuery
             return false;
         }
 
-        return $line->charge === null || $line->charge->status === \App\Models\FinanceCharge::STATUS_ACTIVE;
+        return $line->charge === null || $line->charge->status === FinanceCharge::STATUS_ACTIVE;
     }
 }

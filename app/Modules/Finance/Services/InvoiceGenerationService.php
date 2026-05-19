@@ -8,6 +8,7 @@ use App\Models\FinanceCharge;
 use App\Models\InvoiceDiscount;
 use App\Models\InvoiceLine;
 use App\Models\StudentInvoice;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class InvoiceGenerationService
@@ -23,7 +24,7 @@ class InvoiceGenerationService
         int $studentId,
         int $semesterId,
         ?int $billingCycleId = null,
-        ?\Carbon\Carbon $dueDate = null
+        ?Carbon $dueDate = null
     ): StudentInvoice {
         // Find existing invoice or create new
         $invoice = StudentInvoice::firstOrNew([
@@ -196,7 +197,7 @@ class InvoiceGenerationService
     /**
      * Generate invoices for multiple students in a semester.
      */
-    public function bulkGenerateInvoices(array $studentIds, int $semesterId, ?int $billingCycleId = null, ?\Carbon\Carbon $dueDate = null): array
+    public function bulkGenerateInvoices(array $studentIds, int $semesterId, ?int $billingCycleId = null, ?Carbon $dueDate = null): array
     {
         $results = [];
 

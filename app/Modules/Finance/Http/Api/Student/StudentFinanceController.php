@@ -6,7 +6,9 @@ namespace App\Modules\Finance\Http\Api\Student;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
+use App\Models\FinanceCharge;
 use App\Models\Payment;
+use App\Models\Semester;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
@@ -14,6 +16,7 @@ use App\Modules\Finance\Services\FinanceChargeService;
 use App\Modules\Finance\Services\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class StudentFinanceController extends Controller
 {
@@ -224,7 +227,7 @@ class StudentFinanceController extends Controller
             return ApiResponse::error('Unauthorized', [], 401);
         }
 
-        $charge = \App\Models\FinanceCharge::where('id', $chargeId)
+        $charge = FinanceCharge::where('id', $chargeId)
             ->where('student_id', $student->id)
             ->with(['semester', 'invoiceLines.paymentApplications.payment'])
             ->first();
@@ -748,7 +751,7 @@ class StudentFinanceController extends Controller
         // Resolve semester for response
         $semester = null;
         if ($semesterId) {
-            $semester = \App\Models\Semester::find($semesterId, ['id', 'name']);
+            $semester = Semester::find($semesterId, ['id', 'name']);
         }
 
         return ApiResponse::success([
@@ -780,7 +783,7 @@ class StudentFinanceController extends Controller
     /**
      * Format allocations for a payment.
      */
-    private function formatAllocations(Payment $payment): \Illuminate\Support\Collection
+    private function formatAllocations(Payment $payment): Collection
     {
         return $payment->applications->map(function ($app) {
             $line = $app->invoiceLine;

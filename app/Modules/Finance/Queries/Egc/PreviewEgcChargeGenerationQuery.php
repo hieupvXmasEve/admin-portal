@@ -8,8 +8,8 @@ use App\Models\EgcBlock;
 use App\Models\FinanceCharge;
 use App\Models\Student;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class PreviewEgcChargeGenerationQuery
 {
