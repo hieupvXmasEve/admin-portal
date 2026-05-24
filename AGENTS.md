@@ -1,8 +1,6 @@
 # AGENTS.md
 
-Guidance for all AI coding agents (OpenCode, Devin, Codex, Cursor, and others) when working in this repository.
-
-> **Note for Claude Code users**: see `CLAUDE.md` for the same baseline in Claude's native format.
+Guidance for all AI coding agents (Claude Code, Codex, Cursor, OpenCode, and others) when working in this repository. This is the single source of truth — Claude Code falls back to this file when no `CLAUDE.md` exists.
 
 ## Project
 
@@ -12,13 +10,12 @@ Guidance for all AI coding agents (OpenCode, Devin, Codex, Cursor, and others) w
 **Product:** University operations platform — web admin/staff app + student/lecturer API surfaces.
 **Architecture:** Hybrid modular monolith. New business logic in `app/Modules/{Domain}`. Shared legacy services in `app/Services/*`.
 
-> **CRITICAL — Version awareness:** This project runs **Laravel 13** and **Inertia v3**. Many v2 APIs are removed or renamed. Before writing any Inertia or Laravel code, consult `docs/inertiajs-vue-info.md` (Inertia v3 reference) and `.devin/skills/swinx-frontend/` (project standards). Never use deprecated patterns from older versions.
+> **CRITICAL — Version awareness:** This project runs **Laravel 13** and **Inertia v3**. Many v2 APIs are removed or renamed. Before writing any Inertia or Laravel code, consult `docs/inertiajs-vue-info.md` (Inertia v3 reference). Never use deprecated patterns from older versions.
 
 ## Source of Truth
 
 Read these before planning any change:
 
-- `docs/ai-context.md` — quick-start: what to read, what not to do (START HERE)
 - `README.md` — current baseline, entry points, operational risks
 - `docs/code-standards.md` — implementation rules and quality gates
 - `docs/system-architecture.md` — architecture and module boundaries
@@ -86,7 +83,7 @@ Breaking changes from Inertia v2 → v3. Violating these produces runtime errors
 - `Inertia::lazy()` → use `Inertia::defer()` or `Inertia::optional()`
 - `$page.props.flash` → use `usePage().props.flash` with `Inertia::flash()`
 
-> Full reference: `docs/inertiajs-vue-info.md` | Project patterns: `.devin/skills/swinx-frontend/`
+> Full reference: `docs/inertiajs-vue-info.md`
 
 ## Forbidden Patterns
 
@@ -200,3 +197,19 @@ Before ending a substantial Khuym work chunk:
 2. Leave `.khuym/state.json` and `.khuym/HANDOFF.json` consistent with the current pause/resume state.
 3. Mention any remaining blockers, open questions, or next actions in the final response.
 <!-- KHUYM:END -->
+
+<!-- HARNESS:BEGIN -->
+## Harness
+
+This repo uses Harness. Before work, read:
+
+- `README.md`
+- `docs/HARNESS.md`
+- `docs/FEATURE_INTAKE.md`
+- `docs/ARCHITECTURE.md`
+- `scripts/harness query matrix`
+
+Use the Rust Harness CLI as the main operational tool. Run it through the
+stable repo-local entrypoint `scripts/harness`, which uses the prebuilt Rust
+binary at `scripts/bin/harness-cli` in installed projects.
+<!-- HARNESS:END -->

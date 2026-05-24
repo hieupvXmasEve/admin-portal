@@ -5,7 +5,7 @@ Source of truth: `docs/`
 
 ## AI Quick-Start
 
-- [AI Context (start here)](./ai-context.md) — task-to-rule mapping + top mistakes
+- See `AGENTS.md` at the repo root — single source of truth for all AI agents (rules, commands, forbidden patterns, harness flow).
 
 ## Core Baseline
 

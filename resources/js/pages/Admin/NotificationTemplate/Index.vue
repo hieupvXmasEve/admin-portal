@@ -50,6 +50,7 @@ interface PaginatedTemplates {
 
 interface Props {
     templates: PaginatedTemplates;
+    currentCampus: Campus;
 }
 
 const props = defineProps<Props>();
@@ -81,7 +82,8 @@ const handlePaginationNavigate = (url: string) => {
             <div>
                 <h1 class="text-2xl font-semibold text-gray-900">Notification Email Templates</h1>
                 <p class="mt-1 text-sm text-gray-500">
-                    Manage per-campus email templates for payment notifications.
+                    Email templates for <span class="font-medium">{{ props.currentCampus.name }}</span>
+                    ({{ props.currentCampus.code }}).
                 </p>
             </div>
         </div>
@@ -91,7 +93,8 @@ const handlePaginationNavigate = (url: string) => {
             <CardHeader>
                 <CardTitle>Templates</CardTitle>
                 <CardDescription>
-                    {{ props.templates.total }} template{{ props.templates.total !== 1 ? 's' : '' }} across all campuses.
+                    {{ props.templates.total }} template{{ props.templates.total !== 1 ? 's' : '' }}
+                    in {{ props.currentCampus.name }}.
                 </CardDescription>
             </CardHeader>
             <CardContent class="p-0">
