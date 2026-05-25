@@ -546,10 +546,10 @@ export const mainNavItems: NavItem[] = [
                         requiredPermissions: ['view_finance_operations_dashboard'],
                     },
                     {
-                        title: 'Generate Charges',
-                        href: '/finance/operations/generate-charges',
+                        title: 'Generate HP (Tuition)',
+                        href: '/finance/major/charges',
                         icon: Play,
-                        requiredPermissions: ['view_finance_operations_generate_charges'],
+                        requiredPermissions: ['create_finance_charges'],
                     },
                     {
                         title: 'Exceptions Queue',
@@ -609,7 +609,12 @@ export const mainNavItems: NavItem[] = [
                     },
                 ],
             },
-
+            {
+                title: 'Batch Charges (All Students)',
+                href: '/finance/operations/generate-charges',
+                icon: Layers,
+                requiredPermissions: ['view_finance_operations_generate_charges'],
+            },
             {
                 title: 'DNG Worklist',
                 href: '/finance/operations/dng-worklist',

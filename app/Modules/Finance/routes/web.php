@@ -11,6 +11,7 @@ use App\Modules\Finance\Http\Web\Admin\EgcCarryForwardController;
 use App\Modules\Finance\Http\Web\Admin\EgcChargeGenerationController;
 use App\Modules\Finance\Http\Web\Admin\EgcRetakeAdjustmentsController;
 use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
+use App\Modules\Finance\Http\Web\Admin\MajorChargeGenerationController;
 use App\Modules\Finance\Http\Web\Admin\PaymentController;
 use Illuminate\Support\Facades\Route;
 
@@ -56,6 +57,18 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
                 ->name('index');
             Route::post('/', [EgcCarryForwardController::class, 'store'])
                 ->middleware('can:apply_egc_retake_adjustment')
+                ->name('store');
+        });
+    });
+
+    // Major Tuition (HP) Charge Generation — for intake_course students
+    Route::prefix('major')->name('major.')->group(function () {
+        Route::prefix('charges')->name('charges.')->group(function () {
+            Route::get('/', [MajorChargeGenerationController::class, 'index'])
+                ->middleware('can:view_finance_charges')
+                ->name('index');
+            Route::post('/', [MajorChargeGenerationController::class, 'store'])
+                ->middleware('can:create_finance_charges')
                 ->name('store');
         });
     });
