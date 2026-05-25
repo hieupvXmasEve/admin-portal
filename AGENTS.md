@@ -121,95 +121,66 @@ Before final response:
 - [ ] Final answer summarizes changed files, validation result, and unresolved questions
 
 <!-- KHUYM:START -->
-# Khuym Workflow
+# Khuym — PAUSED
 
-Use `khuym:using-khuym` first in this repo unless you are resuming an already approved Khuym handoff.
+Khuym workflow is paused for this repo. Harness (below) is the sole operational system. Do not invoke `khuym:*` skills or run `node .codex/khuym_status.mjs` from agent sessions.
 
-## Startup
+Archived artifacts (read-only reference, not active workflow):
 
-1. Read this file at session start and again after any context compaction.
-2. If `.khuym/onboarding.json` is missing or outdated, stop and run `khuym:using-khuym` before continuing.
-3. If `.codex/khuym_status.mjs` exists, run `node .codex/khuym_status.mjs --json` as the first quick scout step.
-4. If `.khuym/HANDOFF.json` exists, do not auto-resume. Surface the saved state and wait for user confirmation.
-5. If `history/learnings/critical-patterns.md` exists, read it before planning or execution work.
-
-## Chain
-
-```
-khuym:using-khuym
-  → khuym:exploring
-  → khuym:planning
-  → khuym:validating
-  → khuym:swarming
-  → khuym:executing
-  → khuym:reviewing
-  → khuym:compounding
-```
-
-## Critical Rules
-
-1. Never execute without validating.
-2. `CONTEXT.md` is the source of truth for locked decisions.
-3. If context usage passes roughly 65%, write `.khuym/HANDOFF.json` and pause cleanly.
-4. Treat `.khuym/state.json` as the single runtime state file for routing, current focus, and operator notes.
-5. After compaction, re-read `AGENTS.md`, run `node .codex/khuym_status.mjs --json` if present, then re-open `.khuym/HANDOFF.json`, `.khuym/state.json`, and the active feature context before more work.
-6. P1 review findings block merge.
-
-## Working Files
-
-```
-.khuym/
-  onboarding.json     ← onboarding state for the Khuym plugin
-  state.json          ← single runtime state file for agents, tools, and humans
-  HANDOFF.json        ← pause/resume artifact
-  reservations.json   ← local file reservations for same-session Codex swarms
-
-history/<feature>/
-  CONTEXT.md          ← locked decisions
-  discovery.md        ← research findings
-  approach.md         ← approach + risk map
-
-history/learnings/
-  critical-patterns.md
-
-.beads/               ← bead/task files when beads are in use
-.spikes/              ← spike outputs when validation requires them
-```
-
-.codex/
-  khuym_status.mjs    ← read-only scout command for onboarding, state, and handoff
-  khuym_state.mjs     ← shared state helpers used by the scout command
-  khuym_reservations.mjs ← local reservation helper used by swarming, executing, and hooks
-
-## Codex Guardrails
-
-- Repo-local `.codex/` files installed by Khuym are workflow guardrails, not optional decoration.
-- Use `node .codex/khuym_status.mjs --json` as the preferred quick scout step when it is available.
-- Treat `compact_prompt` recovery instructions as mandatory.
-- Use `bv` only with `--robot-*` flags. Bare `bv` launches the TUI and should be avoided in agent sessions.
-- If the repo is only partially onboarded, stay in bootstrap/planning mode and surface what is missing before implementation.
-
-## Session Finish
-
-Before ending a substantial Khuym work chunk:
-
-1. Update or close the active bead/task if one exists.
-2. Leave `.khuym/state.json` and `.khuym/HANDOFF.json` consistent with the current pause/resume state.
-3. Mention any remaining blockers, open questions, or next actions in the final response.
+- `.khuym/state.json`, `.khuym/onboarding.json` — historical state
+- `.codex/hooks/khuym_*.mjs`, `.codex/khuym_*.mjs` — disabled support scripts (hook firing harmless; outputs ignored)
+- `history/<feature>/`, `history/learnings/critical-patterns.md` — prior feature notes still usable as **input context** for harness intake but no longer the storage layer
 <!-- KHUYM:END -->
 
 <!-- HARNESS:BEGIN -->
-## Harness
+## Harness — sole operational system
 
-This repo uses Harness. Before work, read:
+Harness CLI (`./scripts/harness`, Rust binary at `scripts/bin/harness-cli`, DB at `harness.db`) is the only workflow system in this repo. Before work, read:
 
-- `README.md`
-- `docs/HARNESS.md`
-- `docs/FEATURE_INTAKE.md`
-- `docs/ARCHITECTURE.md`
-- `scripts/harness query matrix`
+- `docs/HARNESS.md` — mental model + spec lifecycle
+- `docs/FEATURE_INTAKE.md` — intake gate, risk lanes, classification
+- `docs/ARCHITECTURE.md` — discovery-before-shape + boundary rules
+- `docs/templates/` — story + decision + validation templates
+- Current state: `./scripts/harness query matrix`, `./scripts/harness query backlog`, `./scripts/harness query decisions`
 
-Use the Rust Harness CLI as the main operational tool. Run it through the
-stable repo-local entrypoint `scripts/harness`, which uses the prebuilt Rust
-binary at `scripts/bin/harness-cli` in installed projects.
+### Operator loop (Claude runs this for every user requirement)
+
+1. **Intake**: classify per `docs/FEATURE_INTAKE.md` (tiny/normal/high-risk + risk flags). Record:
+   ```
+   ./scripts/harness intake --title "..." --lane <tiny|normal|high-risk> --reason "..." --flags "auth,data-model,..."
+   ```
+2. **Story**: for normal/high-risk, create story file from `docs/templates/story.md` (or `docs/templates/high-risk-story/` for high-risk) at `docs/stories/<epic>/<story-id>.md`, then register:
+   ```
+   ./scripts/harness story add --id <id> --title "..." --path docs/stories/<epic>/<id>.md
+   ```
+3. **Planning + confirm**: present approach (affected files, validation shape, risks) to user. Wait for explicit approval before implementation.
+4. **Execute**: implement minimum vertical slice. Update story status:
+   ```
+   ./scripts/harness story update --id <id> --status in_progress
+   ```
+5. **Trace**: at end of substantial actions, record:
+   ```
+   ./scripts/harness trace --story <id> --action "..." --files "..." --outcome <success|fail|blocked> --friction "..."
+   ```
+6. **Decision**: when architecture/behavior choice is made, add ADR to `docs/decisions/NNNN-<slug>.md` + register:
+   ```
+   ./scripts/harness decision add --id <NNNN> --title "..." --path docs/decisions/NNNN-<slug>.md
+   ```
+7. **Backlog**: when friction is found but not fixed:
+   ```
+   ./scripts/harness backlog add --title "..." --discovered-while "<story-id>" --risk <tiny|normal|high-risk>
+   ```
+
+### Lanes (from FEATURE_INTAKE.md)
+
+- **Tiny** (0-1 flags, no hard gate): patch directly + intake record. No story file required.
+- **Normal** (2-3 flags): story file + matrix row + validation expectations.
+- **High-risk** (4+ flags OR any hard gate — auth, authz, data loss, audit/security, external provider, validation weakening): full `docs/templates/high-risk-story/` folder (overview.md + design.md + validation.md + execplan.md) + user confirmation before implementation.
+
+### Hard rules
+
+- Never claim a validation command passes until it exists and was run.
+- Use `./scripts/harness query matrix` to verify story status; do not edit `harness.db` by hand.
+- ADR files in `docs/decisions/` are the human-readable surface; harness DB is the queryable index.
+- One direction only: file → DB via CLI. Never DB → file.
 <!-- HARNESS:END -->
