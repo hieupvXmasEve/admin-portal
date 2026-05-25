@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Dng\Services;
 
+use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use Illuminate\Support\Facades\Log;
 
@@ -12,6 +13,7 @@ class DngReconciliationService
     public function __construct(
         protected DngClient $dngClient,
         protected DngPaymentService $dngPaymentService,
+        protected SettleInstallmentFromDngAction $settleInstallmentAction,
     ) {}
 
     /**
@@ -184,6 +186,10 @@ class DngReconciliationService
 
         // Bridge to canonical Payment if not yet done
         $this->dngPaymentService->bridgeToPayment($request);
+
+        // Settle linked installment + dispatch next push (no-op if not installment-linked).
+        // Idempotent: SettleInstallmentFromDngAction skips when installment is already paid.
+        $this->settleInstallmentAction->handle($request->fresh());
 
         $summary['backfilled']++;
 

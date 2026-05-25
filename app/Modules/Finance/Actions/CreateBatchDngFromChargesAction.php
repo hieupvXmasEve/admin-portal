@@ -136,10 +136,57 @@ class CreateBatchDngFromChargesAction
                 throw new \RuntimeException('Không tìm thấy khoản phí nào có số dư > 0');
             }
 
-            // Compute total (or use override)
-            $totalAmount = $amountOverride !== null && $amountOverride > 0
-                ? $amountOverride
-                : (float) $charges->sum('balance');
+            // Installment-aware total: for each charge, take its next PENDING installment.
+            // For charges without installments (legacy / never backfilled), fall back to balance.
+            // Admin's amountOverride bypasses installment-awareness entirely (explicit override).
+            $nextInstallmentByCharge = \App\Models\FinanceChargeInstallment::query()
+                ->whereIn('finance_charge_id', $charges->pluck('id'))
+                ->where('status', \App\Models\FinanceChargeInstallment::STATUS_PENDING)
+                ->orderBy('finance_charge_id')
+                ->orderBy('installment_no')
+                ->get()
+                ->groupBy('finance_charge_id')
+                ->map(fn ($group) => $group->first()); // lowest installment_no per charge
+
+            // Always compute installment-aware total + collect candidate IDs first.
+            // Even when admin sets amount_override, we still link installments IF the
+            // override happens to equal the auto-computed sum (typical case: UI populated
+            // the field with our default and admin clicked Push). Only when override
+            // genuinely differs do we skip linkage (treat as ad-hoc DNG; admin takes
+            // manual reconciliation responsibility).
+            $installmentIds = [];
+            $installmentAwareTotal = 0.0;
+
+            foreach ($charges as $charge) {
+                $nextInst = $nextInstallmentByCharge[$charge->id] ?? null;
+
+                if ($nextInst !== null) {
+                    $installmentAwareTotal += (float) $nextInst->amount;
+                    $installmentIds[] = $nextInst->id;
+                } else {
+                    // Backward-compat: no installment row → use charge balance.
+                    $installmentAwareTotal += (float) $charge->balance;
+                }
+            }
+
+            if ($amountOverride !== null && $amountOverride > 0) {
+                $totalAmount = $amountOverride;
+
+                // Decimal-safe equality check (1 VND tolerance for float rounding).
+                if (abs($amountOverride - $installmentAwareTotal) >= 1.0) {
+                    // Admin pushed a genuinely-different amount → skip installment
+                    // linkage so settle webhook won't mark installments paid by mistake.
+                    Log::warning('CreateBatchDngFromChargesAction: amount override differs from installment plan; skipping installment linkage', [
+                        'student_id' => $studentId,
+                        'override' => $amountOverride,
+                        'auto_sum' => $installmentAwareTotal,
+                    ]);
+
+                    $installmentIds = [];
+                }
+            } else {
+                $totalAmount = $installmentAwareTotal;
+            }
 
             if ($totalAmount <= 0) {
                 throw new \RuntimeException('Tổng số dư bằng 0, không thể tạo DNG');
@@ -188,6 +235,7 @@ class CreateBatchDngFromChargesAction
                 'student_address' => $student->current_address_line ?? $student->address ?? '',
                 'cccd' => $student->national_id ?? null,
                 'finance_charge_id' => null, // pivot used instead
+                'installment_ids' => $installmentIds, // empty array when legacy / amount override
             ];
 
             // Push DNG via DngPaymentService (creates record + calls DNG API)

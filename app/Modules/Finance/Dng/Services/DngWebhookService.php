@@ -7,6 +7,7 @@ namespace App\Modules\Finance\Dng\Services;
 use App\Models\CourseRetakeRegistration;
 use App\Models\FinanceCharge;
 use App\Modules\Academic\Actions\AutoEnrollRetakeCourseAction;
+use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
@@ -21,6 +22,7 @@ class DngWebhookService
         protected DngPaymentService $dngPaymentService,
         protected DngChecksumService $checksumService,
         protected PublishDomainEventAction $publishDomainEventAction,
+        protected SettleInstallmentFromDngAction $settleInstallmentAction,
     ) {}
 
     /**
@@ -136,6 +138,10 @@ class DngWebhookService
         $freshRequest = $request->fresh();
 
         $this->ensurePaymentBridge($freshRequest);
+
+        // Mark linked installment as paid + dispatch next push (post-commit).
+        // No-op if the DNG request has no linked installment (legacy / non-installment flow).
+        $this->settleInstallmentAction->handle($freshRequest);
 
         // Auto-enroll retake course registrations when payment confirmed
         $this->handleRetakeCourseAutoEnroll($freshRequest);

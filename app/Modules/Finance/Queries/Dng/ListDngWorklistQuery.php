@@ -140,9 +140,71 @@ class ListDngWorklistQuery
             ->groupBy('student_id')
             ->map(fn (Collection $rows) => $rows->first());
 
+        // Installment-aware metadata per (student, charge):
+        //   - next_no: lowest installment_no still pending (what would push next)
+        //   - pending_count: installments still pending for this charge
+        //   - total_count: total installments planned for this charge (>1 means "split")
+        $installmentStatsRows = \DB::table('finance_charge_installments as fci')
+            ->join('finance_charges as fc', 'fc.id', '=', 'fci.finance_charge_id')
+            ->whereIn('fc.student_id', $studentIds)
+            ->where('fc.status', FinanceCharge::STATUS_ACTIVE)
+            ->whereIn('fc.charge_type', $chargeTypes)
+            ->when($semesterId !== null, fn ($q) => $q->where('fc.semester_id', $semesterId))
+            ->selectRaw("
+                fc.student_id,
+                fci.finance_charge_id,
+                COUNT(fci.id) as total_count,
+                SUM(CASE WHEN fci.status = 'pending' THEN 1 ELSE 0 END) as pending_count,
+                MIN(CASE WHEN fci.status = 'pending' THEN fci.installment_no END) as next_no
+            ")
+            ->groupBy('fc.student_id', 'fci.finance_charge_id')
+            ->get();
+
+        // Resolve next-pending installment row (amount) per (charge).
+        $nextInstallmentRowIds = [];
+        foreach ($installmentStatsRows as $r) {
+            if ($r->next_no === null) {
+                continue;
+            }
+            $nextInstallmentRowIds[] = \DB::table('finance_charge_installments')
+                ->where('finance_charge_id', $r->finance_charge_id)
+                ->where('installment_no', $r->next_no)
+                ->value('id');
+        }
+        $nextInstallmentRowIds = array_filter($nextInstallmentRowIds);
+
+        $nextInstallmentRows = \App\Models\FinanceChargeInstallment::query()
+            ->whereIn('id', $nextInstallmentRowIds)
+            ->get(['id', 'finance_charge_id', 'installment_no', 'amount', 'due_date'])
+            ->keyBy('finance_charge_id');
+
+        // Aggregate per student.
+        $byStudent = $installmentStatsRows->groupBy('student_id');
+        $nextPushAmountByStudent = [];
+        $pendingCountByStudent = [];
+        $hasSplitPlanByStudent = [];
+        foreach ($byStudent as $studentId => $chargeRows) {
+            $sum = 0.0;
+            $totalPending = 0;
+            $hasSplit = false;
+            foreach ($chargeRows as $r) {
+                $inst = $nextInstallmentRows->get($r->finance_charge_id);
+                if ($inst !== null) {
+                    $sum += (float) $inst->amount;
+                }
+                $totalPending += (int) $r->pending_count;
+                if ((int) $r->total_count > 1) {
+                    $hasSplit = true;
+                }
+            }
+            $nextPushAmountByStudent[$studentId] = $sum;
+            $pendingCountByStudent[$studentId] = $totalPending;
+            $hasSplitPlanByStudent[$studentId] = $hasSplit;
+        }
+
         // Attach DNG status to rows and filter
         $rows = $allStudentRows
-            ->map(function ($row) use ($activeDngByStudent) {
+            ->map(function ($row) use ($activeDngByStudent, $nextPushAmountByStudent, $pendingCountByStudent, $hasSplitPlanByStudent) {
                 $activeDng = $activeDngByStudent->get($row->student_id);
                 $row->active_dng = $activeDng ? [
                     'id' => $activeDng->id,
@@ -150,6 +212,16 @@ class ListDngWorklistQuery
                     'amount' => (float) $activeDng->amount,
                     'created_at' => $activeDng->created_at?->toIso8601String(),
                 ] : null;
+
+                // Installment-aware next-push amount. Fall back to balance if no installments exist.
+                $row->next_push_amount = isset($nextPushAmountByStudent[$row->student_id])
+                    && $nextPushAmountByStudent[$row->student_id] > 0
+                    ? $nextPushAmountByStudent[$row->student_id]
+                    : (float) $row->balance;
+                $row->pending_installment_count = $pendingCountByStudent[$row->student_id] ?? 0;
+                // True only when at least one charge has >1 installment planned (real split).
+                // Backfilled 1-installment charges of un-split students return false here.
+                $row->has_split_plan = $hasSplitPlanByStudent[$row->student_id] ?? false;
 
                 return $row;
             })

@@ -145,6 +145,12 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::patch('/{charge}/description', [FinanceChargeController::class, 'updateDescription'])
             ->middleware('can:create_finance_charges')
             ->name('update-description');
+        Route::post('/{charge}/installments/split', [FinanceChargeController::class, 'splitInstallments'])
+            ->middleware('can:split_installment_finance_charges')
+            ->name('installments.split');
+        Route::post('/{charge}/installments/{installment}/retry-push', [FinanceChargeController::class, 'retryPushInstallment'])
+            ->middleware('can:split_installment_finance_charges')
+            ->name('installments.retry-push');
     });
 
     // =====================

@@ -67,6 +67,10 @@ class StudentFinanceController extends Controller
         $semesterId = isset($validated['semester_id']) ? (int) $validated['semester_id'] : null;
         $charges = $this->chargeService->getStudentCharges($student->id, $semesterId);
 
+        // Eager-load installments so the student app can render the per-installment
+        // table without an extra round-trip.
+        $charges->loadMissing('installments');
+
         // Add computed attributes
         $charges->each(function ($charge) {
             $charge->append(['is_charge', 'is_credit', 'paid_amount', 'discount_amount', 'balance', 'is_fully_paid']);

@@ -33,18 +33,43 @@ import {
     type PaymentAllocation,
 } from '@/types/finance';
 import { usePermission } from '@/composables/usePermission';
-import { Head, Link, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, Ban, Check, CreditCard, FileText, Pencil, User, X } from 'lucide-vue-next';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { AlertCircle, ArrowLeft, Ban, Check, CalendarClock, CreditCard, FileText, Pencil, RotateCcw, Split, User, X } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
+import SplitInstallmentsModal from './SplitInstallmentsModal.vue';
+
+interface InstallmentRow {
+    id: number;
+    installment_no: number;
+    amount: number | string;
+    due_date: string | null;
+    status: 'pending' | 'awaiting_payment' | 'paid' | 'cancelled';
+    dng_payment_request_id: number | null;
+    paid_at: string | null;
+    push_attempt_count: number;
+    last_push_error: string | null;
+    has_push_error: boolean;
+}
+
+interface InstallmentMeta {
+    net_split_target: number;
+    has_paid_installment: boolean;
+    can_split: boolean;
+}
 
 interface Props {
     charge: FinanceCharge & {
         allocations?: PaymentAllocation[];
     };
+    installments?: InstallmentRow[];
+    installment_meta?: InstallmentMeta;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+    installments: () => [],
+    installment_meta: () => ({ net_split_target: 0, has_paid_installment: false, can_split: false }),
+});
 
 const { can } = usePermission();
 
@@ -114,6 +139,49 @@ const formatDateOnly = (dateStr: string | null | undefined): string => {
         month: '2-digit',
         day: '2-digit',
     });
+};
+
+// Installments UI
+const isSplitModalOpen = ref(false);
+const retryingInstallmentId = ref<number | null>(null);
+
+const installmentStatusLabel = (status: InstallmentRow['status']): string => {
+    return {
+        pending: 'Chờ push',
+        awaiting_payment: 'Đang chờ thanh toán',
+        paid: 'Đã thanh toán',
+        cancelled: 'Đã huỷ',
+    }[status];
+};
+
+const installmentStatusClass = (status: InstallmentRow['status']): string => {
+    return {
+        pending: 'bg-slate-100 text-slate-700',
+        awaiting_payment: 'bg-blue-100 text-blue-700',
+        paid: 'bg-green-100 text-green-700',
+        cancelled: 'bg-red-100 text-red-700',
+    }[status];
+};
+
+const retryPush = (installment: InstallmentRow) => {
+    retryingInstallmentId.value = installment.id;
+    router.post(
+        route('finance.charges.installments.retry-push', [props.charge.id, installment.id]),
+        {},
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success(`Đợt ${installment.installment_no} đã được push lại.`);
+            },
+            onError: (errors) => {
+                const first = Object.values(errors)[0];
+                toast.error(typeof first === 'string' ? first : 'Retry thất bại.');
+            },
+            onFinish: () => {
+                retryingInstallmentId.value = null;
+            },
+        },
+    );
 };
 </script>
 
@@ -263,6 +331,91 @@ const formatDateOnly = (dateStr: string | null | undefined): string => {
                     </CardContent>
                 </Card>
 
+                <!-- Installments -->
+                <Card v-if="installments.length > 0 || installment_meta.can_split">
+                    <CardHeader>
+                        <div class="flex items-center justify-between gap-4">
+                            <div>
+                                <CardTitle class="flex items-center gap-2">
+                                    <CalendarClock class="h-5 w-5" /> Đợt thanh toán
+                                </CardTitle>
+                                <CardDescription>
+                                    <template v-if="installments.length === 0">
+                                        Chưa có kế hoạch đợt. Mặc định 1 đợt = toàn bộ khoản phí khi push DNG.
+                                    </template>
+                                    <template v-else>
+                                        {{ installments.length }} đợt
+                                        ({{ formatCurrency(installment_meta.net_split_target) }} cần thu)
+                                        <span v-if="installment_meta.has_paid_installment" class="text-amber-700">
+                                            — kế hoạch đã khoá vì có đợt đã thanh toán
+                                        </span>
+                                    </template>
+                                </CardDescription>
+                            </div>
+                            <Button
+                                v-if="can('split_installment_finance_charges') && installment_meta.can_split"
+                                size="sm"
+                                @click="isSplitModalOpen = true"
+                            >
+                                <Split class="h-4 w-4 mr-1" />
+                                {{ installments.length > 1 ? 'Sửa kế hoạch đợt' : 'Tách đợt' }}
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent v-if="installments.length > 0">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead class="w-12">#</TableHead>
+                                    <TableHead>Số tiền</TableHead>
+                                    <TableHead>Hạn thanh toán</TableHead>
+                                    <TableHead>Trạng thái</TableHead>
+                                    <TableHead>DNG</TableHead>
+                                    <TableHead>Đã thanh toán</TableHead>
+                                    <TableHead class="text-right">Thao tác</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow v-for="i in installments" :key="i.id">
+                                    <TableCell class="font-medium">{{ i.installment_no }}</TableCell>
+                                    <TableCell>{{ formatCurrency(Number(i.amount)) }}</TableCell>
+                                    <TableCell>{{ formatDateOnly(i.due_date) }}</TableCell>
+                                    <TableCell>
+                                        <Badge :class="installmentStatusClass(i.status)">
+                                            {{ installmentStatusLabel(i.status) }}
+                                        </Badge>
+                                        <div v-if="i.has_push_error" class="mt-1 text-xs text-red-600 flex items-center gap-1">
+                                            <AlertCircle class="h-3 w-3" />
+                                            <span :title="i.last_push_error ?? ''">
+                                                Push lỗi ({{ i.push_attempt_count }} lần)
+                                            </span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <span v-if="i.dng_payment_request_id" class="text-xs text-muted-foreground">
+                                            #{{ i.dng_payment_request_id }}
+                                        </span>
+                                        <span v-else class="text-xs text-muted-foreground">—</span>
+                                    </TableCell>
+                                    <TableCell>{{ formatDate(i.paid_at) }}</TableCell>
+                                    <TableCell class="text-right">
+                                        <Button
+                                            v-if="i.has_push_error && can('split_installment_finance_charges')"
+                                            size="sm"
+                                            variant="outline"
+                                            :disabled="retryingInstallmentId === i.id"
+                                            @click="retryPush(i)"
+                                        >
+                                            <RotateCcw class="h-3 w-3 mr-1" />
+                                            {{ retryingInstallmentId === i.id ? 'Đang...' : 'Thử push lại' }}
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+
                 <!-- Payment Allocations -->
                 <Card>
                     <CardHeader>
@@ -365,5 +518,13 @@ const formatDateOnly = (dateStr: string | null | undefined): string => {
                 </Card>
             </div>
         </div>
+
+        <!-- Split installments modal -->
+        <SplitInstallmentsModal
+            v-model:open="isSplitModalOpen"
+            :charge-id="charge.id"
+            :net-split-target="installment_meta.net_split_target"
+            :current-plan-count="installments.length"
+        />
     </div>
 </template>

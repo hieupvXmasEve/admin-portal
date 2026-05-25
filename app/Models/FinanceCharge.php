@@ -122,6 +122,19 @@ class FinanceCharge extends Model
         return $this->hasMany(InvoiceLine::class, 'charge_id');
     }
 
+    public function installments(): HasMany
+    {
+        return $this->hasMany(FinanceChargeInstallment::class)
+            ->orderBy('installment_no');
+    }
+
+    public function hasPaidInstallment(): bool
+    {
+        return $this->installments()
+            ->where('status', FinanceChargeInstallment::STATUS_PAID)
+            ->exists();
+    }
+
     // =====================
     // Scopes
     // =====================

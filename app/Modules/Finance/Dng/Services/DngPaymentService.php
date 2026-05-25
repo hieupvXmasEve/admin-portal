@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Dng\Services;
 
 use App\Models\Department;
+use App\Models\FinanceChargeInstallment;
 use App\Models\Payment;
 use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
@@ -44,6 +45,8 @@ class DngPaymentService
      *     student_address: string,
      *     cccd?: string|null,
      *     finance_charge_id?: int|null,
+     *     installment_id?: int|null,
+     *     installment_ids?: array<int, int>,
      * }  $chargeData
      */
     public function createAndPush(Student $student, array $chargeData): DngPaymentRequest
@@ -87,7 +90,13 @@ class DngPaymentService
         try {
             $response = $this->dngClient->insertNewRecord($chargeData, $pushPayload);
 
-            DB::transaction(function () use ($request, $pushPayload, $response, $previousRequestIds): void {
+            // Collect installment IDs to link: prefer batch (installment_ids), fall back to single (installment_id).
+            $installmentIdsToLink = $chargeData['installment_ids'] ?? [];
+            if ($installmentIdsToLink === [] && ($chargeData['installment_id'] ?? null) !== null) {
+                $installmentIdsToLink = [(int) $chargeData['installment_id']];
+            }
+
+            DB::transaction(function () use ($request, $pushPayload, $response, $previousRequestIds, $installmentIdsToLink): void {
                 $request->update([
                     'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
                     'push_payload' => $pushPayload,
@@ -102,6 +111,20 @@ class DngPaymentService
                         ->awaitingPayment()
                         ->update([
                             'status' => DngPaymentRequest::STATUS_CANCELLED,
+                        ]);
+                }
+
+                // Link installments to this DNG request atomically with the push commit.
+                // Supports both single (PushNextInstallmentAction) and batch
+                // (CreateBatchDngFromChargesAction) push paths.
+                if ($installmentIdsToLink !== []) {
+                    FinanceChargeInstallment::query()
+                        ->whereIn('id', $installmentIdsToLink)
+                        ->update([
+                            'dng_payment_request_id' => $request->id,
+                            'status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
+                            'last_push_error' => null,
+                            'last_push_attempted_at' => now(),
                         ]);
                 }
             });
@@ -121,8 +144,25 @@ class DngPaymentService
                 'error_message' => $e->getMessage(),
             ]);
 
+            // Record push failure on every targeted installment so admin UI can show
+            // the error + retry button. Status stays pending (not awaiting) so retry is allowed.
+            $failedInstallmentIds = $chargeData['installment_ids'] ?? [];
+            if ($failedInstallmentIds === [] && ($chargeData['installment_id'] ?? null) !== null) {
+                $failedInstallmentIds = [(int) $chargeData['installment_id']];
+            }
+            if ($failedInstallmentIds !== []) {
+                FinanceChargeInstallment::query()
+                    ->whereIn('id', $failedInstallmentIds)
+                    ->update([
+                        'last_push_error' => $e->getMessage(),
+                        'last_push_attempted_at' => now(),
+                        'push_attempt_count' => DB::raw('push_attempt_count + 1'),
+                    ]);
+            }
+
             Log::error('DNG push debt failed', [
                 'dng_payment_request_id' => $request->id,
+                'installment_ids' => $failedInstallmentIds,
                 'error' => $e->getMessage(),
             ]);
 

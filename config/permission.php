@@ -351,6 +351,7 @@ return [
             'view_finance_charges' => 'view_finance_charges',
             'create_finance_charges' => 'create_finance_charges',
             'void_finance_charges' => 'void_finance_charges',
+            'split_installment_finance_charges' => 'split_installment_finance_charges',
             // Payments
             'view_finance_payments' => 'view_finance_payments',
             'allocate_finance_payment' => 'allocate_finance_payment',

@@ -148,7 +148,10 @@ class FinanceChargeController extends Controller
             'voidedBy',
             'invoiceLines.paymentApplications.payment',
             'invoiceLines.invoice',
+            'installments',
         ]);
+
+        $netSplitTarget = max(0, (float) $charge->amount - (float) $charge->discount_amount);
 
         return Inertia::render('Finance/Charges/Show', [
             'charge' => [
@@ -164,7 +167,79 @@ class FinanceChargeController extends Controller
                     'email' => $charge->voidedBy->email,
                 ] : null,
             ],
+            'installments' => $charge->installments->map(fn ($i) => [
+                'id' => $i->id,
+                'installment_no' => $i->installment_no,
+                'amount' => $i->amount,
+                'due_date' => $i->due_date?->toDateString(),
+                'status' => $i->status,
+                'dng_payment_request_id' => $i->dng_payment_request_id,
+                'paid_at' => $i->paid_at?->toIso8601String(),
+                'push_attempt_count' => $i->push_attempt_count,
+                'last_push_error' => $i->last_push_error,
+                'has_push_error' => $i->has_push_error,
+            ]),
+            'installment_meta' => [
+                'net_split_target' => $netSplitTarget,
+                'has_paid_installment' => $charge->hasPaidInstallment(),
+                'can_split' => $charge->status === FinanceCharge::STATUS_ACTIVE
+                    && (float) $charge->amount > 0
+                    && $netSplitTarget > 0
+                    && ! $charge->hasPaidInstallment(),
+            ],
         ]);
+    }
+
+    /**
+     * Replace a charge's installment plan with the submitted N-row plan.
+     * Domain invariants enforced inside SplitChargeIntoInstallmentsAction.
+     */
+    public function splitInstallments(
+        \App\Modules\Finance\Http\Requests\Charges\SplitChargeIntoInstallmentsRequest $request,
+        FinanceCharge $charge,
+        \App\Modules\Finance\Actions\SplitChargeIntoInstallmentsAction $action,
+    ): \Illuminate\Http\RedirectResponse {
+        $this->authorize('splitInstallment', $charge);
+
+        try {
+            $action->handle($charge->id, $request->validated()['installments']);
+        } catch (\App\Modules\Finance\Exceptions\ChargeHasPaidInstallmentException $e) {
+            return back()->withErrors(['installments' => $e->getMessage()]);
+        } catch (\App\Modules\Finance\Exceptions\InstallmentSplitNotAllowedException $e) {
+            return back()->withErrors(['installments' => $e->getMessage()]);
+        } catch (\App\Modules\Finance\Exceptions\InvalidInstallmentPlanException $e) {
+            return back()->withErrors(['installments' => $e->getMessage()]);
+        }
+
+        \Inertia\Inertia::flash('success', 'Kế hoạch đợt đã được lưu.');
+
+        return back();
+    }
+
+    /**
+     * Retry pushing an installment to DNG after a previous push failed.
+     * Only allowed when installment is pending with last_push_error set.
+     */
+    public function retryPushInstallment(
+        FinanceCharge $charge,
+        \App\Models\FinanceChargeInstallment $installment,
+        \App\Modules\Finance\Actions\PushNextInstallmentAction $action,
+    ): \Illuminate\Http\RedirectResponse {
+        $this->authorize('splitInstallment', $charge);
+
+        if ((int) $installment->finance_charge_id !== (int) $charge->id) {
+            abort(404);
+        }
+
+        try {
+            $action->handle($charge->id, $installment->id);
+        } catch (\Throwable $e) {
+            return back()->withErrors(['retry' => 'Push DNG thất bại: '.$e->getMessage()]);
+        }
+
+        \Inertia\Inertia::flash('success', "Đợt {$installment->installment_no} đã được push lại sang DNG.");
+
+        return back();
     }
 
     /**

@@ -57,6 +57,9 @@ interface DngWorklistStudent {
     total_paid: number;
     total_discount: number;
     balance: number;
+    next_push_amount: number;
+    pending_installment_count: number;
+    has_split_plan: boolean;
     active_dng: {
         id: number;
         status: string;
@@ -161,7 +164,8 @@ const pushForm = useForm({
 // Computed helpers
 // ---------------------------------------------------------------------------
 
-const eligibleStudents = computed(() => props.students.data.filter((s) => s.balance > 0));
+// Eligible = anything with a positive next-push amount (covers split + non-split).
+const eligibleStudents = computed(() => props.students.data.filter((s) => s.next_push_amount > 0));
 
 const isAllSelected = computed(
     () => eligibleStudents.value.length > 0 && selectedIds.value.length === eligibleStudents.value.length,
@@ -171,8 +175,10 @@ const selectedStudents = computed(() => eligibleStudents.value.filter((s) => sel
 
 const hasStudentsWithActiveDng = computed(() => selectedStudents.value.some((s) => s.active_dng !== null));
 
+// Total to push = sum of next-push amounts (or admin overrides). Matches backend
+// CreateBatchDngFromChargesAction behavior so the UI total matches what will actually be sent.
 const totalSelectedAmount = computed(() =>
-    selectedStudents.value.reduce((sum, s) => sum + (amountOverrides.value[s.student_id] ?? s.balance), 0),
+    selectedStudents.value.reduce((sum, s) => sum + (amountOverrides.value[s.student_id] ?? s.next_push_amount), 0),
 );
 
 // ---------------------------------------------------------------------------
@@ -208,7 +214,7 @@ const toggleRow = (studentId: number) => {
 // ---------------------------------------------------------------------------
 
 const getAmount = (student: DngWorklistStudent): number =>
-    amountOverrides.value[student.student_id] ?? student.balance;
+    amountOverrides.value[student.student_id] ?? student.next_push_amount;
 
 const setAmount = (student: DngWorklistStudent, val: string) => {
     const num = parseFloat(val);
@@ -285,7 +291,9 @@ const getDngStatusBadge = (student: DngWorklistStudent) => {
     }
     const s = student.active_dng.status;
     if (s === 'pushed_to_dng') {
-        const amountMatch = Math.abs(student.active_dng.amount - student.balance) < 1;
+        // Compare against installment-aware next-push amount: a 2-installment plan
+        // pushed at 10M is "Đã gửi" not "Cần cập nhật" even though balance=20M.
+        const amountMatch = Math.abs(student.active_dng.amount - student.next_push_amount) < 1;
         return amountMatch
             ? { label: 'Đã gửi', class: 'border-green-200 bg-green-50 text-green-700' }
             : { label: 'Cần cập nhật', class: 'border-orange-200 bg-orange-50 text-orange-700' };
@@ -507,7 +515,19 @@ const dngStatusOptions = [
                                     <span class="text-sm font-medium">{{ student.charge_count }}</span>
                                 </TableCell>
                                 <TableCell class="text-right font-medium text-red-600">
-                                    {{ formatCurrency(student.balance) }}
+                                    {{ formatCurrency(student.next_push_amount) }}
+                                    <div
+                                        v-if="student.has_split_plan"
+                                        class="text-muted-foreground mt-0.5 text-[10px] font-normal"
+                                    >
+                                        Đợt tiếp theo · còn {{ student.pending_installment_count }} đợt
+                                    </div>
+                                    <div
+                                        v-if="student.has_split_plan && student.next_push_amount !== student.balance"
+                                        class="text-muted-foreground mt-0.5 text-[10px] font-normal"
+                                    >
+                                        Số dư tổng: {{ formatCurrency(student.balance) }}
+                                    </div>
                                 </TableCell>
                                 <TableCell>
                                     <Input

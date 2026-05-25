@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Providers;
 
+use App\Models\FinanceCharge;
 use App\Modules\Finance\Dng\Services\DngChecksumService;
 use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Dng\Services\DngReconciliationService;
 use App\Modules\Finance\Dng\Services\DngWebhookService;
+use App\Modules\Finance\Policies\FinanceChargePolicy;
 use App\Modules\Finance\Services\DeferCaseService;
 use App\Modules\Finance\Services\FinanceChargeService;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Services\PaymentService;
 use App\Modules\Finance\Services\SettlementService;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 class FinanceServiceProvider extends ServiceProvider
@@ -57,5 +60,9 @@ class FinanceServiceProvider extends ServiceProvider
         if (file_exists($routesPath.'/api.php')) {
             $this->loadRoutesFrom($routesPath.'/api.php');
         }
+
+        // Explicit registration required: Laravel 13 auto-discovery does not
+        // resolve policies in module namespaces (App\Modules\*) automatically.
+        Gate::policy(FinanceCharge::class, FinanceChargePolicy::class);
     }
 }
