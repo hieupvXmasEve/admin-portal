@@ -20,19 +20,34 @@ use Inertia\Response;
 class NotificationTemplateController extends Controller
 {
     /**
-     * List all notification email templates (all campuses, all type_keys).
+     * List notification email templates scoped to the current campus.
+     *
+     * Campus is resolved from the bound `campus` container singleton
+     * (set by the campus-context middleware on every authenticated
+     * web request). Templates from other campuses are not visible
+     * here — admins working in a different campus must switch the
+     * campus context to see/edit those templates.
      */
     public function index(): Response
     {
         $this->authorize('viewAny', NotificationEmailTemplate::class);
 
+        if (! app()->bound('campus') || app('campus')->id === null) {
+            throw new \RuntimeException(
+                'Campus context is required to list notification templates.'
+            );
+        }
+
+        $campusId = (int) app('campus')->id;
+
         $templates = NotificationEmailTemplate::with(['campus', 'updatedBy'])
-            ->orderBy('campus_id')
+            ->where('campus_id', $campusId)
             ->orderBy('type_key')
             ->paginate(20);
 
         return Inertia::render('Admin/NotificationTemplate/Index', [
             'templates' => $templates,
+            'currentCampus' => app('campus')->only(['id', 'name', 'code']),
         ]);
     }
 
