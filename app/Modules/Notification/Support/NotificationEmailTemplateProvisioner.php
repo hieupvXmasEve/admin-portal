@@ -25,6 +25,14 @@ class NotificationEmailTemplateProvisioner
         $defaults = $this->defaults();
 
         foreach (NotificationTemplateTypeKey::cases() as $typeKey) {
+            // Some type_keys (e.g. installment_payment_reminder) are intentionally
+            // created on demand by admins via the /admin/notification-templates UI
+            // rather than pre-seeded. Skip them here so adding a new enum case
+            // does not require updating this provisioner.
+            if (! array_key_exists($typeKey->value, $defaults)) {
+                continue;
+            }
+
             $payload = $defaults[$typeKey->value];
 
             NotificationEmailTemplate::firstOrCreate(
