@@ -21,6 +21,10 @@ enum NotificationTemplateTypeKey: string
 
     case ParentPaymentReminder = 'parent_payment_reminder';
 
+    case InstallmentPaymentReminder = 'installment_payment_reminder';
+
+    case ParentInstallmentPaymentReminder = 'parent_installment_payment_reminder';
+
     case DngPaymentPushed = 'dng_payment_pushed';
 
     case DngPaymentReceived = 'dng_payment_received';
@@ -53,6 +57,29 @@ enum NotificationTemplateTypeKey: string
                 'invoice_code' => ['label' => 'Invoice code', 'sample' => 'INV-2026-00123'],
                 'balance_formatted' => ['label' => 'Outstanding balance (formatted)', 'sample' => '5.000.000'],
                 'due_date' => ['label' => 'Payment deadline', 'sample' => '15/06/2026'],
+            ],
+            self::InstallmentPaymentReminder => [
+                'student_name' => ['label' => 'Student name', 'sample' => 'Nguyễn Văn A'],
+                'student_code' => ['label' => 'Student code', 'sample' => 'SE12345'],
+                'semester_code' => ['label' => 'Semester code', 'sample' => 'SP2026'],
+                'invoice_code' => ['label' => 'DNG / Invoice code', 'sample' => 'DNG-456'],
+                'installment_no' => ['label' => 'Installment number', 'sample' => 2],
+                'installment_total' => ['label' => 'Total installments', 'sample' => 4],
+                'installment_amount_formatted' => ['label' => 'This installment amount (formatted)', 'sample' => '5.000.000'],
+                'remaining_balance_formatted' => ['label' => 'Remaining balance on parent charge (formatted)', 'sample' => '15.000.000'],
+                'due_date' => ['label' => 'Installment due date', 'sample' => '15/06/2026'],
+            ],
+            self::ParentInstallmentPaymentReminder => [
+                'parent_name' => ['label' => 'Parent name', 'sample' => 'Quý Phụ Huynh'],
+                'student_name' => ['label' => 'Student name', 'sample' => 'Nguyễn Văn A'],
+                'student_code' => ['label' => 'Student code', 'sample' => 'SE12345'],
+                'semester_code' => ['label' => 'Semester code', 'sample' => 'SP2026'],
+                'invoice_code' => ['label' => 'DNG / Invoice code', 'sample' => 'DNG-456'],
+                'installment_no' => ['label' => 'Installment number', 'sample' => 2],
+                'installment_total' => ['label' => 'Total installments', 'sample' => 4],
+                'installment_amount_formatted' => ['label' => 'This installment amount (formatted)', 'sample' => '5.000.000'],
+                'remaining_balance_formatted' => ['label' => 'Remaining balance on parent charge (formatted)', 'sample' => '15.000.000'],
+                'due_date' => ['label' => 'Installment due date', 'sample' => '15/06/2026'],
             ],
             self::DngPaymentPushed => [
                 'student_name' => ['label' => 'Student name', 'sample' => 'Nguyễn Văn A'],

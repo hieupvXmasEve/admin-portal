@@ -3,8 +3,8 @@ import DataPagination from '@/components/DataPagination.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Head, Link, router } from '@inertiajs/vue3';
-import { MailIcon, PencilIcon } from 'lucide-vue-next';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { MailIcon, MailPlusIcon, PencilIcon, PlusCircleIcon } from 'lucide-vue-next';
 import { route } from 'ziggy-js';
 
 interface Campus {
@@ -48,8 +48,14 @@ interface PaginatedTemplates {
     links: PaginationLink[];
 }
 
+interface MissingTemplate {
+    type_key: string;
+    variables: Record<string, { label: string; sample: unknown }>;
+}
+
 interface Props {
     templates: PaginatedTemplates;
+    missingTemplates: MissingTemplate[];
     currentCampus: Campus;
 }
 
@@ -71,6 +77,15 @@ const handlePaginationNavigate = (url: string) => {
     // props) instead of forcing a full page reload via window.location.
     router.visit(url, { preserveScroll: true, preserveState: true });
 };
+
+const createForm = useForm({ type_key: '' });
+
+const createTemplate = (typeKey: string) => {
+    createForm.type_key = typeKey;
+    createForm.post(route('admin.notification-templates.store'));
+};
+
+const formatVariableToken = (varName: string): string => `{{${varName}}}`;
 </script>
 
 <template>
@@ -87,6 +102,64 @@ const handlePaginationNavigate = (url: string) => {
                 </p>
             </div>
         </div>
+
+        <!-- Missing templates — admin must create on demand instead of a migration backfilling them -->
+        <Card v-if="props.missingTemplates.length > 0" class="border-amber-200 bg-amber-50/40">
+            <CardHeader>
+                <CardTitle class="flex items-center gap-2 text-amber-800">
+                    <MailPlusIcon class="h-5 w-5" />
+                    Missing templates
+                </CardTitle>
+                <CardDescription class="text-amber-700">
+                    These notification types are wired in code but have no row in <span class="font-medium">{{ props.currentCampus.name }}</span> yet.
+                    Sending will fail until you create them. Click "Create" to author the subject + body from scratch.
+                </CardDescription>
+            </CardHeader>
+            <CardContent class="p-0">
+                <ul class="divide-y divide-amber-100">
+                    <li
+                        v-for="missing in props.missingTemplates"
+                        :key="missing.type_key"
+                        class="flex items-center justify-between px-6 py-4"
+                    >
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100">
+                                <MailPlusIcon class="h-5 w-5 text-amber-700" />
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-medium text-gray-900">
+                                        {{ formatTypeKey(missing.type_key) }}
+                                    </span>
+                                    <Badge variant="outline" class="border-amber-300 text-amber-800 text-xs">
+                                        {{ missing.type_key }}
+                                    </Badge>
+                                </div>
+                                <p class="mt-0.5 text-xs text-amber-700">
+                                    Variables:
+                                    <span
+                                        v-for="(meta, varName) in missing.variables"
+                                        :key="varName"
+                                        class="mr-1 font-mono"
+                                    >{{ formatVariableToken(String(varName)) }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="ml-4 shrink-0">
+                            <Button
+                                size="sm"
+                                variant="default"
+                                :disabled="createForm.processing && createForm.type_key === missing.type_key"
+                                @click="createTemplate(missing.type_key)"
+                            >
+                                <PlusCircleIcon class="mr-1.5 h-3.5 w-3.5" />
+                                {{ createForm.processing && createForm.type_key === missing.type_key ? 'Creating...' : 'Create' }}
+                            </Button>
+                        </div>
+                    </li>
+                </ul>
+            </CardContent>
+        </Card>
 
         <!-- Template list -->
         <Card>

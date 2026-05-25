@@ -39,6 +39,18 @@ class NotificationTemplatePolicy
         return $user->hasPermission('edit_notification_email_template');
     }
 
+    /**
+     * Create a new template row for the current campus + a missing type_key.
+     * Reuses the edit permission so anyone who can author content can also
+     * provision a blank row from the admin UI (no separate "create" right
+     * since the user explicitly asked for in-app on-demand creation rather
+     * than migration-driven provisioning).
+     */
+    public function create(User $user): bool
+    {
+        return $user->hasPermission('edit_notification_email_template');
+    }
+
     public function preview(User $user, NotificationEmailTemplate $template): bool
     {
         return $user->hasPermission('preview_notification_email_template');

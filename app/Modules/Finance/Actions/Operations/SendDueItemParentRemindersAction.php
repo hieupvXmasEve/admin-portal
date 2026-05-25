@@ -8,7 +8,9 @@ use App\Models\ParentProfile;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\DngInstallmentContextResolver;
 use App\Modules\Notification\EmailContent\EmailContentRegistry;
+use App\Modules\Notification\Models\NotificationEmailTemplate;
 use App\Services\EmailService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -25,7 +27,10 @@ class SendDueItemParentRemindersAction
 
         $settlementService = app(SettlementService::class);
         $emailService = app(EmailService::class);
-        $emailContent = app(EmailContentRegistry::class)->resolve('parent_payment_reminder');
+        $registry = app(EmailContentRegistry::class);
+        $installmentResolver = app(DngInstallmentContextResolver::class);
+        $emailContent = $registry->resolve('parent_payment_reminder');
+        $installmentEmailContent = $registry->resolve('parent_installment_payment_reminder');
         $now = now();
 
         foreach ($itemIds as $itemId) {
@@ -63,6 +68,19 @@ class SendDueItemParentRemindersAction
                     continue;
                 }
 
+                $installmentContext = $installmentResolver->resolve($dngRequest);
+                $useInstallment = $installmentContext !== null
+                    && self::installmentTemplateExists('parent_installment_payment_reminder', (int) $student->campus_id);
+
+                if ($installmentContext !== null && ! $useInstallment) {
+                    Log::warning(
+                        'Parent installment template not provisioned for campus; falling back to parent_payment_reminder',
+                        ['campus_id' => $student->campus_id, 'dng_request_id' => $id],
+                    );
+                }
+
+                $providerForDng = $useInstallment ? $installmentEmailContent : $emailContent;
+
                 $contentData = [
                     'campus_id' => $student->campus_id,
                     'parent_name' => 'Quý Phụ Huynh',
@@ -74,14 +92,18 @@ class SendDueItemParentRemindersAction
                     'due_date' => $dngRequest->due_date?->format('d/m/Y') ?? '',
                 ];
 
+                if ($useInstallment && $installmentContext !== null) {
+                    $contentData = array_merge($contentData, $installmentContext);
+                }
+
                 $sentAnyParent = false;
 
                 foreach ($parentEmails as $parentEmail) {
                     try {
                         $emailService->sendSingleEmail(
                             recipient: $parentEmail,
-                            subject: $emailContent->subject($contentData),
-                            content: $emailContent->htmlBody($contentData),
+                            subject: $providerForDng->subject($contentData),
+                            content: $providerForDng->htmlBody($contentData),
                             campusId: $student->campus_id,
                         );
 
@@ -200,6 +222,22 @@ class SendDueItemParentRemindersAction
             ->map(fn (string $email) => mb_strtolower(trim($email)))
             ->unique()
             ->values();
+    }
+
+    /** @var array<string, bool> */
+    private static array $templateExistsCache = [];
+
+    private static function installmentTemplateExists(string $typeKey, int $campusId): bool
+    {
+        $cacheKey = $typeKey.':'.$campusId;
+        if (array_key_exists($cacheKey, self::$templateExistsCache)) {
+            return self::$templateExistsCache[$cacheKey];
+        }
+
+        return self::$templateExistsCache[$cacheKey] = NotificationEmailTemplate::query()
+            ->where('campus_id', $campusId)
+            ->where('type_key', $typeKey)
+            ->exists();
     }
 
     private static function buildSummaryMessage(

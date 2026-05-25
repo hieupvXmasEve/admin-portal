@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Notification\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Notification\Enums\NotificationTemplateTypeKey;
 use App\Modules\Notification\Http\Requests\UpdateNotificationTemplateRequest;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -45,10 +48,67 @@ class NotificationTemplateController extends Controller
             ->orderBy('type_key')
             ->paginate(20);
 
+        $existingKeys = NotificationEmailTemplate::query()
+            ->where('campus_id', $campusId)
+            ->pluck('type_key')
+            ->map(fn ($key) => $key instanceof NotificationTemplateTypeKey ? $key->value : (string) $key)
+            ->all();
+
+        $missingTemplates = collect(NotificationTemplateTypeKey::cases())
+            ->reject(fn (NotificationTemplateTypeKey $case) => in_array($case->value, $existingKeys, true))
+            ->map(fn (NotificationTemplateTypeKey $case) => [
+                'type_key' => $case->value,
+                'variables' => $case->availableVariables(),
+            ])
+            ->values()
+            ->all();
+
         return Inertia::render('Admin/NotificationTemplate/Index', [
             'templates' => $templates,
+            'missingTemplates' => $missingTemplates,
             'currentCampus' => app('campus')->only(['id', 'name', 'code']),
         ]);
+    }
+
+    /**
+     * Create a blank notification email template for the current campus and
+     * a chosen type_key, then redirect to the edit page. Used when admins
+     * notice a missing template (e.g. installment_payment_reminder) and want
+     * to author the content from scratch instead of running a seed/migration.
+     */
+    public function store(Request $request): RedirectResponse
+    {
+        $this->authorize('create', NotificationEmailTemplate::class);
+
+        if (! app()->bound('campus') || app('campus')->id === null) {
+            throw new \RuntimeException(
+                'Campus context is required to create a notification template.'
+            );
+        }
+
+        $campusId = (int) app('campus')->id;
+
+        $validated = $request->validate([
+            'type_key' => [
+                'required',
+                'string',
+                Rule::in(array_map(fn (NotificationTemplateTypeKey $c) => $c->value, NotificationTemplateTypeKey::cases())),
+                Rule::unique('notification_email_templates', 'type_key')
+                    ->where(fn ($query) => $query->where('campus_id', $campusId)),
+            ],
+        ]);
+
+        $template = NotificationEmailTemplate::create([
+            'campus_id' => $campusId,
+            'type_key' => $validated['type_key'],
+            'subject' => '',
+            'body_html' => '',
+            'updated_by_user_id' => $request->user()->id,
+        ]);
+
+        Inertia::flash('success', 'Template created. Fill in subject and body.');
+
+        return redirect()->route('admin.notification-templates.edit', ['template' => $template->id]);
     }
 
     /**

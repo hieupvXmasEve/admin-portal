@@ -50,6 +50,13 @@ final class EmailContentRegistry
 
     public function has(string $typeKey): bool
     {
+        // Accept any valid enum case; legacy fallback is checked separately
+        // in build() so DB-only keys (e.g. installment_payment_reminder) still
+        // resolve when use_db_templates=true even without a legacy class.
+        if (NotificationTemplateTypeKey::tryFrom($typeKey) !== null) {
+            return true;
+        }
+
         return isset($this->legacyMap[$typeKey]);
     }
 
@@ -91,6 +98,13 @@ final class EmailContentRegistry
     {
         if ((bool) config('notifications.use_db_templates', true)) {
             return new DbEmailContentProvider(NotificationTemplateTypeKey::from($typeKey));
+        }
+
+        if (! isset($this->legacyMap[$typeKey])) {
+            throw new InvalidArgumentException(sprintf(
+                'No legacy EmailContentProvider class registered for type_key=%s. Enable notifications.use_db_templates or add a legacy class.',
+                $typeKey,
+            ));
         }
 
         return app($this->legacyMap[$typeKey]);

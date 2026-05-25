@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Head, useForm, usePage } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
 import PreviewPane from './components/PreviewPane.vue';
@@ -57,6 +57,15 @@ const commonVariables = Object.entries(props.variables).map(([name, meta]) => ({
 
 /** Subject input ref — enables inserting variable tokens at cursor position. */
 const subjectInputRef = ref<HTMLInputElement | null>(null);
+
+/**
+ * Treats a row whose subject AND body are both blank as a freshly-created
+ * draft. Reminders for this template type will silently fall back to the
+ * standard payment_reminder template until the admin fills these in.
+ */
+const isDraft = computed(
+    () => (props.template.subject ?? '').trim() === '' && (props.template.body_html ?? '').trim() === '',
+);
 
 const insertVariableIntoSubject = (variableName: string) => {
     const el = subjectInputRef.value;
@@ -111,6 +120,15 @@ const save = () => {
                     {{ form.processing ? 'Saving…' : 'Save' }}
                 </Button>
             </div>
+        </div>
+
+        <div
+            v-if="isDraft"
+            class="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+        >
+            <span class="font-semibold">Draft:</span>
+            Template chưa có nội dung. Reminder cho loại này sẽ tạm dùng template mặc định (payment_reminder)
+            cho đến khi bạn điền subject + body và lưu lại.
         </div>
 
         <!-- Two-column layout: editor on left, preview on right (stacks on narrow screens) -->

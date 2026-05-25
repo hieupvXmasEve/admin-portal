@@ -27,6 +27,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin/notifications')->name('ad
 
 Route::middleware(['auth', 'verified'])->prefix('admin/notification-templates')->name('admin.notification-templates.')->group(function () {
     Route::get('/', [NotificationTemplateController::class, 'index'])->name('index');
+    Route::post('/', [NotificationTemplateController::class, 'store'])->name('store');
     Route::get('/{template}/edit', [NotificationTemplateController::class, 'edit'])->name('edit');
     Route::put('/{template}', [NotificationTemplateController::class, 'update'])->name('update');
 });
