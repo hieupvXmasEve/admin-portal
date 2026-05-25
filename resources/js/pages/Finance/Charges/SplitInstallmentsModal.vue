@@ -184,7 +184,6 @@ const submit = () => {
         {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success('Kế hoạch đợt đã lưu.');
                 emit('saved');
                 emit('update:open', false);
             },
