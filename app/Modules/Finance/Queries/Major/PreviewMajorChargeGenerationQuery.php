@@ -9,6 +9,7 @@ use App\Models\ScholarshipDefinition;
 use App\Models\Student;
 use App\Models\StudentScholarshipAward;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
+use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
@@ -16,6 +17,7 @@ class PreviewMajorChargeGenerationQuery
 {
     public function __construct(
         private readonly StudentChargeTimingResolver $timingResolver,
+        private readonly VoucherDiscountAmountResolver $voucherDiscountAmountResolver,
     ) {}
 
     public function handle(int $semesterId, array $filters = [], ?int $campusId = null): array
@@ -57,7 +59,7 @@ class PreviewMajorChargeGenerationQuery
             ->all();
 
         $students = Student::query()
-            ->with(['scholarshipAward.scholarshipDefinition'])
+            ->with(['scholarshipAward.scholarshipDefinition', 'voucherApplications.voucherDefinition'])
             ->where('status', 'intake_course')
             ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
             ->when($ignoredStudentIds !== [], fn ($query) => $query->whereNotIn('student_id', $ignoredStudentIds))
@@ -151,6 +153,7 @@ class PreviewMajorChargeGenerationQuery
         }
 
         $scholarship = $this->resolveScholarship($student->scholarshipAward, (float) $amount);
+        $voucher = $this->resolveVoucher($student, $semesterId);
 
         return array_merge($base, [
             'eligibility_status' => 'eligible',
@@ -162,8 +165,56 @@ class PreviewMajorChargeGenerationQuery
             'scholarship_type' => $scholarship['type'],
             'scholarship_raw_value' => $scholarship['raw_value'],
             'scholarship_amount' => $scholarship['amount'],
-            'net_amount' => max(0.0, (float) $amount - $scholarship['amount']),
+            'voucher_codes' => $voucher['codes'],
+            'voucher_amount' => $voucher['amount'],
+            'net_amount' => max(0.0, (float) $amount - $scholarship['amount'] - $voucher['amount']),
         ]);
+    }
+
+    /**
+     * Resolve auto-applicable (redeemed-but-unused) vouchers for one student in one semester.
+     * Mirrors the action: prefer the redeemed discount_amount, fall back to a fresh resolution.
+     *
+     * @return array{codes: array<int, string>, amount: float}
+     */
+    private function resolveVoucher(Student $student, int $semesterId): array
+    {
+        $codes = [];
+        $amount = 0.0;
+
+        foreach ($student->voucherApplications as $voucherApp) {
+            // Rule: invoice_id IS NULL => not yet consumed.
+            if ($voucherApp->invoice_id) {
+                continue;
+            }
+
+            $discountAmount = (float) $voucherApp->discount_amount;
+
+            if ($discountAmount <= 0 && $voucherApp->voucherDefinition) {
+                $resolved = $this->voucherDiscountAmountResolver->resolveAmounts(
+                    $voucherApp->voucherDefinition,
+                    $student,
+                    $semesterId,
+                );
+                $discountAmount = (float) $resolved['discount_amount'];
+            }
+
+            if ($discountAmount <= 0) {
+                continue;
+            }
+
+            $amount += $discountAmount;
+
+            $code = $voucherApp->voucherDefinition?->code;
+            if ($code !== null && $code !== '') {
+                $codes[] = $code;
+            }
+        }
+
+        return [
+            'codes' => array_values(array_unique($codes)),
+            'amount' => round($amount, 2),
+        ];
     }
 
     /**
@@ -218,6 +269,8 @@ class PreviewMajorChargeGenerationQuery
             'scholarship_type' => null,
             'scholarship_raw_value' => null,
             'scholarship_amount' => 0.0,
+            'voucher_codes' => [],
+            'voucher_amount' => 0.0,
             'net_amount' => null,
         ];
     }

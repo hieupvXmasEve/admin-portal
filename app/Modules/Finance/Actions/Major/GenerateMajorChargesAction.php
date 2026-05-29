@@ -11,8 +11,10 @@ use App\Models\ScholarshipDefinition;
 use App\Models\Student;
 use App\Models\StudentInvoice;
 use App\Models\StudentScholarshipAward;
+use App\Models\VoucherApplication;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
+use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -48,12 +50,13 @@ class GenerateMajorChargesAction
         }
 
         $students = Student::query()
-            ->with(['scholarshipAward.scholarshipDefinition'])
+            ->with(['scholarshipAward.scholarshipDefinition', 'voucherApplications.voucherDefinition'])
             ->whereIn('id', $studentIds)
             ->where('status', 'intake_course')
             ->get();
 
         $invoiceService = app(InvoiceGenerationService::class);
+        $voucherDiscountAmountResolver = app(VoucherDiscountAmountResolver::class);
 
         DB::beginTransaction();
         try {
@@ -111,6 +114,14 @@ class GenerateMajorChargesAction
                         $invoice,
                         $student->scholarshipAward,
                         (float) $charge->amount,
+                    );
+
+                    self::applyVoucherDiscounts(
+                        $invoiceService,
+                        $voucherDiscountAmountResolver,
+                        $invoice,
+                        $student,
+                        $semesterId,
                     );
 
                     $stats['created']++;
@@ -194,6 +205,61 @@ class GenerateMajorChargesAction
             'Scholarship: '.$definition->name,
             (int) $award->id,
         );
+    }
+
+    /**
+     * Auto-apply any redeemed-but-unused voucher applications (invoice_id IS NULL) to this invoice.
+     * Mirrors the Operations batch flow: prefer the redeemed discount_amount, fall back to a fresh
+     * resolution, and mark informational (zero-discount) vouchers as consumed without a discount line.
+     */
+    private static function applyVoucherDiscounts(
+        InvoiceGenerationService $invoiceService,
+        VoucherDiscountAmountResolver $voucherDiscountAmountResolver,
+        StudentInvoice $invoice,
+        Student $student,
+        int $semesterId,
+    ): void {
+        foreach ($student->voucherApplications as $voucherApp) {
+            // Rule: invoice_id IS NULL => not yet consumed.
+            if ($voucherApp->invoice_id) {
+                continue;
+            }
+
+            $discountAmount = (float) $voucherApp->discount_amount;
+
+            if ($discountAmount <= 0 && $voucherApp->voucherDefinition) {
+                $resolved = $voucherDiscountAmountResolver->resolveAmounts(
+                    $voucherApp->voucherDefinition,
+                    $student,
+                    $semesterId,
+                );
+                $discountAmount = (float) $resolved['discount_amount'];
+            }
+
+            if ($discountAmount > 0) {
+                $invoiceService->applyInvoiceDiscount(
+                    $invoice,
+                    'voucher',
+                    $discountAmount,
+                    VoucherApplication::class,
+                    'Voucher Applied ('.$voucherApp->voucherDefinition?->code.')',
+                    (int) $voucherApp->id,
+                );
+
+                $voucherApp->update([
+                    'finance_charge_id' => null,
+                    'invoice_id' => $invoice->id,
+                    'discount_amount' => $discountAmount,
+                ]);
+
+                continue;
+            }
+
+            // Informational voucher — mark consumed on this invoice without a discount line.
+            $voucherApp->update([
+                'invoice_id' => $invoice->id,
+            ]);
+        }
     }
 
     private static function createDraftInvoice(Student $student, int $semesterId, Carbon $dueDate): StudentInvoice

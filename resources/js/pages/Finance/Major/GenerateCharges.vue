@@ -27,6 +27,8 @@ interface EligibleStudent {
     scholarship_type: 'percentage' | 'fixed' | null;
     scholarship_raw_value: number | null;
     scholarship_amount: number;
+    voucher_codes: string[];
+    voucher_amount: number;
     net_amount: number;
 }
 
@@ -105,6 +107,10 @@ const totalAmount = computed(() =>
 
 const totalScholarship = computed(() =>
     eligibleStudents.value.reduce((sum, student) => sum + (student.scholarship_amount ?? 0), 0),
+);
+
+const totalVoucher = computed(() =>
+    eligibleStudents.value.reduce((sum, student) => sum + (student.voucher_amount ?? 0), 0),
 );
 
 const totalNet = computed(() =>
@@ -246,6 +252,7 @@ function rowNumber(index: number): number {
                         <div class="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
                             <span>HP gốc (trang này): <strong class="font-mono">{{ formatCurrency(totalAmount) }}</strong></span>
                             <span>Scholarship: <strong class="font-mono text-blue-700">-{{ formatCurrency(totalScholarship) }}</strong></span>
+                            <span>Voucher: <strong class="font-mono text-fuchsia-700">-{{ formatCurrency(totalVoucher) }}</strong></span>
                             <span>Còn phải trả: <strong class="font-mono text-emerald-700">{{ formatCurrency(totalNet) }}</strong></span>
                         </div>
                     </div>
@@ -318,6 +325,8 @@ function rowNumber(index: number): number {
                                 <TableHead class="text-right">HP gốc</TableHead>
                                 <TableHead>Scholarship</TableHead>
                                 <TableHead class="text-right">Giảm</TableHead>
+                                <TableHead>Voucher</TableHead>
+                                <TableHead class="text-right">Giảm voucher</TableHead>
                                 <TableHead class="text-right">Còn phải trả</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -357,12 +366,28 @@ function rowNumber(index: number): number {
                                 <TableCell class="text-right font-mono text-sm" :class="student.scholarship_amount > 0 ? 'text-blue-700' : 'text-muted-foreground'">
                                     {{ student.scholarship_amount > 0 ? `-${formatCurrency(student.scholarship_amount)}` : '—' }}
                                 </TableCell>
+                                <TableCell>
+                                    <div v-if="student.voucher_codes.length > 0" class="flex flex-wrap gap-1">
+                                        <Badge
+                                            v-for="code in student.voucher_codes"
+                                            :key="code"
+                                            variant="outline"
+                                            class="border-fuchsia-300 text-fuchsia-700"
+                                        >
+                                            {{ code }}
+                                        </Badge>
+                                    </div>
+                                    <span v-else class="text-muted-foreground text-xs">—</span>
+                                </TableCell>
+                                <TableCell class="text-right font-mono text-sm" :class="student.voucher_amount > 0 ? 'text-fuchsia-700' : 'text-muted-foreground'">
+                                    {{ student.voucher_amount > 0 ? `-${formatCurrency(student.voucher_amount)}` : '—' }}
+                                </TableCell>
                                 <TableCell class="text-right font-mono text-sm font-semibold text-emerald-700">
                                     {{ formatCurrency(student.net_amount) }}
                                 </TableCell>
                             </TableRow>
                             <TableRow v-if="eligibleStudents.length === 0">
-                                <TableCell colspan="7" class="text-muted-foreground py-8 text-center text-sm">
+                                <TableCell colspan="9" class="text-muted-foreground py-8 text-center text-sm">
                                     Không có sinh viên eligible theo filter hiện tại.
                                 </TableCell>
                             </TableRow>
