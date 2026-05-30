@@ -130,6 +130,22 @@ Acceptance criteria:
 - Settlement apply works oldest invoice first, then oldest line first.
 - Generate-charge preview and execution skip zero-amount tuition terms and reuse empty draft invoices when appropriate.
 
+### FR-09 Course Survey Result Download
+
+Code baseline:
+
+- Admin survey result routes under `/forms/admin/results` include aggregate viewing and aggregate download for a single form target:
+    - `GET /forms/admin/results/{target}/aggregate`
+    - `GET /forms/admin/results/{target}/aggregate/download`
+- Aggregate download uses `view_survey_results_aggregate`, matching the existing aggregate page authorization.
+- The download exports course/run metadata, overall KPIs, section summaries, and per-question aggregate results without adding raw student identifiers.
+
+Acceptance criteria:
+
+- Staff with aggregate-result permission can download the class survey aggregate workbook from the aggregate result page.
+- Staff without aggregate-result permission are denied access to the download route.
+- Exported survey result workbooks do not include student ids or student names.
+
 ### FR-06 Notification V2 Foundation (Outbox + Ops Monitoring)
 
 Code baseline:
@@ -214,6 +230,7 @@ Acceptance criteria:
 
 ## 8) Version History
 
+- 2026-05-31: Added course survey class aggregate result download route and workbook contract.
 - 2026-03-23: Documented academic progression logging baseline (`academic_progression_events` for level/stage changes), V2-only student-facing academic notifications for new flows, and `intake_major` as the canonical EGC to major tuition milestone.
 - 2026-03-26: Added finance settlement v2 baseline (`payment_applications`, `invoice_discounts`, `discount_allocations`), settlement worklist, voucher/scholarship backfill commands, and zero-amount tuition generation rule.
 - 2026-03-04: Expanded FR-06 with Notification V2 ops monitoring routes (outbox/messages/deliveries) and retry capabilities.

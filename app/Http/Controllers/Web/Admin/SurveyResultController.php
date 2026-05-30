@@ -5,14 +5,17 @@ namespace App\Http\Controllers\Web\Admin;
 use App\Actions\Form\GetSurveyResponseListAction;
 use App\Actions\Form\GetSurveyRunAggregateAction;
 use App\Actions\Form\GetSurveyRunListAction;
+use App\Exports\SurveyRunAggregateExport;
 use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\FormTarget;
 use App\Models\Semester;
 use App\Queries\Form\GetSurveyProgramStatsQuery;
+use App\Services\ExcelExportService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class SurveyResultController extends Controller
 {
@@ -74,20 +77,20 @@ class SurveyResultController extends Controller
 
         // Validate response filters (for the deferred Responses tab)
         $responseFilters = $request->validate([
-            'resp_search'    => 'nullable|string|max:255',
-            'resp_status'    => 'nullable|string|in:submitted,approved,rejected,pending,all',
-            'resp_sort'      => 'nullable|string|in:submitted_at,status',
+            'resp_search' => 'nullable|string|max:255',
+            'resp_status' => 'nullable|string|in:submitted,approved,rejected,pending,all',
+            'resp_sort' => 'nullable|string|in:submitted_at,status',
             'resp_direction' => 'nullable|string|in:asc,desc',
-            'resp_per_page'  => 'nullable|integer|min:5|max:100',
+            'resp_per_page' => 'nullable|integer|min:5|max:100',
         ]);
 
         // Map resp_* params to the action's expected keys
         $normalizedResponseFilters = [
-            'search'    => $responseFilters['resp_search'] ?? null,
-            'status'    => $responseFilters['resp_status'] ?? 'all',
-            'sort'      => $responseFilters['resp_sort'] ?? null,
+            'search' => $responseFilters['resp_search'] ?? null,
+            'status' => $responseFilters['resp_status'] ?? 'all',
+            'sort' => $responseFilters['resp_sort'] ?? null,
             'direction' => $responseFilters['resp_direction'] ?? null,
-            'per_page'  => $responseFilters['resp_per_page'] ?? 15,
+            'per_page' => $responseFilters['resp_per_page'] ?? 15,
         ];
 
         // Build prev/next navigation from the ordered ID list
@@ -96,10 +99,10 @@ class SurveyResultController extends Controller
         $total = count($orderedIds);
 
         $navigation = [
-            'prev_id'       => ($currentPos !== false && $currentPos > 0) ? $orderedIds[$currentPos - 1] : null,
-            'next_id'       => ($currentPos !== false && $currentPos < $total - 1) ? $orderedIds[$currentPos + 1] : null,
+            'prev_id' => ($currentPos !== false && $currentPos > 0) ? $orderedIds[$currentPos - 1] : null,
+            'next_id' => ($currentPos !== false && $currentPos < $total - 1) ? $orderedIds[$currentPos + 1] : null,
             'current_index' => $currentPos !== false ? (int) $currentPos + 1 : null,
-            'total'         => $total,
+            'total' => $total,
             'return_params' => $returnParam,
         ];
 
@@ -107,23 +110,23 @@ class SurveyResultController extends Controller
         $headerData = $aggregateAction->executeHeader($target);
 
         return Inertia::render('Forms/Admin/results/Aggregate', [
-            'target'     => $target->load(['form', 'semester', 'formVersion.sections.questions.options']),
-            'header'     => $headerData['header'],
-            'overall'    => $headerData['overall'],
+            'target' => $target->load(['form', 'semester', 'formVersion.sections.questions.options']),
+            'header' => $headerData['header'],
+            'overall' => $headerData['overall'],
             'navigation' => $navigation,
             // Deferred group 'aggregate': sections + per-question chart data (heavy)
-            'sections'   => Inertia::defer(fn () => $aggregateAction->executeSections($target)['sections'], 'aggregate'),
+            'sections' => Inertia::defer(fn () => $aggregateAction->executeSections($target)['sections'], 'aggregate'),
             // Deferred: only loaded when the Responses tab is first opened
-            'responses'  => Inertia::defer(fn () => $responseAction->execute(
+            'responses' => Inertia::defer(fn () => $responseAction->execute(
                 $target->load('formVersion.sections.questions.options'),
                 $normalizedResponseFilters,
             )),
             'responseFilters' => [
-                'search'    => $normalizedResponseFilters['search'],
-                'status'    => $normalizedResponseFilters['status'],
-                'sort'      => $normalizedResponseFilters['sort'],
+                'search' => $normalizedResponseFilters['search'],
+                'status' => $normalizedResponseFilters['status'],
+                'sort' => $normalizedResponseFilters['sort'],
                 'direction' => $normalizedResponseFilters['direction'],
-                'per_page'  => $normalizedResponseFilters['per_page'],
+                'per_page' => $normalizedResponseFilters['per_page'],
             ],
         ]);
     }
@@ -156,6 +159,36 @@ class SurveyResultController extends Controller
                 'per_page' => $validated['per_page'] ?? 15,
             ],
         ]);
+    }
+
+    /**
+     * Download aggregate results for a survey run.
+     */
+    public function downloadAggregate(
+        FormTarget $target,
+        GetSurveyRunAggregateAction $aggregateAction,
+        ExcelExportService $excelService,
+    ): BinaryFileResponse {
+        $this->authorize('view_survey_results_aggregate');
+
+        $headerData = $aggregateAction->executeHeader($target);
+        $sectionsData = $aggregateAction->executeSections($target);
+
+        $export = new SurveyRunAggregateExport(
+            $headerData['header'],
+            $headerData['overall'],
+            $sectionsData['sections'],
+        );
+
+        $courseInfo = $headerData['header']['course_info'] ?? null;
+        $filenamePrefix = $courseInfo
+            ? sprintf('survey_results_%s_%s', $courseInfo['code'] ?? 'course', $courseInfo['section'] ?? 'section')
+            : sprintf('survey_results_%s', $target->id);
+
+        return $excelService->download(
+            $export,
+            $excelService->generateFilenameWithTimestamp($filenamePrefix),
+        );
     }
 
     /**

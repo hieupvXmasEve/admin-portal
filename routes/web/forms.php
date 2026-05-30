@@ -1,9 +1,10 @@
 <?php
 
-use App\Http\Controllers\Web\FormController;
 use App\Http\Controllers\QueryTicketController;
 use App\Http\Controllers\Web\Admin\FormTargetController;
 use App\Http\Controllers\Web\Admin\QueryController;
+use App\Http\Controllers\Web\Admin\SurveyResultController;
+use App\Http\Controllers\Web\FormController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -20,7 +21,7 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('forms')->name('forms.')->group(function () {
         // Admin form management
         Route::prefix('admin')->name('admin.')->group(function () {
-             // Form Runs Management
+            // Form Runs Management
             Route::prefix('runs')->name('runs.')->group(function () {
                 Route::get('/', [FormTargetController::class, 'index'])->name('index');
                 Route::get('/create', [FormTargetController::class, 'create'])->name('create');
@@ -40,19 +41,22 @@ Route::middleware(['auth'])->group(function () {
             // Staff survey inbox
             Route::prefix('results')->name('results.')->group(function () {
                 // List survey results
-                Route::get('/', [\App\Http\Controllers\Web\Admin\SurveyResultController::class, 'index'])
+                Route::get('/', [SurveyResultController::class, 'index'])
                     ->name('index')
                     ->middleware('can:view_survey');
                 // Program stats (must be before /{target} routes)
-                Route::get('/stats', [\App\Http\Controllers\Web\Admin\SurveyResultController::class, 'stats'])
+                Route::get('/stats', [SurveyResultController::class, 'stats'])
                     ->name('stats')
                     ->middleware('can:view_survey_results_aggregate');
                 // Aggregate survey results
-                Route::get('/{target}/aggregate', [\App\Http\Controllers\Web\Admin\SurveyResultController::class, 'aggregate'])
+                Route::get('/{target}/aggregate', [SurveyResultController::class, 'aggregate'])
                     ->name('aggregate')
                     ->middleware('can:view_survey_results_aggregate');
+                Route::get('/{target}/aggregate/download', [SurveyResultController::class, 'downloadAggregate'])
+                    ->name('aggregate.download')
+                    ->middleware('can:view_survey_results_aggregate');
                 // Raw survey results
-                Route::get('/{target}/raw', [\App\Http\Controllers\Web\Admin\SurveyResultController::class, 'raw'])
+                Route::get('/{target}/raw', [SurveyResultController::class, 'raw'])
                     ->name('raw')
                     ->middleware('can:view_survey_results_raw');
             });
