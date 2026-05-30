@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for all AI coding agents (Claude Code, Codex, Cursor, OpenCode, and others) when working in this repository. This is the single source of truth — Claude Code falls back to this file when no `CLAUDE.md` exists.
+Guidance for all AI coding agents (Claude Code, Codex, Cursor, OpenCode, and others) when working in this repository. This is the single source of truth for agent operation in Swinx.
 
 ## Project
 
@@ -120,17 +120,19 @@ Before final response:
 - [ ] Docs updated when routes, contracts, auth, or architecture changed
 - [ ] Final answer summarizes changed files, validation result, and unresolved questions
 
-<!-- KHUYM:START -->
-# Khuym — PAUSED
+<!-- RETIRED-WORKFLOWS:START -->
+## Retired Workflows
 
-Khuym workflow is paused for this repo. Harness (below) is the sole operational system. Do not invoke `khuym:*` skills or run `node .codex/khuym_status.mjs` from agent sessions.
+Harness Experimental is the sole operational workflow for this repository.
 
-Archived artifacts (read-only reference, not active workflow):
+Do not use Khuym, claudekit, ClaudeKit command packs, `.claude/`, `.agents/`,
+or `.khuym/` as workflow inputs. Do not run `node .codex/khuym_status.mjs` or
+invoke `khuym:*` / `ck:*` skills for this repo.
 
-- `.khuym/state.json`, `.khuym/onboarding.json` — historical state
-- `.codex/hooks/khuym_*.mjs`, `.codex/khuym_*.mjs` — disabled support scripts (hook firing harmless; outputs ignored)
-- `history/<feature>/`, `history/learnings/critical-patterns.md` — prior feature notes still usable as **input context** for harness intake but no longer the storage layer
-<!-- KHUYM:END -->
+Historical files under `history/` may still be read as product context when a
+Harness story needs the old investigation notes, but they are not a live task
+system.
+<!-- RETIRED-WORKFLOWS:END -->
 
 <!-- HARNESS:BEGIN -->
 ## Harness — sole operational system
@@ -143,15 +145,15 @@ Harness CLI (`./scripts/harness`, Rust binary at `scripts/bin/harness-cli`, DB a
 - `docs/templates/` — story + decision + validation templates
 - Current state: `./scripts/harness query matrix`, `./scripts/harness query backlog`, `./scripts/harness query decisions`
 
-### Operator loop (Claude runs this for every user requirement)
+### Operator loop (all agents run this for every user requirement)
 
 1. **Intake**: classify per `docs/FEATURE_INTAKE.md` (tiny/normal/high-risk + risk flags). Record:
    ```
-   ./scripts/harness intake --title "..." --lane <tiny|normal|high-risk> --reason "..." --flags "auth,data-model,..."
+   ./scripts/harness intake --type <new_spec|spec_slice|change_request|new_initiative|maintenance|harness_improvement> --summary "..." --lane <tiny|normal|high_risk> --flags "auth,data-model,..." --docs "docs/..."
    ```
 2. **Story**: for normal/high-risk, create story file from `docs/templates/story.md` (or `docs/templates/high-risk-story/` for high-risk) at `docs/stories/<epic>/<story-id>.md`, then register:
    ```
-   ./scripts/harness story add --id <id> --title "..." --path docs/stories/<epic>/<id>.md
+   ./scripts/harness story add --id <id> --title "..." --lane <normal|high_risk> --contract docs/stories/<epic>/<id>.md
    ```
 3. **Planning + confirm**: present approach (affected files, validation shape, risks) to user. Wait for explicit approval before implementation.
 4. **Execute**: implement minimum vertical slice. Update story status:
@@ -160,15 +162,15 @@ Harness CLI (`./scripts/harness`, Rust binary at `scripts/bin/harness-cli`, DB a
    ```
 5. **Trace**: at end of substantial actions, record:
    ```
-   ./scripts/harness trace --story <id> --action "..." --files "..." --outcome <success|fail|blocked> --friction "..."
+   ./scripts/harness trace --summary "..." --story <id> --actions "..." --changed "..." --outcome <completed|partial|failed|blocked> --friction "..."
    ```
 6. **Decision**: when architecture/behavior choice is made, add ADR to `docs/decisions/NNNN-<slug>.md` + register:
    ```
-   ./scripts/harness decision add --id <NNNN> --title "..." --path docs/decisions/NNNN-<slug>.md
+   ./scripts/harness decision add --id <NNNN> --title "..." --status accepted --doc docs/decisions/NNNN-<slug>.md
    ```
 7. **Backlog**: when friction is found but not fixed:
    ```
-   ./scripts/harness backlog add --title "..." --discovered-while "<story-id>" --risk <tiny|normal|high-risk>
+   ./scripts/harness backlog add --title "..." --while "<story-id>" --risk <tiny|normal|high_risk>
    ```
 
 ### Lanes (from FEATURE_INTAKE.md)

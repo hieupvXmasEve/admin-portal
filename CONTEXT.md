@@ -1,9 +1,9 @@
 # CONTEXT.md — Swinx Project Onboarding
 
 > Single-page orientation for humans and AI agents new to this repo.
-> For depth, jump to `docs/codebase-discovery-2026-05-12.md`. For agent-specific operating rules, see `CLAUDE.md` (Claude Code) and `AGENTS.md` (other tools).
+> For depth, jump to `docs/codebase-discovery-2026-05-12.md`. For all agent operating rules, see `AGENTS.md`.
 
-**Last updated:** 2026-05-12
+**Last updated:** 2026-05-31
 **Owner:** Platform Team
 **Status:** Active baseline
 
@@ -88,7 +88,7 @@ Routes  ──►  Middleware (Sanctum + Actor)  ──►  Controllers (thin)
 | Runtime | **Docker-first** via `./scripts/dev.sh` | — |
 | Package mgr | composer + **pnpm@10.26.0** | — |
 
-> **Version awareness:** Laravel 13 + Inertia v3 — many v2 APIs are removed. Always consult `docs/inertiajs-vue-info.md` before writing Inertia code. See `CLAUDE.md` / `AGENTS.md` for the "Forbidden Patterns" cheat-sheet.
+> **Version awareness:** Laravel 13 + Inertia v3 — many v2 APIs are removed. Always consult `docs/inertiajs-vue-info.md` before writing Inertia code. See `AGENTS.md` for the "Forbidden Patterns" cheat-sheet.
 
 ---
 
@@ -146,10 +146,10 @@ Routes  ──►  Middleware (Sanctum + Actor)  ──►  Controllers (thin)
 │   └── channels.php
 ├── scripts/                 # dev.sh (canonical wrapper), prod/deploy/setup scripts
 ├── tests/                   # Pest — Feature (53) + Unit (7)
-├── .agents/ .claude/ .codex/ .cursor/ .devin/ .opencode/ .trellis/ .vscode/
-│                            # AI tool integration configs
-├── .khuym/                  # Khuym workflow runtime
-├── custom-skills/inertia-filter-table/   # canonical filter-table skill
+├── .codex/                  # Codex project config; repo hooks disabled
+├── .cursor/ .opencode/ .trellis/ .vscode/
+│                            # non-primary tool configs; Harness remains canonical
+├── history/                 # historical investigation notes, not a live workflow
 └── (root configs: composer.json, package.json, vite.config.ts, tsconfig.json,
    phpunit.xml, eslint.config.js, .prettierrc, components.json, .env.example)
 ```
@@ -314,8 +314,8 @@ Every core doc has: **last updated date, owner, status, unresolved questions**. 
 - Architecture truth → `docs/system-architecture.md`
 - Standards → `docs/code-standards.md` and `docs/rules/`
 - Frontend Inertia v3 reference → `docs/inertiajs-vue-info.md`
-- Canonical filter/table pattern → `custom-skills/inertia-filter-table/SKILL.md`
-- AI agent quick-start → `docs/ai-context.md` · Claude Code rules → `CLAUDE.md` · other tools → `AGENTS.md`
+- Canonical filter/table pattern → `docs/useDataTable-examples.md`
+- AI agent quick-start → `AGENTS.md`
 
 ---
 

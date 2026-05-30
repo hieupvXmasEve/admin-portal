@@ -37,6 +37,9 @@ public/.user.ini
 .claude
 .opencode
 .agents
+.khuym
+.codex/khuym_*.mjs
+.codex/hooks/khuym_*.mjs
 # .kiro
 # docs
 public/.user.ini

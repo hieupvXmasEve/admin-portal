@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-12
 **Branch:** dev
-**Method:** Standalone discovery (no Khuym feature chain). Read-only inspection of `app/`, `resources/`, `routes/`, `database/`, `tests/`, `config/`, `docs/`, root configs, and Docker scaffolding. Cross-referenced existing `docs/system-architecture.md`, `docs/project-overview-pdr.md`, `docs/codebase-summary.md`, `docs/code-standards.md`, `AGENTS.md`, `CLAUDE.md`.
+**Method:** Standalone discovery. Read-only inspection of `app/`, `resources/`, `routes/`, `database/`, `tests/`, `config/`, `docs/`, root configs, and Docker scaffolding. Cross-referenced existing `docs/system-architecture.md`, `docs/project-overview-pdr.md`, `docs/codebase-summary.md`, `docs/code-standards.md`, and `AGENTS.md`.
 **Scope:** Whole repository — depth **high**.
 
 ---
@@ -141,7 +141,7 @@ These ten files alone hold the bulk of legacy business logic that has not yet be
 
 ### 3.4 Cross-module communication contract
 
-`CLAUDE.md` / `AGENTS.md` mandate:
+`AGENTS.md` mandates:
 
 > Module A needing data from Module B must use a **Contract** in `app/Shared/Contracts/{Domain}/`. Never use Eloquent `join` across module boundaries. Contracts must not accept or return Eloquent Models — use DTOs.
 
@@ -280,9 +280,9 @@ Vite config: alias `@` → `resources/js`, alias `ziggy-js` → `vendor/tightenc
 ├── tests/                 # Pest tests
 ├── vendor/                # composer dependencies (gitignored)
 ├── node_modules/          # pnpm dependencies (gitignored)
-├── .agents/ .claude/ .codex/ .cursor/ .devin/ .opencode/ .trellis/ .vscode/
-│                          # AI agent tool integrations
-├── .khuym/                # Khuym workflow runtime (newly installed)
+├── .codex/ .cursor/ .opencode/ .trellis/ .vscode/
+│                          # AI tool configs; Harness in AGENTS.md is canonical
+├── history/               # historical investigation notes, not a live workflow
 ├── plans/ openspec/ prd/ requirements-docs/ specs/ stories/
 │                          # planning/spec artifacts (mostly empty in dev branch)
 ├── custom-skills/         # in-repo Claude skills (e.g. inertia-filter-table)
@@ -470,7 +470,7 @@ composer install
 pnpm install                                 # NOT npm — package.json declares pnpm 10.26
 cp .env.example .env
 
-# Docker stack (preferred — and mandated by CLAUDE.md)
+# Docker stack (preferred — and mandated by AGENTS.md)
 ./scripts/dev.sh start                        # build + up swinx-dev stack
 ./scripts/dev.sh artisan key:generate
 ./scripts/dev.sh artisan migrate
@@ -541,7 +541,7 @@ Severity: **C** = critical, **H** = high, **M** = medium, **L** = low.
 
 | ID | Sev | Item | Evidence |
 |---|---|---|---|
-| A1 | **C** | Doc-vs-code drift: `app/Shared/Contracts/{Domain}/` is mandated for cross-module data but **does not exist**. Only `app/Shared/DTO/` and `app/Shared/Support/`. Modules currently host their own internal Contracts. | `app/Shared/` actual listing vs `CLAUDE.md` |
+| A1 | **C** | Doc-vs-code drift: `app/Shared/Contracts/{Domain}/` is mandated for cross-module data but **does not exist**. Only `app/Shared/DTO/` and `app/Shared/Support/`. Modules currently host their own internal Contracts. | `app/Shared/` actual listing vs `AGENTS.md` |
 | A2 | H | Mega-services exceed the **800-line standard** by an order of magnitude. `AssessmentReportService.php` is 113 KB, `AssessmentManagementService.php` 103 KB, `StudentAcademicSummaryService.php` 66 KB. | `app/Services/*.php` |
 | A3 | H | Frontend filter-stack drift: pages use mix of `useInertiaFilters`, `useFilters`/`useTableFilters`, `useServerTableQuery`, and the newly-canonical `useDataTable`. Code-standards calls `useDataTable` the only correct path; the other three remain in active use. | `resources/js/composables/`, `docs/code-standards.md` |
 | A4 | M | 35 split files in `routes/web/*` plus per-module routes — registration is mostly OK but the **legacy `routes/web/student.php` is commented out and references say to remove campus routes after 2026-06-01** (deprecation deadline imminent). | `routes/web.php:62-79` |
