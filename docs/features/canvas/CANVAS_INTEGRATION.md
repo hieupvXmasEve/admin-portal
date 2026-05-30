@@ -108,6 +108,15 @@ This integration allows you to sync courses from Canvas LMS to your portal using
 - `POST /admin/canvas/courses/{id}/unmap` - Unmap course
 - `POST /admin/canvas/courses/{id}/ignore` - Ignore course
 
+### Syllabus Template Reuse Guard
+
+Mapping a Canvas course reserves the syllabus template currently assigned to
+the local course offering. Course offering create/edit dropdowns exclude
+Canvas-reserved templates, and backend validation rejects direct attempts to
+reuse them for another class. The reservation starts at mapping time; assignment
+sync does not need to run first. Duplicate offering is also blocked for a
+Canvas-reserved syllabus template.
+
 ## Database Schema
 
 ### canvas_integrations

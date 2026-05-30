@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Database\Factories\SyllabusTemplateFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SyllabusTemplate extends AuditableModel
 {
-    /** @use HasFactory<\Database\Factories\SyllabusTemplateFactory> */
+    /** @use HasFactory<SyllabusTemplateFactory> */
     use HasFactory;
 
     protected $fillable = [
@@ -93,6 +95,27 @@ class SyllabusTemplate extends AuditableModel
     public function courseOfferings(): HasMany
     {
         return $this->hasMany(CourseOffering::class);
+    }
+
+    public function scopeAssignableToCourseOffering(Builder $query, ?CourseOffering $courseOffering = null): Builder
+    {
+        $currentTemplateId = $courseOffering?->syllabus_template_id;
+
+        return $query->where(function (Builder $query) use ($currentTemplateId) {
+            $query->where(function (Builder $query) {
+                $query->whereRaw('LOWER(syllabus_templates.title) NOT LIKE ?', ['%canvas%'])
+                    ->whereDoesntHave('courseOfferings', function (Builder $query) {
+                        $query->where('is_canvas_synced', true)
+                            ->orWhereHas('canvasCourseMappings', function (Builder $query) {
+                                $query->where('sync_status', 'mapped');
+                            });
+                    });
+            });
+
+            if ($currentTemplateId !== null) {
+                $query->orWhere('syllabus_templates.id', $currentTemplateId);
+            }
+        });
     }
 
     // ========== AUDIT LOGGING CONFIGURATION ==========

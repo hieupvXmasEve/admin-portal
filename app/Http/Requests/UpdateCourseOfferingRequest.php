@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Models\CourseOffering;
+use App\Rules\CourseOffering\AssignableSyllabusTemplate;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateCourseOfferingRequest extends FormRequest
@@ -22,7 +23,13 @@ class UpdateCourseOfferingRequest extends FormRequest
      */
     public function rules(): array
     {
-        return CourseOffering::validationRules();
+        $rules = CourseOffering::validationRules();
+        $courseOffering = $this->route('courseOffering');
+        $rules['syllabus_template_id'][] = new AssignableSyllabusTemplate(
+            $courseOffering instanceof CourseOffering ? $courseOffering : null
+        );
+
+        return $rules;
     }
 
     /**

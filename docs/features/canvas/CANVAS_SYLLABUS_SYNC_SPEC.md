@@ -116,6 +116,24 @@ $syllabusTemplate = $courseOffering->syllabusTemplate;
 
 ### 🎯 Final Decision: **Clone on First Sync**
 
+### Manual Course Offering Selection Guard
+
+Once a course offering is mapped to Canvas, its assigned syllabus template is
+reserved immediately, before assignment sync runs. Course offering create/edit
+forms must not offer that template for another class.
+
+The same guard also reserves:
+
+- syllabus templates whose title contains `Canvas`;
+- syllabus templates attached to a course offering with
+  `is_canvas_synced = true`.
+
+Backend validation enforces the same rule for direct requests. When editing an
+existing offering, its currently assigned reserved template remains valid so
+staff can update unrelated fields without changing the Canvas link.
+Duplicating an offering with a reserved template is rejected because copying it
+would bypass manual selection validation.
+
 ## 🔄 Sync Flow
 
 ### Phase 0: Prepare SyllabusTemplate (New!)

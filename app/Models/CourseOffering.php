@@ -5,16 +5,17 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Carbon\Carbon;
+use Database\Factories\CourseOfferingFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class CourseOffering extends AuditableModel
 {
-    /** @use HasFactory<\Database\Factories\CourseOfferingFactory> */
+    /** @use HasFactory<CourseOfferingFactory> */
     use HasFactory;
 
     protected $fillable = [
@@ -166,6 +167,11 @@ class CourseOffering extends AuditableModel
         return $this->hasMany(AcademicRecord::class, 'course_offering_id');
     }
 
+    public function canvasCourseMappings(): HasMany
+    {
+        return $this->hasMany(CanvasCourseMapping::class);
+    }
+
     public function syllabusTemplate(): BelongsTo
     {
         return $this->belongsTo(SyllabusTemplate::class);
@@ -178,7 +184,7 @@ class CourseOffering extends AuditableModel
     }
 
     // Form Target
-    public function formTargets(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    public function formTargets(): MorphMany
     {
         return $this->morphMany(FormTarget::class, 'scope');
     }
@@ -428,7 +434,9 @@ class CourseOffering extends AuditableModel
     }
 
     const STATUS_IN_PROGRESS = 'in_progress';
+
     const STATUS_COMPLETED = 'completed';
+
     const STATUS_CANCELLED = 'cancelled';
 
     const LOG_LEVEL_COMPREHENSIVE = 'comprehensive';

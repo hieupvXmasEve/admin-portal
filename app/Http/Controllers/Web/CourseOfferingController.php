@@ -331,6 +331,7 @@ class CourseOfferingController extends Controller
 
         // Get available syllabus templates (now loaded dynamically when unit is selected)
         $syllabusTemplates = SyllabusTemplate::where('is_active', true)
+            ->assignableToCourseOffering()
             ->with(['unit:id,code,name', 'applicableCampus:id,name', 'applicableProgram:id,name'])
             ->orderBy('title')
             ->get(['id', 'unit_id', 'title', 'version', 'description', 'applicable_campus_id', 'applicable_program_id', 'delivery_mode']);
@@ -556,6 +557,7 @@ class CourseOfferingController extends Controller
         // Get available syllabus templates of unit
         $syllabusTemplates = SyllabusTemplate::where('is_active', true)
             ->where('unit_id', $courseOffering->unit_id)
+            ->assignableToCourseOffering($courseOffering)
             ->with(['unit:id,code,name', 'applicableCampus:id,name', 'applicableProgram:id,name'])
             ->orderBy('title')
             ->get(['id', 'unit_id', 'title', 'version', 'description', 'applicable_campus_id', 'applicable_program_id', 'delivery_mode']);
@@ -1222,7 +1224,7 @@ class CourseOfferingController extends Controller
                         // Check prerequisites using UnitPrerequisiteGroup system
                         if ($isEligible) {
                             $prereqService = app(PrerequisiteValidationService::class);
-                            if (!$prereqService->hasMetPrerequisites($student, $courseOffering)) {
+                            if (! $prereqService->hasMetPrerequisites($student, $courseOffering)) {
                                 $prereqDetails = $prereqService->getPrerequisiteValidation($student, $courseOffering);
                                 $missingCodes = collect($prereqDetails['missing_groups'])
                                     ->flatMap(fn ($g) => collect($g['conditions'])
@@ -1643,6 +1645,17 @@ class CourseOfferingController extends Controller
         // Ensure the course offering belongs to current campus
         if ($courseOffering->campus_id !== app('campus')->id) {
             abort(404);
+        }
+
+        if (
+            $courseOffering->syllabus_template_id !== null
+            && ! SyllabusTemplate::query()
+                ->assignableToCourseOffering()
+                ->whereKey($courseOffering->syllabus_template_id)
+                ->exists()
+        ) {
+            return Redirect::back()
+                ->with('error', 'Cannot duplicate a Canvas-linked course offering. Create a new offering and select a reusable syllabus template.');
         }
 
         try {
