@@ -316,7 +316,7 @@ const indexWithCurrentQuery = (): string => {
                         v-model.number="form.credit_points"
                         @input="validateCreditPoints($event.target.value)"
                         type="number"
-                        step="0.5"
+                        step="0.01"
                         min="0"
                         max="100"
                         placeholder="3.00"

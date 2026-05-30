@@ -365,7 +365,7 @@ const selectUnit = (unit: Unit) => {
                             v-model.number="form.credit_points"
                             @input="validateCreditPoints($event.target.value)"
                             type="number"
-                            step="1"
+                            step="0.01"
                             min="0"
                             max="20"
                             placeholder="3.00"
