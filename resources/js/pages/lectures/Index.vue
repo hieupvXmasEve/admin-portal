@@ -9,26 +9,36 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useApi } from '@/composables/useApiRequest';
+import { useDataTable } from '@/composables/useDataTable';
 import type { PaginatedResponse } from '@/types';
 import type { Lecture } from '@/types/models';
 import { lecturerRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { useDebounceFn } from '@vueuse/core';
-import { Building2, Edit, Eye, LogIn, Plus, Search, Trash2 } from 'lucide-vue-next';
-import { computed, h, ref, watch } from 'vue';
+import { Building2, Edit, Eye, LogIn, Plus, Search, Trash2, X } from 'lucide-vue-next';
+import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
 
+interface LecturerFilters {
+    search: string;
+    campus_id: string;
+    semester_id: string;
+    unit_type: string;
+    employment_status: string;
+    employment_type: string;
+    available_for_assignment: boolean | null;
+    page: number;
+    per_page: number;
+    sort: string | null;
+    direction: 'asc' | 'desc' | null;
+}
+
 interface Props {
     lectures: PaginatedResponse<Lecture>;
-    filters: {
-        search?: string;
-        campus_id?: string;
-        employment_status?: string;
-        employment_type?: string;
-        available_for_assignment?: boolean;
-    };
+    filters: Partial<LecturerFilters>;
+    semesters: Array<{ id: number; name: string; code: string }>;
+    unitTypeOptions: Array<{ value: string; label: string }>;
     employmentStatusOptions: Array<{ value: string; label: string }>;
     employmentTypeOptions: Array<{ value: string; label: string }>;
 }
@@ -40,13 +50,38 @@ const data = computed(() => props.lectures.data);
 const deleteDialogOpen = ref(false);
 const selectedLecture = ref<Lecture | null>(null);
 
-// Form for filters
-const filtersForm = useForm({
-    search: props.filters.search || '',
-    campus_id: props.filters.campus_id || 'all',
-    employment_status: props.filters.employment_status || 'all',
-    employment_type: props.filters.employment_type || 'all',
-    available_for_assignment: props.filters.available_for_assignment,
+const { filters, setFilter, clearAllFilters, handleSearch, handleSortChange, handlePaginationNavigate, handlePageSizeChange, hasActiveFilters, isLoading, currentSort, currentDirection } = useDataTable<LecturerFilters>({
+    baseUrl: lecturerRoutes.index(),
+    initialFilters: {
+        search: props.filters.search ?? '',
+        campus_id: props.filters.campus_id ?? 'all',
+        semester_id: props.filters.semester_id ?? 'all',
+        unit_type: props.filters.unit_type ?? 'all',
+        employment_status: props.filters.employment_status ?? 'all',
+        employment_type: props.filters.employment_type ?? 'all',
+        available_for_assignment: props.filters.available_for_assignment ?? null,
+        page: props.filters.page ?? 1,
+        per_page: props.filters.per_page ?? 15,
+        sort: typeof props.filters.sort === 'string' ? props.filters.sort : 'full_name',
+        direction: props.filters.direction ?? 'asc',
+    },
+    defaultValues: {
+        search: '',
+        campus_id: 'all',
+        semester_id: props.filters.semester_id ?? 'all',
+        unit_type: 'all',
+        employment_status: 'all',
+        employment_type: 'all',
+        available_for_assignment: null,
+        page: 1,
+        per_page: 15,
+        sort: 'full_name',
+        direction: 'asc',
+    },
+    only: ['lectures', 'filters'],
+    debounce: 300,
+    fieldDebounce: { search: 300 },
+    immediateFields: ['campus_id', 'semester_id', 'unit_type', 'employment_status', 'employment_type', 'available_for_assignment'],
 });
 
 const deleteForm = useForm({});
@@ -88,21 +123,22 @@ const goToImportPage = () => {
 };
 
 const exportToExcel = () => {
-    window.open('/lectures/export/excel', '_blank');
+    window.open(route('lectures.export.excel'), '_blank');
 };
 
 const exportFilteredToExcel = () => {
     // Build query parameters from current filters
     const params = new URLSearchParams();
 
-    if (filtersForm.search) params.append('search', filtersForm.search);
-    if (filtersForm.campus_id && filtersForm.campus_id !== 'all') params.append('campus_id', filtersForm.campus_id);
-    if (filtersForm.employment_status && filtersForm.employment_status !== 'all') params.append('employment_status', filtersForm.employment_status);
-    if (filtersForm.employment_type && filtersForm.employment_type !== 'all') params.append('employment_type', filtersForm.employment_type);
-    if (filtersForm.available_for_assignment !== undefined) params.append('available_for_assignment', filtersForm.available_for_assignment.toString());
+    if (filters.search) params.append('search', filters.search);
+    if (filters.semester_id && filters.semester_id !== 'all') params.append('semester_id', filters.semester_id);
+    if (filters.unit_type && filters.unit_type !== 'all') params.append('unit_type', filters.unit_type);
+    if (filters.employment_status && filters.employment_status !== 'all') params.append('employment_status', filters.employment_status);
+    if (filters.employment_type && filters.employment_type !== 'all') params.append('employment_type', filters.employment_type);
+    if (filters.available_for_assignment !== null) params.append('available_for_assignment', filters.available_for_assignment.toString());
 
     const queryString = params.toString();
-    const url = `/lectures/export/excel/filtered${queryString ? '?' + queryString : ''}`;
+    const url = `${lecturerRoutes.exportFiltered()}${queryString ? '?' + queryString : ''}`;
     window.open(url, '_blank');
 };
 
@@ -168,39 +204,6 @@ const loginAsLecturer = async (lecture: Lecture) => {
         toast.error(errorMessage);
     }
 };
-
-const handlePaginationNavigate = (url: string) => {
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['lectures'],
-    });
-};
-
-// Debounced search function
-const debouncedSearch = useDebounceFn(() => {
-    filtersForm.get(route('lectures.index'), {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['lectures'],
-    });
-}, 300);
-
-// Watch for filter changes
-watch(
-    () => filtersForm.search,
-    () => {
-        debouncedSearch();
-    },
-);
-
-watch([() => filtersForm.campus_id, () => filtersForm.employment_status, () => filtersForm.employment_type, () => filtersForm.available_for_assignment], () => {
-    filtersForm.get(route('lectures.index'), {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['lectures'],
-    });
-});
 
 const getEmploymentStatusBadge = (status: string) => {
     const statusMap: Record<string, { variant: any; label: string }> = {
@@ -358,19 +361,47 @@ const columns: ColumnDef<Lecture>[] = [
 
     <!-- Filters -->
     <div class="mt-6 space-y-4">
-        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <div class="space-y-2">
                 <Label for="search">Search</Label>
                 <div class="relative">
                     <Search class="absolute top-2.5 left-2 h-4 w-4 text-gray-500" />
-                    <Input id="search" v-model="filtersForm.search" placeholder="Search by name, email, employee ID..." class="pl-8" />
+                    <Input id="search" :model-value="filters.search" placeholder="Search by name, email, employee ID..." class="pl-8" :disabled="isLoading" @update:model-value="(value) => handleSearch(value)" />
                 </div>
             </div>
 
             <div class="space-y-2">
+                <Label for="semester">Semester</Label>
+                <Select :model-value="filters.semester_id" :disabled="isLoading" @update:model-value="(value) => setFilter('semester_id', String(value))">
+                    <SelectTrigger id="semester">
+                        <SelectValue placeholder="All Semesters" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Semesters</SelectItem>
+                        <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()"> {{ semester.name }} ({{ semester.code }}) </SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <div class="space-y-2">
+                <Label for="unit_type">Program</Label>
+                <Select :model-value="filters.unit_type" :disabled="isLoading" @update:model-value="(value) => setFilter('unit_type', String(value))">
+                    <SelectTrigger id="unit_type">
+                        <SelectValue placeholder="All Programs" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Programs</SelectItem>
+                        <SelectItem v-for="type in unitTypeOptions" :key="type.value" :value="type.value">
+                            {{ type.label }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <div class="space-y-2">
                 <Label for="status">Employment Status</Label>
-                <Select v-model="filtersForm.employment_status">
-                    <SelectTrigger>
+                <Select :model-value="filters.employment_status" :disabled="isLoading" @update:model-value="(value) => setFilter('employment_status', String(value))">
+                    <SelectTrigger id="status">
                         <SelectValue placeholder="All Statuses" />
                     </SelectTrigger>
                     <SelectContent>
@@ -384,8 +415,8 @@ const columns: ColumnDef<Lecture>[] = [
 
             <div class="space-y-2">
                 <Label for="type">Employment Type</Label>
-                <Select v-model="filtersForm.employment_type">
-                    <SelectTrigger>
+                <Select :model-value="filters.employment_type" :disabled="isLoading" @update:model-value="(value) => setFilter('employment_type', String(value))">
+                    <SelectTrigger id="type">
                         <SelectValue placeholder="All Types" />
                     </SelectTrigger>
                     <SelectContent>
@@ -397,10 +428,16 @@ const columns: ColumnDef<Lecture>[] = [
                 </Select>
             </div>
         </div>
+        <div v-if="hasActiveFilters" class="flex justify-end">
+            <Button variant="outline" size="sm" :disabled="isLoading" @click="clearAllFilters">
+                <X class="mr-2 h-4 w-4" />
+                Clear filters
+            </Button>
+        </div>
     </div>
 
     <div class="mt-6">
-        <DataTable :data="data" :columns="columns">
+        <DataTable :data="data" :columns="columns" :loading="isLoading" :initial-sort="currentSort ?? undefined" :initial-direction="currentDirection ?? undefined" @sort-change="handleSortChange">
             <template #cell-actions="{ row }">
                 <div class="flex items-center gap-2">
                     <TooltipProvider :delay-duration="0">
@@ -456,7 +493,7 @@ const columns: ColumnDef<Lecture>[] = [
         </DataTable>
     </div>
 
-    <DataPagination :pagination-data="lectures" @navigate="handlePaginationNavigate" />
+    <DataPagination :pagination-data="lectures" item-name="lecturers" :page-size-options="[15, 25, 50, 100]" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
 
     <AlertDialog :open="deleteDialogOpen" @update:open="deleteDialogOpen = $event">
         <AlertDialogContent>

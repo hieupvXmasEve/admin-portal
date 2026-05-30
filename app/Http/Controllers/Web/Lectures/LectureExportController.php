@@ -26,7 +26,7 @@ class LectureExportController extends Controller
     {
         try {
             $filePath = $this->exportService->exportLecturersToExcel();
-            $fileName = 'lecturers_export_' . now()->format('Y-m-d') . '.xlsx';
+            $fileName = 'lecturers_export_'.now()->format('Y-m-d').'.xlsx';
 
             Log::info('Lecturers export completed successfully', [
                 'user_id' => Auth::id(),
@@ -35,15 +35,15 @@ class LectureExportController extends Controller
 
             return response()->download($filePath, $fileName, [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+                'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
             ])->deleteFileAfterSend(true);
         } catch (\Exception $e) {
-            Log::error('Lecturers export failed: ' . $e->getMessage(), [
+            Log::error('Lecturers export failed: '.$e->getMessage(), [
                 'user_id' => Auth::id(),
             ]);
 
             return response()->json([
-                'error' => 'Export failed: ' . $e->getMessage(),
+                'error' => 'Export failed: '.$e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -57,6 +57,8 @@ class LectureExportController extends Controller
         $validated = $request->validate([
             'search' => 'nullable|string|max:255',
             'campus_id' => 'nullable|exists:campuses,id',
+            'semester_id' => 'nullable|string|max:20',
+            'unit_type' => 'nullable|string|max:50',
             'employment_status' => 'nullable|string|in:active,on_leave,sabbatical,retired,terminated,suspended,all',
             'employment_type' => 'nullable|string|in:full_time,part_time,contract,visiting,emeritus,all',
             'department' => 'nullable|string|max:100',
@@ -68,6 +70,11 @@ class LectureExportController extends Controller
         try {
             // Build filters from validated request
             $filters = [];
+            $currentCampusId = session('current_campus_id');
+
+            if ($currentCampusId) {
+                $filters['campus_id'] = (int) $currentCampusId;
+            }
 
             // Handle search filter
             if ($request->filled('search')) {
@@ -77,6 +84,14 @@ class LectureExportController extends Controller
             // Handle specific field filters
             if ($request->filled('campus_id')) {
                 $filters['campus_id'] = $validated['campus_id'];
+            }
+
+            if ($request->filled('semester_id') && $validated['semester_id'] !== 'all') {
+                $filters['semester_id'] = $validated['semester_id'];
+            }
+
+            if ($request->filled('unit_type') && $validated['unit_type'] !== 'all') {
+                $filters['unit_type'] = $validated['unit_type'];
             }
 
             if ($request->filled('employment_status') && $validated['employment_status'] !== 'all') {
@@ -111,7 +126,7 @@ class LectureExportController extends Controller
             if (! empty($filters)) {
                 $filterSuffix = '_filtered';
             }
-            $fileName = 'lecturers_export' . $filterSuffix . '_' . now()->format('Y-m-d') . '.xlsx';
+            $fileName = 'lecturers_export'.$filterSuffix.'_'.now()->format('Y-m-d').'.xlsx';
 
             Log::info('Filtered lecturers export completed successfully', [
                 'user_id' => Auth::id(),
@@ -121,16 +136,16 @@ class LectureExportController extends Controller
 
             return response()->download($filePath, $fileName, [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+                'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
             ])->deleteFileAfterSend(true);
         } catch (\Exception $e) {
-            Log::error('Filtered lecturers export failed: ' . $e->getMessage(), [
+            Log::error('Filtered lecturers export failed: '.$e->getMessage(), [
                 'user_id' => Auth::id(),
                 'filters' => $validated ?? [],
             ]);
 
             return response()->json([
-                'error' => 'Export failed: ' . $e->getMessage(),
+                'error' => 'Export failed: '.$e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

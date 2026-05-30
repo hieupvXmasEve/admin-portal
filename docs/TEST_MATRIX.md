@@ -20,6 +20,7 @@ implemented until tests or validation evidence exist.
 | Story | Contract | Unit | Integration | E2E | Platform | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | S-001-course-survey-class-result-download | Admin/staff can download per-class course survey aggregate results without raw student identifiers | yes | yes | no | no | implemented | `tests/Feature/Form/SurveyResultDownloadTest.php`; targeted Pint, ESLint, Prettier passed; repo-wide `vue-tsc` still fails on pre-existing typing drift |
+| S-001-filter-lecturers-by-semester-program | Staff can filter the lecturer directory by assigned semester and teaching program/unit type, including EGC, within the current campus | yes | yes | no | no | implemented | `tests/Feature/Lecture/ListLecturesQueryTest.php`; targeted Pint, ESLint, Prettier passed; repo-wide `vue-tsc` still fails on pre-existing typing drift |
 
 ## Evidence Rules
 

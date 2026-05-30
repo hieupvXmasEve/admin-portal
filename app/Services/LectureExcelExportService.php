@@ -35,13 +35,13 @@ class LectureExcelExportService implements WithMultipleSheets
         $this->filters = $filters;
 
         // Create temporary file
-        $fileName = 'lecturers_export_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+        $fileName = 'lecturers_export_'.now()->format('Y-m-d_H-i-s').'.xlsx';
 
         // Use Laravel Excel to export to the local disk
-        Excel::store($this, 'temp/' . $fileName, 'local');
+        Excel::store($this, 'temp/'.$fileName, 'local');
 
         // Return the actual file path where it was stored
-        $filePath = Storage::disk('local')->path('temp/' . $fileName);
+        $filePath = Storage::disk('local')->path('temp/'.$fileName);
 
         return $filePath;
     }
@@ -97,12 +97,35 @@ class LectureExcelExportService implements WithMultipleSheets
 
         if (! empty($filters['search'])) {
             $query->where(function ($q) use ($filters) {
-                $q->where('employee_id', 'like', '%' . $filters['search'] . '%')
-                    ->orWhere('first_name', 'like', '%' . $filters['search'] . '%')
-                    ->orWhere('last_name', 'like', '%' . $filters['search'] . '%')
-                    ->orWhere('email', 'like', '%' . $filters['search'] . '%')
-                    ->orWhere('department', 'like', '%' . $filters['search'] . '%')
-                    ->orWhere('specialization', 'like', '%' . $filters['search'] . '%');
+                $q->where('employee_id', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('first_name', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('last_name', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('email', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('department', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('specialization', 'like', '%'.$filters['search'].'%');
+            });
+        }
+
+        $semesterId = $filters['semester_id'] ?? null;
+        $unitType = $filters['unit_type'] ?? null;
+        $hasSemesterFilter = $semesterId !== null && $semesterId !== '' && $semesterId !== 'all';
+        $hasUnitTypeFilter = $unitType !== null && $unitType !== '' && $unitType !== 'all';
+
+        if ($hasSemesterFilter || $hasUnitTypeFilter) {
+            $query->whereHas('courseOfferings', function (Builder $courseOfferingQuery) use ($filters, $hasSemesterFilter, $semesterId, $hasUnitTypeFilter, $unitType) {
+                if (! empty($filters['campus_id'])) {
+                    $courseOfferingQuery->where('course_offerings.campus_id', $filters['campus_id']);
+                }
+
+                if ($hasSemesterFilter) {
+                    $courseOfferingQuery->where('course_offerings.semester_id', (int) $semesterId);
+                }
+
+                if ($hasUnitTypeFilter) {
+                    $courseOfferingQuery->whereHas('unit', function (Builder $unitQuery) use ($unitType) {
+                        $unitQuery->where('units.unit_type', $unitType);
+                    });
+                }
             });
         }
     }

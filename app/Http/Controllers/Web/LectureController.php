@@ -8,21 +8,24 @@ use App\Actions\Lecture\GetLectureTeachingDetailsAction;
 use App\Actions\Lecture\GetTeachingHoursAction;
 use App\Constants\LectureRoutes;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Lecture\ListLecturesRequest;
 use App\Http\Requests\Lecture\StoreLectureRequest;
 use App\Http\Requests\Lecture\UpdateLectureRequest;
 use App\Http\Requests\Lecture\ViewLectureTeachingDetailsRequest;
 use App\Http\Requests\Lecture\ViewTeachingHoursRequest;
 use App\Models\Campus;
-use App\Models\ClassSession;
+use App\Models\CourseOffering;
 use App\Models\Lecture;
 use App\Models\Semester;
 use App\Models\User;
+use App\Queries\Lecture\ListLecturesQuery;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -39,59 +42,33 @@ class LectureController extends Controller
     /**
      * Display a listing of lectures
      */
-    public function index(Request $request): Response
+    public function index(ListLecturesRequest $request, ListLecturesQuery $query): Response
     {
-        $currentCampusId = session('current_campus_id');
-        $query = Lecture::with(['campus'])
-            ->where('campus_id', $currentCampusId)
-            ->orderByName();
+        $currentCampusId = (int) session('current_campus_id');
+        $validated = $request->validated();
+        $filters = [
+            'search' => $validated['search'] ?? '',
+            'campus_id' => $validated['campus_id'] ?? 'all',
+            'semester_id' => $this->resolveLectureSemesterFilter($validated['semester_id'] ?? null),
+            'unit_type' => $validated['unit_type'] ?? 'all',
+            'employment_status' => $validated['employment_status'] ?? 'all',
+            'employment_type' => $validated['employment_type'] ?? 'all',
+            'available_for_assignment' => $validated['available_for_assignment'] ?? null,
+            'page' => (int) ($validated['page'] ?? 1),
+            'per_page' => (int) ($validated['per_page'] ?? 15),
+            'sort' => $validated['sort'] ?? 'full_name',
+            'direction' => $validated['direction'] ?? 'asc',
+        ];
 
-        // Apply filters
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('employee_id', 'like', "%{$search}%")
-                    ->orWhere('first_name', 'like', "%{$search}%")
-                    ->orWhere('last_name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('department', 'like', "%{$search}%")
-                    ->orWhere('specialization', 'like', "%{$search}%");
-            });
-        }
-
-        if ($request->filled('campus_id') && $request->campus_id !== 'all') {
-            $query->where('campus_id', $request->campus_id);
-        }
-
-        if ($request->filled('employment_status') && $request->employment_status !== 'all') {
-            $query->where('employment_status', $request->employment_status);
-        }
-
-        if ($request->filled('employment_type') && $request->employment_type !== 'all') {
-            $query->where('employment_type', $request->employment_type);
-        }
-
-        if ($request->filled('department') && $request->department !== 'all') {
-            $query->where('department', $request->department);
-        }
-
-        if ($request->filled('available_for_assignment')) {
-            $query->where('is_available_for_assignment', $request->boolean('available_for_assignment'));
-        }
-
-        $lectures = $query->paginate(15)->withQueryString();
-
-        // Get filter options
+        $lectures = $query->handle($filters, $currentCampusId);
 
         return Inertia::render('lectures/Index', [
             'lectures' => $lectures,
-            'filters' => $request->only([
-                'search',
-                'campus_id',
-                'employment_status',
-                'employment_type',
-                'available_for_assignment',
-            ]),
+            'filters' => $filters,
+            'semesters' => Semester::select('id', 'name', 'code')
+                ->orderBy('start_date', 'desc')
+                ->get(),
+            'unitTypeOptions' => $this->getLectureUnitTypeOptions($currentCampusId),
             'employmentStatusOptions' => [
                 ['value' => 'active', 'label' => 'Active'],
                 ['value' => 'on_leave', 'label' => 'On Leave'],
@@ -108,6 +85,53 @@ class LectureController extends Controller
                 ['value' => 'emeritus', 'label' => 'Emeritus'],
             ],
         ]);
+    }
+
+    private function resolveLectureSemesterFilter(null|string|int $semesterId): string
+    {
+        if ($semesterId !== null && $semesterId !== '') {
+            return (string) $semesterId;
+        }
+
+        $activeSemester = Semester::getActiveSemester();
+
+        return $activeSemester ? (string) $activeSemester->id : 'all';
+    }
+
+    /**
+     * @return array<int, array{value: string, label: string}>
+     */
+    private function getLectureUnitTypeOptions(int $campusId): array
+    {
+        return CourseOffering::query()
+            ->join('units', 'course_offerings.unit_id', '=', 'units.id')
+            ->where('course_offerings.campus_id', $campusId)
+            ->whereNotNull('units.unit_type')
+            ->distinct()
+            ->orderBy('units.unit_type')
+            ->pluck('units.unit_type')
+            ->map(fn (string $type): array => [
+                'value' => $type,
+                'label' => $this->getUnitTypeLabel($type),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function getUnitTypeLabel(string $type): string
+    {
+        return [
+            'general' => 'General',
+            'egc' => 'English Global Citizen',
+            'semi' => 'Semiconductor',
+            'ai' => 'Artificial Intelligence',
+            'mkt' => 'Marketing',
+            'ba' => 'Business Administration',
+            'cs' => 'Computer Science',
+            'ee' => 'Electrical Engineering',
+            'me' => 'Mechanical Engineering',
+            'fin' => 'Finance',
+        ][$type] ?? ucfirst($type);
     }
 
     /**
@@ -140,10 +164,10 @@ class LectureController extends Controller
             $user = User::firstOrCreate(
                 ['email' => $validated['email']],
                 [
-                    'name' => trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? '')),
+                    'name' => trim(($validated['first_name'] ?? '').' '.($validated['last_name'] ?? '')),
                     'email' => $validated['email'],
                     'phone' => $validated['phone'] ?? null,
-                    'password' => Hash::make($password ?? \Illuminate\Support\Str::random(16)),
+                    'password' => Hash::make($password ?? Str::random(16)),
                     'type' => UserType::LECTURER,
                     'status' => User::STATUS_ACTIVE,
                 ]
@@ -156,7 +180,7 @@ class LectureController extends Controller
 
             // Update user fields from lecture data
             $user->update([
-                'name' => trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? '')),
+                'name' => trim(($validated['first_name'] ?? '').' '.($validated['last_name'] ?? '')),
                 'phone' => $validated['phone'] ?? $user->phone,
             ]);
 
@@ -220,13 +244,13 @@ class LectureController extends Controller
             // Get or create User record
             $user = $lecture->user;
 
-            if (!$user) {
+            if (! $user) {
                 // Create new User if doesn't exist
                 $user = User::create([
-                    'name' => trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? '')),
+                    'name' => trim(($validated['first_name'] ?? '').' '.($validated['last_name'] ?? '')),
                     'email' => $validated['email'],
                     'phone' => $validated['phone'] ?? null,
-                    'password' => Hash::make($password ?? \Illuminate\Support\Str::random(16)),
+                    'password' => Hash::make($password ?? Str::random(16)),
                     'type' => UserType::LECTURER,
                     'status' => User::STATUS_ACTIVE,
                 ]);
@@ -234,7 +258,7 @@ class LectureController extends Controller
             } else {
                 // Update existing User
                 $user->update([
-                    'name' => trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? '')),
+                    'name' => trim(($validated['first_name'] ?? '').' '.($validated['last_name'] ?? '')),
                     'email' => $validated['email'],
                     'phone' => $validated['phone'] ?? $user->phone,
                     'type' => UserType::LECTURER, // Ensure type is lecturer
