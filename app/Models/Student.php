@@ -8,8 +8,10 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Traits\HasNotifications;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Sanctum\HasApiTokens;
@@ -32,6 +34,18 @@ class Student extends StudentAuditableModel
         'graduated',
         'pending',
         // 'admission_deferred',
+    ];
+
+    /**
+     * Statuses excluded from active attendance operations after a student enters
+     * DE flow. Historical roster rows remain visible to lecturers with status
+     * metadata, but they are not counted as active attendees.
+     */
+    public const CLASS_ROSTER_INACTIVE_STATUSES = [
+        'inactive',
+        'deferred',
+        'dropout',
+        'dropout_transfer',
     ];
 
     /**
@@ -207,7 +221,7 @@ class Student extends StudentAuditableModel
         return $this->belongsTo(Semester::class, 'intake_major');
     }
 
-    public function parentProfiles(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function parentProfiles(): BelongsToMany
     {
         return $this->belongsToMany(ParentProfile::class, 'parent_student', 'student_id', 'parent_id')
             ->withPivot(['relationship', 'is_primary', 'access_level'])
@@ -217,7 +231,7 @@ class Student extends StudentAuditableModel
     /**
      * Get the primary parent profile for this student
      */
-    public function primaryParentProfile(): ?\App\Models\ParentProfile
+    public function primaryParentProfile(): ?ParentProfile
     {
         return $this->parentProfiles()->wherePivot('is_primary', true)->first();
     }
@@ -300,7 +314,7 @@ class Student extends StudentAuditableModel
     /**
      * Get the student's gold.
      */
-    public function wallet(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function wallet(): HasOne
     {
         return $this->hasOne(StudentWallet::class);
     }
@@ -308,7 +322,7 @@ class Student extends StudentAuditableModel
     /**
      * Get the student's settings.
      */
-    public function settings(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function settings(): HasOne
     {
         return $this->hasOne(StudentSetting::class);
     }
@@ -324,7 +338,7 @@ class Student extends StudentAuditableModel
     /**
      * Get the student's scholarship award.
      */
-    public function scholarshipAward(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function scholarshipAward(): HasOne
     {
         return $this->hasOne(StudentScholarshipAward::class);
     }
@@ -494,12 +508,31 @@ class Student extends StudentAuditableModel
         return ! in_array($this->status, self::BLOCKED_STATUSES, true);
     }
 
+    public function isClassRosterActive(): bool
+    {
+        return ! in_array($this->status, self::CLASS_ROSTER_INACTIVE_STATUSES, true)
+            && ! in_array((string) $this->academic_status, self::CLASS_ROSTER_INACTIVE_STATUSES, true);
+    }
+
     /**
      * Scope a query to only include active students.
      */
     public function scopeActive($query)
     {
         return $query->whereNotIn('status', self::BLOCKED_STATUSES);
+    }
+
+    /**
+     * Scope a query to students who should appear in active class rosters.
+     */
+    public function scopeClassRosterActive($query)
+    {
+        return $query
+            ->whereNotIn('status', self::CLASS_ROSTER_INACTIVE_STATUSES)
+            ->where(function ($query) {
+                $query->whereNull('academic_status')
+                    ->orWhereNotIn('academic_status', self::CLASS_ROSTER_INACTIVE_STATUSES);
+            });
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\V1\Lecturer;
 
 use App\Models\CourseOffering;
+use App\Models\CourseRegistration;
 use App\Models\Lecture;
 use App\Models\Unit;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -32,11 +33,10 @@ class LecturerCourseService
             ->with([
                 'unit',
                 'semester',
-                'courseRegistrations' => function ($q) {
-                    $q->where('registration_status', 'confirmed');
-                },
+                'classRosterRegistrations.student',
                 'classSessions' => function ($q) use ($lecturer) {
                     $q->where('lecture_id', $lecturer->id)
+                        ->with('attendances')
                         ->orderBy('session_date', 'desc');
                 },
             ])
@@ -66,9 +66,10 @@ class LecturerCourseService
                 ->with([
                     'unit',
                     'semester',
-                    'courseRegistrations.student',
+                    'classRosterRegistrations.student',
                     'classSessions' => function ($q) use ($lecturer) {
                         $q->where('lecture_id', $lecturer->id)
+                            ->with('attendances')
                             ->orderBy('session_date', 'asc');
                     },
                 ])
@@ -122,11 +123,11 @@ class LecturerCourseService
                 $sessionQuery->where('lecture_id', $lecturer->id);
             })
             ->with([
-                'courseRegistrations',
+                'classRosterRegistrations',
                 'classSessions' => function ($q) use ($lecturer) {
                     $q->where('lecture_id', $lecturer->id)
                         ->with('attendances');
-                }
+                },
             ])
             ->where('id', $courseOfferingId)
             ->where('is_active', true)
@@ -158,7 +159,7 @@ class LecturerCourseService
             ->whereHas('classSessions', function ($sessionQuery) use ($lecturer) {
                 $sessionQuery->where('lecture_id', $lecturer->id);
             })
-            ->with("syllabusTemplate")
+            ->with('syllabusTemplate')
             ->where('id', $courseOfferingId)
             ->where('is_active', true)
             ->first();
@@ -183,7 +184,7 @@ class LecturerCourseService
                         ->latest('effective_date');
                 },
             ])
-            ->where('registration_status', 'confirmed');
+            ->whereIn('registration_status', CourseRegistration::CLASS_ROSTER_REGISTRATION_STATUSES);
 
         // Apply student filters
         $this->applyStudentFilters($studentsQuery, $filters);
@@ -193,10 +194,13 @@ class LecturerCourseService
 
         return $students->map(function ($registration) use ($courseOfferingId, $attendanceThreshold) {
             $student = $registration->student;
+            $isRosterActive = $registration->isClassRosterActive();
             $attendanceStats = $this->calculateStudentAttendanceStats($student, $courseOfferingId);
             $academicRecord = $student->academicRecords->first();
             $academicStanding = $student->academicStandings->first();
             $finalScore = $this->calculateStudentFinalScore($student->id, $courseOfferingId);
+            $meetsAttendanceRequirement = $academicRecord?->meets_attendance_requirement ??
+                ($attendanceStats['percentage'] >= $attendanceThreshold);
 
             return [
                 'student_id' => $student->id,
@@ -204,6 +208,10 @@ class LecturerCourseService
                 'full_name' => $student->full_name,
                 'email' => $student->email,
                 'registration_date' => $registration->created_at->format('Y-m-d'),
+                'is_roster_active' => $isRosterActive,
+                'roster_status' => $registration->classRosterStatus(),
+                'roster_status_label' => $registration->classRosterStatusLabel(),
+                'can_mark_attendance' => $isRosterActive,
 
                 // Course Registration Information
                 'registration_status' => $registration->registration_status,
@@ -220,12 +228,13 @@ class LecturerCourseService
                 'sessions_attended' => $attendanceStats['attended'],
                 'total_sessions' => $attendanceStats['total'],
                 'last_attendance' => $attendanceStats['last_attendance'],
-                'meets_attendance_requirement' => $academicRecord?->meets_attendance_requirement ??
-                    ($attendanceStats['percentage'] >= $attendanceThreshold),
+                'meets_attendance_requirement' => $isRosterActive && $meetsAttendanceRequirement,
                 'academic_standing' => $academicStanding?->standing ?? 'good',
                 'academic_standing_label' => $academicStanding?->standing_label ?? 'Good Standing',
 
-                'status' => $this->getStudentStatus($attendanceStats, $attendanceThreshold),
+                'status' => $isRosterActive
+                    ? $this->getStudentStatus($attendanceStats, $attendanceThreshold)
+                    : 'inactive',
             ];
         })->toArray();
     }
@@ -342,13 +351,15 @@ class LecturerCourseService
      */
     protected function formatCourseOffering(CourseOffering $courseOffering): array
     {
+        $activeRosterEnrollment = $this->getActiveRosterEnrollmentCount($courseOffering);
+
         return [
             'id' => $courseOffering->id,
             'section_code' => $courseOffering->section_code,
             'delivery_mode' => $courseOffering->delivery_mode,
             'location' => $courseOffering->location,
             'max_capacity' => $courseOffering->max_capacity,
-            'current_enrollment' => $courseOffering->current_enrollment,
+            'current_enrollment' => $activeRosterEnrollment,
             'enrollment_status' => $courseOffering->enrollment_status,
             'schedule_days' => $courseOffering->schedule_days,
             'schedule_time_start' => $courseOffering->schedule_time_start?->format('H:i'),
@@ -376,8 +387,7 @@ class LecturerCourseService
     protected function getEnrollmentStatistics(CourseOffering $courseOffering): array
     {
         $totalRegistrations = $courseOffering->courseRegistrations()->count();
-        $enrolledStudents = $courseOffering->courseRegistrations()
-            ->where('registration_status', 'confirmed')->count();
+        $enrolledStudents = $this->getActiveRosterEnrollmentCount($courseOffering);
         $waitlistedStudents = $courseOffering->courseRegistrations()
             ->where('registration_status', 'waitlisted')->count();
         $droppedStudents = $courseOffering->courseRegistrations()
@@ -395,25 +405,43 @@ class LecturerCourseService
         ];
     }
 
+    protected function getActiveRosterEnrollmentCount(CourseOffering $courseOffering): int
+    {
+        return $courseOffering->activeClassRosterEnrollmentCount();
+    }
+
     /**
      * Get attendance statistics for course
      */
     protected function getAttendanceStatistics(CourseOffering $courseOffering): array
     {
         $sessions = $courseOffering->classSessions;
+        $activeStudentIds = $courseOffering->activeClassRosterStudentIds();
         $totalSessions = $sessions->count();
         $completedSessions = $sessions->where('status', 'completed')->count();
-        $sessionsWithAttendance = $sessions->where('attendance_marked', true)->count();
+        $sessionsWithAttendance = $sessions
+            ->filter(function ($session) use ($activeStudentIds) {
+                if (! $session->relationLoaded('attendances')) {
+                    return $session->attendance_marked;
+                }
+
+                return $session->attendances
+                    ->whereIn('student_id', $activeStudentIds)
+                    ->isNotEmpty();
+            })
+            ->count();
 
         $attendanceRecords = DB::table('attendances')
             ->join('class_sessions', 'attendances.class_session_id', '=', 'class_sessions.id')
             ->where('class_sessions.course_offering_id', $courseOffering->id)
-            ->where('attendances.status', 'present')
+            ->whereIn('attendances.student_id', $activeStudentIds)
+            ->whereIn('attendances.status', ['present', 'late'])
             ->count();
 
         $totalPossibleAttendances = DB::table('attendances')
             ->join('class_sessions', 'attendances.class_session_id', '=', 'class_sessions.id')
             ->where('class_sessions.course_offering_id', $courseOffering->id)
+            ->whereIn('attendances.student_id', $activeStudentIds)
             ->count();
 
         return [

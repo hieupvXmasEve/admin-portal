@@ -8,6 +8,7 @@ use App\Models\ClassSession;
 use App\Models\Lecture;
 use App\Models\Room;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -69,7 +70,7 @@ class LecturerTimetableService
         // return Cache::remember($cacheKey, 300, function () use ($lecturer, $startDate, $endDate, $filters) {
         // Get sessions in the specified period
         $query = $lecturer->classSessions()
-            ->with(['courseOffering.unit', 'room.building'])
+            ->with(['courseOffering.unit', 'courseOffering.classRosterRegistrations', 'room.building', 'attendances'])
             ->whereBetween('session_date', [$startDate, $endDate]);
 
         // Apply filters
@@ -81,7 +82,7 @@ class LecturerTimetableService
             $query->where('status', $filters['status']);
         }
 
-        if (!($filters['include_cancelled'] ?? false)) {
+        if (! ($filters['include_cancelled'] ?? false)) {
             $query->where('status', '!=', 'cancelled');
         }
 
@@ -113,7 +114,7 @@ class LecturerTimetableService
         $endDate = now()->addDays($days);
 
         $sessions = $lecturer->classSessions()
-            ->with(['courseOffering', 'room'])
+            ->with(['courseOffering.unit', 'courseOffering.classRosterRegistrations', 'room', 'attendances'])
             ->where('session_date', '>=', now())
             ->where('session_date', '<=', $endDate)
             ->where('status', 'scheduled')
@@ -154,7 +155,7 @@ class LecturerTimetableService
             );
 
             if (! empty($conflicts)) {
-                throw new \Exception('Scheduling conflict detected: ' . implode(', ', $conflicts));
+                throw new \Exception('Scheduling conflict detected: '.implode(', ', $conflicts));
             }
 
             // Create the session
@@ -174,7 +175,7 @@ class LecturerTimetableService
                 'delivery_mode' => $sessionData['delivery_mode'] ?? $courseOffering->delivery_mode,
                 'room_id' => $sessionData['room_id'] ?? null,
                 'status' => 'scheduled',
-                'expected_attendees' => $courseOffering->current_enrollment,
+                'expected_attendees' => $courseOffering->activeClassRosterEnrollmentCount(),
                 'learning_objectives' => $sessionData['learning_objectives'] ?? null,
                 'topics_covered' => $sessionData['topics_covered'] ?? null,
                 'required_materials' => $sessionData['required_materials'] ?? null,
@@ -185,7 +186,7 @@ class LecturerTimetableService
             $this->clearTimetableCaches($lecturer);
 
             return [
-                'session' => $this->formatSessionDetails($session->load(['courseOffering', 'room'])),
+                'session' => $this->formatSessionDetails($session->load(['courseOffering.unit', 'courseOffering.classRosterRegistrations', 'room', 'attendances'])),
                 'message' => 'Session created successfully',
             ];
         });
@@ -225,7 +226,7 @@ class LecturerTimetableService
                 );
 
                 if (! empty($conflicts)) {
-                    throw new \Exception('Scheduling conflict detected: ' . implode(', ', $conflicts));
+                    throw new \Exception('Scheduling conflict detected: '.implode(', ', $conflicts));
                 }
             }
 
@@ -243,7 +244,7 @@ class LecturerTimetableService
             $this->clearTimetableCaches($lecturer);
 
             return [
-                'session' => $this->formatSessionDetails($session->load(['courseOffering', 'room'])),
+                'session' => $this->formatSessionDetails($session->load(['courseOffering.unit', 'courseOffering.classRosterRegistrations', 'room', 'attendances'])),
                 'message' => 'Session updated successfully',
             ];
         });
@@ -344,9 +345,9 @@ class LecturerTimetableService
         Lecture $lecturer,
         Carbon $startDate,
         Carbon $endDate
-    ): \Illuminate\Database\Eloquent\Collection {
+    ): Collection {
         return $lecturer->classSessions()
-            ->with(['courseOffering', 'room'])
+            ->with(['courseOffering.unit', 'courseOffering.classRosterRegistrations', 'room', 'attendances'])
             ->whereBetween('session_date', [$startDate, $endDate])
             ->orderBy('session_date')
             ->orderBy('start_time')
@@ -400,11 +401,28 @@ class LecturerTimetableService
                 'building' => $session->room->building,
                 'capacity' => $session->room->capacity,
             ] : null,
-            'attendance_marked' => $session->attendance_marked,
-            'expected_attendees' => $session->expected_attendees,
+            'attendance_marked' => $this->sessionHasActiveRosterAttendance($session),
+            'expected_attendees' => $this->expectedAttendeesForSession($session),
             'learning_objectives' => $session->learning_objectives,
             'topics_covered' => $session->topics_covered,
         ];
+    }
+
+    protected function expectedAttendeesForSession(ClassSession $session): ?int
+    {
+        return $session->courseOffering?->activeClassRosterEnrollmentCount()
+            ?? $session->expected_attendees;
+    }
+
+    protected function sessionHasActiveRosterAttendance(ClassSession $session): bool
+    {
+        if (! $session->relationLoaded('attendances') || ! $session->courseOffering) {
+            return $session->attendance_marked;
+        }
+
+        return $session->attendances
+            ->whereIn('student_id', $session->courseOffering->activeClassRosterStudentIds())
+            ->isNotEmpty();
     }
 
     /**
@@ -566,7 +584,7 @@ class LecturerTimetableService
                     'end' => $session->end_time->format('H:i:s'),
                     'start_display' => $session->start_time->format('g:i A'),
                     'end_display' => $session->end_time->format('g:i A'),
-                    'display' => $session->start_time->format('g:i A') . ' - ' . $session->end_time->format('g:i A'),
+                    'display' => $session->start_time->format('g:i A').' - '.$session->end_time->format('g:i A'),
                     'duration_minutes' => $session->duration_minutes,
                     'duration_display' => $this->formatDuration($session->duration_minutes),
                 ],
@@ -574,13 +592,13 @@ class LecturerTimetableService
                     'room_code' => $session->room->name,
                     'room_name' => $session->room->name,
                     'building' => $session->room->building->name ?? null,
-                    'full_location' => ($session->room->building ? $session->room->building->name . ' - ' : '') . $session->room->name,
+                    'full_location' => ($session->room->building ? $session->room->building->name.' - ' : '').$session->room->name,
                 ] : null,
                 'delivery_mode' => $session->delivery_mode,
                 'status' => $session->status,
                 'status_display' => ucfirst(str_replace('_', ' ', $session->status)),
-                'expected_attendees' => $session->expected_attendees,
-                'attendance_marked' => $session->attendance_marked,
+                'expected_attendees' => $this->expectedAttendeesForSession($session),
+                'attendance_marked' => $this->sessionHasActiveRosterAttendance($session),
                 'is_today' => $session->session_date->isToday(),
                 'is_upcoming' => $session->session_date->isFuture(),
                 'is_current' => $this->isSessionCurrent($session),
@@ -647,17 +665,17 @@ class LecturerTimetableService
     protected function formatDuration(int $minutes): string
     {
         if ($minutes < 60) {
-            return $minutes . 'm';
+            return $minutes.'m';
         }
 
         $hours = intval($minutes / 60);
         $remainingMinutes = $minutes % 60;
 
         if ($remainingMinutes === 0) {
-            return $hours . 'h';
+            return $hours.'h';
         }
 
-        return $hours . 'h ' . $remainingMinutes . 'm';
+        return $hours.'h '.$remainingMinutes.'m';
     }
 
     /**
@@ -665,7 +683,7 @@ class LecturerTimetableService
      */
     protected function isSessionCurrent(ClassSession $session): bool
     {
-        if (!$session->session_date->isToday()) {
+        if (! $session->session_date->isToday()) {
             return false;
         }
 

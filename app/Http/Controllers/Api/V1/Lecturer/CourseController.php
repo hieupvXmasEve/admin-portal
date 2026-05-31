@@ -11,6 +11,8 @@ use App\Http\Resources\Api\V1\Lecturer\CourseDetailResource;
 use App\Http\Resources\Api\V1\Lecturer\CourseOfferingResource;
 use App\Http\Resources\Api\V1\Lecturer\CourseStudentResource;
 use App\Http\Responses\ApiResponse;
+use App\Models\CourseOffering;
+use App\Models\Lecture;
 use App\Services\V1\Lecturer\LecturerCourseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,7 +28,7 @@ class CourseController extends Controller
      */
     public function index(CourseFilterRequest $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -50,7 +52,7 @@ class CourseController extends Controller
      */
     public function show(Request $request, int $courseOfferingId): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -75,7 +77,7 @@ class CourseController extends Controller
      */
     public function unit(Request $request, int $courseOfferingId): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -96,7 +98,7 @@ class CourseController extends Controller
      */
     public function statistics(Request $request, int $courseOfferingId): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -121,7 +123,7 @@ class CourseController extends Controller
      */
     public function students(StudentFilterRequest $request, int $courseOfferingId): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -147,19 +149,21 @@ class CourseController extends Controller
      */
     public function sessions(Request $request, int $courseOfferingId): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Verify lecturer has access to this course through class sessions assignment
-            $courseOffering = \App\Models\CourseOffering::query()
+            $courseOffering = CourseOffering::query()
                 ->whereHas('classSessions', function ($sessionQuery) use ($lecturer) {
                     $sessionQuery->where('lecture_id', $lecturer->id);
                 })
                 ->with([
+                    'classRosterRegistrations',
                     'classSessions' => function ($q) use ($lecturer) {
                         $q->where('lecture_id', $lecturer->id)
-                          ->orderBy('session_date', 'asc');
+                            ->with('attendances')
+                            ->orderBy('session_date', 'asc');
                     },
                 ])
                 ->where('id', $courseOfferingId)
@@ -170,7 +174,16 @@ class CourseController extends Controller
                 return ApiResponse::success([]);
             }
 
-            $sessions = $courseOffering->classSessions->map(function ($session) {
+            $activeStudentIds = $courseOffering->activeClassRosterStudentIds();
+            $expectedAttendees = $activeStudentIds->count();
+
+            $sessions = $courseOffering->classSessions->map(function ($session) use ($activeStudentIds, $expectedAttendees) {
+                $activeAttendances = $session->attendances->whereIn('student_id', $activeStudentIds);
+                $actualAttendees = $activeAttendances->whereIn('status', ['present', 'late'])->count();
+                $attendancePercentage = $expectedAttendees > 0
+                    ? round(($actualAttendees / $expectedAttendees) * 100, 1)
+                    : 0;
+
                 return [
                     'id' => $session->id,
                     'title' => $session->session_title,
@@ -182,10 +195,10 @@ class CourseController extends Controller
                     'session_type' => $session->session_type,
                     'delivery_mode' => $session->delivery_mode,
                     'status' => $session->status,
-                    'attendance_marked' => $session->attendance_marked,
-                    'attendance_percentage' => $session->attendance_percentage,
-                    'expected_attendees' => $session->expected_attendees,
-                    'actual_attendees' => $session->actual_attendees,
+                    'attendance_marked' => $activeAttendances->isNotEmpty(),
+                    'attendance_percentage' => $attendancePercentage,
+                    'expected_attendees' => $expectedAttendees,
+                    'actual_attendees' => $actualAttendees,
                     'learning_objectives' => $session->learning_objectives,
                     'topics_covered' => $session->topics_covered,
                 ];
@@ -206,7 +219,7 @@ class CourseController extends Controller
      */
     public function filterOptions(Request $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -227,7 +240,7 @@ class CourseController extends Controller
      */
     public function summary(Request $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -236,18 +249,21 @@ class CourseController extends Controller
 
             // Get first page of courses for summary
             $courseOfferings = $this->courseService->getCourseOfferings($lecturer, $filters, 100);
+            $offerings = $courseOfferings->getCollection();
+            $totalStudents = $offerings->sum(fn ($offering) => $offering->activeClassRosterEnrollmentCount());
+            $totalCapacity = $offerings->sum('max_capacity');
 
             $summary = [
                 'total_courses' => $courseOfferings->total(),
-                'active_courses' => $courseOfferings->count(),
-                'total_students' => $courseOfferings->sum('current_enrollment'),
-                'average_enrollment' => $courseOfferings->count() > 0
-                    ? round($courseOfferings->avg('current_enrollment'), 1)
+                'active_courses' => $offerings->count(),
+                'total_students' => $totalStudents,
+                'average_enrollment' => $offerings->count() > 0
+                    ? round($totalStudents / $offerings->count(), 1)
                     : 0,
-                'delivery_mode_breakdown' => $courseOfferings->groupBy('delivery_mode')
+                'delivery_mode_breakdown' => $offerings->groupBy('delivery_mode')
                     ->map(fn ($group) => $group->count()),
-                'capacity_utilization' => $courseOfferings->sum('max_capacity') > 0
-                    ? round(($courseOfferings->sum('current_enrollment') / $courseOfferings->sum('max_capacity')) * 100, 1)
+                'capacity_utilization' => $totalCapacity > 0
+                    ? round(($totalStudents / $totalCapacity) * 100, 1)
                     : 0,
             ];
 

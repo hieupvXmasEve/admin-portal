@@ -14,13 +14,15 @@ class CourseOfferingResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $activeRosterEnrollment = $this->activeRosterEnrollmentCount();
+
         return [
             'id' => $this->id,
             'section_code' => $this->section_code,
             'delivery_mode' => $this->delivery_mode,
             'location' => $this->location,
             'max_capacity' => $this->max_capacity,
-            'current_enrollment' => $this->current_enrollment,
+            'current_enrollment' => $activeRosterEnrollment,
             'enrollment_status' => $this->enrollment_status,
             'schedule_days' => $this->schedule_days,
             'schedule_time_start' => $this->schedule_time_start?->format('H:i'),
@@ -51,23 +53,24 @@ class CourseOfferingResource extends JsonResource
 
             // Enrollment Statistics
             'enrollment_stats' => [
-                'enrolled_count' => $this->whenLoaded('courseRegistrations', function () {
-                    return $this->courseRegistrations->where('registration_status', 'confirmed')->count();
-                }),
+                'enrolled_count' => $activeRosterEnrollment,
                 'capacity_utilization' => $this->max_capacity > 0
-                    ? round(($this->current_enrollment / $this->max_capacity) * 100, 1)
+                    ? round(($activeRosterEnrollment / $this->max_capacity) * 100, 1)
                     : 0,
-                'available_spots' => max(0, $this->max_capacity - $this->current_enrollment),
-                'is_full' => $this->current_enrollment >= $this->max_capacity,
+                'available_spots' => max(0, $this->max_capacity - $activeRosterEnrollment),
+                'is_full' => $activeRosterEnrollment >= $this->max_capacity,
             ],
 
             // Session Statistics
             'session_stats' => $this->whenLoaded('classSessions', function () {
                 $sessions = $this->classSessions;
+                $activeStudentIds = $this->activeClassRosterStudentIds();
                 $totalSessions = $sessions->count();
                 $completedSessions = $sessions->where('status', 'completed')->count();
                 $upcomingSessions = $sessions->where('session_date', '>=', now())->count();
-                $sessionsWithAttendance = $sessions->where('attendance_marked', true)->count();
+                $sessionsWithAttendance = $sessions
+                    ->filter(fn ($session) => $this->sessionHasActiveRosterAttendance($session, $activeStudentIds))
+                    ->count();
 
                 return [
                     'total_sessions' => $totalSessions,
@@ -87,7 +90,10 @@ class CourseOfferingResource extends JsonResource
                         'date' => $session->session_date->format('Y-m-d'),
                         'start_time' => $session->start_time->format('H:i'),
                         'status' => $session->status,
-                        'attendance_marked' => $session->attendance_marked,
+                        'attendance_marked' => $this->sessionHasActiveRosterAttendance(
+                            $session,
+                            $this->activeClassRosterStudentIds()
+                        ),
                     ];
                 })->values();
             }),
@@ -116,7 +122,10 @@ class CourseOfferingResource extends JsonResource
 
         return $this->classSessions
             ->where('status', 'completed')
-            ->where('attendance_marked', false)
+            ->filter(fn ($session) => ! $this->sessionHasActiveRosterAttendance(
+                $session,
+                $this->activeClassRosterStudentIds()
+            ))
             ->where('session_date', '<', now()->subHours(2))
             ->isNotEmpty();
     }
@@ -147,9 +156,26 @@ class CourseOfferingResource extends JsonResource
         // 3. Overenrolled
 
         $hasUnmarkedAttendance = $this->hasSessionsNeedingAttendance();
-        $lowEnrollment = $this->max_capacity > 0 && ($this->current_enrollment / $this->max_capacity) < 0.5;
-        $overenrolled = $this->current_enrollment > $this->max_capacity;
+        $activeRosterEnrollment = $this->activeRosterEnrollmentCount();
+        $lowEnrollment = $this->max_capacity > 0 && ($activeRosterEnrollment / $this->max_capacity) < 0.5;
+        $overenrolled = $activeRosterEnrollment > $this->max_capacity;
 
         return $hasUnmarkedAttendance || $lowEnrollment || $overenrolled;
+    }
+
+    protected function activeRosterEnrollmentCount(): int
+    {
+        return $this->activeClassRosterEnrollmentCount();
+    }
+
+    protected function sessionHasActiveRosterAttendance($session, $activeStudentIds): bool
+    {
+        if (! $session->relationLoaded('attendances')) {
+            return $session->attendance_marked;
+        }
+
+        return $session->attendances
+            ->whereIn('student_id', $activeStudentIds)
+            ->isNotEmpty();
     }
 }

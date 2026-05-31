@@ -6,7 +6,8 @@ namespace App\Services;
 
 use App\Models\Attendance;
 use App\Models\ClassSession;
-use App\Models\Student;
+use App\Models\CourseRegistration;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -25,12 +26,13 @@ class AttendanceService
             // Lock the class session to prevent race condition
             $lockedSession = ClassSession::lockForUpdate()->find($classSession->id);
 
-            if (!$lockedSession) {
+            if (! $lockedSession) {
                 DB::rollBack();
+
                 return [
                     'success' => false,
                     'created_count' => 0,
-                    'message' => 'Class session not found'
+                    'message' => 'Class session not found',
                 ];
             }
 
@@ -40,10 +42,11 @@ class AttendanceService
             if ($existingAttendanceCount > 0) {
                 DB::rollBack();
                 Log::info("Attendance records already exist for class session {$classSession->id}");
+
                 return [
                     'success' => true,
                     'created_count' => 0,
-                    'message' => 'Attendance records already exist for this session'
+                    'message' => 'Attendance records already exist for this session',
                 ];
             }
 
@@ -53,10 +56,11 @@ class AttendanceService
             if ($students->isEmpty()) {
                 DB::rollBack();
                 Log::info("No enrolled students found for class session {$classSession->id}");
+
                 return [
                     'success' => true,
                     'created_count' => 0,
-                    'message' => 'No enrolled students found for this session'
+                    'message' => 'No enrolled students found for this session',
                 ];
             }
 
@@ -80,7 +84,7 @@ class AttendanceService
 
             // Bulk insert attendance records
             $insertedCount = 0;
-            if (!empty($attendanceData)) {
+            if (! empty($attendanceData)) {
                 try {
                     Attendance::insert($attendanceData);
                     $insertedCount = count($attendanceData);
@@ -93,15 +97,16 @@ class AttendanceService
                     ]);
 
                     Log::info("Created {$insertedCount} attendance records for class session {$classSession->id}");
-                } catch (\Illuminate\Database\QueryException $e) {
+                } catch (QueryException $e) {
                     // Handle duplicate key error gracefully
                     if ($e->errorInfo[1] === 1062) { // MySQL duplicate entry error code
                         DB::rollBack();
                         Log::info("Attendance records already exist for class session {$classSession->id} (caught duplicate key)");
+
                         return [
                             'success' => true,
                             'created_count' => 0,
-                            'message' => 'Attendance records already exist for this session'
+                            'message' => 'Attendance records already exist for this session',
                         ];
                     }
                     throw $e; // Re-throw if it's not a duplicate key error
@@ -113,16 +118,16 @@ class AttendanceService
             return [
                 'success' => true,
                 'created_count' => $insertedCount,
-                'message' => "Successfully created {$insertedCount} attendance records"
+                'message' => "Successfully created {$insertedCount} attendance records",
             ];
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Failed to create attendance for class session {$classSession->id}: " . $e->getMessage());
+            Log::error("Failed to create attendance for class session {$classSession->id}: ".$e->getMessage());
 
             return [
                 'success' => false,
                 'created_count' => 0,
-                'message' => 'Failed to create attendance records: ' . $e->getMessage()
+                'message' => 'Failed to create attendance records: '.$e->getMessage(),
             ];
         }
     }
@@ -132,14 +137,15 @@ class AttendanceService
      */
     public function getEnrolledStudentsForSession(ClassSession $classSession): Collection
     {
-        return Student::whereHas('courseRegistrations', function ($query) use ($classSession) {
-            $query->where('course_offering_id', $classSession->course_offering_id)
-                ->whereIn('registration_status', ['registered', 'confirmed'])
-                ->where('semester_id', $classSession->courseOffering->semester_id);
-        })
-            ->whereIn('status', ['intake_pre_uni_gc', 'intake_course'])
-            ->select(['id', 'student_id', 'full_name', 'email'])
-            ->get();
+        return CourseRegistration::query()
+            ->where('course_offering_id', $classSession->course_offering_id)
+            ->where('semester_id', $classSession->courseOffering->semester_id)
+            ->activeForClassRoster()
+            ->with('student:id,student_id,full_name,email')
+            ->get()
+            ->pluck('student')
+            ->filter()
+            ->values();
     }
 
     /**
@@ -147,7 +153,10 @@ class AttendanceService
      */
     public function updateAttendanceStatistics(ClassSession $classSession): void
     {
+        $activeStudentIds = $classSession->courseOffering->activeClassRosterStudentIds();
+
         $attendanceStats = $classSession->attendances()
+            ->whereIn('student_id', $activeStudentIds)
             ->selectRaw('
                 COUNT(*) as total,
                 SUM(CASE WHEN status = "present" THEN 1 ELSE 0 END) as present,
@@ -157,15 +166,17 @@ class AttendanceService
             ')
             ->first();
 
-        $total = $attendanceStats->total ?? 0;
         $present = $attendanceStats->present ?? 0;
         $late = $attendanceStats->late ?? 0;
 
         $actualAttendees = $present + $late;
-        $attendancePercentage = $total > 0 ? round(($actualAttendees / $total) * 100, 2) : 0;
+        $expectedAttendees = $activeStudentIds->count();
+        $attendancePercentage = $expectedAttendees > 0
+            ? round(($actualAttendees / $expectedAttendees) * 100, 2)
+            : 0;
 
         $classSession->update([
-            'expected_attendees' => $total,
+            'expected_attendees' => $expectedAttendees,
             'actual_attendees' => $actualAttendees,
             'attendance_percentage' => $attendancePercentage,
         ]);
@@ -200,15 +211,15 @@ class AttendanceService
             return [
                 'success' => true,
                 'deleted_count' => $deletedCount,
-                'message' => "Successfully deleted {$deletedCount} attendance records"
+                'message' => "Successfully deleted {$deletedCount} attendance records",
             ];
         } catch (\Exception $e) {
-            Log::error("Failed to delete attendance for class session {$classSession->id}: " . $e->getMessage());
+            Log::error("Failed to delete attendance for class session {$classSession->id}: ".$e->getMessage());
 
             return [
                 'success' => false,
                 'deleted_count' => 0,
-                'message' => 'Failed to delete attendance records: ' . $e->getMessage()
+                'message' => 'Failed to delete attendance records: '.$e->getMessage(),
             ];
         }
     }

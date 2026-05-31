@@ -14,6 +14,10 @@ class CourseRegistration extends AuditableModel
 {
     use HasFactory;
 
+    public const CLASS_ROSTER_REGISTRATION_STATUSES = [
+        'confirmed',
+    ];
+
     protected $fillable = [
         'student_id',
         'course_offering_id',
@@ -123,6 +127,43 @@ class CourseRegistration extends AuditableModel
         return in_array($this->registration_status, ['pending', 'registered', 'confirmed']);
     }
 
+    public function isClassRosterActive(): bool
+    {
+        return in_array($this->registration_status, self::CLASS_ROSTER_REGISTRATION_STATUSES, true)
+            && (bool) $this->student?->isClassRosterActive();
+    }
+
+    public function classRosterStatus(): string
+    {
+        if (! in_array($this->registration_status, self::CLASS_ROSTER_REGISTRATION_STATUSES, true)) {
+            return $this->registration_status ?? 'inactive';
+        }
+
+        $studentStatus = (string) $this->student?->status;
+        if (in_array($studentStatus, Student::CLASS_ROSTER_INACTIVE_STATUSES, true)) {
+            return $studentStatus;
+        }
+
+        $academicStatus = (string) $this->student?->academic_status;
+        if (in_array($academicStatus, Student::CLASS_ROSTER_INACTIVE_STATUSES, true)) {
+            return $academicStatus;
+        }
+
+        return $this->isClassRosterActive() ? 'active' : 'inactive';
+    }
+
+    public function classRosterStatusLabel(): string
+    {
+        return match ($this->classRosterStatus()) {
+            'active' => 'Active',
+            'deferred' => 'Deferred',
+            'dropout' => 'Dropout',
+            'dropout_transfer' => 'Dropout Transfer',
+            'inactive' => 'Inactive',
+            default => ucfirst(str_replace('_', ' ', (string) $this->classRosterStatus())),
+        };
+    }
+
     public function isPassing(): bool
     {
         if (! $this->final_grade) {
@@ -176,6 +217,15 @@ class CourseRegistration extends AuditableModel
     public function scopeActive(Builder $query): void
     {
         $query->whereIn('registration_status', ['pending', 'registered', 'confirmed']);
+    }
+
+    public function scopeActiveForClassRoster(Builder $query): void
+    {
+        $query
+            ->whereIn('registration_status', self::CLASS_ROSTER_REGISTRATION_STATUSES)
+            ->whereHas('student', function (Builder $query) {
+                $query->classRosterActive();
+            });
     }
 
     public function scopeCompleted(Builder $query): void

@@ -157,6 +157,18 @@ class CourseOffering extends AuditableModel
         return $this->hasMany(CourseRegistration::class, 'course_offering_id');
     }
 
+    public function classRosterRegistrations(): HasMany
+    {
+        return $this->hasMany(CourseRegistration::class, 'course_offering_id')
+            ->whereIn('registration_status', CourseRegistration::CLASS_ROSTER_REGISTRATION_STATUSES);
+    }
+
+    public function activeClassRosterRegistrations(): HasMany
+    {
+        return $this->hasMany(CourseRegistration::class, 'course_offering_id')
+            ->activeForClassRoster();
+    }
+
     public function classSessions(): HasMany
     {
         return $this->hasMany(ClassSession::class, 'course_offering_id');
@@ -213,6 +225,62 @@ class CourseOffering extends AuditableModel
     public function getMaxEnrollmentAttribute(): int
     {
         return $this->max_capacity ?? 0;
+    }
+
+    public function activeClassRosterEnrollmentCount(): int
+    {
+        if ($this->relationLoaded('activeClassRosterRegistrations')) {
+            return $this->activeClassRosterRegistrations->count();
+        }
+
+        if (
+            $this->relationLoaded('classRosterRegistrations') &&
+            $this->classRosterRegistrations->every(fn ($registration) => $registration->relationLoaded('student'))
+        ) {
+            return $this->classRosterRegistrations
+                ->filter(fn ($registration) => $registration->isClassRosterActive())
+                ->count();
+        }
+
+        if (
+            $this->relationLoaded('courseRegistrations') &&
+            $this->courseRegistrations->every(fn ($registration) => $registration->relationLoaded('student'))
+        ) {
+            return $this->courseRegistrations
+                ->filter(fn ($registration) => $registration->isClassRosterActive())
+                ->count();
+        }
+
+        return $this->activeClassRosterRegistrations()->count();
+    }
+
+    public function activeClassRosterStudentIds(): \Illuminate\Support\Collection
+    {
+        if ($this->relationLoaded('activeClassRosterRegistrations')) {
+            return $this->activeClassRosterRegistrations->pluck('student_id')->values();
+        }
+
+        if (
+            $this->relationLoaded('classRosterRegistrations') &&
+            $this->classRosterRegistrations->every(fn ($registration) => $registration->relationLoaded('student'))
+        ) {
+            return $this->classRosterRegistrations
+                ->filter(fn ($registration) => $registration->isClassRosterActive())
+                ->pluck('student_id')
+                ->values();
+        }
+
+        if (
+            $this->relationLoaded('courseRegistrations') &&
+            $this->courseRegistrations->every(fn ($registration) => $registration->relationLoaded('student'))
+        ) {
+            return $this->courseRegistrations
+                ->filter(fn ($registration) => $registration->isClassRosterActive())
+                ->pluck('student_id')
+                ->values();
+        }
+
+        return $this->activeClassRosterRegistrations()->pluck('student_id');
     }
 
     // Helper methods

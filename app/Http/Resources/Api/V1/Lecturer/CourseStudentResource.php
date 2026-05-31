@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Api\V1\Lecturer;
 
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -26,6 +27,14 @@ class CourseStudentResource extends JsonResource
                 'status' => $this->resource['registration_status'],
                 'attempt_number' => $this->resource['attempt_number'],
                 'is_retake' => $this->resource['is_retake'],
+            ],
+
+            // Class Roster Status
+            'roster' => [
+                'is_active' => $this->resource['is_roster_active'] ?? true,
+                'status' => $this->resource['roster_status'] ?? 'active',
+                'status_label' => $this->resource['roster_status_label'] ?? 'Active',
+                'can_mark_attendance' => $this->resource['can_mark_attendance'] ?? true,
             ],
 
             // Academic Scores and Grades
@@ -68,6 +77,7 @@ class CourseStudentResource extends JsonResource
                 'can_add_note' => true,
                 'needs_attention' => $this->needsAttention(),
                 'can_view_details' => true,
+                'can_mark_attendance' => $this->resource['can_mark_attendance'] ?? true,
             ],
         ];
     }
@@ -82,6 +92,7 @@ class CourseStudentResource extends JsonResource
             'good' => 'Good Attendance',
             'warning' => 'Attendance Warning',
             'at_risk' => 'At Risk',
+            'inactive' => 'Inactive Roster',
             default => 'Unknown Status',
         };
     }
@@ -96,6 +107,7 @@ class CourseStudentResource extends JsonResource
             'good' => 'blue',
             'warning' => 'yellow',
             'at_risk' => 'red',
+            'inactive' => 'gray',
             default => 'gray',
         };
     }
@@ -105,6 +117,10 @@ class CourseStudentResource extends JsonResource
      */
     protected function getRiskLevel(): string
     {
+        if (! ($this->resource['is_roster_active'] ?? true)) {
+            return 'low';
+        }
+
         $percentage = $this->resource['attendance_percentage'];
         $lastAttendance = $this->resource['last_attendance'];
 
@@ -113,7 +129,7 @@ class CourseStudentResource extends JsonResource
             return 'high';
         }
 
-        if ($lastAttendance && \Carbon\Carbon::parse($lastAttendance)->lt(now()->subWeeks(2))) {
+        if ($lastAttendance && Carbon::parse($lastAttendance)->lt(now()->subWeeks(2))) {
             return 'high';
         }
 
@@ -131,6 +147,10 @@ class CourseStudentResource extends JsonResource
      */
     protected function getRiskFactors(): array
     {
+        if (! ($this->resource['is_roster_active'] ?? true)) {
+            return [];
+        }
+
         $factors = [];
         $percentage = $this->resource['attendance_percentage'];
         $lastAttendance = $this->resource['last_attendance'];
@@ -142,7 +162,7 @@ class CourseStudentResource extends JsonResource
         }
 
         if ($lastAttendance) {
-            $daysSinceLastAttendance = \Carbon\Carbon::parse($lastAttendance)->diffInDays(now());
+            $daysSinceLastAttendance = Carbon::parse($lastAttendance)->diffInDays(now());
             if ($daysSinceLastAttendance > 14) {
                 $factors[] = 'No recent attendance';
             } elseif ($daysSinceLastAttendance > 7) {
@@ -164,6 +184,10 @@ class CourseStudentResource extends JsonResource
      */
     protected function getRecommendations(): array
     {
+        if (! ($this->resource['is_roster_active'] ?? true)) {
+            return [];
+        }
+
         $recommendations = [];
         $riskLevel = $this->getRiskLevel();
         $percentage = $this->resource['attendance_percentage'];

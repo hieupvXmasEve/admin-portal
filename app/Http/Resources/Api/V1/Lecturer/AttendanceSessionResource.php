@@ -14,6 +14,13 @@ class AttendanceSessionResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $expectedAttendees = $this->activeRosterEnrollmentCount();
+        $actualAttendees = $this->actualRosterAttendees();
+        $attendanceMarked = $this->activeRosterAttendanceMarked();
+        $attendancePercentage = $expectedAttendees > 0 && $actualAttendees !== null
+            ? round(($actualAttendees / $expectedAttendees) * 100, 1)
+            : $this->attendance_percentage;
+
         return [
             'id' => $this->id,
             'title' => $this->session_title,
@@ -27,10 +34,10 @@ class AttendanceSessionResource extends JsonResource
             'status' => $this->status,
 
             // Attendance Information
-            'attendance_marked' => $this->attendance_marked,
-            'attendance_percentage' => $this->attendance_percentage,
-            'expected_attendees' => $this->expected_attendees,
-            'actual_attendees' => $this->actual_attendees,
+            'attendance_marked' => $attendanceMarked,
+            'attendance_percentage' => $attendancePercentage,
+            'expected_attendees' => $expectedAttendees,
+            'actual_attendees' => $actualAttendees,
 
             // Course Information
             'course' => $this->whenLoaded('courseOffering', function () {
@@ -39,7 +46,7 @@ class AttendanceSessionResource extends JsonResource
                     'unit_code' => $this->courseOffering->unit->code,
                     'unit_name' => $this->courseOffering->unit->name,
                     'section_code' => $this->courseOffering->section_code,
-                    'enrollment' => $this->courseOffering->current_enrollment,
+                    'enrollment' => $expectedAttendees,
                     'semester' => $this->when($this->courseOffering->relationLoaded('semester'), [
                         'id' => $this->courseOffering->semester->id,
                         'name' => $this->courseOffering->semester->name,
@@ -50,7 +57,7 @@ class AttendanceSessionResource extends JsonResource
 
             // Attendance Statistics
             'attendance_stats' => $this->whenLoaded('attendances', function () {
-                $attendances = $this->attendances;
+                $attendances = $this->activeRosterAttendances();
                 $total = $attendances->count();
                 $present = $attendances->whereIn('status', ['present', 'late'])->count();
                 $absent = $attendances->where('status', 'absent')->count();
@@ -79,7 +86,7 @@ class AttendanceSessionResource extends JsonResource
                 'can_mark_attendance' => $this->canMarkAttendance(),
                 'can_edit_session' => $this->canEditSession(),
                 'can_view_details' => true,
-                'can_export_attendance' => $this->attendance_marked,
+                'can_export_attendance' => $attendanceMarked,
             ],
 
             // Time Information
@@ -98,6 +105,46 @@ class AttendanceSessionResource extends JsonResource
         ];
     }
 
+    protected function activeRosterEnrollmentCount(): ?int
+    {
+        if (! $this->relationLoaded('courseOffering') || ! $this->courseOffering) {
+            return $this->expected_attendees;
+        }
+
+        return $this->courseOffering->activeClassRosterEnrollmentCount();
+    }
+
+    protected function activeRosterAttendances()
+    {
+        if (! $this->relationLoaded('courseOffering') || ! $this->courseOffering) {
+            return $this->attendances;
+        }
+
+        return $this->attendances
+            ->whereIn('student_id', $this->courseOffering->activeClassRosterStudentIds())
+            ->values();
+    }
+
+    protected function actualRosterAttendees(): ?int
+    {
+        if (! $this->relationLoaded('attendances')) {
+            return $this->actual_attendees;
+        }
+
+        return $this->activeRosterAttendances()
+            ->whereIn('status', ['present', 'late'])
+            ->count();
+    }
+
+    protected function activeRosterAttendanceMarked(): bool
+    {
+        if (! $this->relationLoaded('attendances')) {
+            return $this->attendance_marked;
+        }
+
+        return $this->activeRosterAttendances()->isNotEmpty();
+    }
+
     /**
      * Check if session needs attention
      */
@@ -107,11 +154,17 @@ class AttendanceSessionResource extends JsonResource
         // 1. Attendance not marked and session is completed or overdue
         // 2. Low attendance rate (if marked)
 
-        if (! $this->attendance_marked && $this->isOverdue()) {
+        if (! $this->activeRosterAttendanceMarked() && $this->isOverdue()) {
             return true;
         }
 
-        if ($this->attendance_marked && $this->attendance_percentage < 60) {
+        $expectedAttendees = $this->activeRosterEnrollmentCount();
+        $actualAttendees = $this->actualRosterAttendees();
+        $attendancePercentage = $expectedAttendees > 0 && $actualAttendees !== null
+            ? round(($actualAttendees / $expectedAttendees) * 100, 1)
+            : $this->attendance_percentage;
+
+        if ($this->activeRosterAttendanceMarked() && $attendancePercentage < 60) {
             return true;
         }
 
@@ -123,7 +176,7 @@ class AttendanceSessionResource extends JsonResource
      */
     protected function isOverdue(): bool
     {
-        return ! $this->attendance_marked &&
+        return ! $this->activeRosterAttendanceMarked() &&
                $this->session_date->lt(now()->subHours(2)) &&
                in_array($this->status, ['completed', 'in_progress']);
     }

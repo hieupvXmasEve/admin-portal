@@ -7,6 +7,7 @@ namespace App\Services\V1\Lecturer;
 use App\Models\Attendance;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
+use App\Models\CourseRegistration;
 use App\Models\Lecture;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
@@ -27,6 +28,7 @@ class LecturerAttendanceService
             ->with([
                 'courseOffering',
                 'courseOffering.semester',
+                'courseOffering.classRosterRegistrations',
                 'attendances.student',
             ])
             ->orderBy('session_date', 'desc');
@@ -46,9 +48,9 @@ class LecturerAttendanceService
             ->with([
                 'courseOffering',
                 'courseOffering.semester',
-                'courseOffering.courseRegistrations.student.program',
-                'courseOffering.courseRegistrations.student.specialization',
-                'courseOffering.courseRegistrations.student.campus',
+                'courseOffering.classRosterRegistrations.student.program',
+                'courseOffering.classRosterRegistrations.student.specialization',
+                'courseOffering.classRosterRegistrations.student.campus',
                 'attendances.student',
                 'attendances.recordedBy',
             ])
@@ -59,48 +61,64 @@ class LecturerAttendanceService
             return null;
         }
 
-        $enrolledStudents = $session->courseOffering->courseRegistrations
-            ->where('registration_status', 'confirmed')
-            ->pluck('student');
-
         $attendanceRecords = $session->attendances->keyBy('student_id');
 
-        $students = $enrolledStudents->map(function ($student) use ($attendanceRecords) {
-            $attendance = $attendanceRecords->get($student->id);
+        $students = $session->courseOffering->classRosterRegistrations
+            ->filter(fn (CourseRegistration $registration) => $registration->student !== null)
+            ->map(function (CourseRegistration $registration) use ($attendanceRecords) {
+                $student = $registration->student;
+                $isRosterActive = $registration->isClassRosterActive();
+                $rosterStatus = $registration->classRosterStatus();
+                $rosterStatusLabel = $registration->classRosterStatusLabel();
+                $attendance = $attendanceRecords->get($student->id);
 
-            return [
-                'student_id' => $student->id,
-                'student_number' => $student->student_id,
-                'full_name' => $student->full_name,
-                'email' => $student->email,
-                'phone' => $student->phone,
-                'attendance' => [
-                    'id' => $attendance?->id,
-                    'status' => $attendance?->status ?? 'not_marked',
-                    'check_in_time' => $attendance?->check_in_time?->format('Y-m-d H:i:s'),
-                    'check_out_time' => $attendance?->check_out_time?->format('Y-m-d H:i:s'),
-                    'minutes_late' => $attendance?->minutes_late ?? 0,
-                    'minutes_present' => $attendance?->minutes_present,
-                    'participation_level' => $attendance?->participation_level,
-                    'participation_score' => $attendance?->participation_score,
-                    'notes' => $attendance?->notes,
-                    'excuse_reason' => $attendance?->excuse_reason,
-                    'recording_method' => $attendance?->recording_method ?? 'manual',
-                    'is_verified' => $attendance?->is_verified ?? false,
-                    'recorded_by' => $attendance?->recordedBy?->full_name,
-                    'recorded_at' => $attendance?->created_at?->format('Y-m-d H:i:s'),
-                ],
-                'student_info' => [
-                    'program' => $student->program?->program_name,
-                    'specialization' => $student->specialization?->specialization_name,
-                    'academic_status' => $student->academic_status,
-                    'status' => $student->status,
-                    'campus' => $student->campus?->name,
-                    'admission_date' => $student->admission_date?->format('Y-m-d'),
-                    'expected_graduation_date' => $student->expected_graduation_date?->format('Y-m-d'),
-                ],
-            ];
-        });
+                return [
+                    'student_id' => $student->id,
+                    'student_number' => $student->student_id,
+                    'full_name' => $student->full_name,
+                    'email' => $student->email,
+                    'phone' => $student->phone,
+                    'is_roster_active' => $isRosterActive,
+                    'roster_status' => $rosterStatus,
+                    'roster_status_label' => $rosterStatusLabel,
+                    'can_mark_attendance' => $isRosterActive,
+                    'roster' => [
+                        'is_active' => $isRosterActive,
+                        'status' => $rosterStatus,
+                        'status_label' => $rosterStatusLabel,
+                        'can_mark_attendance' => $isRosterActive,
+                    ],
+                    'attendance' => [
+                        'id' => $attendance?->id,
+                        'status' => $attendance?->status ?? 'not_marked',
+                        'check_in_time' => $attendance?->check_in_time?->format('Y-m-d H:i:s'),
+                        'check_out_time' => $attendance?->check_out_time?->format('Y-m-d H:i:s'),
+                        'minutes_late' => $attendance?->minutes_late ?? 0,
+                        'minutes_present' => $attendance?->minutes_present,
+                        'participation_level' => $attendance?->participation_level,
+                        'participation_score' => $attendance?->participation_score,
+                        'notes' => $attendance?->notes,
+                        'excuse_reason' => $attendance?->excuse_reason,
+                        'recording_method' => $attendance?->recording_method ?? 'manual',
+                        'is_verified' => $attendance?->is_verified ?? false,
+                        'recorded_by' => $attendance?->recordedBy?->full_name,
+                        'recorded_at' => $attendance?->created_at?->format('Y-m-d H:i:s'),
+                    ],
+                    'student_info' => [
+                        'program' => $student->program?->program_name,
+                        'specialization' => $student->specialization?->specialization_name,
+                        'academic_status' => $student->academic_status,
+                        'status' => $student->status,
+                        'campus' => $student->campus?->name,
+                        'admission_date' => $student->admission_date?->format('Y-m-d'),
+                        'expected_graduation_date' => $student->expected_graduation_date?->format('Y-m-d'),
+                    ],
+                ];
+            });
+        $activeStudents = $students
+            ->where('is_roster_active', true)
+            ->values();
+        $attendanceCounts = $this->getAttendanceCounts($activeStudents);
 
         return [
             'session' => [
@@ -113,9 +131,9 @@ class LecturerAttendanceService
                 'session_type' => $session->session_type,
                 'delivery_mode' => $session->delivery_mode,
                 'attendance_required' => $session->attendance_required,
-                'attendance_marked' => $session->attendance_marked,
-                'expected_attendees' => $session->expected_attendees,
-                'actual_attendees' => $session->actual_attendees,
+                'attendance_marked' => $activeStudents->isNotEmpty() && $attendanceCounts['not_marked'] === 0,
+                'expected_attendees' => $activeStudents->count(),
+                'actual_attendees' => $attendanceCounts['present'] + $attendanceCounts['late'],
                 'course' => [
                     'id' => $session->courseOffering->id,
                     'unit_code' => $session->courseOffering->unit->code,
@@ -126,10 +144,13 @@ class LecturerAttendanceService
             ],
             'students' => $students->values()->toArray(),
             'summary' => [
-                'total_enrolled' => $students->count(),
-                'attendance_counts' => $this->getAttendanceCounts($students),
-                'attendance_rate' => $this->calculateAttendanceRate($students),
-                'completion_rate' => $this->calculateCompletionRate($students),
+                'total_enrolled' => $activeStudents->count(),
+                'total_roster' => $students->count(),
+                'active_roster' => $activeStudents->count(),
+                'inactive_roster' => $students->count() - $activeStudents->count(),
+                'attendance_counts' => $attendanceCounts,
+                'attendance_rate' => $this->calculateAttendanceRate($activeStudents),
+                'completion_rate' => $this->calculateCompletionRate($activeStudents),
             ],
         ];
     }
@@ -194,9 +215,7 @@ class LecturerAttendanceService
     {
         $session = ClassSession::where('lecture_id', $lecturer->id)
             ->with([
-                'courseOffering.courseRegistrations' => function ($query) {
-                    $query->where('registration_status', 'confirmed');
-                },
+                'courseOffering.activeClassRosterRegistrations.student',
             ])
             ->where('id', $sessionId)
             ->first();
@@ -205,7 +224,7 @@ class LecturerAttendanceService
             throw new \Exception('Session not found or access denied');
         }
 
-        $enrolledStudents = $session->courseOffering->courseRegistrations;
+        $enrolledStudents = $session->courseOffering->activeClassRosterRegistrations;
 
         if ($enrolledStudents->isEmpty()) {
             return [
@@ -254,7 +273,7 @@ class LecturerAttendanceService
                 : 'Attendance records already exist for all enrolled students';
 
             if ($existingCount > 0 && count($createdRecords) > 0) {
-                $message = 'Generated ' . count($createdRecords) . ' new records. ' . $existingCount . ' records already existed.';
+                $message = 'Generated '.count($createdRecords).' new records. '.$existingCount.' records already existed.';
             }
 
             return [
@@ -283,7 +302,7 @@ class LecturerAttendanceService
             throw new \Exception('Course offering not found or access denied');
         }
 
-        $cacheKey = "lecturer-attendance-analytics:{$lecturer->id}:{$courseOfferingId}:" . md5(serialize($filters));
+        $cacheKey = "lecturer-attendance-analytics:{$lecturer->id}:{$courseOfferingId}:".md5(serialize($filters));
 
         return Cache::remember($cacheKey, 300, function () use ($courseOffering, $filters) {
             return [
@@ -306,11 +325,11 @@ class LecturerAttendanceService
 
         // Sessions requiring attention (unmarked attendance)
         $unmmarkedSessions = ClassSession::where('lecture_id', $lecturer->id)
-            ->whereDoesntHave('attendances')
             ->where('session_date', '<', now()->subHours(2))
             ->where('status', 'completed')
-            ->with('courseOffering.unit')
-            ->get();
+            ->with(['courseOffering.unit', 'courseOffering.classRosterRegistrations', 'attendances'])
+            ->get()
+            ->filter(fn ($session) => ! $this->sessionHasActiveRosterAttendance($session));
 
         foreach ($unmmarkedSessions as $session) {
             $alerts[] = [
@@ -411,6 +430,16 @@ class LecturerAttendanceService
         array $record,
         Lecture $lecturer
     ): Attendance {
+        $isRosterStudent = CourseRegistration::query()
+            ->where('course_offering_id', $session->course_offering_id)
+            ->where('student_id', $record['student_id'])
+            ->activeForClassRoster()
+            ->exists();
+
+        if (! $isRosterStudent) {
+            throw new \Exception('Student is not active in this class roster');
+        }
+
         $attendanceData = [
             'class_session_id' => $session->id,
             'student_id' => $record['student_id'],
@@ -437,10 +466,12 @@ class LecturerAttendanceService
      */
     protected function updateSessionAttendanceStatus(ClassSession $session): void
     {
-        $totalAttendances = $session->attendances()->count();
-        $expectedAttendees = $session->courseOffering->current_enrollment;
+        $activeStudentIds = $session->courseOffering->activeClassRosterStudentIds();
+
+        $expectedAttendees = $activeStudentIds->count();
 
         $presentCount = $session->attendances()
+            ->whereIn('student_id', $activeStudentIds)
             ->whereIn('status', ['present', 'late'])
             ->count();
 
@@ -449,7 +480,8 @@ class LecturerAttendanceService
             : 0;
 
         $session->update([
-            'actual_attendees' => $totalAttendances,
+            'expected_attendees' => $expectedAttendees,
+            'actual_attendees' => $presentCount,
             'attendance_percentage' => $attendancePercentage,
         ]);
     }
@@ -543,8 +575,19 @@ class LecturerAttendanceService
             'unit_name' => $courseOffering->unit->name,
             'section_code' => $courseOffering->section_code,
             'semester' => $courseOffering->semester->name,
-            'enrollment' => $courseOffering->current_enrollment,
+            'enrollment' => $courseOffering->activeClassRosterEnrollmentCount(),
         ];
+    }
+
+    protected function sessionHasActiveRosterAttendance(ClassSession $session): bool
+    {
+        if (! $session->relationLoaded('attendances') || ! $session->courseOffering) {
+            return $session->attendance_marked;
+        }
+
+        return $session->attendances
+            ->whereIn('student_id', $session->courseOffering->activeClassRosterStudentIds())
+            ->isNotEmpty();
     }
 
     /**

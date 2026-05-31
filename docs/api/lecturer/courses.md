@@ -6,6 +6,8 @@
 
 **Description:** Retrieves a paginated list of course offerings assigned to the authenticated lecturer with filtering capabilities.
 
+Enrollment counts are based on the active class roster. Course student lists return the full confirmed roster so lecturers can still see students who entered a class and later moved to DE states (`deferred`, `dropout`, `dropout_transfer`, or `inactive`). Those rows include inactive roster metadata for UI badges and are not counted as active attendees for attendance calculations.
+
 ### Headers
 ```
 Authorization: Bearer {token}
