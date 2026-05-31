@@ -162,6 +162,7 @@ export const systemRoutes = {
 export const studentRoutes = {
     // Web routes
     list: () => route(STUDENT_ROUTE_NAMES.INDEX),
+    export: () => route(STUDENT_ROUTE_NAMES.EXPORT),
     create: () => route(STUDENT_ROUTE_NAMES.CREATE),
     edit: (id: number) => route(STUDENT_ROUTE_NAMES.EDIT, { student: id }),
     show: (id: number) => route(STUDENT_ROUTE_NAMES.SHOW, { student: id }),

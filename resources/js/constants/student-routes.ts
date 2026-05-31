@@ -6,6 +6,7 @@
 // Route Names - these should match Laravel route names from app/Constants/StudentRoutes.php
 export const STUDENT_ROUTE_NAMES = {
     INDEX: 'students.index',
+    EXPORT: 'students.export',
     CREATE: 'students.create',
     STORE: 'students.store',
     SHOW: 'students.academic-summary.overview',

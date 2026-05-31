@@ -2,30 +2,38 @@
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { TagsInput, TagsInputInput, TagsInputItem, TagsInputItemDelete, TagsInputItemText } from '@/components/ui/tags-input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useInertiaFilters } from '@/composables/useInertiaFilters';
+import { useDataTable } from '@/composables/useDataTable';
 import { usePermission } from '@/composables/usePermission';
 import { useStudentImpersonation } from '@/composables/useStudentImpersonation';
-import type { Program, Student } from '@/types/models';
+import type { Program, Semester, Specialization, Student } from '@/types/models';
 import { getStudentStatusBadgeClass, getStudentStatusDescription, getStudentStatusLabel, STUDENT_STATUS_DESCRIPTIONS, STUDENT_STATUS_LABELS, StudentStatus } from '@/types/student';
 import { studentRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { CircleHelp, ClipboardCheck, Download, Edit, Eye, FileSpreadsheet, LogIn, RefreshCw, RotateCw, X } from 'lucide-vue-next';
+import { CircleHelp, ClipboardCheck, Download, Edit, Eye, FileSpreadsheet, Filter, LogIn, RefreshCw, RotateCw, X } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
 interface StudentFilters {
     search: string;
-    campus_id: string;
-    program_id: string;
-    status: string;
+    student_ids: string[];
+    program_ids: string[];
+    specialization_ids: string[];
+    statuses: string[];
+    intake_semester_ids: string[];
     sort: string | null;
     direction: 'asc' | 'desc' | null;
     per_page: number;
@@ -54,15 +62,18 @@ interface Props {
     };
     filters: {
         search?: string;
-        campus_id?: number;
-        program_id?: number;
-        status?: string;
+        student_ids?: string[];
+        program_ids?: Array<number | string>;
+        specialization_ids?: Array<number | string>;
+        statuses?: string[];
+        intake_semester_ids?: Array<number | string>;
         sort?: string;
         direction?: string;
         per_page?: number;
     };
-    // campuses: Campus[];
-    programs: Program[];
+    programs: Array<Pick<Program, 'id' | 'name'>>;
+    specializations: Array<Pick<Specialization, 'id' | 'program_id' | 'name' | 'code'>>;
+    intake_semesters: Array<Pick<Semester, 'id' | 'name' | 'code' | 'start_date' | 'end_date'>>;
     statistics: {
         total_students: number;
         active_students: number;
@@ -86,44 +97,166 @@ const exportForm = ref({
     scope: 'filtered',
 });
 const isExporting = ref(false);
+const showAdvancedFilters = ref(false);
 
 // Reactive data
 const data = computed(() => props.students.data);
 
-// Use Inertia Filters composable
-const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilter, handleSortChange, handlePageSizeChange, handlePaginationNavigate, currentSort, currentDirection } = useInertiaFilters<StudentFilters>({
+const STUDENT_CODE_LIMIT = 100;
+const studentCodeDelimiter = /[\s,;]+/;
+
+type AdvancedFilterKey = 'program_ids' | 'specialization_ids' | 'statuses' | 'intake_semester_ids';
+
+interface AdvancedFilterDraft {
+    program_ids: string[];
+    specialization_ids: string[];
+    statuses: string[];
+    intake_semester_ids: string[];
+}
+
+const normalizeStudentCodes = (studentIds: string[]) => {
+    return [
+        ...new Set(
+            studentIds
+                .flatMap((studentId) => studentId.split(studentCodeDelimiter))
+                .map((studentId) => studentId.trim())
+                .filter(Boolean),
+        ),
+    ].slice(0, STUDENT_CODE_LIMIT);
+};
+
+const { filters, hasActiveFilters, clearAllFilters, setFilter, apply, handleSearch, handleSortChange, handlePageSizeChange, handlePaginationNavigate, currentSort, currentDirection, isLoading } = useDataTable<StudentFilters>({
     baseUrl: studentRoutes.list(),
     initialFilters: {
-        search: props.filters.search || '',
-        campus_id: props.filters?.campus_id?.toString() || 'all',
-        program_id: props.filters?.program_id?.toString() || 'all',
-        status: props.filters?.status || 'all',
-        sort: props.filters?.sort || null,
+        search: props.filters?.search ?? '',
+        student_ids: normalizeStudentCodes(props.filters?.student_ids ?? []),
+        program_ids: props.filters?.program_ids?.map(String) ?? [],
+        specialization_ids: props.filters?.specialization_ids?.map(String) ?? [],
+        statuses: props.filters?.statuses ?? [],
+        intake_semester_ids: props.filters?.intake_semester_ids?.map(String) ?? [],
+        sort: typeof props.filters?.sort === 'string' ? props.filters.sort : null,
         direction: (props.filters?.direction as 'asc' | 'desc') || null,
         per_page: props.filters?.per_page || 15,
-        page: 1,
+        page: props.students.current_page || 1,
     },
-    emptyFilters: {
+    defaultValues: {
         search: '',
-        campus_id: 'all',
-        program_id: 'all',
-        status: 'all',
+        student_ids: [],
+        program_ids: [],
+        specialization_ids: [],
+        statuses: [],
+        intake_semester_ids: [],
         sort: null,
         direction: null,
         per_page: 15,
         page: 1,
     },
-    defaultValues: {
-        campus_id: 'all',
-        program_id: 'all',
-        status: 'all',
-        per_page: 15,
-        direction: 'asc',
-        page: 1,
-    },
     only: ['students', 'filters'],
     debounce: 400,
 });
+
+const handleStudentIdsChange = (studentIds: unknown[]) => {
+    setFilter('student_ids', normalizeStudentCodes(studentIds.map(String)));
+};
+
+const createAdvancedFilterDraft = (): AdvancedFilterDraft => ({
+    program_ids: [...filters.program_ids],
+    specialization_ids: [...filters.specialization_ids],
+    statuses: [...filters.statuses],
+    intake_semester_ids: [...filters.intake_semester_ids],
+});
+
+const advancedFilterDraft = ref<AdvancedFilterDraft>(createAdvancedFilterDraft());
+
+const filteredSpecializations = computed(() => {
+    if (advancedFilterDraft.value.program_ids.length === 0) {
+        return props.specializations;
+    }
+
+    const programIds = new Set(advancedFilterDraft.value.program_ids);
+
+    return props.specializations.filter((specialization) => programIds.has(String(specialization.program_id)));
+});
+
+const activeAdvancedFilterCount = computed(() => filters.program_ids.length + filters.specialization_ids.length + filters.statuses.length + filters.intake_semester_ids.length);
+
+const activeFilterChips = computed(() => [
+    ...filters.program_ids.map((value) => ({
+        key: 'program_ids' as const,
+        value,
+        label: `Program: ${props.programs.find((program) => String(program.id) === value)?.name ?? value}`,
+    })),
+    ...filters.specialization_ids.map((value) => ({
+        key: 'specialization_ids' as const,
+        value,
+        label: `Specialization: ${props.specializations.find((specialization) => String(specialization.id) === value)?.name ?? value}`,
+    })),
+    ...filters.statuses.map((value) => ({
+        key: 'statuses' as const,
+        value,
+        label: `Status: ${getStudentStatusLabel(value)}`,
+    })),
+    ...filters.intake_semester_ids.map((value) => ({
+        key: 'intake_semester_ids' as const,
+        value,
+        label: `Intake: ${props.intake_semesters.find((semester) => String(semester.id) === value)?.name ?? value}`,
+    })),
+]);
+
+const openAdvancedFilters = () => {
+    advancedFilterDraft.value = createAdvancedFilterDraft();
+    showAdvancedFilters.value = true;
+};
+
+const toggleDraftFilter = (key: AdvancedFilterKey, value: string, selected: boolean | 'indeterminate') => {
+    const values = advancedFilterDraft.value[key];
+    const nextValues = selected === true ? [...new Set([...values, value])] : values.filter((item) => item !== value);
+
+    advancedFilterDraft.value[key] = nextValues;
+
+    if (key === 'program_ids' && selected !== true) {
+        advancedFilterDraft.value.specialization_ids = advancedFilterDraft.value.specialization_ids.filter((specializationId) => {
+            const specialization = props.specializations.find((item) => String(item.id) === specializationId);
+
+            return specialization && String(specialization.program_id) !== value;
+        });
+    }
+};
+
+const resetAdvancedFilterDraft = () => {
+    advancedFilterDraft.value = {
+        program_ids: [],
+        specialization_ids: [],
+        statuses: [],
+        intake_semester_ids: [],
+    };
+};
+
+const applyAdvancedFilters = () => {
+    apply({
+        program_ids: [...advancedFilterDraft.value.program_ids],
+        specialization_ids: [...advancedFilterDraft.value.specialization_ids],
+        statuses: [...advancedFilterDraft.value.statuses],
+        intake_semester_ids: [...advancedFilterDraft.value.intake_semester_ids],
+    });
+    showAdvancedFilters.value = false;
+};
+
+const removeAdvancedFilter = (key: AdvancedFilterKey, value: string) => {
+    const nextFilters: Partial<StudentFilters> = {
+        [key]: filters[key].filter((item) => item !== value),
+    };
+
+    if (key === 'program_ids') {
+        nextFilters.specialization_ids = filters.specialization_ids.filter((specializationId) => {
+            const specialization = props.specializations.find((item) => String(item.id) === specializationId);
+
+            return specialization && String(specialization.program_id) !== value;
+        });
+    }
+
+    apply(nextFilters);
+};
 
 // Column definitions with h function
 const columns: ColumnDef<Student>[] = [
@@ -312,12 +445,15 @@ const exportStudents = async () => {
         // Add current filters if exporting filtered results
         if (exportForm.value.scope === 'filtered') {
             if (filters.search) params.set('search', filters.search);
-            if (filters.program_id !== 'all') params.set('program_id', filters.program_id);
-            if (filters.status !== 'all') params.set('status', filters.status);
+            filters.student_ids.forEach((studentId) => params.append('student_ids[]', studentId));
+            filters.program_ids.forEach((programId) => params.append('program_ids[]', programId));
+            filters.specialization_ids.forEach((specializationId) => params.append('specialization_ids[]', specializationId));
+            filters.statuses.forEach((status) => params.append('statuses[]', status));
+            filters.intake_semester_ids.forEach((semesterId) => params.append('intake_semester_ids[]', semesterId));
         }
 
         // Create download URL
-        const exportUrl = `/students/export?${params.toString()}`;
+        const exportUrl = `${studentRoutes.export()}?${params.toString()}`;
 
         // Get CSRF token from meta tag or cookie
         const csrfToken =
@@ -380,7 +516,6 @@ const exportStudents = async () => {
 </script>
 
 <template>
-
     <Head title="Students Management" />
 
     <div class="space-y-4">
@@ -392,20 +527,16 @@ const exportStudents = async () => {
             <div class="flex items-center space-x-2">
                 <Popover v-model:open="helpPopoverOpen">
                     <PopoverTrigger as-child>
-                        <Button variant="ghost" size="icon" class="h-9 w-9" @mouseenter="helpPopoverOpen = true"
-                            @mouseleave="helpPopoverOpen = false">
+                        <Button variant="ghost" size="icon" class="h-9 w-9" @mouseenter="helpPopoverOpen = true" @mouseleave="helpPopoverOpen = false">
                             <CircleHelp class="h-4 w-4" />
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent class="max-h-[500px] w-96 overflow-y-auto p-4" side="bottom" align="end"
-                        @mouseenter="helpPopoverOpen = true" @mouseleave="helpPopoverOpen = false">
+                    <PopoverContent class="max-h-[500px] w-96 overflow-y-auto p-4" side="bottom" align="end" @mouseenter="helpPopoverOpen = true" @mouseleave="helpPopoverOpen = false">
                         <div class="space-y-3">
                             <h4 class="text-sm font-semibold">Giải thích các trạng thái sinh viên</h4>
                             <div class="space-y-2">
-                                <div v-for="status in statusList" :key="status.value"
-                                    class="flex items-start gap-2 rounded-md border bg-gray-50 p-2">
-                                    <span
-                                        :class="`inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ${status.badgeClass}`">
+                                <div v-for="status in statusList" :key="status.value" class="flex items-start gap-2 rounded-md border bg-gray-50 p-2">
+                                    <span :class="`inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ${status.badgeClass}`">
                                         {{ status.label }}
                                     </span>
                                     <p class="text-sm text-gray-600">{{ status.description }}</p>
@@ -447,52 +578,56 @@ const exportStudents = async () => {
             <CardContent class="p-4">
                 <div class="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
                     <div class="flex w-full items-center gap-2 md:w-auto">
-                        <DebouncedInput :model-value="filters.search"
-                            placeholder="Search by name, email or student ID..." class="w-full md:w-64"
-                            @update:model-value="handleSearch" />
-                        <Select v-model="filters.program_id"
-                            @update:model-value="(v) => handleSelectFilter('program_id', v)">
-                            <SelectTrigger class="w-full md:w-48">
-                                <SelectValue placeholder="Filter by program..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Programs</SelectItem>
-                                <SelectItem v-for="program in programs" :key="program.id"
-                                    :value="program.id.toString()">
-                                    {{ program.name }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Select v-model="filters.status" @update:model-value="(v) => handleSelectFilter('status', v)">
-                            <SelectTrigger class="w-full md:w-48">
-                                <SelectValue placeholder="Filter by status..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Status</SelectItem>
-                                <SelectItem value="graduated">Graduated</SelectItem>
-                                <SelectItem value="intake_pre_uni_gc">Intake Pre-Uni GC</SelectItem>
-                                <SelectItem value="intake_course">Intake Course</SelectItem>
-                                <SelectItem value="deferred">Deferred</SelectItem>
-                                <SelectItem value="dropout">Dropout</SelectItem>
-                                <SelectItem value="dropout_transfer">Dropout Transfer</SelectItem>
-                                <SelectItem value="pending">Pending</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Button v-if="hasActiveFilters" variant="ghost" @click="clearFilters">
+                        <DebouncedInput :model-value="filters.search" placeholder="Search by name, email or student ID..." class="w-full md:w-64" :disabled="isLoading" @update:model-value="handleSearch" />
+                        <Button variant="outline" :disabled="isLoading" @click="openAdvancedFilters">
+                            <Filter class="mr-2 h-4 w-4" />
+                            Bộ lọc nâng cao
+                            <Badge v-if="activeAdvancedFilterCount" variant="secondary" class="ml-2">{{ activeAdvancedFilterCount }}</Badge>
+                        </Button>
+                        <Button v-if="hasActiveFilters" variant="ghost" :disabled="isLoading" @click="clearAllFilters">
                             <X class="mr-2 h-4 w-4" />
-                            Clear
+                            Xóa tất cả
                         </Button>
                     </div>
                 </div>
+                <div class="mt-4 space-y-2">
+                    <Label for="student-code-filter" class="text-sm font-medium">Mã SV</Label>
+                    <TagsInput
+                        id="student-code-filter"
+                        :model-value="filters.student_ids"
+                        :delimiter="studentCodeDelimiter"
+                        :max="STUDENT_CODE_LIMIT"
+                        add-on-paste
+                        add-on-blur
+                        add-on-tab
+                        :disabled="isLoading"
+                        class="min-h-10"
+                        @update:model-value="handleStudentIdsChange"
+                    >
+                        <TagsInputItem v-for="studentId in filters.student_ids" :key="studentId" :value="studentId">
+                            <TagsInputItemText />
+                            <TagsInputItemDelete />
+                        </TagsInputItem>
+                        <TagsInputInput placeholder="Paste nhiều Mã SV, phân tách bằng dấu phẩy hoặc xuống dòng..." :max-length="20" />
+                    </TagsInput>
+                    <p class="text-muted-foreground text-xs">Tối đa {{ STUDENT_CODE_LIMIT }} mã. Kết quả khớp chính xác theo Mã SV trong campus hiện tại.</p>
+                </div>
+                <div v-if="activeFilterChips.length" class="mt-4 flex flex-wrap items-center gap-2">
+                    <span class="text-muted-foreground text-xs font-medium">Đang lọc:</span>
+                    <Badge v-for="chip in activeFilterChips" :key="`${chip.key}-${chip.value}`" variant="secondary" class="gap-1 pr-1">
+                        {{ chip.label }}
+                        <button type="button" class="hover:bg-muted-foreground/20 rounded-sm p-0.5" :aria-label="`Bỏ ${chip.label}`" :disabled="isLoading" @click="removeAdvancedFilter(chip.key, chip.value)">
+                            <X class="h-3 w-3" />
+                        </button>
+                    </Badge>
+                </div>
                 <div class="mt-4">
-                    <DataTable :columns="columns" :data="data" enable-server-sorting :initial-sort="currentSort"
-                        :initial-direction="currentDirection" @sort-change="handleSortChange">
+                    <DataTable :columns="columns" :data="data" :loading="isLoading" enable-server-sorting :initial-sort="currentSort ?? undefined" :initial-direction="currentDirection ?? undefined" @sort-change="handleSortChange">
                         <template #cell-status="{ row }">
                             <TooltipProvider :delay-duration="0">
                                 <Tooltip>
                                     <TooltipTrigger as-child>
-                                        <span
-                                            :class="`inline-flex cursor-help items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStudentStatusBadgeClass(row.original.status as string)}`">
+                                        <span :class="`inline-flex cursor-help items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStudentStatusBadgeClass(row.original.status as string)}`">
                                             {{ getStudentStatusLabel(row.original.status as string) }}
                                         </span>
                                     </TooltipTrigger>
@@ -523,8 +658,7 @@ const exportStudents = async () => {
                                     </Tooltip>
                                     <Tooltip v-if="can('change_student_status')">
                                         <TooltipTrigger as-child>
-                                            <Button variant="ghost" size="icon"
-                                                @click="goToStudentPlacementAndProgression(row.original)">
+                                            <Button variant="ghost" size="icon" @click="goToStudentPlacementAndProgression(row.original)">
                                                 <RotateCw class="h-4 w-4" />
                                             </Button>
                                         </TooltipTrigger>
@@ -532,8 +666,7 @@ const exportStudents = async () => {
                                     </Tooltip>
                                     <Tooltip v-if="can('view_student_action')">
                                         <TooltipTrigger as-child>
-                                            <Button variant="ghost" size="icon"
-                                                @click="goToStudentActions(row.original)">
+                                            <Button variant="ghost" size="icon" @click="goToStudentActions(row.original)">
                                                 <ClipboardCheck class="h-4 w-4" />
                                             </Button>
                                         </TooltipTrigger>
@@ -555,9 +688,106 @@ const exportStudents = async () => {
             </CardContent>
         </Card>
 
-        <DataPagination :pagination-data="students" item-name="students" @navigate="handlePaginationNavigate"
-            @page-size-change="handlePageSizeChange" />
+        <DataPagination :pagination-data="students" item-name="students" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
     </div>
+
+    <Sheet v-model:open="showAdvancedFilters">
+        <SheetContent class="w-full gap-0 sm:max-w-lg">
+            <SheetHeader class="border-b">
+                <SheetTitle>Bộ lọc nâng cao</SheetTitle>
+                <SheetDescription>Chọn nhiều giá trị rồi áp dụng một lần. Các bộ lọc được kết hợp với tìm kiếm và Mã SV hiện tại.</SheetDescription>
+            </SheetHeader>
+
+            <ScrollArea class="min-h-0 flex-1">
+                <div class="space-y-6 p-4">
+                    <section class="space-y-3">
+                        <div>
+                            <h3 class="text-sm font-semibold">Program</h3>
+                            <p class="text-muted-foreground text-xs">Chọn một hoặc nhiều chương trình.</p>
+                        </div>
+                        <div class="space-y-2">
+                            <label v-for="program in programs" :key="program.id" :for="`advanced-program-${program.id}`" class="flex cursor-pointer items-center gap-3 rounded-md border p-3 text-sm hover:bg-gray-50">
+                                <Checkbox
+                                    :id="`advanced-program-${program.id}`"
+                                    :model-value="advancedFilterDraft.program_ids.includes(String(program.id))"
+                                    @update:model-value="(selected) => toggleDraftFilter('program_ids', String(program.id), selected)"
+                                />
+                                <span>{{ program.name }}</span>
+                            </label>
+                        </div>
+                    </section>
+
+                    <Separator />
+
+                    <section class="space-y-3">
+                        <div>
+                            <h3 class="text-sm font-semibold">Specialization</h3>
+                            <p class="text-muted-foreground text-xs">Danh sách được giới hạn theo Program đã chọn.</p>
+                        </div>
+                        <div class="space-y-2">
+                            <label
+                                v-for="specialization in filteredSpecializations"
+                                :key="specialization.id"
+                                :for="`advanced-specialization-${specialization.id}`"
+                                class="flex cursor-pointer items-center gap-3 rounded-md border p-3 text-sm hover:bg-gray-50"
+                            >
+                                <Checkbox
+                                    :id="`advanced-specialization-${specialization.id}`"
+                                    :model-value="advancedFilterDraft.specialization_ids.includes(String(specialization.id))"
+                                    @update:model-value="(selected) => toggleDraftFilter('specialization_ids', String(specialization.id), selected)"
+                                />
+                                <span
+                                    >{{ specialization.name }} <span class="text-muted-foreground">({{ specialization.code }})</span></span
+                                >
+                            </label>
+                            <p v-if="filteredSpecializations.length === 0" class="text-muted-foreground text-sm">Không có specialization phù hợp.</p>
+                        </div>
+                    </section>
+
+                    <Separator />
+
+                    <section class="space-y-3">
+                        <div>
+                            <h3 class="text-sm font-semibold">Status</h3>
+                            <p class="text-muted-foreground text-xs">Chọn các trạng thái sinh viên cần hiển thị.</p>
+                        </div>
+                        <div class="space-y-2">
+                            <label v-for="status in statusList" :key="status.value" :for="`advanced-status-${status.value}`" class="flex cursor-pointer items-center gap-3 rounded-md border p-3 text-sm hover:bg-gray-50">
+                                <Checkbox :id="`advanced-status-${status.value}`" :model-value="advancedFilterDraft.statuses.includes(status.value)" @update:model-value="(selected) => toggleDraftFilter('statuses', status.value, selected)" />
+                                <span :class="`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${status.badgeClass}`">{{ status.label }}</span>
+                            </label>
+                        </div>
+                    </section>
+
+                    <Separator />
+
+                    <section class="space-y-3">
+                        <div>
+                            <h3 class="text-sm font-semibold">Intake semester</h3>
+                            <p class="text-muted-foreground text-xs">Lọc theo kỳ nhập học của sinh viên.</p>
+                        </div>
+                        <div class="space-y-2">
+                            <label v-for="semester in intake_semesters" :key="semester.id" :for="`advanced-intake-${semester.id}`" class="flex cursor-pointer items-center gap-3 rounded-md border p-3 text-sm hover:bg-gray-50">
+                                <Checkbox
+                                    :id="`advanced-intake-${semester.id}`"
+                                    :model-value="advancedFilterDraft.intake_semester_ids.includes(String(semester.id))"
+                                    @update:model-value="(selected) => toggleDraftFilter('intake_semester_ids', String(semester.id), selected)"
+                                />
+                                <span
+                                    >{{ semester.name }} <span class="text-muted-foreground">({{ semester.code }})</span></span
+                                >
+                            </label>
+                        </div>
+                    </section>
+                </div>
+            </ScrollArea>
+
+            <SheetFooter class="border-t sm:flex-row sm:justify-between">
+                <Button variant="ghost" type="button" @click="resetAdvancedFilterDraft">Đặt lại</Button>
+                <Button type="button" @click="applyAdvancedFilters">Áp dụng</Button>
+            </SheetFooter>
+        </SheetContent>
+    </Sheet>
 
     <!-- Export Dialog -->
     <Dialog v-model:open="showExportDialog">
@@ -612,8 +842,7 @@ const exportStudents = async () => {
                             <SelectItem value="all">
                                 <div>
                                     <div class="font-medium">All Students</div>
-                                    <div class="text-muted-foreground text-xs">Export all students from current campus
-                                    </div>
+                                    <div class="text-muted-foreground text-xs">Export all students from current campus</div>
                                 </div>
                             </SelectItem>
                         </SelectContent>
@@ -623,12 +852,12 @@ const exportStudents = async () => {
                 <div class="bg-muted rounded-lg p-3">
                     <div class="mb-2 text-sm font-medium">Export Information</div>
                     <ul class="text-muted-foreground space-y-1 text-xs">
-                        <li v-if="exportForm.scope === 'filtered' && filters.search">• Search: "{{ filters.search }}"
-                        </li>
-                        <li v-if="exportForm.scope === 'filtered' && filters.program_id !== 'all'">• Program: {{
-                            programs.find((p) => p.id.toString() === filters.program_id)?.name || 'Unknown'}}</li>
-                        <li v-if="exportForm.scope === 'filtered' && filters.status !== 'all'">• Status: {{
-                            getStatusDisplayText(filters.status) }}</li>
+                        <li v-if="exportForm.scope === 'filtered' && filters.search">• Search: "{{ filters.search }}"</li>
+                        <li v-if="exportForm.scope === 'filtered' && filters.student_ids.length">• Mã SV: {{ filters.student_ids.length }} selected</li>
+                        <li v-if="exportForm.scope === 'filtered' && filters.program_ids.length">• Program: {{ filters.program_ids.length }} selected</li>
+                        <li v-if="exportForm.scope === 'filtered' && filters.specialization_ids.length">• Specialization: {{ filters.specialization_ids.length }} selected</li>
+                        <li v-if="exportForm.scope === 'filtered' && filters.statuses.length">• Status: {{ filters.statuses.map(getStatusDisplayText).join(', ') }}</li>
+                        <li v-if="exportForm.scope === 'filtered' && filters.intake_semester_ids.length">• Intake semester: {{ filters.intake_semester_ids.length }} selected</li>
                         <li v-if="exportForm.scope === 'all'">• All students from current campus will be exported</li>
                         <li>• Format: {{ exportForm.format === 'xlsx' ? 'Excel (.xlsx)' : 'CSV (.csv)' }}</li>
                     </ul>
