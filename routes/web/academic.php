@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web\Admin\Academic;
 
-use App\Http\Controllers\Web\Admin\Academic\AcademicReportController;
-use App\Http\Controllers\Web\Admin\Academic\CourseRankingController;
-use App\Http\Controllers\Web\Admin\Academic\GpaManagementController;
 use App\Modules\Academic\Http\Web\GpaHistoryController;
 use App\Modules\Academic\Http\Web\PerformanceDashboardController;
+use App\Modules\Academic\Http\Web\WarningCenterController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->prefix('academic')->name('academic.')->group(function () {
@@ -33,6 +31,19 @@ Route::middleware(['auth', 'verified'])->prefix('academic')->name('academic.')->
     Route::get('/students/performance', [PerformanceDashboardController::class, 'index'])
         ->middleware('can:view_performance_dashboard')
         ->name('students.performance');
+
+    Route::prefix('warnings')->name('warnings.')->group(function () {
+        Route::get('/', [WarningCenterController::class, 'index'])
+            ->name('index');
+        Route::get('/settings', [WarningCenterController::class, 'settings'])
+            ->name('settings');
+        Route::put('/settings', [WarningCenterController::class, 'updateSettings'])
+            ->name('settings.update');
+        Route::post('/academic-standing/{gpaCalculation}/send', [WarningCenterController::class, 'sendAcademicStanding'])
+            ->name('academic-standing.send');
+        Route::post('/attendance/{courseOffering}/{student}/send', [WarningCenterController::class, 'sendAttendance'])
+            ->name('attendance.send');
+    });
 
     Route::get('/report', [AcademicReportController::class, 'index'])
         ->middleware('can:view_academic_report')

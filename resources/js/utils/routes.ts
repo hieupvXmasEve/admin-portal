@@ -348,6 +348,7 @@ export const academicSummaryRoutes = {
     gpaFinalization: () => route('academic.gpa.finalize.index'),
     gpaHistory: () => route('academic.gpa.history'),
     performanceDashboard: () => route('academic.students.performance'),
+    warningCenter: () => route('academic.warnings.index'),
     academicReport: () => route('academic.report.index'),
     courseRanking: () => route('academic.course-ranking.index'),
     degreeClassification: () => '#',

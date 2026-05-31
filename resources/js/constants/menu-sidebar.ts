@@ -313,6 +313,12 @@ export const mainNavItems: NavItem[] = [
                 requiredPermissions: ['view_grade'],
             },
             {
+                title: 'Warning Center',
+                href: academicSummaryRoutes.warningCenter(),
+                icon: AlertCircle,
+                requiredPermissions: ['view_attendance', 'view_grade'],
+            },
+            {
                 title: 'Academic Report',
                 href: academicSummaryRoutes.academicReport(),
                 icon: FileText,

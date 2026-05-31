@@ -38,7 +38,7 @@ class GPAResource extends JsonResource
             'credit_hours_attempted' => $gpaData['credit_hours_attempted'],
             'credit_hours_earned' => $gpaData['credit_hours_earned'],
             'total_courses' => $gpaData['total_courses'],
-            'gpa_scale' => '4.0',
+            'gpa_scale' => '100',
             'performance_level' => $this->getPerformanceLevel($gpaData['gpa']),
         ];
     }
@@ -89,6 +89,8 @@ class GPAResource extends JsonResource
             'standing' => $standingData['standing'],
             'standing_description' => $this->getStandingDescription($standingData['standing']),
             'gpa' => $standingData['gpa'],
+            'semester_gpa' => $standingData['semester_gpa'] ?? null,
+            'cumulative_gpa' => $standingData['cumulative_gpa'] ?? $standingData['gpa'],
             'required_gpa' => $standingData['required_gpa'],
             'meets_requirement' => $standingData['meets_requirement'],
             'warning_level' => $standingData['warning_level'],
@@ -103,11 +105,10 @@ class GPAResource extends JsonResource
     protected function getPerformanceLevel(float $gpa): string
     {
         return match (true) {
-            $gpa >= 3.7 => 'excellent',
-            $gpa >= 3.3 => 'very_good',
-            $gpa >= 3.0 => 'good',
-            $gpa >= 2.7 => 'satisfactory',
-            $gpa >= 2.0 => 'needs_improvement',
+            $gpa >= 85 => 'excellent',
+            $gpa >= 75 => 'very_good',
+            $gpa >= 65 => 'good',
+            $gpa >= 50 => 'normal',
             default => 'unsatisfactory',
         };
     }
@@ -118,11 +119,8 @@ class GPAResource extends JsonResource
     protected function getStandingDescription(string $standing): string
     {
         return match ($standing) {
-            'excellent' => 'Excellent Academic Standing',
-            'good' => 'Good Academic Standing',
-            'satisfactory' => 'Satisfactory Academic Standing',
-            'probation' => 'Academic Probation',
-            'unsatisfactory' => 'Unsatisfactory Academic Standing',
+            'normal' => 'Normal',
+            'warning' => 'Warning',
             default => 'Unknown Standing',
         };
     }

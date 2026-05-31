@@ -150,6 +150,13 @@ class NotificationResource extends JsonResource
         if ($catKey === 'finance') {
             $badges[] = ['type' => 'finance', 'text' => 'Financial', 'color' => '#22c55e'];
         }
+        $warningType = (string) ($data['warning_type'] ?? '');
+        if ($warningType === 'academic_standing_warning' || $warningType === 'attendance_early_warning') {
+            $badges[] = ['type' => 'warning', 'text' => 'Warning', 'color' => '#f59e0b'];
+        }
+        if ($warningType === 'attendance_limit_exceeded') {
+            $badges[] = ['type' => 'limit_exceeded', 'text' => 'Limit Exceeded', 'color' => '#ef4444'];
+        }
 
         return $badges;
     }
@@ -157,6 +164,9 @@ class NotificationResource extends JsonResource
     protected function getNotificationIcon(string $category, string $typeKey): string
     {
         return match ($typeKey) {
+            'academic_standing_warning',
+            'attendance_early_warning',
+            'attendance_limit_exceeded' => 'alert-triangle',
             'deadline' => 'clock',
             'grade_release' => 'star',
             'payment_due' => 'credit-card',

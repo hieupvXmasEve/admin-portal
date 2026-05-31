@@ -19,9 +19,8 @@ class GPACalculationService
             ->current()
             ->orderBy('semester_id', 'desc')
             ->first();
-        
+
         if ($gpaCalculation) {
-            \Log::info($gpaCalculation);
             return [
                 'gpa' => (float) $gpaCalculation->cumulative_gpa,
                 'quality_points' => (float) $gpaCalculation->cumulative_quality_points,
@@ -181,7 +180,7 @@ class GPACalculationService
         return [
             'distribution' => $distribution,
             'percentages' => $totalCourses > 0 ? array_map(
-                fn($count) => round(($count / $totalCourses) * 100, 1),
+                fn ($count) => round(($count / $totalCourses) * 100, 1),
                 $distribution
             ) : array_fill_keys($standardGrades, 0),
             'total_courses' => $totalCourses,
@@ -201,9 +200,10 @@ class GPACalculationService
         if (! $latestGPA) {
             return [
                 'standing' => 'unknown',
+                'gpa' => 0.0,
                 'semester_gpa' => 0.0,
                 'cumulative_gpa' => 0.0,
-                'required_gpa' => 2.0,
+                'required_gpa' => 50.0,
                 'meets_requirement' => false,
                 'warning_level' => null,
             ];
@@ -212,14 +212,15 @@ class GPACalculationService
         $cumulativeGpa = (float) $latestGPA->cumulative_gpa;
         $semesterGpa = (float) $latestGPA->semester_gpa;
 
-        $standing = $this->determineAcademicStanding($cumulativeGpa);
+        $standing = $latestGPA->academic_standing ?: $this->determineAcademicStanding($cumulativeGpa);
 
         return [
             'standing' => $standing,
+            'gpa' => round($cumulativeGpa, 2),
             'semester_gpa' => round($semesterGpa, 2),
             'cumulative_gpa' => round($cumulativeGpa, 2),
-            'required_gpa' => 2.0, // Default for now
-            'meets_requirement' => $cumulativeGpa >= 2.0,
+            'required_gpa' => 50.0,
+            'meets_requirement' => $cumulativeGpa >= 50.0,
             'warning_level' => $this->getWarningLevel($cumulativeGpa),
         ];
     }
@@ -237,7 +238,7 @@ class GPACalculationService
             ];
         }
 
-        $gpas = $gpaCalculations->pluck('semester_gpa')->map(fn($gpa) => (float) $gpa);
+        $gpas = $gpaCalculations->pluck('semester_gpa')->map(fn ($gpa) => (float) $gpa);
         $latest = $gpas->last();
         $previous = $gpas->get($gpas->count() - 2);
 
@@ -246,7 +247,7 @@ class GPACalculationService
 
         // Calculate consistency (standard deviation)
         $mean = $gpas->avg();
-        $variance = $gpas->map(fn($gpa) => pow($gpa - $mean, 2))->avg();
+        $variance = $gpas->map(fn ($gpa) => pow($gpa - $mean, 2))->avg();
         $stdDev = sqrt($variance);
 
         $consistency = $stdDev < 0.2 ? 'consistent' : ($stdDev < 0.5 ? 'moderate' : 'variable');
@@ -264,13 +265,7 @@ class GPACalculationService
      */
     protected function determineAcademicStanding(float $gpa): string
     {
-        return match (true) {
-            $gpa >= 3.5 => 'excellent',
-            $gpa >= 3.0 => 'good',
-            $gpa >= 2.5 => 'satisfactory',
-            $gpa >= 2.0 => 'probation',
-            default => 'unsatisfactory',
-        };
+        return $gpa >= 50.0 ? 'normal' : 'warning';
     }
 
     /**
@@ -279,9 +274,8 @@ class GPACalculationService
     protected function getWarningLevel(float $gpa): ?string
     {
         return match (true) {
-            $gpa < 1.5 => 'critical',
-            $gpa < 2.0 => 'warning',
-            $gpa < 2.5 => 'watch',
+            $gpa < 40.0 => 'critical',
+            $gpa < 50.0 => 'warning',
             default => null,
         };
     }
