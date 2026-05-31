@@ -23,6 +23,11 @@ export interface NavItem {
     requiredPermissions?: string[];
 }
 
+export interface NavGroup {
+    label: string;
+    items: NavItem[];
+}
+
 export interface SharedData extends PageProps {
     name: string;
     quote: { message: string; author: string };

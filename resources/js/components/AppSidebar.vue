@@ -4,16 +4,16 @@ import NavMain from '@/components/NavMain.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail } from '@/components/ui/sidebar';
 import { usePermissions } from '@/composables/usePermissions';
 import { useSystemConfig } from '@/composables/useSystemConfig';
-import { mainNavItems } from '@/constants/menu-sidebar';
+import { mainNavGroups } from '@/constants/menu-sidebar';
 import { SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import NavUser from './NavUser.vue';
 
-const { filterMenuItems } = usePermissions();
+const { filterMenuGroups } = usePermissions();
 const { get } = useSystemConfig();
 // Filter menu items based on user permissions
-const filteredMenuItems = computed(() => filterMenuItems(mainNavItems));
+const filteredMenuGroups = computed(() => filterMenuGroups(mainNavGroups));
 const page = usePage<SharedData>();
 const campus = page.props.auth.current_campus;
 </script>
@@ -39,7 +39,7 @@ const campus = page.props.auth.current_campus;
         </SidebarHeader>
 
         <SidebarContent>
-            <NavMain :items="filteredMenuItems" />
+            <NavMain :groups="filteredMenuGroups" />
         </SidebarContent>
 
         <SidebarFooter class="border-t border-gray-200 bg-gray-50/50 dark:border-gray-800 dark:bg-gray-900/50">

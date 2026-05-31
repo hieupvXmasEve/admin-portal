@@ -1,4 +1,4 @@
-import type { PageProps } from '@/types';
+import type { NavGroup, NavItem, PageProps } from '@/types';
 import { usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
@@ -31,26 +31,33 @@ export function usePermissions() {
     };
 
     // Filter menu items based on user permissions
-    const filterMenuItems = <T extends { requiredPermissions?: string[]; children?: T[] }>(items: T[]): T[] => {
-        return items.filter(item => {
-            // Filter children recursively if they exist
+    const filterMenuItems = (items: NavItem[]): NavItem[] => {
+        return items.reduce<NavItem[]>((visibleItems, item) => {
             if (item.children) {
-                item.children = filterMenuItems(item.children);
+                const children = filterMenuItems(item.children);
+
+                if (children.length > 0) {
+                    visibleItems.push({ ...item, children });
+                }
+
+                return visibleItems;
             }
-            
-            // For items with children, only show if they have at least one visible child
-            if (item.children) {
-                return item.children.length > 0;
+
+            if (!item.requiredPermissions || item.requiredPermissions.length === 0 || canAny(item.requiredPermissions)) {
+                visibleItems.push({ ...item });
             }
-            
-            // For items without children, check permissions
-            if (!item.requiredPermissions || item.requiredPermissions.length === 0) {
-                return true;
-            }
-            
-            // Check if user has any of the required permissions
-            return canAny(item.requiredPermissions);
-        });
+
+            return visibleItems;
+        }, []);
+    };
+
+    const filterMenuGroups = (groups: NavGroup[]): NavGroup[] => {
+        return groups
+            .map((group) => ({
+                ...group,
+                items: filterMenuItems(group.items),
+            }))
+            .filter((group) => group.items.length > 0);
     };
 
     return {
@@ -60,5 +67,6 @@ export function usePermissions() {
         canAny,
         canAll,
         filterMenuItems,
+        filterMenuGroups,
     };
 }
