@@ -21,6 +21,9 @@ Restate as work item
 Find affected product docs and stories
     |
     v
+Classify portal impact
+    |
+    v
 Run risk checklist
     |
     v
@@ -98,6 +101,22 @@ Mark one flag for each item that applies:
 | Weak proof | unclear or missing tests around the affected area |
 | Multi-domain | more than one product domain changes at once |
 
+## Portal Impact
+
+For Swinx backend work, classify whether student or lecturer Nuxt portals may
+need coordinated edits:
+
+| Impact | Use when |
+| --- | --- |
+| None | No `/api/v1/student/*`, `/api/v1/lecturer/*`, auth/context, realtime, or client-visible API contract changes. |
+| Student | The change touches student API routes, student auth/context, or response/request shape used by `FE/student-nuxt`. |
+| Lecturer | The change touches lecturer API routes, lecturer auth/me/check-science, or response/request shape used by `FE/lecturer-nuxt`. |
+| Both | Shared API envelope, auth, notification, realtime, CORS, or identity behavior affects both portal surfaces. |
+
+When impact is not `None`, read `docs/portal-repos.md`, run
+`./scripts/portal-status.sh`, and add the matching FE validation expectations to
+the story.
+
 ## Classification
 
 ```text
@@ -132,5 +151,6 @@ Lane: normal
 Reason: touches authorization, API contract, and audit behavior.
 Docs: permissions, account-settings, audit-log.
 Story: docs/stories/epics/E02-access-control/US-014-manager-updates-role.md.
+Portal impact: none
 Validation: unit, integration, E2E.
 ```

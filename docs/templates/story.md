@@ -16,6 +16,10 @@ Describe the behavior this story must make true.
 
 - `docs/product/...`
 
+## Portal Impact
+
+none | student | lecturer | both
+
 ## Acceptance Criteria
 
 - Criterion 1.

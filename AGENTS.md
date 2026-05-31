@@ -23,6 +23,7 @@ Read these before planning any change:
 - `docs/codebase-summary.md` — current codebase snapshot
 - `docs/design-guidelines.md` — UI and frontend standards
 - `docs/inertiajs-vue-info.md` — **Inertia v3 API reference** (must-read for any frontend work)
+- `docs/portal-repos.md` — cross-repo workflow for gitignored student/lecturer Nuxt portals
 
 For task-specific rules, use `docs/rules/` (see `docs/rules/README.md` for index).
 
@@ -36,6 +37,7 @@ Project runs inside Docker. Always use the wrapper scripts:
 ./scripts/dev.sh composer <command>
 ./scripts/dev.sh npm <command>
 ./scripts/dev.sh test
+./scripts/portal-status.sh
 ```
 
 Quality checks:
@@ -64,6 +66,38 @@ Quality checks:
 - Filter/pagination pages → `useDataTable` composable (see `docs/rules/filtering.md` and `docs/useDataTable-examples.md`).
 - Use `route(...)` helpers over literal URL paths.
 - Use `lucide-vue-next` icons and existing `@/components/ui` primitives.
+
+## Cross-Repo Portal Rules
+
+The separate Nuxt portals live under `FE/` and are ignored by the Swinx git
+repository:
+
+- Student portal: `FE/student-nuxt`
+- Lecturer portal: `FE/lecturer-nuxt`
+
+When changing student-facing or lecturer-facing API behavior, follow
+`docs/portal-repos.md`.
+
+Rules:
+
+- Set story metadata: `Portal impact: none | student | lecturer | both`.
+- Student-impacting changes include `routes/api/v1/student.php`, student
+  auth/context routes in `app/Modules/Identity/routes/api.php`, and controllers,
+  resources, requests, actions, or docs that shape `/api/v1/student/*`.
+- Lecturer-impacting changes include `routes/api/v1/lecturer.php`, lecturer
+  auth routes in `app/Modules/Identity/routes/api.php`, and controllers,
+  resources, requests, actions, or docs that shape `/api/v1/lecturer/*`.
+- Run `./scripts/portal-status.sh` before touching portal files.
+- If portal impact is `student`, inspect/update only the matching files in
+  `FE/student-nuxt`; if `lecturer`, inspect/update only `FE/lecturer-nuxt`; if
+  `both`, inspect/update both.
+- Keep Swinx and portal git states separate. Do not stage portal files from the
+  Swinx repository, and do not revert unrelated dirty changes in nested portal
+  repos.
+- Update backend API docs plus affected portal `shared/types`, composables,
+  stores, or pages in the same work window when an API contract changes.
+- Run portal `pnpm lint`, `pnpm typecheck`, and `pnpm build` when portal code is
+  changed, or explicitly record why they could not run.
 
 ## Inertia v3 API Rules (mandatory)
 
@@ -155,6 +189,8 @@ Harness CLI (`./scripts/harness`, Rust binary at `scripts/bin/harness-cli`, DB a
    ```
    ./scripts/harness story add --id <id> --title "..." --lane <normal|high_risk> --contract docs/stories/<epic>/<id>.md
    ```
+   Include `Portal impact: none | student | lecturer | both` in the story before
+   implementation.
 3. **Planning + confirm**: present approach (affected files, validation shape, risks) to user. Wait for explicit approval before implementation.
 4. **Execute**: implement minimum vertical slice. Update story status:
    ```

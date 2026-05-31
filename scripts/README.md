@@ -25,6 +25,16 @@ application source folders, package scripts, CI, tests, platform shells, or fake
 validation commands. The installer script is not part of the installed project
 payload.
 
+## Portal Status
+
+Use `./scripts/portal-status.sh` before touching student or lecturer API
+contracts. It reports the Swinx parent status, verifies that `FE/student-nuxt`
+and `FE/lecturer-nuxt` are still ignored by Swinx, and prints each nested repo's
+own git status.
+
+This script is observational only. It does not modify files, install
+dependencies, run validation, stage changes, or commit nested repositories.
+
 ## Future Command Contract
 
 Expected future checks:
