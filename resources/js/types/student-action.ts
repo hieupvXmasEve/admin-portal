@@ -100,6 +100,7 @@ export interface StudentActionLog {
     // Semester references
     from_semester_id?: number;
     return_semester_id?: number;
+    egc_defer_from_block_number?: number | null;
     intended_intake_semester_id?: number;
     dropout_semester_id?: number;
     effective_semester_id?: number;
@@ -165,6 +166,7 @@ export interface StoreStudentActionForm {
     // ACADEMIC_DEFER
     from_semester_id?: number | null;
     return_semester_id?: number | null;
+    egc_defer_from_block_number?: number | null;
 
     // ADMISSION_DEFERRAL
     intended_intake_semester_id?: number | null;
@@ -212,6 +214,8 @@ export interface StudentActionFilters {
     signed_date_from?: string | null;
     signed_date_to?: string | null;
     semester_id?: number | null;
+    from_semester_id?: number | null;
+    egc_defer_from_block_number?: number | null;
     campus_id?: number | null;
     to_campus_id?: number | null;
     from_campus_id?: number | null;
@@ -228,6 +232,11 @@ export interface ActionTypeOption {
     label: string;
     labelEn: string;
     description: string;
+}
+
+export interface EgcDeferBlockOption {
+    value: number;
+    label: string;
 }
 
 export function getActionTypeLabel(actionType: string): string {

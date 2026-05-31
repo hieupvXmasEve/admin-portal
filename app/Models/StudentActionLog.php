@@ -30,6 +30,7 @@ class StudentActionLog extends Model
         'changed_by_user_id',
         'from_semester_id',
         'return_semester_id',
+        'egc_defer_from_block_number',
         'intended_intake_semester_id',
         'dropout_semester_id',
         'effective_semester_id',
@@ -47,6 +48,7 @@ class StudentActionLog extends Model
         'decision_signed_at' => 'date',
         'missing_documents' => 'boolean',
         'effective_at' => 'datetime',
+        'egc_defer_from_block_number' => 'integer',
     ];
 
     protected $with = ['changedBy'];
@@ -245,9 +247,10 @@ class StudentActionLog extends Model
                 $this->fromSemester?->name ?? 'N/A'
             ),
             StudentActionType::ACADEMIC_DEFER => sprintf(
-                'Defer from %s to %s',
+                'Defer from %s to %s%s',
                 $this->fromSemester?->name ?? 'N/A',
-                $this->returnSemester?->name ?? 'N/A'
+                $this->returnSemester?->name ?? 'N/A',
+                $this->egc_defer_from_block_number ? ' (Block '.$this->egc_defer_from_block_number.')' : ''
             ),
             StudentActionType::ACADEMIC_RESUME => sprintf(
                 'Resume in %s',

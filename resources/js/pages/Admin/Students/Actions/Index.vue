@@ -17,6 +17,7 @@ import {
     type Campus,
     type CourseRegistrationPreview,
     type EgcChargePreview,
+    type EgcDeferBlockOption,
     type Semester,
     type StoreStudentActionForm,
     type StudentActionLog,
@@ -55,6 +56,7 @@ interface Props {
         campuses: Campus[];
         deferScopeTypes?: { value: string; label: string }[];
         deferFeePolicies?: { value: string; label: string }[];
+        egcDeferBlocks?: EgcDeferBlockOption[];
         courseRegistrations?: CourseRegistrationPreview[];
         egcCharges?: EgcChargePreview[];
         studentDecisions?: Array<{
@@ -84,6 +86,7 @@ const form = useForm<StoreStudentActionForm>({
     attachment_ids: [],
     from_semester_id: props.options.activeSemesterId ?? null,
     return_semester_id: props.options.activeSemesterId ?? null,
+    egc_defer_from_block_number: null,
     intended_intake_semester_id: null,
     dropout_semester_id: null,
     from_campus_id: props.student.campus_id,
@@ -125,6 +128,7 @@ watch(
         form.defer_preserve_amount = null;
         form.defer_course_registration_ids = [];
         form.defer_egc_charge_ids = [];
+        form.egc_defer_from_block_number = form.action_type === StudentActionType.ACADEMIC_DEFER && props.student.status === 'intake_pre_uni_gc' ? 1 : null;
     },
 );
 // Computed: filter course registrations by selected from_semester_id
@@ -144,7 +148,6 @@ const filteredEgcCharges = computed(() => {
 const hasUnpaidEgcCharges = computed(() => {
     if (!isEgcStudent.value) return false;
     if (filteredEgcCharges.value.length === 0) return false;
-    console.log('filteredEgcCharges', filteredEgcCharges.value)
     return filteredEgcCharges.value.every((charge) => !charge.is_fully_paid);
 });
 watch(
@@ -153,6 +156,9 @@ watch(
         if (selectedActionType.value === StudentActionType.ACADEMIC_DEFER && isEgcStudent.value) {
             form.defer_scope_type = 'FULL';
             form.defer_course_registration_ids = [];
+            form.egc_defer_from_block_number = form.egc_defer_from_block_number ?? 1;
+        } else {
+            form.egc_defer_from_block_number = null;
         }
     },
 );
@@ -178,7 +184,6 @@ watch(
         }
     },
 );
-
 
 const formatCurrency = (amount: number | string): string => {
     const numeric = typeof amount === 'string' ? Number(amount) : amount;
@@ -235,11 +240,13 @@ const formatDateOnly = (dateStr: string | null | undefined): string => {
 
 const getSummary = (log: StudentActionLog): string => {
     switch (log.action_type) {
-        case StudentActionType.ACADEMIC_DEFER:
+        case StudentActionType.ACADEMIC_DEFER: {
+            const blockText = log.egc_defer_from_block_number ? `, from Block ${log.egc_defer_from_block_number}` : '';
             if (log.defer_case?.scope_type === 'COURSES') {
-                return `Defer by courses from ${log.from_semester?.name ?? 'N/A'} to ${log.return_semester?.name ?? 'N/A'}`;
+                return `Defer by courses from ${log.from_semester?.name ?? 'N/A'} to ${log.return_semester?.name ?? 'N/A'}${blockText}`;
             }
-            return `Defer full semester from ${log.from_semester?.name ?? 'N/A'} to ${log.return_semester?.name ?? 'N/A'}`;
+            return `Defer full semester from ${log.from_semester?.name ?? 'N/A'} to ${log.return_semester?.name ?? 'N/A'}${blockText}`;
+        }
         case StudentActionType.ACADEMIC_RESUME:
             return `Resume in ${log.return_semester?.name ?? 'N/A'}`;
         case StudentActionType.ADMISSION_DEFERRAL:
@@ -328,6 +335,21 @@ const getSummary = (log: StudentActionLog): string => {
                                     </Select>
                                     <p v-if="form.errors.return_semester_id" class="text-sm text-red-500">{{ form.errors.return_semester_id }}</p>
                                 </div>
+                            </div>
+
+                            <div v-if="isEgcStudent" class="space-y-2">
+                                <Label for="egc_defer_from_block_number">EGC Defer From Block *</Label>
+                                <Select :model-value="form.egc_defer_from_block_number ? String(form.egc_defer_from_block_number) : undefined" @update:model-value="(value) => (form.egc_defer_from_block_number = Number(value))">
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select block" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem v-for="block in options.egcDeferBlocks ?? []" :key="block.value" :value="String(block.value)">
+                                            {{ block.label }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p v-if="form.errors.egc_defer_from_block_number" class="text-sm text-red-500">{{ form.errors.egc_defer_from_block_number }}</p>
                             </div>
 
                             <!-- Finance Section -->
@@ -570,22 +592,13 @@ const getSummary = (log: StudentActionLog): string => {
                         <div class="grid grid-cols-2 gap-4">
                             <div class="space-y-2">
                                 <Label for="decision_id">Linked Decision (Optional)</Label>
-                                <Select
-                                    :model-value="form.decision_id ? String(form.decision_id) : 'none'"
-                                    @update:model-value="(value) => (form.decision_id = value === 'none' ? null : Number(value))"
-                                >
+                                <Select :model-value="form.decision_id ? String(form.decision_id) : 'none'" @update:model-value="(value) => (form.decision_id = value === 'none' ? null : Number(value))">
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select decision" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="none">No linked decision</SelectItem>
-                                        <SelectItem
-                                            v-for="decision in options.studentDecisions ?? []"
-                                            :key="decision.id"
-                                            :value="String(decision.id)"
-                                        >
-                                            {{ decision.decision_number }} - {{ decision.decision_name }}
-                                        </SelectItem>
+                                        <SelectItem v-for="decision in options.studentDecisions ?? []" :key="decision.id" :value="String(decision.id)"> {{ decision.decision_number }} - {{ decision.decision_name }} </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -647,6 +660,7 @@ const getSummary = (log: StudentActionLog): string => {
                                     <Badge v-if="log.action_type === StudentActionType.ACADEMIC_DEFER && log.defer_case?.scope_type" variant="outline">
                                         {{ log.defer_case.scope_type === 'COURSES' ? 'Course' : 'Toàn kỳ' }}
                                     </Badge>
+                                    <Badge v-if="log.egc_defer_from_block_number" variant="outline"> Block {{ log.egc_defer_from_block_number }} </Badge>
                                     <span v-if="log.missing_documents" class="text-xs text-amber-600"> (Missing Documents) </span>
                                 </div>
                                 <p class="mt-2 text-sm font-medium">{{ getSummary(log) }}</p>
@@ -661,18 +675,10 @@ const getSummary = (log: StudentActionLog): string => {
                                         <User class="mr-1 h-3 w-3" />
                                         {{ log.changed_by?.name ?? 'Unknown' }}
                                     </span>
-                                    <span v-if="log.decision_number" class="flex items-center">
-                                        Decision No: {{ log.decision_number }}
-                                    </span>
-                                    <span v-if="log.decision_signed_at" class="flex items-center">
-                                        Decision Signed: {{ formatDateOnly(log.decision_signed_at) }}
-                                    </span>
-                                    <span v-if="log.decision_signer" class="flex items-center">
-                                        Signer: {{ log.decision_signer }}
-                                    </span>
-                                    <span v-if="log.decision" class="flex items-center">
-                                        Linked: {{ log.decision.decision_number }}
-                                    </span>
+                                    <span v-if="log.decision_number" class="flex items-center"> Decision No: {{ log.decision_number }} </span>
+                                    <span v-if="log.decision_signed_at" class="flex items-center"> Decision Signed: {{ formatDateOnly(log.decision_signed_at) }} </span>
+                                    <span v-if="log.decision_signer" class="flex items-center"> Signer: {{ log.decision_signer }} </span>
+                                    <span v-if="log.decision" class="flex items-center"> Linked: {{ log.decision.decision_number }} </span>
                                     <span v-if="log.attachments && log.attachments.length > 0" class="flex items-center">
                                         <Paperclip class="mr-1 h-3 w-3" />
                                         {{ log.attachments.length }} file(s)

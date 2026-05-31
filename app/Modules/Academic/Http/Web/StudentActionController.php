@@ -142,6 +142,10 @@ class StudentActionController extends Controller
                 ['value' => 'FORFEIT', 'label' => 'Mất học phí (Forfeit Fee)'],
                 ['value' => 'PARTIAL', 'label' => 'Bảo lưu một phần (Partial Preserve)'],
             ],
+            'egcDeferBlocks' => [
+                ['value' => 1, 'label' => 'Block 1'],
+                ['value' => 2, 'label' => 'Block 2'],
+            ],
             'studentDecisions' => StudentDecision::query()
                 ->select('id', 'decision_name', 'decision_number', 'issued_at', 'expires_at')
                 ->orderByDesc('issued_at')

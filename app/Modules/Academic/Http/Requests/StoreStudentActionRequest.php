@@ -70,6 +70,28 @@ class StoreStudentActionRequest extends FormRequest
                 //     }
                 // },
             ],
+            'egc_defer_from_block_number' => [
+                'nullable',
+                'integer',
+                Rule::in([1, 2]),
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $student = Student::query()
+                        ->select(['id', 'status'])
+                        ->find($this->input('student_id'));
+
+                    $isBlank = $value === null || $value === '';
+
+                    if ($student?->status === 'intake_pre_uni_gc' && $isBlank) {
+                        $fail('EGC defer from block is required for EGC students.');
+
+                        return;
+                    }
+
+                    if ($student && $student->status !== 'intake_pre_uni_gc' && ! $isBlank) {
+                        $fail('EGC defer from block is only available for EGC students.');
+                    }
+                },
+            ],
             // Defer Case fields
             'defer_scope_type' => ['required', 'string', 'in:FULL,COURSES'],
             'defer_fee_policy' => ['required', 'string', 'in:PRESERVE,FORFEIT,PARTIAL'],
@@ -246,6 +268,8 @@ class StoreStudentActionRequest extends FormRequest
             'defer_course_registration_ids.*.distinct' => 'Duplicate courses are not allowed.',
             'defer_egc_charge_ids.*.exists' => 'One or more selected EGC fees do not exist.',
             'defer_egc_charge_ids.*.distinct' => 'Duplicate EGC fees are not allowed.',
+            'egc_defer_from_block_number.integer' => 'EGC defer from block must be 1 or 2.',
+            'egc_defer_from_block_number.in' => 'EGC defer from block must be 1 or 2.',
         ];
     }
 

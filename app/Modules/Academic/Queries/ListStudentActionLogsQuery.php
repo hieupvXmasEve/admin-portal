@@ -60,6 +60,9 @@ class ListStudentActionLogsQuery
             ->when($filters['from_semester_id'] ?? null, function (Builder $query, $semesterId) {
                 $query->where('from_semester_id', $semesterId);
             })
+            ->when($filters['egc_defer_from_block_number'] ?? null, function (Builder $query, $blockNumber) {
+                $query->where('egc_defer_from_block_number', (int) $blockNumber);
+            })
             ->when($filters['return_semester_id'] ?? null, function (Builder $query, $semesterId) {
                 $query->where('return_semester_id', $semesterId);
             })
@@ -69,14 +72,20 @@ class ListStudentActionLogsQuery
             ->when($filters['effective_semester_id'] ?? null, function (Builder $query, $semesterId) {
                 $query->where('effective_semester_id', $semesterId);
             })
+            // Filter by student's current campus only
+            ->when($filters['student_campus_id'] ?? null, function (Builder $query, $campusId) {
+                $query->whereHas('student', function (Builder $studentQuery) use ($campusId) {
+                    $studentQuery->where('campus_id', $campusId);
+                });
+            })
             // Filter by campus (student's current campus or transfer campus)
             ->when($filters['campus_id'] ?? null, function (Builder $query, $campusId) {
                 $query->where(function ($q) use ($campusId) {
                     $q->whereHas('student', function ($studentQuery) use ($campusId) {
                         $studentQuery->where('campus_id', $campusId);
                     })
-                    ->orWhere('to_campus_id', $campusId)
-                    ->orWhere('from_campus_id', $campusId);
+                        ->orWhere('to_campus_id', $campusId)
+                        ->orWhere('from_campus_id', $campusId);
                 });
             })
             // Filter by to_campus specifically

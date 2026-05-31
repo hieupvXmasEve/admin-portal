@@ -31,6 +31,7 @@ interface ImportRowResult {
     semester_info?: {
         from_semester_code?: string | null;
         return_semester_code?: string | null;
+        egc_defer_from_block_number?: number | null;
         dropout_semester_code?: string | null;
         effective_at?: string | null;
     };
@@ -160,9 +161,7 @@ const handleExecute = async () => {
         <Card>
             <CardHeader>
                 <CardTitle>Import Source Files</CardTitle>
-                <CardDescription>
-                    `action_type` drives required columns. `ADMISSION_DEFERRAL` is not supported in import.
-                </CardDescription>
+                <CardDescription> `action_type` drives required columns. `ADMISSION_DEFERRAL` is not supported in import. </CardDescription>
             </CardHeader>
             <CardContent class="space-y-6">
                 <div class="space-y-2">
@@ -201,8 +200,7 @@ const handleExecute = async () => {
             <CardHeader>
                 <CardTitle>Import Result</CardTitle>
                 <CardDescription>
-                    Total: {{ previewResult.summary.total }}, Valid: {{ previewResult.summary.valid }}, Invalid: {{ previewResult.summary.invalid }},
-                    Success: {{ previewResult.summary.success }}, Failed: {{ previewResult.summary.failed }}
+                    Total: {{ previewResult.summary.total }}, Valid: {{ previewResult.summary.valid }}, Invalid: {{ previewResult.summary.invalid }}, Success: {{ previewResult.summary.success }}, Failed: {{ previewResult.summary.failed }}
                 </CardDescription>
             </CardHeader>
             <CardContent class="space-y-4">
@@ -223,49 +221,45 @@ const handleExecute = async () => {
                         <div class="text-muted-foreground mt-2 grid gap-1 text-sm md:grid-cols-2">
                             <div>
                                 Student:
-                                <span class="font-medium text-foreground">
-                                    {{ row.student?.student_code ?? '-' }} - {{ row.student?.full_name ?? 'Unknown' }}
-                                </span>
+                                <span class="text-foreground font-medium"> {{ row.student?.student_code ?? '-' }} - {{ row.student?.full_name ?? 'Unknown' }} </span>
                             </div>
                             <div>
                                 Action Type:
-                                <span class="font-medium text-foreground">{{ row.action_type ?? '-' }}</span>
+                                <span class="text-foreground font-medium">{{ row.action_type ?? '-' }}</span>
                             </div>
                             <div>
                                 Semester:
-                                <span class="font-medium text-foreground">
-                                    {{
-                                        row.semester_info?.from_semester_code
-                                            ?? row.semester_info?.return_semester_code
-                                            ?? row.semester_info?.dropout_semester_code
-                                            ?? row.semester_info?.effective_at
-                                            ?? '-'
-                                    }}
+                                <span class="text-foreground font-medium">
+                                    {{ row.semester_info?.from_semester_code ?? row.semester_info?.return_semester_code ?? row.semester_info?.dropout_semester_code ?? row.semester_info?.effective_at ?? '-' }}
+                                </span>
+                            </div>
+                            <div>
+                                EGC From Block:
+                                <span class="text-foreground font-medium">
+                                    {{ row.semester_info?.egc_defer_from_block_number ? `Block ${row.semester_info.egc_defer_from_block_number}` : '-' }}
                                 </span>
                             </div>
                             <div>
                                 Reason:
-                                <span class="font-medium text-foreground">{{ row.reason ?? '-' }}</span>
+                                <span class="text-foreground font-medium">{{ row.reason ?? '-' }}</span>
                             </div>
                             <div>
                                 Decision Number:
-                                <span class="font-medium text-foreground">{{ row.decision_info?.decision_number ?? '-' }}</span>
+                                <span class="text-foreground font-medium">{{ row.decision_info?.decision_number ?? '-' }}</span>
                             </div>
                             <div>
                                 Decision Signed At:
-                                <span class="font-medium text-foreground">{{ row.decision_info?.decision_signed_at ?? '-' }}</span>
+                                <span class="text-foreground font-medium">{{ row.decision_info?.decision_signed_at ?? '-' }}</span>
                             </div>
                             <div>
                                 Decision Signer:
-                                <span class="font-medium text-foreground">{{ row.decision_info?.decision_signer ?? '-' }}</span>
+                                <span class="text-foreground font-medium">{{ row.decision_info?.decision_signer ?? '-' }}</span>
                             </div>
                         </div>
                         <div v-if="row.preserve_preview" class="mt-2 rounded-md bg-emerald-50 p-2 text-sm text-emerald-800">
                             Preserve Amount:
                             <span class="font-semibold">{{ formatCurrency(row.preserve_preview.preserve_amount) }}</span>
-                            <span class="ml-1 text-xs">
-                                ({{ row.preserve_preview.source === 'existing_defer_case' ? 'from existing defer_case' : 'estimated from active charges' }})
-                            </span>
+                            <span class="ml-1 text-xs"> ({{ row.preserve_preview.source === 'existing_defer_case' ? 'from existing defer_case' : 'estimated from active charges' }}) </span>
                         </div>
                         <ul v-if="row.errors.length > 0" class="mt-2 list-disc pl-5 text-sm text-red-600">
                             <li v-for="err in row.errors" :key="err">{{ err }}</li>

@@ -26,8 +26,8 @@ class StudentActionImportTemplateExport implements FromArray, WithEvents, WithHe
     public function array(): array
     {
         return [
-            ['SV001', 'ACADEMIC_DEFER', 'Bảo lưu theo quyết định', '2025FA', '2026SP', 'yes', '', '', '', '', '2026-02-25', 'QD-2026-001', '2026-02-20', 'Phong Dao Tao', 'Ghi chú nội bộ'],
-            ['SV002', 'ACADEMIC_RESUME', 'Đi học lại', '', '2026SP', '', '', '', '', '', '', 'QD-2026-002', '2026-02-21', 'Phong Dao Tao', ''],
+            ['SV001', 'ACADEMIC_DEFER', 'Bảo lưu theo quyết định', '2025FA', '2026SP', 'yes', '1', '', '', '', '', '2026-02-25', 'QD-2026-001', '2026-02-20', 'Phong Dao Tao', 'Ghi chú nội bộ'],
+            ['SV002', 'ACADEMIC_RESUME', 'Đi học lại', '', '2026SP', '', '', '', '', '', '', '', 'QD-2026-002', '2026-02-21', 'Phong Dao Tao', ''],
         ];
     }
 
@@ -40,6 +40,7 @@ class StudentActionImportTemplateExport implements FromArray, WithEvents, WithHe
             'from_semester_code',
             'return_semester_code',
             'defer_preserve_tuition',
+            'egc_defer_from_block_number',
             'dropout_semester_code',
             'from_campus_code',
             'to_campus_code',
@@ -82,27 +83,29 @@ class StudentActionImportTemplateExport implements FromArray, WithEvents, WithHe
         $this->writeList($sheet, 'S', array_values($this->semesterCodes));
         $this->writeList($sheet, 'T', array_values($this->campusCodes));
         $this->writeList($sheet, 'U', ['yes', 'no']);
+        $this->writeList($sheet, 'V', ['1', '2']);
 
-        foreach (['R', 'S', 'T', 'U'] as $col) {
+        foreach (['R', 'S', 'T', 'U', 'V'] as $col) {
             $sheet->getColumnDimension($col)->setVisible(false);
         }
     }
 
     private function applySelectValidation(Worksheet $sheet): void
     {
-        $this->applyRangeValidation($sheet, 'B2:B' . self::MAX_ROWS, '$R$2:$R$' . max(2, count($this->actionTypes) + 1));
-        $semesterFormula = '$S$2:$S$' . max(2, count($this->semesterCodes) + 1);
-        $this->applyRangeValidation($sheet, 'D2:D' . self::MAX_ROWS, $semesterFormula);
-        $this->applyRangeValidation($sheet, 'E2:E' . self::MAX_ROWS, $semesterFormula);
-        $this->applyRangeValidation($sheet, 'G2:G' . self::MAX_ROWS, $semesterFormula);
-        $this->applyRangeValidation($sheet, 'H2:H' . self::MAX_ROWS, '$T$2:$T$' . max(2, count($this->campusCodes) + 1));
-        $this->applyRangeValidation($sheet, 'I2:I' . self::MAX_ROWS, '$T$2:$T$' . max(2, count($this->campusCodes) + 1));
-        $this->applyRangeValidation($sheet, 'F2:F' . self::MAX_ROWS, '$U$2:$U$3');
+        $this->applyRangeValidation($sheet, 'B2:B'.self::MAX_ROWS, '$R$2:$R$'.max(2, count($this->actionTypes) + 1));
+        $semesterFormula = '$S$2:$S$'.max(2, count($this->semesterCodes) + 1);
+        $this->applyRangeValidation($sheet, 'D2:D'.self::MAX_ROWS, $semesterFormula);
+        $this->applyRangeValidation($sheet, 'E2:E'.self::MAX_ROWS, $semesterFormula);
+        $this->applyRangeValidation($sheet, 'G2:G'.self::MAX_ROWS, '$V$2:$V$3');
+        $this->applyRangeValidation($sheet, 'H2:H'.self::MAX_ROWS, $semesterFormula);
+        $this->applyRangeValidation($sheet, 'I2:I'.self::MAX_ROWS, '$T$2:$T$'.max(2, count($this->campusCodes) + 1));
+        $this->applyRangeValidation($sheet, 'J2:J'.self::MAX_ROWS, '$T$2:$T$'.max(2, count($this->campusCodes) + 1));
+        $this->applyRangeValidation($sheet, 'F2:F'.self::MAX_ROWS, '$U$2:$U$3');
     }
 
     private function applyRangeValidation(Worksheet $sheet, string $targetRange, string $listRange): void
     {
-        $dv = new DataValidation();
+        $dv = new DataValidation;
         $dv->setType(DataValidation::TYPE_LIST);
         $dv->setAllowBlank(true);
         $dv->setShowDropDown(true);
@@ -110,7 +113,7 @@ class StudentActionImportTemplateExport implements FromArray, WithEvents, WithHe
         $dv->setErrorStyle(DataValidation::STYLE_STOP);
         $dv->setErrorTitle('Invalid value');
         $dv->setError('Please choose from dropdown values fetched from backend template data.');
-        $dv->setFormula1('=' . $listRange);
+        $dv->setFormula1('='.$listRange);
 
         $sheet->setDataValidation($targetRange, $dv);
     }
@@ -123,7 +126,7 @@ class StudentActionImportTemplateExport implements FromArray, WithEvents, WithHe
         }
 
         foreach ($values as $index => $value) {
-            $sheet->setCellValue($column . ($index + 2), (string) $value);
+            $sheet->setCellValue($column.($index + 2), (string) $value);
         }
     }
 }

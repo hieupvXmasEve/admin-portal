@@ -10,16 +10,16 @@ use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\User;
 use App\Modules\Academic\Actions\ImportStudentActionsFromExcelAction;
-use App\Modules\Academic\Exports\StudentActionLogsExport;
 use App\Modules\Academic\Exports\StudentActionImportTemplateExport;
+use App\Modules\Academic\Exports\StudentActionLogsExport;
 use App\Modules\Academic\Http\Requests\ExecuteStudentActionsImportRequest;
 use App\Modules\Academic\Http\Requests\PreviewStudentActionsImportRequest;
 use App\Modules\Academic\Queries\ListStudentActionLogsQuery;
 use App\Services\ExcelExportService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -138,12 +138,10 @@ class StudentActionAuditController extends Controller
             'signed_date_to' => ['nullable', 'date'],
             'semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
             'from_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
+            'egc_defer_from_block_number' => ['nullable', 'integer', 'in:1,2'],
             'return_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
             'dropout_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
             'effective_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
-            'campus_id' => ['nullable', 'integer', 'exists:campuses,id'],
-            'to_campus_id' => ['nullable', 'integer', 'exists:campuses,id'],
-            'from_campus_id' => ['nullable', 'integer', 'exists:campuses,id'],
             'actor_id' => ['nullable', 'integer', 'exists:users,id'],
             'missing_documents' => ['nullable', 'string'],
             'search' => ['nullable', 'string', 'max:255'],
@@ -154,9 +152,10 @@ class StudentActionAuditController extends Controller
 
         $currentCampusId = session('current_campus_id');
         $filters = array_merge([
-            'campus_id' => $currentCampusId,
             'per_page' => 15,
-        ], array_filter($validated, fn($v) => $v !== null && $v !== ''));
+        ], array_filter($validated, fn ($v) => $v !== null && $v !== ''), [
+            'student_campus_id' => $currentCampusId,
+        ]);
 
         $actionLogs = $query->handle($filters);
 
@@ -169,9 +168,8 @@ class StudentActionAuditController extends Controller
                 'signed_date_from' => $filters['signed_date_from'] ?? null,
                 'signed_date_to' => $filters['signed_date_to'] ?? null,
                 'semester_id' => $filters['semester_id'] ?? null,
-                'campus_id' => $filters['campus_id'] ?? null,
-                'to_campus_id' => $filters['to_campus_id'] ?? null,
-                'from_campus_id' => $filters['from_campus_id'] ?? null,
+                'from_semester_id' => $filters['from_semester_id'] ?? null,
+                'egc_defer_from_block_number' => $filters['egc_defer_from_block_number'] ?? null,
                 'actor_id' => $filters['actor_id'] ?? null,
                 'missing_documents' => $filters['missing_documents'] ?? null,
                 'search' => $filters['search'] ?? null,
@@ -185,15 +183,15 @@ class StudentActionAuditController extends Controller
                     ->select('id', 'name', 'code')
                     ->orderBy('start_date', 'desc')
                     ->get(),
-                'campuses' => Campus::query()
-                    ->select('id', 'name', 'code')
-                    ->orderBy('name')
-                    ->get(),
                 'actors' => User::query()
                     ->select('id', 'name', 'email')
                     ->where('type', 'staff')
                     ->orderBy('name')
                     ->get(),
+                'egcDeferBlocks' => [
+                    ['value' => 1, 'label' => 'Block 1'],
+                    ['value' => 2, 'label' => 'Block 2'],
+                ],
             ],
         ]);
     }
@@ -210,21 +208,26 @@ class StudentActionAuditController extends Controller
             'signed_date_from' => ['nullable', 'date'],
             'signed_date_to' => ['nullable', 'date'],
             'semester_id' => ['nullable', 'integer'],
-            'campus_id' => ['nullable', 'integer'],
-            'to_campus_id' => ['nullable', 'integer'],
-            'from_campus_id' => ['nullable', 'integer'],
+            'from_semester_id' => ['nullable', 'integer'],
+            'egc_defer_from_block_number' => ['nullable', 'integer', 'in:1,2'],
+            'return_semester_id' => ['nullable', 'integer'],
+            'dropout_semester_id' => ['nullable', 'integer'],
+            'effective_semester_id' => ['nullable', 'integer'],
             'actor_id' => ['nullable', 'integer'],
             'missing_documents' => ['nullable', 'string'],
             'search' => ['nullable', 'string'],
         ]);
 
-        $filters = array_filter($validated, fn($v) => $v !== null && $v !== '');
+        $filters = array_merge(
+            array_filter($validated, fn ($v) => $v !== null && $v !== ''),
+            ['student_campus_id' => session('current_campus_id')]
+        );
 
         // Get the builder with filters applied
         $builder = $query->getBuilder($filters);
 
         $export = new StudentActionLogsExport($builder);
-        $filename = 'student_actions_audit_' . date('Y-m-d_H-i');
+        $filename = 'student_actions_audit_'.date('Y-m-d_H-i');
 
         return $excelService->download($export, $filename);
     }

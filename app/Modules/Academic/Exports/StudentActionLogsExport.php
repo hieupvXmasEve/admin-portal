@@ -34,6 +34,7 @@ class StudentActionLogsExport implements FromQuery, WithHeadings, WithMapping
             'Signed At',
             'Missing Documents',
             'From Semester',
+            'EGC From Block',
             'Return Semester',
             'Intended Intake Semester',
             'Dropout Semester',
@@ -63,6 +64,9 @@ class StudentActionLogsExport implements FromQuery, WithHeadings, WithMapping
             $row->signed_at?->format('Y-m-d') ?? '',
             $row->missing_documents ? 'Yes' : 'No',
             $row->fromSemester?->name ?? '',
+            $row->egc_defer_from_block_number
+                ? 'Block '.$row->egc_defer_from_block_number
+                : '',
             $row->returnSemester?->name ?? '',
             $row->intendedIntakeSemester?->name ?? '',
             $row->dropoutSemester?->name ?? '',

@@ -8,10 +8,12 @@ use App\Enums\AcademicProgressionEventType;
 use App\Enums\ProgressionTriggerSource;
 use App\Enums\StudentActionType;
 use App\Models\AcademicProgressionEvent;
+use App\Models\DeferCase;
 use App\Models\FinanceCharge;
 use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\StudentChange;
+use App\Modules\Finance\Services\DeferCaseService;
 use App\Modules\Finance\Services\FinanceChargeService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -79,6 +81,7 @@ class RecordStudentActionAction
                 // Semester fields
                 'from_semester_id' => $data['from_semester_id'] ?? null,
                 'return_semester_id' => $data['return_semester_id'] ?? null,
+                'egc_defer_from_block_number' => self::resolveEgcDeferBlockNumber($student, $actionType, $data),
                 'intended_intake_semester_id' => $data['intended_intake_semester_id'] ?? null,
                 'dropout_semester_id' => $data['dropout_semester_id'] ?? null,
                 'effective_semester_id' => $data['effective_semester_id'] ?? null,
@@ -224,6 +227,27 @@ class RecordStudentActionAction
             ]);
         }
 
+        $egcDeferBlockNumber = $data['egc_defer_from_block_number'] ?? null;
+        $hasEgcDeferBlockNumber = $egcDeferBlockNumber !== null && $egcDeferBlockNumber !== '';
+
+        if ($student->status === 'intake_pre_uni_gc' && ! $hasEgcDeferBlockNumber) {
+            throw ValidationException::withMessages([
+                'egc_defer_from_block_number' => 'EGC defer from block is required for EGC students.',
+            ]);
+        }
+
+        if ($student->status === 'intake_pre_uni_gc' && ! in_array((int) $egcDeferBlockNumber, [1, 2], true)) {
+            throw ValidationException::withMessages([
+                'egc_defer_from_block_number' => 'EGC defer from block must be 1 or 2.',
+            ]);
+        }
+
+        if ($student->status !== 'intake_pre_uni_gc' && $hasEgcDeferBlockNumber) {
+            throw ValidationException::withMessages([
+                'egc_defer_from_block_number' => 'EGC defer from block is only available for EGC students.',
+            ]);
+        }
+
         if ($fromSemesterId && $returnSemesterId && $returnSemesterId < $fromSemesterId) {
             throw ValidationException::withMessages([
                 'return_semester_id' => 'Return semester must be after the from semester.',
@@ -235,6 +259,18 @@ class RecordStudentActionAction
         //         'return_semester_id' => 'Return semester must be different from from semester.',
         //     ]);
         // }
+    }
+
+    private static function resolveEgcDeferBlockNumber(
+        Student $student,
+        StudentActionType $actionType,
+        array $data
+    ): ?int {
+        if ($actionType !== StudentActionType::ACADEMIC_DEFER || $student->status !== 'intake_pre_uni_gc') {
+            return null;
+        }
+
+        return (int) ($data['egc_defer_from_block_number'] ?? 1);
     }
 
     /**
@@ -398,8 +434,8 @@ class RecordStudentActionAction
         Student $student,
         array $data,
         int $userId
-    ): \App\Models\DeferCase {
-        $deferCaseService = app(\App\Modules\Finance\Services\DeferCaseService::class);
+    ): DeferCase {
+        $deferCaseService = app(DeferCaseService::class);
 
         // Create the defer case
         $deferCase = $deferCaseService->createDeferCase($actionLog, [
@@ -438,7 +474,7 @@ class RecordStudentActionAction
     }
 
     private static function createEgcDeferCredits(
-        \App\Models\DeferCase $deferCase,
+        DeferCase $deferCase,
         Student $student,
         array $data,
         int $userId

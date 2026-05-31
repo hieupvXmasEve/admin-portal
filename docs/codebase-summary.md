@@ -40,6 +40,7 @@ Current counts:
     - large shared layer in `app/Services/*`, `app/Models/*`, and shared HTTP layers
 - Vue 3 + Inertia frontend in `resources/js/*`
 - Academic admin now includes a Student Decisions registry with nullable linkage from `student_action_logs.decision_id` to `student_decisions.id`.
+- Student action reporting stores EGC defer source block as `student_action_logs.egc_defer_from_block_number`, filtering reports by `from_semester_id` and Block 1/2 without deriving from finance EGC block records.
 - Notification V2 module (`app/Modules/Notification/`) implements domain event + outbox pattern with Phase 1 foundation complete:
     - Outbox tables: `notification_event_outbox`, `notification_messages`, `notification_deliveries`
     - Event types in use: `academic.course_stage_changed`, `course_completed`

@@ -388,6 +388,7 @@ Quản lý học phí, thanh toán, và hỗ trợ tài chính cho sinh viên.
 - **Lý do**: Lưu phạm vi và chính sách phí khi sinh viên bảo lưu. Gắn 1-1 với `student_action_logs` (action_type = defer). Tách biệt logic tài chính khỏi audit học vụ.
 - **Bảng liên quan**: `defer_cases`, `defer_case_items`
 - **Model**: `App\Models\DeferCase`, `App\Models\DeferCaseItem`
+- **Audit metadata**: `student_action_logs.egc_defer_from_block_number` lưu Block 1/2 mà sinh viên EGC bắt đầu bảo lưu trong kỳ nguồn (`from_semester_id`). Dữ liệu lịch sử EGC defer được backfill mặc định Block 1; sinh viên chuyên ngành giữ `null`.
 - **Fields `defer_cases`**:
     - `student_action_log_id` (unique, 1-1)
     - `student_id`, `semester_id`

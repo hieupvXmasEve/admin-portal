@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Actions;
 
 use App\Models\StudentActionLog;
-use App\Modules\Academic\Support\StudentActionImportConflictValidator;
 use App\Modules\Academic\Support\StudentActionExcelRowMapper;
+use App\Modules\Academic\Support\StudentActionImportConflictValidator;
 use App\Modules\Academic\Support\StudentActionPreservePreviewResolver;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Maatwebsite\Excel\Concerns\ToArray;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ImportStudentActionsFromExcelAction
@@ -60,7 +61,7 @@ class ImportStudentActionsFromExcelAction
         $sheetRows = array_slice($sheet, 1, null, true);
         $dataRows = array_filter($sheetRows, fn (array $row) => ! $this->isRowEmpty($row));
         if (count($dataRows) > self::MAX_IMPORT_ROWS) {
-            return $this->emptyResponse('Too many rows. Maximum allowed is ' . self::MAX_IMPORT_ROWS . '.');
+            return $this->emptyResponse('Too many rows. Maximum allowed is '.self::MAX_IMPORT_ROWS.'.');
         }
 
         $validRows = 0;
@@ -74,7 +75,7 @@ class ImportStudentActionsFromExcelAction
             }
 
             $rowNumber = (int) $index + 2;
-            $mapped = $this->mapper->mapRow($row, $rowNumber);
+            $mapped = $this->mapper->mapRow($row, $rowNumber, $headerValidation['format'] ?? 'current');
 
             if ($mapped['status'] === 'error') {
                 $invalidRows++;
@@ -163,7 +164,7 @@ class ImportStudentActionsFromExcelAction
 
     private function getFirstSheet(UploadedFile $file): array
     {
-        $sheets = Excel::toArray(new class implements \Maatwebsite\Excel\Concerns\ToArray
+        $sheets = Excel::toArray(new class implements ToArray
         {
             public function array(array $array): void {}
         }, $file);
@@ -216,13 +217,19 @@ class ImportStudentActionsFromExcelAction
 
     private function applyImportMetadataUpdates(StudentActionLog $actionLog, array $payload): void
     {
-        $actionLog->update([
+        $updateData = [
             'reason' => $payload['reason'] ?? $actionLog->reason,
             'signed_at' => $payload['signed_at'] ?? null,
             'decision_number' => $payload['decision_number'] ?? null,
             'decision_signed_at' => $payload['decision_signed_at'] ?? null,
             'decision_signer' => $payload['decision_signer'] ?? null,
             'notes' => $payload['notes'] ?? null,
-        ]);
+        ];
+
+        if (array_key_exists('egc_defer_from_block_number', $payload)) {
+            $updateData['egc_defer_from_block_number'] = $payload['egc_defer_from_block_number'];
+        }
+
+        $actionLog->update($updateData);
     }
 }

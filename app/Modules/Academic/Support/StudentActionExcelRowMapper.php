@@ -15,6 +15,12 @@ class StudentActionExcelRowMapper
 
     public const EXPECTED_HEADERS = [
         'student_code', 'action_type', 'reason', 'from_semester_code', 'return_semester_code',
+        'defer_preserve_tuition', 'egc_defer_from_block_number', 'dropout_semester_code', 'from_campus_code', 'to_campus_code',
+        'effective_at', 'signed_at', 'decision_number', 'decision_signed_at', 'decision_signer', 'notes',
+    ];
+
+    public const LEGACY_EXPECTED_HEADERS = [
+        'student_code', 'action_type', 'reason', 'from_semester_code', 'return_semester_code',
         'defer_preserve_tuition', 'dropout_semester_code', 'from_campus_code', 'to_campus_code',
         'effective_at', 'signed_at', 'decision_number', 'decision_signed_at', 'decision_signer', 'notes',
     ];
@@ -28,29 +34,48 @@ class StudentActionExcelRowMapper
             array_pop($normalized);
         }
 
-        $expectedCount = count(self::EXPECTED_HEADERS);
-        $received = array_slice($normalized, 0, $expectedCount);
-        $extraColumns = array_slice($normalized, $expectedCount);
-        $hasExtraNamedColumn = array_filter($extraColumns, fn (string $value) => $value !== '') !== [];
+        foreach ([
+            'current' => self::EXPECTED_HEADERS,
+            'legacy' => self::LEGACY_EXPECTED_HEADERS,
+        ] as $format => $expectedHeaders) {
+            $expectedCount = count($expectedHeaders);
+            $received = array_slice($normalized, 0, $expectedCount);
+            $extraColumns = array_slice($normalized, $expectedCount);
+            $hasExtraNamedColumn = array_filter($extraColumns, fn (string $value) => $value !== '') !== [];
 
-        return $received === self::EXPECTED_HEADERS && ! $hasExtraNamedColumn
-            ? ['ok' => true]
-            : ['ok' => false, 'expected' => self::EXPECTED_HEADERS, 'received' => $received];
+            if ($received === $expectedHeaders && ! $hasExtraNamedColumn) {
+                return ['ok' => true, 'format' => $format];
+            }
+        }
+
+        return [
+            'ok' => false,
+            'expected' => self::EXPECTED_HEADERS,
+            'legacy_expected' => self::LEGACY_EXPECTED_HEADERS,
+            'received' => array_slice($normalized, 0, count(self::EXPECTED_HEADERS)),
+        ];
     }
 
-    public function mapRow(array $row, int $rowNumber): array
+    public function mapRow(array $row, int $rowNumber, string $headerFormat = 'current'): array
     {
-        $d = $this->toAssoc($row);
+        $d = $this->toAssoc($row, $headerFormat);
         $errors = [];
 
         $studentCode = $this->str($d['student_code']);
         $actionType = strtoupper($this->str($d['action_type']));
         $reason = $this->str($d['reason']);
 
-        if ($studentCode === '') $errors[] = 'student_code is required.';
-        if ($actionType === '') $errors[] = 'action_type is required.';
-        elseif (! in_array($actionType, self::SUPPORTED_ACTION_TYPES, true)) $errors[] = 'action_type is invalid. ADMISSION_DEFERRAL is not supported in import.';
-        if ($reason === '') $errors[] = 'reason is required.';
+        if ($studentCode === '') {
+            $errors[] = 'student_code is required.';
+        }
+        if ($actionType === '') {
+            $errors[] = 'action_type is required.';
+        } elseif (! in_array($actionType, self::SUPPORTED_ACTION_TYPES, true)) {
+            $errors[] = 'action_type is invalid. ADMISSION_DEFERRAL is not supported in import.';
+        }
+        if ($reason === '') {
+            $errors[] = 'reason is required.';
+        }
 
         $student = $studentCode !== '' ? $this->resolver->studentByCode($studentCode) : null;
         if ($studentCode !== '' && ! $student) {
@@ -72,6 +97,16 @@ class StudentActionExcelRowMapper
             $errors[] = 'defer_preserve_tuition must be yes or no.';
         }
 
+        $egcDeferBlockValue = $this->nullable($d['egc_defer_from_block_number'] ?? null);
+        $egcDeferBlockNumber = null;
+        if ($egcDeferBlockValue !== null) {
+            if (! in_array($egcDeferBlockValue, ['1', '2'], true)) {
+                $errors[] = 'egc_defer_from_block_number must be 1 or 2.';
+            } else {
+                $egcDeferBlockNumber = (int) $egcDeferBlockValue;
+            }
+        }
+
         $payload = [
             'student_id' => $student?->id,
             'action_type' => $actionType,
@@ -85,9 +120,20 @@ class StudentActionExcelRowMapper
         ];
 
         if ($actionType === 'ACADEMIC_DEFER') {
-            if (! $fromSemester) $errors[] = 'from_semester_code is required for ACADEMIC_DEFER.';
-            if (! $returnSemester) $errors[] = 'return_semester_code is required for ACADEMIC_DEFER.';
-            if ($deferFlag === '') $errors[] = 'defer_preserve_tuition is required for ACADEMIC_DEFER.';
+            if (! $fromSemester) {
+                $errors[] = 'from_semester_code is required for ACADEMIC_DEFER.';
+            }
+            if (! $returnSemester) {
+                $errors[] = 'return_semester_code is required for ACADEMIC_DEFER.';
+            }
+            if ($deferFlag === '') {
+                $errors[] = 'defer_preserve_tuition is required for ACADEMIC_DEFER.';
+            }
+            if ($student?->status === 'intake_pre_uni_gc') {
+                $payload['egc_defer_from_block_number'] = $egcDeferBlockNumber ?? 1;
+            } elseif ($egcDeferBlockNumber !== null) {
+                $errors[] = 'egc_defer_from_block_number is only available for EGC defer students.';
+            }
             if ($fromSemester && $returnSemester && $returnSemester->id < $fromSemester->id) {
                 $errors[] = 'return_semester_code must be after from_semester_code.';
             }
@@ -100,22 +146,32 @@ class StudentActionExcelRowMapper
         }
 
         if ($actionType === 'ACADEMIC_RESUME') {
-            if (! $returnSemester) $errors[] = 'return_semester_code is required for ACADEMIC_RESUME.';
+            if (! $returnSemester) {
+                $errors[] = 'return_semester_code is required for ACADEMIC_RESUME.';
+            }
             $payload['return_semester_id'] = $returnSemester?->id;
         }
 
         if ($actionType === 'ACADEMIC_DROPOUT') {
-            if (! $dropoutSemester) $errors[] = 'dropout_semester_code is required for ACADEMIC_DROPOUT.';
+            if (! $dropoutSemester) {
+                $errors[] = 'dropout_semester_code is required for ACADEMIC_DROPOUT.';
+            }
             $payload['dropout_semester_id'] = $dropoutSemester?->id;
         }
 
         if ($actionType === 'CAMPUS_TRANSFER') {
-            if (! $fromCampus) $errors[] = 'from_campus_code is required for CAMPUS_TRANSFER.';
-            if (! $toCampus) $errors[] = 'to_campus_code is required for CAMPUS_TRANSFER.';
+            if (! $fromCampus) {
+                $errors[] = 'from_campus_code is required for CAMPUS_TRANSFER.';
+            }
+            if (! $toCampus) {
+                $errors[] = 'to_campus_code is required for CAMPUS_TRANSFER.';
+            }
             if ($fromCampus && $toCampus && $fromCampus->id === $toCampus->id) {
                 $errors[] = 'to_campus_code must be different from from_campus_code.';
             }
-            if (! $effectiveAt) $errors[] = 'effective_at is required for CAMPUS_TRANSFER.';
+            if (! $effectiveAt) {
+                $errors[] = 'effective_at is required for CAMPUS_TRANSFER.';
+            }
             $effectiveSemester = $effectiveAt ? $this->resolver->semesterByDateTime($effectiveAt) : null;
             if ($effectiveAt && ! $effectiveSemester) {
                 $errors[] = 'effective_at does not fall into any semester.';
@@ -149,6 +205,7 @@ class StudentActionExcelRowMapper
                 'from_semester_code' => $this->nullable($d['from_semester_code']),
                 'return_semester_id' => $returnSemester?->id,
                 'return_semester_code' => $this->nullable($d['return_semester_code']),
+                'egc_defer_from_block_number' => $payload['egc_defer_from_block_number'] ?? null,
                 'dropout_semester_id' => $dropoutSemester?->id,
                 'dropout_semester_code' => $this->nullable($d['dropout_semester_code']),
                 'effective_semester_id' => $payload['effective_semester_id'] ?? null,
@@ -158,10 +215,13 @@ class StudentActionExcelRowMapper
         ];
     }
 
-    private function toAssoc(array $row): array
+    private function toAssoc(array $row, string $headerFormat): array
     {
+        $headers = $headerFormat === 'legacy'
+            ? self::LEGACY_EXPECTED_HEADERS
+            : self::EXPECTED_HEADERS;
         $assoc = [];
-        foreach (self::EXPECTED_HEADERS as $idx => $h) {
+        foreach ($headers as $idx => $h) {
             $assoc[$h] = $row[$idx] ?? null;
         }
 

@@ -7,6 +7,7 @@ namespace App\Modules\Academic\Http\Requests;
 use App\Enums\StudentActionType;
 use App\Models\StudentActionLog;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateStudentActionRequest extends FormRequest
 {
@@ -50,6 +51,8 @@ class UpdateStudentActionRequest extends FormRequest
     {
         /** @var StudentActionLog $actionLog */
         $actionLog = $this->route('actionLog');
+        $isEgcDefer = $actionLog->previous_status === 'intake_pre_uni_gc'
+            || $actionLog->egc_defer_from_block_number !== null;
 
         return [
             'from_semester_id' => ['required', 'integer', 'exists:semesters,id'],
@@ -65,6 +68,24 @@ class UpdateStudentActionRequest extends FormRequest
                 //         $fail('Return semester must be different from from semester.');
                 //     }
                 // },
+            ],
+            'egc_defer_from_block_number' => [
+                'nullable',
+                'integer',
+                Rule::in([1, 2]),
+                function (string $attribute, mixed $value, \Closure $fail) use ($isEgcDefer): void {
+                    $isBlank = $value === null || $value === '';
+
+                    if ($isEgcDefer && $isBlank) {
+                        $fail('EGC defer from block is required for EGC students.');
+
+                        return;
+                    }
+
+                    if (! $isEgcDefer && ! $isBlank) {
+                        $fail('EGC defer from block is only available for EGC students.');
+                    }
+                },
             ],
         ];
     }
@@ -140,6 +161,8 @@ class UpdateStudentActionRequest extends FormRequest
             'to_campus_id.different' => 'Target campus must be different from current campus.',
             'effective_at.required' => 'Effective date is required for campus transfer.',
             'effective_at.date' => 'Effective date must be a valid date.',
+            'egc_defer_from_block_number.integer' => 'EGC defer from block must be 1 or 2.',
+            'egc_defer_from_block_number.in' => 'EGC defer from block must be 1 or 2.',
         ];
     }
 }

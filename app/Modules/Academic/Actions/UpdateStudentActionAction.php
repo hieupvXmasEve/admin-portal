@@ -33,6 +33,7 @@ class UpdateStudentActionAction
                 // Semester fields
                 'from_semester_id',
                 'return_semester_id',
+                'egc_defer_from_block_number',
                 'intended_intake_semester_id',
                 'dropout_semester_id',
                 'effective_semester_id',
