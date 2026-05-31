@@ -33,6 +33,7 @@ import {
     Receipt,
     RefreshCcw,
     School,
+    Search,
     Send,
     Settings,
     Settings2,
@@ -552,6 +553,12 @@ export const mainNavGroups: NavGroup[] = [
                         requiredPermissions: ['view_room_booking'],
                     },
                     {
+                        title: 'Find Available Rooms',
+                        href: systemRoutes.roomBookings.availability(),
+                        icon: Search,
+                        requiredPermissions: ['view_room_booking'],
+                    },
+                    {
                         title: 'My Bookings',
                         href: systemRoutes.roomBookings.myBookings(),
                         icon: Calendar,
@@ -564,7 +571,7 @@ export const mainNavGroups: NavGroup[] = [
                         requiredPermissions: ['approve_room_booking'],
                     },
                     {
-                        title: 'Calendar',
+                        title: 'Room Usage Calendar',
                         href: systemRoutes.roomBookings.calendar(),
                         icon: CalendarIcon,
                         requiredPermissions: ['view_room_booking'],

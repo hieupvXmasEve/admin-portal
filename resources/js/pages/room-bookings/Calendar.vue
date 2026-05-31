@@ -2,6 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { systemRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import { ChevronLeft, ChevronRight, List, Plus } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -129,21 +130,23 @@ const applyFilters = () => {
     if (selectedBuildingId.value) params.set('building_id', selectedBuildingId.value);
     if (selectedRoomId.value) params.set('room_id', selectedRoomId.value);
 
-    router.visit(`/room-bookings-calendar?${params.toString()}`, {
+    router.visit(systemRoutes.roomBookings.calendar(Object.fromEntries(params.entries())), {
         preserveState: true,
         preserveScroll: true,
         only: ['calendar_data', 'filters'],
     });
 };
 
-const updateBuildingFilter = (value: string) => {
-    selectedBuildingId.value = value === 'all' ? '' : value;
+const updateBuildingFilter = (value: unknown) => {
+    const selectedValue = String(value ?? '');
+    selectedBuildingId.value = selectedValue === 'all' ? '' : selectedValue;
     selectedRoomId.value = '';
     applyFilters();
 };
 
-const updateRoomFilter = (value: string) => {
-    selectedRoomId.value = value === 'all' ? '' : value;
+const updateRoomFilter = (value: unknown) => {
+    const selectedValue = String(value ?? '');
+    selectedRoomId.value = selectedValue === 'all' ? '' : selectedValue;
     applyFilters();
 };
 
@@ -182,7 +185,7 @@ const formatTime = (time: string) => {
 const handleItemClick = (item: CalendarItem) => {
     // Only allow clicking on editable room bookings
     if (item.type === 'room_booking' && item.booking_id) {
-        router.visit(`/room-bookings/${item.booking_id}`);
+        router.visit(systemRoutes.roomBookings.show(item.booking_id));
     }
 };
 
@@ -200,21 +203,21 @@ const getItemTooltip = (item: CalendarItem) => {
 </script>
 
 <template>
-    <Head title="Booking Calendar" />
+    <Head title="Room Usage Calendar" />
 
     <div class="space-y-6">
         <!-- Header -->
         <div class="flex items-center justify-between">
             <div>
-                <h1 class="text-2xl font-semibold">Room Calendar</h1>
-                <p class="text-muted-foreground mt-1">View room bookings and class schedules</p>
+                <h1 class="text-2xl font-semibold">Room Usage Calendar</h1>
+                <p class="text-muted-foreground mt-1">View occupied room bookings and class schedules by week</p>
             </div>
             <div class="flex gap-2">
-                <Button variant="outline" @click="router.visit('/room-bookings')">
+                <Button variant="outline" @click="router.visit(systemRoutes.roomBookings.index())">
                     <List class="mr-2 h-4 w-4" />
                     List View
                 </Button>
-                <Button @click="router.visit('/room-bookings/create')">
+                <Button @click="router.visit(systemRoutes.roomBookings.create())">
                     <Plus class="mr-2 h-4 w-4" />
                     New Booking
                 </Button>

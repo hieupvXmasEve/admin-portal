@@ -2,6 +2,7 @@ export const ROOM_BOOKING_ROUTE_NAMES = {
     INDEX: 'room-bookings.index',
     CREATE: 'room-bookings.create',
     STORE: 'room-bookings.store',
+    AVAILABILITY: 'room-bookings.availability',
     SHOW: 'room-bookings.show',
     EDIT: 'room-bookings.edit',
     UPDATE: 'room-bookings.update',
@@ -15,5 +16,5 @@ export const ROOM_BOOKING_ROUTE_NAMES = {
     CANCEL: 'room-bookings.cancel',
     API_GET_BOOKINGS: 'api.room-bookings.get-bookings',
     API_CHECK_CONFLICTS: 'api.room-bookings.check-conflicts',
+    API_PREVIEW_SERIES: 'api.room-bookings.preview-series',
 } as const;
-

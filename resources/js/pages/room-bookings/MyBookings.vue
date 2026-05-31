@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useGlobalConfirmDialog } from '@/composables';
 import type { PaginatedResponse } from '@/types';
 import type { RoomBooking } from '@/types/models';
+import { systemRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { Building2, Calendar, Plus, X } from 'lucide-vue-next';
+import { Building2, Calendar, Copy, Plus, X } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -49,7 +50,7 @@ const applyFilters = (newFilters: typeof filters.value) => {
     if (newFilters.end_date) params.set('end_date', newFilters.end_date);
     if (newFilters.per_page) params.set('per_page', newFilters.per_page.toString());
 
-    router.visit(`/room-bookings-my${params.toString() ? '?' + params.toString() : ''}`, {
+    router.visit(`${systemRoutes.roomBookings.myBookings()}${params.toString() ? '?' + params.toString() : ''}`, {
         preserveState: true,
         preserveScroll: true,
         only: ['bookings', 'filters'],
@@ -61,7 +62,7 @@ const handleSearch = (value: string | number) => {
     applyFilters(filters.value);
 };
 
-const updateStatusFilter = (value: string | number) => {
+const updateStatusFilter = (value: unknown) => {
     const stringValue = String(value);
     filters.value.status = stringValue === 'all' ? '' : stringValue;
     applyFilters(filters.value);
@@ -69,19 +70,25 @@ const updateStatusFilter = (value: string | number) => {
 
 const clearFilters = () => {
     filters.value = { search: '', status: '', start_date: '', end_date: '', per_page: 15 };
-    router.visit('/room-bookings-my', { preserveState: true, preserveScroll: true });
+    router.visit(systemRoutes.roomBookings.myBookings(), { preserveState: true, preserveScroll: true });
 };
 
 const hasActiveFilters = computed(() => filters.value.search || filters.value.status || filters.value.start_date || filters.value.end_date);
 
 const getStatusBadgeVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
     switch (status) {
-        case 'approved': return 'default';
-        case 'pending': return 'secondary';
-        case 'rejected': return 'destructive';
-        case 'cancelled': return 'outline';
-        case 'completed': return 'default';
-        default: return 'outline';
+        case 'approved':
+            return 'default';
+        case 'pending':
+            return 'secondary';
+        case 'rejected':
+            return 'destructive';
+        case 'cancelled':
+            return 'outline';
+        case 'completed':
+            return 'default';
+        default:
+            return 'outline';
     }
 };
 
@@ -90,9 +97,13 @@ const getStatusLabel = (status: string) => {
     return option?.label || status;
 };
 
-const formatDate = (date: string) => new Date(date).toLocaleDateString('en-US', { 
-    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
-});
+const formatDate = (date: string) =>
+    new Date(date).toLocaleDateString('en-US', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    });
 
 const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
@@ -102,23 +113,32 @@ const formatTime = (time: string) => {
     return `${hour12}:${minutes} ${ampm}`;
 };
 
-const viewBooking = (id: number) => router.visit(`/room-bookings/${id}`);
-const editBooking = (id: number) => router.visit(`/room-bookings/${id}/edit`);
+const viewBooking = (id: number) => router.visit(systemRoutes.roomBookings.show(id));
+const editBooking = (id: number) => router.visit(systemRoutes.roomBookings.edit(id));
+const cloneBooking = (id: number) => router.visit(systemRoutes.roomBookings.create({ source_booking_id: id }));
 
 const cancelBooking = (booking: RoomBooking) => {
-    confirmDialog.confirm({
-        title: 'Cancel Booking',
-        description: `Are you sure you want to cancel "${booking.title}"?`,
-        confirmLabel: 'Cancel Booking',
-        onConfirm: () => {
-            router.post(`/room-bookings/${booking.id}/cancel`, {}, {
-                preserveState: true,
-                preserveScroll: true,
-                onSuccess: () => toast.success('Booking cancelled successfully'),
-                onError: () => toast.error('Failed to cancel booking'),
-            });
+    confirmDialog.showConfirmDialog(
+        {
+            title: 'Cancel Booking',
+            message: `Are you sure you want to cancel "${booking.title}"?`,
+            confirmText: 'Cancel Booking',
         },
-    });
+        {
+            onConfirm: () => {
+                router.post(
+                    systemRoutes.roomBookings.cancel(booking.id),
+                    {},
+                    {
+                        preserveState: true,
+                        preserveScroll: true,
+                        onSuccess: () => toast.success('Booking cancelled successfully'),
+                        onError: () => toast.error('Failed to cancel booking'),
+                    },
+                );
+            },
+        },
+    );
 };
 
 const columns: ColumnDef<RoomBooking>[] = [
@@ -157,14 +177,16 @@ const columns: ColumnDef<RoomBooking>[] = [
             const booking = row.original;
             const canCancel = ['pending', 'approved'].includes(booking.status);
             const canEdit = booking.status === 'pending' || booking.status === 'approved';
-            return h('div', { class: 'flex items-center space-x-2' }, [
-                h(Button, { variant: 'ghost', size: 'sm', onClick: () => viewBooking(booking.id) }, 
-                    () => [h(Icon, { name: 'eye', class: 'w-4 h-4' })]),
-                canEdit && h(Button, { variant: 'ghost', size: 'sm', onClick: () => editBooking(booking.id) }, 
-                    () => [h(Icon, { name: 'edit', class: 'w-4 h-4' })]),
-                canCancel && h(Button, { variant: 'ghost', size: 'sm', onClick: () => cancelBooking(booking) }, 
-                    () => [h(Icon, { name: 'x', class: 'w-4 h-4' })]),
-            ].filter(Boolean));
+            return h(
+                'div',
+                { class: 'flex items-center space-x-2' },
+                [
+                    h(Button, { variant: 'ghost', size: 'sm', onClick: () => viewBooking(booking.id) }, () => [h(Icon, { name: 'eye', class: 'w-4 h-4' })]),
+                    props.permissions?.can_create && h(Button, { variant: 'ghost', size: 'sm', onClick: () => cloneBooking(booking.id) }, () => [h(Copy, { class: 'w-4 h-4' })]),
+                    canEdit && h(Button, { variant: 'ghost', size: 'sm', onClick: () => editBooking(booking.id) }, () => [h(Icon, { name: 'edit', class: 'w-4 h-4' })]),
+                    canCancel && h(Button, { variant: 'ghost', size: 'sm', onClick: () => cancelBooking(booking) }, () => [h(Icon, { name: 'x', class: 'w-4 h-4' })]),
+                ].filter(Boolean),
+            );
         },
     },
 ];
@@ -187,7 +209,7 @@ const handlePageSizeChange = (pageSize: number) => {
             <h1 class="text-2xl font-semibold">My Bookings</h1>
             <p class="text-muted-foreground mt-1">View and manage your room bookings</p>
         </div>
-        <Button v-if="permissions?.can_create" @click="router.visit('/room-bookings/create')">
+        <Button v-if="permissions?.can_create" @click="router.visit(systemRoutes.roomBookings.create())">
             <Plus class="mr-2 h-4 w-4" />
             New Booking
         </Button>
@@ -241,9 +263,7 @@ const handlePageSizeChange = (pageSize: number) => {
                     <Calendar class="text-muted-foreground h-3 w-3" />
                     {{ formatDate(row.original.booking_date) }}
                 </div>
-                <div class="text-muted-foreground text-sm">
-                    {{ formatTime(row.original.start_time) }} - {{ formatTime(row.original.end_time) }}
-                </div>
+                <div class="text-muted-foreground text-sm">{{ formatTime(row.original.start_time) }} - {{ formatTime(row.original.end_time) }}</div>
             </div>
         </template>
 
@@ -261,4 +281,3 @@ const handlePageSizeChange = (pageSize: number) => {
 
     <DataPagination :pagination-data="bookings" item-name="bookings" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
 </template>
-

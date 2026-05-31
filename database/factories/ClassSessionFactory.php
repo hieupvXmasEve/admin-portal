@@ -11,7 +11,7 @@ use App\Models\Room;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\ClassSession>
+ * @extends Factory<ClassSession>
  */
 class ClassSessionFactory extends Factory
 {
@@ -37,7 +37,7 @@ class ClassSessionFactory extends Factory
             'start_time' => $startTime,
             'end_time' => $endTime,
             'duration_minutes' => 120,
-            'session_type' => $this->faker->randomElement(['lecture', 'tutorial', 'lab', 'assessment']),
+            'session_type' => $this->faker->randomElement(['lecture', 'tutorial', 'laboratory', 'assessment']),
             'delivery_mode' => $this->faker->randomElement(['in_person', 'online', 'hybrid']),
             'status' => $this->faker->randomElement(['scheduled', 'in_progress', 'completed', 'cancelled']),
             'attendance_required' => $this->faker->boolean(80),

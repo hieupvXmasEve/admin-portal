@@ -8,8 +8,9 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { usePermissions } from '@/composables/usePermissions';
 import type { RoomBooking } from '@/types/models';
+import { systemRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
-import { Building2, Calendar, Check, Clock, Edit, Mail, Phone, User, X } from 'lucide-vue-next';
+import { Building2, Calendar, Check, Clock, Copy, Edit, Mail, Phone, User, X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -42,6 +43,7 @@ const canBeCancelled = computed(() => {
 // Compute permissions based on booking state and user permissions
 const permissions = computed(() => ({
     can_edit: can('edit_room_booking') && canBeEdited.value,
+    can_create: can('create_room_booking'),
     can_delete: can('delete_room_booking'),
     can_approve: can('approve_room_booking') && props.booking.status === 'pending',
     can_cancel: canBeCancelled.value,
@@ -115,7 +117,7 @@ const formatDateTime = (datetime: string) =>
 const handleApprove = () => {
     processing.value = true;
     router.post(
-        `/room-bookings/${props.booking.id}/approve`,
+        systemRoutes.roomBookings.approve(props.booking.id),
         { note: approvalNote.value },
         {
             onSuccess: () => {
@@ -136,7 +138,7 @@ const handleReject = () => {
     }
     processing.value = true;
     router.post(
-        `/room-bookings/${props.booking.id}/reject`,
+        systemRoutes.roomBookings.reject(props.booking.id),
         { reason: rejectionReason.value },
         {
             onSuccess: () => {
@@ -153,7 +155,7 @@ const handleReject = () => {
 const handleCancel = () => {
     processing.value = true;
     router.post(
-        `/room-bookings/${props.booking.id}/cancel`,
+        systemRoutes.roomBookings.cancel(props.booking.id),
         { reason: cancelReason.value },
         {
             onSuccess: () => {
@@ -220,7 +222,11 @@ const getBookerDisplayName = (bookedBy: any, bookedByType?: string): string => {
             <p class="text-muted-foreground mt-1">Booking #{{ booking.id }}</p>
         </div>
         <div class="flex gap-2">
-            <Button v-if="permissions?.can_edit" variant="outline" @click="router.visit(`/room-bookings/${booking.id}/edit`)">
+            <Button v-if="permissions?.can_create" variant="outline" @click="router.visit(systemRoutes.roomBookings.create({ source_booking_id: booking.id }))">
+                <Copy class="mr-2 h-4 w-4" />
+                Clone
+            </Button>
+            <Button v-if="permissions?.can_edit" variant="outline" @click="router.visit(systemRoutes.roomBookings.edit(booking.id))">
                 <Edit class="mr-2 h-4 w-4" />
                 Edit
             </Button>

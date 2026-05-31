@@ -13,7 +13,7 @@ import type { RoomBooking } from '@/types/models';
 import { systemRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { Building2, Calendar, CalendarClock, Clock, Plus, X } from 'lucide-vue-next';
+import { Building2, Calendar, CalendarClock, Clock, Copy, Plus, Search, X } from 'lucide-vue-next';
 import { computed, h } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -121,12 +121,13 @@ const formatTime = (time: string) => {
     return `${hour12}:${minutes} ${ampm}`;
 };
 
-const viewBooking = (id: number) => router.visit(`/room-bookings/${id}`);
-const editBooking = (id: number) => router.visit(`/room-bookings/${id}/edit`);
+const viewBooking = (id: number) => router.visit(systemRoutes.roomBookings.show(id));
+const editBooking = (id: number) => router.visit(systemRoutes.roomBookings.edit(id));
+const cloneBooking = (id: number) => router.visit(systemRoutes.roomBookings.create({ source_booking_id: id }));
 
 const deleteBooking = (booking: RoomBooking) => {
     confirmDialog.confirmDelete(booking.title, 'booking', () => {
-        router.delete(`/room-bookings/${booking.id}`, {
+        router.delete(systemRoutes.roomBookings.destroy(booking.id), {
             preserveState: true,
             preserveScroll: true,
             onSuccess: () => toast.success('Booking deleted successfully'),
@@ -196,6 +197,7 @@ const columns: ColumnDef<RoomBooking>[] = [
                 { class: 'flex items-center space-x-2' },
                 [
                     h(Button, { variant: 'ghost', size: 'sm', onClick: () => viewBooking(booking.id) }, () => [h(Icon, { name: 'eye', class: 'w-4 h-4' })]),
+                    permissions.value.can_create && h(Button, { variant: 'ghost', size: 'sm', onClick: () => cloneBooking(booking.id) }, () => [h(Copy, { class: 'w-4 h-4' })]),
                     permissions.value.can_edit && h(Button, { variant: 'ghost', size: 'sm', onClick: () => editBooking(booking.id) }, () => [h(Icon, { name: 'edit', class: 'w-4 h-4' })]),
                     permissions.value.can_delete && h(Button, { variant: 'ghost', size: 'sm', onClick: () => deleteBooking(booking) }, () => [h(Icon, { name: 'trash', class: 'w-4 h-4' })]),
                 ].filter(Boolean),
@@ -224,15 +226,19 @@ const columns: ColumnDef<RoomBooking>[] = [
             </div>
         </div>
         <div class="flex gap-2">
-            <Button variant="outline" @click="router.visit('/room-bookings-pending')">
+            <Button variant="outline" @click="router.visit(systemRoutes.roomBookings.availability())">
+                <Search class="mr-2 h-4 w-4" />
+                Find Available Rooms
+            </Button>
+            <Button variant="outline" @click="router.visit(systemRoutes.roomBookings.pending())">
                 <Clock class="mr-2 h-4 w-4" />
                 Pending Approvals
             </Button>
-            <Button variant="outline" @click="router.visit('/room-bookings-calendar')">
+            <Button variant="outline" @click="router.visit(systemRoutes.roomBookings.calendar())">
                 <Calendar class="mr-2 h-4 w-4" />
-                Calendar
+                Room Usage Calendar
             </Button>
-            <Button v-if="permissions.can_create" @click="router.visit('/room-bookings/create')">
+            <Button v-if="permissions.can_create" @click="router.visit(systemRoutes.roomBookings.create())">
                 <Plus class="mr-2 h-4 w-4" />
                 New Booking
             </Button>

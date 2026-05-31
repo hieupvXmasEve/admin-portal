@@ -138,13 +138,21 @@ export const systemRoutes = {
     // Room Booking Routes
     roomBookings: {
         index: () => route(ROOM_BOOKING_ROUTE_NAMES.INDEX),
-        create: () => route(ROOM_BOOKING_ROUTE_NAMES.CREATE),
+        create: (params?: Record<string, unknown>) => route(ROOM_BOOKING_ROUTE_NAMES.CREATE, params ?? {}),
+        store: () => route(ROOM_BOOKING_ROUTE_NAMES.STORE),
+        availability: () => route(ROOM_BOOKING_ROUTE_NAMES.AVAILABILITY),
         show: (id: number) => route(ROOM_BOOKING_ROUTE_NAMES.SHOW, { roomBooking: id }),
         edit: (id: number) => route(ROOM_BOOKING_ROUTE_NAMES.EDIT, { roomBooking: id }),
+        update: (id: number) => route(ROOM_BOOKING_ROUTE_NAMES.UPDATE, { roomBooking: id }),
+        destroy: (id: number) => route(ROOM_BOOKING_ROUTE_NAMES.DESTROY, { roomBooking: id }),
         myBookings: () => route(ROOM_BOOKING_ROUTE_NAMES.MY_BOOKINGS),
         pending: () => route(ROOM_BOOKING_ROUTE_NAMES.PENDING),
-        calendar: () => route(ROOM_BOOKING_ROUTE_NAMES.CALENDAR),
+        calendar: (params?: Record<string, unknown>) => route(ROOM_BOOKING_ROUTE_NAMES.CALENDAR, params ?? {}),
         logs: () => route(ROOM_BOOKING_ROUTE_NAMES.LOGS),
+        approve: (id: number) => route(ROOM_BOOKING_ROUTE_NAMES.APPROVE, { roomBooking: id }),
+        reject: (id: number) => route(ROOM_BOOKING_ROUTE_NAMES.REJECT, { roomBooking: id }),
+        cancel: (id: number) => route(ROOM_BOOKING_ROUTE_NAMES.CANCEL, { roomBooking: id }),
+        apiPreviewSeries: () => route(ROOM_BOOKING_ROUTE_NAMES.API_PREVIEW_SERIES),
     },
     notifications: {
         send: () => route(NOTIFICATION_ROUTE_NAMES.SEND),
