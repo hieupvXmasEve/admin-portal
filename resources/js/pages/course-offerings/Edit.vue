@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LectureCombobox from '@/components/LectureCombobox.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -249,19 +250,9 @@ const enrollmentStatusOptions = [
 
                     <FormField v-slot="{ componentField }" name="lecture_id">
                         <FormItem>
-                            <FormLabel>Lecture</FormLabel>
+                            <FormLabel>Lecturer</FormLabel>
                             <FormControl>
-                                <Select v-bind="componentField">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select lecture (optional)" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">No lecture assigned</SelectItem>
-                                        <SelectItem v-for="lecture in lectures" :key="lecture.id" :value="lecture.id.toString()">
-                                            {{ lecture.full_name }}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <LectureCombobox :model-value="componentField.modelValue" :lectures="lectures" @update:model-value="componentField['onUpdate:modelValue']" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>

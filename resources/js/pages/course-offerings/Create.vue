@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LectureCombobox from '@/components/LectureCombobox.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxItemIndicator, ComboboxList, ComboboxTrigger, ComboboxViewport } from '@/components/ui/combobox';
@@ -389,17 +390,9 @@ const goBack = () => window.history.back();
 
                     <FormField v-slot="{ componentField }" name="lecture_id">
                         <FormItem>
-                            <FormLabel>Lecture</FormLabel>
+                            <FormLabel>Lecturer</FormLabel>
                             <FormControl>
-                                <Select v-bind="componentField">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select lecture (optional)" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">No lecture assigned</SelectItem>
-                                        <SelectItem v-for="lecture in props.lectures" :key="lecture.id" :value="lecture.id.toString()"> {{ lecture.first_name }} {{ lecture.last_name }} ({{ lecture.academic_rank }}) </SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <LectureCombobox :model-value="componentField.modelValue" :lectures="props.lectures" @update:model-value="componentField['onUpdate:modelValue']" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
