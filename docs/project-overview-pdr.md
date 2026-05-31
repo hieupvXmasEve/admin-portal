@@ -1,6 +1,6 @@
 # Project Overview and PDR
 
-Last updated: 2026-03-26  
+Last updated: 2026-05-31
 Owner: Platform Team  
 Status: Current-state baseline (evidence-first)  
 Source of truth: code in `app/`, `routes/`, `resources/` + scout reports in `plans/reports/`
@@ -146,6 +146,33 @@ Acceptance criteria:
 - Staff without aggregate-result permission are denied access to the download route.
 - Exported survey result workbooks do not include student ids or student names.
 
+### FR-10 Lecturer GPA Report
+
+Code baseline:
+
+- Lecturer GPA routes exist under `/lectures/lecturers-GPA`:
+    - `GET /lectures/lecturers-GPA`
+    - `GET /lectures/lecturers-GPA/export`
+- The report defaults to the active semester when no semester filter is
+  provided and remains scoped to the current campus.
+- Lecturer GPA is calculated by averaging each course offering's Lecturer
+  Evaluation rating score first, then averaging those class-level scores per
+  lecturer for the selected semester.
+- The web table and Excel export include lecturer name, email account local
+  part, employee ID, employment type, taught course offerings, GPA, evaluated
+  class count, and response count.
+- Survey Results aggregate pages link to the Lecturer GPA report for the
+  matching semester.
+
+Acceptance criteria:
+
+- Staff with lecturer and aggregate survey result permissions can view and
+  export Lecturer GPA for the selected semester.
+- Staff missing aggregate-result permission are denied access.
+- Lecturer GPA is class-weighted, not response-weighted.
+- Exported Lecturer GPA workbooks do not include raw student identifiers or raw
+  individual answers.
+
 ### FR-06 Notification V2 Foundation (Outbox + Ops Monitoring)
 
 Code baseline:
@@ -230,6 +257,7 @@ Acceptance criteria:
 
 ## 8) Version History
 
+- 2026-05-31: Added Lecturer GPA semester report, Survey Results link, and Excel export contract.
 - 2026-05-31: Added course survey class aggregate result download route and workbook contract.
 - 2026-03-23: Documented academic progression logging baseline (`academic_progression_events` for level/stage changes), V2-only student-facing academic notifications for new flows, and `intake_major` as the canonical EGC to major tuition milestone.
 - 2026-03-26: Added finance settlement v2 baseline (`payment_applications`, `invoice_discounts`, `discount_allocations`), settlement worklist, voucher/scholarship backfill commands, and zero-amount tuition generation rule.

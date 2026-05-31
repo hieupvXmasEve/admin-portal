@@ -225,6 +225,12 @@ export const mainNavItems: NavItem[] = [
                 icon: Clock,
                 requiredPermissions: ['view_lecturer'], // Will be implemented later
             },
+            {
+                title: 'Lecturer GPA',
+                href: lecturerRoutes.gpa(),
+                icon: TrendingUp,
+                requiredPermissions: ['view_lecturer', 'view_survey_results_aggregate'],
+            },
             // {
             //     title: 'Lecturer Timetable',
             //     href: lecturerRoutes.index(), // Placeholder

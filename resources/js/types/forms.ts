@@ -84,6 +84,7 @@ export interface FormTarget {
     form_version_id?: number;
     campus_id?: number;
     campus_name?: string;
+    semester_id?: string | number | null;
     scope_type: ScopeType;
     scope_id?: number;
     start_at: string;

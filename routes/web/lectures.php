@@ -4,6 +4,7 @@ use App\Constants\LectureRoutes;
 use App\Http\Controllers\Web\LectureController;
 use App\Http\Controllers\Web\Lectures\LectureExportController;
 use App\Http\Controllers\Web\Lectures\LectureImportController;
+use App\Http\Controllers\Web\Lectures\LecturerGpaController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
@@ -44,6 +45,14 @@ Route::middleware('auth')->group(function () {
     Route::get('lectures/export/excel/filtered', [LectureExportController::class, 'exportExcelWithCurrentFilters'])
         ->middleware('can:export_lecturer')
         ->name(LectureRoutes::EXPORT_EXCEL_FILTERED);
+
+    Route::get('lectures/lecturers-GPA', [LecturerGpaController::class, 'index'])
+        ->middleware(['can:view_lecturer', 'can:view_survey_results_aggregate'])
+        ->name(LectureRoutes::LECTURER_GPA_INDEX);
+
+    Route::get('lectures/lecturers-GPA/export', [LecturerGpaController::class, 'export'])
+        ->middleware(['can:view_lecturer', 'can:view_survey_results_aggregate'])
+        ->name(LectureRoutes::LECTURER_GPA_EXPORT);
 
     // Lecturer resource routes
     Route::get('lectures', [LectureController::class, 'index'])

@@ -227,6 +227,8 @@ export const lecturerRoutes = {
     destroy: (id: number) => route(LECTURE_ROUTE_NAMES.DESTROY, { lecture: id }),
     import: () => route(LECTURE_ROUTE_NAMES.IMPORT_FORM),
     exportFiltered: () => route(LECTURE_ROUTE_NAMES.EXPORT_EXCEL_FILTERED),
+    gpa: () => route(LECTURE_ROUTE_NAMES.LECTURER_GPA_INDEX),
+    gpaExport: () => route(LECTURE_ROUTE_NAMES.LECTURER_GPA_EXPORT),
     teachingHours: () => route(LECTURE_ROUTE_NAMES.TEACHING_HOURS),
     // API routes
     apiSearch: () => route(LECTURE_ROUTE_NAMES.API_SEARCH),

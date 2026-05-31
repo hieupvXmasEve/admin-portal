@@ -25,6 +25,10 @@ export const LECTURE_ROUTE_NAMES = {
     EXPORT_EXCEL: 'lectures.export.excel',
     EXPORT_EXCEL_FILTERED: 'lectures.export.excel.filtered',
 
+    // Lecturer GPA Report
+    LECTURER_GPA_INDEX: 'lectures.lecturers-gpa.index',
+    LECTURER_GPA_EXPORT: 'lectures.lecturers-gpa.export',
+
     // Teaching Hours Report
     TEACHING_HOURS: 'lectures.teaching-hours',
 

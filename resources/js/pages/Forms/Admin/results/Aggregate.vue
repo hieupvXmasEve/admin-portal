@@ -18,7 +18,7 @@ import type { Student } from '@/types/models';
 import { Deferred, Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { format } from 'date-fns';
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, Star, User, Users, X } from 'lucide-vue-next';
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, Star, TrendingUp, User, Users, X } from 'lucide-vue-next';
 import { computed, h, ref, watch } from 'vue';
 
 interface AggregateHeader {
@@ -109,6 +109,7 @@ const backUrl = computed(() => {
 });
 
 const downloadUrl = computed(() => route('forms.admin.results.aggregate.download', props.target.id));
+const lecturerGpaUrl = computed(() => route('lectures.lecturers-gpa.index', props.target.semester_id ? { semester_id: props.target.semester_id } : undefined));
 
 const navigateTo = (id: number | null) => {
     if (!id) return;
@@ -169,6 +170,7 @@ const getRatingColor = (avg: number) => {
 // Colors for charts
 const chartColors = ['bg-blue-500', 'bg-orange-500', 'bg-amber-500', 'bg-emerald-500', 'bg-indigo-500', 'bg-rose-500', 'bg-cyan-500', 'bg-violet-500'];
 const chartColorsHex = ['#3b82f6', '#f97316', '#f59e0b', '#10b981', '#6366f1', '#f43f5e', '#06b6d4', '#8b5cf6'];
+const chartColorClass = (index: string | number) => chartColors[Number(index) % chartColors.length] ?? chartColors[0];
 
 // Helper: Generate Bar Chart data for rating questions (percentage)
 const getRatingBarChartData = (distribution: number[]) => {
@@ -531,6 +533,10 @@ const responseColumns: ColumnDef<StudentAssignment>[] = [
             </div>
 
             <div class="text-muted-foreground flex items-center gap-6 text-sm">
+                <Button as="a" :href="lecturerGpaUrl" variant="outline" size="sm">
+                    <TrendingUp class="h-4 w-4" />
+                    Lecturer GPA
+                </Button>
                 <Button as="a" :href="downloadUrl" variant="outline" size="sm">
                     <Download class="h-4 w-4" />
                     Download
@@ -714,7 +720,7 @@ const responseColumns: ColumnDef<StudentAssignment>[] = [
                                                 <span class="text-muted-foreground font-mono text-xs">{{ opt.count }} ({{ opt.percentage }}%)</span>
                                             </div>
                                             <div class="bg-muted h-2.5 w-full overflow-hidden rounded-full">
-                                                <div class="h-full rounded-full transition-all" :class="chartColors[idx % chartColors.length]" :style="{ width: `${opt.percentage}%` }"></div>
+                                                <div class="h-full rounded-full transition-all" :class="chartColorClass(idx)" :style="{ width: `${opt.percentage}%` }"></div>
                                             </div>
                                         </div>
                                         <div v-if="q.data.options.length === 0" class="text-muted-foreground py-4 text-center text-sm">No options data available</div>
@@ -814,14 +820,14 @@ const responseColumns: ColumnDef<StudentAssignment>[] = [
                                     <!-- MULTI CHOICE (Keep bar chart for multi-select) -->
                                     <div v-else-if="currentQuestion.type === 'multi_choice'" class="space-y-6">
                                         <div v-for="(opt, idx) in currentQuestion.data.options" :key="idx" class="flex items-center gap-3">
-                                            <div class="h-4 w-4 shrink-0 rounded-full" :class="chartColors[idx % chartColors.length]"></div>
+                                            <div class="h-4 w-4 shrink-0 rounded-full" :class="chartColorClass(idx)"></div>
                                             <div class="flex-1">
                                                 <div class="mb-1 flex justify-between">
                                                     <span class="font-medium">{{ opt.label }}</span>
                                                     <span class="text-muted-foreground text-sm">{{ opt.percentage }}% ({{ opt.count }})</span>
                                                 </div>
                                                 <div class="bg-muted h-2 overflow-hidden rounded-full">
-                                                    <div class="h-full" :class="chartColors[idx % chartColors.length]" :style="{ width: `${opt.percentage}%` }"></div>
+                                                    <div class="h-full" :class="chartColorClass(idx)" :style="{ width: `${opt.percentage}%` }"></div>
                                                 </div>
                                             </div>
                                         </div>

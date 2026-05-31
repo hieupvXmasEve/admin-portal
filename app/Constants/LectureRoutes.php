@@ -46,6 +46,11 @@ class LectureRoutes
 
     public const EXPORT_EXCEL_FILTERED = 'lectures.export.excel.filtered';
 
+    // Lecturer GPA Report
+    public const LECTURER_GPA_INDEX = 'lectures.lecturers-gpa.index';
+
+    public const LECTURER_GPA_EXPORT = 'lectures.lecturers-gpa.export';
+
     // Teaching Hours Report
     public const TEACHING_HOURS = 'lectures.teaching-hours';
 
