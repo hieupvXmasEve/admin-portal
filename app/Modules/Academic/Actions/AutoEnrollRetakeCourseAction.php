@@ -7,13 +7,15 @@ namespace App\Modules\Academic\Actions;
 use App\Models\CourseRegistration;
 use App\Models\CourseRetakeRegistration;
 use App\Models\FinanceCharge;
+use App\Models\PaymentApplication;
+use DateTimeInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class AutoEnrollRetakeCourseAction
 {
     /**
-     * Auto-enroll student when DNG payment is confirmed for a retake course charge.
+     * Record paid retake charges and link an existing staff-created class registration.
      * Called from DngWebhookService after payment bridge.
      */
     public static function handlePaymentConfirmed(FinanceCharge $charge): void
@@ -34,9 +36,13 @@ class AutoEnrollRetakeCourseAction
             return;
         }
 
-        // Only process if currently at payment_pending
-        if ($registration->status !== CourseRetakeRegistration::STATUS_PAYMENT_PENDING) {
-            Log::info('AutoEnrollRetakeCourse: Registration not at payment_pending, skipping', [
+        // Only process if payment is pending or already marked paid but enrollment failed.
+        if (! in_array($registration->status, [
+            CourseRetakeRegistration::STATUS_PAYMENT_PENDING,
+            CourseRetakeRegistration::STATUS_PAID,
+            CourseRetakeRegistration::STATUS_ENROLLED,
+        ], true)) {
+            Log::info('AutoEnrollRetakeCourse: Registration is not payable/enrollable, skipping', [
                 'registration_id' => $registration->id,
                 'current_status' => $registration->status,
             ]);
@@ -45,54 +51,51 @@ class AutoEnrollRetakeCourseAction
         }
 
         DB::transaction(function () use ($registration) {
-            // Step 1: Transition to paid
-            $registration->transitionToPaid();
-
-            // Step 2: Create CourseRegistration
-            try {
-                $unit = $registration->unit;
-                $courseOffering = $registration->courseOffering;
-
-                // Log warning if course is full but proceed anyway (admin_override)
-                if ($courseOffering->current_enrollment >= $courseOffering->max_capacity) {
-                    Log::warning('AutoEnrollRetakeCourse: CourseOffering is full, enrolling anyway (admin_override)', [
-                        'registration_id' => $registration->id,
-                        'course_offering_id' => $courseOffering->id,
-                        'current_enrollment' => $courseOffering->current_enrollment,
-                        'max_capacity' => $courseOffering->max_capacity,
-                    ]);
-                }
-
-                $courseRegistration = CourseRegistration::create([
-                    'student_id' => $registration->student_id,
-                    'course_offering_id' => $registration->course_offering_id,
-                    'semester_id' => $registration->semester_id,
-                    'registration_status' => 'confirmed',
-                    'registration_date' => now(),
-                    'registration_method' => 'admin_override',
-                    'is_retake' => true,
-                    'attempt_number' => $registration->attempt_number,
-                    'retake_fee' => $registration->retake_fee,
-                    'is_retake_paid' => true,
-                    'credit_points' => $unit->credit_points ?? 0,
-                    'credit_hours' => $unit->credit_hours ?? 0,
+            $charge = $registration->financeCharge;
+            if (! $charge || $charge->status !== FinanceCharge::STATUS_ACTIVE || ! $charge->is_fully_paid) {
+                Log::info('AutoEnrollRetakeCourse: Charge is not fully paid, skipping', [
+                    'registration_id' => $registration->id,
+                    'finance_charge_id' => $charge?->id,
                 ]);
 
-                // Increment enrollment count
-                $courseOffering->incrementEnrollment();
-                $courseOffering->updateStatus();
+                return;
+            }
 
-                // Step 3: Transition to enrolled
-                $registration->transitionToEnrolled($courseRegistration->id);
+            // Step 1: Transition to paid. Class placement remains staff-owned.
+            if ($registration->status === CourseRetakeRegistration::STATUS_PAYMENT_PENDING) {
+                $registration->transitionToPaid(self::resolvePaidAt($charge));
+                $registration->refresh();
+            }
 
-                Log::info('AutoEnrollRetakeCourse: Student enrolled successfully', [
+            // Step 2: Link an existing staff-created CourseRegistration when present.
+            try {
+                $existingRegistration = CourseRegistration::query()
+                    ->where('student_id', $registration->student_id)
+                    ->where('course_offering_id', $registration->course_offering_id)
+                    ->whereIn('registration_status', CourseRegistration::CLASS_ROSTER_REGISTRATION_STATUSES)
+                    ->orderByDesc('id')
+                    ->first();
+
+                if (! $existingRegistration) {
+                    Log::info('AutoEnrollRetakeCourse: Payment recorded, waiting for staff class registration', [
+                        'registration_id' => $registration->id,
+                        'student_id' => $registration->student_id,
+                        'course_offering_id' => $registration->course_offering_id,
+                    ]);
+
+                    return;
+                }
+
+                app(LinkPaidRetakeRegistrationToCourseRegistrationAction::class)->run($existingRegistration);
+
+                Log::info('AutoEnrollRetakeCourse: Linked existing staff-created course registration', [
                     'registration_id' => $registration->id,
-                    'course_registration_id' => $courseRegistration->id,
+                    'course_registration_id' => $existingRegistration->id,
                     'student_id' => $registration->student_id,
                 ]);
             } catch (\Throwable $e) {
                 // Payment is already recorded (paid status). Log error for staff to handle manually.
-                Log::error('AutoEnrollRetakeCourse: Failed to create CourseRegistration', [
+                Log::error('AutoEnrollRetakeCourse: Failed to link CourseRegistration', [
                     'registration_id' => $registration->id,
                     'student_id' => $registration->student_id,
                     'error' => $e->getMessage(),
@@ -100,5 +103,27 @@ class AutoEnrollRetakeCourseAction
                 // Don't rethrow — payment status (paid) is separate from enrollment status
             }
         });
+    }
+
+    private static function resolvePaidAt(?FinanceCharge $charge): ?DateTimeInterface
+    {
+        if (! $charge) {
+            return null;
+        }
+
+        $lineIds = $charge->invoiceLines()->pluck('id');
+        if ($lineIds->isEmpty()) {
+            return null;
+        }
+
+        return PaymentApplication::query()
+            ->with('payment:id,paid_at')
+            ->whereIn('invoice_line_id', $lineIds)
+            ->where('amount', '>', 0)
+            ->get()
+            ->map(fn (PaymentApplication $application) => $application->payment?->paid_at)
+            ->filter()
+            ->sortBy(fn (DateTimeInterface $paidAt) => $paidAt->getTimestamp())
+            ->last();
     }
 }

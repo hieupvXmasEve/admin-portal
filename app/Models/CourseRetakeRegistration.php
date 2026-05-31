@@ -164,7 +164,7 @@ class CourseRetakeRegistration extends AuditableModel
         ]);
     }
 
-    public function transitionToPaid(): void
+    public function transitionToPaid(?\DateTimeInterface $paidAt = null): void
     {
         if ($this->status !== self::STATUS_PAYMENT_PENDING) {
             throw new \RuntimeException(
@@ -174,7 +174,7 @@ class CourseRetakeRegistration extends AuditableModel
 
         $this->update([
             'status' => self::STATUS_PAID,
-            'paid_at' => now(),
+            'paid_at' => $paidAt ?? now(),
         ]);
     }
 
@@ -183,6 +183,17 @@ class CourseRetakeRegistration extends AuditableModel
         if ($this->status !== self::STATUS_PAID) {
             throw new \RuntimeException(
                 "Cannot transition to enrolled from status: {$this->status}"
+            );
+        }
+
+        $this->linkToCourseRegistration($courseRegistrationId);
+    }
+
+    public function linkToCourseRegistration(int $courseRegistrationId): void
+    {
+        if (! in_array($this->status, [self::STATUS_PAID, self::STATUS_ENROLLED], true)) {
+            throw new \RuntimeException(
+                "Cannot link course registration from status: {$this->status}"
             );
         }
 

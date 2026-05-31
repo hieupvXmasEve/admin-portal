@@ -10,10 +10,12 @@ use App\Models\CourseRetakeRegistration;
 use App\Models\Semester;
 use App\Modules\Academic\Actions\CancelRetakeCourseRegistrationAction;
 use App\Modules\Academic\Actions\CreateRetakeCourseRegistrationAction;
+use App\Modules\Academic\Actions\SyncPaidRetakeRegistrationsAction;
 use App\Modules\Academic\Http\Requests\RetakeCourse\CancelRetakeCourseRequest;
 use App\Modules\Academic\Http\Requests\RetakeCourse\ListRetakeCourseRequest;
 use App\Modules\Academic\Http\Requests\RetakeCourse\StoreRetakeCourseRequest;
 use App\Modules\Academic\Queries\ListRetakeCourseEligibleStudentsQuery;
+use App\Modules\Academic\Queries\ListRetakeCourseRegistrationsQuery;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -22,6 +24,7 @@ class RetakeCourseRegistrationController extends Controller
 {
     public function __construct(
         private readonly ListRetakeCourseEligibleStudentsQuery $eligibilityQuery,
+        private readonly ListRetakeCourseRegistrationsQuery $registrationsQuery,
     ) {}
 
     /**
@@ -30,28 +33,27 @@ class RetakeCourseRegistrationController extends Controller
     public function index(ListRetakeCourseRequest $request): Response
     {
         $validated = $request->validated();
+        $filters = array_replace([
+            'search' => '',
+            'status' => null,
+            'operation_state' => null,
+            'semester_id' => null,
+            'unit_id' => null,
+            'sort' => null,
+            'direction' => null,
+            'per_page' => 15,
+        ], $validated);
 
-        $query = CourseRetakeRegistration::query()
-            ->with(['student', 'unit', 'courseOffering.semester', 'semester', 'campus', 'approvedBy'])
-            ->when($validated['search'] ?? null, function ($q, $search) {
-                $q->where(function ($q) use ($search) {
-                    $q->whereHas('student', fn ($sq) => $sq->where('full_name', 'like', "%{$search}%")
-                        ->orWhere('student_id', 'like', "%{$search}%"))
-                        ->orWhereHas('unit', fn ($sq) => $sq->where('code', 'like', "%{$search}%")
-                            ->orWhere('name', 'like', "%{$search}%"));
-                });
-            })
-            ->when($validated['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
-            ->when($validated['semester_id'] ?? null, fn ($q, $id) => $q->where('semester_id', $id))
-            ->where('campus_id', session('current_campus_id'))
-            ->when($validated['unit_id'] ?? null, fn ($q, $id) => $q->where('unit_id', $id))
-            ->orderBy($validated['sort'] ?? 'created_at', $validated['direction'] ?? 'desc')
-            ->paginate($validated['per_page'] ?? 15)
-            ->withQueryString();
+        $filters['semester_id'] = $filters['semester_id'] !== null ? (int) $filters['semester_id'] : null;
+        $filters['unit_id'] = $filters['unit_id'] !== null ? (int) $filters['unit_id'] : null;
+        $filters['per_page'] = (int) $filters['per_page'];
+
+        $result = $this->registrationsQuery->handle($filters, session('current_campus_id'));
 
         return Inertia::render('Academic/RetakeCourse/Index', [
-            'registrations' => $query,
-            'filters' => $request->only(['search', 'status', 'semester_id', 'unit_id', 'sort', 'direction', 'per_page']),
+            'registrations' => $result['registrations'],
+            'summary' => $result['summary'],
+            'filters' => $filters,
             'semesters' => Semester::orderByDesc('start_date')->get(['id', 'name', 'code']),
         ]);
     }
@@ -104,6 +106,21 @@ class RetakeCourseRegistrationController extends Controller
         ]);
 
         Inertia::flash('success', 'Đã hủy đăng ký học lại.');
+
+        return back();
+    }
+
+    public function sync(CourseRetakeRegistration $registration, SyncPaidRetakeRegistrationsAction $action): RedirectResponse
+    {
+        $result = $action->runForRegistration($registration->id);
+
+        if ($result['synced'] > 0) {
+            Inertia::flash('success', 'Đã liên kết đăng ký học lại với lớp hiện có.');
+        } elseif ($result['waiting_for_class'] > 0) {
+            Inertia::flash('warning', 'Sinh viên đã thanh toán, đang chờ staff thêm vào lớp.');
+        } else {
+            Inertia::flash('info', 'Không có dữ liệu đủ điều kiện để đồng bộ.');
+        }
 
         return back();
     }

@@ -18,6 +18,7 @@ class ListRetakeCourseRequest extends FormRequest
         return [
             'search' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'in:approved,payment_pending,paid,enrolled,cancelled'],
+            'operation_state' => ['nullable', 'string', 'in:awaiting_payment,paid_waiting_class,enrolled,needs_review,cancelled'],
             'semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
             'campus_id' => ['nullable', 'integer', 'exists:campuses,id'],
             'unit_id' => ['nullable', 'integer', 'exists:units,id'],

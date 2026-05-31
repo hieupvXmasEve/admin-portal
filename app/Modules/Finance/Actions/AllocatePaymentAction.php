@@ -9,6 +9,7 @@ use App\Models\InvoiceLine;
 use App\Models\Payment;
 use App\Models\PaymentApplication;
 use App\Modules\Finance\Services\SettlementService;
+use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -48,7 +49,7 @@ class AllocatePaymentAction
             throw ValidationException::withMessages(['amount' => 'Amount exceeds charge remaining balance.']);
         }
 
-        return DB::transaction(function () use ($payment, $line, $amount, $userId) {
+        $application = DB::transaction(function () use ($payment, $line, $amount, $userId) {
             return $this->settlementService->createPaymentApplication(
                 $payment,
                 $line,
@@ -59,5 +60,9 @@ class AllocatePaymentAction
                 null,
             );
         });
+
+        app(RetakeRegistrationPaymentSyncer::class)->runForChargeIds([$charge->id]);
+
+        return $application;
     }
 }

@@ -9,6 +9,7 @@ use App\Models\InvoiceLine;
 use App\Models\Payment;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
+use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use Illuminate\Support\Facades\DB;
 
 class AutoAllocatePaymentsAction
@@ -65,6 +66,7 @@ class AutoAllocatePaymentsAction
             'total_allocated_amount' => 0,
             'invoices_updated' => 0,
         ];
+        $studentsWithAllocations = [];
 
         $studentIds = array_values(array_unique(array_map('intval', $studentIds)));
 
@@ -72,7 +74,7 @@ class AutoAllocatePaymentsAction
             return $stats;
         }
 
-        DB::transaction(function () use ($studentIds, $priorityOrder, $userId, &$stats) {
+        DB::transaction(function () use ($studentIds, $priorityOrder, $userId, &$stats, &$studentsWithAllocations) {
 
             // 0. Handle 0-amount invoices (mark as paid)
             $zeroAmountInvoices = StudentInvoice::query()
@@ -148,9 +150,14 @@ class AutoAllocatePaymentsAction
 
                 if ($studentHasAllocations) {
                     $stats['students_processed']++;
+                    $studentsWithAllocations[] = $studentId;
                 }
             }
         });
+
+        foreach (array_values(array_unique($studentsWithAllocations)) as $studentId) {
+            app(RetakeRegistrationPaymentSyncer::class)->runForStudent($studentId);
+        }
 
         return $stats;
     }

@@ -347,6 +347,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:create_retake_course')
             ->name('store');
 
+        Route::post('/{registration}/sync', [RetakeCourseRegistrationController::class, 'sync'])
+            ->middleware('can:create_retake_course')
+            ->name('sync');
+
         Route::post('/{registration}/cancel', [RetakeCourseRegistrationController::class, 'cancel'])
             ->middleware('can:cancel_retake_course')
             ->name('cancel');

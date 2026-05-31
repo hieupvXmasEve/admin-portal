@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Dng\Services;
 
-use App\Models\CourseRetakeRegistration;
 use App\Models\FinanceCharge;
 use App\Modules\Academic\Actions\AutoEnrollRetakeCourseAction;
 use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
@@ -12,6 +11,7 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
+use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -23,6 +23,7 @@ class DngWebhookService
         protected DngChecksumService $checksumService,
         protected PublishDomainEventAction $publishDomainEventAction,
         protected SettleInstallmentFromDngAction $settleInstallmentAction,
+        protected RetakeRegistrationPaymentSyncer $retakeRegistrationPaymentSyncer,
     ) {}
 
     /**
@@ -253,29 +254,20 @@ class DngWebhookService
                         AutoEnrollRetakeCourseAction::handlePaymentConfirmed($charge);
                     }
                 }
+            } else {
+                // Priority 2: single precise charge link (single-unit DNG request)
+                $charge = $request->finance_charge_id
+                    ? FinanceCharge::find($request->finance_charge_id)
+                    : null;
 
-                return;
+                if ($charge) {
+                    AutoEnrollRetakeCourseAction::handlePaymentConfirmed($charge);
+                }
             }
 
-            // Priority 2: single precise charge link (single-unit DNG request)
-            $charge = $request->finance_charge_id
-                ? FinanceCharge::find($request->finance_charge_id)
-                : null;
-
-            // Priority 3: legacy fallback for old requests without any charge link
-            if (! $charge) {
-                $charge = FinanceCharge::query()
-                    ->where('student_id', $request->student_id)
-                    ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
-                    ->where('source_type', CourseRetakeRegistration::class)
-                    ->where('status', FinanceCharge::STATUS_ACTIVE)
-                    ->latest()
-                    ->first();
-            }
-
-            if ($charge) {
-                AutoEnrollRetakeCourseAction::handlePaymentConfirmed($charge);
-            }
+            // Legacy aggregate requests may not have pivot links. After payment bridge,
+            // settlement truth identifies every linked retake charge that is fully paid.
+            $this->retakeRegistrationPaymentSyncer->runForStudent((int) $request->student_id);
         } catch (\Throwable $e) {
             Log::warning('DNG webhook: retake course auto-enroll failed', [
                 'dng_payment_request_id' => $request->id,

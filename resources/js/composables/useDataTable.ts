@@ -48,22 +48,8 @@ export interface DataTableConfig<T extends Record<string, any> = Record<string, 
  *     only: ['buildings', 'filters'],
  * });
  */
-export function useDataTable<T extends Record<string, any> = Record<string, FilterValue>>(
-    config: DataTableConfig<T>,
-) {
-    const {
-        baseUrl,
-        initialFilters = {} as T,
-        defaultValues = {} as Partial<T>,
-        only,
-        debounce = 300,
-        fieldDebounce = {},
-        immediateFields = [],
-        preserveScroll = true,
-        replace = true,
-        onError,
-        onSuccess,
-    } = config;
+export function useDataTable<T extends Record<string, any> = Record<string, FilterValue>>(config: DataTableConfig<T>) {
+    const { baseUrl, initialFilters = {} as T, defaultValues = {} as Partial<T>, only, debounce = 300, fieldDebounce = {}, immediateFields = [], preserveScroll = true, replace = true, onError, onSuccess } = config;
 
     const filters = reactive<T>({ ...initialFilters } as T);
     const isNavigating = ref(false);
@@ -85,12 +71,29 @@ export function useDataTable<T extends Record<string, any> = Record<string, Filt
 
             if (Array.isArray(value)) {
                 if (value.length > 0) params[key] = value;
-            } else {
+            } else if (['string', 'number', 'boolean'].includes(typeof value)) {
                 params[key] = value;
             }
         }
 
         return params;
+    };
+
+    const buildUrl = (): string => {
+        const url = new URL(baseUrl, window.location.origin);
+        const params = new URLSearchParams();
+
+        for (const [key, value] of Object.entries(buildParams())) {
+            if (Array.isArray(value)) {
+                value.forEach((item) => params.append(`${key}[]`, String(item)));
+            } else {
+                params.set(key, String(value));
+            }
+        }
+
+        const query = params.toString();
+
+        return `${url.pathname}${query ? `?${query}` : ''}${url.hash}`;
     };
 
     // ── Navigation ───────────────────────────────────────────────────────────
@@ -99,7 +102,7 @@ export function useDataTable<T extends Record<string, any> = Record<string, Filt
         if (isNavigating.value) return;
         isNavigating.value = true;
 
-        router.get(baseUrl, buildParams(), {
+        router.visit(buildUrl(), {
             only,
             preserveState: true,
             preserveScroll,
@@ -216,17 +219,15 @@ export function useDataTable<T extends Record<string, any> = Record<string, Filt
             if (key === 'page' || key === 'per_page') return false;
             const def = defaults[key];
             if (def !== undefined) {
-                return Array.isArray(value)
-                    ? value.length > 0 && JSON.stringify(value) !== JSON.stringify(def)
-                    : value !== def;
+                return Array.isArray(value) ? value.length > 0 && JSON.stringify(value) !== JSON.stringify(def) : value !== def;
             }
             return Array.isArray(value) ? value.length > 0 : true;
         }),
     );
 
     const isLoading = computed(() => isNavigating.value);
-    const currentSort = computed(() => raw.sort as string | null);
-    const currentDirection = computed(() => raw.direction as SortDirection);
+    const currentSort = computed(() => (typeof raw.sort === 'string' ? raw.sort : null));
+    const currentDirection = computed((): SortDirection => (raw.direction === 'asc' || raw.direction === 'desc' ? raw.direction : null));
 
     return {
         // State
