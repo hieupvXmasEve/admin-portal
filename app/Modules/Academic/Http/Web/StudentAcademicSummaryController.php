@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Http\Web;
 
+use App\Actions\Student\GetStudentRegistrationsAction;
 use App\Http\Controllers\Api\GoldTransactionController;
 use App\Http\Controllers\Api\StudentWalletController;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Student\GetRegistrationsRequest;
 use App\Models\Student;
+use App\Modules\Academic\Queries\GetStudentAttendanceDetailsQuery;
+use App\Modules\Academic\Queries\GetStudentAttendanceQuery;
+use App\Modules\Academic\Queries\GetStudentFeeSummaryQuery;
 use App\Services\StudentAcademicSummaryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -84,7 +88,7 @@ class StudentAcademicSummaryController extends Controller
     /**
      * Get registrations tab data
      */
-    public function registrations(Student $student, \App\Http\Requests\Student\GetRegistrationsRequest $request, \App\Actions\Student\GetStudentRegistrationsAction $action): Response
+    public function registrations(Student $student, GetRegistrationsRequest $request, GetStudentRegistrationsAction $action): Response
     {
         $validated = $request->validated();
         $registrationsData = $action->execute($student, $validated);
@@ -126,10 +130,9 @@ class StudentAcademicSummaryController extends Controller
      * Display the attendance tab for academic summary
      *
      * @param  Student  $student  The student to display attendance for
-     * @param  \App\Modules\Academic\Queries\GetStudentAttendanceQuery $query
      * @return Response Inertia response with attendance data
      */
-    public function attendance(Student $student, \App\Modules\Academic\Queries\GetStudentAttendanceQuery $query): Response
+    public function attendance(Student $student, GetStudentAttendanceQuery $query): Response
     {
         $attendanceData = $query->execute($student);
 
@@ -209,10 +212,9 @@ class StudentAcademicSummaryController extends Controller
      * Display the fees tab for academic summary
      *
      * @param  Student  $student  The student to display fees for
-     * @param  \App\Modules\Academic\Queries\GetStudentFeeSummaryQuery $query
      * @return Response Inertia response with fees data
      */
-    public function fees(Student $student, \App\Modules\Academic\Queries\GetStudentFeeSummaryQuery $query): Response
+    public function fees(Student $student, GetStudentFeeSummaryQuery $query): Response
     {
         $feeSummary = $query->execute($student);
 
@@ -227,20 +229,21 @@ class StudentAcademicSummaryController extends Controller
      *
      * @param  Student  $student  The student to get attendance for
      * @param  Request  $request  Request containing unit filter
-     * @param  \App\Modules\Academic\Queries\GetStudentAttendanceDetailsQuery $query
      * @return JsonResponse Detailed attendance data
      */
-    public function getAttendanceDetails(Student $student, Request $request, \App\Modules\Academic\Queries\GetStudentAttendanceDetailsQuery $query): JsonResponse
+    public function getAttendanceDetails(Student $student, Request $request, GetStudentAttendanceDetailsQuery $query): JsonResponse
     {
         $validated = $request->validate([
             'unit_id' => 'required|exists:units,id',
             'semester_id' => 'nullable|exists:semesters,id',
+            'course_offering_id' => 'nullable|exists:course_offerings,id',
         ]);
 
         $attendanceDetails = $query->execute(
             $student->id,
             (int) $validated['unit_id'],
-            isset($validated['semester_id']) ? (int) $validated['semester_id'] : null
+            isset($validated['semester_id']) ? (int) $validated['semester_id'] : null,
+            isset($validated['course_offering_id']) ? (int) $validated['course_offering_id'] : null
         );
 
         return response()->json([

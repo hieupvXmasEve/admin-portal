@@ -18,42 +18,60 @@ class GetStudentAttendanceQuery
             ->join('course_offerings', 'class_sessions.course_offering_id', '=', 'course_offerings.id')
             ->join('units', 'course_offerings.unit_id', '=', 'units.id')
             ->join('semesters', 'course_offerings.semester_id', '=', 'semesters.id')
+            ->leftJoin('course_registrations', function ($join) use ($student) {
+                $join->on('course_registrations.course_offering_id', '=', 'course_offerings.id')
+                    ->on('course_registrations.semester_id', '=', 'course_offerings.semester_id')
+                    ->where('course_registrations.student_id', '=', $student->id)
+                    ->whereNull('course_registrations.deleted_at');
+            })
             ->where('attendances.student_id', $student->id)
             ->select([
                 'units.id as unit_id',
                 'units.name as unit_name',
                 'units.code as unit_code',
+                'semesters.id as semester_id',
                 'semesters.name as semester_name',
                 'course_offerings.id as course_offering_id',
+                'course_offerings.section_code',
+                'course_registrations.attempt_number',
+                'course_registrations.is_retake',
                 'attendances.status',
                 'attendances.check_in_time',
                 'attendances.minutes_late',
+                'class_sessions.id as session_id',
                 'class_sessions.session_date',
                 'class_sessions.start_time',
                 'class_sessions.end_time',
             ])
             ->orderBy('class_sessions.session_date', 'desc')
             ->get()
-            ->groupBy('unit_id');
+            ->groupBy('course_offering_id');
 
-        $attendanceSummary = $attendanceData->map(function ($unitAttendance, $unitId) {
-            $totalSessions = $unitAttendance->count();
-            $presentCount = $unitAttendance->where('status', 'present')->count();
-            $lateCount = $unitAttendance->where('status', 'late')->count();
-            $absentCount = $unitAttendance->where('status', 'absent')->count();
-            $excusedCount = $unitAttendance->where('status', 'excused')->count();
+        $attendanceSummary = $attendanceData->map(function ($offeringAttendance, $courseOfferingId) {
+            $totalSessions = $offeringAttendance->count();
+            $presentCount = $offeringAttendance->where('status', 'present')->count();
+            $lateCount = $offeringAttendance->where('status', 'late')->count();
+            $absentCount = $offeringAttendance->where('status', 'absent')->count();
+            $excusedCount = $offeringAttendance->where('status', 'excused')->count();
 
             $attendedCount = $presentCount + $lateCount; // Late is still considered attended
             $attendancePercentage = $totalSessions > 0 ? ($attendedCount / $totalSessions) * 100 : 0;
 
-            $firstRecord = $unitAttendance->first();
+            $firstRecord = $offeringAttendance->first();
+            $attemptNumber = $firstRecord->attempt_number !== null ? (int) $firstRecord->attempt_number : null;
+            $isRetake = (bool) $firstRecord->is_retake;
 
             return [
-                'unit_id' => $unitId,
+                'unit_id' => (int) $firstRecord->unit_id,
                 'unit_name' => $firstRecord->unit_name,
                 'unit_code' => $firstRecord->unit_code,
+                'semester_id' => (int) $firstRecord->semester_id,
                 'semester' => $firstRecord->semester_name,
-                'course_offering_id' => $firstRecord->course_offering_id,
+                'course_offering_id' => (int) $courseOfferingId,
+                'section_code' => $firstRecord->section_code,
+                'attempt_number' => $attemptNumber,
+                'is_retake' => $isRetake,
+                'attempt_label' => $this->getAttemptLabel($attemptNumber, $isRetake),
                 'total_sessions' => $totalSessions,
                 'attended_count' => $attendedCount,
                 'present_count' => $presentCount,
@@ -62,8 +80,9 @@ class GetStudentAttendanceQuery
                 'excused_count' => $excusedCount,
                 'attendance_percentage' => round($attendancePercentage, 2),
                 'attendance_status' => $this->getAttendanceStatus($attendancePercentage),
-                'sessions' => $unitAttendance->map(function ($session) {
+                'sessions' => $offeringAttendance->map(function ($session) {
                     return [
+                        'session_id' => $session->session_id,
                         'session_date' => $session->session_date,
                         'start_time' => $session->start_time,
                         'end_time' => $session->end_time,
@@ -75,19 +94,32 @@ class GetStudentAttendanceQuery
             ];
         })->values();
 
+        $totalSessions = $attendanceSummary->sum('total_sessions');
+        $totalAttended = $attendanceSummary->sum('attended_count');
+
         return [
             'data' => $attendanceSummary,
             'summary' => [
-                'total_units' => $attendanceSummary->count(),
-                'total_sessions' => $attendanceSummary->sum('total_sessions'),
-                'total_attended' => $attendanceSummary->sum('attended_count'),
+                'total_units' => $attendanceSummary->pluck('unit_id')->unique()->count(),
+                'total_attempts' => $attendanceSummary->count(),
+                'total_sessions' => $totalSessions,
+                'total_attended' => $totalAttended,
                 'total_absent' => $attendanceSummary->sum('absent_count'),
-                'overall_percentage' => $attendanceSummary->count() > 0
-                    ? round($attendanceSummary->avg('attendance_percentage'), 2)
+                'overall_percentage' => $totalSessions > 0
+                    ? round(($totalAttended / $totalSessions) * 100, 2)
                     : 0,
                 'units_at_risk' => $attendanceSummary->where('attendance_percentage', '<', 80)->count(),
             ],
         ];
+    }
+
+    private function getAttemptLabel(?int $attemptNumber, bool $isRetake): string
+    {
+        if ($attemptNumber !== null) {
+            return $isRetake ? "Retake attempt {$attemptNumber}" : "Attempt {$attemptNumber}";
+        }
+
+        return $isRetake ? 'Retake' : 'Attempt';
     }
 
     private function getAttendanceStatus(float $percentage): string

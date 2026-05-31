@@ -733,6 +733,7 @@ export interface ScoresData {
 
 // Attendance interfaces
 export interface AttendanceSession {
+    session_id: number;
     session_date: string;
     start_time: string;
     end_time: string;
@@ -745,8 +746,13 @@ export interface UnitAttendance {
     unit_id: number;
     unit_name: string;
     unit_code: string;
+    semester_id: number;
     semester: string;
     course_offering_id: number;
+    section_code: string | null;
+    attempt_number: number | null;
+    is_retake: boolean;
+    attempt_label: string;
     total_sessions: number;
     attended_count: number;
     present_count: number;
@@ -762,6 +768,7 @@ export interface AttendanceData {
     data: UnitAttendance[];
     summary: {
         total_units: number;
+        total_attempts?: number;
         total_sessions: number;
         total_attended: number;
         total_absent: number;
