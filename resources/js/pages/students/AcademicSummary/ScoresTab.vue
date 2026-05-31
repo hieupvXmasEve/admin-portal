@@ -161,105 +161,88 @@ const openScoreDetails = (course: CourseScores): void => {
         <!-- Loading skeleton -->
         <div v-if="loading" class="space-y-6">
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div v-for="i in 4" :key="i" class="h-24 animate-pulse rounded-lg bg-muted/40"></div>
+                <div v-for="i in 4" :key="i" class="bg-muted/40 h-24 animate-pulse rounded-lg"></div>
             </div>
-            <div class="h-96 animate-pulse rounded-lg bg-muted/30"></div>
+            <div class="bg-muted/30 h-96 animate-pulse rounded-lg"></div>
         </div>
 
         <template v-else>
             <!-- ────────── Cumulative GPA panel ────────── -->
-            <section
-                aria-labelledby="cumulative-heading"
-                class="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-card via-card to-muted/40 dark:to-muted/20"
-            >
+            <section aria-labelledby="cumulative-heading" class="border-border from-card via-card to-muted/40 dark:to-muted/20 relative overflow-hidden rounded-xl border bg-gradient-to-br">
                 <!-- decorative grid -->
                 <div
                     aria-hidden="true"
                     class="pointer-events-none absolute inset-0 opacity-[0.04] dark:opacity-[0.06]"
-                    style="background-image: linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px); background-size: 32px 32px;"
+                    style="background-image: linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px); background-size: 32px 32px"
                 ></div>
 
                 <div class="relative p-6 sm:p-8">
                     <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
                         <div>
-                            <p class="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Academic transcript</p>
+                            <p class="text-muted-foreground text-[11px] font-medium tracking-[0.18em] uppercase">Academic transcript</p>
                             <h2 id="cumulative-heading" class="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Cumulative GPA</h2>
                         </div>
-                        <div v-if="cumulative?.last_finalized_at" class="text-right text-xs text-muted-foreground">
+                        <div v-if="cumulative?.last_finalized_at" class="text-muted-foreground text-right text-xs">
                             <span class="block">Last finalized</span>
-                            <span class="mt-0.5 block font-medium text-foreground">{{ formatDate(cumulative.last_finalized_at) }}</span>
+                            <span class="text-foreground mt-0.5 block font-medium">{{ formatDate(cumulative.last_finalized_at) }}</span>
                         </div>
                     </div>
 
-                    <div v-if="cumulative" class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border lg:grid-cols-4">
+                    <div v-if="cumulative" class="border-border bg-border grid grid-cols-2 gap-px overflow-hidden rounded-lg border lg:grid-cols-4">
                         <div class="bg-card p-5">
-                            <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Cumulative</p>
+                            <p class="text-muted-foreground text-[11px] font-medium tracking-[0.16em] uppercase">Cumulative</p>
                             <p class="mt-2 font-mono text-3xl font-semibold tabular-nums sm:text-4xl" :class="gpaToneClass(cumulative.gpa)">
                                 {{ formatNumber(cumulative.gpa, 3) }}
                             </p>
-                            <p class="mt-1 text-xs text-muted-foreground">
-                                Over {{ cumulative.semesters_count }} semester{{ cumulative.semesters_count === 1 ? '' : 's' }}
-                            </p>
+                            <p class="text-muted-foreground mt-1 text-xs">Over {{ cumulative.semesters_count }} semester{{ cumulative.semesters_count === 1 ? '' : 's' }}</p>
                         </div>
                         <div class="bg-card p-5">
-                            <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Credits attempted</p>
+                            <p class="text-muted-foreground text-[11px] font-medium tracking-[0.16em] uppercase">Credits attempted</p>
                             <p class="mt-2 font-mono text-3xl font-semibold tabular-nums sm:text-4xl">{{ formatNumber(cumulative.credit_points_attempted, 1) }}</p>
-                            <p class="mt-1 text-xs text-muted-foreground">All graded units</p>
+                            <p class="text-muted-foreground mt-1 text-xs">All final attempts</p>
                         </div>
                         <div class="bg-card p-5">
-                            <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Credits earned</p>
-                            <p class="mt-2 font-mono text-3xl font-semibold tabular-nums text-emerald-700 dark:text-emerald-400 sm:text-4xl">
+                            <p class="text-muted-foreground text-[11px] font-medium tracking-[0.16em] uppercase">Credits earned</p>
+                            <p class="mt-2 font-mono text-3xl font-semibold text-emerald-700 tabular-nums sm:text-4xl dark:text-emerald-400">
                                 {{ formatNumber(cumulative.credit_points_earned, 1) }}
                             </p>
-                            <p class="mt-1 text-xs text-muted-foreground">Passed units only</p>
+                            <p class="text-muted-foreground mt-1 text-xs">Passed units only</p>
                         </div>
                         <div class="bg-card p-5">
-                            <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Academic standing</p>
+                            <p class="text-muted-foreground text-[11px] font-medium tracking-[0.16em] uppercase">Academic standing</p>
                             <div class="mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-medium" :class="standingTone(cumulative.academic_standing).class">
                                 <span class="size-1.5 rounded-full bg-current"></span>
                                 {{ standingTone(cumulative.academic_standing).label }}
                             </div>
-                            <p class="mt-2 text-xs text-muted-foreground">Threshold ≥ 50.00</p>
+                            <p class="text-muted-foreground mt-2 text-xs">Threshold ≥ 50.00</p>
                         </div>
                     </div>
 
-                    <div v-else class="rounded-lg border border-dashed border-border bg-card p-6 text-center">
-                        <p class="text-sm text-muted-foreground">No GPA has been finalized yet for this student.</p>
+                    <div v-else class="border-border bg-card rounded-lg border border-dashed p-6 text-center">
+                        <p class="text-muted-foreground text-sm">No GPA has been finalized yet for this student.</p>
                     </div>
                 </div>
             </section>
 
-            <!-- ────────── Summary chips (Total Assessments removed per spec) ────────── -->
-            <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div class="rounded-lg border border-border bg-card p-4">
+            <!-- ────────── Summary chips ────────── -->
+            <section class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div class="border-border bg-card rounded-lg border p-4">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Course units</p>
+                            <p class="text-muted-foreground text-[11px] font-medium tracking-[0.16em] uppercase">Course units</p>
                             <p class="mt-1 font-mono text-2xl font-semibold tabular-nums">{{ scores.summary.total_courses }}</p>
                         </div>
                         <BookOpen class="size-7 text-sky-600 dark:text-sky-400" />
                     </div>
                 </div>
 
-                <div v-if="scores.modules" class="rounded-lg border border-border bg-card p-4">
+                <div v-if="scores.modules" class="border-border bg-card rounded-lg border p-4">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Modules</p>
+                            <p class="text-muted-foreground text-[11px] font-medium tracking-[0.16em] uppercase">Modules</p>
                             <p class="mt-1 font-mono text-2xl font-semibold tabular-nums">{{ scores.summary.total_modules }}</p>
                         </div>
                         <ListChecks class="size-7 text-indigo-600 dark:text-indigo-400" />
-                    </div>
-                </div>
-
-                <div class="rounded-lg border border-border bg-card p-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Overall average</p>
-                            <p class="mt-1 font-mono text-2xl font-semibold tabular-nums" :class="gpaToneClass(scores.summary.overall_average)">
-                                {{ formatPercentage(scores.summary.overall_average) }}
-                            </p>
-                        </div>
-                        <Target class="size-7 text-orange-600 dark:text-orange-400" />
                     </div>
                 </div>
             </section>
@@ -275,42 +258,38 @@ const openScoreDetails = (course: CourseScores): void => {
 
             <!-- ────────── Semester tables ────────── -->
             <section v-if="courseGroups.length > 0" class="space-y-8">
-                <div
-                    v-for="group in courseGroups"
-                    :key="group.semester_name"
-                    class="overflow-hidden rounded-xl border border-border bg-card"
-                >
+                <div v-for="group in courseGroups" :key="group.semester_name" class="border-border bg-card overflow-hidden rounded-xl border">
                     <!-- Semester header -->
-                    <header class="flex flex-wrap items-center justify-between gap-4 border-b border-border bg-muted/30 px-5 py-4">
+                    <header class="border-border bg-muted/30 flex flex-wrap items-center justify-between gap-4 border-b px-5 py-4">
                         <div class="flex items-baseline gap-3">
-                            <p class="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Semester</p>
+                            <p class="text-muted-foreground text-[11px] font-medium tracking-[0.18em] uppercase">Semester</p>
                             <h3 class="text-lg font-semibold tracking-tight">{{ group.semester_name }}</h3>
-                            <Badge v-if="!group.is_finalized && group.semester_gpa !== null" variant="outline" class="text-[10px] uppercase tracking-wider">Pending</Badge>
+                            <Badge v-if="!group.is_finalized && group.semester_gpa !== null" variant="outline" class="text-[10px] tracking-wider uppercase">Pending</Badge>
                         </div>
 
                         <div class="flex flex-wrap items-center gap-4 sm:gap-6">
                             <div class="flex flex-col">
-                                <span class="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Semester GPA</span>
+                                <span class="text-muted-foreground text-[10px] font-medium tracking-[0.16em] uppercase">Semester GPA</span>
                                 <span class="font-mono text-lg font-semibold tabular-nums" :class="gpaToneClass(group.semester_gpa)">
                                     {{ group.semester_gpa !== null ? formatNumber(group.semester_gpa, 3) : '—' }}
                                 </span>
                             </div>
-                            <div class="hidden h-8 w-px bg-border sm:block"></div>
+                            <div class="bg-border hidden h-8 w-px sm:block"></div>
                             <div class="flex flex-col">
-                                <span class="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Credits</span>
+                                <span class="text-muted-foreground text-[10px] font-medium tracking-[0.16em] uppercase">Credits</span>
                                 <span class="font-mono text-sm font-medium tabular-nums">
                                     <span class="text-emerald-700 dark:text-emerald-400">{{ formatNumber(group.credit_points_earned, 1) }}</span>
                                     <span class="text-muted-foreground"> / </span>
                                     <span>{{ formatNumber(group.credit_points_attempted, 1) }}</span>
                                 </span>
                             </div>
-                            <div class="hidden h-8 w-px bg-border sm:block"></div>
+                            <div class="bg-border hidden h-8 w-px sm:block"></div>
                             <div class="flex flex-col">
-                                <span class="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Standing</span>
+                                <span class="text-muted-foreground text-[10px] font-medium tracking-[0.16em] uppercase">Standing</span>
                                 <Badge v-if="group.academic_standing" variant="outline" class="mt-0.5 w-fit border" :class="standingTone(group.academic_standing).class">
                                     {{ standingTone(group.academic_standing).label }}
                                 </Badge>
-                                <span v-else class="text-sm text-muted-foreground">—</span>
+                                <span v-else class="text-muted-foreground text-sm">—</span>
                             </div>
                         </div>
                     </header>
@@ -319,22 +298,17 @@ const openScoreDetails = (course: CourseScores): void => {
                     <Table>
                         <TableHeader>
                             <TableRow class="bg-transparent">
-                                <TableHead class="w-[120px] text-[11px] uppercase tracking-wider text-muted-foreground">Code</TableHead>
-                                <TableHead class="text-[11px] uppercase tracking-wider text-muted-foreground">Course</TableHead>
-                                <TableHead class="w-[80px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Credit</TableHead>
-                                <TableHead class="w-[110px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Assessments</TableHead>
-                                <TableHead class="w-[120px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Final</TableHead>
-                                <TableHead class="w-[70px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Letter</TableHead>
-                                <TableHead class="w-[110px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Result</TableHead>
-                                <TableHead class="w-[110px] text-right text-[11px] uppercase tracking-wider text-muted-foreground">Action</TableHead>
+                                <TableHead class="text-muted-foreground w-[120px] text-[11px] tracking-wider uppercase">Code</TableHead>
+                                <TableHead class="text-muted-foreground text-[11px] tracking-wider uppercase">Course</TableHead>
+                                <TableHead class="text-muted-foreground w-[80px] text-right text-[11px] tracking-wider uppercase">Credit</TableHead>
+                                <TableHead class="text-muted-foreground w-[120px] text-right text-[11px] tracking-wider uppercase">Final</TableHead>
+                                <TableHead class="text-muted-foreground w-[70px] text-right text-[11px] tracking-wider uppercase">Letter</TableHead>
+                                <TableHead class="text-muted-foreground w-[110px] text-right text-[11px] tracking-wider uppercase">Result</TableHead>
+                                <TableHead class="text-muted-foreground w-[110px] text-right text-[11px] tracking-wider uppercase">Action</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            <TableRow
-                                v-for="course in group.courses"
-                                :key="course.course_offering_id"
-                                class="group/row transition-colors hover:bg-muted/40"
-                            >
+                            <TableRow v-for="course in group.courses" :key="course.course_offering_id" class="group/row hover:bg-muted/40 transition-colors">
                                 <TableCell class="font-mono text-sm font-medium tabular-nums">{{ course.course_code }}</TableCell>
                                 <TableCell>
                                     <div class="max-w-[420px]">
@@ -342,55 +316,30 @@ const openScoreDetails = (course: CourseScores): void => {
                                     </div>
                                 </TableCell>
                                 <TableCell class="text-right">
-                                    <span
-                                        v-if="course.credit_points !== undefined && course.credit_points > 0"
-                                        class="font-mono text-sm font-medium tabular-nums"
-                                    >
+                                    <span v-if="course.credit_points !== undefined && course.credit_points > 0" class="font-mono text-sm font-medium tabular-nums">
                                         {{ formatNumber(course.credit_points, 1) }}
                                     </span>
-                                    <span v-else class="text-sm text-muted-foreground">—</span>
+                                    <span v-else class="text-muted-foreground text-sm">—</span>
                                 </TableCell>
                                 <TableCell class="text-right">
-                                    <span class="font-mono text-sm tabular-nums text-muted-foreground">
-                                        <span class="text-foreground">{{ course.completed_assessments }}</span>
-                                        <span> / </span>
-                                        <span>{{ course.total_assessments }}</span>
-                                    </span>
-                                </TableCell>
-                                <TableCell class="text-right">
-                                    <span
-                                        class="inline-flex min-w-[72px] justify-end rounded-md border px-2.5 py-1 font-mono text-sm font-semibold tabular-nums"
-                                        :class="courseAverageBadgeClass(course.course_average)"
-                                    >
+                                    <span class="inline-flex min-w-[72px] justify-end rounded-md border px-2.5 py-1 font-mono text-sm font-semibold tabular-nums" :class="courseAverageBadgeClass(course.course_average)">
                                         {{ formatNumber(course.course_average, 2) }}
                                     </span>
                                 </TableCell>
                                 <TableCell class="text-right">
-                                    <span
-                                        v-if="course.final_letter_grade"
-                                        class="font-mono text-sm font-semibold tabular-nums"
-                                        :class="gpaToneClass(course.course_average)"
-                                    >
+                                    <span v-if="course.final_letter_grade" class="font-mono text-sm font-semibold tabular-nums" :class="gpaToneClass(course.course_average)">
                                         {{ course.final_letter_grade }}
                                     </span>
-                                    <span v-else class="text-sm text-muted-foreground">—</span>
+                                    <span v-else class="text-muted-foreground text-sm">—</span>
                                 </TableCell>
                                 <TableCell class="text-right">
-                                    <span
-                                        class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider"
-                                        :class="passFailBadge(course).class"
-                                    >
+                                    <span class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium tracking-wider uppercase" :class="passFailBadge(course).class">
                                         <span class="size-1.5 rounded-full bg-current"></span>
                                         {{ passFailBadge(course).label }}
                                     </span>
                                 </TableCell>
                                 <TableCell class="text-right">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        class="opacity-70 transition-opacity group-hover/row:opacity-100"
-                                        @click="openScoreDetails(course)"
-                                    >
+                                    <Button variant="ghost" size="sm" class="opacity-70 transition-opacity group-hover/row:opacity-100" @click="openScoreDetails(course)">
                                         <Eye class="mr-1.5 size-3.5" />
                                         Details
                                     </Button>
@@ -402,10 +351,10 @@ const openScoreDetails = (course: CourseScores): void => {
             </section>
 
             <!-- Empty state -->
-            <section v-else class="rounded-xl border border-dashed border-border bg-card py-14 text-center">
-                <Target class="mx-auto mb-3 size-10 text-muted-foreground" />
+            <section v-else class="border-border bg-card rounded-xl border border-dashed py-14 text-center">
+                <Target class="text-muted-foreground mx-auto mb-3 size-10" />
                 <h3 class="mb-1 text-lg font-semibold tracking-tight">No course scores yet</h3>
-                <p class="text-sm text-muted-foreground">There are no graded courses recorded for this student.</p>
+                <p class="text-muted-foreground text-sm">There are no graded courses recorded for this student.</p>
             </section>
         </template>
 
@@ -414,47 +363,47 @@ const openScoreDetails = (course: CourseScores): void => {
             <DialogContent class="max-h-[80vh] !max-w-5xl overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle v-if="selectedScoreDetails" class="flex items-center gap-2">
-                        <span class="font-mono text-sm font-medium text-muted-foreground">{{ selectedScoreDetails.course_code }}</span>
+                        <span class="text-muted-foreground font-mono text-sm font-medium">{{ selectedScoreDetails.course_code }}</span>
                         <span class="text-base font-semibold">{{ selectedScoreDetails.course_name }}</span>
                     </DialogTitle>
                 </DialogHeader>
 
                 <div v-if="selectedScoreDetails" class="space-y-5">
                     <!-- Course header strip -->
-                    <div class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-4">
+                    <div class="border-border bg-border grid grid-cols-2 gap-px overflow-hidden rounded-lg border md:grid-cols-4">
                         <div class="bg-card p-3">
-                            <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Semester</p>
+                            <p class="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">Semester</p>
                             <p class="mt-1 truncate font-medium">{{ selectedScoreDetails.semester }}</p>
                         </div>
                         <div class="bg-card p-3">
-                            <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Course average</p>
+                            <p class="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">Course average</p>
                             <p class="mt-1 font-mono font-semibold tabular-nums" :class="gpaToneClass(selectedScoreDetails.course_average)">
                                 {{ formatPercentage(selectedScoreDetails.course_average) }}
                             </p>
                         </div>
                         <div class="bg-card p-3">
-                            <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Assessments</p>
+                            <p class="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">Assessments</p>
                             <p class="mt-1 font-mono font-medium tabular-nums">{{ selectedScoreDetails.total_assessments }}</p>
                         </div>
                         <div class="bg-card p-3">
-                            <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Completed</p>
-                            <p class="mt-1 font-mono font-medium tabular-nums text-emerald-700 dark:text-emerald-400">
+                            <p class="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">Completed</p>
+                            <p class="mt-1 font-mono font-medium text-emerald-700 tabular-nums dark:text-emerald-400">
                                 {{ selectedScoreDetails.completed_assessments }}
                             </p>
                         </div>
                     </div>
 
                     <!-- Assessment table -->
-                    <div class="overflow-hidden rounded-lg border border-border">
+                    <div class="border-border overflow-hidden rounded-lg border">
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead class="text-[11px] uppercase tracking-wider text-muted-foreground">Assessment</TableHead>
-                                    <TableHead class="text-[11px] uppercase tracking-wider text-muted-foreground">Type</TableHead>
-                                    <TableHead class="text-[11px] uppercase tracking-wider text-muted-foreground">Due</TableHead>
-                                    <TableHead class="text-right text-[11px] uppercase tracking-wider text-muted-foreground">Score</TableHead>
-                                    <TableHead class="text-right text-[11px] uppercase tracking-wider text-muted-foreground">%</TableHead>
-                                    <TableHead class="text-right text-[11px] uppercase tracking-wider text-muted-foreground">Status</TableHead>
+                                    <TableHead class="text-muted-foreground text-[11px] tracking-wider uppercase">Assessment</TableHead>
+                                    <TableHead class="text-muted-foreground text-[11px] tracking-wider uppercase">Type</TableHead>
+                                    <TableHead class="text-muted-foreground text-[11px] tracking-wider uppercase">Due</TableHead>
+                                    <TableHead class="text-muted-foreground text-right text-[11px] tracking-wider uppercase">Score</TableHead>
+                                    <TableHead class="text-muted-foreground text-right text-[11px] tracking-wider uppercase">%</TableHead>
+                                    <TableHead class="text-muted-foreground text-right text-[11px] tracking-wider uppercase">Status</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -464,15 +413,13 @@ const openScoreDetails = (course: CourseScores): void => {
                                         <p v-if="score.is_late" class="text-xs text-rose-600">Late submission</p>
                                     </TableCell>
                                     <TableCell class="text-muted-foreground">{{ score.assessment_type }}</TableCell>
-                                    <TableCell class="text-sm text-muted-foreground">{{ formatDate(score.due_date) }}</TableCell>
-                                    <TableCell class="text-right font-mono tabular-nums">
-                                        {{ score.points_earned }} / {{ score.max_points }}
-                                    </TableCell>
+                                    <TableCell class="text-muted-foreground text-sm">{{ formatDate(score.due_date) }}</TableCell>
+                                    <TableCell class="text-right font-mono tabular-nums"> {{ score.points_earned }} / {{ score.max_points }} </TableCell>
                                     <TableCell class="text-right font-mono font-medium tabular-nums" :class="gpaToneClass(score.percentage_score)">
                                         {{ formatPercentage(score.percentage_score) }}
                                     </TableCell>
                                     <TableCell class="text-right">
-                                        <span class="inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider" :class="assessmentStatusToneClass(score.status)">
+                                        <span class="inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium tracking-wider uppercase" :class="assessmentStatusToneClass(score.status)">
                                             {{ score.status }}
                                         </span>
                                     </TableCell>

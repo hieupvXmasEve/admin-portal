@@ -11,9 +11,9 @@ use App\Models\GpaCalculation;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
-use Illuminate\Support\Facades\Cache;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Service class for handling Student Academic Summary business logic
@@ -113,7 +113,7 @@ class StudentAcademicSummaryService
                 'intake_school' => $student->intakeSemester ? [
                     'code' => $student->intakeSemester->code,
                     'name' => $student->intakeSemester->name,
-                    'intake_year' => \Carbon\Carbon::parse($student->intakeSemester->start_date)->year,
+                    'intake_year' => Carbon::parse($student->intakeSemester->start_date)->year,
                 ] : null,
                 'intake_major' => $student->intakeMajorSemester ? [
                     'code' => $student->intakeMajorSemester->code,
@@ -228,14 +228,14 @@ class StudentAcademicSummaryService
                         // Match semesters that could belong to this academic year
                         $subQuery->where(function ($q) use ($endYear) {
                             // Spring semester of the academic year (contains end year)
-                            $q->where('code', 'LIKE', '%SPR' . $endYear . '%')
-                                ->orWhere('name', 'LIKE', '%Spring ' . $endYear . '%')
-                                ->orWhere('name', 'LIKE', '%Spring' . $endYear . '%');
+                            $q->where('code', 'LIKE', '%SPR'.$endYear.'%')
+                                ->orWhere('name', 'LIKE', '%Spring '.$endYear.'%')
+                                ->orWhere('name', 'LIKE', '%Spring'.$endYear.'%');
                         })->orWhere(function ($q) use ($startYear) {
                             // Fall semester of the academic year (contains start year)
-                            $q->where('code', 'LIKE', '%FALL' . $startYear . '%')
-                                ->orWhere('name', 'LIKE', '%Fall ' . $startYear . '%')
-                                ->orWhere('name', 'LIKE', '%Fall' . $startYear . '%');
+                            $q->where('code', 'LIKE', '%FALL'.$startYear.'%')
+                                ->orWhere('name', 'LIKE', '%Fall '.$startYear.'%')
+                                ->orWhere('name', 'LIKE', '%Fall'.$startYear.'%');
                         });
                     }
                 });
@@ -341,9 +341,9 @@ class StudentAcademicSummaryService
                 'pass_fail_badge_color' => $this->getPassFailBadgeColor($passFailStatus),
                 'is_passing_grade' => $this->isPassingGrade($finalGrade),
                 'formatted_registration_date' => $registration->registration_date ?
-                    \Carbon\Carbon::parse($registration->registration_date)->format('M j, Y') : null,
+                    Carbon::parse($registration->registration_date)->format('M j, Y') : null,
                 'formatted_completion_date' => $registration->completion_date ?
-                    \Carbon\Carbon::parse($registration->completion_date)->format('M j, Y') : null,
+                    Carbon::parse($registration->completion_date)->format('M j, Y') : null,
             ];
         });
 
@@ -526,11 +526,11 @@ class StudentAcademicSummaryService
                 $year = (int) $matches[1];
                 // If it's a spring semester, it's the second year of the academic year
                 if (str_contains(strtolower($semester->code), 'spr')) {
-                    return ($year - 1) . '-' . $year;
+                    return ($year - 1).'-'.$year;
                 }
 
                 // If it's a fall semester, it's the first year of the academic year
-                return $year . '-' . ($year + 1);
+                return $year.'-'.($year + 1);
             }
         }
 
@@ -540,26 +540,26 @@ class StudentAcademicSummaryService
                 $year = (int) $matches[1];
                 // If it's a spring semester, it's the second year of the academic year
                 if (str_contains(strtolower($semester->name), 'spring')) {
-                    return ($year - 1) . '-' . $year;
+                    return ($year - 1).'-'.$year;
                 }
 
                 // If it's a fall semester, it's the first year of the academic year
-                return $year . '-' . ($year + 1);
+                return $year.'-'.($year + 1);
             }
         }
 
         // Try to derive from start_date
         if ($semester->start_date) {
-            $startYear = \Carbon\Carbon::parse($semester->start_date)->year;
-            $startMonth = \Carbon\Carbon::parse($semester->start_date)->month;
+            $startYear = Carbon::parse($semester->start_date)->year;
+            $startMonth = Carbon::parse($semester->start_date)->month;
 
             // If semester starts in Jan-Jul, it's likely the second year of the academic year
             if ($startMonth <= 7) {
-                return ($startYear - 1) . '-' . $startYear;
+                return ($startYear - 1).'-'.$startYear;
             }
 
             // If semester starts in Aug-Dec, it's likely the first year of the academic year
-            return $startYear . '-' . ($startYear + 1);
+            return $startYear.'-'.($startYear + 1);
         }
 
         return 'Unknown';
@@ -633,6 +633,7 @@ class StudentAcademicSummaryService
 
         // Get module scores
         $moduleScores = $this->getModuleScores($student);
+        $creditPointSnapshots = $this->getCreditPointSnapshots($student);
 
         // Per-semester GPA snapshots + cumulative (sources of truth for the transcript view).
         $gpaRows = GpaCalculation::where('student_id', $student->id)
@@ -640,15 +641,17 @@ class StudentAcademicSummaryService
             ->orderBy('semester_id', 'asc')
             ->get();
 
-        $semesterGpa = $gpaRows->map(function (GpaCalculation $g): array {
+        $semesterGpa = $gpaRows->map(function (GpaCalculation $g) use ($creditPointSnapshots): array {
+            $semesterCredits = $creditPointSnapshots['semesters']->get($g->semester_id);
+
             return [
                 'semester_id' => $g->semester_id,
                 'semester_name' => $g->semester?->name ?? 'N/A',
                 'semester_code' => $g->semester?->code ?? '',
                 'start_date' => optional($g->semester?->start_date)->toDateString(),
                 'semester_gpa' => (float) $g->semester_gpa,
-                'credit_points_attempted' => (float) $g->semester_credit_points,
-                'credit_points_earned' => (float) $g->semester_credit_points_earned,
+                'credit_points_attempted' => $semesterCredits['attempted'] ?? (float) $g->semester_credit_points,
+                'credit_points_earned' => $semesterCredits['earned'] ?? (float) $g->semester_credit_points_earned,
                 'academic_standing' => $g->academic_standing,
                 'is_finalized' => (bool) $g->is_finalized,
                 'finalized_at' => optional($g->finalized_at)->toIso8601String(),
@@ -656,11 +659,16 @@ class StudentAcademicSummaryService
         })->values();
 
         $currentGpa = $gpaRows->firstWhere('is_current', true) ?? $gpaRows->last();
+        $cumulativeCredits = $creditPointSnapshots['cumulative'];
 
         $cumulative = $currentGpa ? [
             'gpa' => (float) $currentGpa->cumulative_gpa,
-            'credit_points_attempted' => (float) $currentGpa->cumulative_credit_points,
-            'credit_points_earned' => (float) $currentGpa->cumulative_credit_points_earned,
+            'credit_points_attempted' => $cumulativeCredits['has_records']
+                ? $cumulativeCredits['attempted']
+                : (float) $currentGpa->cumulative_credit_points,
+            'credit_points_earned' => $cumulativeCredits['has_records']
+                ? $cumulativeCredits['earned']
+                : (float) $currentGpa->cumulative_credit_points_earned,
             'academic_standing' => $currentGpa->academic_standing,
             'last_finalized_at' => optional($currentGpa->finalized_at)->toIso8601String(),
             'semesters_count' => $gpaRows->count(),
@@ -699,12 +707,43 @@ class StudentAcademicSummaryService
     }
 
     /**
+     * Build credit attempted/earned snapshots from academic records.
+     *
+     * Attempted credits count every final credit-bearing attempt, including
+     * retakes. Earned credits count only attempts marked as passed.
+     */
+    private function getCreditPointSnapshots(Student $student): array
+    {
+        $records = $student->academicRecords()
+            ->where('excluded_from_gpa', false)
+            ->where('grade_status', 'final')
+            ->where('credit_points', '>', 0)
+            ->get(['semester_id', 'credit_points', 'is_passed']);
+
+        $semesters = $records
+            ->groupBy('semester_id')
+            ->map(fn ($semesterRecords): array => [
+                'attempted' => (float) $semesterRecords->sum('credit_points'),
+                'earned' => (float) $semesterRecords->where('is_passed', true)->sum('credit_points'),
+            ]);
+
+        return [
+            'semesters' => $semesters,
+            'cumulative' => [
+                'attempted' => (float) $records->sum('credit_points'),
+                'earned' => (float) $records->where('is_passed', true)->sum('credit_points'),
+                'has_records' => $records->isNotEmpty(),
+            ],
+        ];
+    }
+
+    /**
      * Get module scores with sub-unit details
      *
      * @param  Student  $student  The student model
-     * @return \Illuminate\Support\Collection Module scores data
+     * @return Collection Module scores data
      */
-    private function getModuleScores(Student $student): \Illuminate\Support\Collection
+    private function getModuleScores(Student $student): Collection
     {
         // Check if student has curriculum with modules
         if (! $student->curriculumVersion) {
@@ -741,10 +780,10 @@ class StudentAcademicSummaryService
 
             // Separate graded vs pass/fail units
             $gradedRecords = $academicRecords->filter(
-                fn($r) => $r->courseOffering && $r->courseOffering->grading_type === 'grade'
+                fn ($r) => $r->courseOffering && $r->courseOffering->grading_type === 'grade'
             );
             $passfailRecords = $academicRecords->filter(
-                fn($r) => $r->courseOffering && $r->courseOffering->grading_type === 'pass_fail'
+                fn ($r) => $r->courseOffering && $r->courseOffering->grading_type === 'pass_fail'
             );
 
             // Calculate module grade (only from graded units)
@@ -1130,7 +1169,7 @@ class StudentAcademicSummaryService
     /**
      * Calculate GPA trend over time
      *
-     * @param  \Illuminate\Support\Collection  $gpaCalculations
+     * @param  Collection  $gpaCalculations
      * @return string Trend indicator
      */
     private function calculateGpaTrend($gpaCalculations): string
@@ -1331,7 +1370,7 @@ class StudentAcademicSummaryService
             'semesters_remaining' => $semestersRemaining,
             'projected_date' => $projectedDate->format('Y-m-d'),
             'on_track' => $projectedDate <= ($student->expected_graduation_date ?
-                \Carbon\Carbon::parse($student->expected_graduation_date) :
+                Carbon::parse($student->expected_graduation_date) :
                 now()->addYears(2)),
         ];
     }
@@ -1491,7 +1530,7 @@ class StudentAcademicSummaryService
     /**
      * Calculate weighted average for assessment components
      *
-     * @param  \Illuminate\Support\Collection  $components
+     * @param  Collection  $components
      * @return float Weighted average
      */
     private function calculateWeightedAverage($components): float
