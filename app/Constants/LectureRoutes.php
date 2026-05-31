@@ -49,6 +49,8 @@ class LectureRoutes
     // Teaching Hours Report
     public const TEACHING_HOURS = 'lectures.teaching-hours';
 
+    public const TEACHING_HOURS_EXPORT = 'lectures.teaching-hours.export';
+
     public const TEACHING_HOURS_DETAILS = 'lectures.teaching-hours.details';
 
     // Route Prefixes

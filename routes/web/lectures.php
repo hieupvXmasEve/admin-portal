@@ -63,6 +63,10 @@ Route::middleware('auth')->group(function () {
         ->middleware('can:view_lecturer')
         ->name(LectureRoutes::TEACHING_HOURS);
 
+    Route::get('lectures/teaching-hours/export/excel', [LectureExportController::class, 'exportTeachingHours'])
+        ->middleware('can:export_lecturer')
+        ->name(LectureRoutes::TEACHING_HOURS_EXPORT);
+
     Route::get('lectures/teaching-hours/{lecture}', [LectureController::class, 'showTeachingHours'])
         ->middleware('can:view_lecturer')
         ->name(LectureRoutes::TEACHING_HOURS_DETAILS);

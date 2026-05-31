@@ -442,11 +442,12 @@ class LectureController extends Controller
         $currentCampusId = session('current_campus_id');
 
         $validated = $request->validated();
+        $filters = $action->normalizeFilters($validated);
 
-        $results = $action->execute($validated, (int) $currentCampusId);
+        $results = $action->execute($filters, (int) $currentCampusId);
 
         // Get semesters for filter dropdown
-        $semesters = Semester::select('id', 'name', 'code', 'start_date', 'end_date')
+        $semesters = Semester::select('id', 'name', 'code', 'start_date', 'end_date', 'is_active')
             ->orderBy('start_date', 'desc')
             ->get()
             ->map(function ($semester) {
@@ -454,20 +455,13 @@ class LectureController extends Controller
                     'id' => $semester->id,
                     'name' => $semester->name,
                     'code' => $semester->code,
+                    'is_active' => $semester->is_active,
                 ];
             });
 
         return Inertia::render('lectures/TeachingHours', [
             'lecturers' => $results,
-            'filters' => [
-                'semester_id' => $validated['semester_id'] ?? 'all',
-                'search' => $validated['search'] ?? '',
-                'date_from' => $validated['date_from'] ?? '2025-01-01',
-                'date_to' => $validated['date_to'] ?? now()->format('Y-m-d'),
-                'sort' => $validated['sort'] ?? 'name',
-                'direction' => $validated['direction'] ?? 'asc',
-                'per_page' => $validated['per_page'] ?? 15,
-            ],
+            'filters' => $filters,
             'semesters' => $semesters,
         ]);
     }

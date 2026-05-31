@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web\Lectures;
 
+use App\Actions\Lecture\GetTeachingHoursAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Lecture\ViewTeachingHoursRequest;
 use App\Services\LectureExcelExportService;
+use App\Services\LectureTeachingHoursExcelExportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -142,6 +145,44 @@ class LectureExportController extends Controller
             Log::error('Filtered lecturers export failed: '.$e->getMessage(), [
                 'user_id' => Auth::id(),
                 'filters' => $validated ?? [],
+            ]);
+
+            return response()->json([
+                'error' => 'Export failed: '.$e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Export the teaching-hours summary using the current report filters.
+     */
+    public function exportTeachingHours(
+        ViewTeachingHoursRequest $request,
+        GetTeachingHoursAction $action,
+        LectureTeachingHoursExcelExportService $exportService
+    ): BinaryFileResponse|JsonResponse {
+        $validated = $request->validated();
+        $filters = $action->normalizeFilters($validated);
+
+        try {
+            $campusId = (int) session('current_campus_id');
+            $filePath = $exportService->exportTeachingHoursToExcel($filters, $campusId);
+            $fileName = 'teaching_hours_export_'.now()->format('Y-m-d').'.xlsx';
+
+            Log::info('Teaching hours export completed successfully', [
+                'user_id' => Auth::id(),
+                'filters' => $filters,
+                'file_name' => $fileName,
+            ]);
+
+            return response()->download($filePath, $fileName, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
+            ])->deleteFileAfterSend(true);
+        } catch (\Exception $e) {
+            Log::error('Teaching hours export failed: '.$e->getMessage(), [
+                'user_id' => Auth::id(),
+                'filters' => $filters,
             ]);
 
             return response()->json([

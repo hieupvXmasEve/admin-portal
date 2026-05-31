@@ -2,121 +2,127 @@
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
+import DatePicker from '@/components/ui/DatePicker.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useInertiaFilters } from '@/composables';
+import { useDataTable } from '@/composables/useDataTable';
 import { PaginatedResponse } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { Clock, X } from 'lucide-vue-next';
+import { Clock, Download, X } from 'lucide-vue-next';
 import { computed, h } from 'vue';
+import { route } from 'ziggy-js';
 
 interface LecturerTeachingHours {
     lecture_id: number;
     lecture_name: string;
     lecture_email: string;
+    email_account: string;
+    employee_id: string;
+    employment_type: string;
+    employment_type_label: string;
+    course_list: string;
+    teaching_subjects: string;
     total_hours: number;
     total_minutes: number;
     session_count: number;
+    course_count: number;
 }
 
 interface Semester {
     id: number;
     name: string;
     code: string;
+    is_active: boolean;
 }
 
 interface TeachingHoursFilters {
-    semester_id?: string;
-    search?: string;
-    date_from?: string;
-    date_to?: string;
-    sort?: string;
-    direction?: string;
-    per_page?: number;
+    semester_id: string;
+    search: string;
+    date_from: string;
+    date_to: string;
+    sort: string | null;
+    direction: 'asc' | 'desc' | null;
+    per_page: number;
     page?: number;
 }
 
 const props = defineProps<{
     lecturers: PaginatedResponse<LecturerTeachingHours>;
-    filters?: TeachingHoursFilters;
+    filters: TeachingHoursFilters;
     semesters: Semester[];
 }>();
 
-// Reactive data
 const data = computed(() => props.lecturers.data);
+const defaultSemesterId = props.filters?.semester_id || 'all';
 
-// Get today's date in YYYY-MM-DD format for max date validation
-const today = computed(() => {
-    const date = new Date();
-    return date.toISOString().split('T')[0];
-});
-
-// Initialize filters with useInertiaFilters composable
-const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilter, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection } = useInertiaFilters<TeachingHoursFilters>({
-    baseUrl: '/lectures/teaching-hours',
+const { filters, hasActiveFilters, clearAllFilters, handleSearch, handleSortChange, handlePaginationNavigate, handlePageSizeChange, setFilter, currentSort, currentDirection, isLoading } = useDataTable<TeachingHoursFilters>({
+    baseUrl: route('lectures.teaching-hours'),
     initialFilters: {
-        semester_id: props.filters?.semester_id || 'all',
-        search: props.filters?.search || '',
-        date_from: props.filters?.date_from || '2025-01-01',
-        date_to: props.filters?.date_to || today.value,
-        sort: props.filters?.sort || 'name',
-        direction: props.filters?.direction || 'asc',
-        per_page: props.filters?.per_page || 15,
-    },
-    emptyFilters: {
-        semester_id: 'all',
-        search: '',
-        date_from: '2025-01-01',
-        date_to: today.value,
-        sort: 'name',
-        direction: 'asc',
-        per_page: 15,
+        semester_id: defaultSemesterId,
+        search: props.filters?.search ?? '',
+        date_from: props.filters?.date_from ?? '',
+        date_to: props.filters?.date_to ?? '',
+        sort: props.filters?.sort ?? 'name',
+        direction: props.filters?.direction ?? 'asc',
+        per_page: props.filters?.per_page ?? 15,
+        page: props.filters?.page ?? 1,
     },
     defaultValues: {
-        per_page: 15,
-        direction: 'asc',
+        semester_id: defaultSemesterId,
+        search: '',
+        date_from: '',
+        date_to: '',
         sort: 'name',
+        direction: 'asc',
+        per_page: 15,
     },
     only: ['lecturers', 'filters'],
-    transform: (filters) => ({
-        ...filters,
-        per_page: Number(filters.per_page),
-    }),
+    debounce: 300,
+    fieldDebounce: { search: 400 },
+    immediateFields: ['semester_id', 'date_from', 'date_to'],
 });
 
-// Computed sort values for DataTable (unwrap computed refs)
-const sortValue = computed(() => {
-    const sort = currentSort.value;
-    return typeof sort === 'string' ? sort : undefined;
-});
+const sortValue = computed(() => currentSort.value ?? undefined);
+const directionValue = computed(() => currentDirection.value ?? undefined);
 
-const directionValue = computed(() => {
-    const dir = currentDirection.value;
-    return dir === 'asc' || dir === 'desc' ? dir : undefined;
-});
-
-// Semester filter handler
 const handleSemesterChange = (value: string | number | bigint | Record<string, any> | null) => {
-    handleSelectFilter('semester_id', value, 'all');
+    setFilter('semester_id', String(value ?? defaultSemesterId));
 };
 
-// Date from handler
-const handleDateFromChange = (event: Event) => {
-    const target = event.target as HTMLInputElement;
-    filters.date_from = target.value;
+const handleDateFromChange = (value: string) => {
+    setFilter('date_from', value);
 };
 
-// Date to handler
-const handleDateToChange = (event: Event) => {
-    const target = event.target as HTMLInputElement;
-    filters.date_to = target.value;
+const handleDateToChange = (value: string) => {
+    setFilter('date_to', value);
 };
 
-// Column definitions
+const exportUrl = computed(() => {
+    const params = new URLSearchParams();
+    const exportFilters: Partial<TeachingHoursFilters> = {
+        semester_id: filters.semester_id,
+        search: filters.search,
+        date_from: filters.date_from,
+        date_to: filters.date_to,
+        sort: filters.sort,
+        direction: filters.direction,
+    };
+
+    Object.entries(exportFilters).forEach(([key, value]) => {
+        if (value !== null && value !== undefined && value !== '') {
+            params.set(key, String(value));
+        }
+    });
+
+    const query = params.toString();
+    const url = route('lectures.teaching-hours.export');
+
+    return query ? `${url}?${query}` : url;
+});
+
 const columns: ColumnDef<LecturerTeachingHours>[] = [
     {
         header: 'No',
@@ -126,51 +132,64 @@ const columns: ColumnDef<LecturerTeachingHours>[] = [
         cell: ({ row }) => {
             const currentPage = props.lecturers.current_page;
             const perPage = props.lecturers.per_page;
-            const rowIndex = row.index;
-            return (currentPage - 1) * perPage + rowIndex + 1;
+            return (currentPage - 1) * perPage + row.index + 1;
         },
     },
     {
-        header: 'Lecturer Name',
+        header: 'Lecturer name',
         id: 'name',
         accessorKey: 'lecture_name',
         enableSorting: true,
-        cell: ({ row }) => {
-            return h(
+        cell: ({ row }) =>
+            h(
                 Link,
                 {
-                    href: `/lectures/teaching-hours/${row.original.lecture_id}`,
-                    class: 'font-medium hover:underline text-primary',
+                    href: route('lectures.teaching-hours.details', row.original.lecture_id),
+                    class: 'font-medium text-primary hover:underline',
                 },
                 () => row.original.lecture_name,
-            );
-        },
+            ),
     },
     {
-        header: 'Email',
-        accessorKey: 'lecture_email',
+        header: 'Email account',
+        accessorKey: 'email_account',
         enableSorting: false,
-        cell: ({ row }) => {
-            return h('span', { class: 'text-muted-foreground' }, row.original.lecture_email);
-        },
+        cell: ({ row }) => h('span', { class: 'font-mono text-sm' }, row.original.email_account),
     },
     {
-        header: 'Total Hours',
+        header: 'Employee ID',
+        id: 'employee_id',
+        accessorKey: 'employee_id',
+        enableSorting: true,
+        cell: ({ row }) => h('span', { class: 'font-mono text-sm' }, row.original.employee_id),
+    },
+    {
+        header: 'Type',
+        id: 'type',
+        accessorKey: 'employment_type_label',
+        enableSorting: true,
+        cell: ({ row }) => h('span', { class: 'text-sm' }, row.original.employment_type_label),
+    },
+    {
+        header: 'Course dạy',
+        accessorKey: 'course_list',
+        enableSorting: false,
+        cell: ({ row }) => h('div', { class: 'max-w-[280px] whitespace-normal text-sm leading-5' }, row.original.course_list || 'N/A'),
+    },
+    {
+        header: 'Môn giảng dạy của GV',
+        accessorKey: 'teaching_subjects',
+        enableSorting: false,
+        cell: ({ row }) => h('div', { class: 'max-w-[220px] whitespace-normal font-mono text-sm leading-5' }, row.original.teaching_subjects || 'N/A'),
+    },
+    {
+        header: 'Total hours',
         id: 'hours',
         accessorKey: 'total_hours',
         enableSorting: true,
         cell: ({ row }) => {
-            const hours = row.original.total_hours;
-            return h('div', { class: 'flex items-center gap-2' }, [h(Clock, { class: 'h-4 w-4 text-muted-foreground' }), h('span', { class: 'font-semibold' }, `${hours.toFixed(2)} hours`)]);
-        },
-    },
-    {
-        header: 'Session Count',
-        accessorKey: 'session_count',
-        enableSorting: false,
-        cell: ({ row }) => {
-            const count = row.original.session_count;
-            return h('span', { class: 'text-muted-foreground' }, `${count} session${count !== 1 ? 's' : ''}`);
+            const hours = Number(row.original.total_hours);
+            return h('div', { class: 'flex items-center gap-2' }, [h(Clock, { class: 'h-4 w-4 text-muted-foreground' }), h('span', { class: 'font-semibold tabular-nums' }, hours.toFixed(2))]);
         },
     },
 ];
@@ -179,52 +198,53 @@ const columns: ColumnDef<LecturerTeachingHours>[] = [
 <template>
     <Head title="Lecturer Teaching Hours" />
 
-    <!-- Page Header -->
-    <div class="mb-6">
-        <h1 class="text-2xl font-semibold">Lecturer Teaching Hours Report</h1>
-        <p class="text-muted-foreground mt-1 text-sm">View total teaching hours for lecturers filtered by semester and date range</p>
+    <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+            <h1 class="text-2xl font-semibold">Lecturer Teaching Hours Report</h1>
+            <p class="text-muted-foreground mt-1 text-sm">Summary by lecturer, semester, and optional date range.</p>
+        </div>
+        <Button as-child variant="outline">
+            <a :href="exportUrl">
+                <Download class="mr-2 h-4 w-4" />
+                Export Excel
+            </a>
+        </Button>
     </div>
 
-    <!-- Filters Section -->
     <Card class="mb-6">
         <CardContent class="pt-6">
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <!-- Semester Filter -->
                 <div class="space-y-2">
                     <Label for="semester">Semester</Label>
-                    <Select :model-value="filters.semester_id || 'all'" @update:model-value="handleSemesterChange">
+                    <Select :model-value="filters.semester_id || defaultSemesterId" @update:model-value="handleSemesterChange">
                         <SelectTrigger id="semester">
-                            <SelectValue placeholder="All Semesters" />
+                            <SelectValue placeholder="Select semester" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Semesters</SelectItem>
-                            <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()"> {{ semester.name }} ({{ semester.code }}) </SelectItem>
+                            <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()"> {{ semester.name }} ({{ semester.code }})<span v-if="semester.is_active"> - Active</span> </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
-                <!-- Search Filter -->
                 <div class="space-y-2">
-                    <Label for="search">Search Lecturer</Label>
-                    <DebouncedInput id="search" :model-value="filters.search || ''" placeholder="Search by name or email..." @debounced="handleSearch" />
+                    <Label for="search">Search lecturer</Label>
+                    <DebouncedInput id="search" :model-value="filters.search || ''" placeholder="Name, email, employee ID, subject..." @debounced="handleSearch" />
                 </div>
 
-                <!-- Date From Filter -->
                 <div class="space-y-2">
-                    <Label for="date_from">From Date</Label>
-                    <Input id="date_from" type="date" :model-value="filters.date_from" :min="'2025-01-01'" :max="today" @change="handleDateFromChange" />
+                    <Label>From date</Label>
+                    <DatePicker :model-value="filters.date_from || ''" placeholder="From date" @update:model-value="handleDateFromChange" />
                 </div>
 
-                <!-- Date To Filter -->
                 <div class="space-y-2">
-                    <Label for="date_to">To Date</Label>
-                    <Input id="date_to" type="date" :model-value="filters.date_to" :min="filters.date_from || '2025-01-01'" :max="today" @change="handleDateToChange" />
+                    <Label>To date</Label>
+                    <DatePicker :model-value="filters.date_to || ''" placeholder="To date" @update:model-value="handleDateToChange" />
                 </div>
             </div>
 
-            <!-- Clear Filters Button -->
             <div v-if="hasActiveFilters" class="mt-4 flex justify-end">
-                <Button variant="ghost" size="sm" @click="clearFilters">
+                <Button variant="ghost" size="sm" @click="clearAllFilters">
                     <X class="mr-2 h-4 w-4" />
                     Clear Filters
                 </Button>
@@ -232,11 +252,9 @@ const columns: ColumnDef<LecturerTeachingHours>[] = [
         </CardContent>
     </Card>
 
-    <!-- Data Table -->
-    <DataTable :data="data" :columns="columns" :loading="false" :initial-sort="sortValue" :initial-direction="directionValue" empty-message="No lecturers found with teaching hours in the selected period." @sort-change="handleSortChange" />
+    <DataTable :data="data" :columns="columns" :loading="isLoading" :initial-sort="sortValue" :initial-direction="directionValue" empty-message="No lecturers found with teaching hours in the selected scope." @sort-change="handleSortChange" />
 
-    <!-- Pagination -->
     <div v-if="lecturers.last_page > 1" class="mt-4">
-        <DataPagination :pagination-data="lecturers" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+        <DataPagination :pagination-data="lecturers" item-name="lecturers" :page-size-options="[15, 25, 50, 100]" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
     </div>
 </template>
