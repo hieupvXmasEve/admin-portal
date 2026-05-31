@@ -183,6 +183,8 @@ Route cluster (`app/Modules/Academic/routes/web.php`):
 
 - `GET /reports/student-decisions`
 - `GET /reports/student-decisions/{studentDecision}`
+- `POST /reports/student-decisions/{studentDecision}/students/preview`
+- `POST /reports/student-decisions/{studentDecision}/students/bulk-link`
 - `POST /reports/student-decisions`
 - `PUT /reports/student-decisions/{studentDecision}`
 
@@ -201,6 +203,8 @@ Query behavior baseline:
 - Decision index sort columns are allowlisted to `decision_number`, `decision_signer`, `issued_at`, and `expires_at` with sanitized defaults (`issued_at` + `desc`).
 - Decision detail view paginates linked student action logs.
 - Decision detail pagination now follows shared server-table keys (`per_page`, `page`) and still accepts legacy aliases (`linked_per_page`, `linked_page`) for compatibility.
+- Decision detail bulk add uses `PreviewStudentDecisionBulkLinkQuery` to normalize pasted student codes, require a selected `action_type`, enforce current-campus matching, show unmatched/skipped rows, and list only unlinked action logs of that selected type as linkable.
+- Decision detail bulk confirm uses `BulkLinkStudentsToDecisionAction` to update eligible same-`action_type` `student_action_logs.decision_id` rows inside a transaction without creating new action logs or overwriting action logs already linked to another decision.
 - Student action list/history/detail queries eager-load linked decision identity fields.
 
 Frontend list workflow baseline:

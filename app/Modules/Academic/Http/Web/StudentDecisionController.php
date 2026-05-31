@@ -4,13 +4,19 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Http\Web;
 
+use App\Enums\StudentActionType;
 use App\Http\Controllers\Controller;
+use App\Http\Responses\ApiResponse;
 use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
+use App\Modules\Academic\Actions\BulkLinkStudentsToDecisionAction;
+use App\Modules\Academic\Http\Requests\BulkStudentDecisionStudentsRequest;
 use App\Modules\Academic\Http\Requests\StoreStudentDecisionRequest;
 use App\Modules\Academic\Http\Requests\UpdateStudentDecisionRequest;
 use App\Modules\Academic\Queries\GetStudentDecisionDetailQuery;
 use App\Modules\Academic\Queries\ListStudentDecisionsQuery;
+use App\Modules\Academic\Queries\PreviewStudentDecisionBulkLinkQuery;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -85,6 +91,41 @@ class StudentDecisionController extends Controller
         return back()->with('success', 'Decision updated successfully.');
     }
 
+    public function previewStudents(
+        BulkStudentDecisionStudentsRequest $request,
+        StudentDecision $studentDecision,
+        PreviewStudentDecisionBulkLinkQuery $query
+    ): JsonResponse {
+        $preview = $query->handle(
+            $studentDecision,
+            $request->studentCodes(),
+            $request->actionType(),
+            session('current_campus_id'),
+            $request->inputCodeCount()
+        );
+
+        return ApiResponse::success($preview, message: 'Student decision preview generated.');
+    }
+
+    public function bulkLinkStudents(
+        BulkStudentDecisionStudentsRequest $request,
+        StudentDecision $studentDecision
+    ): JsonResponse {
+        $result = BulkLinkStudentsToDecisionAction::run(
+            $studentDecision,
+            $request->studentCodes(),
+            $request->actionType(),
+            (int) $request->user()->id,
+            session('current_campus_id'),
+            $request->inputCodeCount()
+        );
+
+        return ApiResponse::success($result, message: sprintf(
+            'Linked %d action(s) to this decision.',
+            $result['linked_action_count']
+        ));
+    }
+
     public function show(Request $request, StudentDecision $studentDecision): Response
     {
         $validated = $request->validate([
@@ -120,6 +161,7 @@ class StudentDecisionController extends Controller
         return Inertia::render('Admin/Reports/StudentDecisions/Show', [
             'decision' => $decision,
             'linkedActions' => $linkedActions,
+            'actionTypes' => StudentActionType::options(),
             'filters' => [
                 'per_page' => $linkedPerPage,
                 'page' => $linkedPage,

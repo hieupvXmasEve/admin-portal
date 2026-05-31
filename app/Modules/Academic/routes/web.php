@@ -312,6 +312,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:view_student_action')
             ->name('show');
 
+        Route::post('/{studentDecision}/students/preview', [StudentDecisionController::class, 'previewStudents'])
+            ->middleware('can:change_student_status')
+            ->name('students.preview');
+
+        Route::post('/{studentDecision}/students/bulk-link', [StudentDecisionController::class, 'bulkLinkStudents'])
+            ->middleware('can:change_student_status')
+            ->name('students.bulk-link');
+
         Route::post('/', [StudentDecisionController::class, 'store'])
             ->middleware('can:change_student_status')
             ->name('store');

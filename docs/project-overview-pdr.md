@@ -84,7 +84,7 @@ Acceptance criteria:
 
 Code baseline:
 
-- Web registry routes exist under `/reports/student-decisions` in `app/Modules/Academic/routes/web.php` (`index`, `show`, `store`, `update`).
+- Web registry routes exist under `/reports/student-decisions` in `app/Modules/Academic/routes/web.php` (`index`, `show`, `store`, `update`, `students.preview`, `students.bulk-link`).
 - Decision records are stored in `student_decisions` (`decision_name`, `decision_number`, `decision_signer`, `issued_at`, `expires_at`, `upload_record_id`, `changed_by_user_id`).
 - `student_action_logs.decision_id` is a nullable FK to `student_decisions.id` with `nullOnDelete`.
 - Student action create/update requests validate `decision_id` with `exists:student_decisions,id`.
@@ -92,11 +92,13 @@ Code baseline:
 - Student decision index query contract accepts `search`, `issued_from`, `issued_to`, `per_page`, `page`, `sort`, and `direction`.
 - Sorting is allowlisted to `decision_number`, `decision_signer`, `issued_at`, and `expires_at` with sanitized defaults (`sort=issued_at`, `direction=desc`, `page=1`).
 - Student decision detail linked-actions pagination follows shared server-table keys (`per_page`, `page`) with compatibility aliases (`linked_per_page`, `linked_page`).
+- Student decision detail supports bulk student-code preview/linking. Staff choose the matching `action_type`, paste up to 100 unique student codes, preview matched current-campus students and linkable action logs of that type, then link eligible unlinked action logs to the decision in one operation. Unknown or cross-campus codes are reported as unmatched, students without a matching action log are skipped, and action logs already linked to any decision are skipped.
 
 Acceptance criteria:
 
 - Staff can register and update student decisions from the Academic report surface.
 - Student action logs can be linked to a registry decision via optional `decision_id`.
+- Staff can bulk link existing, unlinked student action logs to a decision after previewing pasted student codes.
 - Registry screens show linked action and linked student counts per decision.
 
 ### FR-05 API Surface Consistency
