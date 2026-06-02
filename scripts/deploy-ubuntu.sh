@@ -107,6 +107,11 @@ log "Installing frontend dependencies"
 log "Building frontend assets"
 "$pnpm_bin" build
 
+if [ -f resources/js/ziggy.js ] && ! git diff --quiet -- resources/js/ziggy.js; then
+    log "Restoring generated Ziggy source to keep server worktree clean"
+    git restore -- resources/js/ziggy.js
+fi
+
 log "Checking migration status"
 "$php_bin" artisan migrate:status
 

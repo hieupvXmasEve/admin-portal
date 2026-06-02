@@ -60,9 +60,10 @@ jobs:
               exit 10
             fi
 
-            if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+            tracked_changes="$(git status --porcelain --untracked-files=no | sed '/^[ MTADRCU?!][ MTADRCU?!] resources\/js\/ziggy\.js$/d')"
+            if [ -n "${tracked_changes}" ]; then
               echo "Tracked server-side changes exist in ${TARGET_PATH}; aborting to avoid overwriting manual edits." >&2
-              git status --short --untracked-files=no
+              printf '%s\n' "${tracked_changes}"
               exit 11
             fi
 
@@ -125,9 +126,10 @@ jobs:
               exit 10
             fi
 
-            if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+            tracked_changes="$(git status --porcelain --untracked-files=no | sed '/^[ MTADRCU?!][ MTADRCU?!] resources\/js\/ziggy\.js$/d')"
+            if [ -n "${tracked_changes}" ]; then
               echo "Tracked server-side changes exist in ${TARGET_PATH}; aborting to avoid overwriting manual edits." >&2
-              git status --short --untracked-files=no
+              printf '%s\n' "${tracked_changes}"
               exit 11
             fi
 

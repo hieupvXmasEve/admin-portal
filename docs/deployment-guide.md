@@ -630,7 +630,7 @@ DEPLOY_PORT=22
 Deploy behavior:
 
 1. Abort if the target path is not a git worktree.
-2. Abort if tracked server-side changes exist, so CI does not overwrite manual edits.
+2. Abort if tracked server-side changes exist, so CI does not overwrite manual edits. The generated `resources/js/ziggy.js` file is ignored for this dirty-check because deploy regenerates it before asset build.
 3. Fetch the target branch from `origin`.
 4. Check out the branch and reset to the pushed commit for push-triggered deploys.
 5. Run `composer84 install` with optimized autoloading.
@@ -638,11 +638,12 @@ Deploy behavior:
 7. Run `php84 artisan ziggy:generate`.
 8. Run `pnpm install --frozen-lockfile` when `pnpm-lock.yaml` exists.
 9. Run `pnpm build`.
-10. Run `php84 artisan migrate:status`.
-11. Run `php84 artisan migrate --force` only when migrations are enabled.
-12. Run `php84 artisan optimize`.
-13. Run `php84 artisan queue:restart`.
-14. Run a GitHub Actions health check against `/up`.
+10. Restore generated `resources/js/ziggy.js` after build to keep the server worktree clean for the next deploy.
+11. Run `php84 artisan migrate:status`.
+12. Run `php84 artisan migrate --force` only when migrations are enabled.
+13. Run `php84 artisan optimize`.
+14. Run `php84 artisan queue:restart`.
+15. Run a GitHub Actions health check against `/up`.
 
 Migration policy:
 
