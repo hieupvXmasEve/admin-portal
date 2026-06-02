@@ -643,7 +643,7 @@ Deploy behavior:
 12. Run `php84 artisan migrate --force` only when migrations are enabled.
 13. Run `php84 artisan optimize`.
 14. Run `php84 artisan queue:restart`.
-15. Run a GitHub Actions health check against `/up`.
+15. Run a GitHub Actions health check against `/up` with a browser-like user agent, because some aaPanel/WAF rules block default `curl` requests even when the page is reachable in a browser.
 
 Migration policy:
 
