@@ -11,6 +11,7 @@ This guide documents the actual scripts used in this repo:
 - dev stack: [`scripts/dev.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/dev.sh)
 - local production-like stack: [`scripts/local-prod.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/local-prod.sh)
 - production stack: [`scripts/prod.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/prod.sh)
+- Ubuntu host deploy helper: [`scripts/deploy-ubuntu.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/deploy-ubuntu.sh)
 - production DB backup: [`scripts/backup-database.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/backup-database.sh)
 - server bootstrap: [`scripts/server-setup.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/server-setup.sh)
 
@@ -597,6 +598,71 @@ Production:
 ./scripts/prod.sh logs app
 ./scripts/prod.sh artisan queue:restart
 ./scripts/backup-database.sh
+```
+
+## 15) Ubuntu Host Branch CI/CD
+
+Workflow: [`.github/workflows/deploy.yml`](/Users/hunt2412/hieupvdev/project/swinx/.github/workflows/deploy.yml)  
+Server helper: [`scripts/deploy-ubuntu.sh`](/Users/hunt2412/hieupvdev/project/swinx/scripts/deploy-ubuntu.sh)
+
+This CI/CD path is for the current Ubuntu/PHP host deployment model. It does
+not use Docker on the server. GitHub Actions connects over SSH, checks out the
+target branch in the existing server worktree, then runs the Laravel and Vite
+build sequence with host binaries.
+
+Branch mapping:
+
+| Branch | Environment | Server path | Domain |
+| --- | --- | --- | --- |
+| `dev` | development | `/www/wwwroot/dev-x.asia-vn.edu.vn/asia-admin-portal` | `dev-x.asia-vn.edu.vn` |
+| `main` | production | `/www/wwwroot/x.metropolia.edu.vn/asia-admin-portal` | `x.metropolia.edu.vn` |
+| `main` | production | `/www/wwwroot/x.asia-vn.edu.vn/public_html` | `x.asia-vn.edu.vn` |
+
+Required GitHub secrets:
+
+```text
+DEPLOY_HOST=157.10.186.103
+DEPLOY_USER=root
+DEPLOY_SSH_KEY=<private key with server SSH access>
+DEPLOY_PORT=22
+```
+
+Deploy behavior:
+
+1. Abort if the target path is not a git worktree.
+2. Abort if tracked server-side changes exist, so CI does not overwrite manual edits.
+3. Fetch the target branch from `origin`.
+4. Check out the branch and reset to the pushed commit for push-triggered deploys.
+5. Run `composer84 install` with optimized autoloading.
+6. Run `php84 artisan optimize:clear`.
+7. Run `php84 artisan ziggy:generate`.
+8. Run `pnpm install --frozen-lockfile` when `pnpm-lock.yaml` exists.
+9. Run `pnpm build`.
+10. Run `php84 artisan migrate:status`.
+11. Run `php84 artisan migrate --force` only when migrations are enabled.
+12. Run `php84 artisan optimize`.
+13. Run `php84 artisan queue:restart`.
+14. Run a GitHub Actions health check against `/up`.
+
+Migration policy:
+
+- Push to `dev`: migrations run by default.
+- Push to `main`: migrations do not run by default; only `migrate:status` runs.
+- Manual workflow dispatch can run production migrations by selecting
+  `target=production` and `run_migrations=true`.
+
+Manual server-side command after the repo has already been checked out:
+
+```bash
+cd /www/wwwroot/dev-x.asia-vn.edu.vn/asia-admin-portal
+DEPLOY_ENVIRONMENT=development DEPLOY_RUN_MIGRATIONS=true bash scripts/deploy-ubuntu.sh
+```
+
+Production manual example without migrations:
+
+```bash
+cd /www/wwwroot/x.metropolia.edu.vn/asia-admin-portal
+DEPLOY_ENVIRONMENT=production DEPLOY_RUN_MIGRATIONS=false bash scripts/deploy-ubuntu.sh
 ```
 
 ## Unresolved Questions

@@ -102,10 +102,11 @@ Local note:
 
 ## Current Quality Gates Status
 
-- GitHub workflows exist but are fully commented out (disabled):
+- GitHub deploy workflow is active for branch-based Ubuntu host deploys:
+  - `.github/workflows/deploy.yml`
+- GitHub quality workflows remain commented out (disabled):
   - `.github/workflows/lint.yml`
   - `.github/workflows/tests.yml`
-  - `.github/workflows/deploy.yml`
 - Local checks are available, but CI-enforced merge gates are currently inactive.
 
 ## Known Operational Risks

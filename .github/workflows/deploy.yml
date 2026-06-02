@@ -1,142 +1,149 @@
-# name: Deploy to Production Server
+name: Deploy Ubuntu Server
 
-# on:
-#   push:
-#     branches: [main, production]
-#   workflow_dispatch:
+on:
+  push:
+    branches:
+      - dev
+      - main
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment to deploy
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+          - production
+      run_migrations:
+        description: Run php84 artisan migrate --force after migrate:status
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
-# env:
-#   REGISTRY: ghcr.io
-#   IMAGE_NAME: ${{ github.repository }}
+permissions:
+  contents: read
 
-# jobs:
-#   test:
-#     runs-on: ubuntu-latest
+jobs:
+  deploy-dev:
+    name: Deploy dev domain
+    if: ${{ (github.event_name == 'push' && github.ref_name == 'dev') || (github.event_name == 'workflow_dispatch' && inputs.target == 'dev') }}
+    runs-on: ubuntu-latest
+    environment: development
+    concurrency:
+      group: swinx-deploy-dev
+      cancel-in-progress: false
+    steps:
+      - name: Deploy dev over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER || 'root' }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script: |
+            set -Eeuo pipefail
 
-#     steps:
-#       - name: Checkout
-#         uses: actions/checkout@v4
+            TARGET_PATH="/www/wwwroot/dev-x.asia-vn.edu.vn/asia-admin-portal"
+            DEPLOY_BRANCH="dev"
+            DEPLOY_SHA="${{ github.event_name == 'push' && github.sha || '' }}"
+            RUN_MIGRATIONS="${{ github.event_name == 'workflow_dispatch' && inputs.run_migrations || 'true' }}"
 
-#       - name: Setup PHP
-#         uses: shivammathur/setup-php@v2
-#         with:
-#           php-version: 8.4
-#           tools: composer:v2
+            echo "Deploying dev branch to ${TARGET_PATH}"
+            cd "${TARGET_PATH}"
 
-#       - name: Setup Node
-#         uses: actions/setup-node@v4
-#         with:
-#           node-version: '22'
-#           cache: 'npm'
+            if [ ! -d .git ]; then
+              echo "Target path is not a git worktree: ${TARGET_PATH}" >&2
+              exit 10
+            fi
 
-#       - name: Install Dependencies
-#         run: |
-#           composer install --no-interaction --prefer-dist --optimize-autoloader
-#           npm ci
+            if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+              echo "Tracked server-side changes exist in ${TARGET_PATH}; aborting to avoid overwriting manual edits." >&2
+              git status --short --untracked-files=no
+              exit 11
+            fi
 
-#       - name: Copy Environment File
-#         run: cp .env.example .env
+            git fetch origin "${DEPLOY_BRANCH}" --prune
+            git checkout -B "${DEPLOY_BRANCH}" "origin/${DEPLOY_BRANCH}"
 
-#       - name: Generate Application Key
-#         run: php artisan key:generate
+            if [ -n "${DEPLOY_SHA}" ]; then
+              git cat-file -e "${DEPLOY_SHA}^{commit}"
+              git reset --hard "${DEPLOY_SHA}"
+            else
+              git reset --hard "origin/${DEPLOY_BRANCH}"
+            fi
 
-#       - name: Publish Ziggy Configuration
-#         run: php artisan ziggy:generate
+            DEPLOY_ENVIRONMENT="development" \
+            DEPLOY_RUN_MIGRATIONS="${RUN_MIGRATIONS}" \
+            bash scripts/deploy-ubuntu.sh
 
-#       - name: Build Assets
-#         run: npm run build
+      - name: Dev health check
+        run: curl -fsS --retry 3 --retry-delay 5 https://dev-x.asia-vn.edu.vn/up
 
-#       # - name: Run Tests
-#       #   run: ./vendor/bin/pest
+  deploy-production:
+    name: Deploy production domains
+    if: ${{ (github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.target == 'production') }}
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: swinx-deploy-production
+      cancel-in-progress: false
+    strategy:
+      max-parallel: 1
+      matrix:
+        include:
+          - name: metropolia
+            domain: x.metropolia.edu.vn
+            path: /www/wwwroot/x.metropolia.edu.vn/asia-admin-portal
+          - name: asia-vn
+            domain: x.asia-vn.edu.vn
+            path: /www/wwwroot/x.asia-vn.edu.vn/public_html
+    steps:
+      - name: Deploy ${{ matrix.name }} over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER || 'root' }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script: |
+            set -Eeuo pipefail
 
-#       - name: Run Linting
-#         run: |
-#           vendor/bin/pint --test
-#           npm run lint
-#           npm run format:check
+            TARGET_PATH="${{ matrix.path }}"
+            DEPLOY_BRANCH="main"
+            DEPLOY_SHA="${{ github.event_name == 'push' && github.sha || '' }}"
+            RUN_MIGRATIONS="${{ github.event_name == 'workflow_dispatch' && inputs.run_migrations || 'false' }}"
 
-#   build-and-push:
-#     needs: test
-#     runs-on: ubuntu-latest
-#     permissions:
-#       contents: read
-#       packages: write
+            echo "Deploying main branch to ${TARGET_PATH}"
+            cd "${TARGET_PATH}"
 
-#     outputs:
-#       image: ${{ steps.image.outputs.image }}
+            if [ ! -d .git ]; then
+              echo "Target path is not a git worktree: ${TARGET_PATH}" >&2
+              exit 10
+            fi
 
-#     steps:
-#       - name: Checkout
-#         uses: actions/checkout@v4
+            if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+              echo "Tracked server-side changes exist in ${TARGET_PATH}; aborting to avoid overwriting manual edits." >&2
+              git status --short --untracked-files=no
+              exit 11
+            fi
 
-#       - name: Set up Docker Buildx
-#         uses: docker/setup-buildx-action@v3
+            git fetch origin "${DEPLOY_BRANCH}" --prune
+            git checkout -B "${DEPLOY_BRANCH}" "origin/${DEPLOY_BRANCH}"
 
-#       - name: Log in to Container Registry
-#         uses: docker/login-action@v3
-#         with:
-#           registry: ${{ env.REGISTRY }}
-#           username: ${{ github.actor }}
-#           password: ${{ secrets.GITHUB_TOKEN }}
+            if [ -n "${DEPLOY_SHA}" ]; then
+              git cat-file -e "${DEPLOY_SHA}^{commit}"
+              git reset --hard "${DEPLOY_SHA}"
+            else
+              git reset --hard "origin/${DEPLOY_BRANCH}"
+            fi
 
-#       - name: Extract metadata
-#         id: meta
-#         uses: docker/metadata-action@v5
-#         with:
-#           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-#           tags: |
-#             type=ref,event=branch
-#             type=ref,event=pr
-#             type=sha,prefix={{branch}}-
-#             type=raw,value=latest,enable={{is_default_branch}}
+            DEPLOY_ENVIRONMENT="production" \
+            DEPLOY_RUN_MIGRATIONS="${RUN_MIGRATIONS}" \
+            bash scripts/deploy-ubuntu.sh
 
-#       - name: Build and push Docker image
-#         id: build
-#         uses: docker/build-push-action@v5
-#         with:
-#           context: .
-#           platforms: linux/amd64,linux/arm64
-#           push: true
-#           tags: ${{ steps.meta.outputs.tags }}
-#           labels: ${{ steps.meta.outputs.labels }}
-#           cache-from: type=gha
-#           cache-to: type=gha,mode=max
-
-#       - name: Output image
-#         id: image
-#         run: echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> $GITHUB_OUTPUT
-
-#   deploy:
-#     needs: build-and-push
-#     runs-on: ubuntu-latest
-#     environment: production
-
-#     steps:
-#       - name: Checkout
-#         uses: actions/checkout@v4
-
-#       - name: Deploy to production server
-#         uses: appleboy/ssh-action@v1.0.3
-#         with:
-#           host: ${{ secrets.PRODUCTION_HOST }}
-#           username: ${{ secrets.PRODUCTION_USER }}
-#           key: ${{ secrets.PRODUCTION_SSH_KEY }}
-#           port: ${{ secrets.PRODUCTION_PORT || 22 }}
-#           script: |
-#             # Navigate to application directory
-#             cd ${{ secrets.PRODUCTION_APP_PATH || '/opt/swinx' }}
-
-#             # Pull latest code
-#             git pull origin main
-
-#             # Update image tag in production environment
-#             echo "DOCKER_IMAGE=${{ needs.build-and-push.outputs.image }}" > .env.docker.image
-
-#             # Run deployment script
-#             ./scripts/deploy.sh
-
-#       - name: Health check
-#         run: |
-#           sleep 30
-#           curl -f ${{ secrets.PRODUCTION_URL }}/health || exit 1
-#           echo "🚀 Application deployed successfully to: ${{ secrets.PRODUCTION_URL }}"
+      - name: Health check ${{ matrix.name }}
+        run: curl -fsS --retry 3 --retry-delay 5 https://${{ matrix.domain }}/up
