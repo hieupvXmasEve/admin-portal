@@ -270,6 +270,10 @@ class FormController extends Controller
     public function activate(Form $form)
     {
         try {
+            if (! $form->latestPublishedVersion()->exists()) {
+                return back()->withErrors(['error' => 'Publish a form version before activating this form.']);
+            }
+
             $form->update(['status' => 'active']);
             return back()->with('success', 'Form activated successfully.');
         } catch (\Exception $e) {

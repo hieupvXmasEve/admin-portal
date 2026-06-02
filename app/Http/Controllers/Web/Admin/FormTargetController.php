@@ -19,10 +19,18 @@ class FormTargetController extends Controller
     {
         $this->authorize('view_form');
 
+        $validated = $request->validate([
+            'scope_type' => 'nullable|string|in:course,semester,department,global,all',
+            'status' => 'nullable|string|in:draft,active,closed,all',
+            'created_from' => 'nullable|date',
+            'created_to' => 'nullable|date|after_or_equal:created_from',
+            'per_page' => 'nullable|integer|min:5|max:100',
+        ]);
+
         $query = FormTarget::query()
             ->forCurrentCampus()
             ->with([
-                'form', 
+                'form:id,code,title,type,status',
                 'formVersion', 
                 'campus', 
                 'semester',
@@ -32,21 +40,35 @@ class FormTargetController extends Controller
                     ]);
                 }
             ])
-            ->latest('start_at');
+            ->latest('created_at');
 
-        if ($request->filled('scope_type') && $request->input('scope_type') !== 'all') {
-            $query->where('scope_type', $request->input('scope_type'));
+        if (! empty($validated['scope_type']) && $validated['scope_type'] !== 'all') {
+            $query->where('scope_type', $validated['scope_type']);
         }
 
-        if ($request->filled('status') && $request->input('status') !== 'all') {
-            $query->where('status', $request->input('status'));
+        if (! empty($validated['status']) && $validated['status'] !== 'all') {
+            $query->where('status', $validated['status']);
         }
 
-        $runs = $query->paginate(15)->withQueryString();
+        if (! empty($validated['created_from'])) {
+            $query->where('created_at', '>=', $validated['created_from']);
+        }
+
+        if (! empty($validated['created_to'])) {
+            $query->where('created_at', '<=', $validated['created_to']);
+        }
+
+        $runs = $query->paginate($validated['per_page'] ?? 15)->withQueryString();
 
         return Inertia::render('Forms/Runs/Index', [
             'runs' => $runs,
-            'filters' => $request->only(['scope_type', 'status']),
+            'filters' => [
+                'scope_type' => $validated['scope_type'] ?? 'all',
+                'status' => $validated['status'] ?? 'all',
+                'created_from' => $validated['created_from'] ?? null,
+                'created_to' => $validated['created_to'] ?? null,
+                'per_page' => $validated['per_page'] ?? 15,
+            ],
         ]);
     }
 
@@ -54,8 +76,15 @@ class FormTargetController extends Controller
     {
         $this->authorize('edit_form');
         return Inertia::render('Forms/Runs/Create', [
-            'forms' => Form::select('id', 'title', 'type')->get(),
-            'semesters' => Semester::latest()->take(5)->get(), // For context
+            'forms' => Form::query()
+                ->where('status', 'active')
+                ->whereHas('latestPublishedVersion')
+                ->orderBy('title')
+                ->get(['id', 'title', 'type']),
+            'semesters' => Semester::query()
+                ->orderBy('start_date')
+                ->orderBy('id')
+                ->get(['id', 'name', 'code', 'start_date', 'end_date']),
             'departments' => Department::all(), // For department context
         ]);
     }
@@ -63,6 +92,12 @@ class FormTargetController extends Controller
     public function store(Request $request, CreateFormTargetAction $action)
     {
         $this->authorize('edit_form');
+        $request->merge([
+            'scope_type' => 'global',
+            'scope_id' => null,
+            'semester_id' => null,
+        ]);
+
         $validated = $request->validate([
             'form_id' => 'required|exists:forms,id',
             'form_version_id' => 'nullable|exists:form_versions,id',
@@ -78,11 +113,6 @@ class FormTargetController extends Controller
             $validated['campus_id'] = $campusId;
         }
 
-        // Additional validation
-        if ($validated['scope_type'] === 'semester') {
-            $validated['scope_id'] = $validated['semester_id'];
-        }
-        
         $action->execute($validated);
 
         if ($request->wantsJson()) {

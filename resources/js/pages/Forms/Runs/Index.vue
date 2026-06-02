@@ -1,20 +1,26 @@
 <script setup lang="ts">
+import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { PaginatedResponse } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { Filter, MoreHorizontal, Plus, Power, XCircle } from 'lucide-vue-next';
+import { CalendarClock, Filter, MoreHorizontal, Plus, Power, XCircle } from 'lucide-vue-next';
 import { h, ref } from 'vue';
 import { route } from 'ziggy-js';
 
 // Define Run interface locally or import
 interface FormRun {
     id: number;
-    form: { title: string; type: string };
+    form_id: number;
+    form_version_id?: number | null;
+    form: { id: number; code?: string | null; title: string; type: string; status?: string };
+    form_version?: { id: number; version_no?: number | null; is_published?: boolean };
     scope_type: string;
     scope_id?: number | string;
     semester?: { name: string };
@@ -24,13 +30,17 @@ interface FormRun {
     status: string; // draft, active, closed
     is_mandatory: boolean;
     scope?: any;
+    created_at: string;
 }
 
 interface Props {
-    runs: { data: FormRun[]; links: any[]; meta?: any }; // Pagination wrapper
+    runs: PaginatedResponse<FormRun>;
     filters: {
         scope_type?: string;
         status?: string;
+        created_from?: string | null;
+        created_to?: string | null;
+        per_page?: number;
     };
 }
 
@@ -39,14 +49,21 @@ const props = defineProps<Props>();
 // State
 const selectedScope = ref(props.filters.scope_type || 'all');
 const selectedStatus = ref(props.filters.status || 'all');
+const createdFrom = ref(props.filters.created_from || '');
+const createdTo = ref(props.filters.created_to || '');
+const selectedPerPage = ref(props.filters.per_page || 15);
 
 // Methods
-const applyFilters = () => {
+const applyFilters = (options: { resetPage?: boolean } = {}) => {
     router.get(
         route('forms.admin.runs.index'),
         {
             scope_type: selectedScope.value === 'all' ? undefined : selectedScope.value,
             status: selectedStatus.value === 'all' ? undefined : selectedStatus.value,
+            created_from: createdFrom.value || undefined,
+            created_to: createdTo.value || undefined,
+            per_page: selectedPerPage.value,
+            page: options.resetPage ? undefined : props.runs.current_page,
         },
         { preserveState: true, replace: true }
     );
@@ -55,7 +72,22 @@ const applyFilters = () => {
 const clearFilters = () => {
     selectedScope.value = 'all';
     selectedStatus.value = 'all';
-    applyFilters();
+    createdFrom.value = '';
+    createdTo.value = '';
+    selectedPerPage.value = 15;
+    applyFilters({ resetPage: true });
+};
+
+const handlePaginationNavigate = (url: string) => {
+    router.visit(url, {
+        preserveState: true,
+        replace: true,
+    });
+};
+
+const handlePageSizeChange = (pageSize: number) => {
+    selectedPerPage.value = pageSize;
+    applyFilters({ resetPage: true });
 };
 
 const handleAction = (action: string, run: FormRun) => {
@@ -82,15 +114,55 @@ const getStatusVariant = (status: string) => {
     }
 };
 
+const formatDateTime = (value?: string | null) => {
+    if (!value) {
+        return 'N/A';
+    }
+
+    return new Intl.DateTimeFormat(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    }).format(new Date(value));
+};
+
 // Columns
 const columns: ColumnDef<FormRun>[] = [
     {
-        accessorKey: 'form.title',
-        header: 'Form',
-        cell: ({ row }) => h('div', [
-             h('div', { class: 'font-medium' }, row.original.form.title),
-             h('span', { class: 'text-xs text-muted-foreground capitalize' }, row.original.form.type)
-        ]),
+        id: 'run',
+        header: 'Run',
+        cell: ({ row }) => {
+            const run = row.original;
+            return h('div', { class: 'flex flex-col gap-1' }, [
+                h('div', { class: 'flex items-center gap-2' }, [
+                    h('span', { class: 'font-semibold' }, `Run #${run.id}`),
+                    h(Badge, { variant: run.is_mandatory ? 'destructive' : 'outline', class: 'w-fit' }, () => run.is_mandatory ? 'Mandatory' : 'Optional'),
+                ]),
+                h('span', { class: 'text-xs text-muted-foreground' }, `Created ${formatDateTime(run.created_at)}`),
+            ]);
+        },
+    },
+    {
+        id: 'form_template',
+        header: 'Form Template',
+        cell: ({ row }) => {
+            const run = row.original;
+            const versionLabel = run.form_version?.version_no ? `v${run.form_version.version_no}` : `version #${run.form_version_id ?? 'N/A'}`;
+
+            return h('div', { class: 'flex min-w-64 flex-col gap-1' }, [
+                h('div', { class: 'flex items-center gap-2' }, [
+                    h('span', { class: 'font-medium text-primary' }, run.form.title),
+                    h(Badge, { variant: 'secondary', class: 'w-fit capitalize' }, () => run.form.type),
+                ]),
+                h('div', { class: 'flex flex-wrap items-center gap-2 text-xs text-muted-foreground' }, [
+                    h('span', run.form.code || `Form #${run.form_id}`),
+                    h('span', '•'),
+                    h('span', versionLabel),
+                ]),
+            ]);
+        },
     },
     {
         accessorKey: 'scope_type',
@@ -128,20 +200,18 @@ const columns: ColumnDef<FormRun>[] = [
         accessorKey: 'start_at',
         header: 'Time Window',
         cell: ({ row }) => {
-            const start = new Date(row.original.start_at).toLocaleDateString();
-            const end = row.original.end_at ? new Date(row.original.end_at).toLocaleDateString() : 'Forever';
-            return h('div', { class: 'text-xs' }, `${start} - ${end}`);
+            const start = formatDateTime(row.original.start_at);
+            const end = row.original.end_at ? formatDateTime(row.original.end_at) : 'Forever';
+            return h('div', { class: 'text-xs text-muted-foreground' }, [
+                h('div', { class: 'font-medium text-foreground' }, start),
+                h('div', `to ${end}`),
+            ]);
         }
     },
     {
         accessorKey: 'status',
         header: 'Status',
         cell: ({ row }) => h(Badge, { variant: getStatusVariant(row.original.status) }, () => row.original.status.toUpperCase())
-    },
-    {
-        accessorKey: 'is_mandatory',
-        header: 'Mandatory',
-        cell: ({ row }) => row.original.is_mandatory ? h(Badge, { variant: 'destructive' }, () => 'Yes') : h('span', 'No')
     },
     {
         id: 'actions',
@@ -180,12 +250,13 @@ const columns: ColumnDef<FormRun>[] = [
         <Card>
             <CardHeader>
                 <CardTitle class="flex items-center gap-2"><Filter class="h-4 w-4"/> Filters</CardTitle>
+                <CardDescription>Filter run history by audience, status, and creation time.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div class="flex flex-wrap gap-4">
                     <div class="w-48 space-y-2">
                         <label class="text-sm font-medium">Context</label>
-                        <Select v-model="selectedScope" @update:model-value="applyFilters">
+                        <Select v-model="selectedScope" @update:model-value="applyFilters({ resetPage: true })">
                              <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
                              <SelectContent>
                                  <SelectItem value="all">All</SelectItem>
@@ -198,7 +269,7 @@ const columns: ColumnDef<FormRun>[] = [
                     </div>
                     <div class="w-48 space-y-2">
                         <label class="text-sm font-medium">Status</label>
-                        <Select v-model="selectedStatus" @update:model-value="applyFilters">
+                        <Select v-model="selectedStatus" @update:model-value="applyFilters({ resetPage: true })">
                              <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
                              <SelectContent>
                                  <SelectItem value="all">All</SelectItem>
@@ -208,6 +279,17 @@ const columns: ColumnDef<FormRun>[] = [
                              </SelectContent>
                         </Select>
                     </div>
+                    <div class="w-56 space-y-2">
+                        <label class="flex items-center gap-2 text-sm font-medium">
+                            <CalendarClock class="h-4 w-4" />
+                            Created From
+                        </label>
+                        <Input v-model="createdFrom" type="datetime-local" @change="applyFilters({ resetPage: true })" />
+                    </div>
+                    <div class="w-56 space-y-2">
+                        <label class="text-sm font-medium">Created To</label>
+                        <Input v-model="createdTo" type="datetime-local" @change="applyFilters({ resetPage: true })" />
+                    </div>
                     <div class="pt-7">
                         <Button variant="outline" @click="clearFilters">Clear</Button>
                     </div>
@@ -216,9 +298,16 @@ const columns: ColumnDef<FormRun>[] = [
         </Card>
 
         <Card>
-            <CardContent class="p-0">
+            <CardContent class="px-6">
                 <DataTable :columns="columns" :data="runs.data" />
+                <DataPagination
+                    :pagination-data="runs"
+                    item-name="runs"
+                    @navigate="handlePaginationNavigate"
+                    @page-size-change="handlePageSizeChange"
+                />
             </CardContent>
         </Card>
+
     </div>
 </template>

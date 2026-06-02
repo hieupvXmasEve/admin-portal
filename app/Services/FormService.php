@@ -261,12 +261,12 @@ class FormService
         }
 
         return [
-            'total_responses' => $query->count(),
-            'submitted' => $query->where('status', 'submitted')->count(),
-            'approved' => $query->where('status', 'approved')->count(),
-            'rejected' => $query->where('status', 'rejected')->count(),
-            'pending_review' => $query->whereNull('reviewed_by_user_id')->count(),
-            'anonymous_responses' => $query->where('anonymized', true)->count(),
+            'total_responses' => (clone $query)->count(),
+            'submitted' => (clone $query)->where('status', 'submitted')->count(),
+            'approved' => (clone $query)->where('status', 'approved')->count(),
+            'rejected' => (clone $query)->where('status', 'rejected')->count(),
+            'pending_review' => (clone $query)->whereNull('reviewed_by_user_id')->count(),
+            'anonymous_responses' => (clone $query)->where('anonymized', true)->count(),
         ];
     }
 

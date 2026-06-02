@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Loader2 } from 'lucide-vue-next';
-import { computed } from 'vue';
 import { route } from 'ziggy-js';
 import { useForm } from 'vee-validate';
 import { toTypedSchema } from '@vee-validate/zod';
@@ -17,11 +16,11 @@ import { toast } from 'vue-sonner';
 
 interface Props {
     forms: { id: number; title: string; type: string }[];
-    semesters: { id: string; name: string }[];
+    semesters: { id: string; name?: string | null; code?: string | null }[];
     departments: { id: number; name: string }[];
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 const api = useApi();
 
 const { handleSubmit, isSubmitting, errors, defineField, values } = useForm({
@@ -39,28 +38,18 @@ const { handleSubmit, isSubmitting, errors, defineField, values } = useForm({
 });
 
 const [formId] = defineField('form_id');
-const [scopeType] = defineField('scope_type');
-const [scopeId] = defineField('scope_id');
-const [semesterId] = defineField('semester_id');
 const [startAt] = defineField('start_at');
 const [endAt] = defineField('end_at');
 const [isMandatory] = defineField('is_mandatory');
 
-const isContextVisible = computed(() => {
-    return ['course', 'department', 'semester'].includes(values.scope_type || '');
-});
-
 const onSubmit = handleSubmit(async (formValues) => {
     try {
-        const payload = { ...formValues };
-        if (payload.scope_type === 'semester') {
-            payload.scope_id = payload.semester_id;
-        }
-        
-        // Clean up empty or none value for backend
-        if (!payload.semester_id || payload.semester_id === 'none') {
-            payload.semester_id = undefined;
-        }
+        const payload = {
+            ...formValues,
+            scope_type: 'global',
+            scope_id: undefined,
+            semester_id: undefined,
+        };
 
         const { data, error } = await api.post(route('forms.admin.runs.store'), payload);
         
@@ -111,73 +100,13 @@ const onSubmit = handleSubmit(async (formValues) => {
                     <p v-if="errors.form_id" class="text-sm font-medium text-destructive">{{ errors.form_id }}</p>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="space-y-2">
-                        <Label>Context Type</Label>
-                        <Select v-model="scopeType">
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="global">Global</SelectItem>
-                                <SelectItem value="department">Department</SelectItem>
-                                <SelectItem value="semester">Semester</SelectItem>
-                                <SelectItem value="course">Course Offering</SelectItem>
-                            </SelectContent>
-                        </Select>
+                <div class="rounded-lg border border-primary/10 bg-primary/5 p-4">
+                    <div class="flex flex-col gap-1">
+                        <Label class="text-sm font-semibold">Audience</Label>
+                        <p class="text-sm text-muted-foreground">
+                            Global by default: all students in the current campus with EGC or Intake Course status.
+                        </p>
                     </div>
-
-                    <!-- Dynamic Scope Inputs -->
-                    <div v-if="values.scope_type === 'department'" class="space-y-2">
-                        <Label :class="{ 'text-destructive': errors.scope_id }">Department</Label>
-                        <Select v-model="scopeId">
-                                <SelectTrigger :class="{ 'border-destructive': errors.scope_id }">
-                                    <SelectValue placeholder="Select Dept" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem v-for="d in departments" :key="d.id" :value="d.id.toString()">{{ d.name }}</SelectItem>
-                                </SelectContent>
-                        </Select>
-                        <p v-if="errors.scope_id" class="text-sm font-medium text-destructive">{{ errors.scope_id }}</p>
-                    </div>
-                    
-                    <div v-else-if="values.scope_type === 'semester'" class="space-y-2">
-                            <Label :class="{ 'text-destructive': errors.semester_id }">Semester</Label>
-                            <Select v-model="semesterId">
-                                <SelectTrigger :class="{ 'border-destructive': errors.semester_id }">
-                                    <SelectValue placeholder="Select Semester" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem v-for="s in semesters" :key="s.id" :value="s.id.toString()">{{ s.name }}</SelectItem>
-                                </SelectContent>
-                        </Select>
-                        <p v-if="errors.semester_id" class="text-sm font-medium text-destructive">{{ errors.semester_id }}</p>
-                    </div>
-
-                    <div v-else-if="values.scope_type === 'course'" class="space-y-2">
-                        <Label :class="{ 'text-destructive': errors.scope_id }">Course Offering ID</Label>
-                        <Input v-model="scopeId" :class="{ 'border-destructive': errors.scope_id }" placeholder="Enter ID" />
-                        <p class="text-xs text-muted-foreground" v-if="!errors.scope_id">Enter the numeric ID of the offering.</p>
-                        <p v-if="errors.scope_id" class="text-sm font-medium text-destructive">{{ errors.scope_id }}</p>
-                    </div>
-                </div>
-                
-                <!-- Semester Constraint for Dept -->
-                <div v-if="values.scope_type === 'department'" class="space-y-3 p-4 bg-muted/30 rounded-lg border border-border/50">
-                        <div class="flex items-center justify-between">
-                            <Label class="text-sm font-semibold">Semester Restriction</Label>
-                            <span class="text-[10px] uppercase font-bold tracking-wider text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Optional</span>
-                        </div>
-                        <Select v-model="semesterId">
-                            <SelectTrigger class="bg-background">
-                                <SelectValue placeholder="None (All students)" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="none">None (All students)</SelectItem>
-                                <SelectItem v-for="s in semesters" :key="s.id" :value="s.id.toString()">{{ s.name }}</SelectItem>
-                            </SelectContent>
-                    </Select>
-                    <p class="text-xs text-muted-foreground italic">Limit this department form to students active in a specific semester.</p>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">

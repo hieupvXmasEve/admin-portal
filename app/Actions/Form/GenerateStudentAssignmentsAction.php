@@ -23,7 +23,7 @@ class GenerateStudentAssignmentsAction
             'course' => $this->getCourseStudents($target->scope_id),
             'semester' => $this->getSemesterStudents($target->scope_id, $target->campus_id),
             'department' => $this->getDepartmentStudents($target, $target->semester_id),
-            'global' => $this->getAllActiveStudents(),
+            'global' => $this->getAllActiveStudents($target->campus_id),
             default => collect(),
         };
 
@@ -88,8 +88,11 @@ class GenerateStudentAssignmentsAction
         return $this->getSemesterStudents($target->semester_id, $target->campus_id); // Fallback
     }
 
-    protected function getAllActiveStudents()
+    protected function getAllActiveStudents($campusId = null)
     {
-        return Student::where('status', ['intake_pre_uni_gc', 'intake_course'])->pluck('id');
+        return Student::query()
+            ->whereIn('status', ['intake_pre_uni_gc', 'intake_course'])
+            ->when($campusId, fn ($query) => $query->where('campus_id', $campusId))
+            ->pluck('id');
     }
 }
