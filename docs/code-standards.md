@@ -131,7 +131,7 @@ Form submission default and exception path:
 Current status:
 
 - Local quality scripts exist.
-- GitHub workflow enforcement is disabled (commented workflow files).
+- GitHub workflow enforcement is disabled; quality workflows are not currently present as active CI merge gates.
 
 Minimum expected checks before merge:
 
