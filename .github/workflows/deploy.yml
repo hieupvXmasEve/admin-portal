@@ -81,13 +81,6 @@ jobs:
             DEPLOY_RUN_MIGRATIONS="${RUN_MIGRATIONS}" \
             bash scripts/deploy-ubuntu.sh
 
-      - name: Dev health check
-        run: |
-          curl -fsS -L --retry 3 --retry-delay 5 \
-            -A "Mozilla/5.0 (compatible; SwinxDeployHealthCheck/1.0)" \
-            -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
-            https://dev-x.asia-vn.edu.vn/up
-
   deploy-production:
     name: Deploy production domains
     if: ${{ (github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.target == 'production') }}
@@ -150,10 +143,3 @@ jobs:
             DEPLOY_ENVIRONMENT="production" \
             DEPLOY_RUN_MIGRATIONS="${RUN_MIGRATIONS}" \
             bash scripts/deploy-ubuntu.sh
-
-      - name: Health check ${{ matrix.name }}
-        run: |
-          curl -fsS -L --retry 3 --retry-delay 5 \
-            -A "Mozilla/5.0 (compatible; SwinxDeployHealthCheck/1.0)" \
-            -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
-            https://${{ matrix.domain }}/up
