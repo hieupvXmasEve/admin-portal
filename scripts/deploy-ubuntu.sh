@@ -22,6 +22,37 @@ require_command() {
     command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
 }
 
+load_shell_profile() {
+    local profile
+
+    for profile in /etc/profile "$HOME/.bash_profile" "$HOME/.bashrc" "$HOME/.profile"; do
+        if [ -f "$profile" ]; then
+            set +u
+            # shellcheck source=/dev/null
+            . "$profile" >/dev/null 2>&1 || true
+            set -u
+        fi
+    done
+}
+
+add_path_if_exists() {
+    if [ -d "$1" ]; then
+        export PATH="$1:$PATH"
+    fi
+}
+
+load_shell_profile
+add_path_if_exists "$HOME/.local/share/pnpm"
+add_path_if_exists "$HOME/.npm-global/bin"
+add_path_if_exists "$HOME/.config/yarn/global/node_modules/.bin"
+
+if [ -d "$HOME/.nvm/versions/node" ]; then
+    latest_node_dir="$(find "$HOME/.nvm/versions/node" -maxdepth 1 -type d -name 'v*' | sort -V | tail -n 1 || true)"
+    if [ -n "$latest_node_dir" ]; then
+        add_path_if_exists "$latest_node_dir/bin"
+    fi
+fi
+
 environment="${DEPLOY_ENVIRONMENT:-unknown}"
 run_migrations="${DEPLOY_RUN_MIGRATIONS:-false}"
 php_bin="${PHP_BIN:-php84}"
