@@ -326,7 +326,7 @@ const indexWithCurrentQuery = (): string => {
                     <p v-if="form.errors.credit_points" class="text-sm text-red-600">
                         {{ form.errors.credit_points }}
                     </p>
-                    <p class="text-sm text-gray-500">Credit points must be between 0 and 999 (e.g., 3.00, 6.00).</p>
+                    <p class="text-sm text-gray-500">Credit points must be between 0 and 20.</p>
                 </div>
 
                 <!-- Level -->
