@@ -88,14 +88,15 @@ const curriculumUnitToEdit = ref<CurriculumUnit | null>(null);
 const isDeleting = ref(false);
 
 const permission = usePermissions();
-const canEditOrDelete = computed(() => {
-    if (!props.curriculumVersion.effective_from_semester?.start_date) {
-        return true;
-    }
-    const startDate = new Date(props.curriculumVersion.effective_from_semester.start_date);
-    const now = new Date();
-    return now < startDate;
-});
+// Temporarily disabled: allow curriculum unit changes regardless of effective semester date.
+// const canEditOrDelete = computed(() => {
+//     if (!props.curriculumVersion.effective_from_semester?.start_date) {
+//         return true;
+//     }
+//     const startDate = new Date(props.curriculumVersion.effective_from_semester.start_date);
+//     const now = new Date();
+//     return now < startDate;
+// });
 
 // Form schemas
 interface AddUnitFormData {
@@ -249,8 +250,7 @@ const baseColumns: ColumnDef<CurriculumUnit>[] = [
                             {
                                 variant: 'ghost',
                                 size: 'sm',
-                                disabled: !canEditOrDelete.value,
-                                title: canEditOrDelete.value ? 'Edit' : 'Cannot modify for an active or past semester version',
+                                title: 'Edit',
                                 onClick: () => editCurriculumUnit(curriculumUnit),
                             },
                             () => h(Edit, { class: 'h-4 w-4' }),
@@ -262,8 +262,7 @@ const baseColumns: ColumnDef<CurriculumUnit>[] = [
                             {
                                 variant: 'ghost',
                                 size: 'sm',
-                                disabled: !canEditOrDelete.value,
-                                title: canEditOrDelete.value ? 'Delete' : 'Cannot modify for an active or past semester version',
+                                title: 'Delete',
                                 onClick: () => deleteCurriculumUnit(curriculumUnit),
                             },
                             () => h(Trash2, { class: 'h-4 w-4' }),
@@ -520,8 +519,7 @@ const organizedUnits = computed(() => {
 
                         <div v-if="permission.can('create_curriculum_unit')" class="flex items-center gap-2">
                             <Button variant="outline" size="sm"
-                                :disabled="availableUnits.length === 0 || !canEditOrDelete"
-                                :title="!canEditOrDelete ? 'Cannot modify for an active or past semester version' : ''"
+                                :disabled="availableUnits.length === 0"
                                 @click="handleAddUnitClick">
                                 <Plus class="mr-2 h-4 w-4" />
                                 Add Unit
@@ -561,14 +559,12 @@ const organizedUnits = computed(() => {
                                                 <span class="text-gray-500">{{ unit.unit?.credit_points }} CP</span>
                                                 <div class="flex items-center gap-1">
                                                     <Button v-if="permission.can('edit_curriculum_unit')"
-                                                        variant="ghost" size="sm" :disabled="!canEditOrDelete"
-                                                        :title="!canEditOrDelete ? 'Cannot modify for an active or past semester version' : 'Edit'"
+                                                        variant="ghost" size="sm" title="Edit"
                                                         @click="editCurriculumUnit(unit)">
                                                         <Edit class="h-3 w-3" />
                                                     </Button>
                                                     <Button v-if="permission.can('delete_curriculum_unit')"
-                                                        variant="ghost" size="sm" :disabled="!canEditOrDelete"
-                                                        :title="!canEditOrDelete ? 'Cannot modify for an active or past semester version' : 'Delete'"
+                                                        variant="ghost" size="sm" title="Delete"
                                                         @click="deleteCurriculumUnit(unit)">
                                                         <Trash2 class="h-3 w-3" />
                                                     </Button>
@@ -646,8 +642,7 @@ const organizedUnits = computed(() => {
                             <span v-else>This curriculum version doesn't have any units yet.</span>
                         </div>
                         <div v-if="permission.can('create_curriculum_unit')" class="mt-6">
-                            <Button :disabled="availableUnits.length === 0 || !canEditOrDelete"
-                                :title="!canEditOrDelete ? 'Cannot modify for an active or past semester version' : ''"
+                            <Button :disabled="availableUnits.length === 0"
                                 @click="handleAddUnitClick">
                                 <Plus class="mr-2 h-4 w-4" />
                                 Add First Unit
