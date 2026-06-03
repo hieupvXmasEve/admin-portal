@@ -11,9 +11,9 @@ use App\Models\QueryTicket;
 use App\Models\User;
 use App\Services\ImageUploadService;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rules\File;
+use Inertia\Inertia;
 
 class QueryController extends Controller
 {
@@ -25,9 +25,8 @@ class QueryController extends Controller
 
     public function index(Request $request)
     {
-        /** @var User $user */
-        $user = Auth::user();
         $currentCampusId = app('campus')->id;
+        $departments = $this->inboxDepartmentOptions();
 
         $query = FormResponse::query()
             ->where('campus_id', $currentCampusId)
@@ -36,54 +35,15 @@ class QueryController extends Controller
                 $q->where('type', 'query');
             });
 
-        // Get user's active department IDs
-        $userDeptIds = Department::whereHas('memberships', function ($q) use ($user) {
-            $q->where('user_id', $user->id)->where('is_active', true);
-        })->pluck('id')->toArray();
-
-        // Check if user has permission to see everything or is an admin
-        $canViewAll = $user->hasSystemRole('admin') || 
-                      $user->hasSystemRole('super_admin') || 
-                      $user->hasPermission('view_all_queries');
-
-        // Filtering logic based on roles and selection
         if ($request->filled('department_id')) {
             $deptId = (int) $request->input('department_id');
-            // Check if user is member of this dept or has view all access
-            if (in_array($deptId, $userDeptIds) || $canViewAll) {
+
+            if ($departments->contains('id', $deptId)) {
                 $query->whereHas('formTarget', function ($q) use ($deptId) {
                     $q->where('scope_type', 'department')->where('scope_id', $deptId);
                 });
-                
-                // If not "view all" or admin, restrict visibility within department:
-                // Heads see all in dept, Staff see only assigned to them OR unassigned
-                if (!$canViewAll && !$user->isDepartmentHead($deptId)) {
-                     $query->where(function($q) use ($user) {
-                         $q->where('assigned_to_user_id', $user->id)
-                           ->orWhereNull('assigned_to_user_id');
-                     });
-                }
             } else {
-                // Not a member and no global access -> see nothing for this dept
                 $query->whereRaw('1 = 0');
-            }
-        } else {
-            // Default View (No department chosen)
-            if (!$canViewAll) {
-                $query->where(function ($q) use ($user, $userDeptIds) {
-                    // 1. Assigned to me
-                    $q->where('assigned_to_user_id', $user->id);
-                    // 2. Unassigned queries in my departments
-                    if (!empty($userDeptIds)) {
-                        $q->orWhere(function($sq) use ($userDeptIds) {
-                            $sq->whereNull('assigned_to_user_id')
-                               ->whereHas('formTarget', function($tq) use ($userDeptIds) {
-                                   $tq->where('scope_type', 'department')
-                                      ->whereIn('scope_id', $userDeptIds);
-                               });
-                        });
-                    }
-                });
             }
         }
 
@@ -93,25 +53,18 @@ class QueryController extends Controller
 
         $tickets = $query->latest()->paginate(20)->withQueryString();
 
-        // Fetch departments for the filter dropdown
-        if ($canViewAll) {
-            $userDepts = Department::where('is_active', true)->get(['id', 'name', 'code']);
-        } else {
-            $userDepts = Department::whereHas('memberships', function ($q) use ($user) {
-                $q->where('user_id', $user->id)->where('is_active', true);
-            })->get(['id', 'name', 'code']);
-        }
-
         return Inertia::render('Forms/Queries/Inbox', [
             'tickets' => $tickets,
             'filters' => $request->only(['status', 'department_id']),
-            'statusOptions' => \App\Models\QueryTicket::STATUSES,
-            'departments' => $userDepts,
+            'statusOptions' => QueryTicket::STATUSES,
+            'departments' => $departments,
         ]);
     }
 
     public function show(FormResponse $response)
     {
+        $this->assertInboxResponse($response);
+
         /** @var User $user */
         $user = Auth::user();
         $response->load([
@@ -138,22 +91,11 @@ class QueryController extends Controller
             $departmentId = $response->formTarget->scope_id;
         }
 
-        $canViewAll = $user->hasSystemRole('admin') || 
-                      $user->hasSystemRole('super_admin') || 
+        $canViewAll = $user->hasSystemRole('admin') ||
+                      $user->hasSystemRole('super_admin') ||
                       $user->hasPermission('view_all_queries');
 
         $isHead = $departmentId ? $user->isDepartmentHead($departmentId) : false;
-        
-        // Authorization logic
-        if (!$canViewAll && !$isHead) {
-             $isMember = $departmentId ? $user->isDepartmentMember($departmentId) : false;
-             $isAssignedToMe = $response->assigned_to_user_id === $user->id;
-             $isUnassignedInMyDept = $isMember && $response->assigned_to_user_id === null;
-
-             if (!$isAssignedToMe && !$isUnassignedInMyDept) {
-                  abort(403, 'Unauthorized access to this query.');
-             }
-        }
 
         $staffs = [];
         if ($departmentId && ($isHead || $canViewAll)) {
@@ -165,13 +107,15 @@ class QueryController extends Controller
         return Inertia::render('Forms/Queries/Detail', [
             'ticket' => $response,
             'staffs' => $staffs,
-            'statusOptions' => \App\Models\QueryTicket::STATUSES,
+            'statusOptions' => QueryTicket::STATUSES,
             'canAssign' => $isHead || $canViewAll,
         ]);
     }
 
     public function assign(Request $request, FormResponse $response, AssignQueryAction $action)
     {
+        $this->assertInboxResponse($response);
+
         $validated = $request->validate([
             'assigned_to_user_id' => 'nullable|string', // Changed to string to handle 'none'
             'note' => 'nullable|string|max:500',
@@ -180,16 +124,16 @@ class QueryController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        $canViewAll = $user->hasSystemRole('admin') || 
-                      $user->hasSystemRole('super_admin') || 
+        $canViewAll = $user->hasSystemRole('admin') ||
+                      $user->hasSystemRole('super_admin') ||
                       $user->hasPermission('view_all_queries');
 
-        $departmentId = ($response->formTarget && $response->formTarget->scope_type === 'department') 
-            ? $response->formTarget->scope_id 
+        $departmentId = ($response->formTarget && $response->formTarget->scope_type === 'department')
+            ? $response->formTarget->scope_id
             : null;
         $isHead = $departmentId ? $user->isDepartmentHead($departmentId) : false;
 
-        if (!$canViewAll && !$isHead) {
+        if (! $canViewAll && ! $isHead) {
             abort(403, 'Only department heads or administrators can assign queries.');
         }
 
@@ -212,29 +156,14 @@ class QueryController extends Controller
 
     public function updateStatus(Request $request, FormResponse $response)
     {
+        $this->assertInboxResponse($response);
+
         $validated = $request->validate([
-            'status' => 'required|in:' . implode(',', \App\Models\QueryTicket::STATUSES)
+            'status' => 'required|in:'.implode(',', QueryTicket::STATUSES),
         ]);
 
-        /** @var User $user */
-        $user = Auth::user();
-
-        $canViewAll = $user->hasSystemRole('admin') || 
-                      $user->hasSystemRole('super_admin') || 
-                      $user->hasPermission('view_all_queries');
-
-        $departmentId = ($response->formTarget && $response->formTarget->scope_type === 'department') 
-            ? $response->formTarget->scope_id 
-            : null;
-        $isHead = $departmentId ? $user->isDepartmentHead($departmentId) : false;
-        $isAssigned = $response->assigned_to_user_id === $user->id;
-
-        if (!$canViewAll && !$isHead && !$isAssigned) {
-            abort(403, 'Unauthorized to update this query status.');
-        }
-
         $response->update(['query_status' => $validated['status']]);
-        
+
         if ($response->queryTicket) {
             $response->queryTicket->update(['status' => $validated['status']]);
             // If ticket closed, update closed_at if exists
@@ -248,6 +177,8 @@ class QueryController extends Controller
 
     public function reply(Request $request, FormResponse $response, ReplyToQueryAction $action)
     {
+        $this->assertInboxResponse($response);
+
         $contextConfig = config('uploads.contexts.form_attachment', config('uploads.defaults'));
         $maxSize = (int) ($contextConfig['max_size'] ?? 10240);
         $allowedExtensions = $contextConfig['allowed_extensions'] ?? ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'zip'];
@@ -259,13 +190,13 @@ class QueryController extends Controller
             'attachment' => [
                 'nullable',
                 'file',
-                File::types($allowedExtensions)->max($maxSize)
+                File::types($allowedExtensions)->max($maxSize),
             ],
         ]);
 
         /** @var User $user */
         $user = Auth::user();
-        
+
         $uploadRecordId = null;
         if ($request->hasFile('attachment')) {
             $uploadRecord = $this->imageUploadService->upload(
@@ -286,5 +217,22 @@ class QueryController extends Controller
         );
 
         return back()->with('success', 'Reply sent successfully.');
+    }
+
+    private function inboxDepartmentOptions()
+    {
+        return Department::query()
+            ->where('is_active', true)
+            ->whereIn('code', ['HQ', 'ACA'])
+            ->orderByRaw("CASE code WHEN 'HQ' THEN 0 WHEN 'ACA' THEN 1 ELSE 2 END")
+            ->get(['id', 'name', 'code']);
+    }
+
+    private function assertInboxResponse(FormResponse $response): void
+    {
+        $response->loadMissing(['form', 'formTarget']);
+
+        abort_unless((int) $response->campus_id === (int) app('campus')->id, 404);
+        abort_unless($response->form?->type === 'query', 404);
     }
 }
