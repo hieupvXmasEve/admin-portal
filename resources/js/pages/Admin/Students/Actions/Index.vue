@@ -129,6 +129,10 @@ watch(
         form.defer_course_registration_ids = [];
         form.defer_egc_charge_ids = [];
         form.egc_defer_from_block_number = form.action_type === StudentActionType.ACADEMIC_DEFER && props.student.status === 'intake_pre_uni_gc' ? 1 : null;
+        // For waiting course opening, default block if pre-uni context
+        if (form.action_type === StudentActionType.WAITING_COURSE_OPENING && props.student.status === 'intake_pre_uni_gc') {
+            form.egc_defer_from_block_number = form.egc_defer_from_block_number ?? 1;
+        }
     },
 );
 // Computed: filter course registrations by selected from_semester_id
@@ -149,6 +153,50 @@ const hasUnpaidEgcCharges = computed(() => {
     if (!isEgcStudent.value) return false;
     if (filteredEgcCharges.value.length === 0) return false;
     return filteredEgcCharges.value.every((charge) => !charge.is_fully_paid);
+});
+
+// Filtered available actions per current student status (business labels, not raw statuses).
+// Backend still fully enforces in RecordStudentActionAction.
+const availableActions = computed(() => {
+    const status = props.student.status;
+    const full = props.options.actionTypes;
+
+    if (status === 'pending') {
+        return [
+            { value: StudentActionType.STUDENT_ENROLLMENT_NE, label: 'NE Enrollment' },
+            { value: StudentActionType.ADMISSION_DEFERRAL, label: 'Hoãn nhập học (Admission Deferral)' },
+            { value: StudentActionType.ACADEMIC_DROPOUT, label: 'Bỏ học (Dropout)' },
+        ];
+    }
+
+    if (status === 'intake_pre_uni_gc' || status === 'intake_course') {
+        return [
+            { value: StudentActionType.WAITING_COURSE_OPENING, label: 'Chờ mở môn' },
+            { value: StudentActionType.ACADEMIC_DEFER, label: 'Bảo lưu (Defer)' },
+            { value: StudentActionType.ACADEMIC_DROPOUT, label: 'Bỏ học (Dropout)' },
+            { value: StudentActionType.CAMPUS_TRANSFER, label: 'Chuyển campus (Campus Transfer)' },
+        ];
+    }
+
+    if (status === 'pending_course_opening') {
+        // Two continue options both map to ACADEMIC_RESUME; backend history resolver picks the exact prior study status.
+        return [
+            { value: StudentActionType.ACADEMIC_RESUME, label: 'Tiếp tục học Pre-Uni / EGC' },
+            { value: StudentActionType.ACADEMIC_RESUME, label: 'Tiếp tục học Course chính' },
+            { value: StudentActionType.ACADEMIC_DEFER, label: 'Bảo lưu (Defer)' },
+            { value: StudentActionType.ACADEMIC_DROPOUT, label: 'Bỏ học (Dropout)' },
+        ];
+    }
+
+    if (status === 'deferred') {
+        return [
+            { value: StudentActionType.ACADEMIC_RESUME, label: 'Quay lại học' },
+            { value: StudentActionType.ACADEMIC_DEFER, label: 'Bảo lưu tiếp' },
+        ];
+    }
+
+    // Fallback: show all (should not normally happen for this page)
+    return full.map((a) => ({ value: a.value, label: a.label }));
 });
 watch(
     () => [selectedActionType.value, isEgcStudent.value],
@@ -201,6 +249,7 @@ const handleSubmit = () => {
             form.student_id = props.student.id;
             form.from_campus_id = props.student.campus_id;
         },
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         onError: (errors) => {
             toast.error('Failed to record action. Please check the form.');
         },
@@ -296,8 +345,8 @@ const getSummary = (log: StudentActionLog): string => {
                                     <SelectValue placeholder="Select action type" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem v-for="actionType in options.actionTypes" :key="actionType.value" :value="actionType.value">
-                                        {{ actionType.label }}
+                                    <SelectItem v-for="opt in availableActions" :key="opt.value + '::' + opt.label" :value="opt.value">
+                                        {{ opt.label }}
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
@@ -490,6 +539,40 @@ const getSummary = (log: StudentActionLog): string => {
                                     </SelectContent>
                                 </Select>
                                 <p v-if="form.errors.return_semester_id" class="text-sm text-red-500">{{ form.errors.return_semester_id }}</p>
+                            </div>
+                        </template>
+
+                        <!-- WAITING_COURSE_OPENING fields (from_semester + block for timing context) -->
+                        <template v-if="selectedActionType === StudentActionType.WAITING_COURSE_OPENING">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="space-y-2">
+                                    <Label for="from_semester_id">From Semester *</Label>
+                                    <Select v-model="form.from_semester_id">
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select semester" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem v-for="sem in options.semesters" :key="sem.id" :value="sem.id">
+                                                {{ sem.name }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p v-if="form.errors.from_semester_id" class="text-sm text-red-500">{{ form.errors.from_semester_id }}</p>
+                                </div>
+                                <div class="space-y-2">
+                                    <Label for="egc_defer_from_block_number">Block *</Label>
+                                    <Select :model-value="form.egc_defer_from_block_number ? String(form.egc_defer_from_block_number) : undefined" @update:model-value="(value) => (form.egc_defer_from_block_number = Number(value))">
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select block" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem v-for="block in options.egcDeferBlocks ?? []" :key="block.value" :value="String(block.value)">
+                                                {{ block.label }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p v-if="form.errors.egc_defer_from_block_number" class="text-sm text-red-500">{{ form.errors.egc_defer_from_block_number }}</p>
+                                </div>
                             </div>
                         </template>
 

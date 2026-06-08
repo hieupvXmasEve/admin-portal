@@ -5,6 +5,7 @@
 export enum StudentActionType {
     ACADEMIC_DEFER = 'ACADEMIC_DEFER',
     ACADEMIC_RESUME = 'ACADEMIC_RESUME',
+    WAITING_COURSE_OPENING = 'WAITING_COURSE_OPENING',
     ADMISSION_DEFERRAL = 'ADMISSION_DEFERRAL',
     ACADEMIC_DROPOUT = 'ACADEMIC_DROPOUT',
     CAMPUS_TRANSFER = 'CAMPUS_TRANSFER',
@@ -13,6 +14,7 @@ export enum StudentActionType {
 export const STUDENT_ACTION_TYPE_LABELS: Record<StudentActionType, string> = {
     [StudentActionType.ACADEMIC_DEFER]: 'Bảo lưu (Defer)',
     [StudentActionType.ACADEMIC_RESUME]: 'Quay lại học (Resume)',
+    [StudentActionType.WAITING_COURSE_OPENING]: 'Chờ mở môn (Waiting for Course Opening)',
     [StudentActionType.ADMISSION_DEFERRAL]: 'Hoãn nhập học (Admission Deferral)',
     [StudentActionType.ACADEMIC_DROPOUT]: 'Bỏ học (Dropout)',
     [StudentActionType.CAMPUS_TRANSFER]: 'Chuyển campus (Campus Transfer)',
@@ -21,6 +23,7 @@ export const STUDENT_ACTION_TYPE_LABELS: Record<StudentActionType, string> = {
 export const STUDENT_ACTION_TYPE_LABELS_EN: Record<StudentActionType, string> = {
     [StudentActionType.ACADEMIC_DEFER]: 'Academic Defer',
     [StudentActionType.ACADEMIC_RESUME]: 'Academic Resume',
+    [StudentActionType.WAITING_COURSE_OPENING]: 'Waiting for Course Opening',
     [StudentActionType.ADMISSION_DEFERRAL]: 'Admission Deferral',
     [StudentActionType.ACADEMIC_DROPOUT]: 'Academic Dropout',
     [StudentActionType.CAMPUS_TRANSFER]: 'Campus Transfer',
@@ -29,6 +32,7 @@ export const STUDENT_ACTION_TYPE_LABELS_EN: Record<StudentActionType, string> = 
 export const STUDENT_ACTION_TYPE_DESCRIPTIONS: Record<StudentActionType, string> = {
     [StudentActionType.ACADEMIC_DEFER]: 'Student takes a leave of absence and will return in a future semester',
     [StudentActionType.ACADEMIC_RESUME]: 'Student returns from deferral to continue their studies',
+    [StudentActionType.WAITING_COURSE_OPENING]: 'Student is temporarily paused awaiting a suitable course or class section to open',
     [StudentActionType.ADMISSION_DEFERRAL]: 'New student defers their admission or is a no-show',
     [StudentActionType.ACADEMIC_DROPOUT]: 'Student permanently leaves the program',
     [StudentActionType.CAMPUS_TRANSFER]: 'Student transfers to a different campus',
@@ -37,6 +41,7 @@ export const STUDENT_ACTION_TYPE_DESCRIPTIONS: Record<StudentActionType, string>
 export const STUDENT_ACTION_TYPE_BADGE_CLASSES: Record<StudentActionType, string> = {
     [StudentActionType.ACADEMIC_DEFER]: 'bg-orange-100 text-orange-800',
     [StudentActionType.ACADEMIC_RESUME]: 'bg-green-100 text-green-800',
+    [StudentActionType.WAITING_COURSE_OPENING]: 'bg-amber-100 text-amber-800',
     [StudentActionType.ADMISSION_DEFERRAL]: 'bg-yellow-100 text-yellow-800',
     [StudentActionType.ACADEMIC_DROPOUT]: 'bg-red-100 text-red-800',
     [StudentActionType.CAMPUS_TRANSFER]: 'bg-blue-100 text-blue-800',
@@ -260,6 +265,8 @@ export function getRequiredFieldsForActionType(actionType: StudentActionType): s
             return ['from_semester_id', 'return_semester_id'];
         case StudentActionType.ACADEMIC_RESUME:
             return ['return_semester_id'];
+        case StudentActionType.WAITING_COURSE_OPENING:
+            return ['from_semester_id', 'egc_defer_from_block_number'];
         case StudentActionType.ADMISSION_DEFERRAL:
             return ['intended_intake_semester_id'];
         case StudentActionType.ACADEMIC_DROPOUT:

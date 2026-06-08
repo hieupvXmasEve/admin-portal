@@ -49,6 +49,7 @@ class StoreStudentActionRequest extends FormRequest
             StudentActionType::ADMISSION_DEFERRAL->value => array_merge($baseRules, $this->admissionDeferralRules()),
             StudentActionType::ACADEMIC_DROPOUT->value => array_merge($baseRules, $this->dropoutRules()),
             StudentActionType::CAMPUS_TRANSFER->value => array_merge($baseRules, $this->campusTransferRules()),
+            StudentActionType::WAITING_COURSE_OPENING->value => array_merge($baseRules, $this->waitingCourseOpeningRules()),
             default => $baseRules,
         };
     }
@@ -230,6 +231,14 @@ class StoreStudentActionRequest extends FormRequest
         ];
     }
 
+    protected function waitingCourseOpeningRules(): array
+    {
+        return [
+            'from_semester_id' => ['required', 'integer', 'exists:semesters,id'],
+            'egc_defer_from_block_number' => ['required', 'integer', Rule::in([1, 2])],
+        ];
+    }
+
     public function messages(): array
     {
         return [
@@ -255,6 +264,9 @@ class StoreStudentActionRequest extends FormRequest
             'to_campus_id.different' => 'Target campus must be different from current campus.',
             'effective_at.required' => 'Effective date is required for campus transfer.',
             'effective_at.date' => 'Effective date must be a valid date.',
+            'egc_defer_from_block_number.required' => 'Block is required for Chờ mở môn action.',
+            'egc_defer_from_block_number.integer' => 'Block must be 1 or 2.',
+            'egc_defer_from_block_number.in' => 'Block must be 1 or 2.',
             // Defer case messages
             'defer_scope_type.required' => 'Defer scope type is required.',
             'defer_scope_type.in' => 'Defer scope type must be FULL or COURSES.',

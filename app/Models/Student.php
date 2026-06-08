@@ -171,7 +171,7 @@ class Student extends StudentAuditableModel
             'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
-            'status' => ['nullable', 'in:suspended,graduated,intake_pre_uni_gc,intake_course,intake_major,deferred,dropout,dropout_transfer,pending,admission_deferred'],
+            'status' => ['nullable', 'in:suspended,graduated,intake_pre_uni_gc,intake_course,intake_major,deferred,dropout,dropout_transfer,pending,admission_deferred,pending_course_opening'],
         ];
     }
 

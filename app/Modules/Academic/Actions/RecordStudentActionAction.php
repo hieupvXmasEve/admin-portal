@@ -45,17 +45,15 @@ class RecordStudentActionAction
         // Determine target status
         $targetStatus = $actionType->targetStatus();
 
-        // Special handling for ACADEMIC_RESUME: Restore previous status from deferral
+        // Special handling for ACADEMIC_RESUME: resolve the nearest prior *valid study status* from action history.
+        // This fixes consecutive defer issues and supports resume from pending_course_opening (or after defer from waiting).
+        // Never returns 'active' (retired), 'pending', 'deferred', or terminal statuses.
         if ($actionType === StudentActionType::ACADEMIC_RESUME) {
-            $lastDeferral = StudentActionLog::query()
-                ->where('student_id', $student->id)
-                ->where('action_type', StudentActionType::ACADEMIC_DEFER)
-                ->latest('id')
-                ->first();
-
-            if ($lastDeferral && $lastDeferral->previous_status) {
-                $targetStatus = $lastDeferral->previous_status;
+            $resolved = self::resolvePriorStudyStatusFromHistory($student);
+            if ($resolved) {
+                $targetStatus = $resolved;
             }
+            // If no history found, fall back to enum (legacy 'active') but policy + UI should prevent bad cases.
         }
 
         return DB::transaction(function () use ($student, $actionType, $targetStatus, $data, $userId, $fromSemesterId) {
@@ -172,6 +170,8 @@ class RecordStudentActionAction
 
     /**
      * Validate status transition policy before action-specific validation.
+     * Enforces the rules for pending_course_opening, no-revert-to-pending, deferred restrictions,
+     * and prevents using this page for pre-uni <-> course stage changes (handled elsewhere).
      */
     private static function validateStatusTransitionPolicy(Student $student, StudentActionType $actionType): void
     {
@@ -187,9 +187,44 @@ class RecordStudentActionAction
             ]);
         }
 
-        if ($actionType === StudentActionType::ACADEMIC_RESUME && $currentStatus !== 'deferred') {
+        // No action may ever target 'pending' (pending is only initial source for NE/admission deferral)
+        $intendedTarget = $actionType->targetStatus();
+        if ($intendedTarget === 'pending') {
             throw ValidationException::withMessages([
-                'action_type' => 'ACADEMIC_RESUME is only allowed when current status is deferred.',
+                'action_type' => 'No action may transition a student to "pending".',
+            ]);
+        }
+
+        // Deferred students: only resume (Quay lại học) or additional defer (Bảo lưu tiếp)
+        if ($currentStatus === 'deferred') {
+            if (! in_array($actionType, [StudentActionType::ACADEMIC_RESUME, StudentActionType::ACADEMIC_DEFER], true)) {
+                throw ValidationException::withMessages([
+                    'action_type' => 'When status is deferred, only "Quay lại học" or "Bảo lưu tiếp" are allowed on this page.',
+                ]);
+            }
+        }
+
+        // pending_course_opening: resume (to prior study status), defer, or dropout. No direct waiting again.
+        if ($currentStatus === 'pending_course_opening') {
+            $allowed = [StudentActionType::ACADEMIC_RESUME, StudentActionType::ACADEMIC_DEFER, StudentActionType::ACADEMIC_DROPOUT];
+            if (! in_array($actionType, $allowed, true)) {
+                throw ValidationException::withMessages([
+                    'action_type' => 'From "Chờ mở môn", only resume to prior stage, additional defer, or dropout are allowed.',
+                ]);
+            }
+        }
+
+        // WAITING_COURSE_OPENING only from active study stages (pre-uni or course). Not from pending or deferred.
+        if ($actionType === StudentActionType::WAITING_COURSE_OPENING && ! in_array($currentStatus, ['intake_pre_uni_gc', 'intake_course'], true)) {
+            throw ValidationException::withMessages([
+                'action_type' => 'WAITING_COURSE_OPENING is only allowed when current status is intake_pre_uni_gc or intake_course.',
+            ]);
+        }
+
+        // Resume allowed from deferred or from pending_course_opening (history will resolve correct prior study status)
+        if ($actionType === StudentActionType::ACADEMIC_RESUME && ! in_array($currentStatus, ['deferred', 'pending_course_opening'], true)) {
+            throw ValidationException::withMessages([
+                'action_type' => 'ACADEMIC_RESUME is only allowed when current status is deferred or pending_course_opening.',
             ]);
         }
 
@@ -278,10 +313,10 @@ class RecordStudentActionAction
      */
     private static function validateResumeAction(Student $student, array $data): void
     {
-        // Soft warning: student should be in deferred status
-        // We don't block this in Phase 1 for flexibility
-        if ($student->status !== 'deferred') {
-            Log::warning('Student resuming but not in deferred status', [
+        // Allow resume from deferred (classic) or pending_course_opening (continue after waiting).
+        // The history resolver will pick the correct prior study status.
+        if (! in_array((string) $student->status, ['deferred', 'pending_course_opening'], true)) {
+            Log::warning('Student resuming but not in deferred or pending_course_opening status', [
                 'student_id' => $student->id,
                 'current_status' => $student->status,
             ]);
@@ -521,5 +556,39 @@ class RecordStudentActionAction
                 'created_by_user_id' => $userId,
             ]);
         }
+    }
+
+    /**
+     * Walk action history backwards to find the most recent prior valid study status.
+     * Used by ACADEMIC_RESUME (Quay lại học) and continue from waiting.
+     * Allowed study statuses: intake_pre_uni_gc, intake_course, pending_course_opening.
+     * Explicitly excludes: active (retired), pending, deferred, dropout*, graduated, admission_deferred.
+     */
+    private static function resolvePriorStudyStatusFromHistory(Student $student): ?string
+    {
+        $allowedStudyStatuses = ['intake_pre_uni_gc', 'intake_course', 'pending_course_opening'];
+
+        $recentLogs = StudentActionLog::query()
+            ->where('student_id', $student->id)
+            ->orderBy('id', 'desc')
+            ->limit(30)
+            ->get(['previous_status', 'new_status']);
+
+        foreach ($recentLogs as $log) {
+            if ($log->previous_status && in_array($log->previous_status, $allowedStudyStatuses, true)) {
+                return $log->previous_status;
+            }
+            if ($log->new_status && in_array($log->new_status, $allowedStudyStatuses, true)) {
+                return $log->new_status;
+            }
+        }
+
+        // Last resort: if the student's current status is already a valid study one (unusual for resume)
+        $current = (string) $student->status;
+        if (in_array($current, $allowedStudyStatuses, true)) {
+            return $current;
+        }
+
+        return null;
     }
 }
