@@ -226,6 +226,7 @@ class StudentActionLog extends Model
             StudentActionType::STUDENT_MAJOR_ENROLLMENT => $this->fromSemester,
             StudentActionType::ACADEMIC_DEFER => $this->fromSemester,
             StudentActionType::ACADEMIC_RESUME => $this->returnSemester,
+            StudentActionType::WAITING_COURSE_OPENING => $this->fromSemester,
             StudentActionType::ADMISSION_DEFERRAL => $this->intendedIntakeSemester,
             StudentActionType::ACADEMIC_DROPOUT => $this->dropoutSemester,
             StudentActionType::CAMPUS_TRANSFER => $this->effectiveSemester,
@@ -255,6 +256,11 @@ class StudentActionLog extends Model
             StudentActionType::ACADEMIC_RESUME => sprintf(
                 'Resume in %s',
                 $this->returnSemester?->name ?? 'N/A'
+            ),
+            StudentActionType::WAITING_COURSE_OPENING => sprintf(
+                'Waiting for course opening from %s (Block %s)',
+                $this->fromSemester?->name ?? 'N/A',
+                $this->egc_defer_from_block_number ?? '?'
             ),
             StudentActionType::ADMISSION_DEFERRAL => sprintf(
                 'Admission deferred for %s',

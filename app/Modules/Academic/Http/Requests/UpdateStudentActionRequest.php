@@ -43,6 +43,7 @@ class UpdateStudentActionRequest extends FormRequest
             StudentActionType::ADMISSION_DEFERRAL->value => array_merge($baseRules, $this->admissionDeferralRules()),
             StudentActionType::ACADEMIC_DROPOUT->value => array_merge($baseRules, $this->dropoutRules()),
             StudentActionType::CAMPUS_TRANSFER->value => array_merge($baseRules, $this->campusTransferRules()),
+            StudentActionType::WAITING_COURSE_OPENING->value => array_merge($baseRules, $this->waitingCourseOpeningRules()),
             default => $baseRules,
         };
     }
@@ -137,6 +138,14 @@ class UpdateStudentActionRequest extends FormRequest
             ],
             'effective_at' => ['required', 'date'],
             'effective_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
+        ];
+    }
+
+    protected function waitingCourseOpeningRules(): array
+    {
+        return [
+            'from_semester_id' => ['required', 'integer', 'exists:semesters,id'],
+            'egc_defer_from_block_number' => ['required', 'integer', Rule::in([1, 2])],
         ];
     }
 

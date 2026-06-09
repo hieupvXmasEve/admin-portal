@@ -21,7 +21,27 @@ class Student extends StudentAuditableModel
     use HasApiTokens, HasFactory, HasNotifications, Notifiable {
         HasNotifications::notifications insteadof Notifiable;
     }
-    // enum ('active', 'inactive', 'suspended', 'graduated', 'intake_pre_uni_gc', 'intake_course', 'deferred', 'dropout', 'dropout_transfer', 'pending', 'admission_deferred')
+
+    /**
+     * All possible values for the students.status column.
+     * This is the single source of truth for the status ENUM.
+     * Keep this in sync with the database migration that defines/alters the ENUM.
+     */
+    public const STATUSES = [
+        'active',
+        'inactive',
+        'suspended',
+        'graduated',
+        'intake_pre_uni_gc',
+        'intake_course',
+        'intake_major',
+        'deferred',
+        'dropout',
+        'dropout_transfer',
+        'pending',
+        'admission_deferred',
+        'pending_course_opening', // Chờ mở môn
+    ];
 
     /**
      * Statuses that are blocked from active operations (e.g., login)
@@ -171,7 +191,7 @@ class Student extends StudentAuditableModel
             'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
-            'status' => ['nullable', 'in:suspended,graduated,intake_pre_uni_gc,intake_course,intake_major,deferred,dropout,dropout_transfer,pending,admission_deferred,pending_course_opening'],
+            'status' => ['nullable', 'in:' . implode(',', self::STATUSES)],
         ];
     }
 

@@ -210,6 +210,7 @@ class GetStudentStatusBySemesterQuery
             StudentActionType::STUDENT_MAJOR_ENROLLMENT->value => $action->fromSemester,
             StudentActionType::ACADEMIC_DEFER->value => $action->fromSemester,
             StudentActionType::ACADEMIC_RESUME->value => $action->returnSemester,
+            StudentActionType::WAITING_COURSE_OPENING->value => $action->fromSemester,
             StudentActionType::ADMISSION_DEFERRAL->value => $action->intendedIntakeSemester,
             StudentActionType::ACADEMIC_DROPOUT->value => $action->dropoutSemester,
             default => $action->effectiveSemester,

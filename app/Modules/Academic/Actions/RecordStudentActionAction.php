@@ -162,6 +162,7 @@ class RecordStudentActionAction
             StudentActionType::STUDENT_MAJOR_ENROLLMENT => null, // No special validation
             StudentActionType::ACADEMIC_DEFER => self::validateDeferAction($student, $data),
             StudentActionType::ACADEMIC_RESUME => self::validateResumeAction($student, $data),
+            StudentActionType::WAITING_COURSE_OPENING => null, // No special validation beyond policy
             StudentActionType::ADMISSION_DEFERRAL => null, // No special validation
             StudentActionType::ACADEMIC_DROPOUT => null, // No special validation
             StudentActionType::CAMPUS_TRANSFER => self::validateCampusTransferAction($student, $data),
@@ -301,11 +302,22 @@ class RecordStudentActionAction
         StudentActionType $actionType,
         array $data
     ): ?int {
-        if ($actionType !== StudentActionType::ACADEMIC_DEFER || $student->status !== 'intake_pre_uni_gc') {
+        // Support block number for both classic EGC defer and the new WAITING_COURSE_OPENING action
+        if (! in_array($actionType, [StudentActionType::ACADEMIC_DEFER, StudentActionType::WAITING_COURSE_OPENING], true)) {
             return null;
         }
 
-        return (int) ($data['egc_defer_from_block_number'] ?? 1);
+        $block = $data['egc_defer_from_block_number'] ?? null;
+
+        if ($block === null || $block === '') {
+            // Default to 1 only for pre-uni context when not provided (backward compat for defer)
+            if ($student->status === 'intake_pre_uni_gc') {
+                return 1;
+            }
+            return null;
+        }
+
+        return (int) $block;
     }
 
     /**
