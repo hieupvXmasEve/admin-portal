@@ -10,6 +10,7 @@ use App\Http\Responses\ApiResponse;
 use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
 use App\Modules\Academic\Actions\BulkLinkStudentsToDecisionAction;
+use App\Modules\Academic\Actions\UnlinkStudentFromDecisionAction;
 use App\Modules\Academic\Http\Requests\BulkStudentDecisionStudentsRequest;
 use App\Modules\Academic\Http\Requests\StoreStudentDecisionRequest;
 use App\Modules\Academic\Http\Requests\UpdateStudentDecisionRequest;
@@ -124,6 +125,24 @@ class StudentDecisionController extends Controller
             'Linked %d action(s) to this decision.',
             $result['linked_action_count']
         ));
+    }
+
+    public function unlinkStudent(
+        StudentDecision $studentDecision,
+        StudentActionLog $actionLog
+    ): JsonResponse {
+        $result = UnlinkStudentFromDecisionAction::run(
+            $studentDecision,
+            $actionLog,
+            (int) request()->user()?->id,
+            session('current_campus_id'),
+        );
+
+        $message = $result['unlinked_action_count'] > 0
+            ? 'Student action unlinked from decision.'
+            : 'No changes (action log was not linked to this decision).';
+
+        return ApiResponse::success($result, message: $message);
     }
 
     public function show(Request $request, StudentDecision $studentDecision): Response

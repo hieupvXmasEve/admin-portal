@@ -185,6 +185,7 @@ Route cluster (`app/Modules/Academic/routes/web.php`):
 - `GET /reports/student-decisions/{studentDecision}`
 - `POST /reports/student-decisions/{studentDecision}/students/preview`
 - `POST /reports/student-decisions/{studentDecision}/students/bulk-link`
+- `POST /reports/student-decisions/{studentDecision}/students/{actionLog}/unlink`
 - `POST /reports/student-decisions`
 - `PUT /reports/student-decisions/{studentDecision}`
 

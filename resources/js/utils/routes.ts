@@ -224,6 +224,7 @@ export const studentRoutes = {
     studentDecisionsUpdate: (id: number) => route('reports.student-decisions.update', { studentDecision: id }),
     studentDecisionsPreviewStudents: (id: number) => route('reports.student-decisions.students.preview', { studentDecision: id }),
     studentDecisionsBulkLinkStudents: (id: number) => route('reports.student-decisions.students.bulk-link', { studentDecision: id }),
+    studentDecisionsUnlinkStudent: (decisionId: number, actionLogId: number) => route('reports.student-decisions.students.unlink', { studentDecision: decisionId, actionLog: actionLogId }),
 } as const;
 
 // Lecturer Management Routes

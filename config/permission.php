@@ -200,6 +200,8 @@ return [
 
             // Student action audit page
             'view_student_action' => 'view_student_action',
+            // Student decision management (link/unlink action logs to decisions)
+            'unlink_student_from_decision' => 'unlink_student_from_decision',
         ],
         'events' => [
             'view_event' => 'view_event',

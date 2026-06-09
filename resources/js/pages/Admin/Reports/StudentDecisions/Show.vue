@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { useGlobalConfirmDialog, usePermissions } from '@/composables';
 import { useApi } from '@/composables/useApiRequest';
 import { useServerTableQuery } from '@/composables/useServerTableQuery';
 import type { PaginatedResponse } from '@/types';
@@ -17,7 +18,7 @@ import type { StudentDecision } from '@/types/student-decision';
 import { studentRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { AlertTriangle, ExternalLink, Loader2, SearchCheck, UserPlus } from 'lucide-vue-next';
+import { AlertTriangle, ExternalLink, Loader2, SearchCheck, Trash2, UserPlus } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -40,6 +41,8 @@ interface Props {
 
 const props = defineProps<Props>();
 const api = useApi();
+const confirmDialog = useGlobalConfirmDialog();
+const permissions = usePermissions();
 
 interface BulkDecisionActionLog {
     id: number;
@@ -199,6 +202,35 @@ const confirmBulkLink = async () => {
     }
 };
 
+const removeFromDecision = (actionLog: StudentActionLog) => {
+    const studentId = actionLog.student?.student_id || '-';
+    const studentName = actionLog.student?.full_name || '-';
+    const label = `${studentId} - ${studentName} (action #${actionLog.id})`;
+
+    confirmDialog.showConfirmDialog(
+        {
+            title: 'Unlink from Decision',
+            message: `Remove ${label} from decision ${props.decision.decision_number}? This will clear the link on the action log (no data is deleted).`,
+            confirmText: 'Unlink',
+        },
+        {
+            onConfirm: async () => {
+                try {
+                    const response = await api.post(studentRoutes.studentDecisionsUnlinkStudent(props.decision.id, actionLog.id));
+                    if (response.data.value?.success) {
+                        toast.success(response.data.value.message ?? 'Unlinked successfully');
+                        router.reload({ only: ['linkedActions', 'decision'] });
+                    } else {
+                        toast.error(response.data.value?.message ?? 'Failed to unlink');
+                    }
+                } catch {
+                    toast.error('Failed to unlink student from decision.');
+                }
+            },
+        },
+    );
+};
+
 watch([bulkActionType, bulkStudentCodes], () => {
     bulkPreview.value = null;
     bulkError.value = null;
@@ -227,6 +259,12 @@ const columns: ColumnDef<StudentActionLog>[] = [
         header: 'Details',
         id: 'details',
         cell: 'details',
+    },
+    {
+        header: 'Actions',
+        id: 'actions',
+        cell: 'actions',
+        enableSorting: false,
     },
 ];
 </script>
@@ -295,6 +333,19 @@ const columns: ColumnDef<StudentActionLog>[] = [
                         <Link :href="studentRoutes.studentStatusActionShow(row.original.id)">
                             <Button size="sm" variant="outline">View Action</Button>
                         </Link>
+                    </template>
+                    <template #cell-actions="{ row }">
+                        <Button
+                            v-if="permissions.can('unlink_student_from_decision')"
+                            size="sm"
+                            variant="ghost"
+                            class="text-destructive hover:text-destructive"
+                            @click="removeFromDecision(row.original)"
+                            :title="`Unlink action #${row.original.id} from this decision`"
+                        >
+                            <Trash2 class="h-4 w-4" />
+                            <span class="sr-only">Unlink</span>
+                        </Button>
                     </template>
                 </ServerPaginatedDataTable>
             </CardContent>

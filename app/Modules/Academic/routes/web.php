@@ -320,6 +320,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:change_student_status')
             ->name('students.bulk-link');
 
+        Route::post('/{studentDecision}/students/{actionLog}/unlink', [StudentDecisionController::class, 'unlinkStudent'])
+            ->middleware('can:unlink_student_from_decision')
+            ->name('students.unlink');
+
         Route::post('/', [StudentDecisionController::class, 'store'])
             ->middleware('can:change_student_status')
             ->name('store');
