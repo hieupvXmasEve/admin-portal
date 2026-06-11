@@ -34,20 +34,6 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class StudentController extends Controller
 {
-    private const STUDENT_STATUSES = [
-        'active',
-        'inactive',
-        'suspended',
-        'graduated',
-        'intake_pre_uni_gc',
-        'intake_course',
-        'deferred',
-        'dropout',
-        'dropout_transfer',
-        'pending',
-        'admission_deferred',
-    ];
-
     public function __construct(
         private StudentService $studentService
     ) {}
@@ -549,13 +535,13 @@ class StudentController extends Controller
             'student_ids.*' => 'required|string|max:20|distinct',
             // Keep singular filters for compatibility with existing bookmarks.
             'program_id' => 'nullable|integer|exists:programs,id',
-            'status' => ['nullable', 'string', Rule::in(self::STUDENT_STATUSES)],
+            'status' => ['nullable', 'string', Rule::in(Student::STATUSES)],
             'program_ids' => 'nullable|array|max:100',
             'program_ids.*' => 'required|integer|distinct|exists:programs,id',
             'specialization_ids' => 'nullable|array|max:100',
             'specialization_ids.*' => 'required|integer|distinct|exists:specializations,id',
             'statuses' => 'nullable|array|max:20',
-            'statuses.*' => ['required', 'string', 'distinct', Rule::in(self::STUDENT_STATUSES)],
+            'statuses.*' => ['required', 'string', 'distinct', Rule::in(Student::STATUSES)],
             'intake_semester_ids' => 'nullable|array|max:100',
             'intake_semester_ids.*' => 'required|integer|distinct|exists:semesters,id',
         ];

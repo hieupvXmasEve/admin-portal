@@ -5,11 +5,13 @@ export enum StudentStatus {
     Graduated = 'graduated',
     IntakePreUniGC = 'intake_pre_uni_gc',
     IntakeCourse = 'intake_course',
+    IntakeMajor = 'intake_major',
     Deferred = 'deferred',
     Dropout = 'dropout',
     DropoutTransfer = 'dropout_transfer',
     Pending = 'pending',
     AdmissionDeferred = 'admission_deferred',
+    PendingCourseOpening = 'pending_course_opening',
 }
 
 export const STUDENT_STATUS_LABELS: Record<StudentStatus, string> = {
@@ -19,11 +21,13 @@ export const STUDENT_STATUS_LABELS: Record<StudentStatus, string> = {
     [StudentStatus.Graduated]: 'Graduated',
     [StudentStatus.IntakePreUniGC]: 'Intake Pre-Uni GC',
     [StudentStatus.IntakeCourse]: 'Intake Course',
+    [StudentStatus.IntakeMajor]: 'Intake Major',
     [StudentStatus.Deferred]: 'Deferred',
     [StudentStatus.Dropout]: 'Dropout',
     [StudentStatus.DropoutTransfer]: 'Dropout Transfer',
     [StudentStatus.Pending]: 'Pending',
     [StudentStatus.AdmissionDeferred]: 'Admission Deferred',
+    [StudentStatus.PendingCourseOpening]: 'Chờ mở môn',
 };
 
 // Tailwind badge classes
@@ -34,11 +38,13 @@ export const STUDENT_STATUS_BADGE_CLASSES: Record<StudentStatus, string> = {
     [StudentStatus.Graduated]: 'bg-blue-100 text-blue-800',
     [StudentStatus.IntakePreUniGC]: 'bg-yellow-100 text-yellow-800',
     [StudentStatus.IntakeCourse]: 'bg-indigo-100 text-indigo-800',
+    [StudentStatus.IntakeMajor]: 'bg-teal-100 text-teal-800',
     [StudentStatus.Deferred]: 'bg-orange-100 text-orange-800',
     [StudentStatus.Dropout]: 'bg-red-100 text-red-800',
     [StudentStatus.DropoutTransfer]: 'bg-red-100 text-red-800',
     [StudentStatus.Pending]: 'bg-yellow-100 text-yellow-800',
     [StudentStatus.AdmissionDeferred]: 'bg-orange-100 text-orange-800',
+    [StudentStatus.PendingCourseOpening]: 'bg-amber-100 text-amber-800',
 };
 
 export function getStudentStatusLabel(status: string): string {
@@ -56,6 +62,7 @@ export const STUDENT_STATUS_DESCRIPTIONS: Record<StudentStatus, string> = {
     [StudentStatus.Pending]: 'Chưa nhập học, chưa hoàn tất hồ sơ',
     [StudentStatus.IntakePreUniGC]: 'Đang học GC, chưa vào khóa chính',
     [StudentStatus.IntakeCourse]: 'Đang ở trạng thái mới nhập vào chương trình chính',
+    [StudentStatus.IntakeMajor]: 'Đã vào chuyên ngành chính',
     [StudentStatus.Active]: 'Đang học bình thường',
     [StudentStatus.Inactive]: 'Ngừng tạm thời, chưa bỏ hẳn',
     [StudentStatus.Suspended]: 'Bị đình chỉ/kỷ luật',
@@ -64,6 +71,7 @@ export const STUDENT_STATUS_DESCRIPTIONS: Record<StudentStatus, string> = {
     [StudentStatus.DropoutTransfer]: 'Bỏ vì chuyển sang nơi khác',
     [StudentStatus.Graduated]: 'Tốt nghiệp',
     [StudentStatus.AdmissionDeferred]: 'Hoãn nhập học hoặc không đến nhập học',
+    [StudentStatus.PendingCourseOpening]: 'Tạm dừng vì chưa có môn/lớp phù hợp để học tiếp',
 };
 
 export function getStudentStatusDescription(status: string): string {
