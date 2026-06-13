@@ -11,6 +11,8 @@ use App\Modules\Finance\Http\Web\Admin\EgcCarryForwardController;
 use App\Modules\Finance\Http\Web\Admin\EgcChargeGenerationController;
 use App\Modules\Finance\Http\Web\Admin\EgcRetakeAdjustmentsController;
 use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
+use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionController;
+use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionHistoryController;
 use App\Modules\Finance\Http\Web\Admin\MajorChargeGenerationController;
 use App\Modules\Finance\Http\Web\Admin\PaymentController;
 use Illuminate\Support\Facades\Route;
@@ -96,6 +98,19 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::get('/due-calendar', [BillingOperationsController::class, 'dueCalendar'])
             ->middleware('can:view_finance_operations_due_calendar')
             ->name('due-calendar');
+
+        Route::get('/lifecycle-exceptions', [LifecycleDueExceptionController::class, 'index'])
+            ->middleware('can:view_finance_operations_due_calendar')
+            ->name('lifecycle-exceptions');
+        Route::get('/lifecycle-exception-history', [LifecycleDueExceptionHistoryController::class, 'index'])
+            ->middleware('can:view_finance_operations_due_calendar')
+            ->name('lifecycle-exception-history');
+        Route::post('/lifecycle-exceptions/{dngPaymentRequest}/acknowledge', [LifecycleDueExceptionController::class, 'acknowledge'])
+            ->middleware('can:view_finance_operations_due_calendar')
+            ->name('lifecycle-exceptions.acknowledge');
+        Route::post('/lifecycle-exceptions/{dngPaymentRequest}/resolve', [LifecycleDueExceptionController::class, 'resolve'])
+            ->middleware('can:view_finance_operations_due_calendar')
+            ->name('lifecycle-exceptions.resolve');
 
         Route::get('/settlement', [BillingSettlementController::class, 'index'])
             ->middleware('can:allocate_finance_payment')

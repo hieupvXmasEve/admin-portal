@@ -2,36 +2,17 @@
 import DataPagination from '@/components/DataPagination.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { PaginatedResponse } from '@/types';
 import { formatCurrency, type Semester } from '@/types/finance';
 import { formatDateTime } from '@/utils/date';
-import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import {
-    AlertTriangle,
-    ArrowRight,
-    Bell,
-    Calendar,
-    CalendarClock,
-    CalendarDays,
-    CalendarX2,
-    Clock,
-    Download,
-    Mail,
-    Search,
-} from 'lucide-vue-next';
-import { computed, ref, watch } from 'vue';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { AlertTriangle, ArrowRight, Bell, Calendar, CalendarClock, CalendarDays, CalendarX2, Clock, Download, Mail, Search } from 'lucide-vue-next';
+import { ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
 interface InvoiceDueItem {
@@ -72,7 +53,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-const page = usePage();
 
 // Local filter state
 const semesterId = ref(props.filters.semester_id || (props.currentSemester?.id ? String(props.currentSemester.id) : 'all'));
@@ -180,7 +160,7 @@ const toggleSelectAll = () => {
     if (selectedInvoices.value.length === props.invoices.data.length) {
         selectedInvoices.value = [];
     } else {
-        selectedInvoices.value = props.invoices.data.map(i => i.id);
+        selectedInvoices.value = props.invoices.data.map((i) => i.id);
     }
 };
 
@@ -207,22 +187,30 @@ const sendStudentReminders = () => {
     }
 
     // Convert selected IDs to item_ids format (dng_request:id)
-    const itemIds = selectedInvoices.value.map(id => `dng_request:${id}`);
+    const itemIds = selectedInvoices.value.map((id) => `dng_request:${id}`);
 
-    router.post(route('api.finance.operations.send-due-item-reminders'), {
-        item_ids: itemIds,
-    }, {
-        preserveScroll: true,
-        onStart: () => { isSendingStudentReminders.value = true; },
-        onFinish: () => { isSendingStudentReminders.value = false; },
-        onSuccess: () => {
-            // Flash messages are handled automatically by useFlashToast in AppLayout
-            selectedInvoices.value = [];
+    router.post(
+        route('api.finance.operations.send-due-item-reminders'),
+        {
+            item_ids: itemIds,
         },
-        onError: () => {
-            toast.error('Lỗi khi gửi nhắc nợ cho sinh viên');
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isSendingStudentReminders.value = true;
+            },
+            onFinish: () => {
+                isSendingStudentReminders.value = false;
+            },
+            onSuccess: () => {
+                // Flash messages are handled automatically by useFlashToast in AppLayout
+                selectedInvoices.value = [];
+            },
+            onError: () => {
+                toast.error('Lỗi khi gửi nhắc nợ cho sinh viên');
+            },
         },
-    });
+    );
 };
 
 const sendParentReminders = () => {
@@ -232,32 +220,43 @@ const sendParentReminders = () => {
     }
 
     // Convert selected IDs to item_ids format (dng_request:id)
-    const itemIds = selectedInvoices.value.map(id => `dng_request:${id}`);
+    const itemIds = selectedInvoices.value.map((id) => `dng_request:${id}`);
 
-    router.post(route('api.finance.operations.send-due-item-parent-reminders'), {
-        item_ids: itemIds,
-    }, {
-        preserveScroll: true,
-        onStart: () => { isSendingParentReminders.value = true; },
-        onFinish: () => { isSendingParentReminders.value = false; },
-        onSuccess: () => {
-            // Flash messages are handled automatically by useFlashToast in AppLayout
-            selectedInvoices.value = [];
+    router.post(
+        route('api.finance.operations.send-due-item-parent-reminders'),
+        {
+            item_ids: itemIds,
         },
-        onError: () => {
-            toast.error('Lỗi khi gửi thông báo cho phụ huynh');
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isSendingParentReminders.value = true;
+            },
+            onFinish: () => {
+                isSendingParentReminders.value = false;
+            },
+            onSuccess: () => {
+                // Flash messages are handled automatically by useFlashToast in AppLayout
+                selectedInvoices.value = [];
+            },
+            onError: () => {
+                toast.error('Lỗi khi gửi thông báo cho phụ huynh');
+            },
         },
-    });
+    );
 };
 
 const exportList = async () => {
     isExporting.value = true;
 
     try {
-        window.open(route('finance.operations.export-due-list', {
-            semester_id: semesterId.value !== 'all' ? semesterId.value : undefined,
-            status: statusFilter.value !== 'all' ? statusFilter.value : undefined,
-        }), '_blank');
+        window.open(
+            route('finance.operations.export-due-list', {
+                semester_id: semesterId.value !== 'all' ? semesterId.value : undefined,
+                status: statusFilter.value !== 'all' ? statusFilter.value : undefined,
+            }),
+            '_blank',
+        );
     } catch (error) {
         console.error('Export error:', error);
         toast.error('Lỗi khi xuất danh sách');
@@ -279,7 +278,6 @@ defineOptions({
 </script>
 
 <template>
-
     <Head title="Due Calendar" />
 
     <div class="space-y-6">
@@ -290,6 +288,9 @@ defineOptions({
                 <p class="text-muted-foreground mt-1">Quản lý hạn thanh toán và gửi nhắc nợ cho sinh viên hoặc phụ huynh</p>
             </div>
             <div class="flex items-center gap-3">
+                <Link :href="route('finance.operations.lifecycle-exceptions')">
+                    <Button variant="outline">Lifecycle Exceptions</Button>
+                </Link>
                 <Select v-model="semesterId">
                     <SelectTrigger class="w-[200px]">
                         <SelectValue placeholder="Chọn học kỳ" />
@@ -306,8 +307,7 @@ defineOptions({
 
         <!-- Summary Cards -->
         <div class="grid gap-4 md:grid-cols-4">
-            <Card :class="{ 'ring-2 ring-blue-500': statusFilter === 'upcoming' }" class="cursor-pointer"
-                @click="statusFilter = 'upcoming'">
+            <Card :class="{ 'ring-2 ring-blue-500': statusFilter === 'upcoming' }" class="cursor-pointer" @click="statusFilter = 'upcoming'">
                 <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle class="text-sm font-medium">Sắp đến hạn</CardTitle>
                     <CalendarClock class="h-4 w-4 text-blue-500" />
@@ -318,8 +318,7 @@ defineOptions({
                 </CardContent>
             </Card>
 
-            <Card :class="{ 'ring-2 ring-yellow-500': statusFilter === 'due_today' }" class="cursor-pointer"
-                @click="statusFilter = 'due_today'">
+            <Card :class="{ 'ring-2 ring-yellow-500': statusFilter === 'due_today' }" class="cursor-pointer" @click="statusFilter = 'due_today'">
                 <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle class="text-sm font-medium">Đến hạn hôm nay</CardTitle>
                     <CalendarDays class="h-4 w-4 text-yellow-500" />
@@ -330,8 +329,7 @@ defineOptions({
                 </CardContent>
             </Card>
 
-            <Card :class="{ 'ring-2 ring-red-500': statusFilter === 'overdue' }" class="cursor-pointer"
-                @click="statusFilter = 'overdue'">
+            <Card :class="{ 'ring-2 ring-red-500': statusFilter === 'overdue' }" class="cursor-pointer" @click="statusFilter = 'overdue'">
                 <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle class="text-sm font-medium">Quá hạn</CardTitle>
                     <CalendarX2 class="h-4 w-4 text-red-500" />
@@ -348,8 +346,7 @@ defineOptions({
                     <AlertTriangle class="h-4 w-4 text-orange-500" />
                 </CardHeader>
                 <CardContent>
-                    <div class="text-2xl font-bold text-orange-600">{{ formatCurrency(summary.total_overdue_amount) }}
-                    </div>
+                    <div class="text-2xl font-bold text-orange-600">{{ formatCurrency(summary.total_overdue_amount) }}</div>
                     <p class="text-muted-foreground text-xs">Số tiền cần thu hồi</p>
                 </CardContent>
             </Card>
@@ -361,9 +358,8 @@ defineOptions({
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <div class="flex items-center gap-3">
                         <div class="relative">
-                            <Search class="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-                            <Input v-model="search" placeholder="Tìm sinh viên, mã DNG request..."
-                                class="w-[250px] pl-10" />
+                            <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                            <Input v-model="search" placeholder="Tìm sinh viên, mã DNG request..." class="w-[250px] pl-10" />
                         </div>
                         <Select v-model="statusFilter">
                             <SelectTrigger class="w-[180px]">
@@ -408,10 +404,13 @@ defineOptions({
                     <TableHeader>
                         <TableRow>
                             <TableHead class="w-12">
-                                <input type="checkbox"
+                                <input
+                                    type="checkbox"
                                     :checked="selectedInvoices.length === invoices.data.length && invoices.data.length > 0"
                                     :indeterminate="selectedInvoices.length > 0 && selectedInvoices.length < invoices.data.length"
-                                    class="h-4 w-4 rounded border-gray-300" @change="toggleSelectAll" />
+                                    class="h-4 w-4 rounded border-gray-300"
+                                    @change="toggleSelectAll"
+                                />
                             </TableHead>
                             <TableHead>DNG Request</TableHead>
                             <TableHead>Sinh viên</TableHead>
@@ -434,11 +433,9 @@ defineOptions({
                                 </div>
                             </TableCell>
                         </TableRow>
-                        <TableRow v-for="invoice in invoices.data" :key="invoice.id"
-                            :class="{ 'bg-red-50': invoice.status === 'overdue', 'bg-yellow-50': invoice.status === 'due_today' }">
+                        <TableRow v-for="invoice in invoices.data" :key="invoice.id" :class="{ 'bg-red-50': invoice.status === 'overdue', 'bg-yellow-50': invoice.status === 'due_today' }">
                             <TableCell>
-                                <input type="checkbox" :checked="selectedInvoices.includes(invoice.id)"
-                                    class="h-4 w-4 rounded border-gray-300" @change="toggleInvoice(invoice.id)" />
+                                <input type="checkbox" :checked="selectedInvoices.includes(invoice.id)" class="h-4 w-4 rounded border-gray-300" @change="toggleInvoice(invoice.id)" />
                             </TableCell>
                             <TableCell>
                                 <div class="font-medium">{{ invoice.invoice_number }}</div>
@@ -461,25 +458,29 @@ defineOptions({
                             <TableCell class="text-right text-green-600">
                                 {{ formatCurrency(invoice.paid_amount) }}
                             </TableCell>
-                            <TableCell class="text-right font-medium"
-                                :class="invoice.balance > 0 ? 'text-red-600' : ''">
+                            <TableCell class="text-right font-medium" :class="invoice.balance > 0 ? 'text-red-600' : ''">
                                 {{ formatCurrency(invoice.balance) }}
                             </TableCell>
                             <TableCell>
                                 <div class="flex items-center gap-2">
-                                    <Clock class="h-4 w-4" :class="{
-                                        'text-blue-500': invoice.status === 'upcoming',
-                                        'text-yellow-500': invoice.status === 'due_today',
-                                        'text-red-500': invoice.status === 'overdue',
-                                    }" />
+                                    <Clock
+                                        class="h-4 w-4"
+                                        :class="{
+                                            'text-blue-500': invoice.status === 'upcoming',
+                                            'text-yellow-500': invoice.status === 'due_today',
+                                            'text-red-500': invoice.status === 'overdue',
+                                        }"
+                                    />
                                     <div>
-                                        <div class="text-sm">{{ new Date(invoice.due_date).toLocaleDateString('vi-VN')
-                                        }}</div>
-                                        <div class="text-xs" :class="{
-                                            'text-blue-600': invoice.days_until_due > 0,
-                                            'text-yellow-600': invoice.days_until_due === 0,
-                                            'text-red-600': invoice.days_until_due < 0,
-                                        }">
+                                        <div class="text-sm">{{ new Date(invoice.due_date).toLocaleDateString('vi-VN') }}</div>
+                                        <div
+                                            class="text-xs"
+                                            :class="{
+                                                'text-blue-600': invoice.days_until_due > 0,
+                                                'text-yellow-600': invoice.days_until_due === 0,
+                                                'text-red-600': invoice.days_until_due < 0,
+                                            }"
+                                        >
                                             {{ formatDaysRemaining(invoice.days_until_due) }}
                                         </div>
                                     </div>

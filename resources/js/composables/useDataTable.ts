@@ -98,21 +98,23 @@ export function useDataTable<T extends Record<string, any> = Record<string, Filt
 
     // ── Navigation ───────────────────────────────────────────────────────────
 
+    const visitOptions = () => ({
+        ...(only && only.length > 0 ? { only } : {}),
+        preserveState: true,
+        preserveScroll,
+        replace,
+        onFinish: () => {
+            isNavigating.value = false;
+        },
+        onSuccess: () => onSuccess?.(),
+        onError: (errors: unknown) => onError?.(errors),
+    });
+
     const navigate = () => {
         if (isNavigating.value) return;
         isNavigating.value = true;
 
-        router.visit(buildUrl(), {
-            only,
-            preserveState: true,
-            preserveScroll,
-            replace,
-            onFinish: () => {
-                isNavigating.value = false;
-            },
-            onSuccess: () => onSuccess?.(),
-            onError: (errors) => onError?.(errors),
-        });
+        router.visit(buildUrl(), visitOptions());
     };
 
     // Per-field debounced function cache
@@ -203,7 +205,7 @@ export function useDataTable<T extends Record<string, any> = Record<string, Filt
             const page = urlObj.searchParams.get('page');
             if (page) setPage(parseInt(page, 10));
         } catch {
-            router.visit(url, { preserveState: true, preserveScroll, only, replace });
+            router.visit(url, { preserveState: true, preserveScroll, replace, ...(only && only.length > 0 ? { only } : {}) });
         }
     };
 

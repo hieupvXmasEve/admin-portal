@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Operations;
 
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Support\LifecycleDueItemPredicate;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class ListDueItemsQuery
@@ -23,6 +24,8 @@ class ListDueItemsQuery
             ->when($semesterId, fn ($q) => $q->where('semester_id', $semesterId))
             ->where('status', 'pushed_to_dng')
             ->whereNotNull('due_date');
+
+        LifecycleDueItemPredicate::applyActiveCollectionScope($dngQuery);
 
         // Apply status filter to DNG
         if (! empty($status)) {

@@ -8,6 +8,7 @@ use App\Models\StudentInvoice;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\DngInstallmentContextResolver;
+use App\Modules\Finance\Support\LifecycleDueItemPredicate;
 use App\Modules\Notification\EmailContent\EmailContentRegistry;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
 use App\Services\EmailService;
@@ -21,6 +22,7 @@ class SendDueItemRemindersAction
         $failedCount = 0;
         $skippedNoDebtCount = 0;
         $skippedNoStudentEmailCount = 0;
+        $skippedLifecycleExceptionCount = 0;
 
         $settlementService = app(SettlementService::class);
         $emailService = app(EmailService::class);
@@ -55,6 +57,17 @@ class SendDueItemRemindersAction
 
                 $student = $dngRequest->student;
                 $balance = (float) $dngRequest->amount;
+
+                if (LifecycleDueItemPredicate::isLifecycleException($student)) {
+                    \Log::info('Skipping DNG reminder - lifecycle exception', [
+                        'dng_request_id' => $id,
+                        'student_id' => $student?->id,
+                        'student_status' => $student?->status,
+                    ]);
+                    $skippedLifecycleExceptionCount++;
+
+                    continue;
+                }
 
                 if (! $student) {
                     \Log::warning('DNG request has no student', ['dng_request_id' => $id]);
@@ -202,6 +215,7 @@ class SendDueItemRemindersAction
             'failed_count' => $failedCount,
             'skipped_no_debt_count' => $skippedNoDebtCount,
             'skipped_no_student_email_count' => $skippedNoStudentEmailCount,
+            'skipped_lifecycle_exception_count' => $skippedLifecycleExceptionCount,
         ]);
 
         return [
@@ -209,11 +223,13 @@ class SendDueItemRemindersAction
             'failed_count' => $failedCount,
             'skipped_no_debt_count' => $skippedNoDebtCount,
             'skipped_no_student_email_count' => $skippedNoStudentEmailCount,
+            'skipped_lifecycle_exception_count' => $skippedLifecycleExceptionCount,
             'message' => self::buildSummaryMessage(
                 $sentCount,
                 $failedCount,
                 $skippedNoDebtCount,
                 $skippedNoStudentEmailCount,
+                $skippedLifecycleExceptionCount,
             ),
         ];
     }
@@ -243,7 +259,8 @@ class SendDueItemRemindersAction
         int $sentCount,
         int $failedCount,
         int $skippedNoDebtCount,
-        int $skippedNoStudentEmailCount
+        int $skippedNoStudentEmailCount,
+        int $skippedLifecycleExceptionCount = 0,
     ): string {
         $parts = ["Đã gửi {$sentCount} email nhắc nợ cho sinh viên"];
 
@@ -257,6 +274,10 @@ class SendDueItemRemindersAction
 
         if ($skippedNoStudentEmailCount > 0) {
             $parts[] = "{$skippedNoStudentEmailCount} mục không có email sinh viên";
+        }
+
+        if ($skippedLifecycleExceptionCount > 0) {
+            $parts[] = "{$skippedLifecycleExceptionCount} mục ngoại lệ lifecycle bị bỏ qua";
         }
 
         return implode(', ', $parts);
