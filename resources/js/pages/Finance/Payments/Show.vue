@@ -2,13 +2,12 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency, formatDate } from '@/utils/format';
-import { Head, Link, useForm } from '@inertiajs/vue3';
-import { toast } from 'vue-sonner';
+import { Head, Link } from '@inertiajs/vue3';
+import { Lock } from 'lucide-vue-next';
 
 interface PaymentApplication {
     id: number;
@@ -58,28 +57,9 @@ interface Payment {
     } | null;
 }
 
-const props = defineProps<{
+defineProps<{
     payment: Payment;
 }>();
-
-const form = useForm({
-    charge_id: '',
-    amount: '',
-});
-
-const submitAllocation = () => {
-    if (!form.charge_id || !form.amount) return;
-
-    form.post(route('finance.payments.allocate', props.payment.id), {
-        onSuccess: () => {
-            toast.success('Allocation successful');
-            form.reset();
-        },
-        onError: () => {
-            toast.error('Allocation failed');
-        },
-    });
-};
 
 const getApplicationDescription = (application: PaymentApplication) => application.invoice_line?.charge?.description || application.invoice_line?.description_snapshot || '-';
 
@@ -194,24 +174,25 @@ const getApplicationAmountClass = (application: PaymentApplication) => (applicat
         </CardContent>
     </Card>
 
-    <!-- Manual Allocation Form (Future Work: Dropdown of charges) -->
-    <Card v-if="payment.unapplied_amount > 0">
+    <!-- Manual allocation temporarily disabled (UI-SAFE-2) -->
+    <Card v-if="payment.unapplied_amount > 0" class="border-amber-300 bg-amber-50">
         <CardHeader>
-            <CardTitle>Manual Allocation</CardTitle>
-            <CardDescription>Allocate remaining balance to a charge ID (Temporary UI).</CardDescription>
+            <CardTitle class="flex items-center gap-2 text-amber-900">
+                <Lock class="h-5 w-5" />
+                Phân bổ thủ công đang tạm khoá
+            </CardTitle>
+            <CardDescription class="text-amber-800"> Form nhập Charge ID thô đã bị gỡ vì dễ phân bổ nhầm tiền sang khoản phí sai sinh viên (không lọc theo sinh viên, không kiểm tra số dư, không xác nhận). </CardDescription>
         </CardHeader>
-        <CardContent>
-            <form @submit.prevent="submitAllocation" class="flex items-end gap-4">
-                <div class="grid w-full max-w-sm items-center gap-1.5">
-                    <Label for="charge_id">Charge ID</Label>
-                    <Input id="charge_id" v-model="form.charge_id" placeholder="Enter Charge ID" />
-                </div>
-                <div class="grid w-full max-w-sm items-center gap-1.5">
-                    <Label for="amount">Amount</Label>
-                    <Input id="amount" v-model="form.amount" type="number" step="0.01" />
-                </div>
-                <Button type="submit" :disabled="form.processing"> Allocate </Button>
-            </form>
+        <CardContent class="space-y-3 text-sm text-amber-900">
+            <p>
+                Số dư chưa phân bổ:
+                <span class="font-semibold">{{ formatCurrency(payment.unapplied_amount) }}</span
+                >. Bộ chọn khoản phí an toàn (lọc theo sinh viên + xác nhận) sẽ được bổ sung ở bước nâng cấp UI Finance.
+            </p>
+            <p>Trong thời gian chờ, dùng <span class="font-medium">Auto Allocate</span> ở danh sách Khoản thu để phân bổ theo thứ tự ưu tiên một cách an toàn.</p>
+            <Link :href="route('finance.payments.index')">
+                <Button variant="outline" class="border-amber-300">Về danh sách Khoản thu</Button>
+            </Link>
         </CardContent>
     </Card>
 </template>

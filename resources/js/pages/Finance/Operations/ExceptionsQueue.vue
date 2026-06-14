@@ -3,31 +3,14 @@ import DataPagination from '@/components/DataPagination.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { PaginatedResponse } from '@/types';
-import { formatCurrency, type Semester } from '@/types/finance';
+import { type Semester } from '@/types/finance';
 import { Head, Link, router } from '@inertiajs/vue3';
-import {
-    AlertTriangle,
-    ArrowRight,
-    CheckCircle2,
-    CreditCard,
-    DollarSign,
-    FileQuestion,
-    Link2Off,
-    RotateCcw,
-    Users,
-    Wrench,
-} from 'lucide-vue-next';
+import { AlertTriangle, ArrowRight, CheckCircle2, DollarSign, FileQuestion, Link2Off, RotateCcw, Wrench } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -61,8 +44,8 @@ interface Props {
     currentSemester: Semester | null;
 }
 
-
 const props = defineProps<Props>();
+const { showConfirmDialog } = useGlobalConfirmDialog();
 
 // Local filter state
 const semesterId = ref(props.filters.semester_id || (props.currentSemester?.id ? String(props.currentSemester.id) : 'all'));
@@ -149,7 +132,7 @@ const getSeverityBadgeClass = (severity: string) => {
 // Fix exception
 const fixingId = ref<number | null>(null);
 
-const fixException = async (exception: ExceptionItem) => {
+const runFixException = async (exception: ExceptionItem) => {
     fixingId.value = exception.id;
 
     try {
@@ -172,12 +155,25 @@ const fixException = async (exception: ExceptionItem) => {
         } else {
             toast.error('Lỗi kết nối server');
         }
-    } catch (error) {
-        console.error('Fix error:', error);
+    } catch {
         toast.error('Lỗi khi sửa exception');
     } finally {
         fixingId.value = null;
     }
+};
+
+const fixException = (exception: ExceptionItem) => {
+    showConfirmDialog(
+        {
+            title: 'Xác nhận sửa lỗi billing',
+            message: `Tạo dữ liệu billing còn thiếu cho sinh viên ${exception.student_name} (${exception.student_code})? Thao tác có thể sinh khoản phí / điều chỉnh và được ghi vào dữ liệu tài chính.`,
+            confirmText: 'Sửa ngay',
+            cancelText: 'Huỷ bỏ',
+        },
+        {
+            onConfirm: () => runFixException(exception),
+        },
+    );
 };
 
 // Total exceptions
@@ -191,7 +187,6 @@ defineOptions({
 </script>
 
 <template>
-
     <Head title="Billing Exceptions" />
 
     <div class="space-y-6">
@@ -218,8 +213,7 @@ defineOptions({
 
         <!-- Summary Cards -->
         <div class="grid gap-4 md:grid-cols-5">
-            <Card :class="{ 'ring-2 ring-primary': activeTab === 'all' }" class="cursor-pointer"
-                @click="activeTab = 'all'">
+            <Card :class="{ 'ring-primary ring-2': activeTab === 'all' }" class="cursor-pointer" @click="activeTab = 'all'">
                 <CardHeader class="pb-2">
                     <div class="flex items-center justify-between">
                         <CardDescription>Tổng cộng</CardDescription>
@@ -229,8 +223,7 @@ defineOptions({
                 </CardHeader>
             </Card>
 
-            <Card :class="{ 'ring-2 ring-red-500': activeTab === 'missing_charge' }" class="cursor-pointer"
-                @click="activeTab = 'missing_charge'">
+            <Card :class="{ 'ring-2 ring-red-500': activeTab === 'missing_charge' }" class="cursor-pointer" @click="activeTab = 'missing_charge'">
                 <CardHeader class="pb-2">
                     <div class="flex items-center justify-between">
                         <CardDescription>Missing Charge</CardDescription>
@@ -240,8 +233,7 @@ defineOptions({
                 </CardHeader>
             </Card>
 
-            <Card :class="{ 'ring-2 ring-orange-500': activeTab === 'retake_no_charge' }" class="cursor-pointer"
-                @click="activeTab = 'retake_no_charge'">
+            <Card :class="{ 'ring-2 ring-orange-500': activeTab === 'retake_no_charge' }" class="cursor-pointer" @click="activeTab = 'retake_no_charge'">
                 <CardHeader class="pb-2">
                     <div class="flex items-center justify-between">
                         <CardDescription>Retake No Charge</CardDescription>
@@ -251,8 +243,7 @@ defineOptions({
                 </CardHeader>
             </Card>
 
-            <Card :class="{ 'ring-2 ring-purple-500': activeTab === 'defer_no_case' }" class="cursor-pointer"
-                @click="activeTab = 'defer_no_case'">
+            <Card :class="{ 'ring-2 ring-purple-500': activeTab === 'defer_no_case' }" class="cursor-pointer" @click="activeTab = 'defer_no_case'">
                 <CardHeader class="pb-2">
                     <div class="flex items-center justify-between">
                         <CardDescription>Defer No Case</CardDescription>
@@ -262,8 +253,7 @@ defineOptions({
                 </CardHeader>
             </Card>
 
-            <Card :class="{ 'ring-2 ring-yellow-500': activeTab === 'mismatch' }" class="cursor-pointer"
-                @click="activeTab = 'mismatch'">
+            <Card :class="{ 'ring-2 ring-yellow-500': activeTab === 'mismatch' }" class="cursor-pointer" @click="activeTab = 'mismatch'">
                 <CardHeader class="pb-2">
                     <div class="flex items-center justify-between">
                         <CardDescription>Mismatch</CardDescription>
@@ -306,8 +296,7 @@ defineOptions({
                         <Link2Off class="mt-0.5 h-4 w-4 text-yellow-500" />
                         <div>
                             <span class="font-medium">Mismatch:</span>
-                            <span class="text-muted-foreground"> Invoice total ≠ sum charges, payment chưa
-                                allocate</span>
+                            <span class="text-muted-foreground"> Invoice total ≠ sum charges, payment chưa allocate</span>
                         </div>
                     </div>
                 </div>
@@ -369,8 +358,7 @@ defineOptions({
                             </TableCell>
                             <TableCell class="text-right">
                                 <div class="flex justify-end gap-2">
-                                    <Button variant="outline" size="sm" :disabled="fixingId === exception.id"
-                                        @click="fixException(exception)">
+                                    <Button variant="outline" size="sm" :disabled="fixingId === exception.id" @click="fixException(exception)">
                                         <Wrench class="mr-1 h-4 w-4" />
                                         {{ fixingId === exception.id ? 'Đang xử lý...' : 'Fix now' }}
                                     </Button>

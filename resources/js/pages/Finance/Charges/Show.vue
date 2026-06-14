@@ -2,40 +2,15 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import {
-    formatCurrency,
-    getChargeStatusBadgeClass,
-    getChargeStatusLabel,
-    getChargeTypeBadgeClass,
-    getChargeTypeLabel,
-    type ChargeStatus,
-    type ChargeType,
-    type FinanceCharge,
-    type PaymentAllocation,
-} from '@/types/finance';
 import { usePermission } from '@/composables/usePermission';
+import { formatCurrency, getChargeStatusBadgeClass, getChargeStatusLabel, getChargeTypeBadgeClass, getChargeTypeLabel, type ChargeStatus, type ChargeType, type FinanceCharge, type PaymentAllocation } from '@/types/finance';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { AlertCircle, ArrowLeft, Ban, Check, CalendarClock, CreditCard, FileText, Pencil, RotateCcw, Split, User, X } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { AlertCircle, AlertTriangle, ArrowLeft, Ban, CalendarClock, Check, CreditCard, FileText, Pencil, RotateCcw, Split, User, X } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import SplitInstallmentsModal from './SplitInstallmentsModal.vue';
 
@@ -106,6 +81,24 @@ const saveDescription = () => {
 
 const voidForm = useForm({
     void_reason: '',
+});
+
+// Financial impact preview shown before confirming a void (UI-SAFE-1).
+// Built entirely from existing props — voiding releases/reverses these
+// allocations and can auto-reallocate freed cash to other unpaid charges.
+const voidImpact = computed(() => {
+    const allocations = props.charge.allocations ?? [];
+    const allocatedTotal = allocations.reduce((sum, alloc) => sum + Number(alloc.allocated_amount ?? 0), 0);
+    const paidInstallmentCount = props.installments.filter((i) => i.status === 'paid').length;
+
+    return {
+        amount: Number(props.charge.amount ?? 0),
+        paidAmount: Number(props.charge.paid_amount ?? 0),
+        allocationCount: allocations.length,
+        allocatedTotal,
+        paidInstallmentCount,
+        hasMoneyImpact: allocations.length > 0 || paidInstallmentCount > 0,
+    };
 });
 
 const handleVoid = () => {
@@ -186,7 +179,6 @@ const retryPush = (installment: InstallmentRow) => {
 </script>
 
 <template>
-
     <Head :title="`Charge #${charge.id}`" />
 
     <div class="space-y-6">
@@ -214,25 +206,50 @@ const retryPush = (installment: InstallmentRow) => {
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Hủy khoản phí</DialogTitle>
-                            <DialogDescription>
-                                Bạn có chắc chắn muốn hủy khoản phí này? Hành động này không thể hoàn tác.
-                            </DialogDescription>
+                            <DialogDescription> Bạn có chắc chắn muốn hủy khoản phí này? Hành động này không thể hoàn tác. </DialogDescription>
                         </DialogHeader>
                         <div class="space-y-4">
+                            <!-- Financial impact preview (UI-SAFE-1) -->
+                            <div class="rounded-lg border p-4" :class="voidImpact.hasMoneyImpact ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50'">
+                                <div class="flex items-center gap-2 font-medium" :class="voidImpact.hasMoneyImpact ? 'text-amber-800' : 'text-slate-700'">
+                                    <AlertTriangle class="h-4 w-4" />
+                                    Tác động tài chính
+                                </div>
+                                <dl class="mt-3 space-y-1.5 text-sm">
+                                    <div class="flex justify-between gap-4">
+                                        <dt class="text-muted-foreground">Tổng tiền khoản phí</dt>
+                                        <dd class="font-medium">{{ formatCurrency(voidImpact.amount) }}</dd>
+                                    </div>
+                                    <div class="flex justify-between gap-4">
+                                        <dt class="text-muted-foreground">Đã thu</dt>
+                                        <dd class="font-medium text-green-700">{{ formatCurrency(voidImpact.paidAmount) }}</dd>
+                                    </div>
+                                    <div class="flex justify-between gap-4">
+                                        <dt class="text-muted-foreground">Phân bổ sẽ bị thu hồi</dt>
+                                        <dd class="font-medium">
+                                            {{ voidImpact.allocationCount }} khoản
+                                            <span v-if="voidImpact.allocatedTotal > 0"> ({{ formatCurrency(voidImpact.allocatedTotal) }}) </span>
+                                        </dd>
+                                    </div>
+                                    <div class="flex justify-between gap-4">
+                                        <dt class="text-muted-foreground">Đợt đã thanh toán</dt>
+                                        <dd class="font-medium">{{ voidImpact.paidInstallmentCount }} đợt</dd>
+                                    </div>
+                                </dl>
+                                <p v-if="voidImpact.hasMoneyImpact" class="mt-3 text-xs text-amber-800">
+                                    Hủy khoản phí sẽ đảo (reverse) các phân bổ trên. Tiền đã thu được giải phóng và có thể được tự động phân bổ lại sang các khoản phí còn nợ của sinh viên.
+                                </p>
+                                <p v-else class="text-muted-foreground mt-3 text-xs">Khoản phí này chưa có thanh toán nào được phân bổ.</p>
+                            </div>
                             <div class="space-y-2">
                                 <Label for="void_reason">Lý do hủy *</Label>
-                                <Textarea v-model="voidForm.void_reason" placeholder="Nhập lý do hủy khoản phí..."
-                                    rows="3" />
-                                <p v-if="voidForm.errors.void_reason" class="text-sm text-red-500">{{
-                                    voidForm.errors.void_reason }}</p>
+                                <Textarea v-model="voidForm.void_reason" placeholder="Nhập lý do hủy khoản phí..." rows="3" />
+                                <p v-if="voidForm.errors.void_reason" class="text-sm text-red-500">{{ voidForm.errors.void_reason }}</p>
                             </div>
                         </div>
                         <DialogFooter>
                             <Button variant="outline" @click="isVoidDialogOpen = false">Hủy bỏ</Button>
-                            <Button variant="destructive" :disabled="voidForm.processing || !voidForm.void_reason"
-                                @click="handleVoid">
-                                Xác nhận hủy
-                            </Button>
+                            <Button variant="destructive" :disabled="voidForm.processing || !voidForm.void_reason" @click="handleVoid"> Xác nhận hủy </Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
@@ -281,37 +298,17 @@ const retryPush = (installment: InstallmentRow) => {
                         <div>
                             <div class="flex items-center gap-2">
                                 <p class="text-muted-foreground text-sm">Mô tả</p>
-                                <Button
-                                    v-if="can('create_finance_charges') && !isEditingDescription"
-                                    variant="ghost"
-                                    size="icon"
-                                    class="h-5 w-5"
-                                    @click="startEditDescription"
-                                >
+                                <Button v-if="can('create_finance_charges') && !isEditingDescription" variant="ghost" size="icon" class="h-5 w-5" @click="startEditDescription">
                                     <Pencil class="h-3 w-3" />
                                 </Button>
                             </div>
                             <div v-if="isEditingDescription" class="mt-1 flex items-start gap-2">
-                                <Textarea
-                                    v-model="descriptionForm.description"
-                                    class="min-h-[80px] flex-1"
-                                    rows="3"
-                                />
+                                <Textarea v-model="descriptionForm.description" class="min-h-[80px] flex-1" rows="3" />
                                 <div class="flex flex-col gap-1">
-                                    <Button
-                                        size="icon"
-                                        class="h-7 w-7"
-                                        :disabled="descriptionForm.processing"
-                                        @click="saveDescription"
-                                    >
+                                    <Button size="icon" class="h-7 w-7" :disabled="descriptionForm.processing" @click="saveDescription">
                                         <Check class="h-3 w-3" />
                                     </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        class="h-7 w-7"
-                                        @click="cancelEditDescription"
-                                    >
+                                    <Button variant="outline" size="icon" class="h-7 w-7" @click="cancelEditDescription">
                                         <X class="h-3 w-3" />
                                     </Button>
                                 </div>
@@ -324,8 +321,7 @@ const retryPush = (installment: InstallmentRow) => {
                                 <Ban class="h-4 w-4" />
                                 <span class="font-medium">Đã hủy</span>
                             </div>
-                            <p class="text-muted-foreground mt-1 text-sm">{{ formatDate(charge.voided_at) }} bởi {{
-                                charge.voided_by?.name ?? 'N/A' }}</p>
+                            <p class="text-muted-foreground mt-1 text-sm">{{ formatDate(charge.voided_at) }} bởi {{ charge.voided_by?.name ?? 'N/A' }}</p>
                             <p class="mt-2 text-sm">{{ charge.void_reason }}</p>
                         </div>
                     </CardContent>
@@ -336,28 +332,17 @@ const retryPush = (installment: InstallmentRow) => {
                     <CardHeader>
                         <div class="flex items-center justify-between gap-4">
                             <div>
-                                <CardTitle class="flex items-center gap-2">
-                                    <CalendarClock class="h-5 w-5" /> Đợt thanh toán
-                                </CardTitle>
+                                <CardTitle class="flex items-center gap-2"> <CalendarClock class="h-5 w-5" /> Đợt thanh toán </CardTitle>
                                 <CardDescription>
-                                    <template v-if="installments.length === 0">
-                                        Chưa có kế hoạch đợt. Mặc định 1 đợt = toàn bộ khoản phí khi push DNG.
-                                    </template>
+                                    <template v-if="installments.length === 0"> Chưa có kế hoạch đợt. Mặc định 1 đợt = toàn bộ khoản phí khi push DNG. </template>
                                     <template v-else>
-                                        {{ installments.length }} đợt
-                                        ({{ formatCurrency(installment_meta.net_split_target) }} cần thu)
-                                        <span v-if="installment_meta.has_paid_installment" class="text-amber-700">
-                                            — kế hoạch đã khoá vì có đợt đã thanh toán
-                                        </span>
+                                        {{ installments.length }} đợt ({{ formatCurrency(installment_meta.net_split_target) }} cần thu)
+                                        <span v-if="installment_meta.has_paid_installment" class="text-amber-700"> — kế hoạch đã khoá vì có đợt đã thanh toán </span>
                                     </template>
                                 </CardDescription>
                             </div>
-                            <Button
-                                v-if="can('split_installment_finance_charges') && installment_meta.can_split"
-                                size="sm"
-                                @click="isSplitModalOpen = true"
-                            >
-                                <Split class="h-4 w-4 mr-1" />
+                            <Button v-if="can('split_installment_finance_charges') && installment_meta.can_split" size="sm" @click="isSplitModalOpen = true">
+                                <Split class="mr-1 h-4 w-4" />
                                 {{ installments.length > 1 ? 'Sửa kế hoạch đợt' : 'Tách đợt' }}
                             </Button>
                         </div>
@@ -384,29 +369,19 @@ const retryPush = (installment: InstallmentRow) => {
                                         <Badge :class="installmentStatusClass(i.status)">
                                             {{ installmentStatusLabel(i.status) }}
                                         </Badge>
-                                        <div v-if="i.has_push_error" class="mt-1 text-xs text-red-600 flex items-center gap-1">
+                                        <div v-if="i.has_push_error" class="mt-1 flex items-center gap-1 text-xs text-red-600">
                                             <AlertCircle class="h-3 w-3" />
-                                            <span :title="i.last_push_error ?? ''">
-                                                Push lỗi ({{ i.push_attempt_count }} lần)
-                                            </span>
+                                            <span :title="i.last_push_error ?? ''"> Push lỗi ({{ i.push_attempt_count }} lần) </span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <span v-if="i.dng_payment_request_id" class="text-xs text-muted-foreground">
-                                            #{{ i.dng_payment_request_id }}
-                                        </span>
-                                        <span v-else class="text-xs text-muted-foreground">—</span>
+                                        <span v-if="i.dng_payment_request_id" class="text-muted-foreground text-xs"> #{{ i.dng_payment_request_id }} </span>
+                                        <span v-else class="text-muted-foreground text-xs">—</span>
                                     </TableCell>
                                     <TableCell>{{ formatDate(i.paid_at) }}</TableCell>
                                     <TableCell class="text-right">
-                                        <Button
-                                            v-if="i.has_push_error && can('split_installment_finance_charges')"
-                                            size="sm"
-                                            variant="outline"
-                                            :disabled="retryingInstallmentId === i.id"
-                                            @click="retryPush(i)"
-                                        >
-                                            <RotateCcw class="h-3 w-3 mr-1" />
+                                        <Button v-if="i.has_push_error && can('split_installment_finance_charges')" size="sm" variant="outline" :disabled="retryingInstallmentId === i.id" @click="retryPush(i)">
+                                            <RotateCcw class="mr-1 h-3 w-3" />
                                             {{ retryingInstallmentId === i.id ? 'Đang...' : 'Thử push lại' }}
                                         </Button>
                                     </TableCell>
@@ -434,10 +409,7 @@ const retryPush = (installment: InstallmentRow) => {
                             <TableBody>
                                 <TableRow v-for="alloc in charge.allocations" :key="alloc.id">
                                     <TableCell>
-                                        <Link :href="route('finance.payments.show', alloc.payment_id)"
-                                            class="text-primary hover:underline">
-                                            #{{ alloc.payment_id }}
-                                        </Link>
+                                        <Link :href="route('finance.payments.show', alloc.payment_id)" class="text-primary hover:underline"> #{{ alloc.payment_id }} </Link>
                                     </TableCell>
                                     <TableCell>{{ formatDate(alloc.allocated_at) }}</TableCell>
                                     <TableCell class="text-right font-medium text-green-600">
@@ -470,20 +442,16 @@ const retryPush = (installment: InstallmentRow) => {
                         </div>
                         <div class="flex justify-between">
                             <span class="text-muted-foreground">Đã thanh toán</span>
-                            <span class="font-medium text-green-600">{{ formatCurrency(charge.paid_amount ?? 0)
-                                }}</span>
+                            <span class="font-medium text-green-600">{{ formatCurrency(charge.paid_amount ?? 0) }}</span>
                         </div>
                         <hr />
                         <div class="flex justify-between">
                             <span class="font-medium">Còn lại</span>
-                            <span class="text-lg font-bold"
-                                :class="(charge.balance ?? 0) > 0 ? 'text-orange-600' : 'text-green-600'">
+                            <span class="text-lg font-bold" :class="(charge.balance ?? 0) > 0 ? 'text-orange-600' : 'text-green-600'">
                                 {{ formatCurrency(charge.balance ?? 0) }}
                             </span>
                         </div>
-                        <div v-if="charge.is_fully_paid" class="rounded-lg bg-green-50 p-3 text-center text-green-800">
-                            ✓ Đã thanh toán đủ
-                        </div>
+                        <div v-if="charge.is_fully_paid" class="rounded-lg bg-green-50 p-3 text-center text-green-800">✓ Đã thanh toán đủ</div>
                     </CardContent>
                 </Card>
 
@@ -520,11 +488,6 @@ const retryPush = (installment: InstallmentRow) => {
         </div>
 
         <!-- Split installments modal -->
-        <SplitInstallmentsModal
-            v-model:open="isSplitModalOpen"
-            :charge-id="charge.id"
-            :net-split-target="installment_meta.net_split_target"
-            :current-plan-count="installments.length"
-        />
+        <SplitInstallmentsModal v-model:open="isSplitModalOpen" :charge-id="charge.id" :net-split-target="installment_meta.net_split_target" :current-plan-count="installments.length" />
     </div>
 </template>

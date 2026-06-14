@@ -3,6 +3,7 @@ import JsonPayloadCard from '@/components/finance/JsonPayloadCard.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import { usePermission } from '@/composables/usePermission';
 import { formatCurrency, formatDate } from '@/utils/format';
 import { Head, Link, router } from '@inertiajs/vue3';
@@ -50,6 +51,7 @@ interface Props {
 const props = defineProps<Props>();
 
 const permission = usePermission();
+const { showConfirmDialog } = useGlobalConfirmDialog();
 
 const isRetrying = ref(false);
 
@@ -66,9 +68,7 @@ const diagnosisVariant = computed<DiagnosisVariant | null>(() => {
     return null;
 });
 
-const handleRetry = () => {
-    if (!canRetry.value || isRetrying.value) return;
-    if (!window.confirm(`Retry webhook event #${props.event.id}? Service will re-run synchronously.`)) return;
+const runRetry = () => {
     isRetrying.value = true;
     router.post(
         route('finance.dng.webhook-events.retry', props.event.id),
@@ -78,6 +78,22 @@ const handleRetry = () => {
             onFinish: () => {
                 isRetrying.value = false;
             },
+        },
+    );
+};
+
+const handleRetry = () => {
+    if (!canRetry.value || isRetrying.value) return;
+
+    showConfirmDialog(
+        {
+            title: 'Chạy lại webhook',
+            message: `Chạy lại webhook event #${props.event.id}? Service sẽ xử lý lại đồng bộ và có thể thay đổi trạng thái thanh toán.`,
+            confirmText: 'Chạy lại',
+            cancelText: 'Huỷ bỏ',
+        },
+        {
+            onConfirm: () => runRetry(),
         },
     );
 };

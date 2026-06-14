@@ -9,13 +9,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDataTable } from '@/composables/useDataTable';
+import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import { usePermission } from '@/composables/usePermission';
+import AppLayout from '@/layouts/AppLayout.vue';
 import { createColumns } from '@/lib/table-utils';
 import type { PaginatedResponse } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { ArrowLeft, CheckCircle2, ExternalLink, Send, X, Zap } from 'lucide-vue-next';
+import { ArrowLeft, CheckCircle2, ExternalLink, X, Zap } from 'lucide-vue-next';
 import { h, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
 
 interface SettlementInvoice {
@@ -90,6 +93,7 @@ interface Props {
 
 const props = defineProps<Props>();
 const permission = usePermission();
+const { showConfirmDialog } = useGlobalConfirmDialog();
 
 const formatCurrency = (value: number) =>
     new Intl.NumberFormat('vi-VN', {
@@ -153,13 +157,7 @@ const toggleAllCurrentPage = (checked: boolean | 'indeterminate') => {
     selectedStudentIds.value = checked === true ? currentPageActionableIds() : [];
 };
 
-const applySettlement = (studentIds: number[]) => {
-    if (studentIds.length === 0) {
-        toast.error('No actionable students selected.');
-
-        return;
-    }
-
+const runSettlement = (studentIds: number[]) => {
     isApplying.value = true;
 
     router.post(
@@ -173,6 +171,26 @@ const applySettlement = (studentIds: number[]) => {
             onFinish: () => {
                 isApplying.value = false;
             },
+        },
+    );
+};
+
+const applySettlement = (studentIds: number[]) => {
+    if (studentIds.length === 0) {
+        toast.error('Chưa chọn sinh viên nào để tất toán.');
+
+        return;
+    }
+
+    showConfirmDialog(
+        {
+            title: 'Xác nhận tất toán',
+            message: `Chạy tất toán cho ${studentIds.length} sinh viên? Tiền chưa phân bổ sẽ được áp vào các khoản phí còn nợ theo thứ tự ưu tiên. Hành động này ghi vào sổ thanh toán và không tự hoàn tác.`,
+            confirmText: 'Tất toán',
+            cancelText: 'Huỷ bỏ',
+        },
+        {
+            onConfirm: () => runSettlement(studentIds),
         },
     );
 };
@@ -264,6 +282,10 @@ const columns: ColumnDef<SettlementStudent>[] = createColumns<SettlementStudent>
         cell: 'actions',
     },
 ]);
+
+defineOptions({
+    layout: AppLayout,
+});
 </script>
 
 <template>

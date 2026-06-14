@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { PaginatedResponse } from '@/types';
 import { formatCurrency, type Semester } from '@/types/finance';
@@ -53,6 +54,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const { showConfirmDialog } = useGlobalConfirmDialog();
 
 // Local filter state
 const semesterId = ref(props.filters.semester_id || (props.currentSemester?.id ? String(props.currentSemester.id) : 'all'));
@@ -186,6 +188,20 @@ const sendStudentReminders = () => {
         return;
     }
 
+    showConfirmDialog(
+        {
+            title: 'Gửi nhắc nợ sinh viên',
+            message: `Gửi email nhắc nợ cho ${selectedInvoices.value.length} mục đã chọn? Email đã gửi không thể thu hồi.`,
+            confirmText: 'Gửi nhắc nợ',
+            cancelText: 'Huỷ bỏ',
+        },
+        {
+            onConfirm: () => runSendStudentReminders(),
+        },
+    );
+};
+
+const runSendStudentReminders = () => {
     // Convert selected IDs to item_ids format (dng_request:id)
     const itemIds = selectedInvoices.value.map((id) => `dng_request:${id}`);
 
@@ -219,6 +235,20 @@ const sendParentReminders = () => {
         return;
     }
 
+    showConfirmDialog(
+        {
+            title: 'Gửi thông báo phụ huynh',
+            message: `Gửi email thông báo cho phụ huynh của ${selectedInvoices.value.length} mục đã chọn? Email đã gửi không thể thu hồi.`,
+            confirmText: 'Gửi thông báo',
+            cancelText: 'Huỷ bỏ',
+        },
+        {
+            onConfirm: () => runSendParentReminders(),
+        },
+    );
+};
+
+const runSendParentReminders = () => {
     // Convert selected IDs to item_ids format (dng_request:id)
     const itemIds = selectedInvoices.value.map((id) => `dng_request:${id}`);
 
@@ -257,8 +287,7 @@ const exportList = async () => {
             }),
             '_blank',
         );
-    } catch (error) {
-        console.error('Export error:', error);
+    } catch {
         toast.error('Lỗi khi xuất danh sách');
     } finally {
         isExporting.value = false;

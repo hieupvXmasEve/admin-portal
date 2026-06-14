@@ -1,34 +1,15 @@
 <script setup lang="ts">
-import AppLayout from '@/layouts/AppLayout.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import { router } from '@inertiajs/vue3';
-import {
-    ArrowDown,
-    ArrowLeft,
-    ArrowUp,
-    CheckCircle2,
-    Loader2,
-    Sparkles,
-    Users,
-    Wallet,
-    Zap,
-} from 'lucide-vue-next';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApi } from '@/composables/useApiRequest';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, Loader2, Sparkles, Users, Wallet, Zap } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
-import { Head, Link } from '@inertiajs/vue3';
 
 interface AllocationDetail {
     charge_id: number;
@@ -119,9 +100,8 @@ const handlePreview = async () => {
         } else {
             toast.error('Không thể tải xem trước. Vui lòng thử lại.');
         }
-    } catch (error) {
+    } catch {
         toast.error('Không thể tải xem trước. Vui lòng thử lại.');
-        console.error(error);
     } finally {
         isLoading.value = false;
     }
@@ -139,9 +119,8 @@ const handleExecute = () => {
                 toast.success('Phân bổ tự động hoàn tất');
                 currentStep.value = 'complete';
             },
-            onError: (errors) => {
+            onError: () => {
                 toast.error('Phân bổ tự động thất bại');
-                console.error(errors);
             },
             onFinish: () => {
                 isExecuting.value = false;
@@ -166,11 +145,9 @@ const toggleStudent = (studentId: number) => {
         expandedStudents.value.add(studentId);
     }
 };
-
 </script>
 
 <template>
-
     <Head title="Phân bổ tự động" />
 
     <div class="flex items-center gap-4">
@@ -181,79 +158,40 @@ const toggleStudent = (studentId: number) => {
         </Link>
         <div>
             <h1 class="text-2xl font-bold tracking-tight">Phân bổ thanh toán tự động</h1>
-            <p class="text-muted-foreground">
-                Tự động áp dụng các khoản thanh toán chưa phân bổ vào các khoản phí còn
-                thiếu
-            </p>
+            <p class="text-muted-foreground">Tự động áp dụng các khoản thanh toán chưa phân bổ vào các khoản phí còn thiếu</p>
         </div>
     </div>
 
     <div class="flex items-center gap-2">
-        <div class="flex h-8 w-8 items-center justify-center rounded-full" :class="currentStep === 'priority'
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted text-muted-foreground'
-            ">
-            1
-        </div>
-        <span :class="currentStep === 'priority'
-            ? 'font-medium'
-            : 'text-muted-foreground'
-            ">
-            Chọn thứ tự ưu tiên
-        </span>
+        <div class="flex h-8 w-8 items-center justify-center rounded-full" :class="currentStep === 'priority' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'">1</div>
+        <span :class="currentStep === 'priority' ? 'font-medium' : 'text-muted-foreground'"> Chọn thứ tự ưu tiên </span>
         <Separator class="w-8" />
-        <div class="flex h-8 w-8 items-center justify-center rounded-full" :class="currentStep === 'preview'
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted text-muted-foreground'
-            ">
-            2
-        </div>
-        <span :class="currentStep === 'preview'
-            ? 'font-medium'
-            : 'text-muted-foreground'
-            ">
-            Xem trước
-        </span>
+        <div class="flex h-8 w-8 items-center justify-center rounded-full" :class="currentStep === 'preview' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'">2</div>
+        <span :class="currentStep === 'preview' ? 'font-medium' : 'text-muted-foreground'"> Xem trước </span>
         <Separator class="w-8" />
-        <div class="flex h-8 w-8 items-center justify-center rounded-full" :class="currentStep === 'complete'
-            ? 'bg-green-600 text-white'
-            : 'bg-muted text-muted-foreground'
-            ">
+        <div class="flex h-8 w-8 items-center justify-center rounded-full" :class="currentStep === 'complete' ? 'bg-green-600 text-white' : 'bg-muted text-muted-foreground'">
             <CheckCircle2 v-if="currentStep === 'complete'" class="h-5 w-5" />
             <span v-else>3</span>
         </div>
-        <span :class="currentStep === 'complete'
-            ? 'font-medium text-green-600'
-            : 'text-muted-foreground'
-            ">
-            Hoàn tất
-        </span>
+        <span :class="currentStep === 'complete' ? 'font-medium text-green-600' : 'text-muted-foreground'"> Hoàn tất </span>
     </div>
 
     <template v-if="currentStep === 'priority'">
         <Card class="max-w-xl">
             <CardHeader>
                 <CardTitle>Thứ tự ưu tiên</CardTitle>
-                <CardDescription>
-                    Sắp xếp loại phí theo thứ tự ưu tiên. Khoản thanh toán sẽ được phân bổ
-                    vào loại phí có thứ tự cao hơn trước.
-                </CardDescription>
+                <CardDescription> Sắp xếp loại phí theo thứ tự ưu tiên. Khoản thanh toán sẽ được phân bổ vào loại phí có thứ tự cao hơn trước. </CardDescription>
             </CardHeader>
             <CardContent>
                 <Label class="mb-4 block">Kéo để sắp xếp (Cao → Thấp)</Label>
                 <div class="space-y-2">
-                    <div v-for="(item, index) in priorities" :key="item.id"
-                        class="flex items-center justify-between rounded-md border bg-background p-3">
-                        <span class="text-sm font-medium">
-                            {{ index + 1 }}. {{ item.label }}
-                        </span>
+                    <div v-for="(item, index) in priorities" :key="item.id" class="bg-background flex items-center justify-between rounded-md border p-3">
+                        <span class="text-sm font-medium"> {{ index + 1 }}. {{ item.label }} </span>
                         <div class="flex gap-1">
-                            <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="index === 0"
-                                @click="moveUp(index)">
+                            <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="index === 0" @click="moveUp(index)">
                                 <ArrowUp class="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" class="h-8 w-8"
-                                :disabled="index === priorities.length - 1" @click="moveDown(index)">
+                            <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="index === priorities.length - 1" @click="moveDown(index)">
                                 <ArrowDown class="h-4 w-4" />
                             </Button>
                         </div>
@@ -312,18 +250,14 @@ const toggleStudent = (studentId: number) => {
 
         <Card v-if="previewData.students.length === 0">
             <CardContent class="py-10 text-center">
-                <p class="text-muted-foreground">
-                    Không có khoản thanh toán nào cần phân bổ.
-                </p>
+                <p class="text-muted-foreground">Không có khoản thanh toán nào cần phân bổ.</p>
             </CardContent>
         </Card>
 
         <Card v-else>
             <CardHeader>
                 <CardTitle>Chi tiết phân bổ theo sinh viên</CardTitle>
-                <CardDescription>
-                    Nhấn vào sinh viên để xem chi tiết từng khoản phân bổ
-                </CardDescription>
+                <CardDescription> Nhấn vào sinh viên để xem chi tiết từng khoản phân bổ </CardDescription>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -338,8 +272,7 @@ const toggleStudent = (studentId: number) => {
                     </TableHeader>
                     <TableBody>
                         <template v-for="student in previewData.students" :key="student.student_id">
-                            <TableRow class="cursor-pointer hover:bg-muted/50"
-                                @click="toggleStudent(student.student_id)">
+                            <TableRow class="hover:bg-muted/50 cursor-pointer" @click="toggleStudent(student.student_id)">
                                 <TableCell class="font-medium">
                                     {{ student.student_code }}
                                 </TableCell>
@@ -348,7 +281,7 @@ const toggleStudent = (studentId: number) => {
                                     {{ student.payments.length }}
                                 </TableCell>
                                 <TableCell class="text-center">
-                                    {{student.allocations.reduce((sum, a) => sum + a.to_allocate.length, 0)}}
+                                    {{ student.allocations.reduce((sum, a) => sum + a.to_allocate.length, 0) }}
                                 </TableCell>
                                 <TableCell class="text-right font-medium text-green-600">
                                     {{ formatCurrency(student.total_to_allocate) }}
@@ -358,32 +291,23 @@ const toggleStudent = (studentId: number) => {
                             <TableRow v-if="expandedStudents.has(student.student_id)">
                                 <TableCell colspan="5" class="bg-muted/30 p-4">
                                     <div class="space-y-4">
-                                        <div v-for="allocation in student.allocations" :key="allocation.payment_id"
-                                            class="rounded-lg border bg-background p-4">
+                                        <div v-for="allocation in student.allocations" :key="allocation.payment_id" class="bg-background rounded-lg border p-4">
                                             <div class="mb-3 flex items-center justify-between">
                                                 <div>
-                                                    <span class="font-medium">
-                                                        Payment #{{ allocation.payment_id }}
-                                                    </span>
-                                                    <span class="ml-2 text-sm text-muted-foreground">
+                                                    <span class="font-medium"> Payment #{{ allocation.payment_id }} </span>
+                                                    <span class="text-muted-foreground ml-2 text-sm">
                                                         {{ allocation.payment_date }}
                                                     </span>
                                                 </div>
-                                                <Badge variant="outline">
-                                                    Còn: {{ formatCurrency(allocation.payment_unapplied) }}
-                                                </Badge>
+                                                <Badge variant="outline"> Còn: {{ formatCurrency(allocation.payment_unapplied) }} </Badge>
                                             </div>
                                             <div class="space-y-2">
-                                                <div v-for="detail in allocation.to_allocate" :key="detail.charge_id"
-                                                    class="flex items-center justify-between rounded bg-muted/50 px-3 py-2 text-sm">
+                                                <div v-for="detail in allocation.to_allocate" :key="detail.charge_id" class="bg-muted/50 flex items-center justify-between rounded px-3 py-2 text-sm">
                                                     <div>
                                                         <span class="font-medium">
                                                             {{ detail.charge_type }}
                                                         </span>
-                                                        <span v-if="detail.charge_description"
-                                                            class="ml-2 text-muted-foreground">
-                                                            - {{ detail.charge_description }}
-                                                        </span>
+                                                        <span v-if="detail.charge_description" class="text-muted-foreground ml-2"> - {{ detail.charge_description }} </span>
                                                     </div>
                                                     <span class="font-medium text-green-600">
                                                         {{ formatCurrency(detail.amount) }}
@@ -419,10 +343,7 @@ const toggleStudent = (studentId: number) => {
                 <div class="flex flex-col items-center gap-4 text-center">
                     <CheckCircle2 class="h-16 w-16 text-green-600" />
                     <h2 class="text-xl font-semibold">Phân bổ hoàn tất!</h2>
-                    <p class="text-muted-foreground">
-                        Tất cả các khoản thanh toán đã được phân bổ thành công vào các
-                        khoản phí tương ứng.
-                    </p>
+                    <p class="text-muted-foreground">Tất cả các khoản thanh toán đã được phân bổ thành công vào các khoản phí tương ứng.</p>
                     <div class="mt-4 flex gap-3">
                         <Link :href="route('finance.payments.index')">
                             <Button variant="outline">Về danh sách thanh toán</Button>

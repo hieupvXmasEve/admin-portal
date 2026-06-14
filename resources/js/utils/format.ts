@@ -15,11 +15,10 @@ export const formatCurrency = (amount: number | string | null | undefined): stri
 };
 
 export const formatDate = (date: string | null | undefined): string => {
-    console.log(date);
     if (!date) return '-';
     try {
         return format(new Date(date), 'dd/MM/yyyy HH:mm');
-    } catch (e) {
+    } catch {
         return date;
     }
 };
@@ -28,7 +27,7 @@ export const formatDateTime = (date: string | null | undefined): string => {
     if (!date) return '-';
     try {
         return format(new Date(date), 'HH:mm dd/MM/yyyy');
-    } catch (e) {
+    } catch {
         return date;
     }
 };
