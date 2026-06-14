@@ -6,11 +6,16 @@ use App\Enums\StudentActionType;
 use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
+use App\Models\CurriculumVersion;
+use App\Models\DeferCase;
+use App\Models\DeferCaseItem;
 use App\Models\FinanceCharge;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentActionLog;
+use App\Models\TuitionPlan;
+use App\Models\TuitionPlanTerm;
 use App\Models\User;
 use App\Modules\Finance\Actions\Operations\FixBillingExceptionAction;
 use App\Modules\Finance\Queries\Operations\GetBillingExceptionCountsQuery;
@@ -172,6 +177,78 @@ it('does not create duplicate retake charges when the same exception is fixed tw
         ->and($second['charge_id'])->toBe($charges->first()->id);
 });
 
+it('fixes a missing charge exception by creating a tuition term charge', function () {
+    actingAs(User::factory()->create());
+
+    $curriculumVersion = CurriculumVersion::factory()
+        ->forProgram($this->program)
+        ->withEffectiveSemester($this->semester)
+        ->create();
+
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'EXC-FIX-MISS-01',
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+            'status' => 'intake_course',
+            'curriculum_version_id' => $curriculumVersion->id,
+            'intake_gc' => $this->semester->id,
+            'intake_course' => (string) $this->semester->id,
+            'intake_major' => $this->semester->id,
+        ])
+        ->create();
+
+    $plan = TuitionPlan::create([
+        'curriculum_version_id' => $curriculumVersion->id,
+        'intake_semester_id' => $this->semester->id,
+        'total_amount' => 45000000,
+        'currency' => 'VND',
+        'is_active' => true,
+    ]);
+
+    TuitionPlanTerm::create([
+        'tuition_plan_id' => $plan->id,
+        'term_number' => 1,
+        'amount' => 45000000,
+        'due_date' => now()->addDays(30)->toDateString(),
+    ]);
+
+    $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
+
+    $registration = CourseRegistration::create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $this->semester->id,
+        'registration_status' => 'confirmed',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 1,
+    ]);
+
+    $exceptionId = BillingExceptionIdentifier::encode('missing_charge', $registration->id);
+
+    $result = FixBillingExceptionAction::run([
+        'exception_id' => $exceptionId,
+        'semester_id' => $this->semester->id,
+    ]);
+
+    expect($result['fixed'])->toBeTrue();
+
+    expect(
+        FinanceCharge::query()
+            ->where('student_id', $student->id)
+            ->where('semester_id', $this->semester->id)
+            ->where('charge_type', FinanceCharge::TYPE_TUITION_TERM)
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->exists()
+    )->toBeTrue();
+});
+
 it('refuses a missing charge fix when the requested semester does not match the registration', function () {
     $otherSemester = Semester::factory()->create();
     $student = Student::factory()
@@ -267,6 +344,77 @@ it('detects retake no charge exceptions per registration source', function () {
 
     expect($list->total())->toBe(1)
         ->and($list->items()[0]['context']['course_registration_id'])->toBe($secondRegistration->id);
+});
+
+it('refuses a retake fix when defer policy skips charge creation', function () {
+    $user = User::factory()->create();
+    actingAs($user);
+
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'EXC-DEFER-RET-01',
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+            'status' => 'intake_course',
+        ])
+        ->create();
+
+    $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
+
+    $registration = CourseRegistration::create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $this->semester->id,
+        'registration_status' => 'confirmed',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 2,
+        'is_retake' => true,
+        'retake_fee' => 1500000,
+    ]);
+
+    $actionLog = StudentActionLog::create([
+        'student_id' => $student->id,
+        'action_type' => StudentActionType::ACADEMIC_DEFER,
+        'reason' => 'Defer preserve retake fee',
+        'from_semester_id' => $this->semester->id,
+        'changed_by_user_id' => $user->id,
+    ]);
+
+    $deferCase = DeferCase::create([
+        'student_action_log_id' => $actionLog->id,
+        'student_id' => $student->id,
+        'semester_id' => $this->semester->id,
+        'scope_type' => DeferCase::SCOPE_COURSES,
+        'fee_policy' => DeferCase::POLICY_PRESERVE,
+        'applies_once' => true,
+        'effective_at' => now()->toDateString(),
+        'changed_by_user_id' => $user->id,
+    ]);
+
+    DeferCaseItem::create([
+        'defer_case_id' => $deferCase->id,
+        'course_registration_id' => $registration->id,
+        'fee_policy' => DeferCase::POLICY_PRESERVE,
+    ]);
+
+    $exceptionId = BillingExceptionIdentifier::encode('retake_no_charge', $registration->id);
+
+    expect(fn () => FixBillingExceptionAction::run(['exception_id' => $exceptionId]))
+        ->toThrow(RuntimeException::class, 'Retake charge skipped by defer policy');
+
+    expect(
+        FinanceCharge::query()
+            ->where('student_id', $student->id)
+            ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->exists()
+    )->toBeFalse();
 });
 
 it('refuses defer_no_case auto-fix with a clear unsupported message', function () {

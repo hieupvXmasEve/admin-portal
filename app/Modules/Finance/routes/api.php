@@ -29,7 +29,9 @@ Route::prefix('api/v1/finance/operations')
         Route::post('/preview-charges', [BillingOperationsController::class, 'previewCharges'])->name('preview-charges');
         Route::post('/export-preview-charges', [BillingOperationsController::class, 'exportPreviewCharges'])->name('export-preview-charges');
         Route::post('/run-generate', [BillingOperationsController::class, 'runGenerate'])->name('run-generate');
-        Route::post('/exceptions/{exceptionId}/fix', [BillingOperationsController::class, 'fixException'])->name('fix-exception');
+        Route::post('/exceptions/{exceptionId}/fix', [BillingOperationsController::class, 'fixException'])
+            ->middleware('can:view_finance_operations_exceptions')
+            ->name('fix-exception');
         Route::post('/send-reminders', [BillingOperationsController::class, 'sendReminders'])->name('send-reminders');
         Route::post('/send-parent-reminders', [BillingOperationsController::class, 'sendParentReminders'])->name('send-parent-reminders');
         Route::post('/send-due-item-reminders', [BillingOperationsController::class, 'sendDueItemReminders'])->name('send-due-item-reminders');

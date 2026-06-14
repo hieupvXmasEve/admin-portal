@@ -58,4 +58,12 @@ git diff --check
 
 - `./scripts/dev.sh test --filter='BillingExceptionsQueryTest|DueItemsSummaryParityTest|ListDueItemsQueryPaginationTest|GetDueInvoicesSummaryQueryTest|LifecycleDueItemPredicateJoinTest|RetakeUnpaidCountTest|SettlementServicePriorityOrderTest'`: 12 passed / 33 assertions
 - `git diff --check`: passed
-- Remaining follow-up: `ListBillingExceptionsQuery` still materializes exception rows before pagination; code review recommends DB-level pagination/aggregation for this queue before merge-ready signoff.
+
+### Merge-hardening evidence (2026-06-15)
+
+- `fix-exception` API route gated with `can:view_finance_operations_exceptions` (matches web exceptions page).
+- `FixBillingExceptionEndpointTest`: 401 unauthenticated + 403 without permission.
+- `BillingExceptionCollector::counts()` uses SQL `COUNT` / `COUNT DISTINCT` (no full-table `get()`).
+- `ListBillingExceptionsQuery` delegates to `BillingExceptionCollector::paginate()` (DB `paginate()` / union + `forPage()`).
+- `BillingExceptionsPaginationTest`: 25 rows paginated with &lt; 10 queries.
+- `BillingExceptionsQueryTest`: missing_charge happy-path fix + retake defer-policy refusal (no soft success).

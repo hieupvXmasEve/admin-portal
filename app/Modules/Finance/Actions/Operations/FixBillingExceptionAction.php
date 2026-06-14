@@ -105,10 +105,7 @@ class FixBillingExceptionAction
             $charge = app(FinanceChargeService::class)->generateRetakeCharge($registration);
 
             if ($charge === null) {
-                return [
-                    'fixed' => true,
-                    'message' => 'Retake charge skipped by defer policy',
-                ];
+                throw new RuntimeException('Retake charge skipped by defer policy');
             }
 
             return [

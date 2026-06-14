@@ -14,9 +14,14 @@ class ListBillingExceptionsQuery
     {
         $campusId = app('campus')?->id;
         $filterType = $type === 'all' ? null : $type;
-        $rows = app(BillingExceptionCollector::class)
-            ->collect($semesterId, $filterType, $campusId)
-            ->map(fn (array $row) => [
+        $page = (int) request()->get('page', 1);
+        $perPage = 20;
+
+        $paginator = app(BillingExceptionCollector::class)
+            ->paginate($semesterId, $filterType, $campusId, $page, $perPage, $path);
+
+        return $paginator->setCollection(
+            $paginator->getCollection()->map(fn (array $row) => [
                 'id' => BillingExceptionIdentifier::encode($row['type'], $row['source_id']),
                 'type' => $row['type'],
                 'student_id' => $row['student_id'],
@@ -27,17 +32,7 @@ class ListBillingExceptionsQuery
                 'context' => $row['context'],
                 'created_at' => $row['created_at'],
                 'fixable' => $row['fixable'],
-            ]);
-
-        $page = (int) request()->get('page', 1);
-        $perPage = 20;
-
-        return new LengthAwarePaginator(
-            $rows->forPage($page, $perPage)->values(),
-            $rows->count(),
-            $perPage,
-            $page,
-            ['path' => $path, 'pageName' => 'page']
+            ])
         );
     }
 }
