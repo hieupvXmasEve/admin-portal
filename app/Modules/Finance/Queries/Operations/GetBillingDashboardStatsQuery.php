@@ -109,8 +109,13 @@ class GetBillingDashboardStatsQuery
             ->when($campusId, fn ($q) => $q->where('campus_id', $campusId))
             ->whereHas('courseRegistrations', fn ($q) => $q->where('semester_id', $semesterId)->where('is_retake', true))
             ->where(function ($query) use ($semesterId) {
+                // NT4/FIN-28: do not compare raw cache amounts as truth. Filter on
+                // the recalc-maintained lifecycle status, excluding both paid and
+                // cancelled exactly like the settlement worklist
+                // (ListSettlementWorklistQuery: whereNotIn(['paid','cancelled'])).
+                // A fully ledger-derived count belongs to the dashboard slice (FIN-28).
                 $query->whereDoesntHave('invoices', fn ($invoiceQuery) => $invoiceQuery->where('semester_id', $semesterId))
-                    ->orWhereHas('invoices', fn ($invoiceQuery) => $invoiceQuery->where('semester_id', $semesterId)->whereColumn('paid_amount', '<', 'total_amount'));
+                    ->orWhereHas('invoices', fn ($invoiceQuery) => $invoiceQuery->where('semester_id', $semesterId)->whereNotIn('status', ['paid', 'cancelled']));
             })
             ->count();
 

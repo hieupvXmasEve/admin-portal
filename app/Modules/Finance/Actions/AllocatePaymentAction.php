@@ -49,10 +49,24 @@ class AllocatePaymentAction
             throw ValidationException::withMessages(['amount' => 'Amount exceeds charge remaining balance.']);
         }
 
+        // The checks above are a fast-fail UX guard. The authoritative check
+        // runs inside the transaction under a row lock so a concurrent allocator
+        // (e.g. the DNG webhook bridge) cannot race this one into over-allocation.
         $application = DB::transaction(function () use ($payment, $line, $amount, $userId) {
+            $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+            $lockedLine = InvoiceLine::query()->lockForUpdate()->findOrFail($line->id);
+
+            if ($amount > $this->settlementService->getPaymentUnappliedAmount($lockedPayment)) {
+                throw ValidationException::withMessages(['amount' => 'Amount exceeds unallocated payment balance.']);
+            }
+
+            if ($amount > $this->settlementService->getLineOutstandingAmount($lockedLine)) {
+                throw ValidationException::withMessages(['amount' => 'Amount exceeds charge remaining balance.']);
+            }
+
             return $this->settlementService->createPaymentApplication(
-                $payment,
-                $line,
+                $lockedPayment,
+                $lockedLine,
                 $amount,
                 'application',
                 $userId,

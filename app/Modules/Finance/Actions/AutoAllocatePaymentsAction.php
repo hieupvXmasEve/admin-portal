@@ -90,9 +90,15 @@ class AutoAllocatePaymentsAction
             }
 
             foreach ($studentIds as $studentId) {
+                // FIN-11/DB-09: lock this student's completed payments inside the
+                // transaction. A concurrent allocator (DNG webhook bridge or a
+                // second batch run) blocks on these locks and then re-reads the
+                // reduced unapplied amount, so one payment can never be applied
+                // beyond its balance.
                 $payments = Payment::where('student_id', $studentId)
                     ->where('status', Payment::STATUS_COMPLETED)
                     ->orderBy('paid_at', 'asc') // Use oldest payments first
+                    ->lockForUpdate()
                     ->get();
 
                 $payments = $payments->filter(fn (Payment $payment) => $payment->unapplied_amount > 0)->values();
@@ -120,7 +126,16 @@ class AutoAllocatePaymentsAction
                             break;
                         }
 
-                        $outstanding = $this->settlementService->getLineOutstandingAmount($line);
+                        // FIN-11/DB-09: lock the line and re-read its outstanding
+                        // under lock. The payment lock only serializes the same
+                        // payment; this prevents a different payment (DNG bridge /
+                        // manual) from racing onto the same line and overpaying it.
+                        $lockedLine = InvoiceLine::query()->lockForUpdate()->find($line->id);
+                        if (! $lockedLine || $lockedLine->status !== 'active') {
+                            continue;
+                        }
+
+                        $outstanding = $this->settlementService->getLineOutstandingAmount($lockedLine);
                         if ($outstanding <= 0) {
                             continue;
                         }
@@ -132,7 +147,7 @@ class AutoAllocatePaymentsAction
 
                         $this->settlementService->createPaymentApplication(
                             $payment,
-                            $line,
+                            $lockedLine,
                             $allocateAmount,
                             'application',
                             $userId,
@@ -162,36 +177,18 @@ class AutoAllocatePaymentsAction
         return $stats;
     }
 
+    /**
+     * FIN-01: zero-amount detection reads the one canonical ledger calculation
+     * in SettlementService. This adapter only remaps the canonical keys; it
+     * must not re-derive or mix stale cache columns.
+     */
     private function deriveInvoiceSnapshot(StudentInvoice $invoice): array
     {
-        $lineSubtotal = (float) $invoice->invoiceLines
-            ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line) && (float) $line->amount_snapshot > 0)
-            ->sum('amount_snapshot');
-
-        $discountTotal = (float) $invoice->invoiceLines
-            ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line))
-            ->sum(fn (InvoiceLine $line) => max(0, (float) $line->discountAllocations->sum('amount')));
-
-        $paidAmount = (float) $invoice->invoiceLines
-            ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line))
-            ->sum(fn (InvoiceLine $line) => max(0, (float) $line->paymentApplications->sum('amount')));
-
-        $storedTotal = array_key_exists('total_amount', $invoice->getAttributes()) ? (float) $invoice->getAttributes()['total_amount'] : null;
-        $storedPaid = array_key_exists('paid_amount', $invoice->getAttributes()) ? (float) $invoice->getAttributes()['paid_amount'] : null;
-        $derivedTotal = max(0, $lineSubtotal - $discountTotal);
+        $snapshot = $this->settlementService->deriveInvoiceSnapshot($invoice);
 
         return [
-            'total_amount' => $storedTotal !== null ? max($storedTotal, $derivedTotal) : $derivedTotal,
-            'paid_amount' => $storedPaid !== null ? max($storedPaid, min($paidAmount, $derivedTotal)) : min($paidAmount, $derivedTotal),
+            'total_amount' => $snapshot['net'],
+            'paid_amount' => $snapshot['paid'],
         ];
-    }
-
-    private function isBillableActiveLine(InvoiceLine $line): bool
-    {
-        if (($line->status ?? 'active') !== 'active') {
-            return false;
-        }
-
-        return $line->charge === null || $line->charge->status === FinanceCharge::STATUS_ACTIVE;
     }
 }

@@ -10,6 +10,7 @@ use App\Models\Payment;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
+use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -24,6 +25,10 @@ class ListSettlementWorklistQuery
         'unapplied_balance' => 'unapplied_balance',
         'net_amount_to_collect' => 'net_amount_to_collect',
     ];
+
+    public function __construct(
+        protected SettlementService $settlementService
+    ) {}
 
     public function handle(Request $request): array
     {
@@ -316,28 +321,19 @@ class ListSettlementWorklistQuery
         ]))->withQueryString();
     }
 
+    /**
+     * FIN-01: balance numbers come from the one canonical ledger calculation in
+     * SettlementService. This adapter only remaps the canonical keys to the
+     * worklist's local contract ({total_amount, paid_amount}); it must not
+     * re-derive or mix stale cache columns.
+     */
     private function deriveInvoiceSnapshot(StudentInvoice $invoice): array
     {
-        $lineSubtotal = (float) $invoice->invoiceLines
-            ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line) && (float) $line->amount_snapshot > 0)
-            ->sum('amount_snapshot');
-
-        $discountTotal = (float) $invoice->invoiceLines
-            ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line))
-            ->sum(fn (InvoiceLine $line) => max(0, (float) $line->discountAllocations->sum('amount')));
-
-        $paidAmount = (float) $invoice->invoiceLines
-            ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line))
-            ->sum(fn (InvoiceLine $line) => max(0, (float) $line->paymentApplications->sum('amount')));
-
-        $storedTotal = array_key_exists('total_amount', $invoice->getAttributes()) ? (float) $invoice->getAttributes()['total_amount'] : null;
-        $storedPaid = array_key_exists('paid_amount', $invoice->getAttributes()) ? (float) $invoice->getAttributes()['paid_amount'] : null;
-
-        $derivedTotal = max(0, $lineSubtotal - $discountTotal);
+        $snapshot = $this->settlementService->deriveInvoiceSnapshot($invoice);
 
         return [
-            'total_amount' => $storedTotal !== null ? max($storedTotal, $derivedTotal) : $derivedTotal,
-            'paid_amount' => $storedPaid !== null ? $storedPaid : min($paidAmount, $derivedTotal),
+            'total_amount' => $snapshot['net'],
+            'paid_amount' => $snapshot['paid'],
         ];
     }
 

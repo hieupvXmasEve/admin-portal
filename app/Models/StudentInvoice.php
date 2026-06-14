@@ -8,6 +8,7 @@ use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $student_id
  * @property int|null $billing_cycle_id
  * @property int $semester_id
- * @property \Illuminate\Support\Carbon|null $due_date
+ * @property Carbon|null $due_date
  * @property string $status
  * @property-read float $total_amount
  * @property-read float $paid_amount
@@ -35,6 +36,15 @@ class StudentInvoice extends Model
         'student_id',
         'billing_cycle_id',
         'semester_id',
+        // Cache columns (NT4/DB-14): rebuildable snapshot, written only by
+        // SettlementService::recalculateInvoiceSnapshot.
+        'cached_subtotal',
+        'cached_discount_total',
+        'cached_total_amount',
+        'cached_paid_amount',
+        'cached_paid_at',
+        // Legacy aliases kept fillable so existing writers map transparently
+        // onto the cache columns via the mutators below.
         'subtotal',
         'discount_total',
         'total_amount',
@@ -47,12 +57,12 @@ class StudentInvoice extends Model
 
     protected $casts = [
         'due_date' => 'datetime',
-        'paid_at' => 'datetime',
+        'cached_paid_at' => 'datetime',
         'last_reminder_at' => 'datetime',
-        'subtotal' => 'decimal:2',
-        'discount_total' => 'decimal:2',
-        'total_amount' => 'decimal:2',
-        'paid_amount' => 'decimal:2',
+        'cached_subtotal' => 'decimal:2',
+        'cached_discount_total' => 'decimal:2',
+        'cached_total_amount' => 'decimal:2',
+        'cached_paid_amount' => 'decimal:2',
     ];
 
     /**
@@ -252,5 +262,53 @@ class StudentInvoice extends Model
         }
 
         return 'open';
+    }
+
+    // =====================
+    // Cache column aliases (NT4/DB-14)
+    // =====================
+    // total_amount / paid_amount / outstanding_balance are ledger-derived above
+    // (canonical truth). The aliases below keep the legacy attribute names
+    // working transparently: reads of the non-derived snapshot fields return the
+    // rebuildable cache, and writes of any legacy name map onto the cache column.
+
+    public function getSubtotalAttribute(): float
+    {
+        return (float) ($this->cached_subtotal ?? 0);
+    }
+
+    public function getDiscountTotalAttribute(): float
+    {
+        return (float) ($this->cached_discount_total ?? 0);
+    }
+
+    public function getPaidAtAttribute()
+    {
+        return $this->cached_paid_at;
+    }
+
+    public function setSubtotalAttribute($value): void
+    {
+        $this->cached_subtotal = $value;
+    }
+
+    public function setDiscountTotalAttribute($value): void
+    {
+        $this->cached_discount_total = $value;
+    }
+
+    public function setTotalAmountAttribute($value): void
+    {
+        $this->cached_total_amount = $value;
+    }
+
+    public function setPaidAmountAttribute($value): void
+    {
+        $this->cached_paid_amount = $value;
+    }
+
+    public function setPaidAtAttribute($value): void
+    {
+        $this->cached_paid_at = $value;
     }
 }

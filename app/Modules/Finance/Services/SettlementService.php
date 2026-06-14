@@ -11,6 +11,7 @@ use App\Models\InvoiceLine;
 use App\Models\Payment;
 use App\Models\PaymentApplication;
 use App\Models\StudentInvoice;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
 class SettlementService
@@ -20,7 +21,7 @@ class SettlementService
         $invoice->loadMissing([
             'invoiceLines.charge',
             'invoiceLines.paymentApplications',
-            'invoiceLines.discountAllocations',
+            'invoiceLines.discountAllocations.invoiceDiscount',
         ]);
 
         $activeLines = $invoice->invoiceLines
@@ -31,8 +32,14 @@ class SettlementService
             ->where('amount_snapshot', '>', 0)
             ->sum('amount_snapshot');
 
+        // FIN-02 defensive backstop: the ledger is signed, so a released discount
+        // already nets via its negative row. This additionally excludes any
+        // allocation whose parent discount is reversed, so a future path that
+        // flips status without writing the offsetting row cannot inflate balance.
         $discount = (float) $activeLines
-            ->sum(fn (InvoiceLine $line) => max(0, (float) $line->discountAllocations->sum('amount')));
+            ->sum(fn (InvoiceLine $line) => max(0, (float) $line->discountAllocations
+                ->reject(fn (DiscountAllocation $allocation) => $this->isReversedDiscountAllocation($allocation))
+                ->sum('amount')));
 
         if ($discount === 0.0) {
             $discount = abs((float) $activeLines
@@ -110,13 +117,18 @@ class SettlementService
 
         return max(0, (float) DiscountAllocation::query()
             ->whereIn('invoice_line_id', $lineIds)
+            ->where(fn ($query) => $this->excludeReversedDiscountAllocations($query))
             ->sum('amount'));
     }
 
     public function getLineDiscountAmount(InvoiceLine $line): float
     {
+        // FIN-02: keep this consistent with deriveInvoiceSnapshot's discount
+        // backstop — a reversed discount must not reduce line outstanding, or
+        // allocation would stop early while the invoice still shows the balance.
         return max(0, (float) DiscountAllocation::query()
             ->where('invoice_line_id', $line->id)
+            ->where(fn ($query) => $this->excludeReversedDiscountAllocations($query))
             ->sum('amount'));
     }
 
@@ -137,17 +149,38 @@ class SettlementService
         return max(0, $this->getLineNetDue($line) - $this->getLinePaidAmount($line));
     }
 
+    /**
+     * Terminal lifecycle statuses owned by admin actions, not by payment state.
+     * recalculateInvoiceSnapshot must never overwrite these from the derived
+     * payment status (it would resurrect a cancelled/voided invoice).
+     */
+    private const TERMINAL_LIFECYCLE_STATUSES = ['cancelled', 'void'];
+
     public function recalculateInvoiceSnapshot(StudentInvoice $invoice): void
     {
         $snapshot = $this->deriveInvoiceSnapshot($invoice);
 
+        $isPaid = $snapshot['status'] === 'paid' && $snapshot['paid'] > 0;
+
+        // DB-15: keep the first moment the invoice became paid, and clear the
+        // cached timestamp the moment a reversal makes it no longer paid — never
+        // leave a stale paid_at on a reopened invoice.
+        $cachedPaidAt = $isPaid ? ($invoice->cached_paid_at ?? now()) : null;
+
+        // status is a lifecycle column, not cache: preserve terminal states so a
+        // cache rebuild (or any recalc) never flips a cancelled/voided invoice
+        // back into the payment lifecycle.
+        $status = in_array($invoice->status, self::TERMINAL_LIFECYCLE_STATUSES, true)
+            ? $invoice->status
+            : $snapshot['status'];
+
         $invoice->forceFill([
-            'subtotal' => $snapshot['gross'],
-            'discount_total' => $snapshot['discount'],
-            'total_amount' => $snapshot['net'],
-            'paid_amount' => $snapshot['paid'],
-            'status' => $snapshot['status'],
-            'paid_at' => $snapshot['status'] === 'paid' && $snapshot['paid'] > 0 ? now() : null,
+            'cached_subtotal' => $snapshot['gross'],
+            'cached_discount_total' => $snapshot['discount'],
+            'cached_total_amount' => $snapshot['net'],
+            'cached_paid_amount' => $snapshot['paid'],
+            'status' => $status,
+            'cached_paid_at' => $cachedPaidAt,
         ])->save();
     }
 
@@ -471,5 +504,27 @@ class SettlementService
         }
 
         return $line->charge === null || $line->charge->status === FinanceCharge::STATUS_ACTIVE;
+    }
+
+    /**
+     * Defensive backstop for FIN-02: an allocation belonging to a discount whose
+     * parent record is marked reversed must not count toward balance, even if the
+     * offsetting negative allocation row was never written.
+     */
+    private function isReversedDiscountAllocation(DiscountAllocation $allocation): bool
+    {
+        return ($allocation->invoiceDiscount?->status ?? 'active') === 'reversed';
+    }
+
+    /**
+     * Query-builder twin of isReversedDiscountAllocation(): keep allocations
+     * whose parent discount is missing or not reversed. Used by the line-level
+     * discount sums so they agree with deriveInvoiceSnapshot.
+     *
+     * @param  Builder<DiscountAllocation>  $query
+     */
+    private function excludeReversedDiscountAllocations($query): void
+    {
+        $query->whereDoesntHave('invoiceDiscount', fn ($discountQuery) => $discountQuery->where('status', 'reversed'));
     }
 }

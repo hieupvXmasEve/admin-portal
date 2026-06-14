@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Operations;
 
-use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
 use App\Models\Payment;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
@@ -175,36 +173,18 @@ class PreviewAutoAllocateQuery
         ];
     }
 
+    /**
+     * FIN-01: zero-amount detection reads the one canonical ledger calculation
+     * in SettlementService. This adapter only remaps the canonical keys; it
+     * must not re-derive or mix stale cache columns.
+     */
     private function deriveInvoiceSnapshot(StudentInvoice $invoice): array
     {
-        $lineSubtotal = (float) $invoice->invoiceLines
-            ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line) && (float) $line->amount_snapshot > 0)
-            ->sum('amount_snapshot');
-
-        $discountTotal = (float) $invoice->invoiceLines
-            ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line))
-            ->sum(fn (InvoiceLine $line) => max(0, (float) $line->discountAllocations->sum('amount')));
-
-        $paidAmount = (float) $invoice->invoiceLines
-            ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line))
-            ->sum(fn (InvoiceLine $line) => max(0, (float) $line->paymentApplications->sum('amount')));
-
-        $storedTotal = array_key_exists('total_amount', $invoice->getAttributes()) ? (float) $invoice->getAttributes()['total_amount'] : null;
-        $storedPaid = array_key_exists('paid_amount', $invoice->getAttributes()) ? (float) $invoice->getAttributes()['paid_amount'] : null;
-        $derivedTotal = max(0, $lineSubtotal - $discountTotal);
+        $snapshot = $this->settlementService->deriveInvoiceSnapshot($invoice);
 
         return [
-            'total_amount' => $storedTotal !== null ? max($storedTotal, $derivedTotal) : $derivedTotal,
-            'paid_amount' => $storedPaid !== null ? max($storedPaid, min($paidAmount, $derivedTotal)) : min($paidAmount, $derivedTotal),
+            'total_amount' => $snapshot['net'],
+            'paid_amount' => $snapshot['paid'],
         ];
-    }
-
-    private function isBillableActiveLine(InvoiceLine $line): bool
-    {
-        if (($line->status ?? 'active') !== 'active') {
-            return false;
-        }
-
-        return $line->charge === null || $line->charge->status === FinanceCharge::STATUS_ACTIVE;
     }
 }

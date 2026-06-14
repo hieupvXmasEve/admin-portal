@@ -79,9 +79,12 @@ class InvoiceGenerationService
                     'void_reason' => 'Charge no longer active during invoice refresh',
                 ]);
 
-            // Add or update lines
+            // Add lines for new charges. DB-01 / NT2: amount_snapshot and
+            // description_snapshot are frozen at creation — a refresh never
+            // overwrites an existing line's money snapshot. A changed charge
+            // amount is handled by void + recreate, not by restating history.
             foreach ($charges as $charge) {
-                InvoiceLine::updateOrCreate(
+                $line = InvoiceLine::firstOrCreate(
                     [
                         'invoice_id' => $invoice->id,
                         'charge_id' => $charge->id,
@@ -94,6 +97,17 @@ class InvoiceGenerationService
                         'void_reason' => null,
                     ]
                 );
+
+                // A line previously voided (e.g. the charge was temporarily
+                // inactive) may be reactivated, but only its lifecycle status is
+                // restored — the frozen amount_snapshot stays untouched.
+                if (! $line->wasRecentlyCreated && $line->status !== 'active') {
+                    $line->update([
+                        'status' => 'active',
+                        'voided_at' => null,
+                        'void_reason' => null,
+                    ]);
+                }
             }
 
             // Recalculate totals

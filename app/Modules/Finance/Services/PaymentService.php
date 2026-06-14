@@ -20,6 +20,18 @@ use Illuminate\Support\Str;
 
 class PaymentService
 {
+    /**
+     * Canonical charge-type priority for line allocation. Mirrors
+     * AutoAllocatePaymentsAction::DEFAULT_PRIORITY_ORDER; the sort itself is
+     * applied by SettlementService::getOutstandingLinesForStudent.
+     */
+    private const CANONICAL_PRIORITY_ORDER = [
+        FinanceCharge::TYPE_TUITION_TERM,
+        FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        FinanceCharge::TYPE_RETAKE_FEE,
+        FinanceCharge::TYPE_MANUAL_FEE,
+    ];
+
     public function __construct(
         protected GetStudentBalanceQuery $getStudentBalanceQuery,
         protected PublishDomainEventAction $publishDomainEventAction,
@@ -107,26 +119,56 @@ class PaymentService
         $createdAllocations = collect();
 
         DB::transaction(function () use ($payment, $allocations, $userId, &$createdAllocations) {
+            // FIN-11/DB-09: lock the payment row and recompute the unapplied
+            // amount inside the transaction. Concurrent allocators (DNG webhook
+            // bridge + batch auto-allocate) serialize on this lock, so the same
+            // payment can never be applied beyond its unapplied balance.
+            $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+            $remainingUnapplied = $this->settlementService->getPaymentUnappliedAmount($lockedPayment);
+
             foreach ($allocations as $chargeId => $amount) {
-                if ($amount <= 0) {
+                if ($amount <= 0 || $remainingUnapplied <= 0) {
                     continue;
                 }
 
+                // FIN-11/DB-09: lock the target line too. Concurrent allocators
+                // racing onto the same line serialize here and re-read its
+                // outstanding, so a line can never be applied beyond its balance.
                 $line = InvoiceLine::query()
                     ->where('charge_id', (int) $chargeId)
                     ->where('status', 'active')
                     ->orderBy('created_at')
                     ->orderBy('id')
+                    ->lockForUpdate()
                     ->first();
 
                 if (! $line) {
                     continue;
                 }
 
-                $allocation = $this->settlementService->createPaymentApplication(
-                    $payment,
-                    $line,
+                // Never apply one student's payment onto another student's line.
+                $lineStudentId = $line->invoice?->student_id;
+                if ($lineStudentId !== null && (int) $lineStudentId !== (int) $lockedPayment->student_id) {
+                    continue;
+                }
+
+                // Cap by BOTH the payment's remaining unapplied amount AND the
+                // line's outstanding balance — a too-large requested amount
+                // (e.g. DNG pivot rounding) becomes unapplied credit, never line overpay.
+                $applyAmount = min(
                     (float) $amount,
+                    $remainingUnapplied,
+                    $this->settlementService->getLineOutstandingAmount($line),
+                );
+
+                if ($applyAmount <= 0) {
+                    continue;
+                }
+
+                $allocation = $this->settlementService->createPaymentApplication(
+                    $lockedPayment,
+                    $line,
+                    $applyAmount,
                     'application',
                     $userId ?? $this->currentUserId(),
                     self::class,
@@ -134,6 +176,7 @@ class PaymentService
                 );
 
                 $createdAllocations->push($allocation);
+                $remainingUnapplied -= $applyAmount;
             }
         });
 
@@ -141,7 +184,12 @@ class PaymentService
     }
 
     /**
-     * Auto-allocate a payment to outstanding charges using oldest first strategy.
+     * Auto-allocate a payment to outstanding invoice lines using oldest first strategy.
+     *
+     * FIN-01: allocation amounts come from the canonical line-level outstanding
+     * calculation (invoice line truth), not the charge-centric FinanceCharge::balance
+     * fallback. The two diverge once an invoice line snapshot is frozen apart from
+     * the live charge amount, so the ledger-backed line outstanding is authoritative.
      */
     public function autoAllocatePayment(int $paymentId, string $strategy = 'oldest_first'): Collection
     {
@@ -152,28 +200,32 @@ class PaymentService
             return collect();
         }
 
-        // Get outstanding charges (positive amount, with remaining balance)
-        $charges = $this->getOutstandingCharges($payment->student_id)
-            ->sortBy(function ($charge) use ($strategy) {
-                return $strategy === 'oldest_first'
-                    ? $charge->effective_at
-                    : -$charge->effective_at->timestamp;
-            });
+        $lines = $this->settlementService->getOutstandingLinesForStudent(
+            $payment->student_id,
+            self::CANONICAL_PRIORITY_ORDER,
+        );
+
+        if ($strategy !== 'oldest_first') {
+            $lines = $lines->reverse()->values();
+        }
 
         $allocations = [];
 
-        foreach ($charges as $charge) {
+        foreach ($lines as $line) {
             if ($unappliedAmount <= 0) {
                 break;
             }
 
-            $chargeBalance = $charge->balance;
-            if ($chargeBalance <= 0) {
+            $outstanding = $this->settlementService->getLineOutstandingAmount($line);
+            if ($outstanding <= 0) {
                 continue;
             }
 
-            $amountToAllocate = min($unappliedAmount, $chargeBalance);
-            $allocations[$charge->id] = $amountToAllocate;
+            $amountToAllocate = min($unappliedAmount, $outstanding);
+
+            // INV-3: one active invoice line per active charge, so keying by
+            // charge_id is unambiguous and matches allocatePayment()'s lookup.
+            $allocations[$line->charge_id] = ($allocations[$line->charge_id] ?? 0) + $amountToAllocate;
             $unappliedAmount -= $amountToAllocate;
         }
 
