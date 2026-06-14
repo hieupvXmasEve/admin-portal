@@ -9,6 +9,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DngWebhookEvent extends Model
 {
+    // FIN-25: 'pending' is the processing_status column default applied at insert
+    // before the event is classified; declared here so the value set stays in
+    // sync with the chk_dng_we_processing_status DB CHECK.
+    public const STATUS_PENDING = 'pending';
+
     public const STATUS_RECEIVED = 'received';
 
     public const STATUS_PROCESSING = 'processing';

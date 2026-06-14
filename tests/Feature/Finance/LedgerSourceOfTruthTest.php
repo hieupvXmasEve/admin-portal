@@ -17,6 +17,7 @@ use App\Modules\Finance\Queries\Operations\PreviewAutoAllocateQuery;
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -71,15 +72,25 @@ function makeLegacyCreditStudent(Campus $campus, Semester $semester, Program $pr
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
 
-    $creditCharge = FinanceCharge::create([
-        'student_id' => $student->id,
-        'semester_id' => $semester->id,
-        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
-        'amount' => -3000000,
-        'description' => 'Legacy scholarship credit',
-        'effective_at' => now(),
-        'status' => FinanceCharge::STATUS_ACTIVE,
-    ]);
+    // A discount stored as a negative-amount DEBIT charge is a LEGACY shape that
+    // current code no longer produces and that chk_finance_charges_amount_sign
+    // (DB-06) now forbids on write. We still must verify the settlement reader
+    // nets such pre-existing rows, so seed it with the CHECK disabled — legacy
+    // data is allowed to exist, new writes are not.
+    DB::statement('SET SESSION check_constraint_checks = OFF');
+    try {
+        $creditCharge = FinanceCharge::create([
+            'student_id' => $student->id,
+            'semester_id' => $semester->id,
+            'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+            'amount' => -3000000,
+            'description' => 'Legacy scholarship credit',
+            'effective_at' => now(),
+            'status' => FinanceCharge::STATUS_ACTIVE,
+        ]);
+    } finally {
+        DB::statement('SET SESSION check_constraint_checks = ON');
+    }
 
     InvoiceLine::create([
         'invoice_id' => $invoice->id,

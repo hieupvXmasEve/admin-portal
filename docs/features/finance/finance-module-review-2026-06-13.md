@@ -45,6 +45,62 @@ INV-11=3 là nợ dữ liệu cũ — thuộc S-003. Test mới đều xanh; 26 
 
 ---
 
+## Cập nhật triển khai (2026-06-14) — Story S-003-data-guards-and-constraints
+
+Đã implement (branch `dev`, evidence ở `docs/stories/E-finance-module-review-2026-06/S-003-data-guards-and-constraints/validation.md`).
+Nguyên tắc: chỉ thêm guard **additive, an toàn**, KHÔNG xóa/merge dữ liệu trùng (đúng epic rule
++ Stop Conditions). MariaDB 11.4 (CHECK enforced), DB charset `utf8mb4` → **DB-25 đã thỏa**.
+
+- **DB-08 / FIN-14 `fixed`** — FK `voucher_applications.invoice_id` + `.finance_charge_id`
+  `nullOnDelete` (mig `2026_06_14_000002`). Pre-check 0 orphan.
+- **DB-06 `fixed`** — CHECK `payments.amount>0`, `finance_charge_installments.amount>0`,
+  và `finance_charges` sign theo charge_type: **debit `>=0`, credit `<=0`, adjustment any**
+  (mig `..000003`). Chặn cả HAI chiều sign-flip (debit lưu âm / credit lưu dương) nhưng CHO
+  PHÉP 0 (zero không có lỗi dấu; mô hình invoice zero-debt/đã miễn là hợp lệ — vd test skip
+  reminder). Legacy negative-debit line (`tuition_term` ÂM) code hiện KHÔNG còn tạo được → CHECK
+  chặn tái tạo; 1 test reader netting backstop seed shape đó với `check_constraint_checks=OFF`.
+- **DB-05 `fixed`** — CHECK status cho `finance_charge_installments`, `dng_payment_requests`,
+  `dng_webhook_events.processing_status` theo PHP value set (mig `..000004`, đúng B5.2). Lifecycle
+  review status KHÔNG đụng (thuộc E-finance-lifecycle-exceptions; dead `ignored` chờ product).
+- **DB-10 `fixed`** — unique `invoice_discounts(invoice_id, discount_type, reference_key,
+  discount_source)` với `reference_key` = generated column `COALESCE(reference_id,0)` (mig
+  `..000005`). Sentinel đóng lỗ "MariaDB coi NULL distinct" → chặn 2 discount NULL-ref trùng
+  (invoice,type,source); vẫn khớp firstOrNew, không đổi nullability cột.
+- **DB-16/17 `fixed`** — thêm composite/non-FK index còn thiếu (mig `..000006`), đã verify không
+  trùng FK/unique sẵn có.
+- **FIN-13 `fixed`** — `invoice_number` vốn đã unique → thêm retry-on-collision (5 lần) +
+  nới entropy generator (6 số random) ở `CreateFinanceChargeAction`.
+- **FIN-25 `fixed`** — `FinanceCharge::CHARGE_TYPES` thêm `course_fee`+`bhyt` (+`CREDIT_CHARGE_TYPES`);
+  `StudentInvoice::NON_REUSABLE_FOR_CHARGE_GENERATION_STATUSES` bỏ `issued`/`void` (không có trong
+  DB enum, behavior-preserving); `DngWebhookEvent::STATUS_PENDING` khai báo cho khớp default. Có
+  test parity đọc `information_schema` chặn drift tương lai.
+- **Tooling (thay cleanup phá hủy)** — command read-only `finance:export-duplicate-finance-data`
+  liệt kê từng nhóm INV-6 (kèm line/payment/discount/DNG) + INV-11 để con người chọn canonical.
+  DNG linkage lấy CẢ direct (`dng_payment_requests.finance_charge_id`) LẪN pivot
+  (`dng_payment_request_charges`, request aggregate có FK trực tiếp NULL) — ghi `link_source` +
+  `pivot_amount`; trên data hiện tại lộ 33 DNG request pivot-linked / 31 invoice mà bản direct-only
+  bỏ sót → consolidation phải re-point cả DNG linkage, không chỉ line/payment. JSON full row-level
+  ids ở `storage/app/finance/`.
+
+**HOÃN (cần quyết định người / ngoài slice):**
+- **DB-03** unique `(student_id,semester_id)` + **DB-04** restore unique `payload_hash`: BLOCK bởi
+  INV-6=28 / INV-11=3. Export cho thấy đa số là double-bill *đã paid ở cả hai* → chọn canonical là
+  quyết định finance, không tự động hóa. Sau khi review + cleanup về 0 mới thêm 2 unique.
+- **DB-24** soft-delete (quyết định hoãn), **DB-09** (S-002 không cần),
+  lifecycle status CHECK + dead `ignored` (story lifecycle).
+
+Audit sau triển khai = trước: invariant tiền 0, INV-6=28/INV-11=3 vẫn nguyên (guard additive không
+đụng data). Test mới 40 xanh; full Finance suite **26 fail = đúng baseline pre-existing S-002** (0
+regression mới). `pint` + `git diff --check` sạch. Migrate→rollback→migrate chứng minh down() an toàn.
+
+Hiệu chỉnh sau review (sign CHECK): bản strict `>0/<0` (spec confirm) phá (a) fixture legacy
+negative-debit reader và (b) 2 test reminder mô hình invoice zero-debt bằng `tuition_term=0`. Đã
+chốt lại theo approval = **debit `>=0` / credit `<=0`** (chặn cả 2 chiều sign-flip, cho phép 0).
+Bài học: spec số tiền phải tách "sai dấu" (cần chặn) khỏi "giá trị 0" (hợp lệ); khi strict phá test
+hợp lệ thì đó là stop condition cần re-approval, KHÔNG tự ý nới guard.
+
+---
+
 ## 1. Chẩn đoán gốc — 4 lỗ hổng kiến trúc lặp lại
 
 Phần lớn các bug riêng lẻ bên dưới là hệ quả của 4 nguyên nhân gốc sau:

@@ -24,10 +24,13 @@ use Illuminate\Support\Carbon;
  */
 class StudentInvoice extends Model
 {
+    // FIN-25: only statuses that actually exist in the student_invoices.status
+    // DB enum (draft,pending,paid,partial,overdue,cancelled). The legacy values
+    // 'issued'/'void' could never match a stored row, so dropping them keeps the
+    // reuse scope identical while removing dead drift. Finalized invoices (paid
+    // or cancelled) must not be reused for new charge generation.
     public const NON_REUSABLE_FOR_CHARGE_GENERATION_STATUSES = [
-        'issued',
         'paid',
-        'void',
         'cancelled',
     ];
 

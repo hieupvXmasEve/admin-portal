@@ -69,11 +69,14 @@ class FinanceCharge extends Model
 
     public const STATUS_VOID = 'void';
 
+    // FIN-25: keep this list in lockstep with the finance_charges.charge_type DB
+    // enum. course_fee and bhyt are valid DB values and were missing here.
     public const CHARGE_TYPES = [
         self::TYPE_TUITION_TERM,
         self::TYPE_EGC_LEVEL_FEE,
         self::TYPE_RETAKE_FEE,
         self::TYPE_EXAM_RESIT_FEE,
+        self::TYPE_COURSE_FEE,
         self::TYPE_MANUAL_FEE,
         self::TYPE_ADMISSION_FEE,
         self::TYPE_DEFER_CREDIT,
@@ -81,6 +84,20 @@ class FinanceCharge extends Model
         self::TYPE_SCHOLARSHIP_CREDIT,
         self::TYPE_VOUCHER_CREDIT,
         self::TYPE_ADJUSTMENT,
+        self::TYPE_BHYT,
+    ];
+
+    /**
+     * Charge types that represent a credit (negative ledger entry). Used to keep
+     * model logic and the finance_charges money-sign DB CHECK aligned (DB-06).
+     *
+     * @var array<int, string>
+     */
+    public const CREDIT_CHARGE_TYPES = [
+        self::TYPE_DEFER_CREDIT,
+        self::TYPE_EGC_EXEMPT_CREDIT,
+        self::TYPE_SCHOLARSHIP_CREDIT,
+        self::TYPE_VOUCHER_CREDIT,
     ];
 
     // =====================

@@ -1,0 +1,52 @@
+# Design
+
+## Domain Model
+
+Normalize these money rules:
+
+- Discounts must not exceed eligible charge amount.
+- Active charge detection must ignore voided charges.
+- EGC amount source must be chosen once and reused by preview and execute.
+- Installment sum must match net due after discounts.
+- DNG pivot amount sum must match request/payment amount after rounding.
+- `charge.amount`, `installment.amount`, and `dng_payment_requests.amount`
+  represent different lifecycle moments and must not silently drift after a
+  discount or void.
+- Voiding a charge must either cancel/void linked installments or explicitly
+  block with a clear reason; auto-reallocation must not be a hidden side effect.
+
+## Application Flow
+
+- Extract shared helpers only where they remove real duplication.
+- Keep controllers thin and use Finance Actions/Queries.
+- Keep preview and execute paths using the same rule object/action where
+  practical.
+- Recalculate or block installment/DNG push when net due changes after split.
+- Add void/installment regression coverage for linked `finance_charge_installments`.
+- Isolate auto-reallocate behavior after void so staff can see or control it.
+
+## Interface Contract
+
+Admin web forms may receive clearer validation errors. Existing route names
+should remain unless a later UI story intentionally changes navigation.
+
+## Data Model
+
+Possible schema changes should be additive. Money casts must align PHP models
+with DB `decimal(15,2)` columns.
+
+## UI / Platform Impact
+
+Preview tables must show the same amounts that execute will create. If EGC
+source selection changes labels, use Vietnamese terminology from the review.
+
+## Observability
+
+Tests should assert preview/execute parity and exact cents/VND totals.
+
+## Alternatives Considered
+
+1. Patch only the visible EGC page.
+   - Rejected because batch and direct generation paths would still diverge.
+2. Ignore rounding differences as small.
+   - Rejected because payment application totals must reconcile exactly.

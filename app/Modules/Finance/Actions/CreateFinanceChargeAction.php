@@ -10,10 +10,16 @@ use App\Models\StudentInvoice;
 use App\Models\StudentScholarshipAward;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 class CreateFinanceChargeAction
 {
+    /**
+     * Max attempts to generate a non-colliding invoice_number (FIN-13).
+     */
+    protected const INVOICE_NUMBER_MAX_ATTEMPTS = 5;
+
     public function __construct(
         protected InvoiceGenerationService $invoiceService
     ) {}
@@ -142,18 +148,39 @@ class CreateFinanceChargeAction
      */
     protected function createInvoiceForSemester(int $studentId, int $semesterId, ?Carbon $dueDate = null): StudentInvoice
     {
-        // Generate invoice number
-        $invoiceNumber = $this->generateInvoiceNumber($studentId, $semesterId);
+        // FIN-13: invoice_number is generated from time()+random and is UNIQUE at
+        // the DB level. Two invoices created in the same second for the same
+        // student can collide and the insert throws. Retry on the unique
+        // violation with a freshly generated number instead of bubbling a 500.
+        $due = $dueDate ?? now()->addDays(30);
 
-        // Create invoice
-        return StudentInvoice::create([
-            'invoice_number' => $invoiceNumber,
-            'student_id' => $studentId,
-            'semester_id' => $semesterId,
-            'billing_cycle_id' => null,
-            'status' => 'draft',
-            'due_date' => $dueDate ?? now()->addDays(30),
-        ]);
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                return StudentInvoice::create([
+                    'invoice_number' => $this->generateInvoiceNumber($studentId, $semesterId),
+                    'student_id' => $studentId,
+                    'semester_id' => $semesterId,
+                    'billing_cycle_id' => null,
+                    'status' => 'draft',
+                    'due_date' => $due,
+                ]);
+            } catch (QueryException $e) {
+                if (! $this->isInvoiceNumberCollision($e) || $attempt >= self::INVOICE_NUMBER_MAX_ATTEMPTS) {
+                    throw $e;
+                }
+                // Loop and regenerate; generateInvoiceNumber re-draws the random suffix.
+            }
+        }
+    }
+
+    /**
+     * Whether a QueryException is a unique-constraint violation on invoice_number.
+     */
+    protected function isInvoiceNumberCollision(QueryException $e): bool
+    {
+        // 23000 = integrity constraint violation (MySQL/MariaDB duplicate key).
+        return $e->getCode() === '23000'
+            && str_contains($e->getMessage(), 'invoice_number');
     }
 
     /**
@@ -219,7 +246,9 @@ class CreateFinanceChargeAction
         $prefix = 'INV';
         $year = date('Y');
         $timestamp = now()->format('mdHis');
-        $random = str_pad((string) random_int(0, 999), 3, '0', STR_PAD_LEFT);
+        // FIN-13: 6 random digits (re-drawn on every call) make same-second
+        // collisions vanishingly unlikely and guarantee retries diverge.
+        $random = str_pad((string) random_int(0, 999_999), 6, '0', STR_PAD_LEFT);
 
         return "{$prefix}-{$year}-{$studentId}-{$timestamp}{$random}";
     }
