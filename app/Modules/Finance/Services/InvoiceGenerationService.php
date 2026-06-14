@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Services;
 
 use App\Models\FinanceCharge;
+use App\Models\FinanceChargeInstallment;
 use App\Models\InvoiceDiscount;
 use App\Models\InvoiceLine;
 use App\Models\StudentInvoice;
+use App\Modules\Finance\Actions\ReconcileChargeInstallmentsAction;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -184,7 +186,11 @@ class InvoiceGenerationService
         ?int $referenceId = null,
         ?int $approvedBy = null,
     ): InvoiceDiscount {
-        return $this->settlementService->createOrRefreshInvoiceDiscount(
+        // FIN-09: the discount write and the installment reconcile must be atomic.
+        // Reconcile can throw (committed installments already exceed the new net
+        // due) and that "block" must leave NO discount/allocation behind — even
+        // when the caller is not already inside a transaction.
+        return DB::transaction(function () use (
             $invoice,
             $discountType,
             $amount,
@@ -192,7 +198,60 @@ class InvoiceGenerationService
             $description,
             $referenceId,
             $approvedBy,
-        );
+        ) {
+            $discount = $this->settlementService->createOrRefreshInvoiceDiscount(
+                $invoice,
+                $discountType,
+                $amount,
+                $discountSource,
+                $description,
+                $referenceId,
+                $approvedBy,
+            );
+
+            // A discount changes net due. Any charge on this invoice already split
+            // into installments must have its pending rows reconciled to the new
+            // net due (or surface for review if committed rows already exceed it).
+            $this->reconcileInstallmentsForInvoice($invoice);
+
+            return $discount;
+        });
+    }
+
+    /**
+     * Reconcile installment plans for every active charge on the invoice that has
+     * an installment plan (FIN-09). No-op for the common case where charges have
+     * no installments yet (discount applied during generation, before any split).
+     */
+    private function reconcileInstallmentsForInvoice(StudentInvoice $invoice): void
+    {
+        $chargeIds = InvoiceLine::query()
+            ->where('invoice_id', $invoice->id)
+            ->where('status', 'active')
+            ->pluck('charge_id')
+            ->filter()
+            ->unique();
+
+        if ($chargeIds->isEmpty()) {
+            return;
+        }
+
+        $chargeIdsWithPlan = FinanceChargeInstallment::query()
+            ->whereIn('finance_charge_id', $chargeIds)
+            ->distinct()
+            ->pluck('finance_charge_id');
+
+        if ($chargeIdsWithPlan->isEmpty()) {
+            return;
+        }
+
+        $reconciler = app(ReconcileChargeInstallmentsAction::class);
+
+        FinanceCharge::query()
+            ->whereIn('id', $chargeIdsWithPlan)
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->get()
+            ->each(fn (FinanceCharge $charge) => $reconciler->handle($charge));
     }
 
     /**

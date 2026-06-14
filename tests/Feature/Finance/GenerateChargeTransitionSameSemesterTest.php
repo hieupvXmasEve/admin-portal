@@ -906,3 +906,129 @@ it('reuses an empty draft invoice for egc generation when no egc lines exist yet
             ->and($preview['students'][0]['estimated_amount'])->toBe(30000000.0);
     }
 });
+
+it('regenerates a tuition charge after the prior one was voided (FIN-05)', function () {
+    [$student, $semester] = seedTransitionStudentScenario();
+
+    // First generation creates the tuition charge.
+    GenerateBatchChargesAction::run([
+        'semester_id' => $semester->id,
+        'scope_type' => 'upload_list',
+        'uploaded_student_ids' => [$student->student_id],
+        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
+        'skip_if_issued_or_paid' => true,
+        'only_update_draft' => true,
+        'merge_invoice' => true,
+    ]);
+
+    $firstCharge = FinanceCharge::query()
+        ->where('student_id', $student->id)
+        ->where('semester_id', $semester->id)
+        ->where('charge_type', FinanceCharge::TYPE_TUITION_TERM)
+        ->firstOrFail();
+
+    // Void it (e.g. correction). The voided charge must not block regeneration
+    // nor be re-linked as if active.
+    $firstCharge->update(['status' => FinanceCharge::STATUS_VOID, 'voided_at' => now()]);
+
+    GenerateBatchChargesAction::run([
+        'semester_id' => $semester->id,
+        'scope_type' => 'upload_list',
+        'uploaded_student_ids' => [$student->student_id],
+        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
+        'skip_if_issued_or_paid' => true,
+        'only_update_draft' => true,
+        'merge_invoice' => true,
+    ]);
+
+    $activeCharges = FinanceCharge::query()
+        ->where('student_id', $student->id)
+        ->where('semester_id', $semester->id)
+        ->where('charge_type', FinanceCharge::TYPE_TUITION_TERM)
+        ->where('status', FinanceCharge::STATUS_ACTIVE)
+        ->get();
+
+    expect($activeCharges)->toHaveCount(1)
+        ->and($activeCharges->first()->id)->not->toBe($firstCharge->id)
+        ->and((float) $activeCharges->first()->amount)->toBe(45000000.0)
+        ->and($firstCharge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID);
+});
+
+function seedNoUnitEgcScenario(): array
+{
+    $campus = Campus::factory()->create();
+    $program = Program::factory()->create();
+
+    $fall = Semester::factory()->create([
+        'code' => 'FALL2025NU',
+        'name' => 'FALL2025NU',
+        'start_date' => '2025-09-01 00:00:00',
+        'end_date' => '2025-12-31 00:00:00',
+        'is_active' => false,
+        'is_archived' => false,
+    ]);
+
+    $spring = Semester::factory()->create([
+        'code' => 'SPRING2026NU',
+        'name' => 'SPRING2026NU',
+        'start_date' => '2026-01-05 00:00:00',
+        'end_date' => '2026-05-31 00:00:00',
+        'is_active' => true,
+        'is_archived' => false,
+    ]);
+
+    $curriculumVersion = CurriculumVersion::factory()
+        ->forProgram($program)
+        ->withEffectiveSemester($fall)
+        ->create();
+
+    session(['current_campus_id' => $campus->id]);
+    app()->instance('campus', $campus);
+
+    $student = Student::factory()
+        ->forCampus($campus)
+        ->forProgram($program)
+        ->state([
+            'student_id' => 'AUNOUNIT1',
+            'full_name' => 'No Unit EGC Student',
+            'status' => 'intake_pre_uni_gc',
+            'gc_current_level' => 3,
+            'gc_total_levels' => 6,
+            'curriculum_version_id' => $curriculumVersion->id,
+            'intake_semester_id' => $fall->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+        ])
+        ->create();
+
+    // Deliberately NO egc Unit rows for levels 3/4 → EgcLevelFeeResolver fallback.
+    return [$student, $spring];
+}
+
+it('creates two distinct EGC charges on the Unit-fee fallback instead of collapsing levels (FIN-06 fallback)', function () {
+    [$student, $spring] = seedNoUnitEgcScenario();
+
+    GenerateBatchChargesAction::run([
+        'semester_id' => $spring->id,
+        'scope_type' => 'upload_list',
+        'uploaded_student_ids' => [$student->student_id],
+        'charge_types' => [FinanceCharge::TYPE_EGC_LEVEL_FEE],
+        'skip_if_issued_or_paid' => true,
+        'only_update_draft' => true,
+        'merge_invoice' => true,
+    ]);
+
+    $charges = FinanceCharge::query()
+        ->where('student_id', $student->id)
+        ->where('semester_id', $spring->id)
+        ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
+        ->where('status', FinanceCharge::STATUS_ACTIVE)
+        ->orderBy('id')
+        ->get();
+
+    // Levels 3 and 4 must be TWO distinct charges (not one reused), each at the
+    // 15M fallback, with level-distinct descriptions.
+    expect($charges)->toHaveCount(2)
+        ->and($charges->pluck('description')->all())->toEqual(['EGC Level 3 Fee', 'EGC Level 4 Fee'])
+        ->and($charges->pluck('amount')->map(fn ($a) => (float) $a)->all())->toEqual([15_000_000.0, 15_000_000.0]);
+});

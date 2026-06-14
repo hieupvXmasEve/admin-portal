@@ -13,6 +13,7 @@ use App\Models\StudentInvoice;
 use App\Models\StudentScholarshipAward;
 use App\Models\VoucherApplication;
 use App\Modules\Finance\Services\InvoiceGenerationService;
+use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 use Carbon\Carbon;
@@ -175,12 +176,8 @@ class GenerateMajorChargesAction
             return;
         }
 
-        $rawValue = (float) $definition->amount;
-        $discount = $definition->type === 'percentage'
-            ? ($baseAmount * $rawValue) / 100
-            : $rawValue;
-
-        $discount = max(0.0, min($baseAmount, $discount));
+        // FIN-04/07: shared resolver is the single source of capped scholarship math.
+        $discount = app(ScholarshipDiscountResolver::class)->resolve($definition, $baseAmount);
 
         if ($discount <= 0) {
             return;

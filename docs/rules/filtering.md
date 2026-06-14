@@ -6,9 +6,25 @@ paths: '**/*.{php,vue,js,ts}'
 
 This guide standardizes how list pages use the `useDataTable` composable together with Laravel controllers. Follow it whenever you implement or update a paginated index that needs filters, sorting, and pagination.
 
-> **Reference:** `docs/useDataTable-examples.md` for full composable usage, validation, and dependent filter patterns.
+> ## 🔴 MANDATORY (read first — applies to humans and AI agents)
 >
-> **Legacy:** `useInertiaFilters` (26 pages) and `useServerTableQuery` (9 pages) are frozen — bug fix in-place only, migrate to `useDataTable` when refactoring.
+> **`useDataTable` is the ONLY approved composable for filter / sort / pagination
+> list pages. ALWAYS use it when writing new code or editing existing code.**
+>
+> - **New code:** MUST use `useDataTable`. Never introduce a new
+>   `useInertiaFilters` or `useServerTableQuery` usage — they are legacy.
+> - **Editing existing code:** if the page still uses `useInertiaFilters` /
+>   `useServerTableQuery`, migrate it to `useDataTable` as part of the change.
+>   The only exception is a strictly isolated one-line bug fix on a frozen legacy
+>   page where migrating is out of scope — never *extend* the legacy composable.
+> - `useInertiaFilters` (≈26 pages) and `useServerTableQuery` (≈9 pages) are
+>   **legacy/frozen**. `useDataTable` replaces both (see
+>   `resources/js/composables/useDataTable.ts`).
+>
+> AI agents: treat any new or edited `*.vue` list/filter/pagination page that
+> imports `useInertiaFilters` or `useServerTableQuery` as a defect to fix.
+
+> **Reference:** `docs/useDataTable-examples.md` for full composable usage, validation, and dependent filter patterns.
 
 ## 1. Decide the Contract First
 

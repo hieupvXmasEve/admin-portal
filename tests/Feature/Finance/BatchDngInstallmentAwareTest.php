@@ -10,8 +10,10 @@ use App\Models\Student;
 use App\Modules\Finance\Actions\CreateBatchDngFromChargesAction;
 use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngClient;
+use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Jobs\PushNextInstallmentJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -36,7 +38,7 @@ function batch_mockDngClientPushSuccess(): void
         ],
     ]);
     app()->instance(DngClient::class, $mock);
-    app()->forgetInstance(\App\Modules\Finance\Dng\Services\DngPaymentService::class);
+    app()->forgetInstance(DngPaymentService::class);
 }
 
 beforeEach(function () {
@@ -163,6 +165,24 @@ it('worklist bundles next-pending across multiple charges of same student', func
     expect($b1->dng_payment_request_id)->toBe($dng->id);
     expect($a1->status)->toBe(FinanceChargeInstallment::STATUS_AWAITING_PAYMENT);
     expect($b1->status)->toBe(FinanceChargeInstallment::STATUS_AWAITING_PAYMENT);
+
+    // FIN-10b: pivot amounts must mirror the INSTALLMENTS being collected
+    // (A=10M, B=6M), NOT a balance-proportional split (which would be ~12.3M/3.7M
+    // since A balance 20M, B balance 6M). Each pivot also links its installment.
+    $pivotA = DngPaymentRequestCharge::where('dng_payment_request_id', $dng->id)
+        ->where('finance_charge_id', $chargeA->id)->first();
+    $pivotB = DngPaymentRequestCharge::where('dng_payment_request_id', $dng->id)
+        ->where('finance_charge_id', $chargeB->id)->first();
+
+    expect((float) $pivotA->amount)->toBe(10_000_000.0)
+        ->and((float) $pivotB->amount)->toBe(6_000_000.0)
+        ->and($pivotA->finance_charge_installment_id)->toBe($a1->id)
+        ->and($pivotB->finance_charge_installment_id)->toBe($b1->id);
+
+    // Invariant: request amount == Σ pivot == Σ linked installment.
+    $pivotSum = (float) DngPaymentRequestCharge::where('dng_payment_request_id', $dng->id)->sum('amount');
+    expect($pivotSum)->toBe(16_000_000.0)
+        ->and($pivotSum)->toBe((float) $dng->amount);
 });
 
 // =========================================================================

@@ -9,6 +9,7 @@ use App\Models\InvoiceLine;
 use App\Models\StudentInvoice;
 use App\Models\StudentScholarshipAward;
 use App\Modules\Finance\Services\InvoiceGenerationService;
+use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -78,14 +79,12 @@ class CreateFinanceChargeAction
         // }
 
         $scholarshipDef = $award->scholarshipDefinition;
-        $discountAmount = 0;
 
-        if ($scholarshipDef->type === 'percentage') {
-            $discountAmount = ($tuitionCharge->amount * $scholarshipDef->amount) / 100;
-        } else {
-            // Default to fixed_amount
-            $discountAmount = $scholarshipDef->amount;
-        }
+        // FIN-04/07: cap the discount at the charge amount via the shared
+        // resolver so every generation path produces the same capped number and
+        // a fixed_amount/over-100% scholarship can never push balance negative.
+        $discountAmount = app(ScholarshipDiscountResolver::class)
+            ->resolve($scholarshipDef, (float) $tuitionCharge->amount);
 
         if ($discountAmount <= 0) {
             return;

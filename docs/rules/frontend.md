@@ -23,7 +23,7 @@ resources/js/
 
 - **Pages**: 1-1 mapping with Routes (e.g., `Academic/Records/Index.vue`).
 - **Components**: PascalCase (e.g., `RecordTable.vue`). Avoid generic names like `Table.vue`.
-- **Composables**: Use `use` prefix (e.g., `useInertiaFilters.ts`). Do NOT put complex business logic here.
+- **Composables**: Use `use` prefix (e.g., `useDataTable.ts`). Do NOT put complex business logic here.
 
 ## 3. Shadcn-Vue Conventions
 
@@ -86,14 +86,19 @@ const {
 });
 ```
 
-### Legacy composables — DO NOT USE on new pages
+### Legacy composables — DO NOT USE (new code) · MIGRATE (when editing)
+
+> 🔴 **MANDATORY for humans and AI agents:** `useDataTable` is the ONLY approved
+> filter/sort/pagination composable. ALWAYS use it when creating new code, and
+> migrate to it when editing a page that still uses a legacy composable. Never
+> introduce or extend `useInertiaFilters` / `useServerTableQuery`.
 
 | Composable | Status | Action |
 |---|---|---|
-| `useInertiaFilters` | LEGACY — 26 pages | Bug fix in-place only. Migrate on refactor. |
-| `useServerTableQuery` | LEGACY — 9 pages | Bug fix in-place only. Migrate on refactor. |
+| `useInertiaFilters` | LEGACY — ≈26 pages | New code: forbidden. Editing: migrate to `useDataTable`. Only a strictly isolated one-line bug fix may stay in place. |
+| `useServerTableQuery` | LEGACY — ≈9 pages | New code: forbidden. Editing: migrate to `useDataTable`. Only a strictly isolated one-line bug fix may stay in place. |
 
-See `docs/useDataTable-examples.md` for full usage patterns including validation, dependent filters, and migration guide.
+See `docs/useDataTable-examples.md` for full usage patterns including validation, dependent filters, and migration guide. Full rules: `docs/rules/filtering.md`.
 
 ## 5. Form Patterns
 

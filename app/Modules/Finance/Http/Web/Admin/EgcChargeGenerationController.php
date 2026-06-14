@@ -86,10 +86,19 @@ class EgcChargeGenerationController extends Controller
 
         $students = $eligibleStudents->map(function (array $student) use ($overrides): array {
             $override = $overrides->get($student['student_id']);
+            $maxBlocks = (int) $student['max_chargeable_blocks'];
+
+            // UI-SAFE-3: clamp any (possibly stale) override to the student's
+            // current max_chargeable_blocks. The eligible set is recomputed from
+            // the live filter, so a block count carried over from a different
+            // scope/semester can never over-charge beyond what is chargeable now.
+            $blockCount = $override !== null
+                ? min((int) $override['block_count'], $maxBlocks)
+                : $maxBlocks;
 
             return [
                 'student_id' => $student['student_id'],
-                'block_count' => $override['block_count'] ?? $student['max_chargeable_blocks'],
+                'block_count' => $blockCount,
                 'current_level' => $student['current_level'],
             ];
         })->filter(fn (array $student) => (int) $student['block_count'] > 0)

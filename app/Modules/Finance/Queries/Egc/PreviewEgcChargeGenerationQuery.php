@@ -7,12 +7,15 @@ namespace App\Modules\Finance\Queries\Egc;
 use App\Models\EgcBlock;
 use App\Models\FinanceCharge;
 use App\Models\Student;
+use App\Modules\Finance\Support\EgcLevelFeeResolver;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class PreviewEgcChargeGenerationQuery
 {
+    private ?EgcLevelFeeResolver $egcFeeResolver = null;
+
     public function handle(int $semesterId, array $filters = [], ?int $campusId = null): array
     {
         $rows = $this->collectRows($semesterId, $filters, $campusId);
@@ -21,6 +24,16 @@ class PreviewEgcChargeGenerationQuery
         $warnings = $rows->where('eligibility_status', 'warning')->values();
         $perPage = (int) ($filters['per_page'] ?? 20);
         $page = (int) ($filters['page'] ?? 1);
+
+        // UI-SAFE-3: execute generates for ALL eligible students (the server
+        // recomputes the full filter), not just the current page. Surface the
+        // full-scope projection so the confirm total matches what executes, even
+        // though block_count overrides are entered page by page. Students not
+        // adjusted on a page default to their max_chargeable_blocks.
+        $projectedBlockCount = (int) $eligible->sum('max_chargeable_blocks');
+        $projectedTotalAmount = (float) $eligible->sum(
+            fn (array $student) => collect($student['chargeable_levels'] ?? [])->sum('amount')
+        );
 
         return [
             'eligible_students' => $this->paginateCollection($eligible, $perPage, $page),
@@ -31,6 +44,8 @@ class PreviewEgcChargeGenerationQuery
                 'ineligible_count' => $ineligible->count(),
                 'warning_count' => $warnings->count(),
                 'total_count' => $rows->count(),
+                'projected_block_count' => $projectedBlockCount,
+                'projected_total_amount' => $projectedTotalAmount,
             ],
         ];
     }
@@ -206,11 +221,18 @@ class PreviewEgcChargeGenerationQuery
             $levels[] = [
                 'level_number' => $levelNumber,
                 'is_retake' => $this->isRetakeEligible($studentId, $levelNumber),
-                'amount' => 15_000_000,
+                // FIN-06: same canonical fee resolver as execute so the preview
+                // amount equals the charge that will be created.
+                'amount' => (int) $this->egcFeeResolver()->resolve($levelNumber),
             ];
         }
 
         return $levels;
+    }
+
+    private function egcFeeResolver(): EgcLevelFeeResolver
+    {
+        return $this->egcFeeResolver ??= new EgcLevelFeeResolver;
     }
 
     private function isRetakeEligible(int $studentId, int $levelNumber): bool

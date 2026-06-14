@@ -14,6 +14,8 @@ use App\Models\Unit;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\BillingScopeHelper;
+use App\Modules\Finance\Support\EgcLevelFeeResolver;
+use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 use Carbon\Carbon;
@@ -70,6 +72,7 @@ class GenerateBatchChargesAction
         $invoiceService = app(InvoiceGenerationService::class);
         $studentChargeTimingResolver = app(StudentChargeTimingResolver::class);
         $voucherDiscountAmountResolver = app(VoucherDiscountAmountResolver::class);
+        $egcFeeResolver = app(EgcLevelFeeResolver::class);
         $students = $students
             ->filter(fn (Student $student) => $studentChargeTimingResolver->shouldIncludeStudentForChargeGeneration($student, $semesterId, $chargeTypes))
             ->values();
@@ -130,10 +133,8 @@ class GenerateBatchChargesAction
                                 }
 
                                 foreach ($lvls as $l) {
-                                    $u = Unit::where('unit_type', 'egc')->where('level', $l)->first();
-                                    if ($u) {
-                                        $potentialAmount += $u->base_fee;
-                                    }
+                                    // FIN-06: canonical EGC fee = Unit.base_fee, fallback flat.
+                                    $potentialAmount += $egcFeeResolver->resolve($l);
                                 }
                             }
                         }
@@ -208,19 +209,31 @@ class GenerateBatchChargesAction
 
                                 foreach ($levelsToCharge as $level) {
                                     $unit = Unit::where('unit_type', 'egc')->where('level', $level)->first();
-                                    $fee = $unit ? (float) $unit->base_fee : 0;
+                                    // FIN-06: same canonical resolver as preview/dedicated flow.
+                                    $fee = $egcFeeResolver->resolve($level);
 
                                     if ($fee > 0) {
+                                        $levelDescription = "EGC Level {$level} Fee";
+
+                                        // When an EGC Unit exists it is the dedupe source (one
+                                        // unit per level → distinct charges). On the FIN-06
+                                        // fallback (no Unit) there is no source, so the
+                                        // level-bearing description is the dedupe key — otherwise
+                                        // every unit-less level collapses onto source_id 0 and the
+                                        // second level reuses the first level's charge.
                                         $charge = self::createChargeIfNotExists(
                                             $student, $semesterId,
                                             FinanceCharge::TYPE_EGC_LEVEL_FEE,
                                             $fee,
-                                            'App\Models\Unit',
-                                            $unit ? $unit->id : 0,
-                                            $createdByUserId
+                                            $unit ? 'App\Models\Unit' : null,
+                                            $unit?->id,
+                                            $createdByUserId,
+                                            $levelDescription,
                                         );
                                         if ($charge) {
-                                            $charge->update(['description' => "EGC Level {$level} Fee"]);
+                                            if ($charge->description !== $levelDescription) {
+                                                $charge->update(['description' => $levelDescription]);
+                                            }
                                             $charge->refresh();
                                             $chargesToLink[] = $charge;
                                             $hasInvoiceMutation = true;
@@ -393,21 +406,30 @@ class GenerateBatchChargesAction
         ]);
     }
 
-    private static function createChargeIfNotExists(Student $student, int $semesterId, string $type, float $amount, ?string $sourceType = null, $sourceId = null, ?int $createdByUserId = null): ?FinanceCharge
+    private static function createChargeIfNotExists(Student $student, int $semesterId, string $type, float $amount, ?string $sourceType = null, $sourceId = null, ?int $createdByUserId = null, ?string $description = null): ?FinanceCharge
     {
+        // FIN-05: only ACTIVE charges count as "already exists". A voided charge
+        // must neither block regeneration nor be returned and re-linked into an
+        // invoice as if it were live.
         $query = FinanceCharge::where('student_id', $student->id)
             ->where('semester_id', $semesterId)
-            ->where('charge_type', $type);
+            ->where('charge_type', $type)
+            ->where('status', FinanceCharge::STATUS_ACTIVE);
 
         if ($sourceType) {
             $query->where('source_type', $sourceType)->where('source_id', $sourceId);
+        } elseif ($description !== null) {
+            // No external source to dedupe on (e.g. EGC level fee on the FIN-06
+            // fallback): the level-bearing description is the natural key so two
+            // levels do not collapse into one charge.
+            $query->where('description', $description);
         }
 
         if ($query->exists()) {
             return $query->first();
         }
 
-        $description = match ($type) {
+        $resolvedDescription = $description ?? match ($type) {
             FinanceCharge::TYPE_TUITION_TERM => 'Tuition Fee',
             FinanceCharge::TYPE_EGC_LEVEL_FEE => 'EGC Level Fee',
             FinanceCharge::TYPE_SCHOLARSHIP_CREDIT => 'Scholarship Credit',
@@ -418,7 +440,7 @@ class GenerateBatchChargesAction
             'student_id' => $student->id,
             'semester_id' => $semesterId,
             'charge_type' => $type,
-            'description' => $description,
+            'description' => $resolvedDescription,
             'amount' => $amount,
             'source_type' => $sourceType,
             'source_id' => $sourceId,
@@ -457,9 +479,8 @@ class GenerateBatchChargesAction
             return null;
         }
 
-        $discount = $scholarshipDef->type === 'percentage'
-            ? ($baseAmount * $scholarshipDef->amount) / 100
-            : (float) $scholarshipDef->amount;
+        // FIN-04/07: cap at charge amount via the shared resolver (preview/execute parity).
+        $discount = app(ScholarshipDiscountResolver::class)->resolve($scholarshipDef, $baseAmount);
 
         if ($discount <= 0) {
             return null;

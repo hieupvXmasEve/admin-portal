@@ -12,6 +12,8 @@ use App\Models\StudentScholarshipAward;
 use App\Models\Unit;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Support\BillingScopeHelper;
+use App\Modules\Finance\Support\EgcLevelFeeResolver;
+use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 
@@ -127,7 +129,8 @@ class PreviewChargeGenerationQuery
 
                         foreach ($levelsToCharge as $level) {
                             $unit = Unit::where('unit_type', 'egc')->where('level', $level)->first();
-                            $fee = $unit ? (float) $unit->base_fee : 0;
+                            // FIN-06: same canonical fee resolver as execute.
+                            $fee = app(EgcLevelFeeResolver::class)->resolve($level);
 
                             if ($fee > 0) {
                                 // Check specific level existence
@@ -346,9 +349,8 @@ class PreviewChargeGenerationQuery
             return null;
         }
 
-        $discount = $scholarshipDef->type === 'percentage'
-            ? ($baseAmount * $scholarshipDef->amount) / 100
-            : (float) $scholarshipDef->amount;
+        // FIN-04/07: cap at charge amount so preview matches execute.
+        $discount = app(ScholarshipDiscountResolver::class)->resolve($scholarshipDef, $baseAmount);
 
         if ($discount <= 0) {
             return null;

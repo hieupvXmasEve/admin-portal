@@ -5,21 +5,25 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Dng\Models;
 
 use App\Models\FinanceCharge;
+use App\Models\FinanceChargeInstallment;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Pivot model linking a DNG payment request to one or more finance charges.
+ * Pivot model: an allocation line of ONE DNG payment request.
  *
- * Used when a single DNG request covers multiple retake-fee charges (one per unit).
- * The amount field records how much of the DNG total is attributed to each charge,
- * enabling precise per-charge payment allocation on webhook confirmation.
+ * `amount` is how much of THIS request is attributed to the charge — not the
+ * charge's remaining balance. When the request is built from an installment plan
+ * the row also carries `finance_charge_installment_id`, so the pivot amount
+ * equals the installment being collected (allocation truth == installment truth,
+ * FIN-10b). Legacy / ad-hoc (override) rows leave the installment link null.
  */
 class DngPaymentRequestCharge extends Model
 {
     protected $fillable = [
         'dng_payment_request_id',
         'finance_charge_id',
+        'finance_charge_installment_id',
         'amount',
     ];
 
@@ -35,5 +39,10 @@ class DngPaymentRequestCharge extends Model
     public function financeCharge(): BelongsTo
     {
         return $this->belongsTo(FinanceCharge::class);
+    }
+
+    public function financeChargeInstallment(): BelongsTo
+    {
+        return $this->belongsTo(FinanceChargeInstallment::class);
     }
 }

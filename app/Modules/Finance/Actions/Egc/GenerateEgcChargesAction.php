@@ -9,13 +9,18 @@ use App\Models\FinanceCharge;
 use App\Models\InvoiceLine;
 use App\Models\Student;
 use App\Models\StudentInvoice;
+use App\Modules\Finance\Support\EgcLevelFeeResolver;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class GenerateEgcChargesAction
 {
-    public const CHARGE_AMOUNT = 15_000_000;
+    /**
+     * Deprecated flat fee. Retained for backward compatibility; the canonical
+     * source is now {@see EgcLevelFeeResolver} (FIN-06).
+     */
+    public const CHARGE_AMOUNT = EgcLevelFeeResolver::FALLBACK_FEE;
 
     /**
      * Generate EGC charges for a list of students in a semester.
@@ -214,7 +219,8 @@ class GenerateEgcChargesAction
             'student_id' => $studentId,
             'semester_id' => $semesterId,
             'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-            'amount' => self::CHARGE_AMOUNT,
+            // FIN-06: canonical fee = Unit.base_fee for the level, flat fallback.
+            'amount' => app(EgcLevelFeeResolver::class)->resolve($levelNumber),
             'description' => "EGC Level {$levelNumber} Fee",
             'effective_at' => now(),
             'status' => FinanceCharge::STATUS_ACTIVE,

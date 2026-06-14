@@ -8,11 +8,9 @@ use App\Models\CourseOffering;
 use App\Models\CourseRetakeRegistration;
 use App\Models\CurriculumVersion;
 use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
 use App\Models\User;
 use App\Modules\Finance\Actions\CancelDngPaymentRequestAction;
 use App\Modules\Finance\Actions\CreateBatchDngFromChargesAction;
@@ -36,13 +34,13 @@ function makeBatchStudent(string $code, Campus $campus, Semester $semester): Stu
         ->forCampus($campus)
         ->forProgram($program)
         ->state([
-            'student_id'            => $code,
-            'full_name'             => "Student {$code}",
-            'email'                 => strtolower($code) . '@example.com',
+            'student_id' => $code,
+            'full_name' => "Student {$code}",
+            'email' => strtolower($code).'@example.com',
             'curriculum_version_id' => $cv->id,
-            'intake_semester_id'    => $semester->id,
-            'intake'                => 1,
-            'intake_mode'           => 'sequential',
+            'intake_semester_id' => $semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
         ])
         ->create();
 }
@@ -50,13 +48,13 @@ function makeBatchStudent(string $code, Campus $campus, Semester $semester): Stu
 function makeCharge(Student $student, Semester $semester, string $type, float $amount): FinanceCharge
 {
     return FinanceCharge::create([
-        'student_id'   => $student->id,
-        'semester_id'  => $semester->id,
-        'charge_type'  => $type,
-        'amount'       => $amount,
-        'description'  => "Charge {$type}",
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'charge_type' => $type,
+        'amount' => $amount,
+        'description' => "Charge {$type}",
         'effective_at' => now(),
-        'status'       => FinanceCharge::STATUS_ACTIVE,
+        'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
 }
 
@@ -69,25 +67,26 @@ function makeBatchAction(?DngPaymentRequest $fakeCreatedRequest = null, bool $dn
 
     if ($dngFails) {
         $dngPaymentServiceMock->shouldReceive('createAndPush')
-            ->andThrow(new \RuntimeException('DNG API failed'));
+            ->andThrow(new RuntimeException('DNG API failed'));
     } else {
         $dngPaymentServiceMock->shouldReceive('createAndPush')
             ->andReturnUsing(function (Student $student, array $data) use ($fakeCreatedRequest) {
                 if ($fakeCreatedRequest) {
                     return $fakeCreatedRequest;
                 }
+
                 // Create a real DB record mimicking what the service would create
                 return DngPaymentRequest::create([
-                    'student_id'   => $student->id,
-                    'campus_code'  => $data['campus_code'],
+                    'student_id' => $student->id,
+                    'campus_code' => $data['campus_code'],
                     'student_code' => $data['student_code'],
-                    'fee_type'     => $data['fee_type'],
-                    'item_id'      => $data['item_id'],
-                    'amount'       => $data['amount'],
-                    'status'       => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
-                    'description'  => $data['description'] ?? null,
-                    'semester_id'  => $data['semester_id'] ?? null,
-                    'due_date'     => $data['due_date'] ?? null,
+                    'fee_type' => $data['fee_type'],
+                    'item_id' => $data['item_id'],
+                    'amount' => $data['amount'],
+                    'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+                    'description' => $data['description'] ?? null,
+                    'semester_id' => $data['semester_id'] ?? null,
+                    'due_date' => $data['due_date'] ?? null,
                 ]);
             });
     }
@@ -95,7 +94,7 @@ function makeBatchAction(?DngPaymentRequest $fakeCreatedRequest = null, bool $dn
     $campusResolverMock = Mockery::mock(DngCampusCodeResolver::class);
     $campusResolverMock->shouldReceive('requireForStudent')->andReturn('FAUHN');
 
-    $cancelAction      = app(CancelDngPaymentRequestAction::class);
+    $cancelAction = app(CancelDngPaymentRequestAction::class);
     $simpleChargeAction = app(CreateRetakeCourseChargeSimpleAction::class);
 
     $action = new CreateBatchDngFromChargesAction(
@@ -111,12 +110,12 @@ function makeBatchAction(?DngPaymentRequest $fakeCreatedRequest = null, bool $dn
 function batchPayload(array $studentIds, Semester $semester, string $feeType = 'HP'): array
 {
     return [
-        'student_ids'      => $studentIds,
-        'dng_fee_type'     => $feeType,
-        'due_date'         => now()->addDays(30)->toDateString(),
-        'semester_id'      => $semester->id,
-        'description'      => 'Test DNG batch',
-        'estimate_time'    => '05/26',
+        'student_ids' => $studentIds,
+        'dng_fee_type' => $feeType,
+        'due_date' => now()->addDays(30)->toDateString(),
+        'semester_id' => $semester->id,
+        'description' => 'Test DNG batch',
+        'estimate_time' => '05/26',
         'amount_overrides' => null,
     ];
 }
@@ -124,15 +123,15 @@ function batchPayload(array $studentIds, Semester $semester, string $feeType = '
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
 beforeEach(function () {
-    $this->campus   = Campus::factory()->create(['dng_code' => 'FAUHN']);
+    $this->campus = Campus::factory()->create(['dng_code' => 'FAUHN']);
     $this->semester = Semester::factory()->active()->create();
-    $this->user     = User::factory()->create();
+    $this->user = User::factory()->create();
     $this->actingAs($this->user);
 });
 
 it('creates DNG and pivot rows for a single student', function () {
     $student = makeBatchStudent('BATCH001', $this->campus, $this->semester);
-    $charge  = makeCharge($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, 10_000_000);
+    $charge = makeCharge($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, 10_000_000);
 
     [$action] = makeBatchAction();
 
@@ -172,13 +171,13 @@ it('auto-cancels existing active DNG before creating new one', function () {
 
     // Existing pending DNG (no DNG API needed — we can use STATUS_PENDING so cancel is local-only)
     $oldDng = DngPaymentRequest::create([
-        'student_id'   => $student->id,
-        'campus_code'  => 'FAUHN',
+        'student_id' => $student->id,
+        'campus_code' => 'FAUHN',
         'student_code' => 'CANCEL001',
-        'fee_type'     => 'HP',
-        'item_id'      => 'OLD-ITEM',
-        'amount'       => 8_000_000,
-        'status'       => DngPaymentRequest::STATUS_PENDING,
+        'fee_type' => 'HP',
+        'item_id' => 'OLD-ITEM',
+        'amount' => 8_000_000,
+        'status' => DngPaymentRequest::STATUS_PENDING,
     ]);
 
     [$action] = makeBatchAction();
@@ -211,7 +210,7 @@ it('uses amount override when provided', function () {
 
 it('fails gracefully per student without aborting the batch', function () {
     $sGood = makeBatchStudent('GRACE001', $this->campus, $this->semester);
-    $sBad  = makeBatchStudent('GRACE002', $this->campus, $this->semester);
+    $sBad = makeBatchStudent('GRACE002', $this->campus, $this->semester);
 
     makeCharge($sGood, $this->semester, FinanceCharge::TYPE_TUITION_TERM, 5_000_000);
     // sBad has no charges → action will throw "no charges found"
@@ -227,7 +226,7 @@ it('fails gracefully per student without aborting the batch', function () {
 
 it('creates proportional pivot amounts when charge amount is overridden', function () {
     $student = makeBatchStudent('PROP001', $this->campus, $this->semester);
-    makeCharge($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM,  6_000_000);
+    makeCharge($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, 6_000_000);
     makeCharge($student, $this->semester, FinanceCharge::TYPE_EGC_LEVEL_FEE, 4_000_000);
 
     [$action] = makeBatchAction();
@@ -237,11 +236,35 @@ it('creates proportional pivot amounts when charge amount is overridden', functi
 
     $action->handle($payload);
 
-    $dng    = DngPaymentRequest::where('student_id', $student->id)->first();
+    $dng = DngPaymentRequest::where('student_id', $student->id)->first();
     $pivots = DngPaymentRequestCharge::where('dng_payment_request_id', $dng->id)->get();
 
     expect($pivots)->toHaveCount(2);
     expect($pivots->sum('amount'))->toBe(8_000_000.0);
+});
+
+it('keeps pivot sum exactly equal to the request amount despite rounding (FIN-10)', function () {
+    // Three equal balances + an override that does not divide evenly forces a
+    // rounding remainder; the pivot sum must still equal the request amount.
+    $student = makeBatchStudent('ROUND01', $this->campus, $this->semester);
+    makeCharge($student, $this->semester, FinanceCharge::TYPE_RETAKE_FEE, 1_000_000);
+    makeCharge($student, $this->semester, FinanceCharge::TYPE_RETAKE_FEE, 1_000_000);
+    makeCharge($student, $this->semester, FinanceCharge::TYPE_RETAKE_FEE, 1_000_000);
+
+    [$action] = makeBatchAction();
+
+    $payload = batchPayload([$student->id], $this->semester, 'HL');
+    // 10,000,000 / 3 = 3,333,333.33… → rounding must not drift the total.
+    $payload['amount_overrides'] = [$student->id => 10_000_000.0];
+
+    $action->handle($payload);
+
+    $dng = DngPaymentRequest::where('student_id', $student->id)->first();
+    $pivots = DngPaymentRequestCharge::where('dng_payment_request_id', $dng->id)->get();
+
+    expect($pivots)->toHaveCount(3)
+        ->and($pivots->sum('amount'))->toBe(10_000_000.0)
+        ->and((float) $dng->amount)->toBe(10_000_000.0);
 });
 
 it('fails if DNG service throws, and records error', function () {
@@ -263,25 +286,25 @@ it('HL fee_type: auto-creates charge for approved retake registration before DNG
     $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
 
     $academicRecord = AcademicRecord::factory()->create([
-        'student_id'        => $student->id,
-        'campus_id'         => $this->campus->id,
-        'unit_id'           => $offering->unit_id,
+        'student_id' => $student->id,
+        'campus_id' => $this->campus->id,
+        'unit_id' => $offering->unit_id,
         'course_offering_id' => $offering->id,
         'completion_status' => 'failed',
-        'is_passed'         => false,
+        'is_passed' => false,
     ]);
 
     // Approved registration WITHOUT finance_charge_id
     $reg = CourseRetakeRegistration::create([
-        'student_id'                  => $student->id,
-        'unit_id'                     => $offering->unit_id,
-        'course_offering_id'          => $offering->id,
-        'semester_id'                 => $this->semester->id,
-        'campus_id'                   => $this->campus->id,
+        'student_id' => $student->id,
+        'unit_id' => $offering->unit_id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
         'original_academic_record_id' => $academicRecord->id,
-        'status'                      => CourseRetakeRegistration::STATUS_APPROVED,
-        'retake_fee'                  => 2_500_000,
-        'finance_charge_id'           => null,
+        'status' => CourseRetakeRegistration::STATUS_APPROVED,
+        'retake_fee' => 2_500_000,
+        'finance_charge_id' => null,
     ]);
 
     [$action] = makeBatchAction();
@@ -304,24 +327,24 @@ it('HL fee_type: skips registration that already has a charge', function () {
     $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
 
     $academicRecord = AcademicRecord::factory()->create([
-        'student_id'         => $student->id,
-        'campus_id'          => $this->campus->id,
-        'unit_id'            => $offering->unit_id,
+        'student_id' => $student->id,
+        'campus_id' => $this->campus->id,
+        'unit_id' => $offering->unit_id,
         'course_offering_id' => $offering->id,
-        'completion_status'  => 'failed',
-        'is_passed'          => false,
+        'completion_status' => 'failed',
+        'is_passed' => false,
     ]);
 
     CourseRetakeRegistration::create([
-        'student_id'                  => $student->id,
-        'unit_id'                     => $offering->unit_id,
-        'course_offering_id'          => $offering->id,
-        'semester_id'                 => $this->semester->id,
-        'campus_id'                   => $this->campus->id,
+        'student_id' => $student->id,
+        'unit_id' => $offering->unit_id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
         'original_academic_record_id' => $academicRecord->id,
-        'status'                      => CourseRetakeRegistration::STATUS_PAYMENT_PENDING,
-        'retake_fee'                  => 2_500_000,
-        'finance_charge_id'           => $charge->id, // already linked
+        'status' => CourseRetakeRegistration::STATUS_PAYMENT_PENDING,
+        'retake_fee' => 2_500_000,
+        'finance_charge_id' => $charge->id, // already linked
     ]);
 
     [$action] = makeBatchAction();

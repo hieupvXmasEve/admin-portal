@@ -10,6 +10,11 @@ pivots produce consistent money results across preview and execution.
 In scope:
 
 - `FIN-04`, `FIN-05`, `FIN-06`, `FIN-07`, `FIN-08`, `FIN-09`, `FIN-10`, `FIN-12`.
+- `FIN-10b` (model correctness): DNG pivot rows allocate the **installment being
+  collected**, not a `charge.balance` slice. Adds nullable
+  `finance_charge_installment_id` to `dng_payment_request_charges` and invariants
+  INV-14/INV-15. (Webhook lock/idempotency race stays in `FIN-REV-005`; this is a
+  model/amount-truth fix that belongs here.)
 - `DB-12`.
 - `UI-SAFE-3` where EGC preview/execute scope and page-local block overrides
   can mislead staff.

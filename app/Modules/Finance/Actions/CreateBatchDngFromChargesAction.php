@@ -6,6 +6,7 @@ namespace App\Modules\Finance\Actions;
 
 use App\Models\CourseRetakeRegistration;
 use App\Models\FinanceCharge;
+use App\Models\FinanceChargeInstallment;
 use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
@@ -139,9 +140,9 @@ class CreateBatchDngFromChargesAction
             // Installment-aware total: for each charge, take its next PENDING installment.
             // For charges without installments (legacy / never backfilled), fall back to balance.
             // Admin's amountOverride bypasses installment-awareness entirely (explicit override).
-            $nextInstallmentByCharge = \App\Models\FinanceChargeInstallment::query()
+            $nextInstallmentByCharge = FinanceChargeInstallment::query()
                 ->whereIn('finance_charge_id', $charges->pluck('id'))
-                ->where('status', \App\Models\FinanceChargeInstallment::STATUS_PENDING)
+                ->where('status', FinanceChargeInstallment::STATUS_PENDING)
                 ->orderBy('finance_charge_id')
                 ->orderBy('installment_no')
                 ->get()
@@ -169,22 +170,29 @@ class CreateBatchDngFromChargesAction
                 }
             }
 
-            if ($amountOverride !== null && $amountOverride > 0) {
+            // Decimal-safe equality check (1 VND tolerance for float rounding).
+            $adHocOverride = $amountOverride !== null
+                && $amountOverride > 0
+                && abs($amountOverride - $installmentAwareTotal) >= 1.0;
+
+            if ($adHocOverride) {
+                // Admin pushed a genuinely-different amount → skip installment
+                // linkage so the settle webhook won't mark installments paid by
+                // mistake; pivots fall back to balance-proportional (admin owns
+                // reconciliation).
+                Log::warning('CreateBatchDngFromChargesAction: amount override differs from installment plan; skipping installment linkage', [
+                    'student_id' => $studentId,
+                    'override' => $amountOverride,
+                    'auto_sum' => $installmentAwareTotal,
+                ]);
+
                 $totalAmount = $amountOverride;
-
-                // Decimal-safe equality check (1 VND tolerance for float rounding).
-                if (abs($amountOverride - $installmentAwareTotal) >= 1.0) {
-                    // Admin pushed a genuinely-different amount → skip installment
-                    // linkage so settle webhook won't mark installments paid by mistake.
-                    Log::warning('CreateBatchDngFromChargesAction: amount override differs from installment plan; skipping installment linkage', [
-                        'student_id' => $studentId,
-                        'override' => $amountOverride,
-                        'auto_sum' => $installmentAwareTotal,
-                    ]);
-
-                    $installmentIds = [];
-                }
+                $installmentIds = [];
             } else {
+                // Truth mode: the request amount IS the exact sum of the per-charge
+                // amounts we will collect (next installment, or balance for un-split
+                // charges). Using the computed sum — not a near-equal override —
+                // keeps pivot reconciliation exact (FIN-10b).
                 $totalAmount = $installmentAwareTotal;
             }
 
@@ -241,8 +249,15 @@ class CreateBatchDngFromChargesAction
             // Push DNG via DngPaymentService (creates record + calls DNG API)
             $dngRequest = $this->dngPaymentService->createAndPush($student, $chargeData);
 
-            // Create pivot rows: 1 per charge, amount proportional if override applied
-            $this->createChargePivots($dngRequest->id, $charges, $totalAmount);
+            // Create pivot rows. In truth mode each pivot mirrors the installment
+            // being collected; ad-hoc override falls back to balance-proportional.
+            $this->createChargePivots(
+                $dngRequest->id,
+                $charges,
+                $totalAmount,
+                $nextInstallmentByCharge,
+                linkInstallments: ! $adHocOverride,
+            );
 
             return ['cancelled_old' => $cancelledOld];
         });
@@ -328,31 +343,96 @@ class CreateBatchDngFromChargesAction
      *
      * @param  Collection<int, object{id: int, amount: float, balance: float}>  $charges
      */
-    private function createChargePivots(int $dngRequestId, Collection $charges, float $totalAmount): void
-    {
-        $totalBalance = (float) $charges->sum('balance');
+    /**
+     * Create dng_payment_request_charges allocation rows for one DNG request.
+     *
+     * Truth mode (linkInstallments): each pivot reflects the installment being
+     * collected for that charge (or the charge balance for un-split charges), and
+     * carries finance_charge_installment_id. The per-charge amounts already sum to
+     * $totalAmount, so the pivot total reconciles to the request exactly and to the
+     * linked installment amounts (FIN-10b). A pivot is NOT a balance-proportional
+     * slice of the student's debt.
+     *
+     * Ad-hoc override mode: no installment plan to honour — distribute $totalAmount
+     * proportionally to balance in integer cents with the remainder on the last
+     * pivot so Σ pivot == request amount exactly (FIN-10), and leave the installment
+     * link null.
+     *
+     * @param  Collection<int, object{id: int, amount: float, balance: float}>  $charges
+     * @param  Collection<int|string, FinanceChargeInstallment>  $nextInstallmentByCharge
+     */
+    private function createChargePivots(
+        int $dngRequestId,
+        Collection $charges,
+        float $totalAmount,
+        Collection $nextInstallmentByCharge,
+        bool $linkInstallments,
+    ): void {
+        if ($linkInstallments) {
+            foreach ($charges as $charge) {
+                $nextInst = $nextInstallmentByCharge[$charge->id] ?? null;
+                $amount = $nextInst !== null ? (float) $nextInst->amount : (float) $charge->balance;
 
-        foreach ($charges as $charge) {
-            $chargeBalance = (float) $charge->balance;
+                DngPaymentRequestCharge::create([
+                    'dng_payment_request_id' => $dngRequestId,
+                    'finance_charge_id' => $charge->id,
+                    'finance_charge_installment_id' => $nextInst?->id,
+                    'amount' => number_format($this->toCents($amount) / 100, 2, '.', ''),
+                ]);
+            }
 
-            // Proportional distribution when override was applied
-            $pivotAmount = $totalBalance > 0
-                ? round($totalAmount * ($chargeBalance / $totalBalance), 2)
-                : $chargeBalance;
+            return;
+        }
+
+        $chargesList = $charges->values();
+        $count = $chargesList->count();
+
+        $totalCents = $this->toCents($totalAmount);
+        $totalBalanceCents = $chargesList
+            ->sum(fn ($charge) => $this->toCents((float) $charge->balance));
+
+        $allocatedCents = 0;
+
+        foreach ($chargesList as $index => $charge) {
+            $isLast = $index === $count - 1;
+            $chargeBalanceCents = $this->toCents((float) $charge->balance);
+
+            if ($isLast) {
+                $pivotCents = $totalCents - $allocatedCents;
+            } elseif ($totalBalanceCents > 0) {
+                $pivotCents = (int) floor($totalCents * ($chargeBalanceCents / $totalBalanceCents));
+            } else {
+                $pivotCents = $chargeBalanceCents;
+            }
+
+            $allocatedCents += $pivotCents;
 
             DngPaymentRequestCharge::create([
                 'dng_payment_request_id' => $dngRequestId,
                 'finance_charge_id' => $charge->id,
-                'amount' => $pivotAmount,
+                'finance_charge_installment_id' => null,
+                'amount' => number_format($pivotCents / 100, 2, '.', ''),
             ]);
         }
     }
 
+    private function toCents(float $amount): int
+    {
+        return (int) round($amount * 100);
+    }
+
     /**
-     * Build a deterministic item_id for DNG (student_code + fee_type suffix).
+     * Build a unique item_id for DNG (student_code + fee_type + timestamp).
+     *
+     * FIN-33: a bare YmdHis suffix collided when two pushes for the same student
+     * + fee_type happened within the same second, which breaks webhook resolution
+     * (item_id is a reconciliation key). Append a random suffix so same-second
+     * pushes stay distinct. Stays well within the varchar(100) column.
      */
     private function buildItemId(string $studentCode, string $feeType): string
     {
-        return $studentCode.'_'.strtolower($feeType).'_'.now()->format('YmdHis');
+        $random = str_pad((string) random_int(0, 999_999), 6, '0', STR_PAD_LEFT);
+
+        return $studentCode.'_'.strtolower($feeType).'_'.now()->format('YmdHis').$random;
     }
 }

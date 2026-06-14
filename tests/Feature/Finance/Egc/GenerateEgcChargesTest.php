@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Models\AcademicRecord;
 use App\Models\CurriculumVersion;
 use App\Models\EgcBlock;
 use App\Models\FinanceCharge;
 use App\Models\InvoiceDiscount;
-use App\Models\AcademicRecord;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentInvoice;
@@ -430,4 +430,65 @@ it('ignores student codes from newline separated filter input', function () {
 
     expect($preview['summary']['eligible_count'])->toBe(1);
     expect($preview['eligible_students']->items()[0]['student_code'])->toBe('SEKEEP1');
+});
+
+it('reports full-scope projected totals across all eligible students, not just the current page (UI-SAFE-3)', function () {
+    $semester = Semester::factory()->create();
+
+    // Two eligible students; each charges 2 levels (current_level 1, total 6).
+    makeEgcChargeStudent([
+        'status' => 'intake_pre_uni_gc',
+        'gc_current_level' => 1,
+        'gc_total_levels' => 6,
+        'student_id' => 'SEPROJ001',
+        'email' => 'proj1@example.com',
+    ]);
+    makeEgcChargeStudent([
+        'status' => 'intake_pre_uni_gc',
+        'gc_current_level' => 1,
+        'gc_total_levels' => 6,
+        'student_id' => 'SEPROJ002',
+        'email' => 'proj2@example.com',
+    ]);
+
+    // Page size 1 → current page shows a single student, but the projection must
+    // reflect BOTH eligible students (what execute will actually generate).
+    $preview = app(PreviewEgcChargeGenerationQuery::class)
+        ->handle($semester->id, ['per_page' => 20, 'page' => 1]);
+
+    expect($preview['summary']['eligible_count'])->toBe(2)
+        ->and($preview['summary']['projected_block_count'])->toBe(4) // 2 students × 2 blocks
+        // 4 blocks × 15,000,000 fallback fee
+        ->and((float) $preview['summary']['projected_total_amount'])->toBe(60_000_000.0);
+});
+
+it('uses Unit.base_fee for the preview chargeable-level amount (FIN-06)', function () {
+    $semester = Semester::factory()->create();
+
+    Unit::create([
+        'code' => 'EGC-PVL1',
+        'name' => 'EGC Preview Level 1',
+        'credit_points' => 0,
+        'retake_fee' => 0,
+        'unit_type' => 'egc',
+        'level' => 1,
+        'base_fee' => 10_000_000,
+    ]);
+
+    makeEgcChargeStudent([
+        'status' => 'intake_pre_uni_gc',
+        'gc_current_level' => 1,
+        'gc_total_levels' => 6,
+        'student_id' => 'SEFEE001',
+        'email' => 'fee1@example.com',
+    ]);
+
+    $preview = app(PreviewEgcChargeGenerationQuery::class)
+        ->handle($semester->id, ['per_page' => 20, 'page' => 1]);
+
+    $levels = $preview['eligible_students']->items()[0]['chargeable_levels'];
+
+    // Level 1 comes from the seeded unit base_fee; level 2 falls back to the flat fee.
+    expect($levels[0]['amount'])->toBe(10_000_000)
+        ->and($levels[1]['amount'])->toBe(15_000_000);
 });

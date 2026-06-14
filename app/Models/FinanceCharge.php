@@ -30,7 +30,10 @@ class FinanceCharge extends Model
     ];
 
     protected $casts = [
-        'amount' => 'decimal:0',
+        // FIN-08: align with the DB column decimal(15,2). decimal:0 truncated the
+        // fractional part on read, which systematically skewed percentage-based
+        // scholarship math (amount * pct / 100) by up to a unit.
+        'amount' => 'decimal:2',
         'effective_at' => 'datetime',
         'voided_at' => 'datetime',
     ];

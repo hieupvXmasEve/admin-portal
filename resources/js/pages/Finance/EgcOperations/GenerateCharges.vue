@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { useInertiaFilters } from '@/composables/useInertiaFilters';
+import { useDataTable } from '@/composables/useDataTable';
 import { Head, useForm } from '@inertiajs/vue3';
 import { AlertCircle, AlertTriangle, Play, RefreshCw, Search } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -75,6 +75,10 @@ interface PreviewData {
         ineligible_count: number;
         warning_count: number;
         total_count: number;
+        // UI-SAFE-3: full-scope projection across ALL eligible students, not just
+        // the current page. Students not adjusted on a page use max_chargeable_blocks.
+        projected_block_count: number;
+        projected_total_amount: number;
     };
 }
 
@@ -90,7 +94,15 @@ const props = defineProps<{
     filters: { semester_id: string | null; search: string; ignore_student_ids: string; per_page: number; page: number };
 }>();
 
-const { filters, handleSearch, handlePaginationNavigate, handlePageSizeChange } = useInertiaFilters({
+interface EgcChargeFilters {
+    semester_id: string;
+    search: string;
+    ignore_student_ids: string;
+    per_page: number;
+    page: number;
+}
+
+const { filters, setFilter, handleSearch, handlePaginationNavigate, handlePageSizeChange } = useDataTable<EgcChargeFilters>({
     baseUrl: route('finance.egc.charges.index'),
     initialFilters: {
         semester_id: props.filters.semester_id ?? String(props.currentSemester?.id ?? ''),
@@ -106,33 +118,94 @@ const { filters, handleSearch, handlePaginationNavigate, handlePageSizeChange } 
         page: 1,
     },
     only: ['preview', 'filters', 'currentSemester'],
+    // Semester is a select → navigate immediately; search/ignore-list stay debounced.
+    immediateFields: ['semester_id'],
 });
 
-const blockCounts = ref<Record<number, number>>({});
+// UI-SAFE-3: a block-count override is entered per student per page, but the
+// server executes over ALL eligible students. We persist every override the user
+// makes (this component instance survives pagination via preserveState), keep the
+// per-student fee context needed to keep the confirm banner honest, and send the
+// full override set on submit so what executes equals what was confirmed.
+interface BlockOverride {
+    block_count: number;
+    current_level: number;
+    max_chargeable_blocks: number;
+    chargeable_levels: ChargeableLevel[];
+}
+
+const overrides = ref<Record<number, BlockOverride>>({});
 
 const eligibleStudents = computed(() => props.preview.eligible_students.data ?? []);
 
 function getBlockCount(student: EligibleStudent): number {
-    return blockCounts.value[student.student_id] ?? student.max_chargeable_blocks;
+    return overrides.value[student.student_id]?.block_count ?? student.max_chargeable_blocks;
 }
 
-function setBlockCount(studentId: number, count: number) {
-    blockCounts.value[studentId] = count;
+function setBlockCount(student: EligibleStudent, count: number) {
+    overrides.value[student.student_id] = {
+        block_count: count,
+        current_level: student.current_level,
+        max_chargeable_blocks: student.max_chargeable_blocks,
+        chargeable_levels: student.chargeable_levels,
+    };
+}
+
+function levelsTotal(levels: ChargeableLevel[], blocks: number): number {
+    return levels.slice(0, blocks).reduce((sum, level) => sum + level.amount, 0);
+}
+
+// FIN-06: per-level fee now comes from Unit.base_fee (resolved server-side into
+// chargeable_levels[].amount), so the row total must sum those resolved amounts
+// for the selected block count — never a hardcoded flat fee.
+function rowTotal(student: EligibleStudent): number {
+    return levelsTotal(student.chargeable_levels, getBlockCount(student));
+}
+
+// The server projection assumes max blocks for everyone. Adjust it by the delta
+// of each override the user has set (on any page) so the banner reflects the
+// scope that will actually execute, not a stale default.
+const confirmedBlockCount = computed(() =>
+    Object.values(overrides.value).reduce(
+        (total, o) => total + (o.block_count - o.max_chargeable_blocks),
+        props.preview.summary.projected_block_count,
+    ),
+);
+
+const confirmedTotalAmount = computed(() =>
+    Object.values(overrides.value).reduce(
+        (total, o) =>
+            total +
+            (levelsTotal(o.chargeable_levels, o.block_count) -
+                levelsTotal(o.chargeable_levels, o.max_chargeable_blocks)),
+        props.preview.summary.projected_total_amount,
+    ),
+);
+
+// useDataTable does not watch `filters`, so each change routes through setFilter/
+// handleSearch — both reset page to 1 and trigger the (debounced) navigation.
+//
+// UI-SAFE-3: a scope change (semester/search/ignore-list) recomputes eligibility
+// server-side, so block overrides from the previous scope are stale — they would
+// skew the confirm banner and be submitted against a different eligible set.
+// Clear them on scope change. (Pagination/page-size keep overrides — same scope.)
+function clearOverrides() {
+    overrides.value = {};
 }
 
 function handleSemesterChange(value: string) {
-    filters.semester_id = value;
-    filters.page = 1;
+    clearOverrides();
+    setFilter('semester_id', value);
 }
 
 function handleSearchChange(value: string | number) {
+    clearOverrides();
     handleSearch(value);
-    filters.page = 1;
 }
 
 function handleIgnoreStudentIdsChange(value: string | number) {
-    filters.ignore_student_ids = String(value);
-    filters.page = 1;
+    clearOverrides();
+    setFilter('ignore_student_ids', String(value));
 }
 
 const dueDate = ref('');
@@ -150,10 +223,14 @@ function confirmGeneration() {
     form.due_date = dueDate.value;
     form.search = filters.search;
     form.ignore_student_ids = filters.ignore_student_ids;
-    form.students = eligibleStudents.value.map((student) => ({
-        student_id: student.student_id,
-        block_count: getBlockCount(student),
-        current_level: student.current_level,
+    // Send EVERY override the user set across all pages (not just the current
+    // page) so cross-page adjustments are not silently dropped to the default
+    // max. Untouched students are intentionally omitted — the server defaults
+    // them to max_chargeable_blocks.
+    form.students = Object.entries(overrides.value).map(([studentId, override]) => ({
+        student_id: Number(studentId),
+        block_count: override.block_count,
+        current_level: override.current_level,
     }));
 
     form.post(route('finance.egc.charges.store'));
@@ -330,7 +407,7 @@ function rowNumber(index: number): number {
                                 <TableCell>
                                     <Select
                                         :model-value="String(getBlockCount(student))"
-                                        @update:model-value="(value) => setBlockCount(student.student_id, Number(value))"
+                                        @update:model-value="(value) => setBlockCount(student, Number(value))"
                                     >
                                         <SelectTrigger class="w-20">
                                             <SelectValue />
@@ -355,7 +432,7 @@ function rowNumber(index: number): number {
                                     </div>
                                 </TableCell>
                                 <TableCell class="text-right font-mono text-sm">
-                                    {{ formatCurrency(15_000_000 * getBlockCount(student)) }}
+                                    {{ formatCurrency(rowTotal(student)) }}
                                 </TableCell>
                             </TableRow>
                             <TableRow v-if="eligibleStudents.length === 0">
@@ -421,17 +498,32 @@ function rowNumber(index: number): number {
                 Không có EGC students theo điều kiện hiện tại.
             </div>
 
-            <div v-if="preview.summary.eligible_count > 0" class="flex items-end justify-end gap-4">
-                <div class="space-y-1.5">
-                    <Label class="text-sm font-medium">Hạn thanh toán <span class="text-red-500">*</span></Label>
-                    <DatePicker v-model="dueDate" placeholder="Chọn hạn thanh toán" class="w-52" />
-                    <p v-if="form.errors.due_date" class="text-destructive text-xs">{{ form.errors.due_date }}</p>
+            <div v-if="preview.summary.eligible_count > 0" class="space-y-3">
+                <!-- UI-SAFE-3: execute runs over ALL eligible students, not just this page.
+                     Totals reflect every block-count override entered across pages. -->
+                <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <p class="font-medium">
+                        Sẽ tạo charge cho toàn bộ {{ preview.summary.eligible_count }} student đủ điều kiện
+                        (≈ {{ confirmedBlockCount }} block · {{ formatCurrency(confirmedTotalAmount) }}).
+                    </p>
+                    <p class="mt-1 text-xs text-amber-800">
+                        Việc tạo charge áp dụng cho tất cả student theo bộ lọc hiện tại — không chỉ trang này.
+                        Số block bạn đã điều chỉnh (ở bất kỳ trang nào) đều được áp dụng; student chưa điều chỉnh
+                        dùng số block tối đa mặc định.
+                    </p>
                 </div>
-                <Button :disabled="form.processing || !dueDate" @click="confirmGeneration">
-                    <Play v-if="!form.processing" class="mr-2 h-4 w-4" />
-                    <RefreshCw v-else class="mr-2 h-4 w-4 animate-spin" />
-                    {{ form.processing ? 'Đang tạo...' : `Xác nhận tạo charge (${preview.summary.eligible_count} students)` }}
-                </Button>
+                <div class="flex items-end justify-end gap-4">
+                    <div class="space-y-1.5">
+                        <Label class="text-sm font-medium">Hạn thanh toán <span class="text-red-500">*</span></Label>
+                        <DatePicker v-model="dueDate" placeholder="Chọn hạn thanh toán" class="w-52" />
+                        <p v-if="form.errors.due_date" class="text-destructive text-xs">{{ form.errors.due_date }}</p>
+                    </div>
+                    <Button :disabled="form.processing || !dueDate" @click="confirmGeneration">
+                        <Play v-if="!form.processing" class="mr-2 h-4 w-4" />
+                        <RefreshCw v-else class="mr-2 h-4 w-4 animate-spin" />
+                        {{ form.processing ? 'Đang tạo...' : `Xác nhận tạo charge (${preview.summary.eligible_count} students)` }}
+                    </Button>
+                </div>
             </div>
         </template>
     </div>

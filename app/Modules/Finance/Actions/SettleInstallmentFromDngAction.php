@@ -41,14 +41,20 @@ class SettleInstallmentFromDngAction
      */
     public function handle(DngPaymentRequest $request): Collection
     {
+        // FIN-12: only settle installments that are still collectible. A cancelled
+        // installment (e.g. its charge was voided) must never be resurrected to
+        // paid by a late webhook for the same DNG request.
         $installments = FinanceChargeInstallment::query()
             ->where('dng_payment_request_id', $request->id)
-            ->where('status', '!=', FinanceChargeInstallment::STATUS_PAID)
+            ->whereIn('status', [
+                FinanceChargeInstallment::STATUS_PENDING,
+                FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
+            ])
             ->get();
 
         if ($installments->isEmpty()) {
             // Legacy DNG (no installment link) OR all already settled — no-op.
-            return new Collection();
+            return new Collection;
         }
 
         $paidAt = $request->paid_at ?? now();

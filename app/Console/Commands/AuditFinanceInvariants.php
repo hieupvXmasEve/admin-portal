@@ -274,6 +274,64 @@ class AuditFinanceInvariants extends Command
                     WHERE dpr.payment_id IS NOT NULL
                       AND ABS(dpr.amount - p.amount) > 0.01 LIMIT 5',
             ],
+            [
+                // FIN-12: a voided charge must not keep collectible installments.
+                // A live (pending / awaiting_payment) installment on a voided
+                // charge means a next-installment DNG could still be pushed for a
+                // dead charge. Backfill via finance:backfill-voided-charge-installments.
+                'code' => 'INV-13',
+                'severity' => 'HIGH',
+                'label' => 'Live installment (pending/awaiting_payment) on a voided charge',
+                'count_sql' => 'SELECT COUNT(*) c FROM (
+                    SELECT fc.id FROM finance_charges fc
+                    JOIN finance_charge_installments fci ON fci.finance_charge_id = fc.id
+                    WHERE fc.status = "void"
+                      AND fci.status IN ("pending", "awaiting_payment")
+                    GROUP BY fc.id
+                ) t',
+                'sample_sql' => 'SELECT fc.id FROM finance_charges fc
+                    JOIN finance_charge_installments fci ON fci.finance_charge_id = fc.id
+                    WHERE fc.status = "void"
+                      AND fci.status IN ("pending", "awaiting_payment")
+                    GROUP BY fc.id LIMIT 5',
+            ],
+            [
+                // FIN-10b: a DNG pivot is an allocation line of ONE request. The
+                // request amount must equal the sum of its pivot rows, or webhook
+                // allocation (which uses per-pivot amounts) desyncs from the
+                // payment total. Historical rows from the old balance-proportional
+                // round() may surface here until reconciled.
+                'code' => 'INV-14',
+                'severity' => 'HIGH',
+                'label' => 'DNG request amount diverges from sum of its pivot rows',
+                'count_sql' => 'SELECT COUNT(*) c FROM (
+                    SELECT dpr.id FROM dng_payment_requests dpr
+                    JOIN dng_payment_request_charges dprc ON dprc.dng_payment_request_id = dpr.id
+                    GROUP BY dpr.id, dpr.amount
+                    HAVING ABS(dpr.amount - SUM(dprc.amount)) > 0.01
+                ) t',
+                'sample_sql' => 'SELECT dpr.id FROM dng_payment_requests dpr
+                    JOIN dng_payment_request_charges dprc ON dprc.dng_payment_request_id = dpr.id
+                    GROUP BY dpr.id, dpr.amount
+                    HAVING ABS(dpr.amount - SUM(dprc.amount)) > 0.01 LIMIT 5',
+            ],
+            [
+                // FIN-10b: when a pivot is linked to an installment, its amount must
+                // equal that installment amount — the DNG collects the installment,
+                // not a balance-proportional slice. This keeps allocation truth ==
+                // installment truth.
+                'code' => 'INV-15',
+                'severity' => 'HIGH',
+                'label' => 'DNG pivot amount diverges from its linked installment amount',
+                'count_sql' => 'SELECT COUNT(*) c FROM dng_payment_request_charges dprc
+                    JOIN finance_charge_installments fci ON fci.id = dprc.finance_charge_installment_id
+                    WHERE dprc.finance_charge_installment_id IS NOT NULL
+                      AND ABS(dprc.amount - fci.amount) > 0.01',
+                'sample_sql' => 'SELECT dprc.id FROM dng_payment_request_charges dprc
+                    JOIN finance_charge_installments fci ON fci.id = dprc.finance_charge_installment_id
+                    WHERE dprc.finance_charge_installment_id IS NOT NULL
+                      AND ABS(dprc.amount - fci.amount) > 0.01 LIMIT 5',
+            ],
         ];
     }
 }
