@@ -350,7 +350,7 @@ export const mainNavGroups: NavGroup[] = [
                         requiredPermissions: ['allocate_finance_payment'],
                     },
                     {
-                        title: 'Due Calendar',
+                        title: 'DNG Due Reminders',
                         href: '/finance/operations/due-calendar',
                         icon: CalendarIcon,
                         requiredPermissions: ['view_finance_operations_due_calendar'],
@@ -400,7 +400,7 @@ export const mainNavGroups: NavGroup[] = [
                         requiredPermissions: ['view_egc_retake_adjustments'],
                     },
                     {
-                        title: 'Due Calendar',
+                        title: 'DNG Due Reminders',
                         href: '/finance/operations/due-calendar',
                         icon: CalendarIcon,
                         requiredPermissions: ['view_finance_operations_due_calendar'],

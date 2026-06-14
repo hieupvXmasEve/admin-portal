@@ -24,6 +24,7 @@ interface ExceptionItem {
     severity: 'high' | 'medium' | 'low';
     context: Record<string, any>;
     created_at: string;
+    fixable: boolean;
 }
 
 interface ExceptionCounts {
@@ -133,6 +134,11 @@ const getSeverityBadgeClass = (severity: string) => {
 const fixingId = ref<number | null>(null);
 
 const runFixException = async (exception: ExceptionItem) => {
+    if (!exception.fixable) {
+        toast.error('Exception này cần xử lý thủ công');
+        return;
+    }
+
     fixingId.value = exception.id;
 
     try {
@@ -142,19 +148,20 @@ const runFixException = async (exception: ExceptionItem) => {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
             },
+            body: JSON.stringify({
+                semester_id: semesterId.value !== 'all' ? Number(semesterId.value) : undefined,
+            }),
         });
 
-        if (response.ok) {
-            const data = await response.json();
-            if (data.success) {
-                toast.success('Đã sửa lỗi thành công!');
-                router.reload({ only: ['exceptions', 'counts'] });
-            } else {
-                toast.error(data.message || 'Không thể sửa lỗi');
-            }
-        } else {
-            toast.error('Lỗi kết nối server');
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            toast.success(data.data?.message ?? 'Đã sửa lỗi thành công');
+            router.reload({ only: ['exceptions', 'counts'] });
+            return;
         }
+
+        toast.error(data.message || 'Không thể sửa lỗi');
     } catch {
         toast.error('Lỗi khi sửa exception');
     } finally {
@@ -358,7 +365,13 @@ defineOptions({
                             </TableCell>
                             <TableCell class="text-right">
                                 <div class="flex justify-end gap-2">
-                                    <Button variant="outline" size="sm" :disabled="fixingId === exception.id" @click="fixException(exception)">
+                                    <Button
+                                        v-if="exception.fixable"
+                                        variant="outline"
+                                        size="sm"
+                                        :disabled="fixingId === exception.id"
+                                        @click="fixException(exception)"
+                                    >
                                         <Wrench class="mr-1 h-4 w-4" />
                                         {{ fixingId === exception.id ? 'Đang xử lý...' : 'Fix now' }}
                                     </Button>

@@ -481,12 +481,21 @@ class SettlementService
             })
             ->get();
 
+        $priorityRank = [];
+        foreach (array_values($priorityOrder) as $index => $chargeType) {
+            $priorityRank[$chargeType] = $index;
+        }
+        $fallbackRank = count($priorityRank);
+
         return $lines
             ->filter(fn (InvoiceLine $line) => $this->getLineOutstandingAmount($line) > 0)
-            ->sortBy(function (InvoiceLine $line) {
+            ->sortBy(function (InvoiceLine $line) use ($priorityRank, $fallbackRank) {
                 $invoice = $line->invoice;
+                $chargeType = $line->charge?->charge_type ?? '';
+                $priority = $priorityRank[$chargeType] ?? $fallbackRank;
 
                 return [
+                    $priority,
                     optional($invoice?->due_date)?->getTimestamp() ?? PHP_INT_MAX,
                     optional($invoice?->created_at)?->getTimestamp() ?? 0,
                     $invoice?->id ?? 0,

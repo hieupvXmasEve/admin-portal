@@ -235,7 +235,7 @@ defineOptions({
             </div>
             <div class="flex items-center gap-3">
                 <Link :href="route('finance.operations.due-calendar')">
-                    <Button variant="outline">Due Calendar</Button>
+                    <Button variant="outline">DNG Due Reminders</Button>
                 </Link>
                 <Select :model-value="tableFilters.semester_id ? String(tableFilters.semester_id) : 'all'" @update:model-value="(value) => setFilter('semester_id', value === 'all' ? null : Number(value))">
                     <SelectTrigger class="w-[220px]">
@@ -347,7 +347,7 @@ defineOptions({
                     Hàng đợi ngoại lệ lifecycle
                     <Badge variant="outline" class="ml-2">{{ exceptions.total || 0 }}</Badge>
                 </CardTitle>
-                <CardDescription> Các mục này bị loại khỏi Due Calendar và không nhận nhắc nợ tự động. </CardDescription>
+                <CardDescription> Các mục này bị loại khỏi DNG Due Reminders và không nhận nhắc nợ tự động. </CardDescription>
             </CardHeader>
             <CardContent class="p-0">
                 <Table>

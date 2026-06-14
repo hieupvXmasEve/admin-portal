@@ -181,11 +181,18 @@ class BillingOperationsController extends Controller
         return ApiResponse::success($result);
     }
 
-    public function fixException(Request $request, int $exceptionId)
+    public function fixException(Request $request, int $exceptionId): JsonResponse
     {
-        $result = FixBillingExceptionAction::run(['exception_id' => $exceptionId]);
+        try {
+            $result = FixBillingExceptionAction::run([
+                'exception_id' => $exceptionId,
+                'semester_id' => $request->integer('semester_id'),
+            ]);
 
-        return ApiResponse::success($result);
+            return ApiResponse::success($result);
+        } catch (\Throwable $e) {
+            return ApiResponse::error($e->getMessage(), [], 422);
+        }
     }
 
     public function sendReminders(Request $request)

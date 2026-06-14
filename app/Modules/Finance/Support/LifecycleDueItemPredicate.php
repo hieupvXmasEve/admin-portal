@@ -22,11 +22,15 @@ final class LifecycleDueItemPredicate
     /**
      * @param  Builder<DngPaymentRequest>  $query
      */
-    public static function applyActiveCollectionScope(Builder $query): void
+    public static function applyActiveCollectionScope(Builder $query, ?int $campusId = null): void
     {
-        $query->whereHas('student', function (Builder $studentQuery): void {
-            $studentQuery->whereIn('status', Student::FINANCIAL_STATUSES);
-        });
+        if (! self::hasStudentsJoin($query)) {
+            $query->join('students', 'students.id', '=', 'dng_payment_requests.student_id');
+        }
+
+        $query->whereIn('students.status', Student::FINANCIAL_STATUSES)
+            ->when($campusId, fn (Builder $campusQuery) => $campusQuery->where('students.campus_id', $campusId))
+            ->select('dng_payment_requests.*');
     }
 
     /**
@@ -48,5 +52,21 @@ final class LifecycleDueItemPredicate
     {
         return $request->status === DngPaymentRequest::STATUS_PUSHED_TO_DNG
             && $request->due_date !== null;
+    }
+
+    /**
+     * @param  Builder<DngPaymentRequest>  $query
+     */
+    private static function hasStudentsJoin(Builder $query): bool
+    {
+        $joins = $query->getQuery()->joins ?? [];
+
+        foreach ($joins as $join) {
+            if ($join->table === 'students') {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

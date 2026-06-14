@@ -39,4 +39,23 @@ git diff --check
 
 ## Acceptance Evidence
 
-Add targeted test output and query/performance notes after implementation.
+### Implementation evidence (2026-06-15)
+
+- `BillingExceptionsQueryTest`: 6 passed — list rows, retake fix, retake fix idempotency, wrong-semester refusal, per-registration retake detection, defer refusal
+- `DueItemsSummaryParityTest`: 1 passed — upcoming summary excludes due-today (FIN-26)
+- `ListDueItemsQueryPaginationTest`: 1 passed — 25 rows paginated with &lt; 6 queries (FIN-27)
+- `SettlementServicePriorityOrderTest`: 1 passed — `retake_fee` sorts before `tuition_term` (FIN-22)
+- `GetDueInvoicesSummaryQueryTest`: 1 passed — overdue amount via eager-loaded snapshots (FIN-29)
+- `LifecycleDueItemPredicateJoinTest`: 1 passed — active scope uses JOIN not EXISTS (DB-23)
+- `DueCalendarLifecycleFilterTest`: 2 passed — lifecycle filter still works after JOIN rewrite
+- `RetakeUnpaidCountTest`: 1 passed — paid invoice with stale cache not counted unpaid (FIN-28)
+- `finance:audit-invariants --sample`: all 15 invariants 0 offending rows
+- Pint: `./scripts/dev.sh artisan pint` not registered in this container; skipped
+- ESLint: repo-wide baseline drift (5158 pre-existing); touched Finance Operations files not flagged in targeted review
+- `AutoAllocatePaymentsTest`: pre-existing 419 CSRF failures on web POST route; priority ordering covered by unit test instead
+
+### Code review follow-up evidence (2026-06-15)
+
+- `./scripts/dev.sh test --filter='BillingExceptionsQueryTest|DueItemsSummaryParityTest|ListDueItemsQueryPaginationTest|GetDueInvoicesSummaryQueryTest|LifecycleDueItemPredicateJoinTest|RetakeUnpaidCountTest|SettlementServicePriorityOrderTest'`: 12 passed / 33 assertions
+- `git diff --check`: passed
+- Remaining follow-up: `ListBillingExceptionsQuery` still materializes exception rows before pagination; code review recommends DB-level pagination/aggregation for this queue before merge-ready signoff.

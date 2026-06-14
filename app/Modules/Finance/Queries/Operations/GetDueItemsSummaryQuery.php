@@ -19,29 +19,28 @@ class GetDueItemsSummaryQuery
         // DNG Requests summary
         $dngBaseQuery = function () use ($semesterId, $campusId) {
             $query = DngPaymentRequest::query()
-                ->when($semesterId, fn ($q) => $q->where('semester_id', $semesterId))
-                ->when($campusId, fn ($q) => $q->whereHas('student', fn ($sq) => $sq->where('campus_id', $campusId)))
-                ->where('status', 'pushed_to_dng')
-                ->whereNotNull('due_date');
+                ->when($semesterId, fn ($q) => $q->where('dng_payment_requests.semester_id', $semesterId))
+                ->where('dng_payment_requests.status', 'pushed_to_dng')
+                ->whereNotNull('dng_payment_requests.due_date');
 
-            LifecycleDueItemPredicate::applyActiveCollectionScope($query);
+            LifecycleDueItemPredicate::applyActiveCollectionScope($query, $campusId);
 
             return $query;
         };
 
         $dngSummary = [
             'upcoming_count' => $dngBaseQuery()
-                ->whereBetween('due_date', [$today, $today->copy()->addDays(7)])
+                ->whereBetween('dng_payment_requests.due_date', [$today->copy()->addDay(), $today->copy()->addDays(7)])
                 ->count(),
             'due_today_count' => $dngBaseQuery()
-                ->whereDate('due_date', $today)
+                ->whereDate('dng_payment_requests.due_date', $today)
                 ->count(),
             'overdue_count' => $dngBaseQuery()
-                ->where('due_date', '<', $today)
+                ->where('dng_payment_requests.due_date', '<', $today)
                 ->count(),
             'total_overdue_amount' => (float) $dngBaseQuery()
-                ->where('due_date', '<', $today)
-                ->sum('amount'),
+                ->where('dng_payment_requests.due_date', '<', $today)
+                ->sum('dng_payment_requests.amount'),
         ];
 
         // Only DNG requests - no invoices

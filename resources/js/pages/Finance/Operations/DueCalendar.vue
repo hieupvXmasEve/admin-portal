@@ -307,14 +307,14 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Due Calendar" />
+    <Head title="DNG Due Reminders" />
 
     <div class="space-y-6">
         <!-- Header -->
         <div class="flex items-center justify-between">
             <div>
-                <h1 class="text-3xl font-bold tracking-tight">Billing Calendar</h1>
-                <p class="text-muted-foreground mt-1">Quản lý hạn thanh toán và gửi nhắc nợ cho sinh viên hoặc phụ huynh</p>
+                <h1 class="text-3xl font-bold tracking-tight">DNG Due Reminders</h1>
+                <p class="text-muted-foreground mt-1">Hàng đợi nhắc nợ DNG — không phải lịch tháng</p>
             </div>
             <div class="flex items-center gap-3">
                 <Link :href="route('finance.operations.lifecycle-exceptions')">
