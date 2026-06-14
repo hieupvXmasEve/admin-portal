@@ -357,3 +357,24 @@ it('HL fee_type: skips registration that already has a charge', function () {
     // Only 1 charge should exist (no duplicate created)
     expect(FinanceCharge::where('student_id', $student->id)->count())->toBe(1);
 });
+
+it('builds distinct item ids for same-second pushes of the same student and fee type (FIN-33)', function () {
+    // FIN-33: a bare YmdHis suffix collided when two pushes for the same student +
+    // fee type landed in the same second, breaking webhook resolution (item_id is a
+    // reconciliation key). The random suffix must keep same-second item_ids distinct.
+    $action = app(CreateBatchDngFromChargesAction::class);
+    $method = new ReflectionMethod($action, 'buildItemId');
+    $method->setAccessible(true);
+
+    [$first, $second] = $this->travelTo('2026-06-14 10:00:00', function () use ($action, $method) {
+        return [
+            $method->invoke($action, 'STU001', 'HL'),
+            $method->invoke($action, 'STU001', 'HL'),
+        ];
+    });
+
+    expect($first)->not->toBe($second)
+        ->and($first)->toStartWith('STU001_hl_20260614100000')
+        ->and($second)->toStartWith('STU001_hl_20260614100000')
+        ->and(strlen($first))->toBeLessThanOrEqual(100);
+});

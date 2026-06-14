@@ -184,9 +184,27 @@ class DngPaymentRequest extends Model
             $issues[] = "Student mismatch: local={$this->student_code}, callback={$callbackStudentCode}";
         }
 
+        // ItemId is the stable settle-once correlation key. When the callback carries
+        // it, it must match — a callback that matched this request by PaymentId but
+        // carries a different ItemId points at another debt and must be rejected.
+        $callbackItemId = (string) ($payload['ItemId'] ?? '');
+        if ($callbackItemId !== '' && $callbackItemId !== (string) $this->item_id) {
+            $issues[] = "Item mismatch: local={$this->item_id}, callback={$callbackItemId}";
+        }
+
         $callbackFeeType = (string) ($payload['FeeType'] ?? '');
         if ($callbackFeeType !== '' && $callbackFeeType !== $this->fee_type) {
             $issues[] = "Fee type mismatch: local={$this->fee_type}, callback={$callbackFeeType}";
+        }
+
+        // FIN-32: CampusCode is already inside the checksum string, so a valid
+        // checksum guards it. This explicit business-field match is defense in
+        // depth — it catches a payment routed to the wrong campus that happens to
+        // share student + amount + fee type. Only enforced when the callback
+        // actually carries a CampusCode.
+        $callbackCampusCode = (string) ($payload['CampusCode'] ?? '');
+        if ($callbackCampusCode !== '' && $callbackCampusCode !== (string) $this->campus_code) {
+            $issues[] = "Campus mismatch: local={$this->campus_code}, callback={$callbackCampusCode}";
         }
 
         return $issues;

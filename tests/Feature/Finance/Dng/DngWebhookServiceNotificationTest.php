@@ -131,6 +131,42 @@ it('publishes finance.dng_payment_received outbox event on first PAID transition
         ->and($outbox->payload['recipient_targets'][0]['id'])->toBe($this->student->id);
 });
 
+it('publishes the payment-received notification exactly once across Call 1 then Call 2 (P2)', function () {
+    // Call 2 (paid_uninvoiced -> paid_invoiced) only attaches invoice metadata; it must
+    // not re-run Call 1's "payment received" side effects (a second notification).
+    $request = makeWebhookRequest($this->student, 'PAY001', 5000000);
+
+    $mockPaymentService = Mockery::mock(DngPaymentService::class);
+    $mockPaymentService->shouldReceive('bridgeToPayment'); // idempotent; any number of calls
+    app()->instance(DngPaymentService::class, $mockPaymentService);
+
+    // Call 1 — first settlement → notifies.
+    $call1 = makeWebhookEventForNotification(
+        $request,
+        DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE,
+        $this->checksumService,
+    );
+    app(DngWebhookService::class)->processEvent($call1);
+
+    // Call 2 — invoice attach only → must NOT notify again.
+    $request->refresh();
+    $call2 = makeWebhookEventForNotification(
+        $request,
+        DngWebhookEvent::EVENT_PAYMENT_INVOICED,
+        $this->checksumService,
+        ['InvoiceSerialNumber' => 'INV-2026-001', 'InvoiceDate' => '2026-01-15'],
+    );
+    app(DngWebhookService::class)->processEvent($call2);
+
+    expect(NotificationEventOutbox::where('event_name', 'finance.dng_payment_received')->count())->toBe(1);
+
+    $call2->refresh();
+    $request->refresh();
+    expect($call2->processing_status)->toBe(DngWebhookEvent::STATUS_PROCESSED)
+        ->and($request->status)->toBe(DngPaymentRequest::STATUS_PAID_INVOICED)
+        ->and($request->invoice_serial_number)->toBe('INV-2026-001');
+});
+
 it('does not publish notification when webhook is a duplicate (markSkipped)', function () {
     $request = makeWebhookRequest($this->student, 'PAY001', 5000000);
     $request->update(['status' => DngPaymentRequest::STATUS_PAID_UNINVOICED]);

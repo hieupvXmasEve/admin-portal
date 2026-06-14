@@ -129,36 +129,45 @@ class ResolveLifecycleDueExceptionAction
         $fromStatus = $existingReview?->status ?? LifecycleDueExceptionReviewStatus::Open;
         $dngStatusBefore = $request->status;
 
-        $this->recordEventAction->run(
-            request: $request,
-            eventType: LifecycleDueExceptionReviewEventType::CancelRequested,
-            fromStatus: $fromStatus,
-            toStatus: LifecycleDueExceptionReviewStatus::CancelRequested,
-            resolutionAction: $action,
-            resolutionReason: $reason,
-            performedByUserId: $userId,
-            review: $existingReview,
-            dngStatusBefore: $dngStatusBefore,
-            metadata: ['impact_preview' => $impactPreview],
-        );
-
-        if ($requireVoidPermission) {
-            $this->recordEventAction->run(
-                request: $request,
-                eventType: LifecycleDueExceptionReviewEventType::VoidRequested,
-                fromStatus: $fromStatus,
-                toStatus: LifecycleDueExceptionReviewStatus::CancelRequested,
-                resolutionAction: $action,
-                resolutionReason: $reason,
-                performedByUserId: $userId,
-                review: $existingReview,
-                dngStatusBefore: $dngStatusBefore,
-                metadata: ['impact_preview' => $impactPreview],
-            );
-        }
-
         try {
-            $review = DB::transaction(function () use ($request, $exceptionReason, $action, $reason, $userId, $impactPreview): FinanceLifecycleDueExceptionReview {
+            $review = DB::transaction(function () use ($request, $exceptionReason, $action, $reason, $userId, $impactPreview, $fromStatus, $dngStatusBefore, $existingReview, $requireVoidPermission): FinanceLifecycleDueExceptionReview {
+                // FIN-34: record the cancel/void *attempt* events INSIDE the same
+                // transaction as the status mutation. Previously they were written
+                // before the transaction opened, so if the DNG cancel API failed and
+                // the transaction rolled back, a committed "CancelRequested"
+                // transition survived that the review row never durably reached —
+                // audit and review state diverged and the attempt read as a completed
+                // transition. Recording them inside the transaction means they commit
+                // or roll back atomically with the state change; on rollback the catch
+                // block writes the paired CancelFailed/VoidFailed outcome instead.
+                $this->recordEventAction->run(
+                    request: $request,
+                    eventType: LifecycleDueExceptionReviewEventType::CancelRequested,
+                    fromStatus: $fromStatus,
+                    toStatus: LifecycleDueExceptionReviewStatus::CancelRequested,
+                    resolutionAction: $action,
+                    resolutionReason: $reason,
+                    performedByUserId: $userId,
+                    review: $existingReview,
+                    dngStatusBefore: $dngStatusBefore,
+                    metadata: ['impact_preview' => $impactPreview],
+                );
+
+                if ($requireVoidPermission) {
+                    $this->recordEventAction->run(
+                        request: $request,
+                        eventType: LifecycleDueExceptionReviewEventType::VoidRequested,
+                        fromStatus: $fromStatus,
+                        toStatus: LifecycleDueExceptionReviewStatus::CancelRequested,
+                        resolutionAction: $action,
+                        resolutionReason: $reason,
+                        performedByUserId: $userId,
+                        review: $existingReview,
+                        dngStatusBefore: $dngStatusBefore,
+                        metadata: ['impact_preview' => $impactPreview],
+                    );
+                }
+
                 $review = FinanceLifecycleDueExceptionReview::query()->updateOrCreate(
                     ['dng_payment_request_id' => $request->id],
                     [

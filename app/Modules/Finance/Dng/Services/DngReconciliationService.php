@@ -6,6 +6,7 @@ namespace App\Modules\Finance\Dng\Services;
 
 use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class DngReconciliationService
@@ -78,20 +79,25 @@ class DngReconciliationService
             return;
         }
 
-        // Find existing request
-        $request = DngPaymentRequest::where('dng_payment_id', $dngPaymentId)->first();
+        // Resolve the local request. ItemId + StudentId + Campus is the stable
+        // settle-once correlation key; the DNG PaymentId is metadata that can
+        // legitimately differ from the locally stored placeholder. Match on the
+        // correlation key FIRST — matching PaymentId first would wrongly orphan a real
+        // item-matched row whose stored placeholder differs from DNG's reported
+        // PaymentId. Fall back to PaymentId only when no ItemId correlation is given.
+        $itemId = (string) ($txn['ItemId'] ?? '');
+        $studentId = (string) ($txn['StudentId'] ?? '');
+        $request = null;
+
+        if ($itemId !== '' && $studentId !== '') {
+            $request = DngPaymentRequest::where('item_id', $itemId)
+                ->where('student_code', $studentId)
+                ->where('campus_code', $campusCode)
+                ->first();
+        }
 
         if (! $request) {
-            // Try fallback match
-            $request = DngPaymentRequest::where('item_id', $txn['ItemId'] ?? '')
-                ->where('student_code', $txn['StudentId'] ?? '')
-                ->where('campus_code', $campusCode)
-                ->whereNull('dng_payment_id')
-                ->first();
-
-            if ($request) {
-                $request->update(['dng_payment_id' => $dngPaymentId]);
-            }
+            $request = DngPaymentRequest::where('dng_payment_id', $dngPaymentId)->first();
         }
 
         if (! $request) {
@@ -106,10 +112,22 @@ class DngReconciliationService
             return;
         }
 
+        // Surface (but do not fail on) a PaymentId that differs from the stored
+        // placeholder: the row is correlated by ItemId, the placeholder is kept, and
+        // only a null dng_payment_id is bound later in the locked transition.
+        if ($request->dng_payment_id !== null && $request->dng_payment_id !== $dngPaymentId) {
+            Log::info('DNG reconciliation: PaymentId differs from stored value; reconciling by ItemId', [
+                'dng_payment_request_id' => $request->id,
+                'stored_dng_payment_id' => $request->dng_payment_id,
+                'callback_dng_payment_id' => $dngPaymentId,
+            ]);
+        }
+
         $mismatchReasons = $request->callbackMismatchReasons([
             'Amount' => $txn['Amount'] ?? null,
             'StudentId' => $txn['StudentId'] ?? null,
             'CampusCode' => $campusCode,
+            'ItemId' => $txn['ItemId'] ?? null,
         ]);
 
         if ($mismatchReasons !== []) {
@@ -123,17 +141,6 @@ class DngReconciliationService
             return;
         }
 
-        if ($request->status === DngPaymentRequest::STATUS_CANCELLED) {
-            Log::info('DNG reconciliation: skipped cancelled request', [
-                'dng_payment_request_id' => $request->id,
-                'dng_payment_id' => $dngPaymentId,
-            ]);
-            $summary['up_to_date']++;
-
-            return;
-        }
-
-        // Check if local record needs updating
         $hasInvoice = filled($txn['InvoiceSerialNumber'] ?? null)
             && filled($txn['InvoiceDate'] ?? null);
 
@@ -141,21 +148,104 @@ class DngReconciliationService
             ? DngPaymentRequest::STATUS_PAID_INVOICED
             : DngPaymentRequest::STATUS_PAID_UNINVOICED;
 
-        // Already up to date or further along?
-        $statusOrder = $this->statusOrder();
-        $currentOrder = $statusOrder[$request->status] ?? 0;
-        $targetOrder = $statusOrder[$targetStatus] ?? 0;
+        // P1: decide + apply the transition under a row lock with a FRESH re-read so a
+        // concurrent webhook (e.g. Call 2 already advanced to paid_invoiced) cannot be
+        // downgraded by a stale reconciliation read. Mirrors DngWebhookService so the
+        // webhook-vs-reconciliation race is serialised, not just webhook-vs-webhook.
+        $outcome = DB::transaction(function () use ($request, $txn, $hasInvoice, $targetStatus, $dngPaymentId): array {
+            /** @var DngPaymentRequest $locked */
+            $locked = DngPaymentRequest::query()->lockForUpdate()->find($request->id);
 
-        if ($currentOrder >= $targetOrder) {
-            if (
-                ! $request->hasBridgedPayment()
-                && in_array($request->status, [
-                    DngPaymentRequest::STATUS_PAID_UNINVOICED,
-                    DngPaymentRequest::STATUS_PAID_INVOICED,
-                    DngPaymentRequest::STATUS_RECONCILED,
-                ], true)
-            ) {
-                $this->dngPaymentService->bridgeToPayment($request);
+            // FIN-18: both cancellation states are terminal — never revive/bridge them.
+            if (in_array($locked->status, [
+                DngPaymentRequest::STATUS_CANCELLED,
+                DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG,
+            ], true)) {
+                return ['result' => 'cancelled', 'status' => $locked->status];
+            }
+
+            // Bind the DNG PaymentId now that the mismatch check has passed (deferred
+            // from the fallback match so a non-matching DNG row cannot poison it).
+            if (! $locked->dng_payment_id) {
+                $locked->update(['dng_payment_id' => $dngPaymentId]);
+            }
+
+            $statusOrder = $this->statusOrder();
+            $currentOrder = $statusOrder[$locked->status] ?? 0;
+            $targetOrder = $statusOrder[$targetStatus] ?? 0;
+
+            if ($currentOrder >= $targetOrder) {
+                return ['result' => 'up_to_date', 'status' => $locked->status];
+            }
+
+            // Backfill: refuse an illegal transition BEFORE mutating fields, so a
+            // request that cannot legally reach the target (e.g. a failed request) is
+            // never partially backfilled — and is not bridged/settled below either.
+            if (! $locked->canTransitionTo($targetStatus)) {
+                return ['result' => 'cannot_transition', 'from' => $locked->status];
+            }
+
+            $updateData = [
+                'last_callback_payload' => $txn,
+                'psp_code' => $txn['PSPCode'] ?? $locked->psp_code,
+            ];
+
+            if (! $locked->paid_at) {
+                $updateData['paid_at'] = now();
+            }
+
+            if ($hasInvoice) {
+                $updateData['invoice_serial_number'] = $txn['InvoiceSerialNumber'];
+                $updateData['invoice_date'] = $txn['InvoiceDate'];
+            }
+
+            $locked->update($updateData);
+            $locked->transitionTo($targetStatus);
+
+            return ['result' => 'backfilled'];
+        });
+
+        if ($outcome['result'] === 'cancelled') {
+            Log::info('DNG reconciliation: skipped cancelled request', [
+                'dng_payment_request_id' => $request->id,
+                'dng_payment_id' => $dngPaymentId,
+                'status' => $outcome['status'],
+            ]);
+            $summary['up_to_date']++;
+
+            return;
+        }
+
+        if ($outcome['result'] === 'cannot_transition') {
+            // Mirror the webhook: an illegal transition is an error, not a backfill —
+            // do not create a Payment or settle installments for it.
+            Log::warning('DNG reconciliation: refused illegal transition', [
+                'dng_payment_request_id' => $request->id,
+                'dng_payment_id' => $dngPaymentId,
+                'from' => $outcome['from'],
+                'to' => $targetStatus,
+            ]);
+            $summary['errors']++;
+
+            return;
+        }
+
+        if ($outcome['result'] === 'up_to_date') {
+            // P2: even when already at/past the target status, make sure BOTH the
+            // canonical Payment and the linked installment are settled — a prior
+            // attempt may have advanced status but crashed before completing them.
+            // Both operations are idempotent (bridge guards on payment_id; settle
+            // skips already-paid installments).
+            if (in_array($outcome['status'], [
+                DngPaymentRequest::STATUS_PAID_UNINVOICED,
+                DngPaymentRequest::STATUS_PAID_INVOICED,
+                DngPaymentRequest::STATUS_RECONCILED,
+            ], true)) {
+                $fresh = $request->fresh();
+                if (! $fresh->hasBridgedPayment()) {
+                    $this->dngPaymentService->bridgeToPayment($fresh);
+                }
+                $this->settleInstallmentAction->handle($request->fresh());
             }
 
             $summary['up_to_date']++;
@@ -163,29 +253,11 @@ class DngReconciliationService
             return;
         }
 
-        // Backfill: update local record
-        $updateData = [
-            'last_callback_payload' => $txn,
-            'psp_code' => $txn['PSPCode'] ?? $request->psp_code,
-        ];
-
-        if (! $request->paid_at) {
-            $updateData['paid_at'] = now();
-        }
-
-        if ($hasInvoice) {
-            $updateData['invoice_serial_number'] = $txn['InvoiceSerialNumber'];
-            $updateData['invoice_date'] = $txn['InvoiceDate'];
-        }
-
-        $request->update($updateData);
-
-        if ($request->canTransitionTo($targetStatus)) {
-            $request->transitionTo($targetStatus);
-        }
+        // result === 'backfilled'
+        $fresh = $request->fresh();
 
         // Bridge to canonical Payment if not yet done
-        $this->dngPaymentService->bridgeToPayment($request);
+        $this->dngPaymentService->bridgeToPayment($fresh);
 
         // Settle linked installment + dispatch next push (no-op if not installment-linked).
         // Idempotent: SettleInstallmentFromDngAction skips when installment is already paid.
@@ -215,6 +287,8 @@ class DngReconciliationService
             DngPaymentRequest::STATUS_RECONCILED => 4,
             DngPaymentRequest::STATUS_FAILED => -1,
             DngPaymentRequest::STATUS_CANCELLED => -2,
+            // FIN-18: cancel pushed to DNG is terminal (was missing → default 0).
+            DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG => -2,
         ];
     }
 }

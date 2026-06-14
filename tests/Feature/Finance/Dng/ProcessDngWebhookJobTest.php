@@ -8,6 +8,7 @@ use App\Models\CourseOffering;
 use App\Models\CourseRetakeRegistration;
 use App\Models\CurriculumVersion;
 use App\Models\FinanceCharge;
+use App\Models\FinanceChargeInstallment;
 use App\Models\Payment;
 use App\Models\Program;
 use App\Models\Semester;
@@ -217,6 +218,35 @@ it('handles callback 2 arriving before callback 1 and skips to paid_invoiced', f
     expect($dngPaymentRequest->invoice_serial_number)->toBe('INV-2024-001');
 });
 
+it('does not let a stale Call 1 downgrade a request already advanced by Call 2 (race guard)', function () {
+    // Locked, fresh-read transition: once Call 2 has advanced the request to
+    // paid_invoiced, a late Call 1 (paid_uninvoiced target) must be skipped as
+    // "already progressed", never overwriting the higher status back down.
+    $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY001', 5000000);
+
+    $mockPaymentService = Mockery::mock(DngPaymentService::class);
+    $mockPaymentService->shouldReceive('bridgeToPayment');
+    app()->instance(DngPaymentService::class, $mockPaymentService);
+
+    // Call 2 first → paid_invoiced
+    $event2 = createWebhookEvent(
+        $dngPaymentRequest,
+        DngWebhookEvent::EVENT_PAYMENT_INVOICED,
+        ['InvoiceSerialNumber' => 'INV-2024-001', 'InvoiceDate' => '2024-01-15']
+    );
+    (new ProcessDngWebhookJob($event2->id))->handle(app(DngWebhookService::class));
+    expect($dngPaymentRequest->fresh()->status)->toBe(DngPaymentRequest::STATUS_PAID_INVOICED);
+
+    // Stale Call 1 (no invoice) arrives afterwards → must NOT downgrade.
+    $event1 = createWebhookEvent($dngPaymentRequest->fresh(), DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE);
+    (new ProcessDngWebhookJob($event1->id))->handle(app(DngWebhookService::class));
+
+    expect($dngPaymentRequest->fresh()->status)->toBe(DngPaymentRequest::STATUS_PAID_INVOICED);
+    $event1->refresh();
+    expect($event1->processing_status)->toBe(DngWebhookEvent::STATUS_SKIPPED)
+        ->and($event1->error_message)->toContain('already progressed');
+});
+
 it('skips callback processing for cancelled requests', function () {
     $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY001', 5000000);
     $dngPaymentRequest->update(['status' => DngPaymentRequest::STATUS_CANCELLED]);
@@ -313,6 +343,41 @@ it('marks event as mismatch when student code differs', function () {
     expect($event->error_category)->toBe(DngWebhookEvent::ERROR_CATEGORY_MISMATCH);
 });
 
+it('marks event as mismatch when ItemId differs from the matched request (P2)', function () {
+    // ItemId is the settle-once key. A callback matched by PaymentId fallback but
+    // carrying a different ItemId points at another debt — it must be rejected even
+    // though the checksum (which does not cover ItemId) is otherwise valid.
+    $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY001', 5000000); // item_id = ITEM001
+
+    $payload = [
+        'CampusCode' => 'CAMPUS001',
+        'StudentId' => 'STU001',
+        'PaymentId' => 'PAY001',
+        'ItemId' => 'ITEM-WRONG',
+        'Amount' => '5000000',
+        'CheckSum' => generateProcessWebhookChecksum($this->checksumService, '5000000', 'STU001', 'tuition', 'CAMPUS001'),
+    ];
+
+    $event = DngWebhookEvent::create([
+        'dng_payment_id' => 'PAY001',
+        'event_type' => DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE,
+        'payload_hash' => DngWebhookEvent::computePayloadHash($payload),
+        'headers' => [],
+        'payload' => $payload,
+        'is_valid_checksum' => false,
+        'processing_status' => DngWebhookEvent::STATUS_RECEIVED,
+        'received_at' => now(),
+    ]);
+
+    (new ProcessDngWebhookJob($event->id))->handle(app(DngWebhookService::class));
+
+    $event->refresh();
+    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_MISMATCH)
+        ->and($event->error_message)->toContain('Item mismatch')
+        ->and($event->error_category)->toBe(DngWebhookEvent::ERROR_CATEGORY_MISMATCH);
+    expect($dngPaymentRequest->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+});
+
 it('marks event as mismatch when checksum verification fails', function () {
     $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY001', 5000000);
 
@@ -336,13 +401,54 @@ it('marks event as mismatch when checksum verification fails', function () {
     expect($event->is_valid_checksum)->toBeFalse();
 });
 
-it('skips checksum enforcement for first callback without invoice serial number', function () {
+it('rejects first callback (no invoice serial) when the checksum is invalid (FIN-16)', function () {
+    // FIN-16: the public webhook is an untrusted boundary. Call 1 (no invoice
+    // serial) used to bypass checksum verification entirely, letting a forged
+    // settlement event through. It must now be verified with the empty-serial
+    // formula and rejected when invalid — without settling anything.
     $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY001', 5000000);
 
     $event = createWebhookEvent(
         $dngPaymentRequest,
         DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE,
         ['CheckSum' => 'invalid-checksum']
+    );
+
+    $mockPaymentService = Mockery::mock(DngPaymentService::class);
+    $mockPaymentService->shouldNotReceive('bridgeToPayment');
+
+    app()->instance(DngPaymentService::class, $mockPaymentService);
+
+    $job = new ProcessDngWebhookJob($event->id);
+    $job->handle(app(DngWebhookService::class));
+
+    $event->refresh();
+    $dngPaymentRequest->refresh();
+
+    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_MISMATCH);
+    expect($event->error_category)->toBe(DngWebhookEvent::ERROR_CATEGORY_CHECKSUM);
+    expect($event->is_valid_checksum)->toBeFalse();
+    expect($dngPaymentRequest->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+    expect($dngPaymentRequest->payment_id)->toBeNull();
+});
+
+it('settles first callback (no invoice serial) when the empty-serial checksum is valid (FIN-16)', function () {
+    // The legitimate Call 1 is signed by DNG with an empty InvoiceSerialNumber
+    // segment. Verifying with that same empty-serial string must accept it and
+    // settle exactly once — the hardening must not reject the real Call 1.
+    $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY001', 5000000);
+
+    $event = createWebhookEvent(
+        $dngPaymentRequest,
+        DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE,
+        // explicit empty-serial signed checksum (overrides the helper's auto sign)
+        ['CheckSum' => generateProcessWebhookChecksum(
+            app(DngChecksumService::class),
+            '5000000',
+            'STU001',
+            'tuition',
+            'CAMPUS001',
+        )]
     );
 
     $mockPaymentService = Mockery::mock(DngPaymentService::class);
@@ -503,6 +609,60 @@ it('accepts invoice callback checksum when third party formats amount with one d
     expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_PROCESSED);
     expect($event->is_valid_checksum)->toBeTrue();
     expect($request->invoice_serial_number)->toBe('gh3rtr-shd-12343');
+});
+
+it('does not bind dng_payment_id when the callback fails business validation (P1)', function () {
+    // P1: the callback PaymentId must not be bound to a request that turns out to be a
+    // business mismatch. The checksum is signed with the request's real amount (so it
+    // passes) while the callback's Amount field disagrees — binding must be deferred
+    // past crossValidate, leaving dng_payment_id untouched on mismatch.
+    $request = DngPaymentRequest::create([
+        'student_id' => $this->student->id,
+        'campus_code' => 'CAMPUS001',
+        'student_code' => 'STU001',
+        'fee_type' => 'tuition',
+        'item_id' => 'ITEM-NOBIND',
+        'amount' => 5000000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+        'dng_payment_id' => null,
+        'push_payload' => [
+            'StudentId' => 'STU001',
+            'CampusCode' => 'CAMPUS001',
+            'Type' => 'tuition',
+            'Amount' => 5000000,
+            'ItemId' => 'ITEM-NOBIND',
+        ],
+    ]);
+
+    $payload = [
+        'ItemId' => 'ITEM-NOBIND',
+        'StudentId' => 'STU001',
+        'PaymentId' => 'PAY-NEW',
+        'CampusCode' => 'CAMPUS001',
+        'Amount' => '7000000', // disagrees with local 5000000
+        'CheckSum' => generateProcessWebhookChecksum($this->checksumService, '5000000', 'STU001', 'tuition', 'CAMPUS001'),
+    ];
+
+    $event = DngWebhookEvent::create([
+        'dng_payment_id' => 'PAY-NEW',
+        'event_type' => DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE,
+        'payload_hash' => DngWebhookEvent::computePayloadHash($payload),
+        'headers' => [],
+        'payload' => $payload,
+        'is_valid_checksum' => false,
+        'processing_status' => DngWebhookEvent::STATUS_RECEIVED,
+        'received_at' => now(),
+    ]);
+
+    (new ProcessDngWebhookJob($event->id))->handle(app(DngWebhookService::class));
+
+    $event->refresh();
+    $request->refresh();
+
+    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_MISMATCH)
+        ->and($event->error_message)->toContain('Amount mismatch');
+    // The request must NOT have been poisoned with the mismatched callback's PaymentId.
+    expect($request->dng_payment_id)->toBeNull();
 });
 
 it('does not bind fallback payment id before checksum passes', function () {
@@ -783,6 +943,178 @@ it('stores last_callback_payload from webhook', function () {
     expect($dngPaymentRequest->psp_code)->toBe('PSP123');
 });
 
+it('marks event as mismatch when campus differs even if checksum passes (FIN-32)', function () {
+    // FIN-32: CampusCode is inside the checksum string, but as defense in depth the
+    // business-field match must also reject a callback whose CampusCode differs from
+    // the local request — here the checksum is signed with the request's real campus
+    // (CAMPUS001) while the callback body claims CAMPUS999.
+    $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY001', 5000000);
+
+    $event = createWebhookEvent(
+        $dngPaymentRequest,
+        DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE,
+        [
+            'CampusCode' => 'CAMPUS999',
+            'CheckSum' => generateProcessWebhookChecksum(
+                app(DngChecksumService::class),
+                '5000000',
+                'STU001',
+                'tuition',
+                'CAMPUS001',
+            ),
+        ]
+    );
+
+    $mockPaymentService = Mockery::mock(DngPaymentService::class);
+    $mockPaymentService->shouldNotReceive('bridgeToPayment');
+    app()->instance(DngPaymentService::class, $mockPaymentService);
+
+    $job = new ProcessDngWebhookJob($event->id);
+    $job->handle(app(DngWebhookService::class));
+
+    $event->refresh();
+    $dngPaymentRequest->refresh();
+
+    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_MISMATCH);
+    expect($event->error_message)->toContain('Campus mismatch');
+    expect($event->error_category)->toBe(DngWebhookEvent::ERROR_CATEGORY_MISMATCH);
+    expect($dngPaymentRequest->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+});
+
+it('skips late callback for a cancel_pushed_to_dng request (FIN-18)', function () {
+    // FIN-18: cancel_pushed_to_dng is terminal. A late settlement callback must be
+    // skipped, not processed — previously this status fell through statusOrder()'s
+    // default and could be advanced/bridged.
+    $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY001', 5000000);
+    $dngPaymentRequest->update(['status' => DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG]);
+
+    $event = createWebhookEvent($dngPaymentRequest, DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE);
+
+    $mockPaymentService = Mockery::mock(DngPaymentService::class);
+    $mockPaymentService->shouldNotReceive('bridgeToPayment');
+    app()->instance(DngPaymentService::class, $mockPaymentService);
+
+    $job = new ProcessDngWebhookJob($event->id);
+    $job->handle(app(DngWebhookService::class));
+
+    $event->refresh();
+    $dngPaymentRequest->refresh();
+
+    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_SKIPPED)
+        ->and($event->error_message)->toContain('cancelled');
+    expect($dngPaymentRequest->status)->toBe(DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG)
+        ->and($dngPaymentRequest->payment_id)->toBeNull();
+});
+
+it('settles a still-pending installment on a duplicate callback for an already-advanced request (P2 recovery)', function () {
+    // P2: if a prior attempt advanced the status (paid_uninvoiced) but crashed before
+    // settling the linked installment, a later duplicate/late callback lands in the
+    // equivalent/already_progressed branch. That recovery branch must now also settle
+    // the installment (idempotently), not just bridge the Payment — otherwise the next
+    // installment would never be pushed.
+    $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY001', 5000000);
+
+    $charge = FinanceCharge::create([
+        'student_id' => $this->student->id,
+        'semester_id' => $this->semester->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => 5000000,
+        'description' => 'Tuition',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+
+    $installment = FinanceChargeInstallment::factory()->awaitingPayment()->create([
+        'finance_charge_id' => $charge->id,
+        'dng_payment_request_id' => $dngPaymentRequest->id,
+        'amount' => 5000000,
+    ]);
+
+    // Status already advanced, but installment left un-settled (simulated prior crash).
+    $dngPaymentRequest->update([
+        'status' => DngPaymentRequest::STATUS_PAID_UNINVOICED,
+        'paid_at' => now(),
+    ]);
+
+    // Late/duplicate Call 1 (no invoice) → target paid_uninvoiced == current → equivalent.
+    $event = createWebhookEvent($dngPaymentRequest, DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE);
+
+    $mockPaymentService = Mockery::mock(DngPaymentService::class);
+    $mockPaymentService->shouldReceive('bridgeToPayment');
+    app()->instance(DngPaymentService::class, $mockPaymentService);
+
+    (new ProcessDngWebhookJob($event->id))->handle(app(DngWebhookService::class));
+
+    $event->refresh();
+    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_SKIPPED)
+        ->and($event->error_message)->toContain('Equivalent');
+
+    // The recovery branch settled the previously-stuck installment.
+    expect($installment->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_PAID);
+});
+
+it('resolves the webhook to the correct campus when ItemId and StudentId collide across campuses (P1)', function () {
+    // Two requests share ItemId + StudentId but live in different campuses. The
+    // resolver must scope by the callback CampusCode and settle the right one, not the
+    // first-inserted row (which would then fail with a Campus mismatch).
+    $requestA = DngPaymentRequest::create([
+        'student_id' => $this->student->id,
+        'campus_code' => 'CAMPUS-A',
+        'student_code' => 'STU001',
+        'fee_type' => 'tuition',
+        'item_id' => 'ITEM-DUP',
+        'amount' => 5000000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+        'dng_payment_id' => 'PAY-A',
+        'push_payload' => ['StudentId' => 'STU001', 'CampusCode' => 'CAMPUS-A', 'Type' => 'tuition', 'Amount' => 5000000, 'ItemId' => 'ITEM-DUP'],
+    ]);
+    $requestB = DngPaymentRequest::create([
+        'student_id' => $this->student->id,
+        'campus_code' => 'CAMPUS-B',
+        'student_code' => 'STU001',
+        'fee_type' => 'tuition',
+        'item_id' => 'ITEM-DUP',
+        'amount' => 5000000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+        'dng_payment_id' => 'PAY-B',
+        'push_payload' => ['StudentId' => 'STU001', 'CampusCode' => 'CAMPUS-B', 'Type' => 'tuition', 'Amount' => 5000000, 'ItemId' => 'ITEM-DUP'],
+    ]);
+
+    $payload = [
+        'ItemId' => 'ITEM-DUP',
+        'StudentId' => 'STU001',
+        'PaymentId' => 'PAY-B',
+        'CampusCode' => 'CAMPUS-B',
+        'FeeType' => 'tuition',
+        'Amount' => '5000000',
+        'CheckSum' => generateProcessWebhookChecksum($this->checksumService, '5000000', 'STU001', 'tuition', 'CAMPUS-B'),
+    ];
+
+    $event = DngWebhookEvent::create([
+        'dng_payment_id' => 'PAY-B',
+        'event_type' => DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE,
+        'payload_hash' => DngWebhookEvent::computePayloadHash($payload),
+        'headers' => [],
+        'payload' => $payload,
+        'is_valid_checksum' => false,
+        'processing_status' => DngWebhookEvent::STATUS_RECEIVED,
+        'received_at' => now(),
+    ]);
+
+    $mockPaymentService = Mockery::mock(DngPaymentService::class);
+    $mockPaymentService->shouldReceive('bridgeToPayment');
+    app()->instance(DngPaymentService::class, $mockPaymentService);
+
+    (new ProcessDngWebhookJob($event->id))->handle(app(DngWebhookService::class));
+
+    $event->refresh();
+    expect($event->dng_payment_request_id)->toBe($requestB->id)
+        ->and($event->processing_status)->toBe(DngWebhookEvent::STATUS_PROCESSED);
+    expect($requestB->fresh()->status)->toBe(DngPaymentRequest::STATUS_PAID_UNINVOICED);
+    // The colliding Campus A request must be left untouched.
+    expect($requestA->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+});
+
 // =====================
 // Retake auto-enroll via finance_charge_id
 // =====================
@@ -898,6 +1230,7 @@ it('does not link a retake registration from an HL webhook until the charge is s
         'Amount' => '5000000',
         'FeeType' => 'HL',
         'CampusCode' => 'CAMPUS001',
+        'CheckSum' => generateProcessWebhookChecksum($this->checksumService, '5000000', 'STU001', 'HL', 'CAMPUS001'),
     ];
 
     $event = DngWebhookEvent::create([
@@ -977,6 +1310,7 @@ it('does not trigger auto-enroll for non-HL fee type webhooks', function () {
         'Amount' => '5000000',
         'FeeType' => 'HP',
         'CampusCode' => 'CAMPUS001',
+        'CheckSum' => generateProcessWebhookChecksum($this->checksumService, '5000000', 'STU001', 'HP', 'CAMPUS001'),
     ];
 
     $event = DngWebhookEvent::create([
@@ -1103,6 +1437,7 @@ it('does not link aggregate retake registrations from an HL webhook until the ch
         'Amount' => '12000000',
         'FeeType' => 'HL',
         'CampusCode' => 'CAMPUS001',
+        'CheckSum' => generateProcessWebhookChecksum($this->checksumService, '12000000', 'STU001', 'HL', 'CAMPUS001'),
     ];
 
     $event = DngWebhookEvent::create([

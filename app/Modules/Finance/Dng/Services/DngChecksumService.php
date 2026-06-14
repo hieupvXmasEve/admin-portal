@@ -39,10 +39,24 @@ class DngChecksumService
 
     /**
      * Verify a DNG checksum matches the expected value.
+     *
+     * DNG may deliver the callback checksum URL-encoded (trailing `=` padding sent as
+     * `%3d`, as in the reference payload) or already URL-decoded (`=`). Both forms are
+     * legitimate, so the padding is normalised on both sides before the constant-time
+     * compare. base64 never contains `%`, so this only ever rewrites encoded padding
+     * and never a real checksum character.
      */
     public function verify(string $value, string $expectedChecksum): bool
     {
-        return hash_equals($this->generate($value), $expectedChecksum);
+        return hash_equals(
+            $this->normalizePadding($this->generate($value)),
+            $this->normalizePadding($expectedChecksum),
+        );
+    }
+
+    private function normalizePadding(string $checksum): string
+    {
+        return str_ireplace('%3d', '=', $checksum);
     }
 
     /**

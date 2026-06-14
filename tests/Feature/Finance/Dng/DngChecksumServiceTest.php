@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngChecksumService;
 
 // Use the known hash key from the reference spec
@@ -94,4 +95,69 @@ it('respects configured hash key', function () {
     $checksum2 = $service2->generate($testValue);
 
     expect($checksum1)->not->toBe($checksum2);
+});
+
+it('verifies the Call 1 webhook checksum using the empty invoice-serial segment (FIN-16)', function () {
+    // FIN-16: Call 1 (payment success, no invoice yet) is signed by DNG with an
+    // EMPTY InvoiceSerialNumber segment. verifyWebhookChecksum must accept it with
+    // that empty segment — it is verifiable, not unverifiable.
+    config([
+        'services.dng.hash_key' => HASH_KEY,
+        'services.dng.access_code' => 'TEST_ACCESS',
+        'services.dng.client_code' => 'TEST_CLIENT',
+    ]);
+    $service = new DngChecksumService;
+
+    $request = new DngPaymentRequest([
+        'student_code' => 'STU001',
+        'fee_type' => 'HP',
+        'campus_code' => 'FAUHN',
+        'amount' => 200000,
+        'push_payload' => [
+            'StudentId' => 'STU001',
+            'CampusCode' => 'FAUHN',
+            'Type' => 'HP',
+            'Amount' => 200000,
+        ],
+    ]);
+
+    // Checksum string: AccessCode + ClientCode + Amount + '' + StudentId + FeeType + CampusCode
+    $validChecksum = $service->generate('TEST_ACCESS'.'TEST_CLIENT'.'200000'.''.'STU001'.'HP'.'FAUHN');
+
+    $call1Payload = [
+        'StudentId' => 'STU001',
+        'CampusCode' => 'FAUHN',
+        'FeeType' => 'HP',
+        'Amount' => 200000,
+        'InvoiceSerialNumber' => '', // Call 1 — empty
+        'CheckSum' => $validChecksum,
+    ];
+
+    expect($service->verifyWebhookChecksum($request, $call1Payload))->toBeTrue();
+
+    // A forged Call 1 with a wrong checksum must be rejected.
+    $forged = array_merge($call1Payload, ['CheckSum' => 'forged-checksum']);
+    expect($service->verifyWebhookChecksum($request, $forged))->toBeFalse();
+});
+
+it('accepts a checksum delivered URL-decoded (= instead of %3d) (P2)', function () {
+    config([
+        'services.dng.hash_key' => HASH_KEY,
+        'services.dng.access_code' => 'TEST_ACCESS',
+        'services.dng.client_code' => 'TEST_CLIENT',
+    ]);
+    $service = new DngChecksumService;
+
+    $value = 'TEST_ACCESS'.'TEST_CLIENT'.'200000'.''.'STU001'.'HP'.'FAUHN';
+
+    // generate() emits the encoded form (base64 '=' padding rendered as '%3d').
+    $encoded = $service->generate($value);
+    expect($encoded)->toContain('%3d');
+
+    // DNG may instead send the checksum already URL-decoded ('='). Both must verify.
+    $decoded = str_replace('%3d', '=', $encoded);
+    expect($decoded)->toContain('=');
+
+    expect($service->verify($value, $encoded))->toBeTrue();
+    expect($service->verify($value, $decoded))->toBeTrue();
 });

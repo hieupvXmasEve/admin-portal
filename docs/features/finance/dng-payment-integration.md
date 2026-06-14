@@ -1,8 +1,16 @@
 # DNG Payment Gateway Integration
 
-Last updated: 2026-04-24
-Status: Implementation complete
+Last updated: 2026-06-14
+Status: Implementation complete. Webhook security/idempotency hardening delivered in
+S-005 — FIN-16 (checksum on every event incl. Call 1), FIN-17/DB-04 (payload_hash
+dedup + unique restored), FIN-18 (cancel_pushed_to_dng terminal ordering), FIN-15
+(installment settlement lock), FIN-32 (campus mismatch defense-in-depth), FIN-34
+(lifecycle cancel audit ordering). FIN-19 (move the batch external push out of the
+uncommitted transaction) is deferred pending an outbox/compensation design decision.
 Owner: Finance Module
+
+See also: `finance-module-review-2026-06-13.md` (findings FIN-15..19, FIN-32/33)
+and `docs/stories/E-finance-module-review-2026-06/S-005-dng-security-and-idempotency`.
 
 ## Overview
 
@@ -13,6 +21,90 @@ DNG is a Vietnamese payment gateway provider. Swinx integrates with DNG to:
 3. Receive webhook notifications when payments are confirmed
 4. Audit all DNG API interactions and webhook events
 5. Allow staff to cancel unpaid DNG requests from the admin audit page
+
+## Webhook Callback Protocol (provider source of truth)
+
+> Authoritative description of how DNG calls back after a payment. This is the
+> reference for webhook checksum verification and settle-once idempotency.
+> Hardening of this flow is tracked in S-005 and findings FIN-15..19/32/33.
+
+### Two-call settlement
+
+For one successful payment, DNG calls the webhook **twice**:
+
+1. **Call 1 — payment success.** `InvoiceSerialNumber` and `InvoiceDate` are
+   empty. This call confirms money received and **settles** the payment.
+2. **Call 2 — invoice issued.** Sent after the e-invoice exists, with
+   `InvoiceSerialNumber` and `InvoiceDate` populated. This call only **attaches**
+   invoice metadata to the already-settled payment; it must not create a second
+   payment or settle again.
+
+`ItemId` is identical on both calls and is the stable correlation / settle-once
+key. `InvoiceSerialNumber` and the webhook payload hash both differ between the
+two calls, so neither may be used as the settle-once key. A `payload_hash`
+dedup therefore guards retries of the *same* call only — it does not (and must
+not) collapse Call 1 and Call 2.
+
+### Callback payload
+
+```json
+{
+  "StudentId": "FSC0664",
+  "StudentName": "Trương Ngọc Hân",
+  "PaymentId": "12345678",
+  "PSPCode": "BIDV",
+  "FeeType": "HP",
+  "Amount": 10000.0,
+  "CampusCode": "FAN1HCM",
+  "ItemId": "HP0ISH4BdH0S",
+  "InvoiceSerialNumber": "1/001;K23TAA-00004142",
+  "InvoiceDate": "2023-03-20T03:08:02",
+  "CheckSum": "9kzQqcnhSboOl1qACVQR4dTYTqs%3d"
+}
+```
+
+On Call 1, `InvoiceSerialNumber` and `InvoiceDate` are empty.
+
+### Callback checksum (incoming)
+
+Checksum string, exact order:
+
+```
+AccessCode + ClientCode + amount + InvoiceSerialNumber + StudentId + FeeType + CampusCode
+```
+
+- `AccessCode` and `ClientCode` are server-side secrets (config); the checksum
+  cannot be forged without them.
+- On **Call 1** the `InvoiceSerialNumber` segment is the **empty string** — this
+  is how DNG itself signs Call 1, so Call 1 **is verifiable** and must be
+  checksum-checked, not skipped and not rejected.
+- `amount` must be serialized with the exact format DNG uses (e.g. `10000.0`); a
+  different decimal rendering yields a different hash and would reject a
+  legitimate callback. Confirm against real payloads.
+- `CheckSum` may arrive URL-encoded (e.g. `%3d` → `=`); decode before comparing.
+- Compare with a constant-time function (`hash_equals`).
+
+> This **incoming/callback** checksum differs from the **outgoing**
+> `insertNewRecord` checksum
+> (`AccessCode + ApiCode + CampusCode + Amount + ItemId + lowercase(StudentId)`,
+> see `DngClient` below). Do not conflate the two.
+> Because `CampusCode` is inside this string, correct checksum verification also
+> guards campus mismatch (FIN-32); keep an explicit business-field match as
+> defense-in-depth.
+
+### Checksum enforcement (S-005, FIN-16 — fixed)
+
+Call 1 is now checksum-verified with the empty `InvoiceSerialNumber` segment using
+the same formula as Call 2 (`DngWebhookService::processEvent` no longer skips
+verification for serial-less callbacks). A forged Call 1 is rejected as a
+checksum mismatch; the legitimate empty-serial Call 1 still settles. The working
+two-call settle-then-invoice behavior is unchanged — only verification, dedup,
+locks, and audit ordering were added around it.
+
+> Deploy note: the verifier reuses the exact formula already proven by Call 2 in
+> production, and `verifyWebhookChecksum` tries multiple `amount` renderings.
+> Before enabling in a new environment, confirm reproduced Call-1 checksums match
+> real captured production payloads (execplan stop condition).
 
 ## Architecture
 
@@ -43,18 +135,23 @@ Frontend displays QR to student
   ↓
 Student pays via DNG (external)
   ↓
-DNG webhook → POST /api/v1/finance/dng/webhook
+DNG webhook → POST /api/webhooks/dng/payment
   ↓
-DngWebhookController validates checksum
+DngWebhookController: dedup by payload_hash, store raw inbox event, ALWAYS 200
   ↓
-ProcessDngWebhookJob queues async processing
+ProcessDngWebhookJob (queue 'webhooks')
   ↓
-DngWebhookService::processPaymentNotification()
+DngWebhookService::processEvent()
+  ↓ verifies checksum (incl. Call 1), cross-validates, transitions under row lock
+DngPaymentService::bridgeToPayment() → canonical Payment (Call 1 only settles once)
   ↓
-DngReconciliationService matches to Payment record
-  ↓
-DngWebhookEvent audit stored
+DngWebhookEvent marked processed / mismatch / skipped / failed_terminal
 ```
+
+> The controller does NOT validate the checksum or return 403. It captures the raw
+> payload (deduplicating exact retries) and always returns 200 so DNG stops retrying;
+> all checksum/business validation happens in `DngWebhookService::processEvent` (run
+> by the job), which records the outcome on the `DngWebhookEvent`.
 
 ### Database Tables
 
@@ -136,23 +233,15 @@ Output:
 
 Webhook receiver for DNG payment confirmations.
 
-Route: `POST /api/v1/finance/dng/webhook`
-Middleware: none (public, but checksum-validated)
+Route: `POST /api/webhooks/dng/payment` (`routes/api.php`, name `api.webhooks.dng.payment`)
+Middleware: `throttle:60,1` only (public, no auth — checksum-validated in the pipeline)
 
-Expected payload from DNG:
-
-```json
-{
-    "Code": 200,
-    "Type": "payment_confirmed",
-    "Message": "Success",
-    "dng_transaction_id": "TXN123",
-    "dng_payment_id": "PAY123",
-    "amount": 1000000,
-    "student_code": "STU001",
-    "CheckSum": "hmac_sha256_hash"
-}
-```
+Expected payload and the two-call protocol are documented authoritatively in
+[Webhook Callback Protocol](#webhook-callback-protocol-provider-source-of-truth)
+above (real fields: `StudentId`, `PaymentId`, `FeeType`, `Amount`, `CampusCode`,
+`ItemId`, `InvoiceSerialNumber`, `InvoiceDate`, `CheckSum`). The earlier
+`Code/Type/student_code` example was a placeholder and did not match the live
+provider payload.
 
 #### `DngPaymentRequestController`
 
@@ -193,10 +282,11 @@ Main methods:
 - `createVirtualAccountByFeeType(array $data): array` — Get virtual account for payment
 - `checkPaymentStatus(array $data): array` — Poll payment status
 
-Checksum flow:
+Checksum flow (outgoing):
 
 1. Build checksum string: `AccessCode + ApiCode + CampusCode + Amount + ItemId + lowercase(StudentId)`
-2. Generate HMAC-SHA256 using `DNG_HASH_KEY`
+2. Generate via `DngChecksumService::generate` — HMAC-SHA1 + base64, with `=`→`%3d`
+   and space→`+` (keyed by `DNG_HASH_KEY`)
 3. Append as `CheckSum` field in request payload
 
 #### `DngPaymentService`
@@ -223,39 +313,55 @@ Processes incoming webhook events.
 
 Main method:
 
-- `processPaymentNotification(array $data): void`
+- `processEvent(DngWebhookEvent $event): void`
 
 Process:
 
-1. Validate checksum (SHA256 HMAC)
-2. Find matching `DngPaymentRequest` by `dng_transaction_id` or `dng_payment_id`
-3. Call `DngReconciliationService::reconcile()` to create/match `Payment` record
-4. Update `DngPaymentRequest.status = confirmed`
-5. Audit in `DngWebhookEvent`
+1. Resolve the `DngPaymentRequest` by `ItemId + StudentId + Campus` (stable
+   correlation key), falling back to `dng_payment_id`/`dng_transaction_id`.
+2. Validate checksum (HMAC-SHA1) using the incoming callback string, with the empty
+   `InvoiceSerialNumber` segment on Call 1 — see
+   [Webhook Callback Protocol](#webhook-callback-protocol-provider-source-of-truth).
+3. Cross-validate amount/student/fee/campus/item; bind `dng_payment_id` only after
+   validation passes, inside the locked transition.
+4. Transition status under a row lock (forward only): Call 1 → `paid_uninvoiced`,
+   Call 2 → `paid_invoiced` (invoice-attach only — settle/notify run once, on the
+   first paid transition).
+5. Bridge to the canonical `Payment` via `DngPaymentService::bridgeToPayment()`.
+6. Record the outcome on `DngWebhookEvent.processing_status`.
 
 #### `DngReconciliationService`
 
-Matches DNG webhook data to Payment records.
+Daily fallback that reconciles DNG's paid-of-day feed against local requests.
 
 Main method:
 
-- `reconcile(DngPaymentRequest $dngRequest): Payment`
+- `reconcileDay(string $campusCode, string $date): array` (returns
+  `{backfilled, up_to_date, orphans, errors}`)
 
-Process:
+Process (per transaction):
 
-1. Search for existing `Payment` by student + amount + date
-2. If not found, create new `Payment` record with `source = dng`
-3. Link to `DngPaymentRequest` via `dng_payment_id`
-4. Return `Payment` model
+1. Resolve the local request by `ItemId + StudentId + Campus` first, then `PaymentId`.
+2. Cross-validate; skip terminal/cancelled; refuse illegal transitions.
+3. Under a row lock, backfill status + bind `dng_payment_id` if null, then bridge to
+   `Payment` and settle the linked installment (idempotent).
 
 #### `DngChecksumService`
 
-HMAC-SHA256 checksum generation/validation.
+HMAC-SHA1 checksum generation/validation (base64, `=`↔`%3d` tolerant on verify).
 
 Methods:
 
 - `generate(string $data): string` — Generate checksum for outgoing requests
-- `validate(string $data, string $checksum): bool` — Validate incoming webhook checksum
+  (string: `AccessCode + ApiCode + CampusCode + Amount + ItemId + lowercase(StudentId)`)
+- `validate(string $data, string $checksum): bool` — Validate incoming webhook
+  checksum (string:
+  `AccessCode + ClientCode + amount + InvoiceSerialNumber + StudentId + FeeType + CampusCode`,
+  with empty `InvoiceSerialNumber` on Call 1; decode URL-encoded checksum and use
+  `hash_equals`)
+
+The outgoing and incoming checksum strings are different — see
+[Webhook Callback Protocol](#webhook-callback-protocol-provider-source-of-truth).
 
 Key: `DNG_HASH_KEY` env var.
 
@@ -265,14 +371,15 @@ Key: `DNG_HASH_KEY` env var.
 
 Async webhook processing.
 
-Triggered by: `DngWebhookController` after checksum validation
+Triggered by: `DngWebhookController` after the inbox event is stored
 
 Process:
 
-1. Deserialize webhook payload
-2. Call `DngWebhookService::processPaymentNotification()`
-3. Update `DngWebhookEvent.processed = true`
-4. On error: log, update `processing_error`, do not retry
+1. Load the `DngWebhookEvent` by id; skip if already in a terminal state
+   (`processed` / `mismatch` / `failed_terminal` / `skipped`)
+2. Call `DngWebhookService::processEvent()` (checksum + validation + transition)
+3. The service sets `DngWebhookEvent.processing_status` to the outcome
+4. On exception: retry with backoff (`tries = 5`); exhausted → `failed_terminal`
 
 #### `ReconcileDngPaymentsJob`
 
@@ -425,23 +532,32 @@ Controller catches and returns JSON error response.
 
 ### Webhook Validation
 
-`DngWebhookController` rejects if:
+`DngWebhookController` always returns 200 (it never rejects with 403/400) — it only
+captures the raw payload and deduplicates exact retries. Validation happens in
+`DngWebhookService::processEvent` (via `ProcessDngWebhookJob`), which records the
+outcome on the `DngWebhookEvent.processing_status`:
 
-- Checksum invalid → 403 Forbidden
-- Payload missing required fields → 400 Bad Request
+- Missing `PaymentId` → `failed_terminal` (`malformed_payload`)
+- No matching request → `failed_terminal` (`not_found`)
+- Checksum invalid (incl. Call 1) → `mismatch` (`checksum`) — no settlement
+- Amount/student/fee/campus/item mismatch → `mismatch` — **no Payment created**
+- Cancelled/superseded or already-progressed → `skipped`
+- Valid first settlement → `processed` (bridges Payment, settles installment once)
 
 ### Reconciliation Failures
 
 `DngReconciliationService` logs errors but does not throw:
 
-- Student not found → log warning, skip reconciliation
-- Amount mismatch → log info, still create Payment record (manual review required)
+- Student/request not found → `orphans++`, skip (no Payment)
+- Amount/student/campus/item mismatch → `errors++`, skip — **no Payment created**
+- Illegal transition (e.g. a `failed` request) → `errors++`, skip — no bridge/settle
 
-Jobs retry with `ShouldQueue` + `Retryable` traits (configurable attempts).
+Jobs retry with `ShouldQueue` (`tries = 5`, exponential backoff); exhausted attempts
+mark the event `failed_terminal`.
 
 ## Security Considerations
 
-1. **Checksum Validation**: All DNG requests and webhooks validated with HMAC-SHA256.
+1. **Checksum Validation**: All DNG requests and webhooks validated with HMAC-SHA1 (base64).
 2. **Student Identity**: Uses `students.student_id` (string MSSV), not DB primary key.
 3. **Sensitive Data**: Avoid logging full payment amounts or CCCD in production. Audit tables store full payloads for reconciliation only.
 4. **Webhook Authentication**: Checksum is the only authentication (DNG does not send API key in webhook). No IP allowlist needed.
@@ -469,18 +585,21 @@ Run tests:
 
 ## Troubleshooting
 
-### "Checksum invalid"
+### "Checksum invalid" (event `processing_status = mismatch`, category `checksum`)
 
 - Verify `DNG_HASH_KEY` matches DNG's test/prod key
 - Ensure the current campus has the correct `campuses.dng_code`
 - Check `student_code` is string (MSSV), not int
+- Confirm `DNG_ACCESS_CODE`/`DNG_CLIENT_CODE` config (both are in the callback string)
+- The checksum is accepted in both `%3d` and decoded `=` padding forms
 
 ### "Payment not reconciled"
 
 - Check `dng_webhook_events` table for webhook receipt
-- Verify `processed = true` and `checksum_valid = true`
+- Verify `processing_status = 'processed'` and `is_valid_checksum = true`
+- For a stuck event, inspect `error_category` / `error_message` (mismatch, not_found, …)
 - Check `DngReconciliationService` logs for matching errors
-- Manual matching: search `dng_payment_requests` by student + amount + date
+- Manual matching: search `dng_payment_requests` by item_id / student + amount + date
 
 ### "QR not displaying"
 

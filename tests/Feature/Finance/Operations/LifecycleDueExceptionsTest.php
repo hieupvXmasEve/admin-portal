@@ -14,9 +14,12 @@ use App\Modules\Finance\Actions\Operations\ResolveLifecycleDueExceptionAction;
 use App\Modules\Finance\Actions\Operations\SendDueItemParentRemindersAction;
 use App\Modules\Finance\Actions\Operations\SendDueItemRemindersAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Enums\LifecycleDueExceptionResolutionAction;
+use App\Modules\Finance\Enums\LifecycleDueExceptionReviewEventType;
 use App\Modules\Finance\Enums\LifecycleDueExceptionReviewStatus;
 use App\Modules\Finance\Models\FinanceLifecycleDueExceptionReview;
+use App\Modules\Finance\Models\FinanceLifecycleDueExceptionReviewEvent;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -184,4 +187,51 @@ it('stores review metadata for keep_as_debt resolution', function () {
     expect($result['review']->status)->toBe(LifecycleDueExceptionReviewStatus::KeptAsDebt)
         ->and($stored?->resolution_reason)->toBe('Debt remains collectible')
         ->and($request->fresh()->status)->toBe('pushed_to_dng');
+});
+
+it('does not leave a completed cancel state when the DNG cancel rolls back (FIN-34)', function () {
+    // FIN-34: the CancelRequested attempt event used to be written before the
+    // transaction. If the DNG cancel API then failed and the transaction rolled
+    // back, a committed "CancelRequested" transition survived that the review never
+    // durably reached. The attempt event now commits/rolls back atomically with the
+    // state change, so a failure leaves NO orphan completed-looking transition —
+    // only the paired CancelFailed outcome — and the review never reads as resolved.
+    $student = lifecycleExceptionStudent($this->campus, $this->program, $this->semester, 'ROLL001');
+    $request = lifecycleExceptionDng($student, $this->semester, [
+        'push_payload' => ['StudentName' => 'Student ROLL001', 'Email' => 'roll001@example.com'],
+    ]);
+
+    // DNG cancel API fails — the cancel for a pushed_to_dng request calls the gateway.
+    $mockClient = Mockery::mock(DngClient::class);
+    $mockClient->shouldReceive('buildInsertNewRecordPayload')->andReturn(['Amount' => -1]);
+    $mockClient->shouldReceive('cancelRecord')->andThrow(new RuntimeException('DNG gateway unavailable'));
+    app()->instance(DngClient::class, $mockClient);
+
+    expect(fn () => app(ResolveLifecycleDueExceptionAction::class)->run(
+        $request,
+        LifecycleDueExceptionResolutionAction::CancelDng,
+        'Cancel attempt that fails at the gateway',
+        $this->user->id,
+        canCancelDng: true,
+        canVoidCharges: false,
+    ))->toThrow(RuntimeException::class);
+
+    // Review state did not advance to a resolved/cancel-requested durable status.
+    $review = FinanceLifecycleDueExceptionReview::query()
+        ->where('dng_payment_request_id', $request->id)
+        ->first();
+    expect($review)->toBeNull();
+
+    // Audit: no orphan completed-looking CancelRequested transition survived; the
+    // paired CancelFailed outcome WAS recorded.
+    $eventsByType = FinanceLifecycleDueExceptionReviewEvent::query()
+        ->where('dng_payment_request_id', $request->id)
+        ->pluck('event_type');
+
+    expect($eventsByType->contains(LifecycleDueExceptionReviewEventType::CancelRequested))->toBeFalse()
+        ->and($eventsByType->contains(LifecycleDueExceptionReviewEventType::CancelFailed))->toBeTrue();
+
+    // The DNG request itself stays pushed_to_dng with no committed cancel payload.
+    expect($request->fresh()->status)->toBe('pushed_to_dng')
+        ->and($request->fresh()->cancel_push_payload)->toBeNull();
 });

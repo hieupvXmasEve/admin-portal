@@ -190,12 +190,18 @@ it('deduplicates identical payloads and returns 200 on second call', function ()
     $checksum = generateWebhookChecksum($this->checksumService, '5000000.00', 'STU001', 'tuition', 'CAMPUS001');
     $payload['CheckSum'] = $checksum;
 
-    // First call - should succeed
+    // First call - should succeed and store one event (received, job faked).
     $response1 = $this->postJson('/api/webhooks/dng/payment', $payload);
     $response1->assertOk();
     expect(DngWebhookEvent::count())->toBe(1);
+    $eventId = DngWebhookEvent::first()->id;
 
-    // Second call with identical payload - should still return 200
+    // Second call with a byte-identical payload - still returns 200 (DNG expects it)
+    // and does NOT create a second row. Crucially, the retry is NOT swallowed: the
+    // existing event stays non-terminal (received) so its still-pending job will
+    // process it. (The re-dispatch itself is correctly collapsed by the job's
+    // ShouldBeUniqueUntilProcessing lock while the first job is still pending; the
+    // failed_terminal case below proves the explicit reset + re-dispatch path.)
     $response2 = $this->postJson('/api/webhooks/dng/payment', $payload);
     $response2->assertOk();
     $response2->assertJson([
@@ -204,7 +210,71 @@ it('deduplicates identical payloads and returns 200 on second call', function ()
         'Message' => 'Accepted',
     ]);
 
-    expect(DngWebhookEvent::count())->toBe(2);
+    expect(DngWebhookEvent::count())->toBe(1);
+    expect(DngWebhookEvent::find($eventId)->processing_status)
+        ->toBe(DngWebhookEvent::STATUS_RECEIVED);
+});
+
+it('skips a duplicate of an already-processed event without re-dispatching', function () {
+    // A retry of a payload whose prior attempt already PROCESSED is a true no-op:
+    // re-running the identical payload would only churn. Drop it (no re-dispatch).
+    $payload = [
+        'CampusCode' => 'CAMPUS001',
+        'StudentId' => 'STU001',
+        'PaymentId' => 'PAY001',
+        'Amount' => '5000000',
+        'CheckSum' => 'whatever',
+    ];
+
+    DngWebhookEvent::create([
+        'dng_payment_id' => 'PAY001',
+        'event_type' => DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE,
+        'payload_hash' => DngWebhookEvent::computePayloadHash($payload),
+        'headers' => [],
+        'payload' => $payload,
+        'is_valid_checksum' => true,
+        'processing_status' => DngWebhookEvent::STATUS_PROCESSED,
+        'received_at' => now(),
+    ]);
+
+    $this->postJson('/api/webhooks/dng/payment', $payload)->assertOk();
+
+    expect(DngWebhookEvent::count())->toBe(1);
+    Bus::assertNotDispatched(ProcessDngWebhookJob::class);
+});
+
+it('re-dispatches and resets a duplicate of a failed_terminal (not_found) event', function () {
+    // The first attempt failed because the matching request did not exist yet
+    // (NOT_FOUND). DNG retries the same payload after the request is created — the
+    // retry must NOT be swallowed: reset the stored event and re-dispatch it.
+    $payload = [
+        'CampusCode' => 'CAMPUS001',
+        'StudentId' => 'STU001',
+        'PaymentId' => 'PAY-LATE',
+        'Amount' => '5000000',
+        'CheckSum' => 'whatever',
+    ];
+
+    $event = DngWebhookEvent::create([
+        'dng_payment_id' => 'PAY-LATE',
+        'event_type' => DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE,
+        'payload_hash' => DngWebhookEvent::computePayloadHash($payload),
+        'headers' => [],
+        'payload' => $payload,
+        'is_valid_checksum' => false,
+        'processing_status' => DngWebhookEvent::STATUS_FAILED_TERMINAL,
+        'error_category' => DngWebhookEvent::ERROR_CATEGORY_NOT_FOUND,
+        'error_message' => 'No DNG payment request found',
+        'received_at' => now(),
+    ]);
+
+    $this->postJson('/api/webhooks/dng/payment', $payload)->assertOk();
+
+    expect(DngWebhookEvent::count())->toBe(1);
+    $event->refresh();
+    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_RECEIVED)
+        ->and($event->error_category)->toBeNull();
+    Bus::assertDispatched(ProcessDngWebhookJob::class);
 });
 
 it('captures mismatched amount payloads for debugging', function () {

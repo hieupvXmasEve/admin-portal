@@ -13,6 +13,7 @@ use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -59,30 +60,26 @@ class DngWebhookService
         // Link event to request
         $event->update(['dng_payment_request_id' => $request->id]);
 
-        $shouldVerifyChecksum = filled($payload['InvoiceSerialNumber'] ?? null);
-        $isValidChecksum = ! $shouldVerifyChecksum
-            || $this->checksumService->verifyWebhookChecksum($request, $payload);
+        // FIN-16: verify the checksum for EVERY mutation-capable event, including
+        // the first "payment succeeded without invoice" callback (Call 1). DNG
+        // signs Call 1 with an *empty* InvoiceSerialNumber segment, so it is fully
+        // verifiable with the same formula (verifyWebhookChecksum already treats a
+        // missing serial as ''). Previously Call 1 skipped checksum verification,
+        // which left the public webhook boundary forgeable for settlement events.
+        $isValidChecksum = $this->checksumService->verifyWebhookChecksum($request, $payload);
         $event->update(['is_valid_checksum' => $isValidChecksum]);
 
-        if ($shouldVerifyChecksum && ! $isValidChecksum) {
+        if (! $isValidChecksum) {
             $event->markMismatch('Invalid checksum', DngWebhookEvent::ERROR_CATEGORY_CHECKSUM);
 
             return;
         }
 
-        if (! $request->dng_payment_id) {
-            $request->update(['dng_payment_id' => $dngPaymentId]);
-            $request = $request->fresh();
-        }
-
-        // Cross-validate amount and student
+        // Cross-validate amount and student BEFORE mutating the request. Binding the
+        // callback PaymentId to a request that turns out to be a business mismatch
+        // would poison it with a wrong dng_payment_id, so the bind is deferred into
+        // the locked transition below and only happens once validation has passed.
         if (! $this->crossValidate($request, $payload, $event)) {
-            return;
-        }
-
-        if ($request->status === DngPaymentRequest::STATUS_CANCELLED) {
-            $event->markSkipped('Request was superseded and cancelled before this callback arrived');
-
             return;
         }
 
@@ -92,69 +89,135 @@ class DngWebhookService
             ? DngPaymentRequest::STATUS_PAID_INVOICED
             : DngPaymentRequest::STATUS_PAID_UNINVOICED;
 
-        if ($this->statusOrder($request->status) > $this->statusOrder($targetStatus)) {
-            $this->ensurePaymentBridge($request);
-            $event->markSkipped('Request already progressed beyond this event');
+        // Decide and apply the status transition under a row lock, re-reading the
+        // FRESH status inside the lock. Without this, concurrent callbacks (Call 1 vs
+        // Call 2, or webhook vs reconciliation) can both read the same stale status
+        // and a late Call 1 could downgrade a request that Call 2 already advanced
+        // (e.g. paid_invoiced -> paid_uninvoiced). The lock serialises the decision
+        // so each transition is computed against the committed current status.
+        $outcome = DB::transaction(function () use ($request, $payload, $eventType, $targetStatus, $dngPaymentId): array {
+            /** @var DngPaymentRequest $locked */
+            $locked = DngPaymentRequest::query()->lockForUpdate()->find($request->id);
 
-            return;
+            // FIN-18: both local cancellation (STATUS_CANCELLED) and DNG-pushed
+            // cancellation (STATUS_CANCEL_PUSHED_TO_DNG) are terminal. A late callback
+            // for either must never revive or bridge a cancelled request.
+            if (in_array($locked->status, [
+                DngPaymentRequest::STATUS_CANCELLED,
+                DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG,
+            ], true)) {
+                return ['result' => 'cancelled'];
+            }
+
+            // Bind the callback PaymentId now that checksum + business validation have
+            // passed (deferred from before crossValidate so a mismatched callback can
+            // never poison the request with a wrong dng_payment_id).
+            if (! $locked->dng_payment_id) {
+                $locked->update(['dng_payment_id' => $dngPaymentId]);
+            }
+
+            $currentOrder = $this->statusOrder($locked->status);
+            $targetOrder = $this->statusOrder($targetStatus);
+
+            if ($currentOrder > $targetOrder) {
+                return ['result' => 'already_progressed'];
+            }
+
+            if ($currentOrder === $targetOrder) {
+                return ['result' => 'equivalent'];
+            }
+
+            // Advance: refuse an illegal transition BEFORE mutating any fields, so a
+            // request that cannot legally reach the target (e.g. a failed request) is
+            // never partially updated.
+            if (! $locked->canTransitionTo($targetStatus)) {
+                return ['result' => 'cannot_transition', 'from' => $locked->status];
+            }
+
+            // Is this the FIRST time the request reaches a paid state? Call 1
+            // (pushed_to_dng -> paid_uninvoiced) and an out-of-order Call 2
+            // (pushed_to_dng -> paid_invoiced) are first settlements. Call 2 after
+            // Call 1 (paid_uninvoiced -> paid_invoiced) only attaches invoice
+            // metadata and must NOT re-run payment-received side effects.
+            $isFirstSettlement = $this->statusOrder($locked->status)
+                < $this->statusOrder(DngPaymentRequest::STATUS_PAID_UNINVOICED);
+
+            $updateData = [
+                'last_callback_payload' => $payload,
+                'psp_code' => $payload['PSPCode'] ?? $locked->psp_code,
+            ];
+
+            if (! $locked->paid_at) {
+                $updateData['paid_at'] = now();
+            }
+
+            if ($eventType === DngWebhookEvent::EVENT_PAYMENT_INVOICED) {
+                $updateData['invoice_serial_number'] = $payload['InvoiceSerialNumber'];
+                $updateData['invoice_date'] = $payload['InvoiceDate'];
+            }
+
+            $locked->update($updateData);
+            $locked->transitionTo($targetStatus);
+
+            return ['result' => 'advanced', 'first_settlement' => $isFirstSettlement];
+        });
+
+        switch ($outcome['result']) {
+            case 'cancelled':
+                $event->markSkipped('Request was superseded and cancelled before this callback arrived');
+
+                return;
+
+            case 'already_progressed':
+                $this->recoverPaidState($request->fresh());
+                $event->markSkipped('Request already progressed beyond this event');
+
+                return;
+
+            case 'equivalent':
+                $this->recoverPaidState($request->fresh());
+                $event->markSkipped('Equivalent event already applied');
+
+                return;
+
+            case 'cannot_transition':
+                $event->markFailedTerminal(
+                    "Cannot transition request from {$outcome['from']} to {$targetStatus}",
+                    DngWebhookEvent::ERROR_CATEGORY_PROCESSING,
+                );
+
+                return;
         }
 
-        if ($this->statusOrder($request->status) === $this->statusOrder($targetStatus)) {
-            $this->ensurePaymentBridge($request);
-            $event->markSkipped('Equivalent event already applied');
-
-            return;
-        }
-
-        // Update request fields from callback
-        $updateData = [
-            'last_callback_payload' => $payload,
-            'psp_code' => $payload['PSPCode'] ?? $request->psp_code,
-        ];
-
-        if (! $request->paid_at) {
-            $updateData['paid_at'] = now();
-        }
-
-        // Add invoice fields if present
-        if ($eventType === DngWebhookEvent::EVENT_PAYMENT_INVOICED) {
-            $updateData['invoice_serial_number'] = $payload['InvoiceSerialNumber'];
-            $updateData['invoice_date'] = $payload['InvoiceDate'];
-        }
-
-        $request->update($updateData);
-
-        // Transition state (forward only)
-        if (! $request->canTransitionTo($targetStatus)) {
-            $event->markFailedTerminal(
-                "Cannot transition request from {$request->status} to {$targetStatus}",
-                DngWebhookEvent::ERROR_CATEGORY_PROCESSING,
-            );
-
-            return;
-        }
-
-        $request->transitionTo($targetStatus);
-
+        // result === 'advanced'
         $freshRequest = $request->fresh();
 
+        // The Payment bridge is idempotent and always ensured (Call 2 arriving first
+        // still needs the Payment created).
         $this->ensurePaymentBridge($freshRequest);
 
-        // Mark linked installment as paid + dispatch next push (post-commit).
-        // No-op if the DNG request has no linked installment (legacy / non-installment flow).
-        $this->settleInstallmentAction->handle($freshRequest);
+        if ($outcome['first_settlement']) {
+            // Mark linked installment as paid + dispatch next push (post-commit).
+            // No-op if the DNG request has no linked installment (legacy / non-installment flow).
+            $this->settleInstallmentAction->handle($freshRequest);
 
-        // Auto-enroll retake course registrations when payment confirmed
-        $this->handleRetakeCourseAutoEnroll($freshRequest);
+            // Auto-enroll retake course registrations when payment confirmed.
+            $this->handleRetakeCourseAutoEnroll($freshRequest);
+        }
 
         $event->markProcessed();
 
-        $this->publishPaymentReceivedNotification($freshRequest->fresh());
+        if ($outcome['first_settlement']) {
+            // Notify "payment received" exactly once — only on the first paid
+            // transition. Call 2 (invoice attach) must not re-notify the student.
+            $this->publishPaymentReceivedNotification($freshRequest->fresh());
+        }
 
         Log::info('DNG webhook processed', [
             'event_id' => $event->id,
             'dng_payment_request_id' => $request->id,
             'event_type' => $eventType,
+            'first_settlement' => $outcome['first_settlement'],
             'new_status' => $request->fresh()->status,
         ]);
     }
@@ -191,12 +254,22 @@ class DngWebhookService
     {
         $itemId = (string) ($payload['ItemId'] ?? '');
         $studentId = (string) ($payload['StudentId'] ?? '');
+        $campusCode = (string) ($payload['CampusCode'] ?? '');
 
+        // ItemId + StudentId + Campus is the stable correlation key. Scope by campus
+        // when the callback carries it so two requests sharing ItemId+StudentId across
+        // campuses don't link to the wrong row (matches the schema index and the
+        // reconciliation matcher). PaymentId is only a fallback when no key match.
         if ($itemId !== '' && $studentId !== '') {
-            $request = DngPaymentRequest::query()
+            $query = DngPaymentRequest::query()
                 ->where('item_id', $itemId)
-                ->where('student_code', $studentId)
-                ->first();
+                ->where('student_code', $studentId);
+
+            if ($campusCode !== '') {
+                $query->where('campus_code', $campusCode);
+            }
+
+            $request = $query->first();
 
             if ($request) {
                 return $request;
@@ -227,6 +300,20 @@ class DngWebhookService
         if (! $request->hasBridgedPayment()) {
             $this->dngPaymentService->bridgeToPayment($request);
         }
+    }
+
+    /**
+     * Recovery for a late/duplicate callback on an already-advanced request: ensure
+     * BOTH the canonical Payment exists AND the linked installment is settled. A prior
+     * attempt may have advanced the status but crashed before completing the bridge or
+     * the installment settlement, which would otherwise leave the next installment
+     * un-pushed forever. Both operations are idempotent (bridge guards on payment_id;
+     * SettleInstallmentFromDngAction locks rows and skips already-paid installments).
+     */
+    private function recoverPaidState(DngPaymentRequest $request): void
+    {
+        $this->ensurePaymentBridge($request);
+        $this->settleInstallmentAction->handle($request);
     }
 
     /**
@@ -333,6 +420,9 @@ class DngWebhookService
             DngPaymentRequest::STATUS_RECONCILED => 4,
             DngPaymentRequest::STATUS_FAILED => -1,
             DngPaymentRequest::STATUS_CANCELLED => -2,
+            // FIN-18: cancel pushed to DNG is terminal too; without this it fell
+            // through to default => 0 and a late callback could be processed.
+            DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG => -2,
             default => 0,
         };
     }
