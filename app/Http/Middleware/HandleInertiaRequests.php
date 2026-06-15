@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Semester;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
@@ -59,6 +60,37 @@ class HandleInertiaRequests extends Middleware
                     'permissions' => $permissionService->getUserPermissions($user, $currentCampusId),
                     'current_campus_id' => $currentCampusId,
                     'current_campus' => $currentCampusId ? app('campus') : null,
+                ];
+            },
+            'semester' => function () use ($user, $currentCampusId) {
+                if (! $user) {
+                    return null;
+                }
+
+                $permissions = app(PermissionService::class)->getUserPermissions($user, $currentCampusId);
+                $financePerms = ['view_finance_student_overview', 'view_finance_audit_workspace', 'view_finance_operations_dashboard'];
+                if (count(array_intersect($financePerms, $permissions)) === 0) {
+                    return null; // bound cost: only finance users pay for the semester query
+                }
+
+                $selectedId = session('current_semester_id');
+                if ($selectedId === null) {
+                    $selectedId = Semester::query()->where('is_active', true)->value('id');
+                }
+
+                return [
+                    'selected_id' => $selectedId !== null ? (int) $selectedId : null,
+                    'options' => Semester::query()
+                        ->where('is_archived', false)
+                        ->orderByDesc('start_date')
+                        ->get(['id', 'code', 'name', 'is_active'])
+                        ->map(fn (Semester $s) => [
+                            'id' => (int) $s->id,
+                            'code' => $s->code,
+                            'name' => $s->name,
+                            'is_active' => (bool) $s->is_active,
+                        ])
+                        ->all(),
                 ];
             },
             'ziggy' => [

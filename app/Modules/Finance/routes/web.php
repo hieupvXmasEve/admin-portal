@@ -13,6 +13,7 @@ use App\Modules\Finance\Http\Web\Admin\EgcRetakeAdjustmentsController;
 use App\Modules\Finance\Http\Web\Admin\FinanceAuditWorkspaceController;
 use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
 use App\Modules\Finance\Http\Web\Admin\FinanceGlobalSearchController;
+use App\Modules\Finance\Http\Web\Admin\FinanceSemesterContextController;
 use App\Modules\Finance\Http\Web\Admin\FinanceStudentOverviewController;
 use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionController;
 use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionHistoryController;
@@ -164,6 +165,10 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
     Route::get('/search', [FinanceGlobalSearchController::class, 'search'])
         ->middleware('can:view_finance_student_overview')
         ->name('search');
+
+    // Operator semester selection (single source; reflected via shared prop)
+    Route::post('/semester-context', [FinanceSemesterContextController::class, 'update'])
+        ->name('semester-context.update');
 
     // =====================
     // Finance Charges

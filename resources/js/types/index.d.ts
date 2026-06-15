@@ -1,3 +1,4 @@
+import type { SemesterContext } from '@/types/finance';
 import type { PageProps } from '@inertiajs/core';
 import type { LucideIcon } from 'lucide-vue-next';
 import type { Config } from 'ziggy-js';
@@ -34,6 +35,7 @@ export interface SharedData extends PageProps {
     auth: Auth;
     ziggy: Config & { location: string };
     sidebarOpen: boolean;
+    semester?: SemesterContext | null;
 }
 
 export interface User {
