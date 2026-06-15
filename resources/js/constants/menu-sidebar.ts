@@ -315,6 +315,12 @@ export const mainNavGroups: NavGroup[] = [
         label: 'Finance Office',
         items: [
             {
+                title: 'Audit Workspace',
+                href: '/finance/audit',
+                icon: Search,
+                requiredPermissions: ['view_finance_audit_workspace'],
+            },
+            {
                 title: 'Finance Operations',
                 href: '#',
                 icon: DollarSign,
