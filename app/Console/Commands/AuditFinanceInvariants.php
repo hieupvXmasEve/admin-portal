@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Modules\Finance\Support\Integrity\FinanceInvariant;
 use App\Modules\Finance\Support\Integrity\FinanceIntegrityAuditor;
+use App\Modules\Finance\Support\Integrity\FinanceInvariant;
 use App\Modules\Finance\Support\Integrity\FinanceInvariantRegistry;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
