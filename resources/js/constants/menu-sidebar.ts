@@ -48,7 +48,7 @@ import {
     Users,
 } from 'lucide-vue-next';
 
-import { academicSummaryRoutes, attendanceRoutes, courseRoutes, curriculumRoutes, lecturerRoutes, studentRoutes, systemRoutes } from '@/utils/routes';
+import { academicSummaryRoutes, attendanceRoutes, courseRoutes, curriculumRoutes, financeRoutes, lecturerRoutes, studentRoutes, systemRoutes } from '@/utils/routes';
 
 export const mainNavGroups: NavGroup[] = [
     {
@@ -315,176 +315,71 @@ export const mainNavGroups: NavGroup[] = [
         label: 'Finance Office',
         items: [
             {
-                title: 'Audit Workspace',
-                href: '/finance/audit',
-                icon: Search,
-                requiredPermissions: ['view_finance_audit_workspace'],
+                title: 'Hôm nay',
+                href: financeRoutes.today.dashboard(),
+                icon: LayoutDashboard,
+                requiredPermissions: ['view_finance_operations_dashboard'],
             },
             {
-                title: 'Finance Operations',
+                title: 'Sinh phí',
                 href: '#',
                 icon: DollarSign,
                 children: [
-                    {
-                        title: 'Billing Dashboard',
-                        href: '/finance/operations/dashboard',
-                        icon: LayoutDashboard,
-                        requiredPermissions: ['view_finance_operations_dashboard'],
-                    },
-                    {
-                        title: 'Generate HP (Tuition)',
-                        href: '/finance/major/charges',
-                        icon: Play,
-                        requiredPermissions: ['create_finance_charges'],
-                    },
-                    {
-                        title: 'Batch Charges (All Students)',
-                        href: '/finance/operations/generate-charges',
-                        icon: Layers,
-                        requiredPermissions: ['view_finance_operations_generate_charges'],
-                    },
-                    {
-                        title: 'Exceptions Queue',
-                        href: '/finance/operations/exceptions',
-                        icon: AlertCircle,
-                        requiredPermissions: ['view_finance_operations_exceptions'],
-                    },
-                    {
-                        title: 'Settlement Worklist',
-                        href: '/finance/operations/settlement',
-                        icon: Sparkles,
-                        requiredPermissions: ['allocate_finance_payment'],
-                    },
-                    {
-                        title: 'DNG Due Reminders',
-                        href: '/finance/operations/due-calendar',
-                        icon: CalendarIcon,
-                        requiredPermissions: ['view_finance_operations_due_calendar'],
-                    },
-                    {
-                        title: 'Lifecycle Exceptions',
-                        href: '/finance/operations/lifecycle-exceptions',
-                        icon: FileWarning,
-                        requiredPermissions: ['view_finance_operations_due_calendar'],
-                    },
-                    {
-                        title: 'Lifecycle History',
-                        href: '/finance/operations/lifecycle-exception-history',
-                        icon: Clock,
-                        requiredPermissions: ['view_finance_operations_due_calendar'],
-                    },
+                    { title: 'Generate HP (Tuition)', href: financeRoutes.feeGeneration.majorCharges(), icon: Play, requiredPermissions: ['create_finance_charges'] },
+                    { title: 'Batch Charges (All Students)', href: financeRoutes.feeGeneration.batchCharges(), icon: Layers, requiredPermissions: ['view_finance_operations_generate_charges'] },
+                    { title: 'EGC · Generate Charges', href: financeRoutes.feeGeneration.egcCharges(), icon: GraduationCap, requiredPermissions: ['generate_egc_finance_charges'] },
+                    { title: 'EGC · Block Results', href: financeRoutes.feeGeneration.egcBlockResults(), icon: CheckSquare, requiredPermissions: ['view_egc_block_results'] },
+                    { title: 'EGC · Retake Adjustments', href: financeRoutes.feeGeneration.egcRetakeAdjustments(), icon: TrendingUp, requiredPermissions: ['view_egc_retake_adjustments'] },
+                    { title: 'EGC · Carry Forward', href: financeRoutes.feeGeneration.egcCarryForward(), icon: ArrowRightLeft, requiredPermissions: ['view_egc_retake_adjustments'] },
                 ],
             },
             {
-                title: 'EGC Finance',
+                title: 'Thu & Đối soát',
                 href: '#',
-                icon: GraduationCap,
-                requiredPermissions: ['view_egc_finance_operations'],
+                icon: Send,
                 children: [
-                    {
-                        title: 'Generate Charges',
-                        href: '/finance/egc/charges',
-                        icon: Play,
-                        requiredPermissions: ['generate_egc_finance_charges'],
-                    },
-                    {
-                        title: 'Block Results',
-                        href: '/finance/egc/block-results',
-                        icon: CheckSquare,
-                        requiredPermissions: ['view_egc_block_results'],
-                    },
-                    {
-                        title: 'Retake Adjustments',
-                        href: '/finance/egc/retake-adjustments',
-                        icon: TrendingUp,
-                        requiredPermissions: ['view_egc_retake_adjustments'],
-                    },
-                    {
-                        title: 'Carry Forward',
-                        href: '/finance/egc/carry-forward',
-                        icon: ArrowRightLeft,
-                        requiredPermissions: ['view_egc_retake_adjustments'],
-                    },
-                    {
-                        title: 'DNG Due Reminders',
-                        href: '/finance/operations/due-calendar',
-                        icon: CalendarIcon,
-                        requiredPermissions: ['view_finance_operations_due_calendar'],
-                    },
+                    { title: 'DNG Worklist', href: financeRoutes.collect.dngWorklist(), icon: Send, requiredPermissions: ['create_finance_payments'] },
+                    { title: 'DNG Payment Requests', href: financeRoutes.collect.dngPaymentRequests(), icon: Receipt, requiredPermissions: ['view_finance_dng_payment_requests'] },
+                    { title: 'DNG Webhook Events', href: financeRoutes.collect.dngWebhookEvents(), icon: Receipt, requiredPermissions: ['view_finance_dng_webhook_events'] },
+                    { title: 'Settlement Worklist', href: financeRoutes.collect.settlement(), icon: Sparkles, requiredPermissions: ['allocate_finance_payment'] },
+                    { title: 'Payments', href: financeRoutes.collect.payments(), icon: BarChart3, requiredPermissions: ['view_finance_payments'] },
+                    { title: 'DNG Due Reminders', href: financeRoutes.collect.dueReminders(), icon: CalendarIcon, requiredPermissions: ['view_finance_operations_due_calendar'] },
                 ],
             },
             {
-                title: 'Ledgers & Payments',
+                title: 'Ngoại lệ',
                 href: '#',
-                icon: Receipt,
+                icon: FileWarning,
                 children: [
-                    {
-                        title: 'Charge Ledger (Global)',
-                        href: '/finance/charges',
-                        icon: BarChart3,
-                        requiredPermissions: ['view_finance_charges'],
-                    },
-                    {
-                        title: 'Invoices',
-                        href: '/finance/invoices',
-                        icon: Receipt,
-                        requiredPermissions: ['view_finance_invoices'],
-                    },
-                    {
-                        title: 'Payments',
-                        href: '/finance/payments',
-                        icon: BarChart3,
-                        requiredPermissions: ['view_finance_payments'],
-                    },
-                    {
-                        title: 'DNG Worklist',
-                        href: '/finance/operations/dng-worklist',
-                        icon: Send,
-                        requiredPermissions: ['create_finance_payments'],
-                    },
-                    {
-                        title: 'DNG Payment Requests',
-                        href: '/finance/dng/payment-requests',
-                        icon: Receipt,
-                        requiredPermissions: ['view_finance_dng_payment_requests'],
-                    },
-                    {
-                        title: 'DNG Webhook Events',
-                        href: '/finance/dng/webhook-events',
-                        icon: Receipt,
-                        requiredPermissions: ['view_finance_dng_webhook_events'],
-                    },
+                    { title: 'Exceptions Queue', href: financeRoutes.exceptions.queue(), icon: AlertCircle, requiredPermissions: ['view_finance_operations_exceptions'] },
+                    { title: 'Lifecycle Exceptions', href: financeRoutes.exceptions.lifecycle(), icon: FileWarning, requiredPermissions: ['view_finance_operations_due_calendar'] },
+                    { title: 'Lifecycle History', href: financeRoutes.exceptions.lifecycleHistory(), icon: Clock, requiredPermissions: ['view_finance_operations_due_calendar'] },
                 ],
             },
+            {
+                title: 'Tra cứu & Audit',
+                href: '#',
+                icon: Search,
+                children: [
+                    { title: 'Audit Workspace', href: financeRoutes.audit(), icon: Search, requiredPermissions: ['view_finance_audit_workspace'] },
+                    { title: 'Charge Ledger (Global)', href: financeRoutes.lookup.chargeLedger(), icon: BarChart3, requiredPermissions: ['view_finance_charges'] },
+                    { title: 'Invoices', href: financeRoutes.lookup.invoices(), icon: Receipt, requiredPermissions: ['view_finance_invoices'] },
+                ],
+            },
+        ],
+    },
+    {
+        label: 'Discounts & Funding',
+        items: [
             {
                 title: 'Discounts & Funding',
                 href: '#',
                 icon: Award,
                 children: [
-                    {
-                        title: 'Tuition Plans',
-                        href: '/tuition-plans',
-                        icon: Calculator,
-                        requiredPermissions: ['view_tuition_plan'],
-                    },
-                    {
-                        title: 'Scholarships',
-                        href: '/scholarships',
-                        icon: Award,
-                        requiredPermissions: ['view_scholarship'],
-                    },
-                    {
-                        title: 'Student Scholarships',
-                        href: '/student-scholarships',
-                        icon: Users,
-                        requiredPermissions: ['assign_scholarship'],
-                    },
-                    {
-                        title: 'Vouchers',
-                        href: '/vouchers',
-                        icon: Ticket,
-                        requiredPermissions: ['view_voucher'],
-                    },
+                    { title: 'Tuition Plans', href: '/tuition-plans', icon: Calculator, requiredPermissions: ['view_tuition_plan'] },
+                    { title: 'Scholarships', href: '/scholarships', icon: Award, requiredPermissions: ['view_scholarship'] },
+                    { title: 'Student Scholarships', href: '/student-scholarships', icon: Users, requiredPermissions: ['assign_scholarship'] },
+                    { title: 'Vouchers', href: '/vouchers', icon: Ticket, requiredPermissions: ['view_voucher'] },
                 ],
             },
         ],
