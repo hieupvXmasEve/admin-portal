@@ -1,18 +1,17 @@
 <script setup lang="ts">
 import DataPagination from '@/components/DataPagination.vue';
+import LookupRowActions from '@/components/finance/lookup/LookupRowActions.vue';
+import SendToBatchBar from '@/components/finance/lookup/SendToBatchBar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useDataTable } from '@/composables/useDataTable';
+import { useLookupSelection } from '@/composables/useLookupSelection';
+import { usePermission } from '@/composables/usePermission';
+import type { PaginatedResponse } from '@/types';
 import {
     formatCurrency,
     getChargeStatusBadgeClass,
@@ -21,42 +20,49 @@ import {
     getChargeTypeLabel,
     type ChargeStatus,
     type ChargeType,
-    type FinanceCharge,
     type Semester,
 } from '@/types/finance';
-import type { PaginatedResponse } from '@/types';
+import { financeRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { Eye, Plus, Search } from 'lucide-vue-next';
-import { computed, ref, watch } from 'vue';
+import { ChevronsUpDown, Plus, Search } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { route } from 'ziggy-js';
 
-interface Props {
-    charges: PaginatedResponse<FinanceCharge>;
-    chargeTypes: { value: string; label: string }[];
-    semesters: Semester[];
-    student?: {
-        id: number;
-        full_name: string;
-        student_id: string;
-    } | null;
-    filters: {
-        search: string;
-        student_id?: number | null;
-        semester_id: string;
-        charge_type: string;
-        status: string;
-    };
+interface ChargeRow {
+    id: number;
+    student_id: number;
+    student?: { id: number; full_name: string; student_id: string };
+    charge_type: string;
+    description: string;
+    amount: number;
+    status: string;
+    semester?: { name: string };
 }
 
-const props = defineProps<Props>();
+interface ChargeFilters {
+    search: string;
+    student_id?: number | null;
+    semester_id?: number | null;
+    charge_type: string;
+    status: string;
+    sort?: string | null;
+    direction?: 'asc' | 'desc' | null;
+    per_page: number;
+}
 
-// Local filter state
-const search = ref(props.filters.search || '');
-const semesterId = ref(props.filters.semester_id || 'all');
-const chargeType = ref(props.filters.charge_type || 'all');
-const status = ref(props.filters.status || 'all');
+const props = defineProps<{
+    charges: PaginatedResponse<ChargeRow>;
+    semesters: Semester[];
+    chargeTypes: { value: string; label: string }[];
+    student?: { id: number; full_name: string; student_id: string } | null;
+    filters: ChargeFilters;
+}>();
+
+const permission = usePermission();
+const sel = useLookupSelection();
 
 const chargesIndexRoute = computed(() =>
-    props.student ? route('finance.students.charges', props.student.id) : route('finance.charges.index'),
+    props.student ? route('finance.students.charges', props.student.id) : financeRoutes.lookup.chargeLedger(),
 );
 
 const createChargeRoute = computed(() =>
@@ -66,64 +72,57 @@ const createChargeRoute = computed(() =>
 const pageDescription = computed(() =>
     props.student
         ? `Quản lý các khoản phí và tín dụng của ${props.student.full_name} (${props.student.student_id})`
-        : 'Quản lý các khoản phí và tín dụng của sinh viên',
+        : 'Tra cứu charge ledger toàn campus — sort, filter, chọn nhiều dòng để đẩy Batch Studio.',
 );
 
-// Debounced search
-let searchTimeout: ReturnType<typeof setTimeout>;
-watch(search, () => {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        applyFilters();
-    }, 300);
+const { filters, setFilter, handleSearch, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection } = useDataTable<ChargeFilters>({
+    baseUrl: chargesIndexRoute.value,
+    initialFilters: {
+        search: props.filters.search ?? '',
+        student_id: props.filters.student_id ?? null,
+        semester_id: props.filters.semester_id ?? null,
+        charge_type: props.filters.charge_type ?? 'all',
+        status: props.filters.status ?? 'all',
+        sort: props.filters.sort ?? null,
+        direction: props.filters.direction ?? null,
+        per_page: props.filters.per_page ?? 20,
+    },
+    defaultValues: {
+        charge_type: 'all',
+        status: 'all',
+        per_page: 20,
+        sort: null,
+        direction: null,
+    },
+    only: ['charges', 'filters'],
 });
 
-const applyFilters = () => {
-    router.get(
-        chargesIndexRoute.value,
-        {
-            search: search.value || undefined,
-            semester_id: semesterId.value !== 'all' ? semesterId.value : undefined,
-            charge_type: chargeType.value !== 'all' ? chargeType.value : undefined,
-            status: status.value !== 'all' ? status.value : undefined,
-        },
-        { preserveState: true, preserveScroll: true },
-    );
-};
+const canDng = computed(() => permission.can('create_finance_payments'));
+const canRemind = computed(() => permission.can('view_finance_operations_due_calendar'));
 
-const handleFilterChange = () => {
-    applyFilters();
-};
+const allRows = computed(() =>
+    props.charges.data
+        .filter((charge) => charge.student_id)
+        .map((charge) => ({ key: charge.id, studentId: charge.student_id })),
+);
 
-const handlePaginationNavigate = (url: string) => {
-    router.visit(url, { preserveState: true, preserveScroll: true });
-};
+function sortBy(column: string): void {
+    handleSortChange(column, currentSort.value === column && currentDirection.value === 'asc' ? 'desc' : 'asc');
+}
 
-// Computed statistics
-const totalCharges = computed(() => {
-    return props.charges.data.filter((c) => c.amount > 0 && c.status === 'active').reduce((sum, c) => sum + +c.amount, 0);
-});
-
-const totalCredits = computed(() => {
-    return props.charges.data.filter((c) => c.amount < 0 && c.status === 'active').reduce((sum, c) => sum + Math.abs(c.amount), 0);
-});
-
-const statusOptions = [
-    { value: 'all', label: 'Tất cả trạng thái' },
-    { value: 'active', label: 'Hoạt động' },
-    { value: 'voided', label: 'Đã hủy' },
-];
+function openStudent(row: ChargeRow): void {
+    router.visit(financeRoutes.students.overview(row.student_id, `charge:${row.id}`));
+}
 </script>
 
 <template>
-
     <Head title="Finance Charges" />
 
     <div class="space-y-6">
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-3xl font-bold tracking-tight">Finance Charges</h1>
-                <p class="text-muted-foreground mt-1">{{ pageDescription }}</p>
+                <p class="mt-1 text-muted-foreground">{{ pageDescription }}</p>
             </div>
             <Link :href="createChargeRoute">
                 <Button>
@@ -133,135 +132,122 @@ const statusOptions = [
             </Link>
         </div>
 
-        <!-- Summary Cards -->
-        <div class="grid gap-4 md:grid-cols-3">
-            <Card>
-                <CardHeader class="pb-2">
-                    <CardDescription>Tổng phí (Trang này)</CardDescription>
-                    <CardTitle class="text-lg text-red-600">{{ formatCurrency(totalCharges) }}</CardTitle>
-                </CardHeader>
-            </Card>
-            <Card>
-                <CardHeader class="pb-2">
-                    <CardDescription>Tổng tín dụng (Trang này)</CardDescription>
-                    <CardTitle class="text-lg text-green-600">{{ formatCurrency(totalCredits) }}</CardTitle>
-                </CardHeader>
-            </Card>
-            <Card>
-                <CardHeader class="pb-2">
-                    <CardDescription>Số dòng hiển thị</CardDescription>
-                    <CardTitle class="text-lg">{{ charges.data.length }} / {{ charges.total }}</CardTitle>
-                </CardHeader>
-            </Card>
+        <div class="flex flex-wrap items-center gap-2">
+            <div class="relative w-72">
+                <Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input :model-value="filters.search" placeholder="Tìm mô tả / tên / mã SV…" class="pl-9" @update:model-value="handleSearch" />
+            </div>
+            <Select :model-value="filters.status" @update:model-value="(value) => setFilter('status', String(value))">
+                <SelectTrigger class="w-44">
+                    <SelectValue placeholder="Trạng thái" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Mọi trạng thái</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="void">Void</SelectItem>
+                </SelectContent>
+            </Select>
+            <Select :model-value="String(filters.semester_id ?? 'all')" @update:model-value="(value) => setFilter('semester_id', value === 'all' ? null : Number(value))">
+                <SelectTrigger class="w-44">
+                    <SelectValue placeholder="Học kỳ" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Mọi kỳ</SelectItem>
+                    <SelectItem v-for="semester in semesters" :key="semester.id" :value="String(semester.id)">
+                        {{ semester.name }}
+                    </SelectItem>
+                </SelectContent>
+            </Select>
+            <Select :model-value="filters.charge_type" @update:model-value="(value) => setFilter('charge_type', String(value))">
+                <SelectTrigger class="w-44">
+                    <SelectValue placeholder="Loại phí" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Mọi loại phí</SelectItem>
+                    <SelectItem v-for="type in chargeTypes" :key="type.value" :value="type.value">
+                        {{ type.label }}
+                    </SelectItem>
+                </SelectContent>
+            </Select>
         </div>
 
-        <!-- Filters -->
-        <Card>
-            <CardHeader>
-                <CardTitle>Bộ lọc</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div class="grid gap-4 md:grid-cols-4">
-                    <div class="relative">
-                        <Search class="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-                        <Input v-model="search" placeholder="Tìm sinh viên, mô tả..." class="pl-10" />
-                    </div>
-                    <Select v-model="semesterId" @update:model-value="handleFilterChange">
-                        <SelectTrigger>
-                            <SelectValue placeholder="Chọn học kỳ" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Tất cả học kỳ</SelectItem>
-                            <SelectItem v-for="sem in semesters" :key="sem.id" :value="String(sem.id)">
-                                {{ sem.name }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Select v-model="chargeType" @update:model-value="handleFilterChange">
-                        <SelectTrigger>
-                            <SelectValue placeholder="Loại phí" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Tất cả loại phí</SelectItem>
-                            <SelectItem v-for="type in chargeTypes" :key="type.value" :value="type.value">
-                                {{ type.label }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Select v-model="status" @update:model-value="handleFilterChange">
-                        <SelectTrigger>
-                            <SelectValue placeholder="Trạng thái" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
-                                {{ opt.label }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-            </CardContent>
-        </Card>
+        <div class="rounded-md border">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead class="sticky top-0 z-10 w-8 bg-background">
+                            <Checkbox :model-value="allRows.length > 0 && sel.count.value === allRows.length" @update:model-value="(value) => sel.toggleAll(allRows, !!value)" />
+                        </TableHead>
+                        <TableHead class="sticky top-0 z-10 bg-background">Sinh viên</TableHead>
+                        <TableHead class="sticky top-0 z-10 cursor-pointer bg-background" @click="sortBy('charge_type')">
+                            Loại phí
+                            <ChevronsUpDown class="inline h-3 w-3" />
+                        </TableHead>
+                        <TableHead class="sticky top-0 z-10 bg-background">Mô tả</TableHead>
+                        <TableHead class="sticky top-0 z-10 bg-background">Học kỳ</TableHead>
+                        <TableHead class="sticky top-0 z-10 cursor-pointer bg-background text-right" @click="sortBy('amount')">
+                            Số tiền
+                            <ChevronsUpDown class="inline h-3 w-3" />
+                        </TableHead>
+                        <TableHead class="sticky top-0 z-10 cursor-pointer bg-background" @click="sortBy('status')">
+                            Trạng thái
+                            <ChevronsUpDown class="inline h-3 w-3" />
+                        </TableHead>
+                        <TableHead class="sticky top-0 z-10 bg-background text-right">Thao tác</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    <TableRow
+                        v-for="charge in charges.data"
+                        :key="charge.id"
+                        class="cursor-pointer hover:bg-muted/50"
+                        @click="openStudent(charge)"
+                    >
+                        <TableCell @click.stop>
+                            <Checkbox :model-value="sel.isSelected(charge.id)" @update:model-value="() => sel.toggle({ key: charge.id, studentId: charge.student_id })" />
+                        </TableCell>
+                        <TableCell>
+                            <div class="font-medium">{{ charge.student?.full_name ?? 'N/A' }}</div>
+                            <div class="text-xs text-muted-foreground tabular-nums">{{ charge.student?.student_id }}</div>
+                        </TableCell>
+                        <TableCell>
+                            <Badge :class="getChargeTypeBadgeClass(charge.charge_type as ChargeType)">
+                                {{ getChargeTypeLabel(charge.charge_type as ChargeType) }}
+                            </Badge>
+                        </TableCell>
+                        <TableCell class="max-w-[220px] truncate text-muted-foreground">{{ charge.description }}</TableCell>
+                        <TableCell>{{ charge.semester?.name ?? '-' }}</TableCell>
+                        <TableCell class="text-right tabular-nums" :class="charge.amount < 0 ? 'text-emerald-600' : ''">
+                            {{ formatCurrency(charge.amount) }}
+                        </TableCell>
+                        <TableCell>
+                            <Badge :class="getChargeStatusBadgeClass(charge.status as ChargeStatus)">
+                                {{ getChargeStatusLabel(charge.status as ChargeStatus) }}
+                            </Badge>
+                        </TableCell>
+                        <TableCell @click.stop>
+                            <LookupRowActions
+                                :student-id="charge.student_id"
+                                :focus="`charge:${charge.id}`"
+                                :detail-url="route('finance.charges.show', charge.id)"
+                            />
+                        </TableCell>
+                    </TableRow>
+                    <TableEmpty v-if="charges.data.length === 0" :colspan="8">
+                        Không có khoản phí nào khớp bộ lọc.
+                    </TableEmpty>
+                </TableBody>
+            </Table>
+        </div>
 
-        <!-- Charges Table -->
-        <Card>
-            <CardContent class="p-0">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Sinh viên</TableHead>
-                            <TableHead>Loại phí</TableHead>
-                            <TableHead>Mô tả</TableHead>
-                            <TableHead>Học kỳ</TableHead>
-                            <TableHead class="text-right">Số tiền</TableHead>
-                            <TableHead>Trạng thái</TableHead>
-                            <TableHead class="text-right">Thao tác</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        <TableRow v-if="charges.data.length === 0">
-                            <TableCell colspan="9" class="text-muted-foreground py-12 text-center">
-                                Không có dữ liệu phí nào
-                            </TableCell>
-                        </TableRow>
-                        <TableRow v-for="charge in charges.data" :key="charge.id">
-                            <TableCell>
-                                <div>
-                                    <div class="font-medium">{{ charge.student?.full_name ?? 'N/A' }}</div>
-                                    <div class="text-muted-foreground text-xs">{{ charge.student?.student_id }}</div>
-                                </div>
-                            </TableCell>
-                            <TableCell>
-                                <Badge :class="getChargeTypeBadgeClass(charge.charge_type as ChargeType)">
-                                    {{ getChargeTypeLabel(charge.charge_type as ChargeType) }}
-                                </Badge>
-                            </TableCell>
-                            <TableCell class="max-w-[200px] truncate">{{ charge.description }}</TableCell>
-                            <TableCell>{{ charge.semester?.name ?? '-' }}</TableCell>
-                            <TableCell class="text-right font-medium"
-                                :class="charge.amount < 0 ? 'text-green-600' : 'text-red-600'">
-                                {{ formatCurrency(charge.amount) }}
-                            </TableCell>
-                            <TableCell>
-                                <Badge :class="getChargeStatusBadgeClass(charge.status as ChargeStatus)">
-                                    {{ getChargeStatusLabel(charge.status as ChargeStatus) }}
-                                </Badge>
-                            </TableCell>
-                            <TableCell class="text-right">
-                                <div class="flex justify-end gap-2">
-                                    <Link :href="route('finance.charges.show', charge.id)">
-                                        <Button variant="outline" size="sm">
-                                            <Eye class="h-4 w-4" />
-                                        </Button>
-                                    </Link>
-                                </div>
-                            </TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
-
-        <!-- Pagination -->
-        <DataPagination :pagination-data="charges" @navigate="handlePaginationNavigate" />
+        <DataPagination :pagination-data="charges" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+        <SendToBatchBar
+            :count="sel.count.value"
+            :can-dng="canDng"
+            :can-remind="canRemind"
+            @dng="sel.sendToBatch('dng')"
+            @reminders="sel.sendToBatch('reminders')"
+            @clear="sel.clear"
+        />
     </div>
 </template>

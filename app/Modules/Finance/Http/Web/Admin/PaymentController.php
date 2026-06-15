@@ -14,6 +14,7 @@ use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
+use App\Modules\Finance\Http\Requests\Lookup\FilterPaymentsRequest;
 use App\Modules\Finance\Queries\GetPaymentDetailsQuery;
 use App\Modules\Finance\Queries\ListPaymentsQuery;
 use App\Modules\Finance\Queries\Operations\PreviewAutoAllocateQuery;
@@ -27,7 +28,7 @@ class PaymentController extends Controller
         private DngCampusCodeResolver $dngCampusCodeResolver,
     ) {}
 
-    public function index(Request $request, ListPaymentsQuery $query)
+    public function index(FilterPaymentsRequest $request, ListPaymentsQuery $query): Response
     {
         $result = $query->handle($request);
 

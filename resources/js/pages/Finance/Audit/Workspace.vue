@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import MoneyFlowGraph from '@/components/finance/audit/MoneyFlowGraph.vue';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,7 +71,14 @@ interface Warning {
 }
 
 const props = defineProps<{
-    filters: { q: string | null; target_type: string | null; target_id: number | null; semester_id: number | null; billing_cycle_id: number | null };
+    filters: {
+        q: string | null;
+        target_type: string | null;
+        target_id: number | null;
+        semester_id: number | null;
+        billing_cycle_id: number | null;
+        finding_code?: string | null;
+    };
     resolution: Resolution;
     links: { source: { url: string; label: string } | null };
     allowed_actions: { export: boolean };
@@ -85,23 +94,6 @@ const submitSearch = (): void => {
 };
 
 const isSingle = computed(() => props.resolution.status === 'single');
-
-// Group nodes by type for a readable summary instead of a raw node dump.
-const nodeGroups = (graph: Graph): { type: string; nodes: GraphNode[] }[] => {
-    const order = ['student', 'invoice', 'invoice_line', 'charge', 'payment', 'dng'];
-    const byType: Record<string, GraphNode[]> = {};
-    for (const node of graph.nodes) (byType[node.type] ??= []).push(node);
-    return order.filter((t) => byType[t]?.length).map((type) => ({ type, nodes: byType[type] }));
-};
-
-const typeLabel: Record<string, string> = {
-    student: 'Student',
-    invoice: 'Invoices',
-    invoice_line: 'Invoice lines',
-    charge: 'Charges',
-    payment: 'Payments',
-    dng: 'DNG requests',
-};
 
 const severityClass = (severity: string): string => {
     switch (severity) {
@@ -183,6 +175,12 @@ const refreshDeferred = (): void => {
 
         <!-- Resolution: single target -->
         <div v-else-if="isSingle" class="space-y-6">
+            <Alert v-if="filters.finding_code">
+                <AlertDescription>
+                    Đang xem theo phát hiện <strong>{{ filters.finding_code }}</strong>. Bảng "Sức khỏe dữ liệu" (Cockpit) là nguồn của lối tắt này.
+                </AlertDescription>
+            </Alert>
+
             <!-- Action bar -->
             <div class="flex flex-wrap items-center gap-2">
                 <Badge variant="secondary" class="capitalize">{{ resolution.target?.type }} #{{ resolution.target?.id }}</Badge>
@@ -214,10 +212,7 @@ const refreshDeferred = (): void => {
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent class="space-y-4">
-                                    <div class="flex flex-wrap gap-2">
-                                        <Badge v-for="group in nodeGroups(graph)" :key="group.type" variant="outline"> {{ typeLabel[group.type] ?? group.type }}: {{ group.nodes.length }} </Badge>
-                                        <Badge variant="outline">Edges: {{ graph.edges.length }}</Badge>
-                                    </div>
+                                    <MoneyFlowGraph :graph="graph" />
 
                                     <Separator />
 
@@ -257,7 +252,9 @@ const refreshDeferred = (): void => {
                                                 {{ event.label }}
                                                 <span class="text-muted-foreground">· {{ event.at ? formatDate(event.at) : '—' }}</span>
                                             </span>
-                                            <span class="font-mono text-sm" :class="event.signed_amount < 0 ? 'text-red-600' : 'text-emerald-700'"> {{ event.signed_amount < 0 ? '−' : '+' }}{{ formatCurrency(Math.abs(event.signed_amount)) }} </span>
+                                            <span class="font-mono text-sm tabular-nums" :class="event.signed_amount < 0 ? 'text-red-600' : 'text-emerald-600'">
+                                                {{ event.signed_amount < 0 ? '−' : '+' }}{{ formatCurrency(Math.abs(event.signed_amount)) }}
+                                            </span>
                                         </li>
                                     </ol>
                                 </CardContent>

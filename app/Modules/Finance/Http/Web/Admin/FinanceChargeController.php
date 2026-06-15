@@ -6,11 +6,21 @@ namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\FinanceCharge;
+use App\Models\FinanceChargeInstallment;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
+use App\Modules\Finance\Actions\PushNextInstallmentAction;
+use App\Modules\Finance\Actions\SplitChargeIntoInstallmentsAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
+use App\Modules\Finance\Exceptions\ChargeHasPaidInstallmentException;
+use App\Modules\Finance\Exceptions\InstallmentSplitNotAllowedException;
+use App\Modules\Finance\Exceptions\InvalidInstallmentPlanException;
+use App\Modules\Finance\Http\Requests\Charges\SplitChargeIntoInstallmentsRequest;
+use App\Modules\Finance\Http\Requests\Lookup\FilterFinanceChargesRequest;
+use App\Modules\Finance\Queries\Lookup\ListFinanceChargesQuery;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -46,68 +56,36 @@ class FinanceChargeController extends Controller
     /**
      * Display a listing of finance charges.
      */
-    public function index(Request $request): Response
-    {
-        return $this->renderIndex($request);
+    public function index(
+        FilterFinanceChargesRequest $request,
+        ListFinanceChargesQuery $query,
+    ): Response {
+        return $this->renderIndex($request, $query);
     }
 
     /**
      * Display a listing of finance charges for a specific student.
      */
-    public function studentCharges(Request $request, Student $student): Response
-    {
-        return $this->renderIndex($request, $student);
+    public function studentCharges(
+        FilterFinanceChargesRequest $request,
+        ListFinanceChargesQuery $query,
+        Student $student,
+    ): Response {
+        return $this->renderIndex($request, $query, $student);
     }
 
-    private function renderIndex(Request $request, ?Student $student = null): Response
-    {
-        $validated = $request->validate([
-            'search' => 'nullable|string|max:255',
-            'student_id' => 'nullable|integer|exists:students,id',
-            'semester_id' => 'nullable|integer|exists:semesters,id',
-            'charge_type' => 'nullable|string',
-            'status' => 'nullable|string|in:all,active,void',
-            'per_page' => 'nullable|integer|min:5|max:100',
-        ]);
-
+    private function renderIndex(
+        FilterFinanceChargesRequest $request,
+        ListFinanceChargesQuery $query,
+        ?Student $student = null,
+    ): Response {
         $selectedStudent = $student;
 
-        if (! $selectedStudent && ! empty($validated['student_id'])) {
-            $selectedStudent = Student::find($validated['student_id']);
+        if (! $selectedStudent && $request->filled('student_id')) {
+            $selectedStudent = Student::query()->find((int) $request->input('student_id'));
         }
 
-        $query = FinanceCharge::query()
-            ->with(['student', 'semester', 'createdBy']);
-
-        if ($selectedStudent) {
-            $query->where('student_id', $selectedStudent->id);
-        }
-
-        if (! empty($validated['search'])) {
-            $query->where(function ($q) use ($validated) {
-                $q->where('description', 'like', "%{$validated['search']}%")
-                    ->orWhereHas('student', function ($q) use ($validated) {
-                        $q->where('full_name', 'like', "%{$validated['search']}%")
-                            ->orWhere('student_id', 'like', "%{$validated['search']}%")
-                            ->orWhere('email', 'like', "%{$validated['search']}%");
-                    });
-            });
-        }
-
-        if (! empty($validated['semester_id'])) {
-            $query->where('semester_id', $validated['semester_id']);
-        }
-
-        if (! empty($validated['charge_type']) && $validated['charge_type'] !== 'all') {
-            $query->where('charge_type', $validated['charge_type']);
-        }
-
-        if (! empty($validated['status']) && $validated['status'] !== 'all') {
-            $query->where('status', $validated['status']);
-        }
-
-        $charges = $query->orderBy('effective_at', 'desc')
-            ->paginate($validated['per_page'] ?? 20);
+        $result = $query->handle($request, $selectedStudent?->id);
 
         $semesters = Semester::orderBy('start_date', 'desc')->get();
 
@@ -117,7 +95,7 @@ class FinanceChargeController extends Controller
         ]);
 
         return Inertia::render('Finance/Charges/Index', [
-            'charges' => $charges,
+            'charges' => $result['items'],
             'semesters' => $semesters,
             'chargeTypes' => $chargeTypes,
             'student' => $selectedStudent ? [
@@ -126,11 +104,14 @@ class FinanceChargeController extends Controller
                 'student_id' => $selectedStudent->student_id,
             ] : null,
             'filters' => [
-                'search' => $validated['search'] ?? '',
-                'student_id' => $selectedStudent?->id ?? $validated['student_id'] ?? null,
-                'semester_id' => $validated['semester_id'] ?? null,
-                'charge_type' => $validated['charge_type'] ?? 'all',
-                'status' => $validated['status'] ?? 'all',
+                'search' => $request->input('search', ''),
+                'student_id' => $selectedStudent?->id ?? ($request->filled('student_id') ? (int) $request->input('student_id') : null),
+                'semester_id' => $request->filled('semester_id') ? (int) $request->input('semester_id') : null,
+                'charge_type' => $request->input('charge_type', 'all'),
+                'status' => $request->input('status', 'all'),
+                'sort' => $request->input('sort'),
+                'direction' => $request->input('direction'),
+                'per_page' => (int) $request->input('per_page', 20),
             ],
         ]);
     }
@@ -195,23 +176,23 @@ class FinanceChargeController extends Controller
      * Domain invariants enforced inside SplitChargeIntoInstallmentsAction.
      */
     public function splitInstallments(
-        \App\Modules\Finance\Http\Requests\Charges\SplitChargeIntoInstallmentsRequest $request,
+        SplitChargeIntoInstallmentsRequest $request,
         FinanceCharge $charge,
-        \App\Modules\Finance\Actions\SplitChargeIntoInstallmentsAction $action,
-    ): \Illuminate\Http\RedirectResponse {
+        SplitChargeIntoInstallmentsAction $action,
+    ): RedirectResponse {
         $this->authorize('splitInstallment', $charge);
 
         try {
             $action->handle($charge->id, $request->validated()['installments']);
-        } catch (\App\Modules\Finance\Exceptions\ChargeHasPaidInstallmentException $e) {
+        } catch (ChargeHasPaidInstallmentException $e) {
             return back()->withErrors(['installments' => $e->getMessage()]);
-        } catch (\App\Modules\Finance\Exceptions\InstallmentSplitNotAllowedException $e) {
+        } catch (InstallmentSplitNotAllowedException $e) {
             return back()->withErrors(['installments' => $e->getMessage()]);
-        } catch (\App\Modules\Finance\Exceptions\InvalidInstallmentPlanException $e) {
+        } catch (InvalidInstallmentPlanException $e) {
             return back()->withErrors(['installments' => $e->getMessage()]);
         }
 
-        \Inertia\Inertia::flash('success', 'Kế hoạch đợt đã được lưu.');
+        Inertia::flash('success', 'Kế hoạch đợt đã được lưu.');
 
         return back();
     }
@@ -222,9 +203,9 @@ class FinanceChargeController extends Controller
      */
     public function retryPushInstallment(
         FinanceCharge $charge,
-        \App\Models\FinanceChargeInstallment $installment,
-        \App\Modules\Finance\Actions\PushNextInstallmentAction $action,
-    ): \Illuminate\Http\RedirectResponse {
+        FinanceChargeInstallment $installment,
+        PushNextInstallmentAction $action,
+    ): RedirectResponse {
         $this->authorize('splitInstallment', $charge);
 
         if ((int) $installment->finance_charge_id !== (int) $charge->id) {
@@ -237,7 +218,7 @@ class FinanceChargeController extends Controller
             return back()->withErrors(['retry' => 'Push DNG thất bại: '.$e->getMessage()]);
         }
 
-        \Inertia\Inertia::flash('success', "Đợt {$installment->installment_no} đã được push lại sang DNG.");
+        Inertia::flash('success', "Đợt {$installment->installment_no} đã được push lại sang DNG.");
 
         return back();
     }
