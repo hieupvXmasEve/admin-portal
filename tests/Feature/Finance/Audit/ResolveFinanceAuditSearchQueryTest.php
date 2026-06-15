@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
+use App\Models\FinanceCharge;
 use App\Models\Payment;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentInvoice;
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Queries\Audit\ResolveFinanceAuditSearchQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -97,6 +99,60 @@ it('does not surface a same-code record from another campus', function () {
 
     $result = app(ResolveFinanceAuditSearchQuery::class)->handle('SWB999', $this->campus->id);
     expect($result['status'])->toBe('empty');
+});
+
+it('resolves a DNG item_id to a single dng target', function () {
+    $student = resolverStudent($this->campus, $this->program, $this->semester);
+    $dng = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'HCM',
+        'student_code' => (string) $student->student_id,
+        'fee_type' => 'HL',
+        'item_id' => 'ITEM-RES-9',
+        'amount' => 1000,
+        'status' => 'pending',
+    ]);
+
+    $result = app(ResolveFinanceAuditSearchQuery::class)->handle('ITEM-RES-9', $this->campus->id);
+
+    expect($result['status'])->toBe('single')
+        ->and($result['target'])->toBe(['type' => 'dng', 'id' => $dng->id]);
+});
+
+it('resolves a charge: prefix to a single charge target', function () {
+    $student = resolverStudent($this->campus, $this->program, $this->semester);
+    $charge = FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $this->semester->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => 1000,
+        'description' => 'Prefix charge',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+
+    $result = app(ResolveFinanceAuditSearchQuery::class)->handle("charge:{$charge->id}", $this->campus->id);
+
+    expect($result['status'])->toBe('single')
+        ->and($result['target'])->toBe(['type' => 'charge', 'id' => $charge->id]);
+});
+
+it('resolves a non-MSSV payment external_ref to a single payment target', function () {
+    $student = resolverStudent($this->campus, $this->program, $this->semester);
+    $payment = Payment::create([
+        'student_id' => $student->id,
+        'amount' => 2500,
+        'method' => Payment::METHOD_GATEWAY,
+        'source' => 'manual',
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+        'external_ref' => 'EXTREF-123', // hyphen => not MSSV-shaped => external_ref branch runs
+    ]);
+
+    $result = app(ResolveFinanceAuditSearchQuery::class)->handle('EXTREF-123', $this->campus->id);
+
+    expect($result['status'])->toBe('single')
+        ->and($result['target'])->toBe(['type' => 'payment', 'id' => $payment->id]);
 });
 
 it('returns ambiguous when a name matches multiple students', function () {

@@ -33,7 +33,10 @@ class ResolveFinanceAuditSearchQuery
     public function handle(?string $q, ?int $campusId): array
     {
         $q = trim((string) ($q ?? ''));
-        if ($q === '') {
+        if ($q === '' || $campusId === null) {
+            // No search term, or no campus context — resolve nothing. Defense in
+            // depth: every branch is campus-filtered, so a null campus would match
+            // nothing anyway; this just makes the contract explicit and skips work.
             return $this->empty();
         }
 

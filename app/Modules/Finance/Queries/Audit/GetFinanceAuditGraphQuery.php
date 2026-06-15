@@ -23,7 +23,8 @@ use Illuminate\Support\Collection;
  */
 class GetFinanceAuditGraphQuery
 {
-    private const DRIFT_TOLERANCE = 0.01;
+    /** Structural node types that are always kept even with no edges. */
+    private const STRUCTURAL_TYPES = ['student', 'invoice', 'invoice_line', 'charge'];
 
     public function __construct(private readonly SettlementService $settlement) {}
 
@@ -61,6 +62,7 @@ class GetFinanceAuditGraphQuery
 
         $nodes = $this->buildNodes($student, $invoices, $lines, $charges, $payments, $dngRequests);
         $edges = $this->buildEdges($invoices, $lines, $charges, $payments, $dngRequests, $inScopeLineIds);
+        $nodes = $this->pruneOrphanNodes($nodes, $edges);
 
         return [
             'subject' => $this->subject($student),
@@ -180,6 +182,29 @@ class GetFinanceAuditGraphQuery
         return $edges;
     }
 
+    /**
+     * Drop payment/DNG nodes left with no edges (e.g. whose applications/charges
+     * all fell outside the bounded semester scope). Structural nodes — the
+     * student, its in-scope invoices, lines, and charges — are always kept.
+     *
+     * @param  array<string,array>  $nodes
+     * @param  list<array>  $edges
+     * @return array<string,array>
+     */
+    private function pruneOrphanNodes(array $nodes, array $edges): array
+    {
+        $referenced = [];
+        foreach ($edges as $edge) {
+            $referenced[$edge['from']] = true;
+            $referenced[$edge['to']] = true;
+        }
+
+        return array_filter(
+            $nodes,
+            fn (array $node) => in_array($node['type'], self::STRUCTURAL_TYPES, true) || isset($referenced[$node['key']]),
+        );
+    }
+
     /** @return list<array> */
     private function derivedBalance(Collection $invoices): array
     {
@@ -188,8 +213,7 @@ class GetFinanceAuditGraphQuery
             $cachedTotal = (float) $invoice->cached_total_amount;
             $cachedPaid = (float) $invoice->cached_paid_amount;
 
-            $drift = abs($cachedPaid - $snapshot['paid']) > self::DRIFT_TOLERANCE
-                || abs($cachedTotal - $snapshot['net']) > self::DRIFT_TOLERANCE;
+            $drift = $this->settlement->snapshotDriftsFromCache($invoice, $snapshot);
 
             return [
                 'invoice_id' => (int) $invoice->id,

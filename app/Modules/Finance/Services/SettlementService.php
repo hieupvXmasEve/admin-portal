@@ -16,6 +16,31 @@ use Illuminate\Database\Eloquent\Collection;
 
 class SettlementService
 {
+    /** Tolerance for comparing cached invoice columns against derived balances. */
+    public const CACHE_DRIFT_TOLERANCE = 0.01;
+
+    /**
+     * Whether an invoice's cached columns disagree with its derived snapshot.
+     * Single source of the cache-drift formula shared by the audit graph query
+     * and the audit warning builder so they can never diverge.
+     */
+    public function invoiceCacheDrifts(StudentInvoice $invoice): bool
+    {
+        return $this->snapshotDriftsFromCache($invoice, $this->deriveInvoiceSnapshot($invoice));
+    }
+
+    /**
+     * Same comparison as invoiceCacheDrifts() but against an already-computed
+     * snapshot, so callers that need the derived numbers do not derive twice.
+     *
+     * @param  array{net:float,paid:float}  $snapshot
+     */
+    public function snapshotDriftsFromCache(StudentInvoice $invoice, array $snapshot): bool
+    {
+        return abs((float) $invoice->cached_paid_amount - (float) $snapshot['paid']) > self::CACHE_DRIFT_TOLERANCE
+            || abs((float) $invoice->cached_total_amount - (float) $snapshot['net']) > self::CACHE_DRIFT_TOLERANCE;
+    }
+
     public function deriveInvoiceSnapshot(StudentInvoice $invoice): array
     {
         $invoice->loadMissing([

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Models\Semester;
+use App\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Audit\GetFinanceAuditGraphQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -44,6 +46,36 @@ it('flags cache drift in derived_balance when cached_paid_amount is stale', func
         ->and($row['drift'])->toBeTrue()
         ->and($row['derived_paid'])->toBe(500.0)
         ->and((float) $row['cached_paid_amount'])->toBe(0.0);
+});
+
+it('bounds the default graph to the most recent semester with activity', function () {
+    $student = auditFixtureStudent();
+    $olderSemesterId = (int) $student->intake_semester_id;
+    $newerSemester = Semester::factory()->create(); // higher id => most recent
+
+    $makeInvoice = function (int $semesterId, string $number) use ($student): StudentInvoice {
+        return StudentInvoice::create([
+            'invoice_number' => $number,
+            'student_id' => $student->id,
+            'semester_id' => $semesterId,
+            'status' => 'pending',
+            'due_date' => now()->addDays(30),
+            'subtotal' => 1000, 'discount_total' => 0, 'total_amount' => 1000, 'paid_amount' => 0,
+            'cached_total_amount' => 1000, 'cached_paid_amount' => 0,
+        ]);
+    };
+
+    $olderInvoice = $makeInvoice($olderSemesterId, 'INV-OLD-1');
+    $newerInvoice = $makeInvoice($newerSemester->id, 'INV-NEW-1');
+
+    $graph = app(GetFinanceAuditGraphQuery::class)
+        ->handle(['type' => 'student', 'id' => $student->id]);
+
+    $nodeKeys = collect($graph['nodes'])->pluck('key');
+    expect($nodeKeys)->toContain("invoice:{$newerInvoice->id}")
+        ->and($nodeKeys)->not->toContain("invoice:{$olderInvoice->id}")
+        ->and(collect($graph['derived_balance'])->pluck('invoice_id'))->toContain($newerInvoice->id)
+        ->and(collect($graph['derived_balance'])->pluck('invoice_id'))->not->toContain($olderInvoice->id);
 });
 
 it('emits ledger_entries carrying signed payment applications for the timeline', function () {

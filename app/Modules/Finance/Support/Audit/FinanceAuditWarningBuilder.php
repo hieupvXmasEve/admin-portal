@@ -22,8 +22,6 @@ use App\Modules\Finance\Support\Integrity\FinanceIntegrityAuditor;
  */
 class FinanceAuditWarningBuilder
 {
-    private const DRIFT_TOLERANCE = 0.01;
-
     public function __construct(
         private readonly FinanceIntegrityAuditor $auditor,
         private readonly SettlementService $settlement,
@@ -75,12 +73,7 @@ class FinanceAuditWarningBuilder
 
         $ids = [];
         foreach ($invoices as $invoice) {
-            $snapshot = $this->settlement->deriveInvoiceSnapshot($invoice);
-
-            $driftsOnPaid = abs((float) $invoice->cached_paid_amount - $snapshot['paid']) > self::DRIFT_TOLERANCE;
-            $driftsOnTotal = abs((float) $invoice->cached_total_amount - $snapshot['net']) > self::DRIFT_TOLERANCE;
-
-            if ($driftsOnPaid || $driftsOnTotal) {
+            if ($this->settlement->invoiceCacheDrifts($invoice)) {
                 $ids[] = (int) $invoice->id;
             }
         }
