@@ -1,0 +1,30 @@
+export const FINANCE_ROUTE_NAMES = {
+    // Lookup & Audit
+    AUDIT_INDEX: 'finance.audit.index',
+    CHARGES_INDEX: 'finance.charges.index',
+    INVOICES_INDEX: 'finance.invoices.index',
+    // Today
+    OPERATIONS_DASHBOARD: 'finance.operations.dashboard',
+    // Fee generation
+    MAJOR_CHARGES_INDEX: 'finance.major.charges.index',
+    OPERATIONS_GENERATE_CHARGES: 'finance.operations.generate-charges',
+    EGC_CHARGES_INDEX: 'finance.egc.charges.index',
+    EGC_BLOCK_RESULTS_INDEX: 'finance.egc.block-results.index',
+    EGC_RETAKE_ADJUSTMENTS_INDEX: 'finance.egc.retake-adjustments.index',
+    EGC_CARRY_FORWARD_INDEX: 'finance.egc.carry-forward.index',
+    // Collect & reconcile
+    DNG_WORKLIST: 'finance.operations.dng-worklist',
+    DNG_PAYMENT_REQUESTS_INDEX: 'finance.dng.payment-requests.index',
+    DNG_WEBHOOK_EVENTS_INDEX: 'finance.dng.webhook-events.index',
+    SETTLEMENT_INDEX: 'finance.operations.settlement.index',
+    PAYMENTS_INDEX: 'finance.payments.index',
+    DUE_CALENDAR: 'finance.operations.due-calendar',
+    // Exceptions
+    OPERATIONS_EXCEPTIONS: 'finance.operations.exceptions',
+    LIFECYCLE_EXCEPTIONS: 'finance.operations.lifecycle-exceptions',
+    LIFECYCLE_EXCEPTION_HISTORY: 'finance.operations.lifecycle-exception-history',
+    // New in this milestone
+    STUDENT_OVERVIEW: 'finance.students.overview',
+    GLOBAL_SEARCH: 'finance.search',
+    SEMESTER_CONTEXT_UPDATE: 'finance.semester-context.update',
+} as const;

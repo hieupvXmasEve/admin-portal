@@ -20,6 +20,7 @@ import {
     UNIT_ROUTE_NAMES,
     USER_ROUTE_NAMES,
 } from '@/constants';
+import { FINANCE_ROUTE_NAMES } from '@/constants/finance-routes';
 import { SYSTEM_ACTIVITY_LOG_ROUTE_NAMES, SYSTEM_CONFIG_ROUTE_NAMES, SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES } from '@/constants/system-routes';
 import { route } from 'ziggy-js';
 
@@ -443,4 +444,45 @@ export const classSessionRoutes = {
     create: () => route(CLASS_SESSION_ROUTE_NAMES.CREATE),
     edit: (id: number) => route(CLASS_SESSION_ROUTE_NAMES.EDIT, { classSession: id }),
     show: (id: number) => route(CLASS_SESSION_ROUTE_NAMES.SHOW, { classSession: id }),
+} as const;
+
+// Finance Office Routes
+export const financeRoutes = {
+    audit: () => route(FINANCE_ROUTE_NAMES.AUDIT_INDEX),
+    today: {
+        dashboard: () => route(FINANCE_ROUTE_NAMES.OPERATIONS_DASHBOARD),
+    },
+    feeGeneration: {
+        majorCharges: () => route(FINANCE_ROUTE_NAMES.MAJOR_CHARGES_INDEX),
+        batchCharges: () => route(FINANCE_ROUTE_NAMES.OPERATIONS_GENERATE_CHARGES),
+        egcCharges: () => route(FINANCE_ROUTE_NAMES.EGC_CHARGES_INDEX),
+        egcBlockResults: () => route(FINANCE_ROUTE_NAMES.EGC_BLOCK_RESULTS_INDEX),
+        egcRetakeAdjustments: () => route(FINANCE_ROUTE_NAMES.EGC_RETAKE_ADJUSTMENTS_INDEX),
+        egcCarryForward: () => route(FINANCE_ROUTE_NAMES.EGC_CARRY_FORWARD_INDEX),
+    },
+    collect: {
+        dngWorklist: () => route(FINANCE_ROUTE_NAMES.DNG_WORKLIST),
+        dngPaymentRequests: () => route(FINANCE_ROUTE_NAMES.DNG_PAYMENT_REQUESTS_INDEX),
+        dngWebhookEvents: () => route(FINANCE_ROUTE_NAMES.DNG_WEBHOOK_EVENTS_INDEX),
+        settlement: () => route(FINANCE_ROUTE_NAMES.SETTLEMENT_INDEX),
+        payments: () => route(FINANCE_ROUTE_NAMES.PAYMENTS_INDEX),
+        dueReminders: () => route(FINANCE_ROUTE_NAMES.DUE_CALENDAR),
+    },
+    exceptions: {
+        queue: () => route(FINANCE_ROUTE_NAMES.OPERATIONS_EXCEPTIONS),
+        lifecycle: () => route(FINANCE_ROUTE_NAMES.LIFECYCLE_EXCEPTIONS),
+        lifecycleHistory: () => route(FINANCE_ROUTE_NAMES.LIFECYCLE_EXCEPTION_HISTORY),
+    },
+    lookup: {
+        chargeLedger: () => route(FINANCE_ROUTE_NAMES.CHARGES_INDEX),
+        invoices: () => route(FINANCE_ROUTE_NAMES.INVOICES_INDEX),
+    },
+    students: {
+        overview: (studentId: number, focus?: string) =>
+            route(FINANCE_ROUTE_NAMES.STUDENT_OVERVIEW, focus ? { student: studentId, focus } : { student: studentId }),
+    },
+    search: () => route(FINANCE_ROUTE_NAMES.GLOBAL_SEARCH),
+    semesterContext: {
+        update: () => route(FINANCE_ROUTE_NAMES.SEMESTER_CONTEXT_UPDATE),
+    },
 } as const;
