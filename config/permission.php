@@ -367,6 +367,9 @@ return [
             // Retake Course Charges
             'view_retake_course_charge' => 'view_retake_course_charge',
             'create_retake_course_charge' => 'create_retake_course_charge',
+            // Staff workspace foundation (S-010 milestone 1)
+            'view_finance_student_overview' => 'view_finance_student_overview',
+            'view_finance_all_campus' => 'view_finance_all_campus',
         ],
         'modules' => [
             'view_module' => 'view_module',

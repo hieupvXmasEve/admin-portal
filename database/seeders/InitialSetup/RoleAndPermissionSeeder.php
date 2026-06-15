@@ -150,6 +150,8 @@ class RoleAndPermissionSeeder extends Seeder
                 'sync_egc_block_results',
                 'view_egc_retake_adjustments',
                 'apply_egc_retake_adjustment',
+                // Staff workspace foundation (S-010 milestone 1)
+                'view_finance_student_overview',
             ],
             'can_bo' => [
                 'view_user',
@@ -166,6 +168,8 @@ class RoleAndPermissionSeeder extends Seeder
                 'sync_egc_block_results',
                 'view_egc_retake_adjustments',
                 'apply_egc_retake_adjustment',
+                // Staff workspace foundation (S-010 milestone 1)
+                'view_finance_student_overview',
             ],
         ];
 
