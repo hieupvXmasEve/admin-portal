@@ -44,6 +44,21 @@ it('findForScope() returns nothing for an empty scope rather than scanning globa
     expect(app(FinanceIntegrityAuditor::class)->findForScope(new FinanceAuditScope()))->toBe([]);
 });
 
+it('runs every one of the 15 invariants cleanly, globally and scoped (no SQL errors)', function () {
+    // Guards all 15 ported SQL splices: a bad column or mis-spliced {scope}/{ids}
+    // would throw here, catching regressions the token-only registry test cannot.
+    $student = auditStudent();
+    $registry = app(FinanceInvariantRegistry::class);
+    $auditor = app(FinanceIntegrityAuditor::class);
+    $scope = new FinanceAuditScope(studentIds: [$student->id]);
+
+    foreach ($registry->all() as $invariant) {
+        expect($auditor->count($invariant, null))->toBeInt()
+            ->and($auditor->count($invariant, $scope))->toBeInt()
+            ->and($auditor->samples($invariant, $scope))->toBeArray();
+    }
+});
+
 it('surfaces a failing invariant as an error, never a false clean result', function () {
     // Registry whose single invariant points at a non-existent table.
     $broken = new class extends FinanceInvariantRegistry

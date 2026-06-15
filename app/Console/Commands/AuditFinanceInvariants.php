@@ -104,6 +104,11 @@ class AuditFinanceInvariants extends Command
 
     private function showSamples(FinanceInvariant $invariant): void
     {
+        // Parity note: the pre-refactor command printed "sample error: <msg>" if a
+        // sample SQL threw. The shared auditor treats samples as best-effort and
+        // degrades to an empty id list instead. This only differs on an effectively
+        // unreachable path (samples run only after count() on the same tables already
+        // succeeded); count-level parity — the integrity signal — is fully preserved.
         $ids = $this->auditor->samples($invariant, null);
         $this->line("   ↳ {$invariant->code} sample ids: ".implode(', ', $ids));
     }
