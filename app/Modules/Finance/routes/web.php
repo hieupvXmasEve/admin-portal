@@ -10,6 +10,7 @@ use App\Modules\Finance\Http\Web\Admin\EgcBlockResultsController;
 use App\Modules\Finance\Http\Web\Admin\EgcCarryForwardController;
 use App\Modules\Finance\Http\Web\Admin\EgcChargeGenerationController;
 use App\Modules\Finance\Http\Web\Admin\EgcRetakeAdjustmentsController;
+use App\Modules\Finance\Http\Web\Admin\FinanceAuditWorkspaceController;
 use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
 use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionController;
 use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionHistoryController;
@@ -18,6 +19,11 @@ use App\Modules\Finance\Http\Web\Admin\PaymentController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(function () {
+    // Audit Workspace (read-only) — primary Finance Office entry
+    Route::get('/audit', [FinanceAuditWorkspaceController::class, 'index'])
+        ->middleware('can:view_finance_audit_workspace')
+        ->name('audit.index');
+
     // EGC Operations
     Route::prefix('egc')->name('egc.')->group(function () {
         // EGC Charge Generation
