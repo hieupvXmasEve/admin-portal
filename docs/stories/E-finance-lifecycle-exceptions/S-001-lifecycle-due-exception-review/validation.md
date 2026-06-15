@@ -20,6 +20,7 @@ audit reason requirements.
 | Integration | Acknowledge/keep-as-debt writes review status, reason, acting user id, and does not mutate DNG or charges. |
 | Integration | `cancel_dng` refuses paid, reconciled, cancelled, missing, or non-cancellable DNG requests. |
 | Integration | `cancel_dng_and_void_linked_charge` requires `void_finance_charges` and records every affected linked charge/invoice line in metadata. |
+| Integration | DNG request charge linkage is populated before linked-charge voiding; missing linkage blocks with an audited reason instead of no-op. |
 | Authorization | Users without view permission cannot open the page. |
 | Authorization | Users without `create_finance_payments` cannot cancel DNG requests from the page. |
 | Authorization | Users without `void_finance_charges` cannot run charge-voiding resolution. |
@@ -40,6 +41,7 @@ audit reason requirements.
 - DNG request already paid/bridged to a payment.
 - DNG request linked to one charge.
 - DNG request linked to multiple charges through `DngPaymentRequestCharge`.
+- DNG request with missing charge linkage to prove the `FIN-23` regression guard.
 - User with view-only finance operations permission.
 - User with DNG cancel permission.
 - User with charge void permission.

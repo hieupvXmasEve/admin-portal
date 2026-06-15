@@ -16,6 +16,8 @@ In scope:
 - Query/read model for DNG requests excluded by lifecycle status.
 - Review state/audit record for acknowledgement, keep-as-debt, routing, and
   resolution.
+- Deduplicated acknowledge/review-state transition logic so acknowledgement
+  metadata cannot drift between separate actions.
 - Optional destructive resolution actions only after impact preview, permission
   checks, current-state checks, and reason capture.
 - Menu/sidebar entry with Finance operations permission gating.
@@ -75,10 +77,16 @@ Portal impact:
    - Add review table/model if persistent acknowledge/keep/routed statuses are
      required.
    - Add actions for acknowledgement and non-destructive resolution.
+   - Share review-state transition and metadata-writing behavior between
+     acknowledge and resolve actions.
 5. Destructive resolution.
    - Add impact preview and hard permission checks.
    - Reuse existing DNG cancellation and finance void actions.
    - Require staff reason and store audit metadata.
+   - Add a regression check that DNG requests entering charge-void resolution
+     have populated charge linkage (`chargeLinks` or `finance_charge_id`) and do
+     not no-op silently when linkage is missing (`FIN-23`, invalid finding but
+     valid test gap).
 6. Verification.
    - Run targeted Finance operation tests, DNG cancellation regressions, Pint,
      frontend lint/format/type checks, and browser smoke for the new page.

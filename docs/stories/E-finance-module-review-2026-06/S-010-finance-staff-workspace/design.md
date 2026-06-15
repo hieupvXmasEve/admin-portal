@@ -2,7 +2,9 @@
 
 ## Domain Model
 
-This story records desired product shape, not final implementation logic.
+This story records the staff workspace direction plus the Milestone 1 foundation
+from the implementation plan. Milestone 1 is intentionally read-only and
+presentation/session oriented.
 
 Working vocabulary:
 
@@ -23,6 +25,16 @@ Known task groups:
 - Training-driven finance decisions.
 - Payment follow-up and exceptions.
 - Audit/search/deep-dive.
+
+Milestone 1 foundation concepts:
+
+- **Finance shell context**: global command search and selected semester shared
+  through the app shell.
+- **Student 360 shell**: read-only student destination for search, showing
+  identity, lifecycle status, four derived balances, and a deferred basic ledger.
+- **Finance route constants**: named route helpers used by Finance navigation.
+- **Work-group IA**: five Finance Office groups plus the existing Discounts &
+  Funding group kept separate.
 
 ## Application Flow
 
@@ -49,9 +61,29 @@ Confirmed direction:
 
 ## Interface Contract
 
-No concrete route contract is locked yet.
+Milestone 1 locks these route and prop contracts:
 
-Candidate future route:
+- `GET /finance/students/{student}` named `finance.students.overview`.
+  - Permission: `view_finance_student_overview`.
+  - Campus scope: current campus only unless the user has
+    `view_finance_all_campus`.
+  - Query: optional `focus=<type>:<id>` where type is
+    `dng|invoice|charge|payment|installment`.
+  - Inertia page: `Finance/Student360/Show`.
+- `GET /finance/search` named `finance.search`.
+  - Permission: `view_finance_student_overview`.
+  - Response envelope: `ApiResponse::success()`.
+  - Resolves student code/name, invoice number, and DNG identifiers through the
+    existing audit resolver, then maps results to Student 360 URLs.
+- `POST /finance/semester-context` named
+  `finance.semester-context.update`.
+  - Stores only `current_semester_id` in the operator session.
+  - Reflected through the shared Inertia `semester` prop.
+- Shared Inertia prop: `semester?: { selected_id: number|null, options: [...] }`
+  for users with Finance shell permissions.
+- Route helper surface: `FINANCE_ROUTE_NAMES` and `financeRoutes`.
+
+Candidate future route for the broader staff workspace remains:
 
 - `GET /finance/staff-workspace`
 
@@ -83,13 +115,15 @@ Open questions:
 
 ## Data Model
 
-No new data model is planned for MVP discovery.
+No new data model is planned for Milestone 1.
 
 Important constraints:
 
 - No persisted collection-campaign table in the first staff-workspace slice.
 - Do not introduce new ledger/money tables.
 - Do not weaken existing Finance data guards or audit invariants.
+- New permissions must be declared in `config/permission.php`, synced to the DB,
+  and role-mapped before route-gated UI is treated as shippable.
 - If later design proves that a persisted campaign is necessary, pause and create
   a separate data-model decision before implementation.
 
@@ -97,7 +131,18 @@ Important constraints:
 
 Expected platform impact is admin/staff web UI only.
 
-Desired IA:
+Milestone 1 UI impact:
+
+- Topbar mounts global Finance command search and semester switcher for Finance
+  users.
+- Finance Office sidebar is reorganized into five work groups:
+  Hôm nay, Sinh phí, Thu & Đối soát, Ngoại lệ, Tra cứu & Audit.
+- Discounts & Funding remains a separate group because those routes live outside
+  the Finance module.
+- Student 360 is not a sidebar item; it is reached through global search and
+  later through row clicks/deep links.
+
+Broader desired IA:
 
 - Finance Staff Workspace: primary operational entry.
 - Finance Audit Workspace: read-only investigation/audit entry.
@@ -113,15 +158,17 @@ Desired UX:
 
 ## Observability
 
-Future write actions must preserve current audit and history behavior.
+Future write actions must preserve current audit and history behavior. Milestone
+1 does not add Finance money writes, so it does not require new audit records or
+`finance:audit-invariants` evidence.
 
-Because this story is discovery-only:
+For Milestone 1:
 
-- No new logs are required now.
-- Future implementation must identify which existing audit/event trails cover
-  each write action.
-- If a drawer performs a new write path, it must define audit evidence before
-  implementation.
+- Search, Student 360, and semester context are covered by feature tests.
+- Browser smoke must prove the palette, switcher, sidebar IA, and 360 route are
+  visible and navigable.
+- If a later drawer performs a new write path, it must define audit evidence
+  before implementation.
 
 ## Alternatives Considered
 

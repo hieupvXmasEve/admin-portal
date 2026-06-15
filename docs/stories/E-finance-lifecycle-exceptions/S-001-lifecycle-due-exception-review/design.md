@@ -56,6 +56,10 @@ Controllers and actions:
 - Add a `ResolveLifecycleDueExceptionAction` for destructive or state-changing
   decisions. It must validate permission, current DNG status, linked payment
   state, linked charges, and staff reason before mutation.
+- Avoid duplicating acknowledge/review-state transition logic across
+  `AcknowledgeLifecycleDueExceptionAction` and
+  `ResolveLifecycleDueExceptionAction`; shared metadata and audit behavior must
+  stay consistent (`FIN-24`).
 - Reuse `CancelDngPaymentRequestAction` for DNG cancellation. Do not duplicate
   provider cancellation logic.
 - Reuse `VoidFinanceChargeAction` when a linked charge must be voided. Do not

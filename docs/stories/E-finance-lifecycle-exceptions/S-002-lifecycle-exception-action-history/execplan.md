@@ -18,6 +18,8 @@ In scope:
 - `View history` action from the lifecycle exceptions table and detail drawer
   that opens the shared history page with a DNG request or item filter applied.
 - Append-only lifecycle exception history event model/table.
+- Consistent acknowledge metadata across both lifecycle exception action paths.
+- Correct attempt-vs-state-transition handling for DNG cancellation audit.
 - Query/read model for paginated history events with DNG request summary,
   student summary, current review, and filter options.
 - Updates to acknowledge/resolve actions so every staff or destructive action
@@ -75,6 +77,8 @@ Portal impact:
 3. Write path.
    - Update acknowledge and resolve actions to append events.
    - Record attempted and final events around destructive DNG/charge mutations.
+   - Ensure attempted DNG cancel events cannot masquerade as committed review
+     state transitions when the mutation transaction rolls back.
    - Preserve current review state as the latest queue state.
 4. Read path.
    - Add shared history query and controller index action.

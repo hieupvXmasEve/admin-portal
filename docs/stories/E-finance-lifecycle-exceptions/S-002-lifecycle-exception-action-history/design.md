@@ -52,9 +52,14 @@ Controllers and actions:
 - Update `AcknowledgeLifecycleDueExceptionAction` and
   `ResolveLifecycleDueExceptionAction` to append history events whenever they
   change review state, attempt DNG cancellation, or attempt charge voiding.
+- Keep acknowledge metadata identical whether the user enters through the
+  dedicated acknowledge action or the acknowledge branch of resolve (`FIN-24`).
 - For destructive operations, append the attempted event before calling the DNG
   or Finance mutation action, then append a success or failure event with the
   final outcome.
+- Attempted events must be distinct from committed review-state transitions: a
+  failed transaction may leave an attempt event, but it must not leave the
+  current review state looking cancelled/resolved (`FIN-34`).
 - Do not duplicate DNG cancellation or finance charge voiding logic. Keep using
   the existing dedicated actions from the owning Finance areas.
 

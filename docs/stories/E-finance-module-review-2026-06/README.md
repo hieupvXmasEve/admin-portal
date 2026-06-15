@@ -9,16 +9,41 @@ finally UI/BOD surfaces.
 
 ## Story Order
 
-| Order | Story id | Story packet | Main scope | Depends on |
-| --- | --- | --- | --- | --- |
-| 1 | `FIN-REV-001-audit-and-safety-gates` | `S-001-audit-and-safety-gates/` | Run/record invariants, close immediate dangerous UI/action gaps | None |
-| 2 | `FIN-REV-002-ledger-source-of-truth` | `S-002-ledger-source-of-truth/` | One balance source, immutable invoice snapshot, allocation locks/idempotency, transparent cache/rebuild, DNG-vs-ledger reconciliation | 001 |
-| 3 | `FIN-REV-003-data-guards-and-constraints` | `S-003-data-guards-and-constraints/` | Clean duplicates, then add DB uniqueness/check/FK/status/model guards and any operation-token schema needed by 002 | 001, 002 for final constraints |
-| 4 | `FIN-REV-004-charge-discount-installment-correctness` | `S-004-charge-discount-installment-correctness/` | Scholarship/EGC/installment/pivot/void amount correctness | 001, preferably 002 |
-| 5 | `FIN-REV-005-dng-security-and-idempotency` | `S-005-dng-security-and-idempotency/` | Webhook checksum, dedup, locks, cancelled status ordering | 001, 003 for payload cleanup |
-| 6 | `FIN-REV-006-operations-stubs-and-performance` | `S-006-operations-stubs-and-performance/` | Replace stub ops, due-reminder naming/counts, query pagination/perf | 001 |
-| 7 | `FIN-REV-007-finance-ui-foundation-and-navigation` | `S-007-finance-ui-foundation-and-navigation/` | Shared finance UI foundation, navigation links, unsafe form rewrites | 001, 002 for money display confidence |
-| 8 | `FIN-REV-008-bod-finance-oversight` | `S-008-bod-finance-oversight/` | Read-only BOD finance overview with charts after cache/rebuild and DNG-vs-invoice rail decisions | 002, 003, 007 |
+| Order | Story id                                              | Story packet                                     | Main scope                                                                                                                            | Depends on                                   |
+| ----- | ----------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| 1     | `FIN-REV-001-audit-and-safety-gates`                  | `S-001-audit-and-safety-gates/`                  | Run/record invariants, close immediate dangerous UI/action gaps                                                                       | None                                         |
+| 2     | `FIN-REV-002-ledger-source-of-truth`                  | `S-002-ledger-source-of-truth/`                  | One balance source, immutable invoice snapshot, allocation locks/idempotency, transparent cache/rebuild, DNG-vs-ledger reconciliation | 001                                          |
+| 3     | `FIN-REV-003-data-guards-and-constraints`             | `S-003-data-guards-and-constraints/`             | Clean duplicates, then add DB uniqueness/check/FK/status/model guards and any operation-token schema needed by 002                    | 001, 002 for final constraints               |
+| 4     | `FIN-REV-004-charge-discount-installment-correctness` | `S-004-charge-discount-installment-correctness/` | Scholarship/EGC/installment/pivot/void amount correctness                                                                             | 001, preferably 002                          |
+| 5     | `FIN-REV-005-dng-security-and-idempotency`            | `S-005-dng-security-and-idempotency/`            | Webhook checksum, dedup, locks, cancelled status ordering                                                                             | 001, 003 for payload cleanup                 |
+| 6     | `FIN-REV-006-operations-stubs-and-performance`        | `S-006-operations-stubs-and-performance/`        | Replace stub ops, due-reminder naming/counts, query pagination/perf                                                                   | 001                                          |
+| 7     | `FIN-REV-007-finance-ui-foundation-and-navigation`    | `S-007-finance-ui-foundation-and-navigation/`    | Shared finance UI foundation, navigation links, unsafe form rewrites                                                                  | 001, 002 for money display confidence        |
+| 8     | `FIN-REV-008-bod-finance-oversight`                   | `S-008-bod-finance-oversight/`                   | Read-only BOD finance overview with charts after cache/rebuild and DNG-vs-invoice rail decisions                                      | 002, 003, 007                                |
+| 9     | `FIN-REV-009-finance-audit-workspace`                 | `S-009-finance-audit-workspace/`                 | Universal-search Finance Audit Workspace built on the ledger graph, derived settlement truth, and permission-checked deep links       | 002, 005, 007                                |
+| 10.1  | `FIN-REV-010-finance-staff-workspace`                 | `S-010-finance-staff-workspace/`                 | Milestone 1 consolidated story: Finance shell + Student 360 foundation                                                                | 002, 004, 005, 006, 009 for audit/deep links |
+| 10.2  | `FIN-REV-010-student-360-full`                        | `S-010-student-360-full/`                        | Milestone 2 consolidated story: full Student 360 operator surface and safe action drawers                                             | 010.1, 002, 005                              |
+
+## FIN-REV-010 Consolidated Stories
+
+FIN-REV-010 is tracked as two milestone-sized Harness stories. The old
+task-sized child packets are retained as historical notes only so validation
+evidence and debugging context are not lost.
+
+| Order | Story id                              | Story packet                     | Main scope                                                                                                                                                  | Depends on              |
+| ----- | ------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| 10.1  | `FIN-REV-010-finance-staff-workspace` | `S-010-finance-staff-workspace/` | M1 shell/foundation: route helpers, permissions, Student 360 shell, global search, semester context, sidebar IA, topbar mount, and M1 evidence              | 002, 004, 005, 006, 009 |
+| 10.2  | `FIN-REV-010-student-360-full`        | `S-010-student-360-full/`        | M2 Student 360 full surface: status cards, grouped ledger, allocation preview, record-payment adapter, reviewed DNG cancel, action drawers, and M2 evidence | 010.1, 002, 005         |
+
+### Retired Child Packets
+
+These task-sized packets were useful while executing/debugging the milestones,
+but they are no longer active Harness story units. Use the two consolidated
+stories above for planning, status, review, and acceptance.
+
+| Retired task packets                                                              | Merged into                           |
+| --------------------------------------------------------------------------------- | ------------------------------------- |
+| `S-010-01-finance-route-constants/` through `S-010-07-topbar-and-evidence/`       | `FIN-REV-010-finance-staff-workspace` |
+| `S-010-08-student-360-status-ledger/` through `S-010-14-student-360-m2-evidence/` | `FIN-REV-010-student-360-full`        |
 
 ## Shared Rules
 
@@ -36,6 +61,9 @@ finally UI/BOD surfaces.
 - `DB-13`, `DB-14`, and `DB-15` are blockers for leadership aggregates: do not
   build BOD metrics from stale cache columns or by double-counting invoice and
   DNG rails.
+- The audit workspace must model Finance as a graph/ledger, not a linear
+  `charge -> invoice -> DNG -> payment -> settlement` chain. `Settlement` is a
+  derived read model from `SettlementService`, not a persisted entity.
 - Lifecycle due exception residuals are split: duplicated acknowledge/resolve
   logic belongs to `E-finance-lifecycle-exceptions`; DNG cancel audit ordering
   is cross-cutting with the DNG hardening story.
