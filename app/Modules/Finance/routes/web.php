@@ -13,6 +13,7 @@ use App\Modules\Finance\Http\Web\Admin\EgcChargeGenerationController;
 use App\Modules\Finance\Http\Web\Admin\EgcRetakeAdjustmentsController;
 use App\Modules\Finance\Http\Web\Admin\FinanceAuditWorkspaceController;
 use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
+use App\Modules\Finance\Http\Web\Admin\FinanceCockpitController;
 use App\Modules\Finance\Http\Web\Admin\FinanceGlobalSearchController;
 use App\Modules\Finance\Http\Web\Admin\FinanceSemesterContextController;
 use App\Modules\Finance\Http\Web\Admin\FinanceStudentOverviewController;
@@ -28,6 +29,17 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
     Route::get('/audit', [FinanceAuditWorkspaceController::class, 'index'])
         ->middleware('can:view_finance_audit_workspace')
         ->name('audit.index');
+
+    // Cockpit "Hôm nay"
+    Route::get('/cockpit', [FinanceCockpitController::class, 'index'])
+        ->middleware('can:view_finance_cockpit')
+        ->name('cockpit.index');
+    Route::get('/cockpit/queue/{queue}', [FinanceCockpitController::class, 'queueRows'])
+        ->middleware('can:view_finance_cockpit')
+        ->name('cockpit.queue-rows');
+    Route::post('/cockpit/phase', [FinanceCockpitController::class, 'setPhase'])
+        ->middleware('can:view_finance_cockpit')
+        ->name('cockpit.phase');
 
     // EGC Operations
     Route::prefix('egc')->name('egc.')->group(function () {
