@@ -9,6 +9,8 @@ use App\Models\Student;
 use App\Modules\Finance\Http\Requests\Student360ShowRequest;
 use App\Modules\Finance\Queries\Audit\GetFinanceAuditGraphQuery;
 use App\Modules\Finance\Queries\GetStudentBalanceQuery;
+use App\Modules\Finance\Queries\Student360\GetStudent360LedgerQuery;
+use App\Modules\Finance\Queries\Student360\GetStudent360StatusCardsQuery;
 use App\Modules\Finance\Support\Audit\FinanceLedgerTimelineBuilder;
 use App\Modules\Finance\Support\LifecycleDueExceptionReasonResolver;
 use Inertia\Inertia;
@@ -28,6 +30,8 @@ class FinanceStudentOverviewController extends Controller
         GetStudentBalanceQuery $balanceQuery,
         GetFinanceAuditGraphQuery $graphQuery,
         FinanceLedgerTimelineBuilder $timelineBuilder,
+        GetStudent360StatusCardsQuery $cardsQuery,
+        GetStudent360LedgerQuery $ledgerQuery,
     ): Response {
         if (! $this->visible($student, $request)) {
             abort(404);
@@ -60,6 +64,15 @@ class FinanceStudentOverviewController extends Controller
             ],
         ];
 
+        $props['status_cards'] = $cardsQuery->handle($studentId);
+
+        $props['actions'] = [
+            'can_record_payment' => $request->user()?->can('create_finance_payments') ?? false,
+            'can_allocate' => $request->user()?->can('allocate_finance_payment') ?? false,
+            'can_cancel_dng' => $request->user()?->can('create_finance_payments') ?? false,
+            'can_void_charges' => $request->user()?->can('void_finance_charges') ?? false,
+        ];
+
         // Basic ledger is heavy → deferred. Reuses the audit money-graph + signed
         // timeline builder so the 360 ledger and Audit Workspace never diverge.
         $props['ledger'] = Inertia::defer(function () use ($studentId, $graphQuery, $timelineBuilder): array {
@@ -67,6 +80,9 @@ class FinanceStudentOverviewController extends Controller
 
             return $timelineBuilder->build($graph);
         });
+
+        // Grouped "Sổ cái" lens is heavier than the four cards → deferred.
+        $props['ledger_groups'] = Inertia::defer(fn () => $ledgerQuery->handle($studentId));
 
         return Inertia::render('Finance/Student360/Show', $props);
     }

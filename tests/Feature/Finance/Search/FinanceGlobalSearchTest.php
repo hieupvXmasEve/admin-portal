@@ -51,6 +51,24 @@ it('resolves a student code to a 360 deep link', function () {
         ->assertJsonPath('data.results.0.id', $student->id);
 });
 
+it('returns student matches for a partial student code', function () {
+    $user = grantFinanceSearch(['view_finance_student_overview']);
+    $first = Student::factory()->forCampus($this->campus)->forProgram($this->program)
+        ->state(['intake' => 1, 'intake_semester_id' => $this->semester->id, 'student_id' => 'AUH15041', 'full_name' => 'Student One'])
+        ->create();
+    $second = Student::factory()->forCampus($this->campus)->forProgram($this->program)
+        ->state(['intake' => 1, 'intake_semester_id' => $this->semester->id, 'student_id' => 'AUH15043', 'full_name' => 'Student Two'])
+        ->create();
+
+    actingAs($user)->getJson('/finance/search?q=AUH1504')
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.status', 'ambiguous')
+        ->assertJsonPath('data.results.0.type', 'student')
+        ->assertJsonPath('data.results.0.id', $first->id)
+        ->assertJsonPath('data.results.1.id', $second->id);
+});
+
 it('maps an invoice number to the owning student 360 with a focus link', function () {
     $user = grantFinanceSearch(['view_finance_student_overview']);
     $student = Student::factory()->forCampus($this->campus)->forProgram($this->program)

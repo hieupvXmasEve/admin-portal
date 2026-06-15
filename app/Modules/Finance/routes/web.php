@@ -15,6 +15,7 @@ use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
 use App\Modules\Finance\Http\Web\Admin\FinanceGlobalSearchController;
 use App\Modules\Finance\Http\Web\Admin\FinanceSemesterContextController;
 use App\Modules\Finance\Http\Web\Admin\FinanceStudentOverviewController;
+use App\Modules\Finance\Http\Web\Admin\FinanceStudentPaymentController;
 use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionController;
 use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionHistoryController;
 use App\Modules\Finance\Http\Web\Admin\MajorChargeGenerationController;
@@ -160,6 +161,9 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
     Route::get('/students/{student}', [FinanceStudentOverviewController::class, 'show'])
         ->middleware('can:view_finance_student_overview')
         ->name('students.overview');
+    Route::post('/students/{student}/payments', [FinanceStudentPaymentController::class, 'store'])
+        ->middleware('can:create_finance_payments')
+        ->name('students.payments.store');
 
     // Global finance search (JSON) for the ⌘K palette
     Route::get('/search', [FinanceGlobalSearchController::class, 'search'])
@@ -222,6 +226,9 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::post('/auto-allocate', [PaymentController::class, 'autoAllocate'])
             ->middleware('can:allocate_finance_payment')
             ->name('auto-allocate');
+        Route::get('/{payment}/allocate-preview', [FinanceStudentPaymentController::class, 'allocatePreview'])
+            ->middleware('can:allocate_finance_payment')
+            ->name('allocate-preview');
         Route::get('/{payment}', [PaymentController::class, 'show'])
             ->middleware('can:view_finance_payment_details')
             ->name('show');
@@ -238,6 +245,12 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
             Route::get('/{dngPaymentRequest}', [DngPaymentRequestController::class, 'show'])
                 ->middleware('can:view_finance_dng_payment_requests')
                 ->name('show');
+            Route::get('/{dngPaymentRequest}/cancel-impact', [DngPaymentRequestController::class, 'cancelImpact'])
+                ->middleware('can:create_finance_payments')
+                ->name('cancel-impact');
+            Route::post('/{dngPaymentRequest}/cancel-reviewed', [DngPaymentRequestController::class, 'cancelReviewed'])
+                ->middleware('can:create_finance_payments')
+                ->name('cancel-reviewed');
             Route::post('/{dngPaymentRequest}/cancel', [DngPaymentRequestController::class, 'cancel'])
                 ->middleware('can:create_finance_payments')
                 ->name('cancel');

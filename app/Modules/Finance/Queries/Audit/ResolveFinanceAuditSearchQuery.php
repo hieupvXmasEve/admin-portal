@@ -19,7 +19,7 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
  *   3. DNG ids: item_id, then dng_payment_id, then dng_transaction_id
  *   4. Exact students.student_id (MSSV)
  *   5. payment.external_ref — only when the input is not MSSV-shaped
- *   6. Student name/email fuzzy (may be ambiguous)
+ *   6. Student code/name/email fuzzy (may be ambiguous)
  *
  * Bare integers never guess a primary key. Every candidate is filtered to the
  * owning student's campus; cross-campus rows are invisible (treated as no-match,
@@ -86,11 +86,12 @@ class ResolveFinanceAuditSearchQuery
             }
         }
 
-        // 6. Fuzzy student name/email -> single or ambiguous.
+        // 6. Fuzzy student code/name/email -> single or ambiguous.
         $students = Student::query()
             ->where('campus_id', $campusId)
             ->where(fn ($w) => $w
-                ->where('full_name', 'like', "%{$q}%")
+                ->where('student_id', 'like', "%{$q}%")
+                ->orWhere('full_name', 'like', "%{$q}%")
                 ->orWhere('email', 'like', "%{$q}%"))
             ->orderBy('full_name')
             ->limit(10)
