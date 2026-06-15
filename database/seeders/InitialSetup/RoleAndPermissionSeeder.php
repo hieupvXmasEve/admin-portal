@@ -153,6 +153,7 @@ class RoleAndPermissionSeeder extends Seeder
                 // Staff workspace foundation (S-010 milestone 1)
                 'view_finance_student_overview',
                 'view_finance_batch_studio',
+                'view_finance_cockpit',
             ],
             'can_bo' => [
                 'view_user',
@@ -172,6 +173,7 @@ class RoleAndPermissionSeeder extends Seeder
                 // Staff workspace foundation (S-010 milestone 1)
                 'view_finance_student_overview',
                 'view_finance_batch_studio',
+                'view_finance_cockpit',
             ],
         ];
 
