@@ -5,6 +5,9 @@ export const FINANCE_ROUTE_NAMES = {
     INVOICES_INDEX: 'finance.invoices.index',
     // Today
     OPERATIONS_DASHBOARD: 'finance.operations.dashboard',
+    COCKPIT_INDEX: 'finance.cockpit.index',
+    COCKPIT_QUEUE_ROWS: 'finance.cockpit.queue-rows',
+    COCKPIT_PHASE: 'finance.cockpit.phase',
     // Fee generation
     MAJOR_CHARGES_INDEX: 'finance.major.charges.index',
     OPERATIONS_GENERATE_CHARGES: 'finance.operations.generate-charges',

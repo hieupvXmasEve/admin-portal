@@ -347,3 +347,51 @@ export interface BatchResult {
     fee_category?: string;
     summary: Record<string, unknown> & { errors?: string[] };
 }
+
+export interface CockpitKpi {
+    total_receivable: number;
+    total_collected: number;
+    collected_pct: number;
+    uncharged_count: number;
+}
+
+export interface CockpitQueue {
+    key: string;
+    label: string;
+    count: number;
+    obeys_semester: boolean;
+    scope_badge: 'campus' | 'semester' | 'multi';
+    permission: string;
+    action_url: string;
+    severity: 'critical' | 'action' | 'normal';
+}
+
+export interface CockpitPhase {
+    key: 'early' | 'mid' | 'late';
+    label: string;
+    source: string;
+}
+
+export interface CockpitInvariant {
+    code: string;
+    severity: string;
+    label: string;
+    count: number | null;
+    error: string | null;
+}
+
+export interface CockpitDataHealth {
+    scope_badge: 'campus' | 'all_campus';
+    critical_count: number;
+    invariants: CockpitInvariant[];
+    balance_match: { match_pct: number; matched: number; denominator: number };
+}
+
+export interface CockpitQueueRow {
+    id: number;
+    title: string;
+    subtitle: string;
+    age: string | null;
+    student_id: number | null;
+    primary_action: { kind: string; url: string; label: string };
+}

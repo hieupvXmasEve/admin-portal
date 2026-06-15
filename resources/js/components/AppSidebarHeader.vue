@@ -19,7 +19,9 @@ withDefaults(
 );
 
 const { canAny } = usePermissions();
-const showFinanceShell = computed(() => canAny(['view_finance_student_overview', 'view_finance_audit_workspace', 'view_finance_operations_dashboard']));
+const showFinanceShell = computed(() =>
+    canAny(['view_finance_student_overview', 'view_finance_audit_workspace', 'view_finance_operations_dashboard', 'view_finance_cockpit']),
+);
 </script>
 
 <template>

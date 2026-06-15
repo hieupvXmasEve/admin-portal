@@ -452,6 +452,11 @@ export const financeRoutes = {
     today: {
         dashboard: () => route(FINANCE_ROUTE_NAMES.OPERATIONS_DASHBOARD),
     },
+    cockpit: {
+        index: () => route(FINANCE_ROUTE_NAMES.COCKPIT_INDEX),
+        queueRows: (queue: string) => route(FINANCE_ROUTE_NAMES.COCKPIT_QUEUE_ROWS, { queue }),
+        phase: () => route(FINANCE_ROUTE_NAMES.COCKPIT_PHASE),
+    },
     feeGeneration: {
         majorCharges: () => route(FINANCE_ROUTE_NAMES.MAJOR_CHARGES_INDEX),
         batchCharges: () => route(FINANCE_ROUTE_NAMES.OPERATIONS_GENERATE_CHARGES),

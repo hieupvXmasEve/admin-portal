@@ -316,9 +316,9 @@ export const mainNavGroups: NavGroup[] = [
         items: [
             {
                 title: 'Hôm nay',
-                href: financeRoutes.today.dashboard(),
+                href: financeRoutes.cockpit.index(),
                 icon: LayoutDashboard,
-                requiredPermissions: ['view_finance_operations_dashboard'],
+                requiredPermissions: ['view_finance_cockpit'],
             },
             {
                 title: 'Sinh phí',
@@ -363,6 +363,7 @@ export const mainNavGroups: NavGroup[] = [
                 icon: Search,
                 children: [
                     { title: 'Audit Workspace', href: financeRoutes.audit(), icon: Search, requiredPermissions: ['view_finance_audit_workspace'] },
+                    { title: 'Billing Dashboard', href: financeRoutes.today.dashboard(), icon: LayoutDashboard, requiredPermissions: ['view_finance_operations_dashboard'] },
                     { title: 'Charge Ledger (Global)', href: financeRoutes.lookup.chargeLedger(), icon: BarChart3, requiredPermissions: ['view_finance_charges'] },
                     { title: 'Invoices', href: financeRoutes.lookup.invoices(), icon: Receipt, requiredPermissions: ['view_finance_invoices'] },
                 ],
