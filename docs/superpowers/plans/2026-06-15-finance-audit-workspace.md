@@ -24,13 +24,13 @@
   - **Graph node:** `['key' => "{type}:{id}", 'type' => string, 'id' => int, 'label' => string, 'status' => ?string, 'amount' => ?float, 'date' => ?string]`.
   - **Graph edge:** `['from' => string, 'to' => string, 'kind' => string, 'amount' => ?float]`.
   - **Timeline event:** `['at' => ?string, 'type' => string, 'signed_amount' => float, 'label' => string, 'refs' => array<string,int>]`.
-  - **Warning:** `['code' => string, 'severity' => string, 'label' => string, 'kind' => 'invariant'|'cache_drift', 'sample_ids' => list<int>]`.
+  - **Warning:** `['code' => string, 'severity' => string, 'label' => string, 'kind' => 'invariant'|'invariant_error'|'cache_drift', 'sample_ids' => list<int>]`. `kind=invariant_error` means the invariant SQL itself failed (severity `ERROR`) — the workspace renders "audit unavailable" for that check, never a clean ✅.
 
 ---
 
 ## Task 0: Establish a runnable test baseline in the worktree
 
-**Why:** Worktrees do not share `vendor/`/`node_modules/`, tests run in Docker, and `tests/Feature/Finance` has a **known pre-existing baseline of 26 fail / 324 pass** (memory, 2026-06-14). Capture the baseline so new failures are distinguishable.
+**Why:** Worktrees do not share `vendor/`/`node_modules/`, tests run in Docker, and `tests/Feature/Finance` has a body of **pre-existing failures** (memory `finance-test-suite-preexisting-failures` recorded ~26 fail / 324 pass on 2026-06-14 — treat that number as a hint, not truth). Re-capture the **actual** baseline in this worktree so new failures are distinguishable from inherited ones.
 
 **Files:** none (environment only).
 
@@ -39,13 +39,16 @@
 Run: `sed -n '1,80p' scripts/dev.sh` and `cat docker/docker-compose*.yml 2>/dev/null || cat docker-compose*.yml`
 Goal: find whether the container mounts a fixed host path (the main checkout) or the current working dir. Record the answer.
 
-- [ ] **Step 2: Provide dependencies for the worktree**
+- [ ] **Step 2: Provide dependencies for the worktree (detect first)**
 
-If `vendor/` / `node_modules/` are missing, symlink from the main checkout to avoid a heavy reinstall:
+Only act if a dependency dir is missing. Detect the main checkout dynamically instead of hardcoding a path:
 ```bash
-ln -s /Users/hunt2412/hieupvdev/project/swinx/vendor vendor
-ln -s /Users/hunt2412/hieupvdev/project/swinx/node_modules node_modules
+MAIN=$(git -C "$(git rev-parse --git-common-dir)/.." rev-parse --show-toplevel 2>/dev/null \
+  || git worktree list --porcelain | awk 'NR==1{print $2}')
+[ -e vendor ]       || ln -s "$MAIN/vendor" vendor
+[ -e node_modules ] || ln -s "$MAIN/node_modules" node_modules
 ```
+If `$MAIN` cannot be resolved or its `vendor/`/`node_modules/` are themselves absent, STOP and report rather than symlinking a bad target.
 
 - [ ] **Step 3: Confirm the test runner sees worktree files**
 
@@ -70,19 +73,26 @@ Run: `./scripts/dev.sh test tests/Feature/Finance tests/Unit/Finance` and save t
 
 - [ ] **Step 1: Name the shared warning engine in `design.md`**
 
-Under "Application Flow", replace item 4 (`BuildFinanceAuditWarnings`) description so it reads: warnings are produced by a shared, subject-scopeable `App\Modules\Finance\Support\Integrity\FinanceIntegrityAuditor` backed by `FinanceInvariantRegistry` (the 15 invariants extracted from `AuditFinanceInvariants`); the command and the workspace consume the same registry. Add a sentence: "Cache drift is computed via `SettlementService` (canonical balance), while invariant `INV-2` remains the DB-level guard in the command — the two are intentionally separate truth layers."
+Under "Application Flow", move the registry/auditor out of `Support/Audit` into `App\Modules\Finance\Support\Integrity\` and rewrite item 4 so it reads: warnings are produced by a shared `App\Modules\Finance\Support\Integrity\FinanceIntegrityAuditor` backed by `App\Modules\Finance\Support\Integrity\FinanceInvariantRegistry` (the 15 invariants extracted from `AuditFinanceInvariants`); the command and the workspace consume the same registry. Add: "The auditor never swallows a failing invariant — a SQL error surfaces as an `ERROR`/`invariant_error` result so the command still prints `ERROR` and the workspace shows 'audit unavailable', never a false ✅." Add: "Cache drift is computed via `SettlementService` (canonical balance), while invariant `INV-2` remains the DB-level guard in the command — the two are intentionally separate truth layers." Note the scope is **student-resolved**: any searched subject (invoice/payment/DNG/charge) is reduced to its owning student's id set before invariants run.
 
 - [ ] **Step 2: Name the two permissions and builder placement in `design.md`**
 
-In "Interface Contract", set the workspace permission to `view_finance_audit_workspace` and name the export permission `export_finance_audit_workspace` (defined now; export endpoint deferred until an audit-log surface exists). In "Application Flow", state that `BuildFinanceLedgerTimeline` and `BuildFinanceAuditWarnings` live under `App\Modules\Finance\Support\Audit\` (pure transforms, no `Query` suffix), while `ResolveFinanceAuditSearchQuery` and `GetFinanceAuditGraphQuery` live under `App\Modules\Finance\Queries\Audit\`.
+In "Interface Contract", set the workspace permission to `view_finance_audit_workspace` and name the export permission `export_finance_audit_workspace` (**defined and seeded now; export endpoint + audit-log deferred** until an audit-log surface exists — the button ships disabled). Lock the namespace convention in "Application Flow":
+- **`App\Modules\Finance\Support\Integrity\`** — the shared engine reused by command + workspace: `FinanceAuditScope`, `FinanceInvariant`, `FinanceInvariantRegistry`, `FinanceIntegrityAuditor`.
+- **`App\Modules\Finance\Support\Audit\`** — workspace-only pure transforms (repo noun+role naming, no `Build*` verb prefix): `FinanceLedgerTimelineBuilder`, `FinanceAuditWarningBuilder`.
+- **`App\Modules\Finance\Queries\Audit\`** — `ResolveFinanceAuditSearchQuery`, `GetFinanceAuditGraphQuery`.
 
-- [ ] **Step 3: Fix resolver tie-break in `design.md`**
+- [ ] **Step 3: Confirm resolver precedence (design.md is the source of truth)**
 
-In "Resolver precedence", add: "Free-form `payment.external_ref` only matches when the input does not also match the `student_id` (MSSV) format; an exact `student_id` format always outranks an `external_ref` match."
+`design.md:79-90` already locks the precedence: **(1) explicit prefixes `payment:`/`invoice:`/`dng:`/`charge:`**, (2) exact `invoice_number`, (3) DNG `item_id`→`dng_payment_id`→`dng_transaction_id`, (4) exact `students.student_id`, (5) `payment.external_ref` (only after invoice/DNG/exact-student-code fail), (6) student name/email fuzzy. Do **not** reorder design.md. Instead, Task 7's contract and tests must be brought into line with this order (the original plan draft had prefixes last and `external_ref` above the student code — that draft was wrong). If the external_ref/MSSV-collision note is missing from design.md, add only: "an exact `student_id` (MSSV) format always outranks an `external_ref` match."
 
 - [ ] **Step 4: Mirror the decisions in `execplan.md` and `validation.md`**
 
-In `execplan.md` Phase 4, name `FinanceInvariantRegistry`/`FinanceIntegrityAuditor` extraction (command parity preserved) as the first backend work. In `validation.md` add a row: "Unit | Command parity: `finance:audit-invariants` produces identical counts after the registry refactor."
+In `execplan.md` Phase 4, name the `Support\Integrity\FinanceInvariantRegistry`/`FinanceIntegrityAuditor` extraction (command parity preserved, errors surfaced not swallowed) as the first backend work, and the `Support\Audit\` builders as the second.
+
+In `validation.md`:
+- Add a row: "Unit | Command parity: `finance:audit-invariants` produces identical counts **and still renders `ERROR` for a failing invariant** after the registry refactor."
+- **Soften the export rows** (currently `:21` and `:25`) so they no longer require a live export endpoint. Rewrite row 21's export clause to: "export is **denied** without `export_finance_audit_workspace`; with the permission the disabled export affordance is shown — **the egress endpoint + audit entry are deferred to a follow-up slice**." Reword the `Logs/Audit` row 25 to: "When the export endpoint ships, its audit entries must include actor, target, scope, timestamp, and outcome (deferred this slice); runtime logs never include raw DNG payloads or sensitive PII."
 
 - [ ] **Step 5: Commit**
 
@@ -138,23 +148,20 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support\Integrity;
 
+/**
+ * Subject scope for finance integrity checks. Every searched subject
+ * (student/invoice/payment/DNG/charge) is resolved to its owning student id set
+ * upstream (GetFinanceAuditGraphQuery), so the scope only carries student ids.
+ * If a future invariant genuinely needs entity-level scoping, add the id type
+ * here together with its registry predicate — do not add unused fields now.
+ */
 final class FinanceAuditScope
 {
     /**
      * @param  list<int>  $studentIds
-     * @param  list<int>  $invoiceIds
-     * @param  list<int>  $paymentIds
-     * @param  list<int>  $chargeIds
-     * @param  list<int>  $dngRequestIds
-     * @param  list<int>  $invoiceLineIds
      */
     public function __construct(
         public readonly array $studentIds = [],
-        public readonly array $invoiceIds = [],
-        public readonly array $paymentIds = [],
-        public readonly array $chargeIds = [],
-        public readonly array $dngRequestIds = [],
-        public readonly array $invoiceLineIds = [],
     ) {}
 
     public function isEmpty(): bool
@@ -360,6 +367,8 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Support\Integrity\FinanceAuditScope;
 use App\Modules\Finance\Support\Integrity\FinanceIntegrityAuditor;
+use App\Modules\Finance\Support\Integrity\FinanceInvariant;
+use App\Modules\Finance\Support\Integrity\FinanceInvariantRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -425,6 +434,30 @@ it('findForScope() returns nothing for an empty scope rather than scanning globa
 
     expect(app(FinanceIntegrityAuditor::class)->findForScope(new FinanceAuditScope()))->toBe([]);
 });
+
+it('surfaces a failing invariant as an error, never a false clean result', function () {
+    // Registry whose single invariant points at a non-existent table.
+    $broken = new class extends FinanceInvariantRegistry
+    {
+        public function all(): array
+        {
+            return [new FinanceInvariant(
+                'INV-1', 'CRITICAL', 'broken',
+                'SELECT COUNT(*) c FROM nonexistent_audit_table WHERE {scope}',
+                'SELECT id FROM nonexistent_audit_table WHERE {scope} LIMIT 5',
+                'student_id IN ({ids})',
+            )];
+        }
+    };
+    $auditor = new FinanceIntegrityAuditor($broken);
+
+    $summary = collect($auditor->summarize(null))->keyBy('code');
+    expect($summary['INV-1']['count'])->toBeNull()
+        ->and($summary['INV-1']['error'])->not->toBeNull();
+
+    $findings = $auditor->findForScope(new FinanceAuditScope(studentIds: [1]));
+    expect(collect($findings)->firstWhere('code', 'INV-1')['kind'])->toBe('invariant_error');
+});
 ```
 
 Note: implement `makeInvoiceLineForStudent()` as a small Pest helper in the test file that creates a `StudentInvoice` + `InvoiceLine` (active) for the student so the `payment_applications.invoice_line_id` FK is satisfied. Model the invoice/line creation on `tests/Feature/Finance/LedgerSourceOfTruthTest.php`.
@@ -451,32 +484,49 @@ class FinanceIntegrityAuditor
     public function __construct(private readonly FinanceInvariantRegistry $registry) {}
 
     /**
-     * Global run for the command. @return list<array{code:string,severity:string,label:string,count:int}>
+     * Global run for the command. A failing invariant yields count=null + error
+     * message (never 0) so the command can still render ERROR — parity preserved.
+     *
+     * @return list<array{code:string,severity:string,label:string,count:?int,error:?string}>
      */
     public function summarize(?FinanceAuditScope $scope = null): array
     {
         return array_map(function (FinanceInvariant $invariant) use ($scope): array {
+            try {
+                $count = $this->count($invariant, $scope);
+                $error = null;
+            } catch (Throwable $e) {
+                $count = null;
+                $error = $e->getMessage();
+            }
+
             return [
                 'code' => $invariant->code,
                 'severity' => $invariant->severity,
                 'label' => $invariant->label,
-                'count' => $this->count($invariant, $scope),
+                'count' => $count,
+                'error' => $error,
             ];
         }, $this->registry->all());
     }
 
+    /**
+     * Raw count. Deliberately does NOT swallow DB errors — a broken invariant SQL
+     * must surface as a failure, not as "0 offending rows".
+     */
     public function count(FinanceInvariant $invariant, ?FinanceAuditScope $scope = null): int
     {
         $sql = $this->resolve($invariant->countSqlTemplate, $invariant, $scope);
 
-        try {
-            return (int) (DB::selectOne($sql)->c ?? 0);
-        } catch (Throwable) {
-            return 0;
-        }
+        return (int) (DB::selectOne($sql)->c ?? 0);
     }
 
-    /** @return list<int> */
+    /**
+     * Best-effort sample ids — only ever called after count() already succeeded,
+     * so an empty list here is decoration loss, not a hidden integrity failure.
+     *
+     * @return list<int>
+     */
     public function samples(FinanceInvariant $invariant, ?FinanceAuditScope $scope = null): array
     {
         $sql = $this->resolve($invariant->sampleSqlTemplate, $invariant, $scope);
@@ -489,10 +539,11 @@ class FinanceIntegrityAuditor
     }
 
     /**
-     * Subject-scoped findings: only invariants with count > 0 for this student scope.
-     * Empty scope returns [] (never a global scan).
+     * Subject-scoped findings. Emits a finding for every invariant that is either
+     * violated (kind=invariant) or failed to run (kind=invariant_error). Empty
+     * scope returns [] (never a global scan).
      *
-     * @return list<array{code:string,severity:string,label:string,sample_ids:list<int>}>
+     * @return list<array{code:string,severity:string,label:string,kind:string,sample_ids:list<int>}>
      */
     public function findForScope(FinanceAuditScope $scope): array
     {
@@ -502,11 +553,26 @@ class FinanceIntegrityAuditor
 
         $findings = [];
         foreach ($this->registry->all() as $invariant) {
-            if ($this->count($invariant, $scope) > 0) {
+            try {
+                $count = $this->count($invariant, $scope);
+            } catch (Throwable) {
+                $findings[] = [
+                    'code' => $invariant->code,
+                    'severity' => 'ERROR',
+                    'label' => $invariant->label,
+                    'kind' => 'invariant_error',
+                    'sample_ids' => [],
+                ];
+
+                continue;
+            }
+
+            if ($count > 0) {
                 $findings[] = [
                     'code' => $invariant->code,
                     'severity' => $invariant->severity,
                     'label' => $invariant->label,
+                    'kind' => 'invariant',
                     'sample_ids' => $this->samples($invariant, $scope),
                 ];
             }
@@ -586,6 +652,8 @@ Expected: PASS against the current command (proves the assertion is correct), gi
 - [ ] **Step 3: Refactor the command to consume the registry + auditor**
 
 Replace the private `$invariants` array and `defineInvariants()` with a constructor-injected `FinanceInvariantRegistry`/`FinanceIntegrityAuditor`. Build the output table from `$this->auditor->summarize(null)`; for `--sample`, call `$this->auditor->samples($invariant, null)` (fetch each `FinanceInvariant` via `$registry->all()`). Keep the exact header lines, the context row-count table, the `✅ 0` / `❌ {n}` rendering, the `{totalBad} total offending rows/groups` summary, and `return self::SUCCESS;`.
+
+**Preserve the ERROR branch (parity):** the original `catch` renders `[code, severity, 'ERROR', substr(message, 0, 60)]` and does not add to `$totalBad`. With the auditor, a row whose `count === null` is that same error — render `'ERROR'` + `mb_substr($row['error'] ?? '', 0, 60)` and skip the `$totalBad` increment, exactly as before. Only rows with a non-null int count contribute the `✅ 0` / `❌ {n}` cell and feed `$totalBad`. Confirm `finance:audit-invariants` output is byte-identical for both clean and erroring invariants.
 
 ```php
 public function __construct(
@@ -670,7 +738,7 @@ git commit -m "feat(finance): add view/export finance audit workspace permission
 - Test: `tests/Feature/Finance/Audit/ResolveFinanceAuditSearchQueryTest.php`
 - Reference: `app/Models/StudentInvoice.php` (`scopeSearch`), `app/Models/Payment.php`, `app/Modules/Finance/Dng/Models/DngPaymentRequest.php`, `app/Models/Student.php`.
 
-**Contract:** `handle(?string $q, ?int $campusId): array` returns the **Resolution** shape. Precedence (design.md): (1) exact `invoice_number`; (2) DNG `item_id` → `dng_payment_id` → `dng_transaction_id`; (3) `payment.external_ref` **only if `$q` is not MSSV-shaped**; (4) exact `students.student_id` (MSSV); (5) student name/email fuzzy (`Student` search) → may be ambiguous; (6) explicit prefixes `payment:<id>` / `invoice:<id>` / `dng:<id>` / `charge:<id>`. Bare integers never guess. **Every candidate is filtered to `$campusId`** (resolve the owning student's campus) before inclusion; cross-campus rows are invisible (treated as no-match, never "denied").
+**Contract:** `handle(?string $q, ?int $campusId): array` returns the **Resolution** shape. Precedence — **exactly the order locked in `design.md:79-90`**: (1) explicit prefixes `payment:<id>` / `invoice:<id>` / `dng:<id>` / `charge:<id>` (always win when present); (2) exact `student_invoices.invoice_number`; (3) DNG `item_id` → `dng_payment_id` → `dng_transaction_id`; (4) exact `students.student_id` (MSSV); (5) `payment.external_ref`, **only after (2)–(4) fail and never when `$q` is MSSV-shaped** (an exact student code always outranks an external_ref); (6) student name/email fuzzy (`Student` search) → may be ambiguous. Bare integers never guess. **Every candidate is filtered to `$campusId`** (resolve the owning student's campus) before inclusion; cross-campus rows are invisible (treated as no-match, never "denied").
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -720,6 +788,20 @@ it('resolves an exact student code to a student target, outranking a colliding e
         ->and($result['target'])->toBe(['type' => 'student', 'id' => $student->id]);
 });
 
+it('resolves an explicit prefix id directly, ahead of any free-form search', function () {
+    $student = Student::factory()->forCampus($this->campus)->forProgram($this->program)->create();
+    $invoice = StudentInvoice::factory()->create([
+        'student_id' => $student->id,
+        'semester_id' => $this->semester->id,
+        'invoice_number' => 'INV-PFX-001',
+    ]);
+
+    $result = app(ResolveFinanceAuditSearchQuery::class)->handle("invoice:{$invoice->id}", $this->campus->id);
+
+    expect($result['status'])->toBe('single')
+        ->and($result['target'])->toBe(['type' => 'invoice', 'id' => $invoice->id]);
+});
+
 it('never resolves a bare integer to a guessed entity', function () {
     $result = app(ResolveFinanceAuditSearchQuery::class)->handle('12345', $this->campus->id);
     expect($result['status'])->toBe('empty');
@@ -750,12 +832,12 @@ Expected: FAIL.
 
 - [ ] **Step 3: Implement the resolver**
 
-Implement `handle()` walking the precedence list, each lookup scoped to `$campusId` via the owning student's campus relation. Define a private `looksLikeStudentCode(string $q): bool` (MSSV format — letters+digits, e.g. `^[A-Za-z]{2,}\d{2,}$`; confirm the real format against existing `students.student_id` data before finalizing the regex). Return the Resolution shape. Build a private `studentMatch`/`invoiceMatch`/etc. helper to format `matches` rows (`label`, `sublabel`). Prefix handling: if `$q` matches `^(payment|invoice|dng|charge):(\d+)$`, resolve that id directly (still campus-checked).
+Implement `handle()` walking the precedence list **top to bottom, returning on the first hit**, each lookup scoped to `$campusId` via the owning student's campus relation. The walk **starts** with prefix handling: if `$q` matches `^(payment|invoice|dng|charge):(\d+)$`, resolve that id directly (still campus-checked) and return before any free-form search. Only if no prefix is present fall through to (2) invoice_number, (3) DNG ids, (4) exact student code, (5) external_ref, (6) fuzzy. Define a private `looksLikeStudentCode(string $q): bool` (MSSV format — letters+digits, e.g. `^[A-Za-z]{2,}\d{2,}$`; confirm the real format against existing `students.student_id` data before finalizing the regex) and short-circuit the external_ref branch when it returns true. Return the Resolution shape. Build private `studentMatch`/`invoiceMatch`/etc. helpers to format `matches` rows (`label`, `sublabel`).
 
 - [ ] **Step 4: Run to verify it passes**
 
 Run: `./scripts/dev.sh test --filter=ResolveFinanceAuditSearchQueryTest`
-Expected: PASS (5 tests).
+Expected: PASS (6 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -839,11 +921,11 @@ git commit -m "feat(finance): build student-scoped audit money graph with cache-
 
 ---
 
-## Task 9: `BuildFinanceLedgerTimeline`
+## Task 9: `FinanceLedgerTimelineBuilder`
 
 **Files:**
-- Create: `app/Modules/Finance/Support/Audit/BuildFinanceLedgerTimeline.php`
-- Test: `tests/Unit/Finance/Audit/BuildFinanceLedgerTimelineTest.php`
+- Create: `app/Modules/Finance/Support/Audit/FinanceLedgerTimelineBuilder.php`
+- Test: `tests/Unit/Finance/Audit/FinanceLedgerTimelineBuilderTest.php`
 
 **Contract:** `build(array $graph): array` returns a chronological list of **Timeline event**s built from graph nodes/edges. Preserves signed amounts: a `payment_application` with `entry_type=reversal` (negative `amount`) becomes a `signed_amount < 0` event labelled "Payment reversal"; allocations/releases likewise. Pure function (no DB) — input is the graph from Task 8, so the graph must carry application/allocation entry rows. (If Task 8's node set lacks raw ledger entries, extend its output with a `ledger_entries` array — adjust both tasks to agree on that key.)
 
@@ -854,7 +936,7 @@ git commit -m "feat(finance): build student-scoped audit money graph with cache-
 
 declare(strict_types=1);
 
-use App\Modules\Finance\Support\Audit\BuildFinanceLedgerTimeline;
+use App\Modules\Finance\Support\Audit\FinanceLedgerTimelineBuilder;
 
 it('preserves signed reversal entries and orders by time', function () {
     $graph = [
@@ -864,7 +946,7 @@ it('preserves signed reversal entries and orders by time', function () {
         ],
     ];
 
-    $timeline = (new BuildFinanceLedgerTimeline())->build($graph);
+    $timeline = (new FinanceLedgerTimelineBuilder())->build($graph);
 
     expect($timeline[0]['at'])->toBe('2026-01-01 09:00:00')
         ->and($timeline[0]['signed_amount'])->toBe(200.0)
@@ -877,13 +959,13 @@ it('preserves signed reversal entries and orders by time', function () {
 
 ---
 
-## Task 10: `BuildFinanceAuditWarnings`
+## Task 10: `FinanceAuditWarningBuilder`
 
 **Files:**
-- Create: `app/Modules/Finance/Support/Audit/BuildFinanceAuditWarnings.php`
-- Test: `tests/Feature/Finance/Audit/BuildFinanceAuditWarningsTest.php`
+- Create: `app/Modules/Finance/Support/Audit/FinanceAuditWarningBuilder.php`
+- Test: `tests/Feature/Finance/Audit/FinanceAuditWarningBuilderTest.php`
 
-**Contract:** `build(FinanceAuditScope $scope): array` returns a list of **Warning**s. It (a) calls `FinanceIntegrityAuditor::findForScope($scope)` → maps to `kind => 'invariant'`; and (b) computes `kind => 'cache_drift'` warnings via `SettlementService::deriveInvoiceSnapshot()` for each of the scope's student invoices where cached vs derived differ by > 0.01. Cache-drift uses `SettlementService` (canonical balance); INV-2 remains the command's DB guard — overlap is intentional and documented.
+**Contract:** `build(FinanceAuditScope $scope): array` returns a list of **Warning**s. It (a) calls `FinanceIntegrityAuditor::findForScope($scope)` and **passes through each finding's `kind` verbatim** (`invariant` for a violation, `invariant_error` for a check that failed to run) — it must never relabel an `invariant_error` as a clean/ordinary invariant; and (b) computes `kind => 'cache_drift'` warnings via `SettlementService::deriveInvoiceSnapshot()` for each of the scope's student invoices where cached vs derived differ by > 0.01. Cache-drift uses `SettlementService` (canonical balance); INV-2 remains the command's DB guard — overlap is intentional and documented.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -892,7 +974,7 @@ it('preserves signed reversal entries and orders by time', function () {
 
 declare(strict_types=1);
 
-use App\Modules\Finance\Support\Audit\BuildFinanceAuditWarnings;
+use App\Modules\Finance\Support\Audit\FinanceAuditWarningBuilder;
 use App\Modules\Finance\Support\Integrity\FinanceAuditScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -901,7 +983,7 @@ uses(RefreshDatabase::class);
 it('emits a cache_drift warning when cached_paid_amount disagrees with SettlementService', function () {
     [$student, $invoice] = seedStaleCacheFixture(); // reuse helper shape from Task 8
 
-    $warnings = app(BuildFinanceAuditWarnings::class)
+    $warnings = app(FinanceAuditWarningBuilder::class)
         ->build(new FinanceAuditScope(studentIds: [$student->id]));
 
     expect(collect($warnings)->where('kind', 'cache_drift')->pluck('sample_ids')->flatten())
@@ -910,7 +992,7 @@ it('emits a cache_drift warning when cached_paid_amount disagrees with Settlemen
 
 it('emits invariant warnings only for the scoped student', function () {
     $bad = makeStudentWithOverAllocatedPayment(); // reuse Task 4 helper
-    $warnings = app(BuildFinanceAuditWarnings::class)
+    $warnings = app(FinanceAuditWarningBuilder::class)
         ->build(new FinanceAuditScope(studentIds: [$bad->id]));
 
     expect(collect($warnings)->where('kind', 'invariant')->pluck('code'))->toContain('INV-1');
@@ -1038,7 +1120,7 @@ Route::get('/audit', [FinanceAuditWorkspaceController::class, 'index'])
 
 **Props contract (snake_case, matches the controller):** `filters`, `resolution`, `graph` (deferred), `timeline` (deferred), `warnings` (deferred), `links`, `allowed_actions`.
 
-- [ ] **Step 1: Build the page** with: a universal search bar (`useForm` GET to `finance.audit.index` via route helper); a resolution area handling `empty` / `single` / `ambiguous` (ambiguous → clickable `matches`); subject header; `<Deferred>` blocks for graph summary, signed ledger timeline (render `signed_amount` with sign + color), derived-balance panel (cached vs derived, highlight `drift`), and warning panel (group by `severity`); lightweight actions (copy authenticated link, refresh, open source page via `links`, export button **disabled** with tooltip). Follow web design-quality rules — intentional hierarchy, not a default card grid.
+- [ ] **Step 1: Build the page** with: a universal search bar (`useForm` GET to `finance.audit.index` via route helper); a resolution area handling `empty` / `single` / `ambiguous` (ambiguous → clickable `matches`); subject header; `<Deferred>` blocks for graph summary, signed ledger timeline (render `signed_amount` with sign + color), derived-balance panel (cached vs derived, highlight `drift`), and warning panel (group by `severity`; render `kind=cache_drift` and `kind=invariant` distinctly, and surface `kind=invariant_error` as an "audit unavailable" notice — never as a passed/clean check); lightweight actions (copy authenticated link, refresh, open source page via `links`, export button **disabled** with tooltip). Follow web design-quality rules — intentional hierarchy, not a default card grid.
 
 - [ ] **Step 2: Verify** — `./scripts/dev.sh npm run type-check` and `./scripts/dev.sh npm run lint` clean; the page test's `assertInertia` passes.
 
@@ -1094,3 +1176,15 @@ Keep Charges/Invoices/Payments/DNG entries as-is (they remain specialist deep-di
 - **Deferred / explicitly out of MVP:** export data egress endpoint (permission defined, button disabled) — matches the story stop condition "export deferred if no audit-log surface"; raise as a follow-up slice when an audit-log surface is chosen.
 - **Cross-task type consistency:** `FinanceAuditScope` fields, the Resolution/node/edge/timeline/warning shapes, and `ledger_entries` (shared between T8 and T9) are defined once in "Conventions" and reused verbatim. If T8 cannot cheaply emit `ledger_entries`, update T8 and T9 together.
 - **Risk:** the `{scope}` SQL splice (T3) is the only place raw ids touch SQL; `studentIdsCsv()` sanitizes to positive ints so interpolation is injection-safe. Confirm the MSSV regex (T7) against real `students.student_id` values before finalizing.
+
+---
+
+## Revision log (2026-06-15, pre-execution review)
+
+Applied before execution after a structural review:
+- **[P1] Scope = student-only.** `FinanceAuditScope` trimmed to `studentIds` (dead invoice/payment/charge/DNG id fields removed); every subject resolves to its owning student upstream. (T2)
+- **[P1] No swallowed SQL errors.** `FinanceIntegrityAuditor` no longer returns `0`/`[]` on `Throwable`. `summarize()` yields `count=null`+`error`; `findForScope()` emits `kind=invariant_error`; command keeps its `ERROR` row (parity); workspace shows "audit unavailable". New error-state test added. (T4, T5, T10, T13, Warning shape)
+- **[P1] Resolver precedence realigned to `design.md:79-90`** — explicit prefixes **first**, `external_ref` only after exact student code. Prefix-precedence test added. (T1, T7)
+- **[P2] Export deferred + validation softened.** Permission seeded, endpoint/audit-log deferred; `validation.md` rows 21/25 reworded so they no longer assert a live export endpoint. (T1, T6)
+- **[P2] Namespace convention locked.** Engine under `Support\Integrity`; workspace pure transforms under `Support\Audit` with repo noun+role names (`FinanceLedgerTimelineBuilder`, `FinanceAuditWarningBuilder`). `design.md` updated in T1. (T1, T9, T10)
+- **[P3] Baseline + deps hardened.** Treat the memory baseline as a hint and re-capture in-worktree; symlink helper is detect-first, not a hardcoded path. (T0)
