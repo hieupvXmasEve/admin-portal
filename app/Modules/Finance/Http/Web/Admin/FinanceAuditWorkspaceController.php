@@ -16,6 +16,10 @@ use App\Modules\Finance\Queries\Audit\ResolveFinanceAuditSearchQuery;
 use App\Modules\Finance\Support\Audit\FinanceAuditWarningBuilder;
 use App\Modules\Finance\Support\Audit\FinanceLedgerTimelineBuilder;
 use App\Modules\Finance\Support\Integrity\FinanceAuditScope;
+use App\Modules\Finance\Support\Integrity\FinanceIntegrityAuditor;
+use App\Modules\Finance\Support\Integrity\FinanceInvariantRegistry;
+use App\Modules\Finance\Support\Integrity\FinanceInvariantSampleResolver;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -44,9 +48,17 @@ class FinanceAuditWorkspaceController extends Controller
         GetFinanceAuditGraphQuery $graphQuery,
         FinanceLedgerTimelineBuilder $timelineBuilder,
         FinanceAuditWarningBuilder $warningBuilder,
-    ): Response {
+        FinanceInvariantRegistry $registry,
+        FinanceIntegrityAuditor $auditor,
+        FinanceInvariantSampleResolver $sampleResolver,
+    ): Response|RedirectResponse {
         $campusId = $this->currentCampusId();
         $data = $request->validated();
+
+        [$data, $redirectUrl] = $this->applyFindingDrilldown($data, $campusId, $registry, $auditor, $sampleResolver, $request);
+        if ($redirectUrl !== null) {
+            return redirect($redirectUrl);
+        }
 
         $resolution = $this->resolve($data, $campusId, $resolver);
         $semesterId = isset($data['semester_id']) ? (int) $data['semester_id'] : null;
@@ -59,6 +71,9 @@ class FinanceAuditWorkspaceController extends Controller
                 'target_id' => isset($data['target_id']) ? (int) $data['target_id'] : null,
                 'semester_id' => $semesterId,
                 'billing_cycle_id' => $billingCycleId,
+                'finding_code' => $data['finding_code'] ?? null,
+                'sample_id' => isset($data['sample_id']) ? (int) $data['sample_id'] : null,
+                'scope' => $data['scope'] ?? null,
             ],
             'resolution' => $resolution,
             'links' => $this->links($resolution, $request),
@@ -192,5 +207,67 @@ class FinanceAuditWorkspaceController extends Controller
         $campus = app('campus');
 
         return $campus?->id !== null ? (int) $campus->id : null;
+    }
+
+    /**
+     * @param  array<string,mixed>  $data
+     * @return array{0:array<string,mixed>,1:?string}
+     */
+    private function applyFindingDrilldown(
+        array $data,
+        ?int $campusId,
+        FinanceInvariantRegistry $registry,
+        FinanceIntegrityAuditor $auditor,
+        FinanceInvariantSampleResolver $resolver,
+        FinanceAuditSearchRequest $request,
+    ): array {
+        $code = $data['finding_code'] ?? null;
+        if ($code === null) {
+            return [$data, null];
+        }
+
+        $canAllCampus = $request->user()?->can('view_finance_all_campus') ?? false;
+        if (($data['scope'] ?? 'campus') === 'all_campus' && ! $canAllCampus) {
+            $data['scope'] = 'campus';
+        }
+
+        $listUrl = $resolver->listUrlFor($code);
+        $targetType = $resolver->targetTypeFor($code);
+        if ($targetType === null) {
+            return [$data, $listUrl];
+        }
+
+        $sampleId = isset($data['sample_id']) ? (int) $data['sample_id'] : null;
+        if ($sampleId === null) {
+            $invariant = $registry->find($code);
+            $scope = ($data['scope'] ?? 'campus') === 'all_campus'
+                ? null
+                : new FinanceAuditScope($this->campusStudentIds($campusId));
+            $sampleId = $invariant !== null ? ($auditor->samples($invariant, $scope)[0] ?? null) : null;
+        }
+
+        if ($sampleId === null) {
+            return [$data, null];
+        }
+
+        $targetId = $resolver->resolveTargetId($code, $sampleId);
+        if ($targetId === null) {
+            return [$data, $listUrl];
+        }
+
+        $data['target_type'] = $targetType;
+        $data['target_id'] = $targetId;
+
+        return [$data, null];
+    }
+
+    /** @return list<int> */
+    private function campusStudentIds(?int $campusId): array
+    {
+        if ($campusId === null) {
+            return [];
+        }
+
+        return Student::query()->where('campus_id', $campusId)->pluck('id')->map(fn ($id) => (int) $id)->all();
     }
 }
