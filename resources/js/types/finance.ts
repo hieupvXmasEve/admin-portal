@@ -198,3 +198,53 @@ export function formatCurrency(amount: number): string {
 export function isCredit(chargeType: ChargeType): boolean {
     return ['defer_credit', 'egc_exempt_credit', 'scholarship_credit', 'voucher_credit'].includes(chargeType);
 }
+
+// =====================================================================
+// Finance Office shell + Student 360 (S-010 milestone 1)
+// =====================================================================
+
+export interface SemesterOption {
+    id: number;
+    code: string;
+    name: string;
+    is_active: boolean;
+}
+
+export interface SemesterContext {
+    selected_id: number | null;
+    options: SemesterOption[];
+}
+
+export interface Student360Identity {
+    id: number;
+    student_code: string;
+    full_name: string;
+    status: string;
+    academic_status: string | null;
+    lifecycle_reason: string;
+    lifecycle_label: string;
+}
+
+export interface Student360Balances {
+    net_charges: number;
+    total_paid: number;
+    balance: number;
+    unapplied_credit: number;
+    status: string;
+}
+
+export interface LedgerEvent {
+    at: string | null;
+    type: string;
+    signed_amount: number;
+    label: string;
+    refs: Record<string, number>;
+}
+
+export interface FinanceSearchResult {
+    type: string;
+    id: number;
+    label: string;
+    sublabel: string;
+    url: string;
+}

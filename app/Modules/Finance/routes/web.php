@@ -12,6 +12,7 @@ use App\Modules\Finance\Http\Web\Admin\EgcChargeGenerationController;
 use App\Modules\Finance\Http\Web\Admin\EgcRetakeAdjustmentsController;
 use App\Modules\Finance\Http\Web\Admin\FinanceAuditWorkspaceController;
 use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
+use App\Modules\Finance\Http\Web\Admin\FinanceStudentOverviewController;
 use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionController;
 use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionHistoryController;
 use App\Modules\Finance\Http\Web\Admin\MajorChargeGenerationController;
@@ -153,6 +154,11 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
             ->middleware('can:void_finance_charges')
             ->name('lines.void');
     });
+    // Student 360 read-only shell (search destination)
+    Route::get('/students/{student}', [FinanceStudentOverviewController::class, 'show'])
+        ->middleware('can:view_finance_student_overview')
+        ->name('students.overview');
+
     // =====================
     // Finance Charges
     // =====================
