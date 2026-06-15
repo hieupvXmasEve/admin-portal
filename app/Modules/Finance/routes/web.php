@@ -12,6 +12,7 @@ use App\Modules\Finance\Http\Web\Admin\EgcChargeGenerationController;
 use App\Modules\Finance\Http\Web\Admin\EgcRetakeAdjustmentsController;
 use App\Modules\Finance\Http\Web\Admin\FinanceAuditWorkspaceController;
 use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
+use App\Modules\Finance\Http\Web\Admin\FinanceGlobalSearchController;
 use App\Modules\Finance\Http\Web\Admin\FinanceStudentOverviewController;
 use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionController;
 use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionHistoryController;
@@ -158,6 +159,11 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
     Route::get('/students/{student}', [FinanceStudentOverviewController::class, 'show'])
         ->middleware('can:view_finance_student_overview')
         ->name('students.overview');
+
+    // Global finance search (JSON) for the ⌘K palette
+    Route::get('/search', [FinanceGlobalSearchController::class, 'search'])
+        ->middleware('can:view_finance_student_overview')
+        ->name('search');
 
     // =====================
     // Finance Charges
