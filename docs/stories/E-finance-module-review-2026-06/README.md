@@ -22,6 +22,7 @@ finally UI/BOD surfaces.
 | 9     | `FIN-REV-009-finance-audit-workspace`                 | `S-009-finance-audit-workspace/`                 | Universal-search Finance Audit Workspace built on the ledger graph, derived settlement truth, and permission-checked deep links       | 002, 005, 007                                |
 | 10.1  | `FIN-REV-010-finance-staff-workspace`                 | `S-010-finance-staff-workspace/`                 | Milestone 1 consolidated story: Finance shell + Student 360 foundation                                                                | 002, 004, 005, 006, 009 for audit/deep links |
 | 10.2  | `FIN-REV-010-student-360-full`                        | `S-010-student-360-full/`                        | Milestone 2 consolidated story: full Student 360 operator surface and safe action drawers                                             | 010.1, 002, 005                              |
+| 10.4  | `FIN-REV-010-batch-studio`                            | `S-010-batch-studio/`                            | Milestone 4 consolidated story: Batch Studio wizard + preview-token safety for bulk charge gen, DNG push, and reminders                 | 010.1, 010.2, 002, 004, 005, 006             |
 
 ## FIN-REV-010 Consolidated Stories
 
@@ -33,6 +34,7 @@ evidence and debugging context are not lost.
 | ----- | ------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
 | 10.1  | `FIN-REV-010-finance-staff-workspace` | `S-010-finance-staff-workspace/` | M1 shell/foundation: route helpers, permissions, Student 360 shell, global search, semester context, sidebar IA, topbar mount, and M1 evidence              | 002, 004, 005, 006, 009 |
 | 10.2  | `FIN-REV-010-student-360-full`        | `S-010-student-360-full/`        | M2 Student 360 full surface: status cards, grouped ledger, allocation preview, record-payment adapter, reviewed DNG cancel, action drawers, and M2 evidence | 010.1, 002, 005         |
+| 10.4  | `FIN-REV-010-batch-studio`            | `S-010-batch-studio/`            | M4 Batch Studio: shared 4-step wizard, preview-token drift safety, bulk charge gen / DNG push / reminders, and M4 invariant evidence                          | 010.1, 010.2, 002, 004, 005, 006 |
 
 ### Retired Child Packets
 

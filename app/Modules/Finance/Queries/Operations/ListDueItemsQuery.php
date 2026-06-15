@@ -46,7 +46,7 @@ class ListDueItemsQuery
         }
 
         $page = (int) request()->get('page', 1);
-        $perPage = 20;
+        $perPage = min(500, max(1, (int) request()->get('per_page', 20)));
 
         return $dngQuery
             ->orderBy('dng_payment_requests.due_date')

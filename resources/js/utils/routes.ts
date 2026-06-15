@@ -460,6 +460,18 @@ export const financeRoutes = {
         egcRetakeAdjustments: () => route(FINANCE_ROUTE_NAMES.EGC_RETAKE_ADJUSTMENTS_INDEX),
         egcCarryForward: () => route(FINANCE_ROUTE_NAMES.EGC_CARRY_FORWARD_INDEX),
     },
+    batchStudio: {
+        hub: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_HUB),
+        charges: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_CHARGES),
+        chargesPreview: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_CHARGES_PREVIEW),
+        chargesCommit: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_CHARGES_COMMIT),
+        dng: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_DNG),
+        dngPreview: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_DNG_PREVIEW),
+        dngCommit: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_DNG_COMMIT),
+        reminders: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_REMINDERS),
+        remindersPreview: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_REMINDERS_PREVIEW),
+        remindersCommit: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_REMINDERS_COMMIT),
+    },
     collect: {
         dngWorklist: () => route(FINANCE_ROUTE_NAMES.DNG_WORKLIST),
         dngPaymentRequests: () => route(FINANCE_ROUTE_NAMES.DNG_PAYMENT_REQUESTS_INDEX),

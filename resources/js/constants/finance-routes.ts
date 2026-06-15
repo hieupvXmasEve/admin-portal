@@ -33,4 +33,15 @@ export const FINANCE_ROUTE_NAMES = {
     DNG_CANCEL_IMPACT: 'finance.dng.payment-requests.cancel-impact',
     DNG_CANCEL_REVIEWED: 'finance.dng.payment-requests.cancel-reviewed',
     INSTALLMENT_RETRY_PUSH: 'finance.charges.installments.retry-push',
+    // Batch Studio (milestone 4)
+    BATCH_STUDIO_HUB: 'finance.batch-studio.hub',
+    BATCH_STUDIO_CHARGES: 'finance.batch-studio.charges',
+    BATCH_STUDIO_CHARGES_PREVIEW: 'finance.batch-studio.charges.preview',
+    BATCH_STUDIO_CHARGES_COMMIT: 'finance.batch-studio.charges.commit',
+    BATCH_STUDIO_DNG: 'finance.batch-studio.dng',
+    BATCH_STUDIO_DNG_PREVIEW: 'finance.batch-studio.dng.preview',
+    BATCH_STUDIO_DNG_COMMIT: 'finance.batch-studio.dng.commit',
+    BATCH_STUDIO_REMINDERS: 'finance.batch-studio.reminders',
+    BATCH_STUDIO_REMINDERS_PREVIEW: 'finance.batch-studio.reminders.preview',
+    BATCH_STUDIO_REMINDERS_COMMIT: 'finance.batch-studio.reminders.commit',
 } as const;

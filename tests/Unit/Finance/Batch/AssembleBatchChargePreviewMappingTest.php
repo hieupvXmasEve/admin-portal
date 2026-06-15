@@ -1,0 +1,59 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Modules\Finance\Queries\Batch\AssembleBatchChargePreviewQuery;
+
+it('maps an eligible row into a 🟢 create line with a stable key and net in the hash', function () {
+    $row = [
+        'id' => 11,
+        'student_id' => 'SV011',
+        'full_name' => 'Nguyen Van A',
+        'estimated_amount' => 500000.0,
+        'gross_amount' => 600000.0,
+        'discount_amount' => 100000.0,
+        'scholarship_id' => 7,
+        'voucher_id' => null,
+        'has_existing_charge' => false,
+        'warning' => null,
+        'fee_plan_id' => 42,
+        'fee_plan_updated_at' => '2026-06-01 10:00:00',
+        'fee_term_id' => 9,
+        'fee_term_updated_at' => '2026-06-02 11:00:00',
+    ];
+
+    $line = AssembleBatchChargePreviewQuery::mapChargeRow($row, 'major', 5, 'create');
+
+    expect($line->key)->toBe('charge:major:student:11:semester:5')
+        ->and($line->display['diff'])->toBe('create')
+        ->and($line->display['net'])->toBe(500000.0)
+        ->and($line->hashPayload['net'])->toBe(500000.0)
+        ->and($line->hashPayload['scholarship_id'])->toBe(7)
+        ->and($line->hashPayload['fee_config_fingerprint'])->toBe('plan:42@2026-06-01 10:00:00|term:9@2026-06-02 11:00:00');
+});
+
+it('maps a warning row into a 🟠 warning line carrying the reason', function () {
+    $row = [
+        'id' => 12, 'student_id' => 'SV012', 'full_name' => 'B',
+        'estimated_amount' => 0.0, 'has_existing_charge' => false,
+        'warning' => 'scholarship_expired',
+    ];
+
+    $line = AssembleBatchChargePreviewQuery::mapChargeRow($row, 'major', 5, 'warning');
+
+    expect($line->display['diff'])->toBe('warning')
+        ->and($line->display['reason'])->toBe('scholarship_expired')
+        ->and($line->hashPayload['warning_codes'])->toBe(['scholarship_expired']);
+});
+
+it('maps an already-charged row into a ⚪ skip line with a reason', function () {
+    $row = [
+        'id' => 13, 'student_id' => 'SV013', 'full_name' => 'C',
+        'estimated_amount' => 500000.0, 'has_existing_charge' => true, 'warning' => null,
+    ];
+
+    $line = AssembleBatchChargePreviewQuery::mapChargeRow($row, 'non_academic', 5, 'skip');
+
+    expect($line->display['diff'])->toBe('skip')
+        ->and($line->display['reason'])->toBe('already_charged');
+});

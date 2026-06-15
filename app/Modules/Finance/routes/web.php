@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Finance\Http\Web\Admin\BatchStudioController;
 use App\Modules\Finance\Http\Web\Admin\BillingInvoiceController;
 use App\Modules\Finance\Http\Web\Admin\BillingOperationsController;
 use App\Modules\Finance\Http\Web\Admin\BillingSettlementController;
@@ -271,4 +272,21 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
 
     // Retake Course Charge routes removed — absorbed by DNG Worklist (fee_type=HL)
     // See: DngWorklistController + CreateBatchDngFromChargesAction (auto-creates charges for approved registrations)
+
+    Route::prefix('batch-studio')->name('batch-studio.')->group(function () {
+        Route::get('/', [BatchStudioController::class, 'hub'])
+            ->middleware('can:view_finance_batch_studio')->name('hub');
+        Route::get('/charges', [BatchStudioController::class, 'charges'])
+            ->middleware('can:view_finance_batch_studio')->name('charges');
+        Route::post('/charges', [BatchStudioController::class, 'commitCharges'])
+            ->middleware('can:create_finance_charges')->name('charges.commit');
+        Route::get('/dng', [BatchStudioController::class, 'dng'])
+            ->middleware('can:view_finance_batch_studio')->name('dng');
+        Route::post('/dng', [BatchStudioController::class, 'commitDng'])
+            ->middleware('can:create_finance_payments')->name('dng.commit');
+        Route::get('/reminders', [BatchStudioController::class, 'reminders'])
+            ->middleware('can:view_finance_batch_studio')->name('reminders');
+        Route::post('/reminders', [BatchStudioController::class, 'commitReminders'])
+            ->middleware('can:view_finance_operations_due_calendar')->name('reminders.commit');
+    });
 });

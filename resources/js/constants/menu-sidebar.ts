@@ -331,6 +331,7 @@ export const mainNavGroups: NavGroup[] = [
                     { title: 'EGC · Block Results', href: financeRoutes.feeGeneration.egcBlockResults(), icon: CheckSquare, requiredPermissions: ['view_egc_block_results'] },
                     { title: 'EGC · Retake Adjustments', href: financeRoutes.feeGeneration.egcRetakeAdjustments(), icon: TrendingUp, requiredPermissions: ['view_egc_retake_adjustments'] },
                     { title: 'EGC · Carry Forward', href: financeRoutes.feeGeneration.egcCarryForward(), icon: ArrowRightLeft, requiredPermissions: ['view_egc_retake_adjustments'] },
+                    { title: 'Batch Studio', href: financeRoutes.batchStudio.hub(), icon: Layers, requiredPermissions: ['view_finance_batch_studio'] },
                 ],
             },
             {

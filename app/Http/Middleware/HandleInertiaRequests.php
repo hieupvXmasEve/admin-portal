@@ -68,7 +68,12 @@ class HandleInertiaRequests extends Middleware
                 }
 
                 $permissions = app(PermissionService::class)->getUserPermissions($user, $currentCampusId);
-                $financePerms = ['view_finance_student_overview', 'view_finance_audit_workspace', 'view_finance_operations_dashboard'];
+                $financePerms = [
+                    'view_finance_student_overview',
+                    'view_finance_audit_workspace',
+                    'view_finance_operations_dashboard',
+                    'view_finance_batch_studio',
+                ];
                 if (count(array_intersect($financePerms, $permissions)) === 0) {
                     return null; // bound cost: only finance users pay for the semester query
                 }

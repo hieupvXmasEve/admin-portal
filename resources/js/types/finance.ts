@@ -314,3 +314,36 @@ export interface LedgerGroup {
     semester: { id: number | null; name: string };
     invoices: LedgerInvoice[];
 }
+
+export type BatchDiffBucket = 'create' | 'update' | 'skip' | 'warning';
+
+export interface BatchPreviewLineDisplay {
+    student_id: string;
+    label: string;
+    diff: BatchDiffBucket;
+    gross?: number;
+    discount?: number;
+    net: number;
+    installment_aware_total?: number;
+    reason?: string | null;
+    warning_codes?: string[];
+}
+
+export interface BatchPreviewLineClient {
+    key: string;
+    display: BatchPreviewLineDisplay;
+}
+
+export interface BatchPreviewResponse {
+    preview_token: string;
+    lines: BatchPreviewLineClient[];
+    summary: Record<string, number>;
+}
+
+export type BatchJobKind = 'charge_generation' | 'dng_push' | 'reminder';
+
+export interface BatchResult {
+    job: BatchJobKind;
+    fee_category?: string;
+    summary: Record<string, unknown> & { errors?: string[] };
+}

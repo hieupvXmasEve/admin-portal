@@ -152,6 +152,7 @@ class RoleAndPermissionSeeder extends Seeder
                 'apply_egc_retake_adjustment',
                 // Staff workspace foundation (S-010 milestone 1)
                 'view_finance_student_overview',
+                'view_finance_batch_studio',
             ],
             'can_bo' => [
                 'view_user',
@@ -170,6 +171,7 @@ class RoleAndPermissionSeeder extends Seeder
                 'apply_egc_retake_adjustment',
                 // Staff workspace foundation (S-010 milestone 1)
                 'view_finance_student_overview',
+                'view_finance_batch_studio',
             ],
         ];
 

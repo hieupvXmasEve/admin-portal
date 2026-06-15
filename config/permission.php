@@ -370,6 +370,8 @@ return [
             // Staff workspace foundation (S-010 milestone 1)
             'view_finance_student_overview' => 'view_finance_student_overview',
             'view_finance_all_campus' => 'view_finance_all_campus',
+            // Batch Studio (S-010 milestone 4) — thin view gate; each job gated per-action
+            'view_finance_batch_studio' => 'view_finance_batch_studio',
         ],
         'modules' => [
             'view_module' => 'view_module',

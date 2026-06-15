@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Finance\Http\Api\Admin\BatchStudioPreviewController;
 use App\Modules\Finance\Http\Api\Admin\BillingOperationsController;
 use Illuminate\Support\Facades\Route;
 
@@ -36,4 +37,19 @@ Route::prefix('api/v1/finance/operations')
         Route::post('/send-parent-reminders', [BillingOperationsController::class, 'sendParentReminders'])->name('send-parent-reminders');
         Route::post('/send-due-item-reminders', [BillingOperationsController::class, 'sendDueItemReminders'])->name('send-due-item-reminders');
         Route::post('/send-due-item-parent-reminders', [BillingOperationsController::class, 'sendDueItemParentReminders'])->name('send-due-item-parent-reminders');
+    });
+
+Route::prefix('api/v1/finance/batch-studio')
+    ->middleware(['web', 'auth'])
+    ->name('finance.batch-studio.')
+    ->group(function () {
+        Route::post('/charges/preview', [BatchStudioPreviewController::class, 'previewCharges'])
+            ->middleware('can:create_finance_charges')
+            ->name('charges.preview');
+        Route::post('/dng/preview', [BatchStudioPreviewController::class, 'previewDng'])
+            ->middleware('can:create_finance_payments')
+            ->name('dng.preview');
+        Route::post('/reminders/preview', [BatchStudioPreviewController::class, 'previewReminders'])
+            ->middleware('can:view_finance_operations_due_calendar')
+            ->name('reminders.preview');
     });
