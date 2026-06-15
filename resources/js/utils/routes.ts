@@ -485,4 +485,17 @@ export const financeRoutes = {
     semesterContext: {
         update: () => route(FINANCE_ROUTE_NAMES.SEMESTER_CONTEXT_UPDATE),
     },
+    student360: {
+        allocatePreview: (paymentId: number) =>
+            route(FINANCE_ROUTE_NAMES.PAYMENT_ALLOCATE_PREVIEW, { payment: paymentId }),
+        allocate: (paymentId: number) => route(FINANCE_ROUTE_NAMES.PAYMENT_ALLOCATE, { payment: paymentId }),
+        recordPayment: (studentId: number) =>
+            route(FINANCE_ROUTE_NAMES.STUDENT_PAYMENT_STORE, { student: studentId }),
+        dngCancelImpact: (dngId: number) =>
+            route(FINANCE_ROUTE_NAMES.DNG_CANCEL_IMPACT, { dngPaymentRequest: dngId }),
+        dngCancelReviewed: (dngId: number) =>
+            route(FINANCE_ROUTE_NAMES.DNG_CANCEL_REVIEWED, { dngPaymentRequest: dngId }),
+        retryInstallmentPush: (chargeId: number, installmentId: number) =>
+            route(FINANCE_ROUTE_NAMES.INSTALLMENT_RETRY_PUSH, { charge: chargeId, installment: installmentId }),
+    },
 } as const;

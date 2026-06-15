@@ -26,8 +26,9 @@ const runSearch = async (term: string): Promise<void> => {
     abort = new AbortController();
     loading.value = true;
     try {
-        const res = await get<{ status: string; results: FinanceSearchResult[] }>(financeRoutes.search(), { q: term }, { signal: abort.signal });
-        results.value = res.success && res.data ? res.data.results : [];
+        const response = await get<{ status: string; results: FinanceSearchResult[] }>(financeRoutes.search(), { q: term }, { signal: abort.signal });
+        const payload = response.data.value;
+        results.value = payload?.success && payload.data ? payload.data.results : [];
     } catch {
         results.value = [];
     } finally {

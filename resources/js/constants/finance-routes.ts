@@ -27,4 +27,10 @@ export const FINANCE_ROUTE_NAMES = {
     STUDENT_OVERVIEW: 'finance.students.overview',
     GLOBAL_SEARCH: 'finance.search',
     SEMESTER_CONTEXT_UPDATE: 'finance.semester-context.update',
+    PAYMENT_ALLOCATE_PREVIEW: 'finance.payments.allocate-preview',
+    PAYMENT_ALLOCATE: 'finance.payments.allocate',
+    STUDENT_PAYMENT_STORE: 'finance.students.payments.store',
+    DNG_CANCEL_IMPACT: 'finance.dng.payment-requests.cancel-impact',
+    DNG_CANCEL_REVIEWED: 'finance.dng.payment-requests.cancel-reviewed',
+    INSTALLMENT_RETRY_PUSH: 'finance.charges.installments.retry-push',
 } as const;

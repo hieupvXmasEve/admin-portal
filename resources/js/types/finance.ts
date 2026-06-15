@@ -248,3 +248,69 @@ export interface FinanceSearchResult {
     sublabel: string;
     url: string;
 }
+
+// =====================================================================
+// Student 360 Milestone 2 display types
+// =====================================================================
+
+export interface DngCardRequest {
+    id: number;
+    status: string;
+    item_id: string;
+    amount: number;
+    error_message: string | null;
+}
+
+export interface Student360StatusCards {
+    balance: {
+        balance: number;
+        unapplied_credit: number;
+        has_unapplied: boolean;
+        unapplied_payment_id: number | null;
+    };
+    dng: { has_active: boolean; request: DngCardRequest | null };
+    installments: {
+        total: number;
+        paid: number;
+        next: {
+            id: number;
+            charge_id: number;
+            installment_no: number;
+            due_date: string | null;
+            has_push_error: boolean;
+        } | null;
+    };
+    exception: {
+        needs_review: boolean;
+        dng_request_id: number | null;
+        blocking_reasons: string[];
+    };
+}
+
+export interface Student360Actions {
+    can_record_payment: boolean;
+    can_allocate: boolean;
+    can_cancel_dng: boolean;
+    can_void_charges: boolean;
+}
+
+export interface LedgerInvoiceLine {
+    id: number;
+    label: string;
+    outstanding: number;
+}
+
+export interface LedgerInvoice {
+    id: number;
+    invoice_number: string;
+    status: string;
+    net: number;
+    paid: number;
+    remaining: number;
+    lines: LedgerInvoiceLine[];
+}
+
+export interface LedgerGroup {
+    semester: { id: number | null; name: string };
+    invoices: LedgerInvoice[];
+}
