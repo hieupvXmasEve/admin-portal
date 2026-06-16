@@ -22,26 +22,31 @@ finally UI/BOD surfaces.
 | 9     | `FIN-REV-009-finance-audit-workspace`                 | `S-009-finance-audit-workspace/`                 | Universal-search Finance Audit Workspace built on the ledger graph, derived settlement truth, and permission-checked deep links       | 002, 005, 007                                |
 | 10.1  | `FIN-REV-010-finance-staff-workspace`                 | `S-010-finance-staff-workspace/`                 | Milestone 1 consolidated story: Finance shell + Student 360 foundation                                                                | 002, 004, 005, 006, 009 for audit/deep links |
 | 10.2  | `FIN-REV-010-student-360-full`                        | `S-010-student-360-full/`                        | Milestone 2 consolidated story: full Student 360 operator surface and safe action drawers                                             | 010.1, 002, 005                              |
-| 10.4  | `FIN-REV-010-batch-studio`                            | `S-010-batch-studio/`                            | Milestone 4 consolidated story: Batch Studio wizard + preview-token safety for bulk charge gen, DNG push, and reminders                 | 010.1, 010.2, 002, 004, 005, 006             |
-| 10.5  | `FIN-REV-010-lookup-and-audit`                        | `S-010-lookup-and-audit/`                        | Milestone 5 consolidated story: unified lookup standard (charges/invoices/payments) + Audit Workspace money-flow graph                  | 010.1, 010.2, 009; 010.4 for batch hand-off  |
+| 10.3  | `FIN-REV-010-cockpit`                                 | `S-010-cockpit/`                                 | Milestone 3 consolidated story: Cockpit Hôm nay triage, queue action panel, data-health, and invariant drilldown                      | 010.1, 010.2                                 |
+| 10.4  | `FIN-REV-010-batch-studio`                            | `S-010-batch-studio/`                            | Milestone 4 consolidated story: Batch Studio wizard + preview-token safety for bulk charge gen, DNG push, and reminders               | 010.1, 010.2, 002, 004, 005, 006             |
+| 10.5  | `FIN-REV-010-lookup-and-audit`                        | `S-010-lookup-and-audit/`                        | Milestone 5 consolidated story: unified lookup standard (charges/invoices/payments) + Audit Workspace money-flow graph                | 010.1, 010.2, 009; 010.4 for batch hand-off  |
+| 10.6  | `FIN-REV-010-cutover-and-uat`                         | `S-010-cutover-and-uat/`                         | Milestone 6 consolidated story: Finance Office cutover, legacy entrypoint decisions, and role-based operator UAT                      | 010.1, 010.2, 010.3, 010.4, 010.5            |
+| 12    | `FIN-REV-012-fee-tracking-reporting-requirements`     | `S-012-fee-tracking-reporting-requirements/`     | Requirement holder for new Finance UI fee tracking, statistics, and export data surfaces                                              | 010.1-010.6, 008, 009                        |
 
 ## FIN-REV-010 Consolidated Stories
 
-FIN-REV-010 is tracked as two milestone-sized Harness stories. The old
+FIN-REV-010 is tracked as milestone-sized Harness stories. The old
 task-sized child packets are retained as historical notes only so validation
 evidence and debugging context are not lost.
 
-| Order | Story id                              | Story packet                     | Main scope                                                                                                                                                  | Depends on              |
-| ----- | ------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| 10.1  | `FIN-REV-010-finance-staff-workspace` | `S-010-finance-staff-workspace/` | M1 shell/foundation: route helpers, permissions, Student 360 shell, global search, semester context, sidebar IA, topbar mount, and M1 evidence              | 002, 004, 005, 006, 009 |
-| 10.2  | `FIN-REV-010-student-360-full`        | `S-010-student-360-full/`        | M2 Student 360 full surface: status cards, grouped ledger, allocation preview, record-payment adapter, reviewed DNG cancel, action drawers, and M2 evidence | 010.1, 002, 005         |
-| 10.4  | `FIN-REV-010-batch-studio`            | `S-010-batch-studio/`            | M4 Batch Studio: shared 4-step wizard, preview-token drift safety, bulk charge gen / DNG push / reminders, and M4 invariant evidence                          | 010.1, 010.2, 002, 004, 005, 006 |
+| Order | Story id                              | Story packet                     | Main scope                                                                                                                                                  | Depends on                                  |
+| ----- | ------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| 10.1  | `FIN-REV-010-finance-staff-workspace` | `S-010-finance-staff-workspace/` | M1 shell/foundation: route helpers, permissions, Student 360 shell, global search, semester context, sidebar IA, topbar mount, and M1 evidence              | 002, 004, 005, 006, 009                     |
+| 10.2  | `FIN-REV-010-student-360-full`        | `S-010-student-360-full/`        | M2 Student 360 full surface: status cards, grouped ledger, allocation preview, record-payment adapter, reviewed DNG cancel, action drawers, and M2 evidence | 010.1, 002, 005                             |
+| 10.3  | `FIN-REV-010-cockpit`                 | `S-010-cockpit/`                 | M3 Cockpit Hôm nay: KPI ribbon, queues, Action Panel, deferred data-health, invariant drilldown, phase shortcuts, and M3 evidence                           | 010.1, 010.2                                |
+| 10.4  | `FIN-REV-010-batch-studio`            | `S-010-batch-studio/`            | M4 Batch Studio: shared 4-step wizard, preview-token drift safety, bulk charge gen / DNG push / reminders, and M4 invariant evidence                        | 010.1, 010.2, 002, 004, 005, 006            |
 | 10.5  | `FIN-REV-010-lookup-and-audit`        | `S-010-lookup-and-audit/`        | M5 Lookup & Audit: `useDataTable` lookup standard for charges/invoices/payments, row→360 + Batch Studio selection, Audit money-flow graph + timeline polish | 010.1, 010.2, 009; 010.4 for batch hand-off |
+| 10.6  | `FIN-REV-010-cutover-and-uat`         | `S-010-cutover-and-uat/`         | M6 Cutover & UAT: route/menu/page inventory, legacy entrypoint decisions, navigation cutover, permission pass, and operator UAT evidence                    | 010.1, 010.2, 010.3, 010.4, 010.5           |
 
 ### Retired Child Packets
 
 These task-sized packets were useful while executing/debugging the milestones,
-but they are no longer active Harness story units. Use the two consolidated
+but they are no longer active Harness story units. Use the consolidated
 stories above for planning, status, review, and acceptance.
 
 | Retired task packets                                                              | Merged into                           |

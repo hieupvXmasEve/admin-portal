@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApi } from '@/composables/useApiRequest';
+import { financeRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, Loader2, Sparkles, Users, Wallet, Zap } from 'lucide-vue-next';
 import { ref } from 'vue';
@@ -348,8 +349,8 @@ const toggleStudent = (studentId: number) => {
                         <Link :href="route('finance.payments.index')">
                             <Button variant="outline">Về danh sách thanh toán</Button>
                         </Link>
-                        <Link :href="route('finance.operations.dashboard')">
-                            <Button>Xem Dashboard</Button>
+                        <Link :href="financeRoutes.cockpit.index()">
+                            <Button>Về Hôm nay</Button>
                         </Link>
                     </div>
                 </div>

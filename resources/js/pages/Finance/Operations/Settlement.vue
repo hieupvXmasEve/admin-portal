@@ -19,6 +19,7 @@ import type { ColumnDef } from '@tanstack/vue-table';
 import { ArrowLeft, CheckCircle2, ExternalLink, X, Zap } from 'lucide-vue-next';
 import { h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
+import { financeRoutes } from '@/utils/routes';
 import { route } from 'ziggy-js';
 
 interface SettlementInvoice {
@@ -294,7 +295,7 @@ defineOptions({
 
         <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-3">
-                <Link :href="route('finance.operations.dashboard')">
+                <Link :href="permission.can('view_finance_cockpit') ? financeRoutes.cockpit.index() : financeRoutes.today.dashboard()">
                     <Button variant="ghost" size="icon">
                         <ArrowLeft class="h-4 w-4" />
                     </Button>
