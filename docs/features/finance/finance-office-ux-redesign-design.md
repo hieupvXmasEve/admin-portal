@@ -50,6 +50,7 @@ Top bar **luôn hiện** trên mọi màn:
 **Nguyên tắc:**
 - **Student 360 không phải mục sidebar** — là đích đến từ ô tìm kiếm và từ click bất kỳ dòng nào.
 - Danh sách theo-đối-tượng (Payments, Invoices, DNG Requests...) bị "giáng cấp" thành bộ lọc/tra cứu bên trong nhóm, không còn là điểm xuất phát chính.
+- Detail backend routes của Charges, Invoices, Payments và DNG Requests **không bị xoá** khi giáng cấp UI; chúng là secondary pages cho deep-link, audit evidence và repair có phân quyền.
 - **Hai trục di chuyển song hành:** trục "việc cần làm" (Hôm nay → hàng đợi → việc) và trục "theo sinh viên" (tìm SV → 360). Mỗi điểm đau có mặt ở cả hai trục (vd webhook lỗi ở cả Cockpit lẫn tab DNG của 360).
 
 **Bảng migration menu (việc mới — cần đầy đủ ở plan mục 1):** §3.2 mới nêu nhóm-đích; plan phải có **bảng chi tiết `current item → new group → keep | hide | remove | deep-link`** cho từng mục `menu-sidebar.ts` hiện tại, để không sót/không trùng. Lưu ý đặc biệt:

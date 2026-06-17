@@ -131,7 +131,7 @@ function getStatusBadgeVariant(status: string): 'default' | 'destructive' | 'out
             <CardContent>
                 <div class="mb-6 flex flex-col gap-4 md:flex-row">
                     <div class="relative w-full md:w-1/3">
-                        <Search class="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
+                        <Search class="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
                         <Input :model-value="filters.search" placeholder="Search invoice #, student name/ID…" class="pl-8" @update:model-value="handleSearch" />
                     </div>
                     <div class="w-full md:w-1/4">
@@ -154,46 +154,41 @@ function getStatusBadgeVariant(status: string): 'default' | 'destructive' | 'out
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead class="sticky top-0 z-10 w-8 bg-background">
+                                <TableHead class="bg-background sticky top-0 z-10 w-8">
                                     <Checkbox :model-value="allRows.length > 0 && sel.count.value === allRows.length" @update:model-value="(value) => sel.toggleAll(allRows, !!value)" />
                                 </TableHead>
-                                <TableHead class="sticky top-0 z-10 cursor-pointer bg-background" @click="sortBy('invoice_number')">
+                                <TableHead class="bg-background sticky top-0 z-10 cursor-pointer" @click="sortBy('invoice_number')">
                                     Invoice #
                                     <ChevronsUpDown class="inline h-3 w-3" />
                                 </TableHead>
-                                <TableHead class="sticky top-0 z-10 bg-background">Student</TableHead>
-                                <TableHead class="sticky top-0 z-10 bg-background">Semester</TableHead>
-                                <TableHead class="sticky top-0 z-10 cursor-pointer bg-background text-right" @click="sortBy('cached_total_amount')">
+                                <TableHead class="bg-background sticky top-0 z-10">Student</TableHead>
+                                <TableHead class="bg-background sticky top-0 z-10">Semester</TableHead>
+                                <TableHead class="bg-background sticky top-0 z-10 cursor-pointer text-right" @click="sortBy('cached_total_amount')">
                                     Total
                                     <ChevronsUpDown class="inline h-3 w-3" />
                                 </TableHead>
-                                <TableHead class="sticky top-0 z-10 cursor-pointer bg-background text-right" @click="sortBy('cached_paid_amount')">
+                                <TableHead class="bg-background sticky top-0 z-10 cursor-pointer text-right" @click="sortBy('cached_paid_amount')">
                                     Paid
                                     <ChevronsUpDown class="inline h-3 w-3" />
                                 </TableHead>
-                                <TableHead class="sticky top-0 z-10 bg-background text-right">Balance</TableHead>
-                                <TableHead class="sticky top-0 z-10 bg-background">Status</TableHead>
-                                <TableHead class="sticky top-0 z-10 cursor-pointer bg-background" @click="sortBy('due_date')">
+                                <TableHead class="bg-background sticky top-0 z-10 text-right">Balance</TableHead>
+                                <TableHead class="bg-background sticky top-0 z-10">Status</TableHead>
+                                <TableHead class="bg-background sticky top-0 z-10 cursor-pointer" @click="sortBy('due_date')">
                                     Due Date
                                     <ChevronsUpDown class="inline h-3 w-3" />
                                 </TableHead>
-                                <TableHead class="sticky top-0 z-10 bg-background text-right">Actions</TableHead>
+                                <TableHead class="bg-background sticky top-0 z-10 text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            <TableRow
-                                v-for="invoice in invoices.data"
-                                :key="invoice.id"
-                                class="cursor-pointer hover:bg-muted/50"
-                                @click="openStudent(invoice)"
-                            >
+                            <TableRow v-for="invoice in invoices.data" :key="invoice.id" class="hover:bg-muted/50 cursor-pointer" @click="openStudent(invoice)">
                                 <TableCell @click.stop>
                                     <Checkbox :model-value="sel.isSelected(invoice.id)" @update:model-value="() => sel.toggle({ key: invoice.id, studentId: invoice.student_id })" />
                                 </TableCell>
                                 <TableCell class="font-medium tabular-nums">{{ invoice.invoice_number }}</TableCell>
                                 <TableCell>
                                     <div class="font-medium">{{ invoice.student.full_name }}</div>
-                                    <div class="text-xs text-muted-foreground tabular-nums">{{ invoice.student.student_id }}</div>
+                                    <div class="text-muted-foreground text-xs tabular-nums">{{ invoice.student.student_id }}</div>
                                 </TableCell>
                                 <TableCell>{{ invoice.semester.name }}</TableCell>
                                 <TableCell class="text-right tabular-nums">{{ formatCurrency(invoice.total_amount) }}</TableCell>
@@ -206,16 +201,10 @@ function getStatusBadgeVariant(status: string): 'default' | 'destructive' | 'out
                                 </TableCell>
                                 <TableCell>{{ invoice.due_date ? formatDate(invoice.due_date) : '-' }}</TableCell>
                                 <TableCell @click.stop>
-                                    <LookupRowActions
-                                        :student-id="invoice.student_id"
-                                        :focus="`invoice:${invoice.id}`"
-                                        :detail-url="route('finance.invoices.show', invoice.id)"
-                                    />
+                                    <LookupRowActions :student-id="invoice.student_id" :focus="`invoice:${invoice.id}`" :detail-url="financeRoutes.lookup.invoiceDetail(invoice.id)" />
                                 </TableCell>
                             </TableRow>
-                            <TableEmpty v-if="invoices.data.length === 0" :colspan="10">
-                                No invoices found.
-                            </TableEmpty>
+                            <TableEmpty v-if="invoices.data.length === 0" :colspan="10"> No invoices found. </TableEmpty>
                         </TableBody>
                     </Table>
                 </div>
@@ -226,13 +215,6 @@ function getStatusBadgeVariant(status: string): 'default' | 'destructive' | 'out
             </CardContent>
         </Card>
 
-        <SendToBatchBar
-            :count="sel.count.value"
-            :can-dng="canDng"
-            :can-remind="canRemind"
-            @dng="sel.sendToBatch('dng')"
-            @reminders="sel.sendToBatch('reminders')"
-            @clear="sel.clear"
-        />
+        <SendToBatchBar :count="sel.count.value" :can-dng="canDng" :can-remind="canRemind" @dng="sel.sendToBatch('dng')" @reminders="sel.sendToBatch('reminders')" @clear="sel.clear" />
     </div>
 </template>

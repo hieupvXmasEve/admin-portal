@@ -19,7 +19,6 @@ import { financeRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowDown, ArrowUp, ChevronsUpDown, Sparkles } from 'lucide-vue-next';
 import { computed } from 'vue';
-import { route } from 'ziggy-js';
 
 interface PaymentRow {
     id: number;
@@ -83,11 +82,7 @@ const { filters, handleSearch, setFilter, handleSortChange, handlePaginationNavi
 const canDng = computed(() => permission.can('create_finance_payments'));
 const canRemind = computed(() => permission.can('view_finance_operations_due_calendar'));
 
-const allRows = computed(() =>
-    props.items.data
-        .filter((payment) => payment.student?.id)
-        .map((payment) => ({ key: payment.id, studentId: payment.student!.id })),
-);
+const allRows = computed(() => props.items.data.filter((payment) => payment.student?.id).map((payment) => ({ key: payment.id, studentId: payment.student!.id })));
 
 function toggleSort(column: NonNullable<PaymentFilters['sort']>): void {
     const nextDirection = currentSort.value === column && currentDirection.value === 'asc' ? 'desc' : 'asc';
@@ -170,16 +165,16 @@ const sortableHeaders: Array<{ key: NonNullable<PaymentFilters['sort']>; label: 
         <div class="grid gap-4 md:grid-cols-3">
             <Card>
                 <CardHeader class="pb-2">
-                    <CardTitle class="text-sm font-medium text-muted-foreground">Tổng đã đóng</CardTitle>
+                    <CardTitle class="text-muted-foreground text-sm font-medium">Tổng đã đóng</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div class="text-2xl font-semibold tabular-nums">{{ formatCurrency(stats.total_paid) }}</div>
-                    <p class="mt-1 text-xs text-muted-foreground">{{ stats.payment_count }} payment(s) trong scope hiện tại</p>
+                    <p class="text-muted-foreground mt-1 text-xs">{{ stats.payment_count }} payment(s) trong scope hiện tại</p>
                 </CardContent>
             </Card>
             <Card>
                 <CardHeader class="pb-2">
-                    <CardTitle class="text-sm font-medium text-muted-foreground">Đã thanh toán</CardTitle>
+                    <CardTitle class="text-muted-foreground text-sm font-medium">Đã thanh toán</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div class="text-2xl font-semibold text-emerald-600 tabular-nums">{{ formatCurrency(stats.total_applied) }}</div>
@@ -187,11 +182,11 @@ const sortableHeaders: Array<{ key: NonNullable<PaymentFilters['sort']>; label: 
             </Card>
             <Card>
                 <CardHeader class="pb-2">
-                    <CardTitle class="text-sm font-medium text-muted-foreground">Còn dư</CardTitle>
+                    <CardTitle class="text-muted-foreground text-sm font-medium">Còn dư</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div class="text-2xl font-semibold text-amber-600 tabular-nums">{{ formatCurrency(stats.total_unapplied) }}</div>
-                    <p class="mt-1 text-xs text-muted-foreground">Số tiền chưa được apply</p>
+                    <p class="text-muted-foreground mt-1 text-xs">Số tiền chưa được apply</p>
                 </CardContent>
             </Card>
         </div>
@@ -229,45 +224,30 @@ const sortableHeaders: Array<{ key: NonNullable<PaymentFilters['sort']>; label: 
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead class="sticky top-0 z-10 w-8 bg-background">
+                        <TableHead class="bg-background sticky top-0 z-10 w-8">
                             <Checkbox :model-value="allRows.length > 0 && sel.count.value === allRows.length" @update:model-value="(value) => sel.toggleAll(allRows, !!value)" />
                         </TableHead>
-                        <TableHead
-                            v-for="header in sortableHeaders"
-                            :key="header.key"
-                            class="sticky top-0 z-10 cursor-pointer bg-background"
-                            :class="header.align === 'right' ? 'text-right' : ''"
-                            @click="toggleSort(header.key)"
-                        >
+                        <TableHead v-for="header in sortableHeaders" :key="header.key" class="bg-background sticky top-0 z-10 cursor-pointer" :class="header.align === 'right' ? 'text-right' : ''" @click="toggleSort(header.key)">
                             <span class="inline-flex items-center gap-1" :class="header.align === 'right' ? 'ml-auto' : ''">
                                 {{ header.label }}
                                 <component :is="getSortIcon(header.key)" class="h-4 w-4" />
                             </span>
                         </TableHead>
-                        <TableHead class="sticky top-0 z-10 bg-background">Ref</TableHead>
-                        <TableHead class="sticky top-0 z-10 bg-background">Source</TableHead>
-                        <TableHead class="sticky top-0 z-10 cursor-pointer bg-background" @click="toggleSort('status')">
+                        <TableHead class="bg-background sticky top-0 z-10">Ref</TableHead>
+                        <TableHead class="bg-background sticky top-0 z-10">Source</TableHead>
+                        <TableHead class="bg-background sticky top-0 z-10 cursor-pointer" @click="toggleSort('status')">
                             <span class="inline-flex items-center gap-1">
                                 Status
                                 <component :is="getSortIcon('status')" class="h-4 w-4" />
                             </span>
                         </TableHead>
-                        <TableHead class="sticky top-0 z-10 bg-background text-right">Actions</TableHead>
+                        <TableHead class="bg-background sticky top-0 z-10 text-right">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    <TableRow
-                        v-for="payment in items.data"
-                        :key="payment.id"
-                        class="cursor-pointer hover:bg-muted/50"
-                        @click="openStudent(payment)"
-                    >
+                    <TableRow v-for="payment in items.data" :key="payment.id" class="hover:bg-muted/50 cursor-pointer" @click="openStudent(payment)">
                         <TableCell @click.stop>
-                            <Checkbox
-                                v-if="payment.student?.id"
-                                :model-value="sel.isSelected(payment.id)"
-                                @update:model-value="() => sel.toggle({ key: payment.id, studentId: payment.student!.id })"
-                            />
+                            <Checkbox v-if="payment.student?.id" :model-value="sel.isSelected(payment.id)" @update:model-value="() => sel.toggle({ key: payment.id, studentId: payment.student!.id })" />
                         </TableCell>
                         <TableCell>{{ formatDate(payment.paid_at) }}</TableCell>
                         <TableCell class="font-mono text-xs tabular-nums">{{ payment.student?.student_id ?? '-' }}</TableCell>
@@ -287,29 +267,15 @@ const sortableHeaders: Array<{ key: NonNullable<PaymentFilters['sort']>; label: 
                             <Badge :variant="getStatusColor(payment.status)">{{ payment.status }}</Badge>
                         </TableCell>
                         <TableCell @click.stop>
-                            <LookupRowActions
-                                v-if="payment.student?.id"
-                                :student-id="payment.student.id"
-                                :focus="`payment:${payment.id}`"
-                                :detail-url="route('finance.payments.show', payment.id)"
-                            />
+                            <LookupRowActions v-if="payment.student?.id" :student-id="payment.student.id" :focus="`payment:${payment.id}`" :detail-url="financeRoutes.collect.paymentDetail(payment.id)" />
                         </TableCell>
                     </TableRow>
-                    <TableEmpty v-if="items.data.length === 0" :colspan="10">
-                        No payments found.
-                    </TableEmpty>
+                    <TableEmpty v-if="items.data.length === 0" :colspan="10"> No payments found. </TableEmpty>
                 </TableBody>
             </Table>
         </div>
 
         <DataPagination :pagination-data="items" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
-        <SendToBatchBar
-            :count="sel.count.value"
-            :can-dng="canDng"
-            :can-remind="canRemind"
-            @dng="sel.sendToBatch('dng')"
-            @reminders="sel.sendToBatch('reminders')"
-            @clear="sel.clear"
-        />
+        <SendToBatchBar :count="sel.count.value" :can-dng="canDng" :can-remind="canRemind" @dng="sel.sendToBatch('dng')" @reminders="sel.sendToBatch('reminders')" @clear="sel.clear" />
     </div>
 </template>

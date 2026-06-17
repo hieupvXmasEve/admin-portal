@@ -12,16 +12,7 @@ import { useDataTable } from '@/composables/useDataTable';
 import { useLookupSelection } from '@/composables/useLookupSelection';
 import { usePermission } from '@/composables/usePermission';
 import type { PaginatedResponse } from '@/types';
-import {
-    formatCurrency,
-    getChargeStatusBadgeClass,
-    getChargeStatusLabel,
-    getChargeTypeBadgeClass,
-    getChargeTypeLabel,
-    type ChargeStatus,
-    type ChargeType,
-    type Semester,
-} from '@/types/finance';
+import { formatCurrency, getChargeStatusBadgeClass, getChargeStatusLabel, getChargeTypeBadgeClass, getChargeTypeLabel, type ChargeStatus, type ChargeType, type Semester } from '@/types/finance';
 import { financeRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ChevronsUpDown, Plus, Search } from 'lucide-vue-next';
@@ -61,19 +52,11 @@ const props = defineProps<{
 const permission = usePermission();
 const sel = useLookupSelection();
 
-const chargesIndexRoute = computed(() =>
-    props.student ? route('finance.students.charges', props.student.id) : financeRoutes.lookup.chargeLedger(),
-);
+const chargesIndexRoute = computed(() => (props.student ? route('finance.students.charges', props.student.id) : financeRoutes.lookup.chargeLedger()));
 
-const createChargeRoute = computed(() =>
-    props.student ? route('finance.charges.create', { student_id: props.student.id }) : route('finance.charges.create'),
-);
+const createChargeRoute = computed(() => (props.student ? route('finance.charges.create', { student_id: props.student.id }) : route('finance.charges.create')));
 
-const pageDescription = computed(() =>
-    props.student
-        ? `Quản lý các khoản phí và tín dụng của ${props.student.full_name} (${props.student.student_id})`
-        : 'Tra cứu charge ledger toàn campus — sort, filter, chọn nhiều dòng để đẩy Batch Studio.',
-);
+const pageDescription = computed(() => (props.student ? `Quản lý các khoản phí và tín dụng của ${props.student.full_name} (${props.student.student_id})` : 'Tra cứu charge ledger toàn campus — sort, filter, chọn nhiều dòng để đẩy Batch Studio.'));
 
 const { filters, setFilter, handleSearch, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection } = useDataTable<ChargeFilters>({
     baseUrl: chargesIndexRoute.value,
@@ -100,11 +83,7 @@ const { filters, setFilter, handleSearch, handleSortChange, handlePaginationNavi
 const canDng = computed(() => permission.can('create_finance_payments'));
 const canRemind = computed(() => permission.can('view_finance_operations_due_calendar'));
 
-const allRows = computed(() =>
-    props.charges.data
-        .filter((charge) => charge.student_id)
-        .map((charge) => ({ key: charge.id, studentId: charge.student_id })),
-);
+const allRows = computed(() => props.charges.data.filter((charge) => charge.student_id).map((charge) => ({ key: charge.id, studentId: charge.student_id })));
 
 function sortBy(column: string): void {
     handleSortChange(column, currentSort.value === column && currentDirection.value === 'asc' ? 'desc' : 'asc');
@@ -122,7 +101,7 @@ function openStudent(row: ChargeRow): void {
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-3xl font-bold tracking-tight">Finance Charges</h1>
-                <p class="mt-1 text-muted-foreground">{{ pageDescription }}</p>
+                <p class="text-muted-foreground mt-1">{{ pageDescription }}</p>
             </div>
             <Link :href="createChargeRoute">
                 <Button>
@@ -134,7 +113,7 @@ function openStudent(row: ChargeRow): void {
 
         <div class="flex flex-wrap items-center gap-2">
             <div class="relative w-72">
-                <Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
                 <Input :model-value="filters.search" placeholder="Tìm mô tả / tên / mã SV…" class="pl-9" @update:model-value="handleSearch" />
             </div>
             <Select :model-value="filters.status" @update:model-value="(value) => setFilter('status', String(value))">
@@ -175,47 +154,42 @@ function openStudent(row: ChargeRow): void {
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead class="sticky top-0 z-10 w-8 bg-background">
+                        <TableHead class="bg-background sticky top-0 z-10 w-8">
                             <Checkbox :model-value="allRows.length > 0 && sel.count.value === allRows.length" @update:model-value="(value) => sel.toggleAll(allRows, !!value)" />
                         </TableHead>
-                        <TableHead class="sticky top-0 z-10 bg-background">Sinh viên</TableHead>
-                        <TableHead class="sticky top-0 z-10 cursor-pointer bg-background" @click="sortBy('charge_type')">
+                        <TableHead class="bg-background sticky top-0 z-10">Sinh viên</TableHead>
+                        <TableHead class="bg-background sticky top-0 z-10 cursor-pointer" @click="sortBy('charge_type')">
                             Loại phí
                             <ChevronsUpDown class="inline h-3 w-3" />
                         </TableHead>
-                        <TableHead class="sticky top-0 z-10 bg-background">Mô tả</TableHead>
-                        <TableHead class="sticky top-0 z-10 bg-background">Học kỳ</TableHead>
-                        <TableHead class="sticky top-0 z-10 cursor-pointer bg-background text-right" @click="sortBy('amount')">
+                        <TableHead class="bg-background sticky top-0 z-10">Mô tả</TableHead>
+                        <TableHead class="bg-background sticky top-0 z-10">Học kỳ</TableHead>
+                        <TableHead class="bg-background sticky top-0 z-10 cursor-pointer text-right" @click="sortBy('amount')">
                             Số tiền
                             <ChevronsUpDown class="inline h-3 w-3" />
                         </TableHead>
-                        <TableHead class="sticky top-0 z-10 cursor-pointer bg-background" @click="sortBy('status')">
+                        <TableHead class="bg-background sticky top-0 z-10 cursor-pointer" @click="sortBy('status')">
                             Trạng thái
                             <ChevronsUpDown class="inline h-3 w-3" />
                         </TableHead>
-                        <TableHead class="sticky top-0 z-10 bg-background text-right">Thao tác</TableHead>
+                        <TableHead class="bg-background sticky top-0 z-10 text-right">Thao tác</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    <TableRow
-                        v-for="charge in charges.data"
-                        :key="charge.id"
-                        class="cursor-pointer hover:bg-muted/50"
-                        @click="openStudent(charge)"
-                    >
+                    <TableRow v-for="charge in charges.data" :key="charge.id" class="hover:bg-muted/50 cursor-pointer" @click="openStudent(charge)">
                         <TableCell @click.stop>
                             <Checkbox :model-value="sel.isSelected(charge.id)" @update:model-value="() => sel.toggle({ key: charge.id, studentId: charge.student_id })" />
                         </TableCell>
                         <TableCell>
                             <div class="font-medium">{{ charge.student?.full_name ?? 'N/A' }}</div>
-                            <div class="text-xs text-muted-foreground tabular-nums">{{ charge.student?.student_id }}</div>
+                            <div class="text-muted-foreground text-xs tabular-nums">{{ charge.student?.student_id }}</div>
                         </TableCell>
                         <TableCell>
                             <Badge :class="getChargeTypeBadgeClass(charge.charge_type as ChargeType)">
                                 {{ getChargeTypeLabel(charge.charge_type as ChargeType) }}
                             </Badge>
                         </TableCell>
-                        <TableCell class="max-w-[220px] truncate text-muted-foreground">{{ charge.description }}</TableCell>
+                        <TableCell class="text-muted-foreground max-w-[220px] truncate">{{ charge.description }}</TableCell>
                         <TableCell>{{ charge.semester?.name ?? '-' }}</TableCell>
                         <TableCell class="text-right tabular-nums" :class="charge.amount < 0 ? 'text-emerald-600' : ''">
                             {{ formatCurrency(charge.amount) }}
@@ -226,28 +200,15 @@ function openStudent(row: ChargeRow): void {
                             </Badge>
                         </TableCell>
                         <TableCell @click.stop>
-                            <LookupRowActions
-                                :student-id="charge.student_id"
-                                :focus="`charge:${charge.id}`"
-                                :detail-url="route('finance.charges.show', charge.id)"
-                            />
+                            <LookupRowActions :student-id="charge.student_id" :focus="`charge:${charge.id}`" :detail-url="financeRoutes.lookup.chargeDetail(charge.id)" />
                         </TableCell>
                     </TableRow>
-                    <TableEmpty v-if="charges.data.length === 0" :colspan="8">
-                        Không có khoản phí nào khớp bộ lọc.
-                    </TableEmpty>
+                    <TableEmpty v-if="charges.data.length === 0" :colspan="8"> Không có khoản phí nào khớp bộ lọc. </TableEmpty>
                 </TableBody>
             </Table>
         </div>
 
         <DataPagination :pagination-data="charges" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
-        <SendToBatchBar
-            :count="sel.count.value"
-            :can-dng="canDng"
-            :can-remind="canRemind"
-            @dng="sel.sendToBatch('dng')"
-            @reminders="sel.sendToBatch('reminders')"
-            @clear="sel.clear"
-        />
+        <SendToBatchBar :count="sel.count.value" :can-dng="canDng" :can-remind="canRemind" @dng="sel.sendToBatch('dng')" @reminders="sel.sendToBatch('reminders')" @clear="sel.clear" />
     </div>
 </template>

@@ -13,6 +13,7 @@ import { useDataTable } from '@/composables/useDataTable';
 import { usePermission } from '@/composables/usePermission';
 import type { PaginatedResponse } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/format';
+import { financeRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { ArrowLeft, ArrowRight, Ban, CheckCircle2, Clock3, Send, XCircle } from 'lucide-vue-next';
@@ -108,18 +109,7 @@ const yesNoOptions = [
     { value: 'no', label: 'No' },
 ];
 
-const {
-    filters,
-    hasActiveFilters,
-    clearAllFilters,
-    setFilter,
-    apply,
-    handleSortChange,
-    handlePaginationNavigate,
-    handlePageSizeChange,
-    currentSort,
-    currentDirection,
-} = useDataTable<Filters>({
+const { filters, hasActiveFilters, clearAllFilters, setFilter, apply, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection } = useDataTable<Filters>({
     baseUrl: route('finance.dng.payment-requests.index'),
     initialFilters: {
         search: props.filters.search ?? '',
@@ -169,12 +159,16 @@ const cancelRequest = (request: DngPaymentRequestRow) => {
         {
             onConfirm: () =>
                 new Promise<void>((resolve, reject) => {
-                    router.post(route('finance.dng.payment-requests.cancel', request.id), {}, {
-                        preserveScroll: true,
-                        only: ['items', 'stats', 'filters'],
-                        onSuccess: () => resolve(),
-                        onError: (errors) => reject(new Error(Object.values(errors).join(', '))),
-                    });
+                    router.post(
+                        route('finance.dng.payment-requests.cancel', request.id),
+                        {},
+                        {
+                            preserveScroll: true,
+                            only: ['items', 'stats', 'filters'],
+                            onSuccess: () => resolve(),
+                            onError: (errors) => reject(new Error(Object.values(errors).join(', '))),
+                        },
+                    );
                 }),
         },
     );
@@ -285,7 +279,7 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
 
         <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-3">
-                <Link v-if="permission.can('view_finance_payments')" :href="route('finance.payments.index')">
+                <Link v-if="permission.can('view_finance_payments')" :href="financeRoutes.collect.payments()">
                     <Button variant="outline" size="icon">
                         <ArrowLeft class="h-4 w-4" />
                     </Button>
@@ -348,13 +342,7 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
                 <CardTitle>Requests</CardTitle>
             </CardHeader>
             <CardContent class="space-y-4">
-                <DataTable
-                    :data="items.data"
-                    :columns="columns"
-                    :initial-sort="currentSort ?? undefined"
-                    :initial-direction="currentDirection ?? undefined"
-                    @sort-change="handleSortChange"
-                >
+                <DataTable :data="items.data" :columns="columns" :initial-sort="currentSort ?? undefined" :initial-direction="currentDirection ?? undefined" @sort-change="handleSortChange">
                     <template #cell-student="{ row }">
                         <div class="space-y-1">
                             <div class="font-medium">{{ row.original.student?.full_name || '-' }}</div>
@@ -395,7 +383,7 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
 
                     <template #cell-bridged="{ row }">
                         <div v-if="row.original.payment" class="space-y-1">
-                            <Link v-if="permission.can('view_finance_payment_details')" :href="route('finance.payments.show', row.original.payment.id)" class="text-sm font-medium text-blue-600 hover:underline">
+                            <Link v-if="permission.can('view_finance_payment_details')" :href="financeRoutes.collect.paymentDetail(row.original.payment.id)" class="text-sm font-medium text-blue-600 hover:underline">
                                 Payment #{{ row.original.payment.id }}
                             </Link>
                             <div v-else class="text-sm font-medium">Payment #{{ row.original.payment.id }}</div>
@@ -422,7 +410,7 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
                                 Cancel
                                 <Ban class="ml-2 h-4 w-4" />
                             </Button>
-                            <Link :href="route('finance.dng.payment-requests.show', row.original.id)">
+                            <Link :href="financeRoutes.collect.dngPaymentRequestDetail(row.original.id)">
                                 <Button variant="ghost" size="sm">
                                     View
                                     <ArrowRight class="ml-2 h-4 w-4" />

@@ -11,6 +11,7 @@ import { usePermission } from '@/composables/usePermission';
 import { useServerTableQuery } from '@/composables/useServerTableQuery';
 import type { PaginatedResponse } from '@/types';
 import { formatDate } from '@/utils/format';
+import { financeRoutes } from '@/utils/routes';
 import { Head, Link } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, CircleDashed, ShieldAlert } from 'lucide-vue-next';
@@ -215,7 +216,7 @@ const columns: ColumnDef<DngWebhookEventRow>[] = [
         <Head title="DNG Webhook Events" />
 
         <div class="flex items-center gap-3">
-            <Link v-if="permission.can('view_finance_dng_payment_requests')" :href="route('finance.dng.payment-requests.index')">
+            <Link v-if="permission.can('view_finance_dng_payment_requests')" :href="financeRoutes.collect.dngPaymentRequests()">
                 <Button variant="outline" size="icon">
                     <ArrowLeft class="h-4 w-4" />
                 </Button>
@@ -293,7 +294,7 @@ const columns: ColumnDef<DngWebhookEventRow>[] = [
 
                     <template #cell-linked_request="{ row }">
                         <div v-if="row.original.linked_request" class="space-y-1">
-                            <Link v-if="permission.can('view_finance_dng_payment_requests')" :href="route('finance.dng.payment-requests.show', row.original.linked_request.id)" class="text-sm font-medium text-blue-600 hover:underline">
+                            <Link v-if="permission.can('view_finance_dng_payment_requests')" :href="financeRoutes.collect.dngPaymentRequestDetail(row.original.linked_request.id)" class="text-sm font-medium text-blue-600 hover:underline">
                                 Request #{{ row.original.linked_request.id }}
                             </Link>
                             <div v-else class="text-sm font-medium">Request #{{ row.original.linked_request.id }}</div>

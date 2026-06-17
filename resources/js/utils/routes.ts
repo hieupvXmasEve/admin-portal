@@ -480,9 +480,11 @@ export const financeRoutes = {
     collect: {
         dngWorklist: () => route(FINANCE_ROUTE_NAMES.DNG_WORKLIST),
         dngPaymentRequests: () => route(FINANCE_ROUTE_NAMES.DNG_PAYMENT_REQUESTS_INDEX),
+        dngPaymentRequestDetail: (dngPaymentRequestId: number) => route(FINANCE_ROUTE_NAMES.DNG_PAYMENT_REQUESTS_SHOW, { dngPaymentRequest: dngPaymentRequestId }),
         dngWebhookEvents: () => route(FINANCE_ROUTE_NAMES.DNG_WEBHOOK_EVENTS_INDEX),
         settlement: () => route(FINANCE_ROUTE_NAMES.SETTLEMENT_INDEX),
         payments: () => route(FINANCE_ROUTE_NAMES.PAYMENTS_INDEX),
+        paymentDetail: (paymentId: number) => route(FINANCE_ROUTE_NAMES.PAYMENTS_SHOW, { payment: paymentId }),
         dueReminders: () => route(FINANCE_ROUTE_NAMES.DUE_CALENDAR),
     },
     exceptions: {
@@ -492,27 +494,23 @@ export const financeRoutes = {
     },
     lookup: {
         chargeLedger: () => route(FINANCE_ROUTE_NAMES.CHARGES_INDEX),
+        chargeDetail: (chargeId: number) => route(FINANCE_ROUTE_NAMES.CHARGES_SHOW, { charge: chargeId }),
         invoices: () => route(FINANCE_ROUTE_NAMES.INVOICES_INDEX),
+        invoiceDetail: (invoiceId: number) => route(FINANCE_ROUTE_NAMES.INVOICES_SHOW, { invoice: invoiceId }),
     },
     students: {
-        overview: (studentId: number, focus?: string) =>
-            route(FINANCE_ROUTE_NAMES.STUDENT_OVERVIEW, focus ? { student: studentId, focus } : { student: studentId }),
+        overview: (studentId: number, focus?: string) => route(FINANCE_ROUTE_NAMES.STUDENT_OVERVIEW, focus ? { student: studentId, focus } : { student: studentId }),
     },
     search: () => route(FINANCE_ROUTE_NAMES.GLOBAL_SEARCH),
     semesterContext: {
         update: () => route(FINANCE_ROUTE_NAMES.SEMESTER_CONTEXT_UPDATE),
     },
     student360: {
-        allocatePreview: (paymentId: number) =>
-            route(FINANCE_ROUTE_NAMES.PAYMENT_ALLOCATE_PREVIEW, { payment: paymentId }),
+        allocatePreview: (paymentId: number) => route(FINANCE_ROUTE_NAMES.PAYMENT_ALLOCATE_PREVIEW, { payment: paymentId }),
         allocate: (paymentId: number) => route(FINANCE_ROUTE_NAMES.PAYMENT_ALLOCATE, { payment: paymentId }),
-        recordPayment: (studentId: number) =>
-            route(FINANCE_ROUTE_NAMES.STUDENT_PAYMENT_STORE, { student: studentId }),
-        dngCancelImpact: (dngId: number) =>
-            route(FINANCE_ROUTE_NAMES.DNG_CANCEL_IMPACT, { dngPaymentRequest: dngId }),
-        dngCancelReviewed: (dngId: number) =>
-            route(FINANCE_ROUTE_NAMES.DNG_CANCEL_REVIEWED, { dngPaymentRequest: dngId }),
-        retryInstallmentPush: (chargeId: number, installmentId: number) =>
-            route(FINANCE_ROUTE_NAMES.INSTALLMENT_RETRY_PUSH, { charge: chargeId, installment: installmentId }),
+        recordPayment: (studentId: number) => route(FINANCE_ROUTE_NAMES.STUDENT_PAYMENT_STORE, { student: studentId }),
+        dngCancelImpact: (dngId: number) => route(FINANCE_ROUTE_NAMES.DNG_CANCEL_IMPACT, { dngPaymentRequest: dngId }),
+        dngCancelReviewed: (dngId: number) => route(FINANCE_ROUTE_NAMES.DNG_CANCEL_REVIEWED, { dngPaymentRequest: dngId }),
+        retryInstallmentPush: (chargeId: number, installmentId: number) => route(FINANCE_ROUTE_NAMES.INSTALLMENT_RETRY_PUSH, { charge: chargeId, installment: installmentId }),
     },
 } as const;

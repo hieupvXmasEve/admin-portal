@@ -2,7 +2,9 @@ export const FINANCE_ROUTE_NAMES = {
     // Lookup & Audit
     AUDIT_INDEX: 'finance.audit.index',
     CHARGES_INDEX: 'finance.charges.index',
+    CHARGES_SHOW: 'finance.charges.show',
     INVOICES_INDEX: 'finance.invoices.index',
+    INVOICES_SHOW: 'finance.invoices.show',
     // Today
     OPERATIONS_DASHBOARD: 'finance.operations.dashboard',
     COCKPIT_INDEX: 'finance.cockpit.index',
@@ -18,9 +20,11 @@ export const FINANCE_ROUTE_NAMES = {
     // Collect & reconcile
     DNG_WORKLIST: 'finance.operations.dng-worklist',
     DNG_PAYMENT_REQUESTS_INDEX: 'finance.dng.payment-requests.index',
+    DNG_PAYMENT_REQUESTS_SHOW: 'finance.dng.payment-requests.show',
     DNG_WEBHOOK_EVENTS_INDEX: 'finance.dng.webhook-events.index',
     SETTLEMENT_INDEX: 'finance.operations.settlement.index',
     PAYMENTS_INDEX: 'finance.payments.index',
+    PAYMENTS_SHOW: 'finance.payments.show',
     DUE_CALENDAR: 'finance.operations.due-calendar',
     // Exceptions
     OPERATIONS_EXCEPTIONS: 'finance.operations.exceptions',
