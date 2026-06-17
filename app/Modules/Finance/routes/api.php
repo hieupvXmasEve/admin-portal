@@ -44,7 +44,6 @@ Route::prefix('api/v1/finance/batch-studio')
     ->name('finance.batch-studio.')
     ->group(function () {
         Route::post('/charges/preview', [BatchStudioPreviewController::class, 'previewCharges'])
-            ->middleware('can:create_finance_charges')
             ->name('charges.preview');
         Route::post('/dng/preview', [BatchStudioPreviewController::class, 'previewDng'])
             ->middleware('can:create_finance_payments')

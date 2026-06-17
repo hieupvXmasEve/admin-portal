@@ -5,141 +5,51 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Semester;
-use App\Modules\Finance\Actions\Egc\GenerateEgcChargesAction;
-use App\Modules\Finance\Queries\Egc\PreviewEgcChargeGenerationQuery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Inertia\Response;
+use Illuminate\Http\Response as HttpResponse;
 
 class EgcChargeGenerationController extends Controller
 {
-    public function index(
-        Request $request,
-        PreviewEgcChargeGenerationQuery $previewQuery
-    ): Response {
-        $validated = $request->validate([
-            'semester_id' => 'nullable|integer|exists:semesters,id',
-            'search' => 'nullable|string|max:100',
-            'ignore_student_ids' => 'nullable|string|max:10000',
-            'per_page' => 'nullable|integer|in:20,50,100',
-            'page' => 'nullable|integer|min:1',
-        ]);
-
-        $currentSemester = Semester::where('is_active', true)->first();
-        $currentCampusId = session('current_campus_id') ? (int) session('current_campus_id') : null;
-        $semesterId = isset($validated['semester_id'])
-            ? (int) $validated['semester_id']
-            : $currentSemester?->id;
-
-        $preview = $semesterId ? $previewQuery->handle($semesterId, [
-            'search' => $validated['search'] ?? '',
-            'ignore_student_ids' => $this->parseIgnoredStudentIds($validated['ignore_student_ids'] ?? null),
-            'per_page' => (int) ($validated['per_page'] ?? 20),
-            'page' => (int) ($validated['page'] ?? 1),
-        ], $currentCampusId) : [
-            'eligible_students' => [],
-            'ineligible_students' => [],
-            'warning_students' => [],
-            'summary' => ['eligible_count' => 0, 'ineligible_count' => 0, 'warning_count' => 0, 'total_count' => 0],
-        ];
-        $semesters = Semester::orderBy('start_date', 'desc')->get();
-
-        return Inertia::render('Finance/EgcOperations/GenerateCharges', [
-            'preview' => $preview,
-            'semesters' => $semesters,
-            'currentSemester' => $semesterId ? Semester::find($semesterId) : $currentSemester,
-            'filters' => [
-                'semester_id' => $semesterId ? (string) $semesterId : null,
-                'search' => $validated['search'] ?? '',
-                'ignore_student_ids' => $validated['ignore_student_ids'] ?? '',
-                'per_page' => (int) ($validated['per_page'] ?? 20),
-                'page' => (int) ($validated['page'] ?? 1),
-            ],
-        ]);
+    public function index(Request $request): RedirectResponse
+    {
+        return redirect()->route('finance.batch-studio.charges', $this->safePrefill($request, 'egc'));
     }
 
-    public function store(
-        Request $request,
-        PreviewEgcChargeGenerationQuery $previewQuery
-    ): RedirectResponse {
-        $validated = $request->validate([
-            'semester_id' => 'required|integer|exists:semesters,id',
-            'due_date' => 'required|date',
-            'search' => 'nullable|string|max:100',
-            'ignore_student_ids' => 'nullable|string|max:10000',
-            'students' => 'nullable|array',
-            'students.*.student_id' => 'required|integer|exists:students,id',
-            'students.*.block_count' => 'required|integer|in:1,2',
-            'students.*.current_level' => 'required|integer|min:0',
-        ]);
-
-        $currentCampusId = session('current_campus_id') ? (int) session('current_campus_id') : null;
-        $eligibleStudents = $previewQuery->resolveEligibleStudents((int) $validated['semester_id'], [
-            'search' => $validated['search'] ?? '',
-            'ignore_student_ids' => $this->parseIgnoredStudentIds($validated['ignore_student_ids'] ?? null),
-        ], $currentCampusId);
-
-        $overrides = collect($validated['students'] ?? [])
-            ->keyBy('student_id');
-
-        $students = $eligibleStudents->map(function (array $student) use ($overrides): array {
-            $override = $overrides->get($student['student_id']);
-            $maxBlocks = (int) $student['max_chargeable_blocks'];
-
-            // UI-SAFE-3: clamp any (possibly stale) override to the student's
-            // current max_chargeable_blocks. The eligible set is recomputed from
-            // the live filter, so a block count carried over from a different
-            // scope/semester can never over-charge beyond what is chargeable now.
-            $blockCount = $override !== null
-                ? min((int) $override['block_count'], $maxBlocks)
-                : $maxBlocks;
-
-            return [
-                'student_id' => $student['student_id'],
-                'block_count' => $blockCount,
-                'current_level' => $student['current_level'],
-            ];
-        })->filter(fn (array $student) => (int) $student['block_count'] > 0)
-            ->values()
-            ->all();
-
-        if ($students === []) {
-            return redirect()
-                ->route('finance.egc.charges.index', array_filter([
-                    'semester_id' => $validated['semester_id'],
-                    'search' => $validated['search'] ?? null,
-                    'ignore_student_ids' => $validated['ignore_student_ids'] ?? null,
-                ]))
-                ->with('error', 'Không có student hợp lệ theo bộ lọc hiện tại để tạo charge.');
-        }
-
-        $results = GenerateEgcChargesAction::run([
-            'semester_id' => (int) $validated['semester_id'],
-            'due_date' => $validated['due_date'],
-            'students' => $students,
-        ]);
-
-        return redirect()
-            ->route('finance.egc.charges.index', array_filter([
-                'semester_id' => $validated['semester_id'],
-                'search' => $validated['search'] ?? null,
-                'ignore_student_ids' => $validated['ignore_student_ids'] ?? null,
-            ]))
-            ->with('success', "Generated charges: {$results['created']} created, {$results['skipped']} skipped.");
+    public function store(Request $request): HttpResponse
+    {
+        return response('EGC charges must be generated through Batch Studio.', 410);
     }
 
     /**
-     * @return array<int, string>
+     * @return array<string, mixed>
      */
-    private function parseIgnoredStudentIds(?string $value): array
+    private function safePrefill(Request $request, string $feeCategory): array
     {
-        return collect(preg_split('/\r\n|\r|\n/', (string) $value) ?: [])
-            ->map(fn (string $studentId): string => trim($studentId))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+        return array_filter([
+            'fee_category' => $feeCategory,
+            'semester_id' => $this->positiveInt($request->query('semester_id')),
+            'search' => $this->boundedString($request->query('search'), 100),
+            'ignore_student_ids' => $this->boundedString($request->query('ignore_student_ids'), 10000),
+            'per_page' => $this->allowedPerPage($request->query('per_page')),
+            'page' => $this->positiveInt($request->query('page')),
+        ], fn (mixed $value): bool => $value !== null && $value !== '');
+    }
+
+    private function positiveInt(mixed $value): ?int
+    {
+        return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
+    }
+
+    private function allowedPerPage(mixed $value): ?int
+    {
+        return is_numeric($value) && in_array((int) $value, [20, 50, 100], true) ? (int) $value : null;
+    }
+
+    private function boundedString(mixed $value, int $limit): ?string
+    {
+        $value = trim((string) $value);
+
+        return $value === '' ? null : mb_substr($value, 0, $limit);
     }
 }

@@ -1,7 +1,7 @@
 import type { BatchDiffBucket } from '@/types/finance';
 
 const REASON_LABELS: Record<string, string> = {
-    already_charged: 'Kỳ này đã có học phí HP — không tạo lại',
+    already_charged: 'Kỳ này đã có charge active cùng loại - không tạo lại',
     tuition_not_due_this_semester: 'Chưa tới kỳ phát sinh HP (trước intake_major)',
     zero_amount_term: 'Kỳ này không phát sinh HP (amount = 0)',
     missing_curriculum_version: 'Thiếu curriculum_version',
@@ -26,10 +26,7 @@ export function batchReasonLabel(reason: string | null | undefined): string {
     return REASON_LABELS[reason] ?? reason.replace(/_/g, ' ');
 }
 
-export const BATCH_BUCKET_META: Record<
-    BatchDiffBucket,
-    { label: string; short: string; dot: string; badgeClass: string; cardClass: string }
-> = {
+export const BATCH_BUCKET_META: Record<BatchDiffBucket, { label: string; short: string; dot: string; badgeClass: string; cardClass: string }> = {
     create: {
         label: 'Tạo mới',
         short: 'Tạo',

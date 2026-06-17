@@ -28,17 +28,17 @@ class BatchStudioPreviewController extends Controller
         AssembleBatchChargePreviewQuery $assembler,
     ): JsonResponse {
         $feeCategory = (string) $request->input('fee_category');
+        $semesterId = (int) $request->input('semester_id');
 
-        if ($feeCategory === 'egc' && ! $request->user()?->can('generate_egc_finance_charges')) {
-            throw new AuthorizationException('Bạn không có quyền sinh phí EGC.');
-        }
+        $this->authorizeChargeCategory($request, $feeCategory);
 
         $campusId = $request->user()?->can('view_finance_all_campus') ? null : (int) session('current_campus_id');
+        $scope = $assembler->normalizeScope($feeCategory, $semesterId, (array) $request->input('scope', []));
 
         $result = $assembler->handle(
             $feeCategory,
-            (int) $request->input('semester_id'),
-            (array) $request->input('scope', []),
+            $semesterId,
+            $scope,
             $campusId,
         );
 
@@ -47,8 +47,8 @@ class BatchStudioPreviewController extends Controller
             BatchJobType::ChargeGeneration,
             [
                 'fee_category' => $feeCategory,
-                'semester_id' => (int) $request->input('semester_id'),
-                'scope' => (array) $request->input('scope', []),
+                'semester_id' => $semesterId,
+                'scope' => $scope,
             ],
             $result['lines'],
         );
@@ -58,6 +58,22 @@ class BatchStudioPreviewController extends Controller
             'lines' => array_map(fn ($line) => $line->toClientArray(), $result['lines']),
             'summary' => $result['summary'],
         ]);
+    }
+
+    private function authorizeChargeCategory(PreviewBatchChargesRequest $request, string $feeCategory): void
+    {
+        $allowed = match ($feeCategory) {
+            'egc' => (bool) $request->user()?->can('generate_egc_finance_charges'),
+            'major', 'non_academic' => (bool) $request->user()?->can('create_finance_charges'),
+            default => false,
+        };
+
+        if (! $allowed) {
+            throw new AuthorizationException(match ($feeCategory) {
+                'egc' => 'Bạn không có quyền sinh phí EGC.',
+                default => 'Bạn không có quyền sinh phí HP/Tuition.',
+            });
+        }
     }
 
     public function previewDng(

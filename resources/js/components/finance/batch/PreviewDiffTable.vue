@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { BatchDiffBucket, BatchPreviewLineClient } from '@/types/finance';
 import { formatCurrency } from '@/types/finance';
@@ -16,9 +17,15 @@ const props = defineProps<{
     selected: Set<string>;
     counts: Record<string, number>;
     exportable?: boolean;
+    blockCountControls?: boolean;
+    blockCounts?: Record<string, number>;
 }>();
 
-const emit = defineEmits<{ (e: 'toggle', key: string): void; (e: 'export'): void }>();
+const emit = defineEmits<{
+    (e: 'toggle', key: string): void;
+    (e: 'export'): void;
+    (e: 'update-block-count', key: string, count: number): void;
+}>();
 
 const filter = ref<BatchDiffBucket | 'all'>('all');
 const search = ref('');
@@ -27,8 +34,7 @@ const rows = computed(() =>
     props.lines.filter((l) => {
         const okBucket = filter.value === 'all' || l.display.diff === filter.value;
         const q = search.value.trim().toLowerCase();
-        const okSearch =
-            !q || l.display.label.toLowerCase().includes(q) || l.display.student_id.toLowerCase().includes(q);
+        const okSearch = !q || l.display.label.toLowerCase().includes(q) || l.display.student_id.toLowerCase().includes(q);
         return okBucket && okSearch;
     }),
 );
@@ -37,6 +43,29 @@ const selectedInView = computed(() => rows.value.filter((l) => props.selected.ha
 
 function setFilter(value: BatchDiffBucket | 'all') {
     filter.value = value;
+}
+
+function maxBlockCount(line: BatchPreviewLineClient): number {
+    return Math.max(0, Number(line.display.block_count ?? 0));
+}
+
+function blockOptions(line: BatchPreviewLineClient): number[] {
+    return Array.from({ length: maxBlockCount(line) }, (_, index) => index + 1);
+}
+
+function selectedBlockCount(line: BatchPreviewLineClient): number {
+    return props.blockCounts?.[line.key] ?? maxBlockCount(line);
+}
+
+function displayAmount(line: BatchPreviewLineClient): number {
+    const blocks = selectedBlockCount(line);
+    const amounts = line.display.block_amounts ?? [];
+
+    if (props.blockCountControls && amounts.length > 0 && blocks > 0) {
+        return amounts.slice(0, blocks).reduce((total, amount) => total + Number(amount), 0);
+    }
+
+    return Number(line.display.net ?? 0);
 }
 </script>
 
@@ -48,7 +77,7 @@ function setFilter(value: BatchDiffBucket | 'all') {
                 :key="key"
                 type="button"
                 class="rounded-lg border p-3 text-left transition hover:shadow-sm"
-                :class="[meta.cardClass, filter === key ? 'ring-2 ring-primary/30' : '']"
+                :class="[meta.cardClass, filter === key ? 'ring-primary/30 ring-2' : '']"
                 @click="setFilter(key as BatchDiffBucket)"
             >
                 <p class="text-muted-foreground text-xs font-medium">{{ meta.dot }} {{ meta.label }}</p>
@@ -60,24 +89,12 @@ function setFilter(value: BatchDiffBucket | 'all') {
             <CardHeader class="gap-4 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
                 <div class="space-y-1">
                     <CardTitle class="text-base">Danh sách xem trước</CardTitle>
-                    <CardDescription>
-                        {{ rows.length }} dòng hiển thị · {{ selectedInView }} đã chọn trong bộ lọc
-                    </CardDescription>
+                    <CardDescription> {{ rows.length }} dòng hiển thị · {{ selectedInView }} đã chọn trong bộ lọc </CardDescription>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                    <Button :variant="filter === 'all' ? 'default' : 'outline'" size="sm" @click="setFilter('all')">
-                        Tất cả
-                    </Button>
-                    <Button
-                        v-for="(meta, key) in BATCH_BUCKET_META"
-                        :key="`btn-${key}`"
-                        size="sm"
-                        :variant="filter === key ? 'default' : 'outline'"
-                        @click="setFilter(key as BatchDiffBucket)"
-                    >
-                        {{ meta.short }} ({{ counts[key] ?? 0 }})
-                    </Button>
+                    <Button :variant="filter === 'all' ? 'default' : 'outline'" size="sm" @click="setFilter('all')"> Tất cả </Button>
+                    <Button v-for="(meta, key) in BATCH_BUCKET_META" :key="`btn-${key}`" size="sm" :variant="filter === key ? 'default' : 'outline'" @click="setFilter(key as BatchDiffBucket)"> {{ meta.short }} ({{ counts[key] ?? 0 }}) </Button>
                 </div>
             </CardHeader>
 
@@ -101,26 +118,18 @@ function setFilter(value: BatchDiffBucket | 'all') {
                                     <TableHead class="w-12 px-4" />
                                     <TableHead class="min-w-[14rem] px-4">Sinh viên</TableHead>
                                     <TableHead class="w-36 px-4">Phân loại</TableHead>
+                                    <TableHead v-if="blockCountControls" class="w-32 px-4">Số block</TableHead>
                                     <TableHead class="w-36 px-4 text-right">Số tiền</TableHead>
                                     <TableHead class="min-w-[12rem] px-4">Lý do</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                <TableRow
-                                    v-for="l in rows"
-                                    :key="l.key"
-                                    class="hover:bg-muted/30"
-                                    :class="selected.has(l.key) ? 'bg-primary/5' : ''"
-                                >
+                                <TableRow v-for="l in rows" :key="l.key" class="hover:bg-muted/30" :class="selected.has(l.key) ? 'bg-primary/5' : ''">
                                     <TableCell class="px-4 py-3 align-middle">
-                                        <Checkbox
-                                            :model-value="selected.has(l.key)"
-                                            :disabled="l.display.diff === 'skip'"
-                                            @update:model-value="emit('toggle', l.key)"
-                                        />
+                                        <Checkbox :model-value="selected.has(l.key)" :disabled="l.display.diff === 'skip'" @update:model-value="emit('toggle', l.key)" />
                                     </TableCell>
                                     <TableCell class="px-4 py-3 align-middle">
-                                        <div class="font-medium leading-snug">{{ l.display.label }}</div>
+                                        <div class="leading-snug font-medium">{{ l.display.label }}</div>
                                         <div class="text-muted-foreground mt-0.5 font-mono text-xs">
                                             {{ l.display.student_id || '—' }}
                                         </div>
@@ -130,17 +139,28 @@ function setFilter(value: BatchDiffBucket | 'all') {
                                             {{ BATCH_BUCKET_META[l.display.diff].label }}
                                         </Badge>
                                     </TableCell>
+                                    <TableCell v-if="blockCountControls" class="px-4 py-3 align-middle">
+                                        <Select v-if="maxBlockCount(l) > 0 && l.display.diff !== 'skip'" :model-value="String(selectedBlockCount(l))" @update:model-value="(value) => emit('update-block-count', l.key, Number(value))">
+                                            <SelectTrigger class="h-8 w-24">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem v-for="count in blockOptions(l)" :key="count" :value="String(count)">
+                                                    {{ count }}
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <span v-else class="text-muted-foreground text-sm">—</span>
+                                    </TableCell>
                                     <TableCell class="px-4 py-3 text-right align-middle font-mono text-sm tabular-nums">
-                                        {{ formatCurrency(l.display.net) }}
+                                        {{ formatCurrency(displayAmount(l)) }}
                                     </TableCell>
                                     <TableCell class="text-muted-foreground px-4 py-3 align-middle text-sm leading-relaxed">
                                         {{ batchReasonLabel(l.display.reason) }}
                                     </TableCell>
                                 </TableRow>
                                 <TableRow v-if="rows.length === 0">
-                                    <TableCell colspan="5" class="text-muted-foreground px-4 py-10 text-center">
-                                        Không có dòng nào khớp bộ lọc.
-                                    </TableCell>
+                                    <TableCell :colspan="blockCountControls ? 6 : 5" class="text-muted-foreground px-4 py-10 text-center"> Không có dòng nào khớp bộ lọc. </TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>

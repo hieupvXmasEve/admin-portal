@@ -380,10 +380,10 @@ defineOptions({
             </CardHeader>
             <CardContent>
                 <div class="grid gap-3 md:grid-cols-4">
-                    <Link :href="route('finance.operations.generate-charges')">
+                    <Link :href="route('finance.batch-studio.charges')">
                         <Button variant="outline" class="w-full justify-start">
                             <Play class="mr-2 h-4 w-4" />
-                            Generate Charges
+                            Sinh phí hàng loạt
                         </Button>
                     </Link>
                     <Link :href="route('finance.charges.create')">

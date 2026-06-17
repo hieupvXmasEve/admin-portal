@@ -5,118 +5,51 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Semester;
-use App\Modules\Finance\Actions\Major\GenerateMajorChargesAction;
-use App\Modules\Finance\Queries\Major\PreviewMajorChargeGenerationQuery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Inertia\Response;
+use Illuminate\Http\Response as HttpResponse;
 
 class MajorChargeGenerationController extends Controller
 {
-    public function index(
-        Request $request,
-        PreviewMajorChargeGenerationQuery $previewQuery
-    ): Response {
-        $validated = $request->validate([
-            'semester_id' => 'nullable|integer|exists:semesters,id',
-            'search' => 'nullable|string|max:100',
-            'ignore_student_ids' => 'nullable|string|max:10000',
-            'per_page' => 'nullable|integer|in:20,50,100',
-            'page' => 'nullable|integer|min:1',
-        ]);
-
-        $currentSemester = Semester::where('is_active', true)->first();
-        $currentCampusId = session('current_campus_id') ? (int) session('current_campus_id') : null;
-        $semesterId = isset($validated['semester_id'])
-            ? (int) $validated['semester_id']
-            : $currentSemester?->id;
-
-        $preview = $semesterId
-            ? $previewQuery->handle($semesterId, [
-                'search' => $validated['search'] ?? '',
-                'ignore_student_ids' => $this->parseIgnoredStudentIds($validated['ignore_student_ids'] ?? null),
-                'per_page' => (int) ($validated['per_page'] ?? 20),
-                'page' => (int) ($validated['page'] ?? 1),
-            ], $currentCampusId)
-            : [
-                'eligible_students' => [],
-                'ineligible_students' => [],
-                'warning_students' => [],
-                'summary' => ['eligible_count' => 0, 'ineligible_count' => 0, 'warning_count' => 0, 'total_count' => 0],
-            ];
-
-        $semesters = Semester::orderBy('start_date', 'desc')->get();
-
-        return Inertia::render('Finance/Major/GenerateCharges', [
-            'preview' => $preview,
-            'semesters' => $semesters,
-            'currentSemester' => $semesterId ? Semester::find($semesterId) : $currentSemester,
-            'filters' => [
-                'semester_id' => $semesterId ? (string) $semesterId : null,
-                'search' => $validated['search'] ?? '',
-                'ignore_student_ids' => $validated['ignore_student_ids'] ?? '',
-                'per_page' => (int) ($validated['per_page'] ?? 20),
-                'page' => (int) ($validated['page'] ?? 1),
-            ],
-        ]);
+    public function index(Request $request): RedirectResponse
+    {
+        return redirect()->route('finance.batch-studio.charges', $this->safePrefill($request, 'major'));
     }
 
-    public function store(
-        Request $request,
-        PreviewMajorChargeGenerationQuery $previewQuery
-    ): RedirectResponse {
-        $validated = $request->validate([
-            'semester_id' => 'required|integer|exists:semesters,id',
-            'due_date' => 'required|date',
-            'search' => 'nullable|string|max:100',
-            'ignore_student_ids' => 'nullable|string|max:10000',
-        ]);
-
-        $currentCampusId = session('current_campus_id') ? (int) session('current_campus_id') : null;
-        $eligibleStudents = $previewQuery->resolveEligibleStudents((int) $validated['semester_id'], [
-            'search' => $validated['search'] ?? '',
-            'ignore_student_ids' => $this->parseIgnoredStudentIds($validated['ignore_student_ids'] ?? null),
-        ], $currentCampusId);
-
-        $studentIds = $eligibleStudents->pluck('student_id')->map(fn ($id) => (int) $id)->all();
-
-        if ($studentIds === []) {
-            return redirect()
-                ->route('finance.major.charges.index', array_filter([
-                    'semester_id' => $validated['semester_id'],
-                    'search' => $validated['search'] ?? null,
-                    'ignore_student_ids' => $validated['ignore_student_ids'] ?? null,
-                ]))
-                ->with('error', 'Không có student hợp lệ theo bộ lọc hiện tại để tạo HP.');
-        }
-
-        $results = GenerateMajorChargesAction::run([
-            'semester_id' => (int) $validated['semester_id'],
-            'due_date' => $validated['due_date'],
-            'student_ids' => $studentIds,
-        ]);
-
-        return redirect()
-            ->route('finance.major.charges.index', array_filter([
-                'semester_id' => $validated['semester_id'],
-                'search' => $validated['search'] ?? null,
-                'ignore_student_ids' => $validated['ignore_student_ids'] ?? null,
-            ]))
-            ->with('success', "Generated HP charges: {$results['created']} created, {$results['skipped']} skipped, {$results['failed']} failed.");
+    public function store(Request $request): HttpResponse
+    {
+        return response('HP/Tuition charges must be generated through Batch Studio.', 410);
     }
 
     /**
-     * @return array<int, string>
+     * @return array<string, mixed>
      */
-    private function parseIgnoredStudentIds(?string $value): array
+    private function safePrefill(Request $request, string $feeCategory): array
     {
-        return collect(preg_split('/\r\n|\r|\n/', (string) $value) ?: [])
-            ->map(fn (string $studentId): string => trim($studentId))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+        return array_filter([
+            'fee_category' => $feeCategory,
+            'semester_id' => $this->positiveInt($request->query('semester_id')),
+            'search' => $this->boundedString($request->query('search'), 100),
+            'ignore_student_ids' => $this->boundedString($request->query('ignore_student_ids'), 10000),
+            'per_page' => $this->allowedPerPage($request->query('per_page')),
+            'page' => $this->positiveInt($request->query('page')),
+        ], fn (mixed $value): bool => $value !== null && $value !== '');
+    }
+
+    private function positiveInt(mixed $value): ?int
+    {
+        return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
+    }
+
+    private function allowedPerPage(mixed $value): ?int
+    {
+        return is_numeric($value) && in_array((int) $value, [20, 50, 100], true) ? (int) $value : null;
+    }
+
+    private function boundedString(mixed $value, int $limit): ?string
+    {
+        $value = trim((string) $value);
+
+        return $value === '' ? null : mb_substr($value, 0, $limit);
     }
 }

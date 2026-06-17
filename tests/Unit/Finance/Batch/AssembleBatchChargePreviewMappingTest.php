@@ -57,3 +57,24 @@ it('maps an already-charged row into a ⚪ skip line with a reason', function ()
     expect($line->display['diff'])->toBe('skip')
         ->and($line->display['reason'])->toBe('already_charged');
 });
+
+it('maps EGC chargeable levels into preview amount and block metadata', function () {
+    $row = [
+        'student_id' => 14,
+        'student_code' => 'EGC014',
+        'student_name' => 'EGC Student',
+        'max_chargeable_blocks' => 2,
+        'chargeable_levels' => [
+            ['level_number' => 1, 'amount' => 12000000],
+            ['level_number' => 2, 'amount' => 15000000],
+        ],
+    ];
+
+    $line = AssembleBatchChargePreviewQuery::mapChargeRow($row, 'egc', 5, 'create');
+
+    expect($line->key)->toBe('charge:egc:student:14:semester:5')
+        ->and($line->display['net'])->toBe(27000000.0)
+        ->and($line->display['block_count'])->toBe(2)
+        ->and($line->display['block_amounts'])->toBe([12000000.0, 15000000.0])
+        ->and($line->hashPayload['net'])->toBe(27000000.0);
+});

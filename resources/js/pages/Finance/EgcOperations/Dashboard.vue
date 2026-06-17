@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { financeRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowRightLeft, BarChart3, CheckCircle2, DollarSign, Play, RefreshCw, TrendingUp } from 'lucide-vue-next';
 import { ref } from 'vue';
@@ -105,12 +103,12 @@ function onSemesterChange(val: string) {
 
         <!-- Quick Actions -->
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Link :href="route('finance.egc.charges.index', { semester_id: selectedSemesterId })">
+            <Link :href="financeRoutes.batchStudio.charges({ fee_category: 'egc', semester_id: selectedSemesterId })">
                 <Card class="hover:bg-muted/50 cursor-pointer transition-colors">
                     <CardContent class="flex items-center gap-3 pt-6">
                         <Play class="h-8 w-8 text-blue-500" />
                         <div>
-                            <div class="font-semibold">Generate Charges</div>
+                            <div class="font-semibold">Sinh phí EGC</div>
                             <div class="text-muted-foreground text-sm">Create EGC block charges</div>
                         </div>
                     </CardContent>
