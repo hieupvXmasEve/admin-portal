@@ -86,7 +86,9 @@ export interface User {
 }
 
 // Enums
-export type ChargeType = 'tuition_term' | 'egc_level_fee' | 'retake_fee' | 'exam_resit_fee' | 'manual_fee' | 'admission_fee' | 'defer_credit' | 'egc_exempt_credit' | 'scholarship_credit' | 'voucher_credit' | 'adjustment';
+export type ChargeType = 'tuition_term' | 'egc_level_fee' | 'retake_fee' | 'exam_resit_fee' | 'course_fee' | 'manual_fee' | 'admission_fee' | 'defer_credit' | 'egc_exempt_credit' | 'scholarship_credit' | 'voucher_credit' | 'adjustment' | 'bhyt';
+
+export type InvoiceStatus = 'draft' | 'pending' | 'partial' | 'paid' | 'overdue' | 'cancelled' | 'void';
 
 export type ChargeStatus = 'active' | 'void' | 'transferred';
 
@@ -100,6 +102,7 @@ export const CHARGE_TYPE_LABELS: Record<ChargeType, string> = {
     egc_level_fee: 'Phí EGC (EGC Level Fee)',
     retake_fee: 'Phí học lại môn (Course Retake)',
     exam_resit_fee: 'Phí thi lại (Exam Resit)',
+    course_fee: 'Phí môn học (Course Fee)',
     manual_fee: 'Phí thủ công (Manual Fee)',
     admission_fee: 'Lệ phí xét tuyển (Admission Fee)',
     defer_credit: 'Hoàn phí bảo lưu (Defer Credit)',
@@ -107,6 +110,27 @@ export const CHARGE_TYPE_LABELS: Record<ChargeType, string> = {
     scholarship_credit: 'Học bổng (Scholarship)',
     voucher_credit: 'Voucher',
     adjustment: 'Điều chỉnh (Adjustment)',
+    bhyt: 'BHYT',
+};
+
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+    draft: 'Nháp',
+    pending: 'Chờ thanh toán',
+    partial: 'Thanh toán một phần',
+    paid: 'Đã thanh toán',
+    overdue: 'Quá hạn',
+    cancelled: 'Đã hủy',
+    void: 'Đã hủy',
+};
+
+export const INVOICE_STATUS_BADGE_CLASSES: Record<InvoiceStatus, string> = {
+    draft: 'bg-slate-100 text-slate-700 border-slate-200',
+    pending: 'bg-blue-50 text-blue-700 border-blue-200',
+    partial: 'bg-amber-50 text-amber-800 border-amber-200',
+    paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    overdue: 'bg-red-50 text-red-700 border-red-200',
+    cancelled: 'bg-gray-100 text-gray-500 border-gray-200',
+    void: 'bg-gray-100 text-gray-500 border-gray-200',
 };
 
 export const CHARGE_STATUS_LABELS: Record<ChargeStatus, string> = {
@@ -137,6 +161,7 @@ export const CHARGE_TYPE_BADGE_CLASSES: Record<ChargeType, string> = {
     egc_level_fee: 'bg-indigo-100 text-indigo-800',
     retake_fee: 'bg-orange-100 text-orange-800',
     exam_resit_fee: 'bg-red-100 text-red-800',
+    course_fee: 'bg-violet-100 text-violet-800',
     manual_fee: 'bg-gray-100 text-gray-800',
     admission_fee: 'bg-pink-100 text-pink-800',
     defer_credit: 'bg-green-100 text-green-800',
@@ -144,6 +169,7 @@ export const CHARGE_TYPE_BADGE_CLASSES: Record<ChargeType, string> = {
     scholarship_credit: 'bg-teal-100 text-teal-800',
     voucher_credit: 'bg-lime-100 text-lime-800',
     adjustment: 'bg-yellow-100 text-yellow-800',
+    bhyt: 'bg-cyan-100 text-cyan-800',
 };
 
 export const CHARGE_STATUS_BADGE_CLASSES: Record<ChargeStatus, string> = {
@@ -160,12 +186,20 @@ export const PAYMENT_STATUS_BADGE_CLASSES: Record<PaymentStatus, string> = {
 };
 
 // Helper functions
-export function getChargeTypeLabel(type: ChargeType): string {
-    return CHARGE_TYPE_LABELS[type] ?? type;
+export function getChargeTypeLabel(type: string): string {
+    return CHARGE_TYPE_LABELS[type as ChargeType] ?? type;
 }
 
-export function getChargeTypeBadgeClass(type: ChargeType): string {
-    return CHARGE_TYPE_BADGE_CLASSES[type] ?? 'bg-gray-100 text-gray-800';
+export function getChargeTypeBadgeClass(type: string): string {
+    return CHARGE_TYPE_BADGE_CLASSES[type as ChargeType] ?? 'bg-gray-100 text-gray-800';
+}
+
+export function getInvoiceStatusLabel(status: string): string {
+    return INVOICE_STATUS_LABELS[status as InvoiceStatus] ?? status;
+}
+
+export function getInvoiceStatusBadgeClass(status: string): string {
+    return INVOICE_STATUS_BADGE_CLASSES[status as InvoiceStatus] ?? 'bg-gray-100 text-gray-800 border-gray-200';
 }
 
 export function getChargeStatusLabel(status: ChargeStatus): string {
@@ -296,22 +330,31 @@ export interface Student360Actions {
 
 export interface LedgerInvoiceLine {
     id: number;
+    charge_type: string;
     label: string;
+    description: string;
+    amount: number;
+    paid: number;
     outstanding: number;
+    is_credit: boolean;
 }
 
 export interface LedgerInvoice {
     id: number;
     invoice_number: string;
     status: string;
+    gross: number;
+    discount: number;
     net: number;
     paid: number;
     remaining: number;
+    due_date: string | null;
+    paid_at: string | null;
     lines: LedgerInvoiceLine[];
 }
 
 export interface LedgerGroup {
-    semester: { id: number | null; name: string };
+    semester: { id: number | null; code: string | null; name: string };
     invoices: LedgerInvoice[];
 }
 
@@ -327,6 +370,8 @@ export interface BatchPreviewLineDisplay {
     installment_aware_total?: number;
     reason?: string | null;
     warning_codes?: string[];
+    block_count?: number | null;
+    block_amounts?: number[];
 }
 
 export interface BatchPreviewLineClient {

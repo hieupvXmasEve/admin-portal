@@ -1,84 +1,357 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { LedgerEvent, LedgerGroup } from '@/types/finance';
+import { cn } from '@/lib/utils';
+import type { LedgerEvent, LedgerGroup, LedgerInvoice } from '@/types/finance';
+import {
+    getChargeTypeBadgeClass,
+    getChargeTypeLabel,
+    getInvoiceStatusBadgeClass,
+    getInvoiceStatusLabel,
+} from '@/types/finance';
 import { formatCurrency, formatDate } from '@/utils/format';
-import { Deferred } from '@inertiajs/vue3';
+import { financeRoutes } from '@/utils/routes';
+import { Deferred, Link } from '@inertiajs/vue3';
+import {
+    ArrowDownLeft,
+    ArrowUpRight,
+    BookOpen,
+    Calendar,
+    CheckCircle2,
+    Clock,
+    ExternalLink,
+    Minus,
+    Receipt,
+} from 'lucide-vue-next';
+import { computed } from 'vue';
 
-defineProps<{ timeline?: LedgerEvent[]; groups?: LedgerGroup[] }>();
+const props = defineProps<{ timeline?: LedgerEvent[]; groups?: LedgerGroup[] }>();
+
+const timelineEventMeta = (event: LedgerEvent) => {
+    const isCredit = event.signed_amount < 0;
+
+    if (event.type === 'payment_application') {
+        return {
+            icon: ArrowDownLeft,
+            tone: 'text-emerald-700 dark:text-emerald-300',
+            bg: 'bg-emerald-50 dark:bg-emerald-950/40',
+            label: event.label.replace(/^Payment /i, 'Thanh toán · '),
+        };
+    }
+
+    if (event.type === 'discount_allocation') {
+        return {
+            icon: Minus,
+            tone: 'text-violet-700 dark:text-violet-300',
+            bg: 'bg-violet-50 dark:bg-violet-950/40',
+            label: event.label.replace(/^Discount /i, 'Giảm giá · '),
+        };
+    }
+
+    return {
+        icon: isCredit ? ArrowDownLeft : ArrowUpRight,
+        tone: isCredit ? 'text-emerald-700 dark:text-emerald-300' : 'text-orange-700 dark:text-orange-300',
+        bg: isCredit ? 'bg-emerald-50 dark:bg-emerald-950/40' : 'bg-orange-50 dark:bg-orange-950/40',
+        label: event.label,
+    };
+};
+
+const invoiceBorderClass = (status: string): string => {
+    const map: Record<string, string> = {
+        paid: 'border-l-emerald-500',
+        partial: 'border-l-amber-500',
+        overdue: 'border-l-red-500',
+        pending: 'border-l-blue-500',
+        draft: 'border-l-slate-400',
+        cancelled: 'border-l-gray-400',
+        void: 'border-l-gray-400',
+    };
+
+    return map[status] ?? 'border-l-slate-300';
+};
+
+const semesterSummary = (invoices: LedgerInvoice[]) => {
+    const remaining = invoices.reduce((sum, invoice) => sum + invoice.remaining, 0);
+    const net = invoices.reduce((sum, invoice) => sum + invoice.net, 0);
+
+    return { count: invoices.length, remaining, net };
+};
+
+const totalOutstanding = computed(() => {
+    if (!props.groups?.length) return 0;
+
+    return props.groups.reduce(
+        (sum, group) => sum + group.invoices.reduce((groupSum, invoice) => groupSum + invoice.remaining, 0),
+        0,
+    );
+});
+
+const formatLineAmount = (amount: number, isCredit: boolean): string => {
+    const formatted = formatCurrency(Math.abs(amount));
+
+    return isCredit ? `−${formatted}` : formatted;
+};
 </script>
 
 <template>
-    <Card>
-        <CardHeader class="pb-2">
-            <CardTitle class="text-sm">Sổ cái</CardTitle>
+    <Card class="overflow-hidden">
+        <CardHeader class="border-b bg-muted/30 pb-3">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="flex items-start gap-2">
+                    <div class="bg-primary/10 text-primary mt-0.5 rounded-md p-2">
+                        <BookOpen class="size-4" />
+                    </div>
+                    <div>
+                        <CardTitle class="text-base">Sổ cái</CardTitle>
+                        <CardDescription class="mt-0.5">Hóa đơn theo kỳ học và dòng phí chi tiết</CardDescription>
+                    </div>
+                </div>
+                <div v-if="groups?.length" class="text-right">
+                    <p class="text-muted-foreground text-xs">Tổng còn nợ</p>
+                    <p
+                        class="text-lg font-semibold tabular-nums"
+                        :class="totalOutstanding > 0 ? 'text-orange-700 dark:text-orange-300' : 'text-emerald-700 dark:text-emerald-300'"
+                    >
+                        {{ formatCurrency(totalOutstanding) }}
+                    </p>
+                </div>
+            </div>
         </CardHeader>
-        <CardContent>
+
+        <CardContent class="pt-4">
             <Tabs default-value="ledger" class="w-full">
-                <TabsList>
-                    <TabsTrigger value="ledger">Sổ cái</TabsTrigger>
-                    <TabsTrigger value="timeline">Dòng thời gian</TabsTrigger>
+                <TabsList class="grid h-9 w-full max-w-sm grid-cols-2">
+                    <TabsTrigger value="ledger" class="gap-1.5 text-xs sm:text-sm">
+                        <Receipt class="size-3.5" />
+                        Sổ cái
+                    </TabsTrigger>
+                    <TabsTrigger value="timeline" class="gap-1.5 text-xs sm:text-sm">
+                        <Clock class="size-3.5" />
+                        Dòng thời gian
+                    </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="ledger" class="mt-3">
+                <TabsContent value="ledger" class="mt-4">
                     <Deferred data="ledger_groups">
                         <template #fallback>
-                            <Skeleton class="h-24 w-full" />
+                            <div class="space-y-3">
+                                <Skeleton class="h-10 w-full" />
+                                <Skeleton class="h-32 w-full" />
+                                <Skeleton class="h-32 w-full" />
+                            </div>
                         </template>
-                        <div v-if="groups && groups.length" class="space-y-4">
-                            <section v-for="group in groups" :key="group.semester.id ?? 'none'">
-                                <h3 class="text-muted-foreground mb-1 text-xs font-semibold uppercase">
-                                    {{ group.semester.name }}
-                                </h3>
-                                <div v-for="invoice in group.invoices" :key="invoice.id" class="mb-2 rounded-md border p-2">
-                                    <div class="flex flex-wrap items-center justify-between gap-2 text-sm font-medium">
-                                        <span>
-                                            {{ invoice.invoice_number }}
-                                            <Badge variant="secondary" class="ml-1">{{ invoice.status }}</Badge>
-                                        </span>
-                                        <span class="tabular-nums">{{ formatCurrency(invoice.remaining) }} còn nợ</span>
+
+                        <div v-if="groups && groups.length" class="space-y-5">
+                            <section
+                                v-for="group in groups"
+                                :key="group.semester.id ?? 'none'"
+                                class="overflow-hidden rounded-lg border"
+                            >
+                                <div class="bg-muted/50 flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+                                    <div>
+                                        <h3 class="text-sm font-semibold tracking-tight">
+                                            {{ group.semester.name }}
+                                        </h3>
+                                        <p v-if="group.semester.code" class="text-muted-foreground text-xs">
+                                            {{ group.semester.code }}
+                                        </p>
                                     </div>
-                                    <ul class="text-muted-foreground mt-1 space-y-0.5 text-xs">
-                                        <li v-for="line in invoice.lines" :key="line.id" class="flex justify-between gap-2">
-                                            <span>{{ line.label }}</span>
-                                            <span class="tabular-nums">{{ formatCurrency(line.outstanding) }}</span>
-                                        </li>
-                                    </ul>
+                                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                                        <Badge variant="outline" class="tabular-nums">
+                                            {{ semesterSummary(group.invoices).count }} hóa đơn
+                                        </Badge>
+                                        <Badge
+                                            variant="outline"
+                                            class="tabular-nums"
+                                            :class="
+                                                semesterSummary(group.invoices).remaining > 0
+                                                    ? 'border-orange-200 bg-orange-50 text-orange-800'
+                                                    : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                                            "
+                                        >
+                                            Còn nợ {{ formatCurrency(semesterSummary(group.invoices).remaining) }}
+                                        </Badge>
+                                    </div>
+                                </div>
+
+                                <div class="divide-y">
+                                    <article
+                                        v-for="invoice in group.invoices"
+                                        :key="invoice.id"
+                                        class="border-l-4 bg-card px-4 py-3"
+                                        :class="invoiceBorderClass(invoice.status)"
+                                    >
+                                        <div class="flex flex-wrap items-start justify-between gap-3">
+                                            <div class="min-w-0 space-y-1">
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    <Link
+                                                        :href="financeRoutes.lookup.invoiceDetail(invoice.id)"
+                                                        class="hover:text-primary truncate font-medium tabular-nums transition-colors"
+                                                    >
+                                                        {{ invoice.invoice_number }}
+                                                    </Link>
+                                                    <Badge
+                                                        variant="outline"
+                                                        :class="cn('text-[11px] font-medium', getInvoiceStatusBadgeClass(invoice.status))"
+                                                    >
+                                                        <CheckCircle2 v-if="invoice.status === 'paid'" class="mr-1 size-3" />
+                                                        {{ getInvoiceStatusLabel(invoice.status) }}
+                                                    </Badge>
+                                                    <Link
+                                                        :href="financeRoutes.lookup.invoiceDetail(invoice.id)"
+                                                        class="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-xs"
+                                                    >
+                                                        Chi tiết
+                                                        <ExternalLink class="size-3" />
+                                                    </Link>
+                                                </div>
+
+                                                <div class="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                                                    <span v-if="invoice.due_date" class="inline-flex items-center gap-1">
+                                                        <Calendar class="size-3" />
+                                                        Hạn: {{ formatDate(invoice.due_date) }}
+                                                    </span>
+                                                    <span v-if="invoice.paid_at" class="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
+                                                        <CheckCircle2 class="size-3" />
+                                                        Thanh toán: {{ formatDate(invoice.paid_at) }}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div class="grid shrink-0 grid-cols-2 gap-x-4 gap-y-1 text-right text-xs sm:grid-cols-4">
+                                                <div>
+                                                    <p class="text-muted-foreground">Tổng</p>
+                                                    <p class="font-medium tabular-nums">{{ formatCurrency(invoice.net) }}</p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-muted-foreground">Giảm giá</p>
+                                                    <p class="font-medium tabular-nums text-violet-700 dark:text-violet-300">
+                                                        {{ invoice.discount > 0 ? `−${formatCurrency(invoice.discount)}` : '—' }}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-muted-foreground">Đã thu</p>
+                                                    <p class="font-medium tabular-nums text-emerald-700 dark:text-emerald-300">
+                                                        {{ formatCurrency(invoice.paid) }}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-muted-foreground">Còn nợ</p>
+                                                    <p
+                                                        class="font-semibold tabular-nums"
+                                                        :class="
+                                                            invoice.remaining > 0
+                                                                ? 'text-orange-700 dark:text-orange-300'
+                                                                : 'text-emerald-700 dark:text-emerald-300'
+                                                        "
+                                                    >
+                                                        {{ formatCurrency(invoice.remaining) }}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div v-if="invoice.lines.length" class="mt-3 overflow-x-auto rounded-md border bg-muted/20">
+                                            <table class="w-full min-w-[520px] text-xs">
+                                                <thead>
+                                                    <tr class="text-muted-foreground border-b text-left">
+                                                        <th class="px-3 py-2 font-medium">Loại phí</th>
+                                                        <th class="px-3 py-2 font-medium">Mô tả</th>
+                                                        <th class="px-3 py-2 text-right font-medium">Phải thu</th>
+                                                        <th class="px-3 py-2 text-right font-medium">Đã thu</th>
+                                                        <th class="px-3 py-2 text-right font-medium">Còn nợ</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="divide-y">
+                                                    <tr v-for="line in invoice.lines" :key="line.id">
+                                                        <td class="px-3 py-2 align-top">
+                                                            <Badge
+                                                                variant="outline"
+                                                                :class="cn('whitespace-nowrap text-[10px]', getChargeTypeBadgeClass(line.charge_type ?? line.label))"
+                                                            >
+                                                                {{ getChargeTypeLabel(line.charge_type ?? line.label) }}
+                                                            </Badge>
+                                                        </td>
+                                                        <td class="text-muted-foreground max-w-[200px] truncate px-3 py-2 align-top">
+                                                            {{ line.description || '—' }}
+                                                        </td>
+                                                        <td
+                                                            class="px-3 py-2 text-right align-top tabular-nums"
+                                                            :class="line.is_credit ? 'text-emerald-700 dark:text-emerald-300' : ''"
+                                                        >
+                                                            {{ formatLineAmount(line.amount, line.is_credit) }}
+                                                        </td>
+                                                        <td class="px-3 py-2 text-right align-top tabular-nums text-emerald-700 dark:text-emerald-300">
+                                                            {{ line.paid > 0 ? formatCurrency(line.paid) : '—' }}
+                                                        </td>
+                                                        <td
+                                                            class="px-3 py-2 text-right align-top font-medium tabular-nums"
+                                                            :class="
+                                                                line.outstanding > 0
+                                                                    ? 'text-orange-700 dark:text-orange-300'
+                                                                    : 'text-muted-foreground'
+                                                            "
+                                                        >
+                                                            {{ formatCurrency(line.outstanding) }}
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </article>
                                 </div>
                             </section>
                         </div>
-                        <p v-else class="text-muted-foreground py-6 text-center text-sm">Chưa có hóa đơn.</p>
+
+                        <div v-else class="flex flex-col items-center justify-center gap-2 py-10 text-center">
+                            <Receipt class="text-muted-foreground size-8 opacity-40" />
+                            <p class="text-muted-foreground text-sm">Chưa có hóa đơn cho sinh viên này.</p>
+                        </div>
                     </Deferred>
                 </TabsContent>
 
-                <TabsContent value="timeline" class="mt-3">
+                <TabsContent value="timeline" class="mt-4">
                     <Deferred data="ledger">
                         <template #fallback>
                             <Skeleton class="h-24 w-full" />
                         </template>
-                        <div v-if="timeline && timeline.length" class="divide-y">
+
+                        <div v-if="timeline && timeline.length" class="divide-y rounded-lg border">
                             <div
                                 v-for="(event, idx) in timeline"
                                 :key="idx"
-                                class="flex items-center justify-between py-2 text-sm"
+                                class="flex items-center justify-between gap-3 px-4 py-3"
                             >
-                                <div>
-                                    <span class="font-medium">{{ event.label }}</span>
-                                    <span class="text-muted-foreground ml-2 text-xs">
-                                        {{ event.at ? formatDate(event.at) : '—' }}
-                                    </span>
+                                <div class="flex min-w-0 items-center gap-3">
+                                    <div :class="cn('rounded-full p-2', timelineEventMeta(event).bg)">
+                                        <component :is="timelineEventMeta(event).icon" :class="cn('size-3.5', timelineEventMeta(event).tone)" />
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="truncate text-sm font-medium">{{ timelineEventMeta(event).label }}</p>
+                                        <p class="text-muted-foreground text-xs">
+                                            {{ event.at ? formatDate(event.at) : 'Không có ngày' }}
+                                        </p>
+                                    </div>
                                 </div>
                                 <span
-                                    class="tabular-nums"
-                                    :class="event.signed_amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'"
+                                    class="shrink-0 text-sm font-semibold tabular-nums"
+                                    :class="
+                                        event.signed_amount < 0
+                                            ? 'text-emerald-700 dark:text-emerald-300'
+                                            : 'text-orange-700 dark:text-orange-300'
+                                    "
                                 >
-                                    {{ formatCurrency(event.signed_amount) }}
+                                    {{ event.signed_amount < 0 ? '' : '+' }}{{ formatCurrency(event.signed_amount) }}
                                 </span>
                             </div>
                         </div>
-                        <p v-else class="text-muted-foreground py-6 text-center text-sm">Chưa có hoạt động.</p>
+
+                        <div v-else class="flex flex-col items-center justify-center gap-2 py-10 text-center">
+                            <Clock class="text-muted-foreground size-8 opacity-40" />
+                            <p class="text-muted-foreground text-sm">Chưa có hoạt động tài chính.</p>
+                        </div>
                     </Deferred>
                 </TabsContent>
             </Tabs>
