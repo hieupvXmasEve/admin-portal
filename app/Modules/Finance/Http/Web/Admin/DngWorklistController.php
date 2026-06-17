@@ -5,102 +5,82 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Campus;
-use App\Models\Semester;
-use App\Modules\Finance\Actions\CreateBatchDngFromChargesAction;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
-use App\Modules\Finance\Http\Requests\Dng\StoreBatchDngFromChargesRequest;
-use App\Modules\Finance\Queries\Dng\ListDngWorklistQuery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Inertia\Response;
+use Illuminate\Http\Response as HttpResponse;
 
 /**
- * Unified DNG Worklist controller.
- *
- * Replaces:
- *  - BatchDngPageController (batch DNG from settlement data)
- *  - RetakeCourseChargeController::index (retake payment_pending list)
- *  - The "Tạo DNG" dialog in Settlement.vue
- *
- * All DNG creation now routes through here, ensuring charge↔DNG linking via
- * the dng_payment_request_charges pivot for correct webhook allocation.
+ * Compatibility controller for the retired standalone DNG worklist.
+ * Batch Studio is now the canonical bulk DNG payment-request creation surface.
  */
 class DngWorklistController extends Controller
 {
-    public function __construct(
-        private readonly ListDngWorklistQuery $worklistQuery,
-        private readonly CreateBatchDngFromChargesAction $createBatchAction,
-    ) {}
-
     /**
-     * Render the unified DNG worklist page.
-     * Fee type is driven by dng_fee_type query param; defaults to HP.
+     * Redirect legacy bookmarks to the Batch Studio DNG wizard.
      */
-    public function index(Request $request): Response
+    public function index(Request $request): RedirectResponse
     {
-        // Default to HP if not provided
-        if (! $request->has('dng_fee_type')) {
-            $request->merge(['dng_fee_type' => 'HP']);
-        }
-
-        $data = $this->worklistQuery->handle($request);
-
-        $campusId = app()->bound('campus') ? app('campus')->id : null;
-
-        $campuses = Campus::query()
-            ->when($campusId, fn ($q) => $q->where('id', $campusId))
-            ->orderBy('name')
-            ->get(['id', 'name', 'code'])
-            ->map(fn (Campus $c) => ['id' => $c->id, 'name' => $c->name, 'code' => $c->code])
-            ->all();
-
-        $semesters = Semester::query()
-            ->orderByDesc('start_date')
-            ->get(['id', 'name', 'code'])
-            ->map(fn (Semester $s) => ['id' => $s->id, 'name' => $s->name, 'code' => $s->code])
-            ->all();
-
-        // Only expose fee types used in the worklist (exclude BHYT, PRE, etc.)
-        $feeTypeOptions = collect(DngFeeTypeOptions::all())
-            // ->filter(fn ($ft) => in_array($ft['value'], ['HP', 'HL', 'PTL', 'KHAC'], true))
-            ->values()
-            ->all();
-
-        return Inertia::render('Finance/Operations/DngWorklist', [
-            'students' => $data['students'],
-            'filters' => $data['filters'],
-            'summary' => $data['summary'],
-            'feeTypeOptions' => $feeTypeOptions,
-            'semesters' => $semesters,
-            'campuses' => Inertia::once(fn () => $campuses),
-        ]);
+        return redirect()->route('finance.batch-studio.dng', $this->safePrefill($request));
     }
 
     /**
-     * Create batch DNG payment requests from charges for selected students.
+     * Retired direct-write endpoint. DNG payment requests must be created
+     * through Batch Studio so the preview-token recompute check cannot be bypassed.
      */
-    public function store(StoreBatchDngFromChargesRequest $request): RedirectResponse
+    public function store(Request $request): HttpResponse
     {
-        $result = $this->createBatchAction->handle($request->validated());
+        return response('DNG payment requests must be created through Batch Studio.', 410);
+    }
 
-        $msg = "Đã tạo {$result['created']} DNG thành công.";
-
-        if ($result['cancelled_old'] > 0) {
-            $msg .= " Đã hủy {$result['cancelled_old']} DNG cũ.";
+    /**
+     * @return array<string, mixed>
+     */
+    private function safePrefill(Request $request): array
+    {
+        $prefill = [];
+        $feeType = (string) $request->query('dng_fee_type', '');
+        if (in_array($feeType, DngFeeTypeOptions::values(), true)) {
+            $prefill['dng_fee_type'] = $feeType;
         }
 
-        if ($result['failed'] > 0) {
-            $msg .= " {$result['failed']} thất bại.";
-
-            if (! empty($result['errors'])) {
-                $msg .= ' Lỗi: '.implode('; ', array_slice($result['errors'], 0, 3));
-            }
+        $semesterId = $request->query('semester_id');
+        if (is_numeric($semesterId) && (int) $semesterId > 0) {
+            $prefill['semester_id'] = (int) $semesterId;
         }
 
-        Inertia::flash($result['failed'] > 0 ? 'warning' : 'success', $msg);
+        $campusId = $request->query('campus_id');
+        if ($request->user()?->can('view_finance_all_campus') && is_numeric($campusId) && (int) $campusId > 0) {
+            $prefill['campus_id'] = (int) $campusId;
+        }
 
-        return back();
+        $studentIds = $this->studentIds($request->query('student_ids', []));
+        if ($studentIds !== []) {
+            $prefill['student_ids'] = $studentIds;
+        }
+
+        return $prefill;
+    }
+
+    /**
+     * @return int[]
+     */
+    private function studentIds(mixed $value): array
+    {
+        if (is_string($value)) {
+            $value = preg_split('/[,\s]+/', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        }
+
+        if (! is_array($value)) {
+            return [];
+        }
+
+        return collect($value)
+            ->map(fn (mixed $id): int => is_numeric($id) ? (int) $id : 0)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->take(100)
+            ->values()
+            ->all();
     }
 }

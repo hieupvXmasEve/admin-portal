@@ -64,3 +64,15 @@ it('marks webhook/unallocated queues as semester-agnostic and due/lifecycle as s
             expect($queues->firstWhere('key', 'lifecycle')['obeys_semester'])->toBeTrue();
         });
 });
+
+it('routes installment retry queue to the Batch Studio DNG wizard', function () {
+    $user = grantCockpit(['view_finance_cockpit', 'create_finance_payments']);
+
+    actingAs($user)->get('/finance/cockpit')
+        ->assertInertia(function ($page) {
+            $queues = collect($page->toArray()['props']['queues']);
+
+            expect($queues->firstWhere('key', 'installment_failures')['action_url'])
+                ->toBe(route('finance.batch-studio.dng'));
+        });
+});

@@ -141,12 +141,12 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::post('/settlement/apply', [BillingSettlementController::class, 'apply'])
             ->middleware('can:allocate_finance_payment')
             ->name('settlement.apply');
-        // /finance/operations/batch-dng removed — replaced by DNG Worklist below
+        // /finance/operations/batch-dng removed — replaced by Batch Studio DNG below
         // Route kept commented for redirect reference only
 
-        // Unified DNG Worklist — replaces BatchDng, RetakeCourse DNG, Settlement DNG dialog
+        // Legacy DNG Worklist URL — compatibility redirect to Batch Studio DNG wizard.
         Route::get('/dng-worklist', [DngWorklistController::class, 'index'])
-            ->middleware('can:create_finance_payments')
+            ->middleware('can:view_finance_batch_studio')
             ->name('dng-worklist');
         Route::post('/dng-worklist', [DngWorklistController::class, 'store'])
             ->middleware('can:create_finance_payments')
@@ -228,7 +228,7 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::get('/', [PaymentController::class, 'index'])
             ->middleware('can:view_finance_payments')
             ->name('index');
-        // /finance/payments/create removed — DNG creation unified in DNG Worklist
+        // /finance/payments/create removed — DNG creation unified in Batch Studio DNG
         // /finance/payments/{student}/dng-data removed — no longer needed
         Route::get('/auto-allocate', [PaymentController::class, 'showAutoAllocate'])
             ->middleware('can:allocate_finance_payment')
@@ -282,7 +282,7 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         });
     });
 
-    // Retake Course Charge routes removed — absorbed by DNG Worklist (fee_type=HL)
+    // Retake Course Charge routes removed — absorbed by Batch Studio DNG (fee_type=HL)
     // See: DngWorklistController + CreateBatchDngFromChargesAction (auto-creates charges for approved registrations)
 
     Route::prefix('batch-studio')->name('batch-studio.')->group(function () {
@@ -291,7 +291,7 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::get('/charges', [BatchStudioController::class, 'charges'])
             ->middleware('can:view_finance_batch_studio')->name('charges');
         Route::post('/charges', [BatchStudioController::class, 'commitCharges'])
-            ->middleware('can:create_finance_charges')->name('charges.commit');
+            ->name('charges.commit');
         Route::get('/dng', [BatchStudioController::class, 'dng'])
             ->middleware('can:view_finance_batch_studio')->name('dng');
         Route::post('/dng', [BatchStudioController::class, 'commitDng'])

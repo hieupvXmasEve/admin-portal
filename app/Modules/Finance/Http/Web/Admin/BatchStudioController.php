@@ -49,6 +49,7 @@ class BatchStudioController extends Controller
     {
         return Inertia::render('Finance/BatchStudio/ChargeGeneration', [
             'feeTypeOptions' => NonAcademicChargeTypeEnum::forSelect(),
+            'prefill' => $this->chargePrefill($request),
         ]);
     }
 
@@ -56,6 +57,7 @@ class BatchStudioController extends Controller
     {
         return Inertia::render('Finance/BatchStudio/DngPush', [
             'dngFeeTypeOptions' => DngFeeTypeOptions::all(),
+            'prefill' => $this->dngPrefill($request),
         ]);
     }
 
@@ -83,9 +85,7 @@ class BatchStudioController extends Controller
         $feeCategory = (string) ($scope['fee_category'] ?? '');
         $semesterId = (int) ($scope['semester_id'] ?? 0);
 
-        if ($feeCategory === 'egc' && ! $request->user()?->can('generate_egc_finance_charges')) {
-            throw new AuthorizationException('Bạn không có quyền sinh phí EGC.');
-        }
+        $this->authorizeChargeCategory($request, $feeCategory);
 
         $campusId = $request->user()?->can('view_finance_all_campus') ? null : (int) session('current_campus_id');
 
@@ -108,6 +108,7 @@ class BatchStudioController extends Controller
             $dueDate,
             $currentByKey,
             (array) ($scope['scope'] ?? []),
+            (array) $request->input('block_overrides', []),
         );
 
         return Inertia::flash('batch_result', [
@@ -250,6 +251,7 @@ class BatchStudioController extends Controller
         string $dueDate,
         array $currentByKey,
         array $scope,
+        array $blockOverrides = [],
     ): array {
         return match ($feeCategory) {
             'major' => GenerateMajorChargesAction::run([
@@ -260,13 +262,15 @@ class BatchStudioController extends Controller
             'egc' => GenerateEgcChargesAction::run([
                 'semester_id' => $semesterId,
                 'due_date' => $dueDate,
-                'students' => collect($studentIds)->map(function (int $id) use ($currentByKey, $feeCategory, $semesterId) {
+                'students' => collect($studentIds)->map(function (int $id) use ($currentByKey, $feeCategory, $semesterId, $blockOverrides) {
                     $key = sprintf('charge:%s:student:%d:semester:%d', $feeCategory, $id, $semesterId);
                     $line = $currentByKey[$key] ?? null;
+                    $maxBlocks = max(1, (int) ($line?->display['block_count'] ?? 2));
+                    $override = isset($blockOverrides[$key]) ? (int) $blockOverrides[$key] : 0;
 
                     return [
                         'student_id' => $id,
-                        'block_count' => (int) ($line?->display['block_count'] ?? 2),
+                        'block_count' => $override > 0 ? min($override, $maxBlocks) : $maxBlocks,
                     ];
                 })->all(),
             ]),
@@ -277,5 +281,106 @@ class BatchStudioController extends Controller
             ])),
             default => [],
         };
+    }
+
+    private function authorizeChargeCategory(Request $request, string $feeCategory): void
+    {
+        $allowed = match ($feeCategory) {
+            'egc' => (bool) $request->user()?->can('generate_egc_finance_charges'),
+            'major', 'non_academic' => (bool) $request->user()?->can('create_finance_charges'),
+            default => false,
+        };
+
+        if (! $allowed) {
+            throw new AuthorizationException(match ($feeCategory) {
+                'egc' => 'Bạn không có quyền sinh phí EGC.',
+                default => 'Bạn không có quyền sinh phí HP/Tuition.',
+            });
+        }
+    }
+
+    /**
+     * @return array{fee_category: string, semester_id: int|null, scope: array{filters: array<string, mixed>}}
+     */
+    private function chargePrefill(Request $request): array
+    {
+        $feeCategory = (string) $request->query('fee_category', 'major');
+        if (! in_array($feeCategory, ['major', 'egc', 'non_academic'], true)) {
+            $feeCategory = 'major';
+        }
+
+        $semesterId = $request->query('semester_id');
+        $filters = [];
+
+        $search = trim((string) $request->query('search', ''));
+        if ($search !== '') {
+            $filters['search'] = mb_substr($search, 0, 100);
+        }
+
+        $ignored = trim((string) $request->query('ignore_student_ids', ''));
+        if ($ignored !== '') {
+            $filters['ignore_student_ids'] = mb_substr($ignored, 0, 10000);
+        }
+
+        $perPage = $request->query('per_page');
+        if (is_numeric($perPage) && in_array((int) $perPage, [20, 50, 100], true)) {
+            $filters['per_page'] = (int) $perPage;
+        }
+
+        $page = $request->query('page');
+        if (is_numeric($page) && (int) $page > 0) {
+            $filters['page'] = (int) $page;
+        }
+
+        return [
+            'fee_category' => $feeCategory,
+            'semester_id' => is_numeric($semesterId) && (int) $semesterId > 0 ? (int) $semesterId : null,
+            'scope' => ['filters' => $filters],
+        ];
+    }
+
+    /**
+     * @return array{dng_fee_type: string, semester_id: int|null, campus_id: int|null, student_ids: int[]}
+     */
+    private function dngPrefill(Request $request): array
+    {
+        $feeType = (string) $request->query('dng_fee_type', 'HP');
+        if (! in_array($feeType, DngFeeTypeOptions::values(), true)) {
+            $feeType = 'HP';
+        }
+
+        $semesterId = $request->query('semester_id');
+        $campusId = $request->query('campus_id');
+
+        return [
+            'dng_fee_type' => $feeType,
+            'semester_id' => is_numeric($semesterId) && (int) $semesterId > 0 ? (int) $semesterId : null,
+            'campus_id' => $request->user()?->can('view_finance_all_campus') && is_numeric($campusId) && (int) $campusId > 0
+                ? (int) $campusId
+                : null,
+            'student_ids' => $this->dngStudentIds($request->query('student_ids', [])),
+        ];
+    }
+
+    /**
+     * @return int[]
+     */
+    private function dngStudentIds(mixed $value): array
+    {
+        if (is_string($value)) {
+            $value = preg_split('/[,\s]+/', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        }
+
+        if (! is_array($value)) {
+            return [];
+        }
+
+        return collect($value)
+            ->map(fn (mixed $id): int => is_numeric($id) ? (int) $id : 0)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->take(100)
+            ->values()
+            ->all();
     }
 }

@@ -16,7 +16,7 @@ const tiles = [
     },
     {
         key: 'dng_push' as const,
-        title: 'Đẩy DNG hàng loạt',
+        title: 'Lập yêu cầu thanh toán DNG',
         desc: 'Tạo yêu cầu thanh toán cho nhiều SV',
         icon: Send,
         href: financeRoutes.batchStudio.dng(),
@@ -41,34 +41,15 @@ const tiles = [
             </div>
             <div>
                 <h1 class="text-2xl font-bold tracking-tight">Batch Studio</h1>
-                <p class="text-muted-foreground mt-1 max-w-2xl text-sm">
-                    Một khuôn xem trước → xác nhận → kết quả cho mọi thao tác hàng loạt. Số liệu preview được khóa
-                    bằng token trước khi ghi.
-                </p>
+                <p class="text-muted-foreground mt-1 max-w-2xl text-sm">Một khuôn xem trước → xác nhận → kết quả cho mọi thao tác hàng loạt. Số liệu preview được khóa bằng token trước khi ghi.</p>
             </div>
         </div>
 
         <div class="grid gap-4 md:grid-cols-3">
-            <component
-                :is="jobs[tile.key] ? Link : 'div'"
-                v-for="tile in tiles"
-                :key="tile.key"
-                :href="jobs[tile.key] ? tile.href : undefined"
-                class="group block h-full"
-            >
-                <Card
-                    class="h-full transition"
-                    :class="
-                        jobs[tile.key]
-                            ? 'hover:border-primary/40 hover:shadow-md'
-                            : 'cursor-not-allowed opacity-60'
-                    "
-                >
+            <component :is="jobs[tile.key] ? Link : 'div'" v-for="tile in tiles" :key="tile.key" :href="jobs[tile.key] ? tile.href : undefined" class="group block h-full">
+                <Card class="h-full transition" :class="jobs[tile.key] ? 'hover:border-primary/40 hover:shadow-md' : 'cursor-not-allowed opacity-60'">
                     <CardHeader class="space-y-3">
-                        <div
-                            class="flex h-10 w-10 items-center justify-center rounded-lg border"
-                            :class="jobs[tile.key] ? 'bg-background' : 'bg-muted'"
-                        >
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg border" :class="jobs[tile.key] ? 'bg-background' : 'bg-muted'">
                             <component :is="tile.icon" class="h-5 w-5" />
                         </div>
                         <div>
@@ -77,10 +58,7 @@ const tiles = [
                         </div>
                     </CardHeader>
                     <CardContent class="pt-0">
-                        <p
-                            v-if="jobs[tile.key]"
-                            class="text-primary inline-flex items-center gap-1 text-sm font-medium opacity-0 transition group-hover:opacity-100"
-                        >
+                        <p v-if="jobs[tile.key]" class="text-primary inline-flex items-center gap-1 text-sm font-medium opacity-0 transition group-hover:opacity-100">
                             Mở wizard
                             <ArrowRight class="h-4 w-4" />
                         </p>

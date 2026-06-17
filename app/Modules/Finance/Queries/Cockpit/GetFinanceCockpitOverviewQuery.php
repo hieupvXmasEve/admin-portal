@@ -88,7 +88,7 @@ class GetFinanceCockpitOverviewQuery
             $this->queue('charge_errors', 'Sai sót sinh phí', (int) array_sum($exceptions), true, 'semester',
                 'view_finance_operations_exceptions', route('finance.operations.exceptions'), 'action'),
             $this->queue('installment_failures', 'Installment đẩy thất bại', (int) $installments['count'], false, 'campus',
-                'create_finance_payments', route('finance.operations.dng-worklist'), (int) $installments['count'] > 0 ? 'action' : 'normal'),
+                'create_finance_payments', route('finance.batch-studio.dng'), (int) $installments['count'] > 0 ? 'action' : 'normal'),
         ];
     }
 

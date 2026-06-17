@@ -18,7 +18,17 @@ import { Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft, Send } from 'lucide-vue-next';
 import { computed, reactive } from 'vue';
 
-const props = defineProps<{ dngFeeTypeOptions?: { value: string; label: string }[] }>();
+interface DngPrefill {
+    dng_fee_type: string;
+    semester_id: number | null;
+    campus_id: number | null;
+    student_ids: number[];
+}
+
+const props = defineProps<{
+    dngFeeTypeOptions?: { value: string; label: string }[];
+    prefill?: DngPrefill;
+}>();
 
 const { selectedId: semesterId, labelFor: semesterLabelFor } = useFinanceSemester();
 
@@ -28,11 +38,11 @@ const wizard = useBatchStudio({
     previewUrl: financeRoutes.batchStudio.dngPreview(),
     commitUrl: financeRoutes.batchStudio.dngCommit(),
     defaultSetup: {
-        semester_id: null as number | null,
-        dng_fee_type: 'tuition',
-        student_ids: [] as number[],
+        semester_id: props.prefill?.semester_id ?? null,
+        dng_fee_type: props.prefill?.dng_fee_type ?? 'HP',
+        student_ids: props.prefill?.student_ids ?? ([] as number[]),
         due_date: '',
-        description: 'Học phí kỳ',
+        description: 'Yêu cầu thanh toán DNG',
         estimate_time: '3d',
     },
     commitExtras: () => ({
@@ -53,9 +63,7 @@ const ack = computed({
 const needsAck = computed(() => wizard.selected.value.size > 50);
 const nextDisabled = computed(() => wizard.step.value === 3 && needsAck.value && !ack.value);
 
-const rerunCancelsCount = computed(
-    () => wizard.lines.value.filter((l) => l.display.warning_codes?.includes('rerun_cancels_old_dng')).length,
-);
+const rerunCancelsCount = computed(() => wizard.lines.value.filter((l) => l.display.warning_codes?.includes('rerun_cancels_old_dng')).length);
 
 const overrideDriftCount = computed(() => {
     let count = 0;
@@ -73,14 +81,14 @@ const overrideDriftCount = computed(() => {
 const hasOverrideDrift = computed(() => overrideDriftCount.value > 0);
 
 const summaryText = computed(() => {
-    if (wizard.step.value === 1) return 'Điền thông tin DNG trước khi xem trước danh sách SV';
+    if (wizard.step.value === 1) return 'Điền thông tin yêu cầu thanh toán trước khi xem trước danh sách SV';
     const c = wizard.counts.value;
     return `${wizard.selected.value.size} đã chọn · 🟢 ${c.create} · 🔵 ${c.update} · ⚪ ${c.skip} · 🟠 ${c.warning}`;
 });
 
 function onNext() {
     if (wizard.step.value === 1) {
-        wizard.setup.semester_id = semesterId.value;
+        wizard.setup.semester_id = wizard.setup.semester_id ?? semesterId.value;
         return void wizard.runPreview();
     }
     if (wizard.step.value === 2) {
@@ -104,14 +112,11 @@ function retryFailedSubset() {
 </script>
 
 <template>
-    <Head title="Đẩy DNG hàng loạt" />
+    <Head title="Lập yêu cầu thanh toán DNG" />
 
     <div class="space-y-6">
         <div class="space-y-2">
-            <Link
-                :href="financeRoutes.batchStudio.hub()"
-                class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
-            >
+            <Link :href="financeRoutes.batchStudio.hub()" class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm">
                 <ArrowLeft class="h-4 w-4" />
                 Batch Studio
             </Link>
@@ -120,7 +125,7 @@ function retryFailedSubset() {
                     <Send class="h-5 w-5" />
                 </div>
                 <div>
-                    <h1 class="text-2xl font-bold tracking-tight">Đẩy DNG hàng loạt</h1>
+                    <h1 class="text-2xl font-bold tracking-tight">Lập yêu cầu thanh toán DNG</h1>
                     <p class="text-muted-foreground text-sm">Tối đa 100 SV mỗi lần chạy</p>
                 </div>
             </div>
@@ -135,7 +140,7 @@ function retryFailedSubset() {
             :summary-text="summaryText"
             :next-disabled="nextDisabled || wizard.previewing.value || wizard.form.processing"
             :can-back="wizard.step.value > 1 && wizard.step.value < 4"
-            :next-label="wizard.step.value === 3 ? 'Đẩy DNG' : wizard.step.value === 1 ? 'Xem trước' : 'Tiếp'"
+            :next-label="wizard.step.value === 3 ? 'Gửi yêu cầu sang DNG' : wizard.step.value === 1 ? 'Xem trước' : 'Tiếp'"
             @next="onNext"
             @back="wizard.step.value--"
         >
@@ -153,16 +158,10 @@ function retryFailedSubset() {
                                     <SelectValue placeholder="Chọn loại phí" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem
-                                        v-for="opt in props.dngFeeTypeOptions ?? []"
-                                        :key="opt.value"
-                                        :value="opt.value"
-                                    >
+                                    <SelectItem v-for="opt in props.dngFeeTypeOptions ?? []" :key="opt.value" :value="opt.value">
                                         {{ opt.label }}
                                     </SelectItem>
-                                    <SelectItem v-if="!(props.dngFeeTypeOptions?.length)" value="tuition">
-                                        Học phí
-                                    </SelectItem>
+                                    <SelectItem v-if="!props.dngFeeTypeOptions?.length" value="HP"> Học phí </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -185,13 +184,7 @@ function retryFailedSubset() {
                     </CardContent>
                 </Card>
 
-                <PreviewDiffTable
-                    v-else-if="step === 2"
-                    :lines="wizard.lines.value"
-                    :selected="wizard.selected.value"
-                    :counts="wizard.counts.value"
-                    @toggle="wizard.toggle"
-                />
+                <PreviewDiffTable v-else-if="step === 2" :lines="wizard.lines.value" :selected="wizard.selected.value" :counts="wizard.counts.value" @toggle="wizard.toggle" />
 
                 <div v-else-if="step === 3" class="mx-auto max-w-2xl space-y-4">
                     <Card>
@@ -202,20 +195,13 @@ function retryFailedSubset() {
                         <CardContent class="space-y-4">
                             <Alert v-if="hasOverrideDrift" variant="destructive">
                                 <AlertDescription>
-                                    Số tiền ghi đè lệch tổng tính được (≥1 VND) ở {{ overrideDriftCount }} SV → khoản
-                                    này thành <strong>ad-hoc</strong>, <strong>bỏ liên kết đợt</strong> và phải
-                                    <strong>đối soát thủ công</strong>.
+                                    Số tiền ghi đè lệch tổng tính được (≥1 VND) ở {{ overrideDriftCount }} SV → khoản này thành <strong>ad-hoc</strong>, <strong>bỏ liên kết đợt</strong> và phải <strong>đối soát thủ công</strong>.
                                 </AlertDescription>
                             </Alert>
                             <Alert v-if="rerunCancelsCount > 0" variant="destructive">
-                                <AlertDescription>
-                                    {{ rerunCancelsCount }} SV đã có DNG đang chờ — chạy lại sẽ
-                                    <strong>hủy DNG cũ</strong> rồi tạo mới.
-                                </AlertDescription>
+                                <AlertDescription> {{ rerunCancelsCount }} SV đã có DNG đang chờ — chạy lại sẽ <strong>hủy DNG cũ</strong> rồi tạo mới. </AlertDescription>
                             </Alert>
-                            <Button type="button" variant="link" class="h-auto p-0" @click="wizard.excludeWarnings()">
-                                Loại trừ tất cả dòng 🟠 cảnh báo
-                            </Button>
+                            <Button type="button" variant="link" class="h-auto p-0" @click="wizard.excludeWarnings()"> Loại trừ tất cả dòng 🟠 cảnh báo </Button>
                             <label v-if="needsAck" class="flex items-start gap-3 text-sm leading-relaxed">
                                 <Checkbox v-model="ack" class="mt-0.5" />
                                 <span>Tôi đã rà soát preview trước khi chạy lô lớn.</span>
@@ -224,12 +210,7 @@ function retryFailedSubset() {
                     </Card>
                 </div>
 
-                <BatchResultPanel
-                    v-else-if="step === 4 && wizard.result.value"
-                    :result="wizard.result.value as BatchResult"
-                    @retry-failed="retryFailedSubset"
-                    @restart="restart"
-                />
+                <BatchResultPanel v-else-if="step === 4 && wizard.result.value" :result="wizard.result.value as BatchResult" @retry-failed="retryFailedSubset" @restart="restart" />
             </template>
         </BatchWizard>
     </div>

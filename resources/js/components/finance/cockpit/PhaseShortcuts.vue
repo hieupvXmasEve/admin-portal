@@ -10,8 +10,9 @@ const props = defineProps<{ phase: CockpitPhase }>();
 
 const shortcuts = {
     early: [
-        { label: 'Sinh phí hàng loạt', href: financeRoutes.feeGeneration.batchCharges() },
-        { label: 'Đẩy DNG hàng loạt', href: financeRoutes.collect.dngWorklist() },
+        { label: 'Sinh HP/Tuition', href: financeRoutes.batchStudio.charges({ fee_category: 'major' }) },
+        { label: 'Sinh phí EGC', href: financeRoutes.batchStudio.charges({ fee_category: 'egc' }) },
+        { label: 'Lập yêu cầu thanh toán DNG', href: financeRoutes.batchStudio.dng() },
     ],
     late: [
         { label: 'Nhắc nợ', href: financeRoutes.collect.dueReminders() },
@@ -37,20 +38,16 @@ const setPhase = (key: CockpitPhase['key']): void => {
 <template>
     <Card>
         <CardHeader class="flex flex-row items-center justify-between pb-1">
-            <CardTitle class="text-sm">Theo giai đoạn <Badge variant="secondary">{{ phase.label }}</Badge></CardTitle>
+            <CardTitle class="text-sm"
+                >Theo giai đoạn <Badge variant="secondary">{{ phase.label }}</Badge></CardTitle
+            >
         </CardHeader>
         <CardContent class="space-y-2">
             <Button v-for="s in shortcuts[props.phase.key]" :key="s.label" as-child size="sm" variant="outline" class="w-full justify-start">
                 <Link :href="s.href">{{ s.label }}</Link>
             </Button>
             <div class="flex gap-1 pt-1">
-                <Button
-                    v-for="k in (['early', 'mid', 'late'] as const)"
-                    :key="k"
-                    size="sm"
-                    :variant="phase.key === k ? 'default' : 'ghost'"
-                    @click="setPhase(k)"
-                >
+                <Button v-for="k in ['early', 'mid', 'late'] as const" :key="k" size="sm" :variant="phase.key === k ? 'default' : 'ghost'" @click="setPhase(k)">
                     {{ phaseLabels[k] }}
                 </Button>
             </div>

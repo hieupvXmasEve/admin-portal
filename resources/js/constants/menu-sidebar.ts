@@ -324,16 +324,14 @@ export const mainNavGroups: NavGroup[] = [
                 title: 'Sinh phí',
                 href: '#',
                 icon: DollarSign,
-                children: [
-                    { title: 'Batch Studio', href: financeRoutes.batchStudio.hub(), icon: Layers, requiredPermissions: ['view_finance_batch_studio'] },
-                ],
+                children: [{ title: 'Batch Studio', href: financeRoutes.batchStudio.hub(), icon: Layers, requiredPermissions: ['view_finance_batch_studio'] }],
             },
             {
                 title: 'Thu & Đối soát',
                 href: '#',
                 icon: Send,
                 children: [
-                    { title: 'DNG Worklist', href: financeRoutes.collect.dngWorklist(), icon: Send, requiredPermissions: ['create_finance_payments'] },
+                    { title: 'Lập yêu cầu thanh toán DNG', href: financeRoutes.batchStudio.dng(), icon: Send, requiredPermissions: ['view_finance_batch_studio', 'create_finance_payments'] },
                     { title: 'Settlement Worklist', href: financeRoutes.collect.settlement(), icon: Sparkles, requiredPermissions: ['allocate_finance_payment'] },
                     { title: 'Payments', href: financeRoutes.collect.payments(), icon: BarChart3, requiredPermissions: ['view_finance_payments'] },
                 ],
@@ -368,9 +366,9 @@ export const mainNavGroups: NavGroup[] = [
                 href: '#',
                 icon: DollarSign,
                 children: [
-                    { title: 'Generate HP (Tuition)', href: financeRoutes.feeGeneration.majorCharges(), icon: Play, requiredPermissions: ['create_finance_charges'] },
-                    { title: 'Batch Charges (All Students)', href: financeRoutes.feeGeneration.batchCharges(), icon: Layers, requiredPermissions: ['view_finance_operations_generate_charges'] },
-                    { title: 'EGC · Generate Charges', href: financeRoutes.feeGeneration.egcCharges(), icon: GraduationCap, requiredPermissions: ['generate_egc_finance_charges'] },
+                    { title: 'Sinh HP/Tuition', href: financeRoutes.feeGeneration.majorCharges(), icon: Play, requiredPermissions: ['create_finance_charges'] },
+                    { title: 'Batch Studio Sinh phí', href: financeRoutes.feeGeneration.batchCharges(), icon: Layers, requiredPermissions: ['view_finance_batch_studio'] },
+                    { title: 'Sinh phí EGC', href: financeRoutes.feeGeneration.egcCharges(), icon: GraduationCap, requiredPermissions: ['generate_egc_finance_charges'] },
                     { title: 'EGC · Block Results', href: financeRoutes.feeGeneration.egcBlockResults(), icon: CheckSquare, requiredPermissions: ['view_egc_block_results'] },
                     { title: 'EGC · Retake Adjustments', href: financeRoutes.feeGeneration.egcRetakeAdjustments(), icon: TrendingUp, requiredPermissions: ['view_egc_retake_adjustments'] },
                     { title: 'EGC · Carry Forward', href: financeRoutes.feeGeneration.egcCarryForward(), icon: ArrowRightLeft, requiredPermissions: ['view_egc_retake_adjustments'] },
@@ -390,9 +388,7 @@ export const mainNavGroups: NavGroup[] = [
                 title: 'Legacy Reports',
                 href: '#',
                 icon: LayoutDashboard,
-                children: [
-                    { title: 'Billing KPIs (Legacy)', href: financeRoutes.today.dashboard(), icon: LayoutDashboard, requiredPermissions: ['view_finance_operations_dashboard'] },
-                ],
+                children: [{ title: 'Billing KPIs (Legacy)', href: financeRoutes.today.dashboard(), icon: LayoutDashboard, requiredPermissions: ['view_finance_operations_dashboard'] }],
             },
         ],
     },
