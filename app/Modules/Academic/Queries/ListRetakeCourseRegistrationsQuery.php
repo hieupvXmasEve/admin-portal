@@ -186,7 +186,10 @@ class ListRetakeCourseRegistrationsQuery
         }
 
         $matchesTarget = $courseRegistration->student_id === $registration->student_id
-            && $courseRegistration->course_offering_id === $registration->course_offering_id;
+            && (
+                $registration->course_offering_id === null
+                || $courseRegistration->course_offering_id === $registration->course_offering_id
+            );
 
         if (! $matchesTarget) {
             return ['value' => 'link_mismatch', 'label' => 'Lệch link lớp', 'variant' => 'destructive'];

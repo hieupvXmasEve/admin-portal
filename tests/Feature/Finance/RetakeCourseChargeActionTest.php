@@ -108,6 +108,35 @@ it('creates finance charge for approved registration', function () {
     expect($charge->status)->toBe(FinanceCharge::STATUS_ACTIVE);
 });
 
+it('reuses an existing active source charge for an approved registration', function () {
+    $reg = createChargeTestRegistration();
+    $existingCharge = FinanceCharge::create([
+        'student_id' => $reg->student_id,
+        'semester_id' => $reg->semester_id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 5000000,
+        'description' => 'Pre-existing HQ retake fee',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+        'source_type' => CourseRetakeRegistration::class,
+        'source_id' => $reg->id,
+    ]);
+
+    $action = app(CreateRetakeCourseChargeAction::class);
+    $result = $action->handle([
+        'registration_id' => $reg->id,
+    ]);
+
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
+    expect($result->finance_charge_id)->toBe($existingCharge->id);
+    expect(FinanceCharge::query()
+        ->where('source_type', CourseRetakeRegistration::class)
+        ->where('source_id', $reg->id)
+        ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
+        ->where('status', FinanceCharge::STATUS_ACTIVE)
+        ->count())->toBe(1);
+});
+
 it('uses custom amount when provided', function () {
     $reg = createChargeTestRegistration();
 
@@ -157,15 +186,15 @@ it('creates aggregate DNG request with pivot rows when student has multiple paym
     $user = User::factory()->create();
     $this->actingAs($user);
 
-    $offeringA = \App\Models\CourseOffering::factory()->create(['semester_id' => $semester->id]);
-    $offeringB = \App\Models\CourseOffering::factory()->create(['semester_id' => $semester->id]);
+    $offeringA = CourseOffering::factory()->create(['semester_id' => $semester->id]);
+    $offeringB = CourseOffering::factory()->create(['semester_id' => $semester->id]);
 
-    $academicRecordA = \App\Models\AcademicRecord::factory()->create([
+    $academicRecordA = AcademicRecord::factory()->create([
         'student_id' => $student->id, 'campus_id' => $campus->id,
         'unit_id' => $offeringA->unit_id, 'course_offering_id' => $offeringA->id,
         'completion_status' => 'failed', 'is_passed' => false,
     ]);
-    $academicRecordB = \App\Models\AcademicRecord::factory()->create([
+    $academicRecordB = AcademicRecord::factory()->create([
         'student_id' => $student->id, 'campus_id' => $campus->id,
         'unit_id' => $offeringB->unit_id, 'course_offering_id' => $offeringB->id,
         'completion_status' => 'failed', 'is_passed' => false,
@@ -229,7 +258,7 @@ it('creates aggregate DNG request with pivot rows when student has multiple paym
         'finance_charge_id' => null,
     ]);
 
-    $mockDngService = Mockery::mock(\App\Modules\Finance\Dng\Services\DngPaymentService::class);
+    $mockDngService = Mockery::mock(DngPaymentService::class);
     $mockDngService
         ->shouldReceive('createAndPush')
         ->once()
@@ -242,11 +271,11 @@ it('creates aggregate DNG request with pivot rows when student has multiple paym
             return true;
         })
         ->andReturn($fakeDngRequest);
-    app()->instance(\App\Modules\Finance\Dng\Services\DngPaymentService::class, $mockDngService);
+    app()->instance(DngPaymentService::class, $mockDngService);
 
-    $mockResolver = Mockery::mock(\App\Modules\Finance\Dng\Services\DngCampusCodeResolver::class);
+    $mockResolver = Mockery::mock(DngCampusCodeResolver::class);
     $mockResolver->shouldReceive('requireForStudent')->andReturn('HCM');
-    app()->instance(\App\Modules\Finance\Dng\Services\DngCampusCodeResolver::class, $mockResolver);
+    app()->instance(DngCampusCodeResolver::class, $mockResolver);
 
     // Act: trigger from registration A
     $action = app(CreateRetakeCourseChargeAction::class);
@@ -290,7 +319,7 @@ it('handles payment_pending registration triggered again (re-create DNG with all
         'finance_charge_id' => null,
     ]);
 
-    $mockDngService = Mockery::mock(\App\Modules\Finance\Dng\Services\DngPaymentService::class);
+    $mockDngService = Mockery::mock(DngPaymentService::class);
     $mockDngService
         ->shouldReceive('createAndPush')
         ->once()
@@ -300,11 +329,11 @@ it('handles payment_pending registration triggered again (re-create DNG with all
             return true;
         })
         ->andReturn($fakeDngRequest2);
-    app()->instance(\App\Modules\Finance\Dng\Services\DngPaymentService::class, $mockDngService);
+    app()->instance(DngPaymentService::class, $mockDngService);
 
-    $mockResolver = Mockery::mock(\App\Modules\Finance\Dng\Services\DngCampusCodeResolver::class);
+    $mockResolver = Mockery::mock(DngCampusCodeResolver::class);
     $mockResolver->shouldReceive('requireForStudent')->andReturn('HCM');
-    app()->instance(\App\Modules\Finance\Dng\Services\DngCampusCodeResolver::class, $mockResolver);
+    app()->instance(DngCampusCodeResolver::class, $mockResolver);
 
     $action = app(CreateRetakeCourseChargeAction::class);
     $result = $action->handle(['registration_id' => $reg->id]);

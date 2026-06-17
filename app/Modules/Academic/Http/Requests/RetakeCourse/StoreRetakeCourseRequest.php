@@ -19,7 +19,7 @@ class StoreRetakeCourseRequest extends FormRequest
             'student_id' => ['required', 'integer', 'exists:students,id'],
             'unit_id' => ['required', 'integer', 'exists:units,id'],
             'original_academic_record_id' => ['required', 'integer', 'exists:academic_records,id'],
-            'course_offering_id' => ['required', 'integer', 'exists:course_offerings,id'],
+            'course_offering_id' => ['nullable', 'integer', 'exists:course_offerings,id'],
             'semester_id' => ['required', 'integer', 'exists:semesters,id'],
             'campus_id' => ['required', 'integer', 'exists:campuses,id'],
             'registration_start_date' => ['nullable', 'date'],
@@ -34,7 +34,6 @@ class StoreRetakeCourseRequest extends FormRequest
             'student_id.required' => 'Sinh viên là bắt buộc.',
             'unit_id.required' => 'Môn học là bắt buộc.',
             'original_academic_record_id.required' => 'Bản ghi học tập gốc là bắt buộc.',
-            'course_offering_id.required' => 'Lớp học là bắt buộc.',
             'semester_id.required' => 'Học kỳ là bắt buộc.',
             'campus_id.required' => 'Cơ sở là bắt buộc.',
         ];

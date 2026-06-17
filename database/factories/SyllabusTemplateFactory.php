@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\SyllabusTemplate>
+ * @extends Factory<SyllabusTemplate>
  */
 class SyllabusTemplateFactory extends Factory
 {
@@ -41,7 +41,14 @@ class SyllabusTemplateFactory extends Factory
             'description' => $this->faker->paragraphs(2, true),
 
             'total_hours' => $this->faker->numberBetween(30, 180),
-            'hours_per_session' => $this->faker->numberBetween(1, 4),
+            'total_sessions' => $this->faker->numberBetween(10, 60),
+            'min_attendance_threshold' => 80.00,
+            'min_grade_threshold' => 60.00,
+            'exam_resit_max_attempts' => 1,
+            'exam_resit_fee' => 750000,
+            'exam_resit_registration_window_days' => null,
+            'exam_resit_late_payment_grace_days' => 14,
+            'exam_resit_allow_unpaid_sitting' => false,
             'learning_outcomes' => $this->faker->sentences(3),
             'grading_criteria' => [
                 ['name' => 'Assignments', 'weight' => 40],
@@ -49,15 +56,15 @@ class SyllabusTemplateFactory extends Factory
                 ['name' => 'Final Exam', 'weight' => 40],
             ],
             'required_materials' => [
-                'Textbook: ' . $this->faker->sentence(3),
+                'Textbook: '.$this->faker->sentence(3),
                 'Laptop',
-                'Software: ' . $this->faker->randomElement(['RStudio', 'VS Code', 'Matlab']),
+                'Software: '.$this->faker->randomElement(['RStudio', 'VS Code', 'Matlab']),
             ],
             'assessment_policy' => $this->faker->paragraph(),
 
-            'applicable_program_id' => fn() => $this->faker->boolean(60) ? Program::factory() : null,
-            'applicable_campus_id' => fn() => $this->faker->boolean(60) ? Campus::factory() : null,
-            'delivery_mode' => fn() => $this->faker->boolean(80)
+            'applicable_program_id' => fn () => $this->faker->boolean(60) ? Program::factory() : null,
+            'applicable_campus_id' => fn () => $this->faker->boolean(60) ? Campus::factory() : null,
+            'delivery_mode' => fn () => $this->faker->boolean(80)
                 ? $this->faker->randomElement(['in_person', 'online', 'hybrid', 'blended'])
                 : null,
 
@@ -74,7 +81,7 @@ class SyllabusTemplateFactory extends Factory
      */
     public function defaultForUnit(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'is_default' => true,
         ]);
     }
@@ -84,7 +91,7 @@ class SyllabusTemplateFactory extends Factory
      */
     public function inactive(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'is_active' => false,
         ]);
     }
@@ -94,7 +101,7 @@ class SyllabusTemplateFactory extends Factory
      */
     public function clonedFrom(SyllabusTemplate $template): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'source_template_id' => $template->getKey(),
         ]);
     }

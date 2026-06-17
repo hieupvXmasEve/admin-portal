@@ -23,6 +23,7 @@ class FinanceCharge extends Model
         'status',
         'source_type',
         'source_id',
+        'active_source_key',
         'created_by_user_id',
         'voided_at',
         'voided_by_user_id',
@@ -106,6 +107,13 @@ class FinanceCharge extends Model
     // =====================
     // Relationships
     // =====================
+
+    protected static function booted(): void
+    {
+        static::saving(function (FinanceCharge $charge): void {
+            $charge->active_source_key = $charge->buildActiveSourceKey();
+        });
+    }
 
     public function student(): BelongsTo
     {
@@ -245,5 +253,23 @@ class FinanceCharge extends Model
         ]);
 
         return $this;
+    }
+
+    public function buildActiveSourceKey(): ?string
+    {
+        if (
+            $this->status !== self::STATUS_ACTIVE
+            || blank($this->source_type)
+            || blank($this->source_id)
+            || blank($this->charge_type)
+        ) {
+            return null;
+        }
+
+        return implode('|', [
+            $this->source_type,
+            (string) $this->source_id,
+            $this->charge_type,
+        ]);
     }
 }

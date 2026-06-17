@@ -6,6 +6,7 @@ namespace App\Modules\Finance\Queries\Dng;
 
 use App\Models\CourseRetakeRegistration;
 use App\Models\FinanceCharge;
+use App\Models\FinanceChargeInstallment;
 use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
@@ -128,6 +129,13 @@ class ListDngWorklistQuery
 
         // Fetch all student rows for summary + DNG status join
         $allStudentRows = (clone $query)->get();
+        if ($dngFeeType === 'HL') {
+            $allStudentRows = $this->mergeApprovedRetakeSourcesWithoutCharge(
+                $allStudentRows,
+                $this->loadApprovedRetakeSourceRows($campusFilter, $semesterId, $search),
+            );
+        }
+
         $studentIds = $allStudentRows->pluck('student_id')->unique()->values()->all();
 
         // Active DNG per student for this fee_type
@@ -173,7 +181,7 @@ class ListDngWorklistQuery
         }
         $nextInstallmentRowIds = array_filter($nextInstallmentRowIds);
 
-        $nextInstallmentRows = \App\Models\FinanceChargeInstallment::query()
+        $nextInstallmentRows = FinanceChargeInstallment::query()
             ->whereIn('id', $nextInstallmentRowIds)
             ->get(['id', 'finance_charge_id', 'installment_no', 'amount', 'due_date'])
             ->keyBy('finance_charge_id');
@@ -265,7 +273,7 @@ class ListDngWorklistQuery
 
         // For HL fee_type: approved registrations without charges (needs_charge_creation)
         $needsChargeByStudent = $dngFeeType === 'HL'
-            ? $this->loadApprovedRetakeRegistrationsWithoutCharge($pagedStudentIds)
+            ? $this->loadApprovedRetakeRegistrationsWithoutCharge($pagedStudentIds, $semesterId)
             : collect();
 
         $pagedRows = $pagedRows->map(function ($row) use ($chargesByStudent, $needsChargeByStudent) {
@@ -400,7 +408,7 @@ class ListDngWorklistQuery
      * @param  array<int, int>  $studentIds
      * @return Collection<int, Collection> student_id → array of registration rows
      */
-    private function loadApprovedRetakeRegistrationsWithoutCharge(array $studentIds): Collection
+    private function loadApprovedRetakeRegistrationsWithoutCharge(array $studentIds, ?int $semesterId): Collection
     {
         if (empty($studentIds)) {
             return collect();
@@ -410,6 +418,7 @@ class ListDngWorklistQuery
             ->whereIn('student_id', $studentIds)
             ->where('status', CourseRetakeRegistration::STATUS_APPROVED)
             ->whereNull('finance_charge_id')
+            ->when($semesterId !== null, fn ($query) => $query->where('semester_id', $semesterId))
             ->with(['unit:id,code,name', 'semester:id,name'])
             ->get(['id', 'student_id', 'unit_id', 'semester_id', 'retake_fee', 'status'])
             ->map(fn ($reg) => [
@@ -422,5 +431,66 @@ class ListDngWorklistQuery
             ]);
 
         return $registrations->groupBy('student_id');
+    }
+
+    private function loadApprovedRetakeSourceRows(?int $campusId, ?int $semesterId, string $search): Collection
+    {
+        $registrations = CourseRetakeRegistration::query()
+            ->with(['student:id,student_id,full_name,campus_id', 'student.campus:id,name', 'campus:id,name'])
+            ->where('status', CourseRetakeRegistration::STATUS_APPROVED)
+            ->whereNull('finance_charge_id')
+            ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
+            ->when($semesterId !== null, fn ($query) => $query->where('semester_id', $semesterId))
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->whereHas('student', function ($studentQuery) use ($search): void {
+                    $studentQuery->where('student_id', 'like', "%{$search}%")
+                        ->orWhere('full_name', 'like', "%{$search}%");
+                });
+            })
+            ->get();
+
+        return $registrations
+            ->groupBy('student_id')
+            ->map(function (Collection $studentRegistrations) {
+                /** @var CourseRetakeRegistration $first */
+                $first = $studentRegistrations->first();
+                $student = $first->student;
+                $campus = $first->campus ?? $student?->campus;
+                $total = (float) $studentRegistrations->sum(fn (CourseRetakeRegistration $registration) => (float) $registration->retake_fee);
+
+                return (object) [
+                    'student_id' => $first->student_id,
+                    'student_code' => $student?->student_id,
+                    'student_name' => $student?->full_name,
+                    'campus_id' => $campus?->id,
+                    'campus_name' => $campus?->name,
+                    'charge_count' => 0,
+                    'total_amount' => $total,
+                    'total_paid' => 0.0,
+                    'total_discount' => 0.0,
+                    'balance' => $total,
+                ];
+            })
+            ->values();
+    }
+
+    private function mergeApprovedRetakeSourcesWithoutCharge(Collection $chargeRows, Collection $sourceRows): Collection
+    {
+        $merged = $chargeRows->keyBy('student_id');
+
+        foreach ($sourceRows as $sourceRow) {
+            $existing = $merged->get($sourceRow->student_id);
+
+            if ($existing === null) {
+                $merged->put($sourceRow->student_id, $sourceRow);
+
+                continue;
+            }
+
+            $existing->total_amount = (float) $existing->total_amount + (float) $sourceRow->total_amount;
+            $existing->balance = (float) $existing->balance + (float) $sourceRow->balance;
+        }
+
+        return $merged->values();
     }
 }

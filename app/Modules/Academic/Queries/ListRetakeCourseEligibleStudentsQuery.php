@@ -19,8 +19,8 @@ class ListRetakeCourseEligibleStudentsQuery
      * 1. Student.status = 'intake_course'
      * 2. Has AcademicRecord with is_passed = false, completion_status finalized (not in_progress),
      *    and override_pass = false (not overridden to pass)
-     * 3. That unit has a CourseOffering open (is_active=true, enrollment_status='open') in the target semester
-     * 4. No existing non-terminal course_retake_registrations for same student+unit+semester
+     * 3. No existing non-terminal course_retake_registrations for same student+unit+semester
+     * 4. Open CourseOfferings are attached when available, but are not required at source creation.
      *
      * @param  array{
      *   campus_id?: int|null,
@@ -119,10 +119,6 @@ class ListRetakeCourseEligibleStudentsQuery
                     ->when($campusId, fn ($q) => $q->where('campus_id', $campusId));
 
                 $offerings = $offeringsQuery->with(['semester', 'campus', 'lecture'])->get();
-
-                if ($offerings->isEmpty()) {
-                    continue;
-                }
 
                 $results->push([
                     'student' => $student,

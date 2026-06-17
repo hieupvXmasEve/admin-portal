@@ -12,6 +12,21 @@ class AcademicRecord extends AuditableModel
 {
     use HasFactory, SoftDeletes;
 
+    public const FAILURE_GRADE_FAILED = 'grade_failed';
+
+    public const FAILURE_ATTENDANCE_FAILED = 'attendance_failed';
+
+    public const FAILURE_BOTH_FAILED = 'both_failed';
+
+    public const FAILURE_MANUAL_FAILED = 'manual_failed';
+
+    public const FAILURE_REASONS = [
+        self::FAILURE_GRADE_FAILED,
+        self::FAILURE_ATTENDANCE_FAILED,
+        self::FAILURE_BOTH_FAILED,
+        self::FAILURE_MANUAL_FAILED,
+    ];
+
     protected $fillable = [
         'student_id',
         'course_offering_id',
@@ -69,6 +84,8 @@ class AcademicRecord extends AuditableModel
         'last_changed_by_lecture_id',
         'override_pass',
         'is_passed',
+        'failure_reason',
+        'failure_reason_snapshot',
         'override_reason',
     ];
 
@@ -134,6 +151,7 @@ class AcademicRecord extends AuditableModel
             'excluded_from_gpa' => $this->excluded_from_gpa,
             'override_pass' => $this->override_pass,
             'override_reason' => $this->override_reason,
+            'failure_reason' => $this->failure_reason,
         ];
     }
 
@@ -172,6 +190,7 @@ class AcademicRecord extends AuditableModel
         'last_grade_change_at' => 'datetime',
         'override_pass' => 'boolean',
         'is_passed' => 'boolean',
+        'failure_reason_snapshot' => 'array',
     ];
 
     // Relationships
@@ -307,10 +326,10 @@ class AcademicRecord extends AuditableModel
     {
         // Map percentage to 4.0 scale:
         // A common accurate formula for continuous GPA is (Percentage / 100) * 4
-        // However, many systems cap 4.0 at 90% or 95%. 
+        // However, many systems cap 4.0 at 90% or 95%.
         // We will use min(4.0, (percentage / 25)) if we want 100% = 4.0 linear
         // Or min(4.0, round(($percentage * 4) / 100, 2)) for a direct ratio.
-        
+
         $gpa = ($percentage * 4) / 100;
 
         return round(max(0, min(4.0, $gpa)), 2);

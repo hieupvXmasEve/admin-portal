@@ -65,17 +65,18 @@ class CreateRetakeCourseChargeAction
                 $unit = $registration->unit;
                 $amount = $data['amount'] ?? $registration->retake_fee;
 
-                $charge = $this->createChargeAction->handle([
-                    'student_id' => $registration->student_id,
-                    'semester_id' => $registration->semester_id,
-                    'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
-                    'amount' => $amount,
-                    'description' => "Phí học lại: {$unit->code} - {$unit->name}",
-                    'source_type' => CourseRetakeRegistration::class,
-                    'source_id' => $registration->id,
-                    'created_by_user_id' => $userId,
-                    'due_date' => $paymentDeadline,
-                ]);
+                $charge = $this->findActiveSourceCharge($registration)
+                    ?? $this->createChargeAction->handle([
+                        'student_id' => $registration->student_id,
+                        'semester_id' => $registration->charge_semester_id ?? $registration->semester_id,
+                        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+                        'amount' => $amount,
+                        'description' => "Phí học lại: {$unit->code} - {$unit->name}",
+                        'source_type' => CourseRetakeRegistration::class,
+                        'source_id' => $registration->id,
+                        'created_by_user_id' => $userId,
+                        'due_date' => $paymentDeadline,
+                    ]);
 
                 $registration->transitionToPaymentPending($charge->id, $userId);
                 $registration->refresh();
@@ -157,5 +158,15 @@ class CreateRetakeCourseChargeAction
 
             return $registration->fresh();
         });
+    }
+
+    private function findActiveSourceCharge(CourseRetakeRegistration $registration): ?FinanceCharge
+    {
+        return FinanceCharge::query()
+            ->where('source_type', CourseRetakeRegistration::class)
+            ->where('source_id', $registration->id)
+            ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->first();
     }
 }

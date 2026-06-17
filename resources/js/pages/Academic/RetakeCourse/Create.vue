@@ -35,8 +35,9 @@ interface Props {
     campuses: { id: number; name: string; code: string }[];
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
+const NO_OFFERING_VALUE = '__no_offering__';
 const selectedEntry = ref<EligibleEntry | null>(null);
 const selectedOfferingId = ref<number | null>(null);
 
@@ -52,6 +53,15 @@ const form = useForm({
     notes: '',
 });
 
+const defaultSemesterId = (): number | null => {
+    const filterSemesterId = Number(props.filters?.semester_id);
+    if (Number.isInteger(filterSemesterId) && props.semesters.some((semester) => semester.id === filterSemesterId)) {
+        return filterSemesterId;
+    }
+
+    return props.semesters[0]?.id ?? null;
+};
+
 const selectEntry = (entry: EligibleEntry) => {
     selectedEntry.value = entry;
     selectedOfferingId.value = null;
@@ -60,10 +70,16 @@ const selectEntry = (entry: EligibleEntry) => {
     form.original_academic_record_id = entry.failed_record.id;
     form.campus_id = entry.student.campus_id;
     form.course_offering_id = null;
-    form.semester_id = null;
+    form.semester_id = defaultSemesterId();
 };
 
 const selectOffering = (offeringId: string) => {
+    if (offeringId === NO_OFFERING_VALUE) {
+        selectedOfferingId.value = null;
+        form.course_offering_id = null;
+        return;
+    }
+
     const id = Number(offeringId);
     selectedOfferingId.value = id;
     form.course_offering_id = id;
@@ -73,10 +89,16 @@ const selectOffering = (offeringId: string) => {
     }
 };
 
+const selectSemester = (semesterId: string) => {
+    form.semester_id = Number(semesterId);
+};
+
 const selectedOffering = computed(() => {
     if (!selectedEntry.value || !selectedOfferingId.value) return null;
     return selectedEntry.value.available_offerings.find((o) => o.id === selectedOfferingId.value);
 });
+
+const selectedOfferingValue = computed(() => selectedOfferingId.value?.toString() ?? NO_OFFERING_VALUE);
 
 const hasZeroRetakeFee = computed(() => {
     if (!selectedEntry.value) return false;
@@ -92,52 +114,52 @@ const submit = () => {
 
 <template>
     <Head title="Đăng ký học lại - Tạo mới" />
-    <div class="flex items-center gap-4 mb-6">
+    <div class="mb-6 flex items-center gap-4">
         <Button variant="ghost" size="icon" @click="router.visit(route('academic.retake-course.index'))">
             <ArrowLeft class="h-4 w-4" />
         </Button>
         <div>
             <h2 class="text-xl leading-tight font-semibold text-gray-800 dark:text-gray-200">Đăng ký học lại</h2>
-            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Chọn sinh viên đủ điều kiện để đăng ký học lại.</p>
+            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Chọn sinh viên đủ điều kiện để tạo nguồn học lại.</p>
         </div>
     </div>
 
-    <div class="flex items-center gap-3 mb-6 rounded-lg border bg-card p-4">
-        <Users class="h-4 w-4 text-muted-foreground" />
-        <span class="text-sm text-muted-foreground">Tổng SV đủ điều kiện học lại:</span>
+    <div class="bg-card mb-6 flex items-center gap-3 rounded-lg border p-4">
+        <Users class="text-muted-foreground h-4 w-4" />
+        <span class="text-muted-foreground text-sm">Tổng SV đủ điều kiện học lại:</span>
         <span class="text-lg font-semibold">{{ total_eligible_students.toLocaleString('vi-VN') }}</span>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <!-- Left: Eligible Students List -->
         <Card>
             <CardHeader>
                 <CardTitle>Sinh viên đủ điều kiện</CardTitle>
-                <CardDescription>Danh sách SV fail có lớp mở để đăng ký học lại.</CardDescription>
+                <CardDescription>Danh sách SV fail có thể tạo nguồn học lại.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div v-if="eligible_students.length === 0" class="text-center py-8 text-muted-foreground">
-                    Không tìm thấy sinh viên đủ điều kiện.
-                </div>
-                <div v-else class="space-y-2 max-h-[500px] overflow-y-auto">
+                <div v-if="eligible_students.length === 0" class="text-muted-foreground py-8 text-center">Không tìm thấy sinh viên đủ điều kiện.</div>
+                <div v-else class="max-h-[500px] space-y-2 overflow-y-auto">
                     <div
                         v-for="entry in eligible_students"
                         :key="`${entry.student.id}-${entry.unit.id}`"
-                        class="p-3 border rounded-lg cursor-pointer transition-colors hover:bg-accent"
+                        class="hover:bg-accent cursor-pointer rounded-lg border p-3 transition-colors"
                         :class="{ 'border-primary bg-accent': selectedEntry?.student.id === entry.student.id && selectedEntry?.unit.id === entry.unit.id }"
                         @click="selectEntry(entry)"
                     >
-                        <div class="flex justify-between items-start">
+                        <div class="flex items-start justify-between">
                             <div>
                                 <div class="font-medium">{{ entry.student.full_name }}</div>
-                                <div class="text-xs text-muted-foreground font-mono">{{ entry.student.student_id }}</div>
+                                <div class="text-muted-foreground font-mono text-xs">{{ entry.student.student_id }}</div>
                             </div>
                             <div class="text-right">
                                 <div class="font-mono text-sm font-medium">{{ entry.unit.code }}</div>
-                                <div class="text-xs text-muted-foreground">{{ entry.available_offerings.length }} lớp mở</div>
+                                <div class="text-muted-foreground text-xs">
+                                    {{ entry.available_offerings.length > 0 ? `${entry.available_offerings.length} lớp mở` : 'Chờ xếp lớp' }}
+                                </div>
                             </div>
                         </div>
-                        <div class="mt-1 text-xs text-muted-foreground truncate">{{ entry.unit.name }}</div>
+                        <div class="text-muted-foreground mt-1 truncate text-xs">{{ entry.unit.name }}</div>
                     </div>
                 </div>
             </CardContent>
@@ -148,7 +170,7 @@ const submit = () => {
             <CardHeader>
                 <CardTitle>Thông tin đăng ký</CardTitle>
                 <CardDescription v-if="!selectedEntry">Chọn sinh viên từ danh sách bên trái.</CardDescription>
-                <CardDescription v-else>Hoàn tất thông tin đăng ký cho {{ selectedEntry.student.full_name }}.</CardDescription>
+                <CardDescription v-else>Hoàn tất thông tin nguồn học lại cho {{ selectedEntry.student.full_name }}.</CardDescription>
             </CardHeader>
             <CardContent>
                 <form v-if="selectedEntry" @submit.prevent="submit" class="space-y-4">
@@ -174,34 +196,44 @@ const submit = () => {
                     <div>
                         <Label>Phí học lại (VNĐ)</Label>
                         <Input :model-value="parseFloat(selectedEntry.unit.retake_fee || '0').toLocaleString('vi-VN')" disabled />
-                        <p v-if="hasZeroRetakeFee" class="mt-1 text-xs text-destructive">
-                            Môn {{ selectedEntry.unit.code }} chưa cấu hình phí học lại. Vui lòng cập nhật retake_fee trong quản lý Unit trước khi đăng ký.
-                        </p>
+                        <p v-if="hasZeroRetakeFee" class="text-destructive mt-1 text-xs">Môn {{ selectedEntry.unit.code }} chưa cấu hình phí học lại. Vui lòng cập nhật retake_fee trong quản lý Unit trước khi đăng ký.</p>
+                    </div>
+
+                    <!-- Operation Semester -->
+                    <div>
+                        <Label>Học kỳ vận hành <span class="text-destructive">*</span></Label>
+                        <Select :model-value="form.semester_id?.toString() ?? undefined" @update:model-value="selectSemester">
+                            <SelectTrigger>
+                                <SelectValue placeholder="Chọn học kỳ..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
+                                    {{ semester.name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p v-if="form.errors.semester_id" class="text-destructive mt-1 text-xs">{{ form.errors.semester_id }}</p>
                     </div>
 
                     <!-- Course Offering Selection -->
                     <div>
-                        <Label>Chọn lớp <span class="text-destructive">*</span></Label>
-                        <Select :model-value="selectedOfferingId?.toString() ?? undefined" @update:model-value="selectOffering">
+                        <Label>Chọn lớp</Label>
+                        <Select :model-value="selectedOfferingValue" @update:model-value="selectOffering">
                             <SelectTrigger>
-                                <SelectValue placeholder="Chọn lớp học mở..." />
+                                <SelectValue placeholder="Chưa gán lớp" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem
-                                    v-for="offering in selectedEntry.available_offerings"
-                                    :key="offering.id"
-                                    :value="offering.id.toString()"
-                                >
+                                <SelectItem :value="NO_OFFERING_VALUE">Chưa gán lớp</SelectItem>
+                                <SelectItem v-for="offering in selectedEntry.available_offerings" :key="offering.id" :value="offering.id.toString()">
                                     {{ offering.section_code || 'N/A' }} · {{ offering.semester.name }}
                                     <template v-if="offering.campus"> · {{ offering.campus.name }}</template>
                                     ({{ offering.current_enrollment }}/{{ offering.max_capacity }})
                                 </SelectItem>
                             </SelectContent>
                         </Select>
-                        <p v-if="selectedOffering && selectedOffering.current_enrollment >= selectedOffering.max_capacity" class="text-xs text-yellow-600 mt-1">
-                            Lớp đã đầy. Đăng ký sẽ được xử lý dạng admin override.
-                        </p>
-                        <p v-if="form.errors.course_offering_id" class="text-xs text-destructive mt-1">{{ form.errors.course_offering_id }}</p>
+                        <p v-if="selectedOffering && selectedOffering.current_enrollment >= selectedOffering.max_capacity" class="mt-1 text-xs text-yellow-600">Lớp đã đầy. Đăng ký sẽ được xử lý dạng admin override.</p>
+                        <p v-if="!selectedOfferingId" class="text-muted-foreground mt-1 text-xs">Có thể tạo nguồn trước và xếp lớp sau.</p>
+                        <p v-if="form.errors.course_offering_id" class="text-destructive mt-1 text-xs">{{ form.errors.course_offering_id }}</p>
                     </div>
 
                     <!-- Dates -->
@@ -223,20 +255,18 @@ const submit = () => {
                     </div>
 
                     <!-- Errors -->
-                    <p v-if="form.errors.student_id" class="text-xs text-destructive">{{ form.errors.student_id }}</p>
-                    <p v-if="form.errors.unit_id" class="text-xs text-destructive">{{ form.errors.unit_id }}</p>
+                    <p v-if="form.errors.student_id" class="text-destructive text-xs">{{ form.errors.student_id }}</p>
+                    <p v-if="form.errors.unit_id" class="text-destructive text-xs">{{ form.errors.unit_id }}</p>
 
                     <!-- Submit -->
                     <div class="flex justify-end">
-                        <Button type="submit" :disabled="form.processing || !form.course_offering_id || hasZeroRetakeFee">
+                        <Button type="submit" :disabled="form.processing || !form.semester_id || hasZeroRetakeFee">
                             {{ form.processing ? 'Đang xử lý...' : 'Đăng ký học lại' }}
                         </Button>
                     </div>
                 </form>
 
-                <div v-else class="flex items-center justify-center py-16 text-muted-foreground">
-                    Chọn sinh viên từ danh sách bên trái để bắt đầu.
-                </div>
+                <div v-else class="text-muted-foreground flex items-center justify-center py-16">Chọn sinh viên từ danh sách bên trái để bắt đầu.</div>
             </CardContent>
         </Card>
     </div>

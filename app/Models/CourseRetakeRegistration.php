@@ -24,6 +24,18 @@ class CourseRetakeRegistration extends AuditableModel
 
     public const STATUS_CANCELLED = 'cancelled';
 
+    public const REQUEST_ORIGIN_STAFF = 'staff';
+
+    public const REQUEST_ORIGIN_STUDENT = 'student';
+
+    public const HQ_FEE_PENDING = 'hq_fee_pending';
+
+    public const HQ_FEE_CHARGE_CREATED = 'charge_created';
+
+    public const HQ_FEE_PAID = 'paid';
+
+    public const HQ_FEE_CANCELLED = 'cancelled';
+
     public const TERMINAL_STATUSES = [
         self::STATUS_ENROLLED,
         self::STATUS_CANCELLED,
@@ -47,12 +59,28 @@ class CourseRetakeRegistration extends AuditableModel
         'course_offering_id',
         'semester_id',
         'campus_id',
+        'original_semester_id',
+        'operation_semester_id',
+        'charge_semester_id',
         'status',
+        'request_origin',
+        'requested_by_student_id',
+        'requested_by_user_id',
+        'requested_at',
+        'reviewed_by_user_id',
+        'reviewed_at',
+        'rejected_at',
+        'rejection_reason',
         'attempt_number',
         'retake_fee',
+        'hq_fee_status',
+        'policy_snapshot',
         'registration_start_date',
         'registration_end_date',
         'payment_deadline',
+        'first_class_session_at',
+        'payment_overdue_at',
+        'last_reminded_at',
         'approved_by_user_id',
         'approved_at',
         'finance_charge_id',
@@ -73,6 +101,13 @@ class CourseRetakeRegistration extends AuditableModel
         'registration_start_date' => 'date',
         'registration_end_date' => 'date',
         'payment_deadline' => 'date',
+        'requested_at' => 'datetime',
+        'reviewed_at' => 'datetime',
+        'rejected_at' => 'datetime',
+        'policy_snapshot' => 'array',
+        'first_class_session_at' => 'datetime',
+        'payment_overdue_at' => 'datetime',
+        'last_reminded_at' => 'datetime',
         'approved_at' => 'datetime',
         'charge_created_at' => 'datetime',
         'paid_at' => 'datetime',
@@ -158,6 +193,7 @@ class CourseRetakeRegistration extends AuditableModel
 
         $this->update([
             'status' => self::STATUS_PAYMENT_PENDING,
+            'hq_fee_status' => self::HQ_FEE_CHARGE_CREATED,
             'finance_charge_id' => $financeChargeId,
             'charge_created_by_user_id' => $userId,
             'charge_created_at' => now(),
@@ -174,6 +210,7 @@ class CourseRetakeRegistration extends AuditableModel
 
         $this->update([
             'status' => self::STATUS_PAID,
+            'hq_fee_status' => self::HQ_FEE_PAID,
             'paid_at' => $paidAt ?? now(),
         ]);
     }
@@ -214,6 +251,7 @@ class CourseRetakeRegistration extends AuditableModel
 
         $this->update([
             'status' => self::STATUS_CANCELLED,
+            'hq_fee_status' => self::HQ_FEE_CANCELLED,
             'cancelled_by_user_id' => $userId,
             'cancelled_at' => now(),
             'cancellation_reason' => $reason,

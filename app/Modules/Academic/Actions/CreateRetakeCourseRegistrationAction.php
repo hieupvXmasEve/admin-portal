@@ -7,10 +7,8 @@ namespace App\Modules\Academic\Actions;
 use App\Models\AcademicRecord;
 use App\Models\CourseOffering;
 use App\Models\CourseRetakeRegistration;
-use App\Models\FinanceCharge;
 use App\Models\Student;
 use App\Models\Unit;
-use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Services\V1\Student\PrerequisiteValidationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -18,17 +16,16 @@ use Illuminate\Validation\ValidationException;
 class CreateRetakeCourseRegistrationAction
 {
     /**
-     * Create a new retake course registration and automatically create a FinanceCharge.
+     * Create a new Academic-owned retake course source.
      *
-     * Flow: validate → create registration (approved) → create FinanceCharge →
-     *       transition registration to payment_pending.
-     * Finance team can create a DNG payment request separately via /finance/retake-course if needed.
+     * Flow: validate → create registration (approved/listed). HQ/Finance creates
+     * the charge later from the source through the DNG/fee worklist.
      *
      * @param  array{
      *   student_id: int,
      *   unit_id: int,
      *   original_academic_record_id: int,
-     *   course_offering_id: int,
+     *   course_offering_id?: int|null,
      *   semester_id: int,
      *   campus_id: int,
      *   registration_start_date?: string|null,
@@ -41,7 +38,9 @@ class CreateRetakeCourseRegistrationAction
         return DB::transaction(function () use ($data) {
             $student = Student::findOrFail($data['student_id']);
             $unit = Unit::findOrFail($data['unit_id']);
-            $courseOffering = CourseOffering::findOrFail($data['course_offering_id']);
+            $courseOffering = isset($data['course_offering_id']) && $data['course_offering_id'] !== null
+                ? CourseOffering::findOrFail($data['course_offering_id'])
+                : null;
 
             // Validate unit has retake_fee configured
             if (! $unit->retake_fee || (float) $unit->retake_fee <= 0) {
@@ -93,24 +92,27 @@ class CreateRetakeCourseRegistrationAction
                 ]);
             }
 
-            // Validate prerequisites for the target course offering
-            $prereqMet = app(PrerequisiteValidationService::class)
-                ->hasMetPrerequisites($student, $courseOffering);
-            if (! $prereqMet) {
-                $prereqDetails = app(PrerequisiteValidationService::class)
-                    ->getPrerequisiteValidation($student, $courseOffering);
-                $missingCodes = collect($prereqDetails['missing_groups'])
-                    ->flatMap(fn ($g) => collect($g['conditions'])
-                        ->where('met', false)
-                        ->pluck('unit.code')
-                        ->filter()
-                    )
-                    ->unique()
-                    ->implode(', ');
-                $msg = $missingCodes
-                    ? "Sinh viên chưa hoàn thành điều kiện tiên quyết cho môn {$unit->code}: {$missingCodes}"
-                    : "Sinh viên chưa đáp ứng điều kiện tiên quyết cho môn {$unit->code}";
-                throw ValidationException::withMessages(['unit_id' => [$msg]]);
+            // Class placement is optional at source creation time. When staff pick
+            // a target class now, keep the existing prerequisite guard.
+            if ($courseOffering) {
+                $prereqMet = app(PrerequisiteValidationService::class)
+                    ->hasMetPrerequisites($student, $courseOffering);
+                if (! $prereqMet) {
+                    $prereqDetails = app(PrerequisiteValidationService::class)
+                        ->getPrerequisiteValidation($student, $courseOffering);
+                    $missingCodes = collect($prereqDetails['missing_groups'])
+                        ->flatMap(fn ($g) => collect($g['conditions'])
+                            ->where('met', false)
+                            ->pluck('unit.code')
+                            ->filter()
+                        )
+                        ->unique()
+                        ->implode(', ');
+                    $msg = $missingCodes
+                        ? "Sinh viên chưa hoàn thành điều kiện tiên quyết cho môn {$unit->code}: {$missingCodes}"
+                        : "Sinh viên chưa đáp ứng điều kiện tiên quyết cho môn {$unit->code}";
+                    throw ValidationException::withMessages(['unit_id' => [$msg]]);
+                }
             }
 
             // Calculate attempt_number: count existing academic records + 1
@@ -127,10 +129,19 @@ class CreateRetakeCourseRegistrationAction
                 'student_id' => $data['student_id'],
                 'unit_id' => $data['unit_id'],
                 'original_academic_record_id' => $data['original_academic_record_id'],
-                'course_offering_id' => $data['course_offering_id'],
+                'course_offering_id' => $courseOffering?->id,
                 'semester_id' => $data['semester_id'],
                 'campus_id' => $data['campus_id'],
+                'original_semester_id' => $academicRecord->semester_id,
+                'operation_semester_id' => $data['semester_id'],
+                'charge_semester_id' => $data['charge_semester_id'] ?? $data['semester_id'],
                 'status' => CourseRetakeRegistration::STATUS_APPROVED,
+                'request_origin' => CourseRetakeRegistration::REQUEST_ORIGIN_STAFF,
+                'requested_by_user_id' => auth()->id(),
+                'requested_at' => now(),
+                'reviewed_by_user_id' => auth()->id(),
+                'reviewed_at' => now(),
+                'hq_fee_status' => CourseRetakeRegistration::HQ_FEE_PENDING,
                 'attempt_number' => $attemptNumber,
                 'retake_fee' => $retakeFee,
                 'registration_start_date' => $data['registration_start_date'] ?? null,
@@ -139,21 +150,6 @@ class CreateRetakeCourseRegistrationAction
                 'approved_by_user_id' => auth()->id(),
                 'approved_at' => now(),
             ]);
-
-            // Automatically create a FinanceCharge (no DNG request).
-            // Finance team can create the DNG payment request later via /finance/retake-course.
-            $charge = app(CreateFinanceChargeAction::class)->handle([
-                'student_id' => $registration->student_id,
-                'semester_id' => $registration->semester_id,
-                'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
-                'amount' => $retakeFee,
-                'description' => "Phí học lại: {$unit->code} - {$unit->name}",
-                'source_type' => CourseRetakeRegistration::class,
-                'source_id' => $registration->id,
-                'created_by_user_id' => auth()->id(),
-            ]);
-
-            $registration->transitionToPaymentPending($charge->id, auth()->id());
 
             return $registration->fresh();
         });
