@@ -53,7 +53,7 @@ class GenerateMajorChargesAction
         $students = Student::query()
             ->with(['scholarshipAward.scholarshipDefinition', 'voucherApplications.voucherDefinition'])
             ->whereIn('id', $studentIds)
-            ->where('status', 'intake_course')
+            ->whereIn('status', ['intake_course', 'intake_major'])
             ->get();
 
         $invoiceService = app(InvoiceGenerationService::class);

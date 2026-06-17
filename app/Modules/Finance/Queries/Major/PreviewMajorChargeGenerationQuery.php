@@ -61,7 +61,7 @@ class PreviewMajorChargeGenerationQuery
 
         $students = Student::query()
             ->with(['scholarshipAward.scholarshipDefinition', 'voucherApplications.voucherDefinition'])
-            ->where('status', 'intake_course')
+            ->whereIn('status', ['intake_course', 'intake_major'])
             ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
             ->when($ignoredStudentIds !== [], fn ($query) => $query->whereNotIn('student_id', $ignoredStudentIds))
             ->when($search !== '', function ($query) use ($search) {

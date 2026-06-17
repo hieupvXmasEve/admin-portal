@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useBatchStudio } from '@/composables/useBatchStudio';
@@ -14,21 +15,59 @@ import type { BatchResult } from '@/types/finance';
 import { financeRoutes } from '@/utils/routes';
 import { Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft, GraduationCap } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { computed, reactive } from 'vue';
 
-defineProps<{ feeTypeOptions?: { value: string; label: string }[] }>();
+type FeeCategory = 'major' | 'egc' | 'non_academic';
+
+interface ChargeScope {
+    filters: Record<string, unknown>;
+    fee_type?: string;
+    amount?: string | number;
+    note?: string;
+}
+
+interface ChargePrefill {
+    fee_category: FeeCategory;
+    semester_id: number | null;
+    scope: ChargeScope;
+}
+
+interface ChargeSetup extends Record<string, unknown> {
+    fee_category: FeeCategory;
+    semester_id: number | null;
+    scope: ChargeScope;
+}
+
+const props = defineProps<{
+    feeTypeOptions?: { value: string; label: string }[];
+    prefill?: ChargePrefill;
+}>();
 
 const { selectedId: semesterId, labelFor: semesterLabelFor } = useFinanceSemester();
 
-const wizard = useBatchStudio({
+const defaultSetup: ChargeSetup = {
+    fee_category: props.prefill?.fee_category ?? 'major',
+    semester_id: props.prefill?.semester_id ?? null,
+    scope: {
+        filters: props.prefill?.scope?.filters ?? {},
+        fee_type: props.prefill?.scope?.fee_type ?? props.feeTypeOptions?.[0]?.value ?? '',
+        amount: props.prefill?.scope?.amount ?? '',
+        note: props.prefill?.scope?.note ?? '',
+    },
+};
+
+const wizard = useBatchStudio<ChargeSetup>({
     previewUrl: financeRoutes.batchStudio.chargesPreview(),
     commitUrl: financeRoutes.batchStudio.chargesCommit(),
-    defaultSetup: {
-        fee_category: 'major' as 'major' | 'egc' | 'non_academic',
-        semester_id: null as number | null,
-        scope: { filters: {} },
+    defaultSetup,
+    commitExtras: () => {
+        return {
+            block_overrides: Object.keys(blockOverrides).length ? { ...blockOverrides } : undefined,
+        };
     },
 });
+
+const blockOverrides = reactive<Record<string, number>>({});
 
 const ack = computed({
     get: () => Boolean(wizard.form.acknowledged),
@@ -38,7 +77,20 @@ const ack = computed({
 });
 
 const needsAck = computed(() => wizard.selected.value.size > 50);
-const nextDisabled = computed(() => wizard.step.value === 3 && needsAck.value && !ack.value);
+const isNonAcademic = computed(() => wizard.setup.fee_category === 'non_academic');
+const isEgc = computed(() => wizard.setup.fee_category === 'egc');
+const nonAcademicReady = computed(() => {
+    if (!isNonAcademic.value) return true;
+
+    return Boolean(wizard.setup.scope.fee_type && Number(wizard.setup.scope.amount) > 0);
+});
+const nextDisabled = computed(() => {
+    if (wizard.step.value === 1 && isNonAcademic.value) {
+        return !nonAcademicReady.value;
+    }
+
+    return wizard.step.value === 3 && needsAck.value && !ack.value;
+});
 
 const summaryText = computed(() => {
     if (wizard.step.value === 1) return 'Chọn loại phí và phạm vi trước khi xem trước';
@@ -48,7 +100,9 @@ const summaryText = computed(() => {
 
 function onNext() {
     if (wizard.step.value === 1) {
-        wizard.setup.semester_id = semesterId.value;
+        wizard.setup.semester_id = wizard.setup.semester_id ?? semesterId.value;
+        if (!prepareScopeForCategory()) return;
+        Object.keys(blockOverrides).forEach((key) => delete blockOverrides[key]);
         return void wizard.runPreview();
     }
     if (wizard.step.value === 2) {
@@ -59,6 +113,38 @@ function onNext() {
         wizard.commit();
     }
 }
+
+function setBlockOverride(key: string, count: number) {
+    blockOverrides[key] = count;
+}
+
+function prepareScopeForCategory(): boolean {
+    if (isNonAcademic.value) {
+        return prepareNonAcademicScope();
+    }
+
+    wizard.setup.scope = {
+        filters: wizard.setup.scope.filters ?? {},
+    };
+
+    return true;
+}
+
+function prepareNonAcademicScope(): boolean {
+    if (!isNonAcademic.value) return true;
+
+    wizard.setup.scope.filters = wizard.setup.scope.filters ?? {};
+    wizard.setup.scope.fee_type = wizard.setup.scope.fee_type || props.feeTypeOptions?.[0]?.value || '';
+    wizard.setup.scope.amount = Number(wizard.setup.scope.amount ?? 0);
+    wizard.setup.scope.note = String(wizard.setup.scope.note ?? '').slice(0, 255);
+
+    if (!nonAcademicReady.value) {
+        wizard.driftMessage.value = 'Vui lòng chọn loại phí và số tiền.';
+        return false;
+    }
+
+    return true;
+}
 </script>
 
 <template>
@@ -67,10 +153,7 @@ function onNext() {
     <div class="space-y-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="space-y-2">
-                <Link
-                    :href="financeRoutes.batchStudio.hub()"
-                    class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
-                >
+                <Link :href="financeRoutes.batchStudio.hub()" class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm">
                     <ArrowLeft class="h-4 w-4" />
                     Batch Studio
                 </Link>
@@ -123,6 +206,29 @@ function onNext() {
                             <span class="text-muted-foreground">Kỳ đang chọn:</span>
                             <span class="ml-2 font-medium">{{ semesterLabelFor(wizard.setup.semester_id ?? semesterId) }}</span>
                         </div>
+                        <div v-if="isNonAcademic" class="bg-muted/20 grid gap-4 rounded-lg border p-4 sm:grid-cols-2">
+                            <div class="space-y-2">
+                                <Label>Loại phí phi học vụ</Label>
+                                <Select v-model="wizard.setup.scope.fee_type">
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Chọn loại phí" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem v-for="option in feeTypeOptions ?? []" :key="option.value" :value="option.value">
+                                            {{ option.label }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div class="space-y-2">
+                                <Label>Số tiền</Label>
+                                <Input v-model="wizard.setup.scope.amount" type="number" min="1" step="1" placeholder="500000" />
+                            </div>
+                            <div class="space-y-2">
+                                <Label>Ghi chú</Label>
+                                <Input v-model="wizard.setup.scope.note" maxlength="255" placeholder="Tùy chọn" />
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -131,8 +237,11 @@ function onNext() {
                     :lines="wizard.lines.value"
                     :selected="wizard.selected.value"
                     :counts="wizard.counts.value"
+                    :block-count-controls="isEgc"
+                    :block-counts="blockOverrides"
                     exportable
                     @toggle="wizard.toggle"
+                    @update-block-count="setBlockOverride"
                 />
 
                 <div v-else-if="step === 3" class="mx-auto max-w-lg space-y-5">
@@ -142,9 +251,7 @@ function onNext() {
                             <CardDescription>{{ summaryText }}</CardDescription>
                         </CardHeader>
                         <CardContent class="space-y-4">
-                            <Button type="button" variant="link" class="h-auto p-0" @click="wizard.excludeWarnings()">
-                                Loại trừ tất cả dòng 🟠 cảnh báo
-                            </Button>
+                            <Button type="button" variant="link" class="h-auto p-0" @click="wizard.excludeWarnings()"> Loại trừ tất cả dòng 🟠 cảnh báo </Button>
                             <label v-if="needsAck" class="flex items-start gap-3 text-sm leading-relaxed">
                                 <Checkbox v-model="ack" class="mt-0.5" />
                                 <span>Tôi đã rà soát preview và xác nhận chạy lô lớn (&gt;50 dòng).</span>
@@ -153,11 +260,7 @@ function onNext() {
                     </Card>
                 </div>
 
-                <BatchResultPanel
-                    v-else-if="step === 4 && wizard.result.value"
-                    :result="wizard.result.value as BatchResult"
-                    @restart="wizard.step.value = 1"
-                />
+                <BatchResultPanel v-else-if="step === 4 && wizard.result.value" :result="wizard.result.value as BatchResult" @restart="wizard.step.value = 1" />
             </template>
         </BatchWizard>
     </div>

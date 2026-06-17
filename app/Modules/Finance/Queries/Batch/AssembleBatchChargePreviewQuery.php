@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Batch;
 
+use App\Models\FinanceCharge;
+use App\Models\Student;
 use App\Modules\Finance\Queries\Egc\PreviewEgcChargeGenerationQuery;
 use App\Modules\Finance\Queries\Major\PreviewMajorChargeGenerationQuery;
-use App\Modules\Finance\Queries\Operations\PreviewChargeGenerationQuery;
 use App\Modules\Finance\Support\Batch\BatchPreviewLine;
 use App\Modules\Finance\Support\Batch\BatchPreviewLineHasher;
+use App\Modules\Finance\Support\BillingScopeHelper;
+use App\Modules\Finance\Support\StudentChargeTimingResolver;
 
 /**
  * Step ② for sinh phí: delegates to the existing Preview*Query per fee category and
@@ -20,7 +23,6 @@ class AssembleBatchChargePreviewQuery
     public function __construct(
         private readonly PreviewMajorChargeGenerationQuery $majorPreview,
         private readonly PreviewEgcChargeGenerationQuery $egcPreview,
-        private readonly PreviewChargeGenerationQuery $nonAcademicPreview,
     ) {}
 
     /**
@@ -29,11 +31,27 @@ class AssembleBatchChargePreviewQuery
      */
     public function handle(string $feeCategory, int $semesterId, array $scope, ?int $campusId): array
     {
+        $scope = $this->normalizeScope($feeCategory, $semesterId, $scope);
+
         return match ($feeCategory) {
             'major' => $this->fromMajor($semesterId, $scope, $campusId),
             'egc' => $this->fromEgc($semesterId, $scope, $campusId),
             'non_academic' => $this->fromNonAcademic($semesterId, $scope),
             default => ['lines' => [], 'summary' => []],
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $scope
+     * @return array<string, mixed>
+     */
+    public function normalizeScope(string $feeCategory, int $semesterId, array $scope): array
+    {
+        return match ($feeCategory) {
+            'non_academic' => $this->normalizeNonAcademicScope($scope),
+            default => [
+                'filters' => $this->normalizeFilters($scope['filters'] ?? []),
+            ],
         };
     }
 
@@ -75,6 +93,12 @@ class AssembleBatchChargePreviewQuery
             'warning_codes' => $warningCodes,
         ];
 
+        $blockAmounts = collect($row['chargeable_levels'] ?? [])
+            ->map(fn (mixed $level): float => is_array($level) ? (float) ($level['amount'] ?? 0) : 0.0)
+            ->filter(fn (float $amount): bool => $amount > 0)
+            ->values()
+            ->all();
+
         return new BatchPreviewLine(
             key: sprintf('charge:%s:student:%d:semester:%d', $feeCategory, (int) $row['id'], $semesterId),
             hashPayload: $hashPayload,
@@ -88,6 +112,7 @@ class AssembleBatchChargePreviewQuery
                 'reason' => $reason,
                 'warning_codes' => $warningCodes,
                 'block_count' => isset($row['max_chargeable_blocks']) ? (int) $row['max_chargeable_blocks'] : null,
+                'block_amounts' => $blockAmounts,
             ],
         );
     }
@@ -142,24 +167,115 @@ class AssembleBatchChargePreviewQuery
      */
     private function fromNonAcademic(int $semesterId, array $scope): array
     {
-        $result = $this->nonAcademicPreview->handle(array_merge($scope, ['semester_id' => $semesterId]));
-        $lines = [];
+        $feeType = (string) ($scope['fee_type'] ?? '');
+        $amount = (float) ($scope['amount'] ?? 0);
+        $filters = $this->normalizeFilters($scope['filters'] ?? []);
 
-        foreach (($result['students'] ?? []) as $row) {
-            $bucket = match (true) {
-                ! empty($row['warning']) => 'warning',
-                ($row['has_existing_charge'] ?? false) => 'skip',
-                default => 'create',
-            };
+        $query = BillingScopeHelper::getEligibleStudentsQuery($semesterId, 'all_eligible');
+
+        $search = trim((string) ($filters['search'] ?? ''));
+        if ($search !== '') {
+            $query->where(function ($q) use ($search): void {
+                $q->where('students.student_id', 'like', "%{$search}%")
+                    ->orWhere('students.full_name', 'like', "%{$search}%");
+            });
+        }
+
+        $ignoredStudentIds = $this->ignoredStudentIds($filters['ignore_student_ids'] ?? null);
+        if ($ignoredStudentIds !== []) {
+            $query->whereNotIn('students.id', $ignoredStudentIds);
+        }
+
+        /** @var StudentChargeTimingResolver $timingResolver */
+        $timingResolver = app(StudentChargeTimingResolver::class);
+        $students = $query->limit(500)->get()
+            ->filter(fn (Student $student): bool => $timingResolver->shouldIncludeStudentForChargeGeneration($student, $semesterId, [$feeType]))
+            ->values();
+
+        $lines = [];
+        $newChargesCount = 0;
+        $skipCount = 0;
+        $totalAmount = 0.0;
+
+        foreach ($students as $student) {
+            $hasExistingCharge = FinanceCharge::query()
+                ->where('student_id', $student->id)
+                ->where('semester_id', $semesterId)
+                ->where('charge_type', $feeType)
+                ->where('status', FinanceCharge::STATUS_ACTIVE)
+                ->exists();
+
+            if ($hasExistingCharge) {
+                $skipCount++;
+            } else {
+                $newChargesCount++;
+                $totalAmount += $amount;
+            }
+
+            $bucket = $hasExistingCharge ? 'skip' : 'create';
+            $row = [
+                'id' => $student->id,
+                'student_id' => $student->student_id,
+                'full_name' => $student->full_name,
+                'charge_type' => $feeType,
+                'has_existing_charge' => $hasExistingCharge,
+                'estimated_amount' => $amount,
+                'gross_amount' => $amount,
+                'discount_amount' => 0.0,
+                'skip_reason' => $hasExistingCharge ? 'already_charged' : null,
+            ];
+
             $lines[] = self::mapChargeRow($row, 'non_academic', $semesterId, $bucket);
         }
 
         return ['lines' => $lines, 'summary' => [
-            'total_students' => $result['total_students'] ?? count($lines),
-            'new_charges_count' => $result['new_charges_count'] ?? 0,
-            'skip_count' => $result['skip_count'] ?? 0,
-            'total_amount' => $result['total_amount'] ?? 0,
+            'total_students' => count($lines),
+            'new_charges_count' => $newChargesCount,
+            'skip_count' => $skipCount,
+            'total_amount' => $totalAmount,
         ]];
+    }
+
+    /**
+     * @param  array<string, mixed>  $scope
+     * @return array{filters: array<string, mixed>, fee_type: string, amount: float, note: string}
+     */
+    private function normalizeNonAcademicScope(array $scope): array
+    {
+        return [
+            'filters' => $this->normalizeFilters($scope['filters'] ?? []),
+            'fee_type' => (string) ($scope['fee_type'] ?? ''),
+            'amount' => (float) ($scope['amount'] ?? 0),
+            'note' => mb_substr(trim((string) ($scope['note'] ?? '')), 0, 255),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function normalizeFilters(mixed $filters): array
+    {
+        return is_array($filters) ? $filters : [];
+    }
+
+    /**
+     * @return int[]
+     */
+    private function ignoredStudentIds(mixed $raw): array
+    {
+        if (is_array($raw)) {
+            return array_values(array_filter(array_map('intval', $raw)));
+        }
+
+        if (! is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+
+        return collect(explode(',', $raw))
+            ->map(fn (string $id): int => (int) trim($id))
+            ->filter(fn (int $id): bool => $id > 0)
+            ->values()
+            ->all();
     }
 
     /**
@@ -177,7 +293,9 @@ class AssembleBatchChargePreviewQuery
         $normalized['student_code'] = $row['student_code'] ?? (is_string($row['student_id'] ?? null) ? $row['student_id'] : '');
 
         if ($feeCategory === 'major' || $feeCategory === 'egc') {
-            $normalized['estimated_amount'] = $row['estimated_amount'] ?? $row['net_amount'] ?? 0.0;
+            $chargeableLevelAmount = collect($row['chargeable_levels'] ?? [])
+                ->sum(fn (mixed $level): float => is_array($level) ? (float) ($level['amount'] ?? 0) : 0.0);
+            $normalized['estimated_amount'] = $row['estimated_amount'] ?? $row['net_amount'] ?? $chargeableLevelAmount;
             $normalized['gross_amount'] = $row['gross_amount'] ?? $row['amount'] ?? $normalized['estimated_amount'];
             $normalized['discount_amount'] = $row['discount_amount']
                 ?? ((float) ($row['scholarship_amount'] ?? 0) + (float) ($row['voucher_amount'] ?? 0));

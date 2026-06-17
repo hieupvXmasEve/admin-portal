@@ -10,7 +10,8 @@ class CommitBatchChargesRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->can('create_finance_charges');
+        return (bool) ($this->user()?->can('create_finance_charges')
+            || $this->user()?->can('generate_egc_finance_charges'));
     }
 
     /**
@@ -26,7 +27,8 @@ class CommitBatchChargesRequest extends FormRequest
             'preview_token' => 'required|string',
             'selected_keys' => 'required|array|min:1',
             'selected_keys.*' => 'required|string',
-            'due_date' => 'nullable|date',
+            'block_overrides' => 'nullable|array',
+            'block_overrides.*' => 'integer|in:1,2',
             'acknowledged' => 'nullable|boolean',
         ];
     }

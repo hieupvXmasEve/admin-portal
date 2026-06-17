@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Student;
 use App\Modules\Finance\Actions\CreateBatchDngFromChargesAction;
 use App\Modules\Finance\Actions\Egc\GenerateEgcChargesAction;
 use App\Modules\Finance\Actions\Major\GenerateMajorChargesAction;
-use App\Modules\Finance\Actions\Operations\GenerateBatchChargesAction;
+use App\Modules\Finance\Actions\Operations\GenerateNonAcademicChargesAction;
 use App\Modules\Finance\Actions\Operations\SendDueItemParentRemindersAction;
 use App\Modules\Finance\Actions\Operations\SendDueItemRemindersAction;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
@@ -99,15 +100,17 @@ class BatchStudioController extends Controller
             ->map(fn (string $key) => (int) (explode(':', $key)[3] ?? 0))
             ->filter()->values()->all();
 
-        $dueDate = (string) ($request->input('due_date') ?? now()->addDays(30)->toDateString());
+        $chargeScope = (array) ($scope['scope'] ?? []);
+        // DNG owns the real payment due date. Legacy invoice rows still require a non-null date.
+        $internalInvoiceDueDate = now()->addDays(30)->toDateString();
 
         $summary = $this->runGeneration(
             $feeCategory,
             $semesterId,
             $studentIds,
-            $dueDate,
+            $internalInvoiceDueDate,
             $currentByKey,
-            (array) ($scope['scope'] ?? []),
+            $chargeScope,
             (array) $request->input('block_overrides', []),
         );
 
@@ -248,7 +251,7 @@ class BatchStudioController extends Controller
         string $feeCategory,
         int $semesterId,
         array $studentIds,
-        string $dueDate,
+        string $internalInvoiceDueDate,
         array $currentByKey,
         array $scope,
         array $blockOverrides = [],
@@ -256,12 +259,12 @@ class BatchStudioController extends Controller
         return match ($feeCategory) {
             'major' => GenerateMajorChargesAction::run([
                 'semester_id' => $semesterId,
-                'due_date' => $dueDate,
+                'due_date' => $internalInvoiceDueDate,
                 'student_ids' => $studentIds,
             ]),
             'egc' => GenerateEgcChargesAction::run([
                 'semester_id' => $semesterId,
-                'due_date' => $dueDate,
+                'due_date' => $internalInvoiceDueDate,
                 'students' => collect($studentIds)->map(function (int $id) use ($currentByKey, $feeCategory, $semesterId, $blockOverrides) {
                     $key = sprintf('charge:%s:student:%d:semester:%d', $feeCategory, $id, $semesterId);
                     $line = $currentByKey[$key] ?? null;
@@ -274,13 +277,52 @@ class BatchStudioController extends Controller
                     ];
                 })->all(),
             ]),
-            'non_academic' => GenerateBatchChargesAction::run(array_merge($scope, [
-                'semester_id' => $semesterId,
-                'due_date' => $dueDate,
-                'student_ids' => $studentIds,
-            ])),
+            'non_academic' => $this->runNonAcademicGeneration($semesterId, $studentIds, $internalInvoiceDueDate, $scope),
             default => [],
         };
+    }
+
+    /**
+     * @param  int[]  $studentIds
+     * @param  array<string, mixed>  $scope
+     * @return array<string, mixed>
+     */
+    private function runNonAcademicGeneration(int $semesterId, array $studentIds, string $internalInvoiceDueDate, array $scope): array
+    {
+        $result = GenerateNonAcademicChargesAction::run([
+            'fee_type' => (string) ($scope['fee_type'] ?? ''),
+            'semester_id' => $semesterId,
+            'amount' => (float) ($scope['amount'] ?? 0),
+            'due_date' => $internalInvoiceDueDate,
+            'note' => (string) ($scope['note'] ?? ''),
+            'student_codes' => $this->studentCodesForIds($studentIds),
+        ]);
+
+        return [
+            'created' => (int) ($result['summary']['created'] ?? count($result['created'] ?? [])),
+            'skipped' => (int) ($result['summary']['skipped'] ?? count($result['skipped'] ?? [])),
+            'total' => (int) ($result['summary']['total'] ?? count($studentIds)),
+            'failed' => 0,
+            'errors' => [],
+        ];
+    }
+
+    /**
+     * @param  int[]  $studentIds
+     * @return string[]
+     */
+    private function studentCodesForIds(array $studentIds): array
+    {
+        $studentsById = Student::query()
+            ->whereKey($studentIds)
+            ->get(['id', 'student_id'])
+            ->keyBy('id');
+
+        return collect($studentIds)
+            ->map(fn (int $id): ?string => $studentsById->get($id)?->student_id)
+            ->filter()
+            ->values()
+            ->all();
     }
 
     private function authorizeChargeCategory(Request $request, string $feeCategory): void
