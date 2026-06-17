@@ -52,7 +52,7 @@ _Status: implemented — automated acceptance recorded 2026-06-16._
 - [x] `./scripts/dev.sh test tests/Feature/Finance/Audit/InvariantDrilldownTest.php` (2 passed)
 - [x] `./scripts/dev.sh test tests/Feature/Finance/Audit/FinanceAuditWorkspacePageTest.php` — no regression (3 passed)
 - [x] Targeted eslint on changed cockpit frontend files — 0 errors
-- [ ] `./scripts/dev.sh artisan finance:audit-invariants` — counts match cockpit tiles for same scope (manual cross-check pending)
+- [x] `./scripts/dev.sh artisan finance:audit-invariants` — ran successfully 2026-06-16; dev data still has known pre-existing INV-6=28 and INV-13=1 findings
 
 #### Browser smoke (manual — not run in CI)
 

@@ -26,7 +26,10 @@ finally UI/BOD surfaces.
 | 10.4  | `FIN-REV-010-batch-studio`                            | `S-010-batch-studio/`                            | Milestone 4 consolidated story: Batch Studio wizard + preview-token safety for bulk charge gen, DNG push, and reminders               | 010.1, 010.2, 002, 004, 005, 006             |
 | 10.5  | `FIN-REV-010-lookup-and-audit`                        | `S-010-lookup-and-audit/`                        | Milestone 5 consolidated story: unified lookup standard (charges/invoices/payments) + Audit Workspace money-flow graph                | 010.1, 010.2, 009; 010.4 for batch hand-off  |
 | 10.6  | `FIN-REV-010-cutover-and-uat`                         | `S-010-cutover-and-uat/`                         | Milestone 6 consolidated story: Finance Office cutover, legacy entrypoint decisions, and role-based operator UAT                      | 010.1, 010.2, 010.3, 010.4, 010.5            |
-| 12    | `FIN-REV-012-fee-tracking-reporting-requirements`     | `S-012-fee-tracking-reporting-requirements/`     | Requirement holder for new Finance UI fee tracking, statistics, and export data surfaces                                              | 010.1-010.6, 008, 009                        |
+| 12    | `FIN-REV-012-fee-tracking-reporting-requirements`     | `S-012-fee-tracking-reporting-requirements/`     | Requirement holder for Finance Reporting fee tracking, statistics, drilldowns, campus scope, and page structure                       | 010.1-010.6, 008, 009; `ACAD-RET-001` before retake/resit expected-fee implementation |
+| 13    | `FIN-REV-013-dng-payment-request-batch-studio-cutover` | `S-013-dng-payment-request-batch-studio-cutover/` | Make Batch Studio the primary bulk DNG payment-request creation path while keeping DNG audit/detail routes intact                     | 010.4, 010.6, 005                            |
+| 14    | `FIN-REV-014-detail-deeplink-audit-repair`            | `S-014-detail-deeplink-audit-repair/`            | Keep charge/invoice/payment/DNG detail backend routes as secondary detail/deep-link/audit/repair pages                               | 010.5, 010.6; coordinate with 013            |
+| 15    | `FIN-REV-015-hp-egc-generation-batch-studio-cutover`  | `S-015-hp-egc-generation-batch-studio-cutover/`  | Migrate HP/Tuition and EGC charge generation so Batch Studio is the only primary generation command surface                           | 010.4, 010.6, 004; coordinate with 013, 014  |
 
 ## FIN-REV-010 Consolidated Stories
 
@@ -76,7 +79,17 @@ stories above for planning, status, review, and acceptance.
 - Lifecycle due exception residuals are split: duplicated acknowledge/resolve
   logic belongs to `E-finance-lifecycle-exceptions`; DNG cancel audit ordering
   is cross-cutting with the DNG hardening story.
+- Charge, invoice, payment, and DNG request detail backend routes are not
+  legacy-deletable cleanup targets; keep them as detail, deep-link, audit, and
+  repair surfaces unless a future accepted story explicitly supersedes them.
+- HP/Tuition and EGC standalone generation pages are temporary command surfaces:
+  `FIN-REV-015` owns migrating their normal generation workflows fully into
+  Batch Studio while preserving existing money logic.
 - Scheduling note: `FIN-REV-002` should first try lock-and-check idempotency
   without schema. If the implementation proves an operation token is required,
   pause that slice and let `FIN-REV-003` add the minimal storage before
   continuing.
+- Retake/resit reporting note: do not implement missing expected-fee logic for
+  `retake_fee` or `exam_resit_fee` until
+  `ACAD-RET-001-retake-resit-operations` provides the Academic source/lifecycle
+  contract.
