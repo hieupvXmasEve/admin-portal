@@ -7,8 +7,10 @@ namespace App\Modules\Finance\Http\Web\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Semester;
 use App\Modules\Finance\Http\Requests\Reporting\ListCollectionProgressRequest;
+use App\Modules\Finance\Http\Requests\Reporting\ListDngLifecycleRequest;
 use App\Modules\Finance\Http\Requests\Reporting\ListFeeMonitorRequest;
 use App\Modules\Finance\Queries\Reporting\ListCollectionProgressQuery;
+use App\Modules\Finance\Queries\Reporting\ListDngLifecycleQuery;
 use App\Modules\Finance\Queries\Reporting\ListFeeMonitorQuery;
 use App\Modules\Finance\Support\Reporting\FeeMonitorAcadRetGate;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -39,7 +41,7 @@ class FinanceReportingController extends Controller
             'key' => 'dng-lifecycle',
             'label' => 'DNG/Payment Lifecycle',
             'description' => 'DNG requests, webhooks, payment bridge, invoice, and allocation attention queue.',
-            'status' => 'planned',
+            'status' => 'implemented',
             'obeys_semester' => false,
         ],
     ];
@@ -68,7 +70,66 @@ class FinanceReportingController extends Controller
             $payload = array_merge($payload, $this->collectionProgressPayload($computedAt));
         }
 
+        if ($activeView === 'dng-lifecycle') {
+            $payload = array_merge($payload, $this->dngLifecyclePayload($computedAt));
+        }
+
         return Inertia::render('Finance/Reporting/Index', $payload);
+    }
+
+    /**
+     * DNG/Payment Lifecycle lens (FIN-REV-019). Campus-bound and intentionally
+     * NOT hard-filtered by the global Finance semester — the selected semester is
+     * passed only so rows relating entirely to other semesters can be flagged and
+     * filtered (`outside_selected_semester`). Read-only: no mutation actions.
+     *
+     * @return array<string, mixed>
+     */
+    private function dngLifecyclePayload(string $computedAt): array
+    {
+        $request = app(ListDngLifecycleRequest::class);
+        $listQuery = app(ListDngLifecycleQuery::class);
+
+        $filters = array_replace([
+            'attention_bucket' => 'all',
+            'dng_status' => 'all',
+            'payment_bridge' => 'all',
+            'webhook_state' => 'all',
+            'invoice_state' => 'all',
+            'allocation_state' => 'all',
+            'flow_state' => 'all',
+            'related_semester' => 'all',
+            'outside_selected_semester' => 'all',
+            'fee_type' => 'all',
+            'amount_min' => '',
+            'amount_max' => '',
+            'created_from' => '',
+            'created_to' => '',
+            'paid_from' => '',
+            'paid_to' => '',
+            'search' => '',
+            'per_page' => 20,
+            'page' => 1,
+        ], $request->validated());
+
+        $selectedSemesterId = $this->resolveSemesterId();
+        $result = $listQuery->handle($selectedSemesterId, $filters);
+
+        return [
+            'dng_lifecycle' => [
+                'rows' => $result['rows'],
+                'summary' => $result['summary'],
+                'breakdowns' => $result['breakdowns'],
+                'filters' => $filters,
+                'filter_options' => $listQuery->filterOptions($selectedSemesterId),
+                'meta' => array_merge([
+                    'selected_semester_id' => $selectedSemesterId,
+                    'campus_bound' => true,
+                    'obeys_semester' => false,
+                ], $result['meta']),
+                'computed_at' => $computedAt,
+            ],
+        ];
     }
 
     /**

@@ -47,7 +47,7 @@ it('renders the reporting shell with the default collection progress view', func
             ->where('views.2.key', 'dng-lifecycle')
             ->where('views.0.status', 'implemented')
             ->where('views.1.status', 'implemented')
-            ->where('views.2.status', 'planned')
+            ->where('views.2.status', 'implemented')
             ->where('actions.export_enabled', false)
             ->has('computed_at')
         );

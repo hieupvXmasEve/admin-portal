@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import AppLayout from '@/layouts/AppLayout.vue';
 import CollectionProgress from '@/pages/Finance/Reporting/CollectionProgress.vue';
+import DngLifecycle from '@/pages/Finance/Reporting/DngLifecycle.vue';
 import FeeMonitor from '@/pages/Finance/Reporting/FeeMonitor.vue';
 import { financeRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
@@ -26,6 +27,7 @@ const props = defineProps<{
     actions: { export_enabled: boolean };
     fee_monitor?: Record<string, unknown>;
     collection_progress?: Record<string, unknown>;
+    dng_lifecycle?: Record<string, unknown>;
 }>();
 
 const { selectedLabel } = useFinanceSemester();
@@ -41,6 +43,7 @@ const activeView = computed(() => props.views.find((view) => view.key === props.
 const viewPropMap: Record<string, string> = {
     'fee-monitor': 'fee_monitor',
     'collection-progress': 'collection_progress',
+    'dng-lifecycle': 'dng_lifecycle',
 };
 
 const updateView = (value: string | number): void => {
@@ -103,6 +106,8 @@ defineOptions({
                 <FeeMonitor v-if="view.key === 'fee-monitor' && props.fee_monitor" :fee_monitor="props.fee_monitor as any" />
 
                 <CollectionProgress v-else-if="view.key === 'collection-progress' && props.collection_progress" :collection_progress="props.collection_progress as any" />
+
+                <DngLifecycle v-else-if="view.key === 'dng-lifecycle' && props.dng_lifecycle" :dng_lifecycle="props.dng_lifecycle as any" />
 
                 <Card v-else>
                     <CardHeader>
