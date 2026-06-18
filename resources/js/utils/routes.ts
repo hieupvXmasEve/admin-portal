@@ -457,6 +457,9 @@ export const financeRoutes = {
         queueRows: (queue: string) => route(FINANCE_ROUTE_NAMES.COCKPIT_QUEUE_ROWS, { queue }),
         phase: () => route(FINANCE_ROUTE_NAMES.COCKPIT_PHASE),
     },
+    reporting: {
+        index: (params?: Record<string, unknown>) => route(FINANCE_ROUTE_NAMES.REPORTING_INDEX, params ?? {}),
+    },
     feeGeneration: {
         majorCharges: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_CHARGES, { fee_category: 'major' }),
         batchCharges: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_CHARGES),

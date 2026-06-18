@@ -321,6 +321,12 @@ export const mainNavGroups: NavGroup[] = [
                 requiredPermissions: ['view_finance_cockpit'],
             },
             {
+                title: 'Finance Reporting',
+                href: financeRoutes.reporting.index(),
+                icon: BarChart3,
+                requiredPermissions: ['view_finance_reporting'],
+            },
+            {
                 title: 'Sinh phí',
                 href: '#',
                 icon: DollarSign,

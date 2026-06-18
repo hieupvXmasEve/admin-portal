@@ -30,6 +30,10 @@ finally UI/BOD surfaces.
 | 13    | `FIN-REV-013-dng-payment-request-batch-studio-cutover` | `S-013-dng-payment-request-batch-studio-cutover/` | Make Batch Studio the primary bulk DNG payment-request creation path while keeping DNG audit/detail routes intact                     | 010.4, 010.6, 005                            |
 | 14    | `FIN-REV-014-detail-deeplink-audit-repair`            | `S-014-detail-deeplink-audit-repair/`            | Keep charge/invoice/payment/DNG detail backend routes as secondary detail/deep-link/audit/repair pages                               | 010.5, 010.6; coordinate with 013            |
 | 15    | `FIN-REV-015-hp-egc-generation-batch-studio-cutover`  | `S-015-hp-egc-generation-batch-studio-cutover/`  | Migrate HP/Tuition and EGC charge generation so Batch Studio is the only primary generation command surface                           | 010.4, 010.6, 004; coordinate with 013, 014  |
+| 16    | `FIN-REV-016-finance-reporting-shell`                 | `S-016-finance-reporting-shell/`                 | Build the read-only Finance Reporting shell with permission, route, sidebar entry, URL-backed views, campus context, and freshness conventions | 012, 010.6                              |
+| 17    | `FIN-REV-017-finance-reporting-fee-monitor`           | `S-017-finance-reporting-fee-monitor/`           | Build the Fee Monitor lens for expected/generated/missing fee completeness and drilldowns                                             | 016; `ACAD-RET-001` before retake/resit missing-fee completeness |
+| 18    | `FIN-REV-018-finance-reporting-collection-progress`   | `S-018-finance-reporting-collection-progress/`   | Build the Collection Progress lens using canonical settlement/ledger money truth                                                      | 016, 002                                    |
+| 19    | `FIN-REV-019-finance-reporting-dng-lifecycle`         | `S-019-finance-reporting-dng-lifecycle/`         | Build the DNG/Payment Lifecycle lens with attention buckets, webhook/payment bridge state, and related semester lineage               | 016, 005, 009                              |
 
 ## FIN-REV-010 Consolidated Stories
 
@@ -93,3 +97,6 @@ stories above for planning, status, review, and acceptance.
   `retake_fee` or `exam_resit_fee` until
   `ACAD-RET-001-retake-resit-operations` provides the Academic source/lifecycle
   contract.
+- Reporting build note: `FIN-REV-012` is the requirement holder only. Runtime
+  work starts with the shell in `FIN-REV-016`, then separate lens stories for
+  Fee Monitor, Collection Progress, and DNG/Payment Lifecycle.

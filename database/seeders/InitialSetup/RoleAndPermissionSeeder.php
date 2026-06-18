@@ -154,6 +154,7 @@ class RoleAndPermissionSeeder extends Seeder
                 'view_finance_student_overview',
                 'view_finance_batch_studio',
                 'view_finance_cockpit',
+                'view_finance_reporting',
             ],
             'can_bo' => [
                 'view_user',
@@ -174,6 +175,7 @@ class RoleAndPermissionSeeder extends Seeder
                 'view_finance_student_overview',
                 'view_finance_batch_studio',
                 'view_finance_cockpit',
+                'view_finance_reporting',
             ],
         ];
 

@@ -73,6 +73,7 @@ class HandleInertiaRequests extends Middleware
                     'view_finance_audit_workspace',
                     'view_finance_operations_dashboard',
                     'view_finance_batch_studio',
+                    'view_finance_reporting',
                 ];
                 if (count(array_intersect($financePerms, $permissions)) === 0) {
                     return null; // bound cost: only finance users pay for the semester query

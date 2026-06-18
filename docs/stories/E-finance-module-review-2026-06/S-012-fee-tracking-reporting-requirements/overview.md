@@ -2,7 +2,7 @@
 
 ## Status
 
-planned
+implemented
 
 ## Lane
 
@@ -578,6 +578,24 @@ This is the accepted first-pass page structure for later implementation stories:
 | Lookup & Audit drilldowns  | Destination for object-level investigation opened from Reporting rows.                        | Required as a navigation target, not a replacement for a dedicated Reporting page.                            |
 | Export Center              | Separate future export surface with saved definitions, columns, permissions, and history.     | Deferred from this page; useful later if Finance needs official/scheduled/exported reports.                   |
 
+## Implementation Story Split
+
+This requirement holder is complete when the reporting contract is stable and
+the build work is split into separate Harness stories. Product implementation
+must continue through these stories instead of adding runtime code directly to
+`FIN-REV-012`.
+
+| Story id                                               | Packet                                             | Scope                                                                                               | Key dependency                                                                                 |
+| ------------------------------------------------------ | -------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `FIN-REV-016-finance-reporting-shell`                  | `S-016-finance-reporting-shell/`                  | Finance Reporting route, permission, sidebar entry, shared shell, URL-backed active view state.      | `FIN-REV-012`, `FIN-REV-010-cutover-and-uat`                                                    |
+| `FIN-REV-017-finance-reporting-fee-monitor`            | `S-017-finance-reporting-fee-monitor/`            | Fee Monitor view for expected/generated/missing fee completeness by student and expected fee type.   | `FIN-REV-016`; `ACAD-RET-001` before missing `retake_fee` or `exam_resit_fee` completeness     |
+| `FIN-REV-018-finance-reporting-collection-progress`    | `S-018-finance-reporting-collection-progress/`    | Collection Progress view for billed, paid, outstanding, overdue, overpaid, and unapplied balances.  | `FIN-REV-016`, canonical settlement/ledger read model                                           |
+| `FIN-REV-019-finance-reporting-dng-lifecycle`          | `S-019-finance-reporting-dng-lifecycle/`          | DNG/Payment Lifecycle attention worklist with webhook, payment bridge, invoice, and semester lineage. | `FIN-REV-016`, DNG request/webhook audit model                                                  |
+
+The Export Center remains a deferred future story. It should not be registered
+or built until Finance confirms official export definitions, columns,
+permissions, row limits, queueing, and audit requirements.
+
 ## Acceptance Criteria
 
 - The story records a clear user-role matrix for fee tracking and statistics
@@ -674,14 +692,17 @@ This is the accepted first-pass page structure for later implementation stories:
 
 ## Harness Delta
 
-- Register this story as the dedicated requirement holder for Finance fee
+- Registered this story as the dedicated requirement holder for Finance fee
   tracking, statistics, and drilldown boundaries.
-- Keep later implementation stories separate so the requirement conversation can
-  stay product-first.
+- Split later implementation into `FIN-REV-016` through `FIN-REV-019` so the
+  requirement conversation stays product-first and each build slice can carry
+  its own query, UI, and validation proof.
 
 ## Evidence
 
-Requirement discussion in progress. Confirmed on 2026-06-16: DNG/payment
+Requirement holder closed on 2026-06-18 with the implementation story split
+above. No runtime code was changed in this story. Confirmed on 2026-06-16:
+DNG/payment
 lifecycle worklists are not hard-filtered by the global semester, but every
 request row/detail must show creation time and related semester lineage.
 Confirmed on 2026-06-16: first-pass filter scope follows the recommended split

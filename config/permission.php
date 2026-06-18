@@ -374,6 +374,8 @@ return [
             'view_finance_batch_studio' => 'view_finance_batch_studio',
             // Cockpit "Hôm nay" (S-010 milestone 3) — thin view gate; widgets check source permissions
             'view_finance_cockpit' => 'view_finance_cockpit',
+            // Finance Reporting (FIN-REV-016) — thin shell gate; lens stories own data permissions later
+            'view_finance_reporting' => 'view_finance_reporting',
         ],
         'modules' => [
             'view_module' => 'view_module',

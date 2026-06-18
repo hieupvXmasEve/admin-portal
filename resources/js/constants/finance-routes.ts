@@ -10,6 +10,7 @@ export const FINANCE_ROUTE_NAMES = {
     COCKPIT_INDEX: 'finance.cockpit.index',
     COCKPIT_QUEUE_ROWS: 'finance.cockpit.queue-rows',
     COCKPIT_PHASE: 'finance.cockpit.phase',
+    REPORTING_INDEX: 'finance.reporting.index',
     // Fee generation
     MAJOR_CHARGES_INDEX: 'finance.major.charges.index',
     OPERATIONS_GENERATE_CHARGES: 'finance.operations.generate-charges',

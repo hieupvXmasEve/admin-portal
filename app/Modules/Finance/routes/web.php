@@ -15,6 +15,7 @@ use App\Modules\Finance\Http\Web\Admin\FinanceAuditWorkspaceController;
 use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
 use App\Modules\Finance\Http\Web\Admin\FinanceCockpitController;
 use App\Modules\Finance\Http\Web\Admin\FinanceGlobalSearchController;
+use App\Modules\Finance\Http\Web\Admin\FinanceReportingController;
 use App\Modules\Finance\Http\Web\Admin\FinanceSemesterContextController;
 use App\Modules\Finance\Http\Web\Admin\FinanceStudentOverviewController;
 use App\Modules\Finance\Http\Web\Admin\FinanceStudentPaymentController;
@@ -40,6 +41,11 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
     Route::post('/cockpit/phase', [FinanceCockpitController::class, 'setPhase'])
         ->middleware('can:view_finance_cockpit')
         ->name('cockpit.phase');
+
+    // Finance Reporting shell
+    Route::get('/reporting', [FinanceReportingController::class, 'index'])
+        ->middleware('can:view_finance_reporting')
+        ->name('reporting.index');
 
     // EGC Operations
     Route::prefix('egc')->name('egc.')->group(function () {
