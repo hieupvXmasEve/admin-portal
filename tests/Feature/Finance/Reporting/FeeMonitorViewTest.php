@@ -133,3 +133,48 @@ it('exposes drilldown links for generated charge rows', function () {
         ->and($row['drilldowns']['student_360_focus'])->toBe('charge:'.$charge->id)
         ->and($row['batch_handoff'])->toBeNull();
 });
+
+it('does not report missing rows for non-mandatory fees (admission, BHYT)', function () {
+    grantFinance($this->user, ['view_finance_reporting'], $this->campus);
+
+    // Intake semester = active semester → the admission-fee builder includes this
+    // student, but they have no admission charge. Admission is NOT mandatory, so it
+    // must not surface as a "missing" row (same rule applies to BHYT).
+    Student::factory()->forCampus($this->campus)->create([
+        'student_id' => 'FM-OPT',
+        'status' => 'intake_course',
+        'intake' => 1,
+        'intake_mode' => 'sequential',
+        'intake_semester_id' => $this->semester->id,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->get(route('finance.reporting.index', [
+            'view' => 'fee-monitor',
+            'search' => 'FM-OPT',
+        ]))
+        ->assertOk();
+
+    $rows = collect($response->original->getData()['page']['props']['fee_monitor']['rows']['data']);
+
+    expect($rows->pluck('expected_source'))
+        ->not->toContain('admission_enrollment')
+        ->not->toContain('bhyt_health_insurance')
+        ->and($rows->where('generation_state', 'missing'))->toBeEmpty();
+});
+
+it('hides intake_major from the student-status filter (HP lane still covers it)', function () {
+    grantFinance($this->user, ['view_finance_reporting'], $this->campus);
+
+    $response = $this->actingAs($this->user)
+        ->get(route('finance.reporting.index', ['view' => 'fee-monitor']))
+        ->assertOk();
+
+    $statuses = collect($response->original->getData()['page']['props']['fee_monitor']['filter_options']['student_statuses'])
+        ->pluck('value');
+
+    expect($statuses)
+        ->toContain('intake_pre_uni_gc')
+        ->toContain('intake_course')
+        ->not->toContain('intake_major');
+});

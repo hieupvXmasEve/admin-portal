@@ -160,7 +160,10 @@ class ListFeeMonitorQuery
                 ['value' => 'voided', 'label' => 'Đã void'],
                 ['value' => 'skipped', 'label' => 'Bỏ qua'],
             ],
+            // intake_major still gets HP monitored in the tuition lane, but is hidden
+            // from the status filter per ops request (no intake_major cohort in use yet).
             'student_statuses' => collect(Student::FINANCIAL_STATUSES)
+                ->reject(fn (string $status) => $status === 'intake_major')
                 ->map(fn (string $status) => [
                     'value' => $status,
                     'label' => self::statusLabelFor($status),
@@ -700,9 +703,14 @@ class ListFeeMonitorQuery
     private function applyRowFilters(Collection $rows, array $filters): Collection
     {
         $generationState = (string) ($filters['generation_state'] ?? 'all');
+        $missingInferenceSources = FeeMonitorExpectedFeeCatalog::firstPassMissingInferenceSources();
 
         return $rows
             ->filter(fn (array $row) => $row !== [])
+            // Only mandatory fees may report "missing"; optional fees (BHYT, admission)
+            // surface only when a charge already exists.
+            ->reject(fn (array $row) => $row['generation_state'] === 'missing'
+                && ! in_array($row['expected_source'], $missingInferenceSources, true))
             ->when($generationState !== 'skipped', fn (Collection $collection) => $collection
                 ->reject(fn (array $row) => $row['generation_state'] === 'skipped'))
             ->when(! empty($filters['expected_fee_type']) && $filters['expected_fee_type'] !== 'all', function (Collection $collection) use ($filters) {

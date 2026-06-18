@@ -21,7 +21,18 @@ final class FeeMonitorExpectedFeeCatalog
     public const SOURCE_EXAM_RESIT = 'exam_resit';
 
     /**
-     * @return array<string, array{charge_type: string, label: string, missing_inference: bool}>
+     * Fee source catalog for the Fee Monitor.
+     *
+     * `mandatory` declares the business rule: only mandatory fees may report a
+     * "missing" row when no charge exists yet. Optional fees (admission, BHYT)
+     * never report missing — they only surface once a charge already exists.
+     * Add future mandatory fees here with `mandatory => true`.
+     *
+     * `missing_inference` is the effective switch the query honours:
+     * mandatory AND not otherwise gated. Retake/resit stay mandatory but are
+     * held off by the ACAD-RET-001 gate until that source contract is accepted.
+     *
+     * @return array<string, array{charge_type: string, label: string, mandatory: bool, missing_inference: bool}>
      */
     public static function sources(): array
     {
@@ -29,34 +40,48 @@ final class FeeMonitorExpectedFeeCatalog
             self::SOURCE_TUITION_PLAN => [
                 'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
                 'label' => 'Học phí theo kế hoạch',
+                'mandatory' => true,
                 'missing_inference' => true,
             ],
             self::SOURCE_EGC_TUITION => [
                 'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
                 'label' => 'Phí EGC',
+                'mandatory' => true,
                 'missing_inference' => true,
             ],
             self::SOURCE_ADMISSION_ENROLLMENT => [
                 'charge_type' => FinanceCharge::TYPE_ADMISSION_FEE,
                 'label' => 'Lệ phí tuyển sinh / nhập học',
-                'missing_inference' => true,
+                'mandatory' => false,
+                'missing_inference' => false,
             ],
             self::SOURCE_BHYT => [
                 'charge_type' => FinanceCharge::TYPE_BHYT,
                 'label' => 'BHYT',
-                'missing_inference' => true,
+                'mandatory' => false,
+                'missing_inference' => false,
             ],
             self::SOURCE_COURSE_RETAKE => [
                 'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
                 'label' => 'Phí học lại',
+                'mandatory' => true,
                 'missing_inference' => FeeMonitorAcadRetGate::missingInferenceEnabled(),
             ],
             self::SOURCE_EXAM_RESIT => [
                 'charge_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
                 'label' => 'Phí thi lại',
+                'mandatory' => true,
                 'missing_inference' => FeeMonitorAcadRetGate::missingInferenceEnabled(),
             ],
         ];
+    }
+
+    /**
+     * Whether a fee source is mandatory (i.e. may report a missing row).
+     */
+    public static function isMandatory(string $source): bool
+    {
+        return self::sources()[$source]['mandatory'] ?? false;
     }
 
     public static function chargeTypeForSource(string $source): ?string
