@@ -191,7 +191,7 @@ class Student extends StudentAuditableModel
             'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
-            'status' => ['nullable', 'in:' . implode(',', self::STATUSES)],
+            'status' => ['nullable', 'in:'.implode(',', self::STATUSES)],
         ];
     }
 
@@ -628,6 +628,7 @@ class Student extends StudentAuditableModel
             'dropout_transfer' => 'Dropout Transfer',
             'pending' => 'Pending',
             'admission_deferred' => 'Admission Deferred',
+            'pending_course_opening' => 'Pending Course Opening',
             default => 'Unknown',
         };
     }
@@ -647,6 +648,7 @@ class Student extends StudentAuditableModel
             'dropout_transfer' => 'red',
             'pending' => 'yellow',
             'admission_deferred' => 'orange',
+            'pending_course_opening' => 'orange',
             default => 'gray',
         };
     }
