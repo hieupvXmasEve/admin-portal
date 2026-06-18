@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import AppLayout from '@/layouts/AppLayout.vue';
+import FeeMonitor from '@/pages/Finance/Reporting/FeeMonitor.vue';
 import { financeRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import { AlertCircle, BarChart3, Clock, Link2, ReceiptText } from 'lucide-vue-next';
@@ -13,7 +14,7 @@ interface ReportingView {
     key: 'fee-monitor' | 'collection-progress' | 'dng-lifecycle';
     label: string;
     description: string;
-    status: 'planned';
+    status: 'planned' | 'implemented';
     obeys_semester: boolean;
 }
 
@@ -22,6 +23,7 @@ const props = defineProps<{
     views: ReportingView[];
     computed_at: string;
     actions: { export_enabled: boolean };
+    fee_monitor?: Record<string, unknown>;
 }>();
 
 const { selectedLabel } = useFinanceSemester();
@@ -35,13 +37,16 @@ const icons = {
 const activeView = computed(() => props.views.find((view) => view.key === props.active_view) ?? props.views[0]);
 
 const updateView = (value: string | number): void => {
+    const view = String(value);
+    const only = view === 'fee-monitor' ? ['active_view', 'views', 'computed_at', 'actions', 'fee_monitor'] : ['active_view', 'views', 'computed_at', 'actions'];
+
     router.get(
-        financeRoutes.reporting.index({ view: String(value) }),
+        financeRoutes.reporting.index({ view }),
         {},
         {
             preserveScroll: true,
             preserveState: true,
-            only: ['active_view', 'views', 'computed_at', 'actions'],
+            only,
         },
     );
 };
@@ -87,7 +92,9 @@ defineOptions({
             </TabsList>
 
             <TabsContent v-for="view in props.views" :key="view.key" :value="view.key" class="mt-4">
-                <Card>
+                <FeeMonitor v-if="view.key === 'fee-monitor' && props.fee_monitor" :fee_monitor="props.fee_monitor as any" />
+
+                <Card v-else>
                     <CardHeader>
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div class="space-y-2">
@@ -100,7 +107,9 @@ defineOptions({
 
                             <div class="flex flex-wrap gap-2">
                                 <Badge variant="outline">{{ view.obeys_semester ? 'Semester-bound' : 'Cross-semester queue' }}</Badge>
-                                <Badge variant="secondary">Shell only</Badge>
+                                <Badge :variant="view.status === 'implemented' ? 'default' : 'secondary'">
+                                    {{ view.status === 'implemented' ? 'Live lens' : 'Shell only' }}
+                                </Badge>
                             </div>
                         </div>
                     </CardHeader>

@@ -2,7 +2,7 @@
 
 ## Status
 
-planned
+implemented
 
 ## Lane
 
@@ -78,4 +78,16 @@ Register this story as the Fee Monitor implementation slice.
 
 ## Evidence
 
-Pending implementation.
+Implemented on 2026-06-18.
+
+- Added `ListFeeMonitorQuery` + `GetFeeMonitorSummaryQuery` for semester/campus-scoped fee completeness rows.
+- Covered first-pass missing inference for tuition plan, EGC, admission/enrollment, and BHYT sources.
+- Gated retake/resit missing inference behind `FeeMonitorAcadRetGate` (ACAD-RET-001); existing retake/resit charges still render.
+- Extended `FinanceReportingController` and `Finance/Reporting/FeeMonitor.vue` with filters, summary cards, drilldowns, and Batch Studio handoff.
+- Targeted tests:
+  `./scripts/dev.sh test tests/Unit/Finance/Reporting/FeeMonitorAcadRetGateTest.php tests/Feature/Finance/Reporting/FeeMonitorViewTest.php tests/Feature/Finance/Reporting/FinanceReportingShellTest.php`
+  passed, 10 tests.
+- `./scripts/dev.sh composer exec pint --` on touched PHP files passed.
+- `./scripts/dev.sh npm exec eslint resources/js/pages/Finance/Reporting/Index.vue resources/js/pages/Finance/Reporting/FeeMonitor.vue` passed.
+- `./scripts/dev.sh npm exec -- prettier --check resources/js/pages/Finance/Reporting/Index.vue resources/js/pages/Finance/Reporting/FeeMonitor.vue` passed after write.
+- `./scripts/dev.sh npm run type-check` was killed (exit 137, likely container OOM); not claimed as passing.

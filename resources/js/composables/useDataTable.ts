@@ -83,8 +83,13 @@ export function useDataTable<T extends Record<string, any> = Record<string, Filt
         const url = new URL(baseUrl, window.location.origin);
         const params = new URLSearchParams();
 
+        // Preserve query params pinned in baseUrl (e.g. a persistent `view` tab on the
+        // Finance Reporting page). Computed filter params below overlay/override these.
+        url.searchParams.forEach((value, key) => params.set(key, value));
+
         for (const [key, value] of Object.entries(buildParams())) {
             if (Array.isArray(value)) {
+                params.delete(key);
                 value.forEach((item) => params.append(`${key}[]`, String(item)));
             } else {
                 params.set(key, String(value));

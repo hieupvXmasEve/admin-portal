@@ -57,6 +57,14 @@ class PreviewEgcChargeGenerationQuery
             ->values();
     }
 
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function collectClassificationRows(int $semesterId, array $filters = [], ?int $campusId = null): Collection
+    {
+        return $this->collectRows($semesterId, $filters, $campusId);
+    }
+
     private function collectRows(int $semesterId, array $filters = [], ?int $campusId = null): Collection
     {
         $search = trim((string) ($filters['search'] ?? ''));
@@ -66,8 +74,15 @@ class PreviewEgcChargeGenerationQuery
             ->values()
             ->all();
 
+        $studentIds = collect($filters['student_ids'] ?? [])
+            ->filter(fn (mixed $id): bool => is_numeric($id))
+            ->map(fn (mixed $id): int => (int) $id)
+            ->values()
+            ->all();
+
         $students = Student::query()
             ->where('status', 'intake_pre_uni_gc')
+            ->when($studentIds !== [], fn ($query) => $query->whereIn('id', $studentIds))
             ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
             ->when($ignoredStudentIds !== [], fn ($query) => $query->whereNotIn('student_id', $ignoredStudentIds))
             ->when($search !== '', function ($query) use ($search) {

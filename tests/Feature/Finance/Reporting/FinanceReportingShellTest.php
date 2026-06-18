@@ -45,7 +45,7 @@ it('renders the reporting shell with the default collection progress view', func
             ->where('views.0.key', 'fee-monitor')
             ->where('views.1.key', 'collection-progress')
             ->where('views.2.key', 'dng-lifecycle')
-            ->where('views.0.status', 'planned')
+            ->where('views.0.status', 'implemented')
             ->where('views.1.status', 'planned')
             ->where('views.2.status', 'planned')
             ->where('actions.export_enabled', false)
