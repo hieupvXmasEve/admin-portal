@@ -6,7 +6,9 @@ namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Semester;
+use App\Modules\Finance\Http\Requests\Reporting\ListCollectionProgressRequest;
 use App\Modules\Finance\Http\Requests\Reporting\ListFeeMonitorRequest;
+use App\Modules\Finance\Queries\Reporting\ListCollectionProgressQuery;
 use App\Modules\Finance\Queries\Reporting\ListFeeMonitorQuery;
 use App\Modules\Finance\Support\Reporting\FeeMonitorAcadRetGate;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -30,7 +32,7 @@ class FinanceReportingController extends Controller
             'key' => 'collection-progress',
             'label' => 'Collection Progress',
             'description' => 'Billed, paid, outstanding, overdue, overpaid, and unapplied balances.',
-            'status' => 'planned',
+            'status' => 'implemented',
             'obeys_semester' => true,
         ],
         [
@@ -62,7 +64,114 @@ class FinanceReportingController extends Controller
             $payload = array_merge($payload, $this->feeMonitorPayload($request, $listQuery, $computedAt));
         }
 
+        if ($activeView === 'collection-progress') {
+            $payload = array_merge($payload, $this->collectionProgressPayload($computedAt));
+        }
+
         return Inertia::render('Finance/Reporting/Index', $payload);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function collectionProgressPayload(string $computedAt): array
+    {
+        $request = app(ListCollectionProgressRequest::class);
+        $listQuery = app(ListCollectionProgressQuery::class);
+
+        $filters = array_replace([
+            'program_id' => 'all',
+            'intake_semester_id' => 'all',
+            'cohort' => 'all',
+            'fee_type' => 'all',
+            'balance_state' => 'all',
+            'aging_bucket' => 'all',
+            'student_status' => 'all',
+            'search' => '',
+            'per_page' => 20,
+            'page' => 1,
+        ], $request->validated());
+
+        $semesterId = $this->resolveSemesterId();
+
+        $result = $semesterId
+            ? $listQuery->handle($semesterId, $filters)
+            : [
+                'rows' => new LengthAwarePaginator([], 0, 20, 1, ['path' => request()->url(), 'query' => request()->query()]),
+                'summary' => $this->emptyCollectionSummary(),
+                'breakdowns' => $this->emptyCollectionBreakdowns(),
+            ];
+
+        return [
+            'collection_progress' => [
+                'rows' => $result['rows'],
+                'summary' => $result['summary'],
+                'breakdowns' => $result['breakdowns'],
+                'filters' => $filters,
+                'filter_options' => $semesterId ? $listQuery->filterOptions($semesterId) : $this->emptyCollectionFilterOptions(),
+                'meta' => [
+                    'semester_id' => $semesterId,
+                ],
+                'computed_at' => $computedAt,
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptyCollectionSummary(): array
+    {
+        return [
+            'student_count' => 0,
+            'billed_total' => 0.0,
+            'paid_total' => 0.0,
+            'outstanding_total' => 0.0,
+            'overdue_total' => 0.0,
+            'overpaid_total' => 0.0,
+            'unapplied_total' => 0.0,
+            'collection_rate' => null,
+            'unpaid_count' => 0,
+            'partially_paid_count' => 0,
+            'paid_count' => 0,
+            'overdue_count' => 0,
+            'overpaid_count' => 0,
+            'unapplied_count' => 0,
+            'lifecycle_exception_count' => 0,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptyCollectionBreakdowns(): array
+    {
+        return [
+            'by_fee_type' => [],
+            'by_program' => [],
+            'by_intake' => [],
+            'by_cohort' => [],
+            'by_balance_state' => [],
+            'by_aging_bucket' => [],
+            'by_lifecycle_exception' => [],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptyCollectionFilterOptions(): array
+    {
+        return [
+            'programs' => [],
+            'intakes' => [],
+            'cohorts' => [],
+            'fee_types' => [],
+            'balance_states' => [],
+            'aging_buckets' => [],
+            'student_statuses' => [],
+            'semester_id' => null,
+        ];
     }
 
     /**

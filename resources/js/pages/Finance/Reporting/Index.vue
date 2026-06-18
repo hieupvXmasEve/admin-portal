@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import AppLayout from '@/layouts/AppLayout.vue';
+import CollectionProgress from '@/pages/Finance/Reporting/CollectionProgress.vue';
 import FeeMonitor from '@/pages/Finance/Reporting/FeeMonitor.vue';
 import { financeRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
@@ -24,6 +25,7 @@ const props = defineProps<{
     computed_at: string;
     actions: { export_enabled: boolean };
     fee_monitor?: Record<string, unknown>;
+    collection_progress?: Record<string, unknown>;
 }>();
 
 const { selectedLabel } = useFinanceSemester();
@@ -36,9 +38,15 @@ const icons = {
 
 const activeView = computed(() => props.views.find((view) => view.key === props.active_view) ?? props.views[0]);
 
+const viewPropMap: Record<string, string> = {
+    'fee-monitor': 'fee_monitor',
+    'collection-progress': 'collection_progress',
+};
+
 const updateView = (value: string | number): void => {
     const view = String(value);
-    const only = view === 'fee-monitor' ? ['active_view', 'views', 'computed_at', 'actions', 'fee_monitor'] : ['active_view', 'views', 'computed_at', 'actions'];
+    const baseOnly = ['active_view', 'views', 'computed_at', 'actions'];
+    const only = viewPropMap[view] ? [...baseOnly, viewPropMap[view]] : baseOnly;
 
     router.get(
         financeRoutes.reporting.index({ view }),
@@ -93,6 +101,8 @@ defineOptions({
 
             <TabsContent v-for="view in props.views" :key="view.key" :value="view.key" class="mt-4">
                 <FeeMonitor v-if="view.key === 'fee-monitor' && props.fee_monitor" :fee_monitor="props.fee_monitor as any" />
+
+                <CollectionProgress v-else-if="view.key === 'collection-progress' && props.collection_progress" :collection_progress="props.collection_progress as any" />
 
                 <Card v-else>
                     <CardHeader>

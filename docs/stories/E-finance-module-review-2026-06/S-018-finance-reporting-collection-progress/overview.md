@@ -2,7 +2,7 @@
 
 ## Status
 
-planned
+implemented
 
 ## Lane
 
@@ -74,4 +74,42 @@ Register this story as the Collection Progress implementation slice.
 
 ## Evidence
 
-Pending implementation.
+Implemented on 2026-06-18.
+
+### Money lineage (canonical settlement/ledger truth)
+
+- `billed` / `paid` / `outstanding` — summed per student from
+  `SettlementService::deriveInvoiceSnapshot()` (`net` / `paid` / `remaining`) over
+  the student's non-cancelled `student_invoices` in the selected semester.
+- `overdue` — invoice `remaining` where `due_date` is past; aging bucket from the
+  worst overdue invoice age (`not_due`, `d_1_30`, `d_31_60`, `d_61_90`,
+  `d_90_plus`).
+- `overpaid` — applied cash beyond net due:
+  `max(0, Σ active-line payment_applications − invoice net)` from the same loaded
+  ledger rows (snapshot clamps paid to net, so this is a derived anomaly signal).
+- `unapplied` — student-level available cash: completed `payments.amount` minus
+  `Σ payment_applications.amount` per payment, summed by student. Invoice rail
+  only; the DNG rail is not counted, so there is no double count.
+
+### Surfaces
+
+- Read-only `collection-progress` Inertia props on `/finance/reporting` (grain
+  `student × semester_balance`, scoped to the account campus + selected Finance
+  semester).
+- Summary cards (billed/paid/outstanding/overdue/overpaid/unapplied + collection
+  rate) and grouped breakdowns by fee type, program, intake, cohort, balance
+  state, aging/due bucket, and lifecycle-exception flag.
+- Always-visible filters: program, intake, cohort, fee type, balance state,
+  aging/due bucket, student status, student search.
+- Visible `computed_at` freshness; drilldowns to Student 360 and Lookup & Audit
+  (invoice). No export or mutation actions.
+
+### Validation
+
+| Layer       | Proof                                                                                                                                                                                    |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit        | `tests/Unit/Finance/Reporting/CollectionProgressCatalogTest.php` — 4 passed (aging buckets, vocabulary).                                                                                 |
+| Integration | `tests/Feature/Finance/Reporting/CollectionProgressViewTest.php` — 6 passed (props, formulas, filters, scope, drilldowns); shell test updated. 24 reporting tests / 180 assertions pass. |
+| E2E         | Not run — no browser tooling invoked in this slice.                                                                                                                                      |
+| Platform    | Targeted ESLint, Prettier, Pint, and `git diff --check` clean on touched files.                                                                                                          |
+| Release     | Money-statistic lineage recorded above (formula → canonical source for every displayed figure).                                                                                          |
