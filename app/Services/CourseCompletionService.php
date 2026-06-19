@@ -10,6 +10,7 @@ use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\Student;
+use App\Modules\Academic\Support\FailureReasonClassifier;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use Carbon\CarbonImmutable;
@@ -93,8 +94,11 @@ class CourseCompletionService
     }
 
     /**
-     * Finalize all academic records for the course
-     * SKIP Attendance requirement check
+     * Finalize all academic records for the course.
+     *
+     * Pass/fail and the explicit `failure_reason` are derived by
+     * {@see FailureReasonClassifier} from grade AND attendance (ACAD-RET-001),
+     * so failed students route to the correct remediation lane.
      */
     private function finalizeAcademicRecords(CourseOffering $courseOffering): void
     {
@@ -106,8 +110,11 @@ class CourseCompletionService
         // Use syllabus template values if available, otherwise fallback to defaults
         $passingThreshold = $courseOffering->syllabusTemplate?->min_grade_threshold ?? ($isEgcCourse ? 70 : 60);
 
-        // Attendance threshold:
-        // $attendanceThreshold = $courseOffering->syllabusTemplate?->min_attendance_threshold ?? 80.00;
+        // Attendance threshold (ACAD-RET-001): forward-only attendance gating that
+        // drives the explicit failure_reason routing. Attendance only fails a
+        // student when there is recorded evidence below this threshold; courses
+        // with no recorded attendance stay grade-only.
+        $attendanceThreshold = (float) ($courseOffering->syllabusTemplate?->min_attendance_threshold ?? 80.00);
 
         // Get all registered student IDs to filter academic records
         $registeredStudentIds = CourseRegistration::where('course_offering_id', $courseOffering->id)
@@ -125,58 +132,34 @@ class CourseCompletionService
         $passedCount = 0;
 
         foreach ($records as $record) {
-            // STEP 1: CHECK ATTENDANCE REQUIREMENT FIRST (PRIORITY)
-            // Student must attend >= threshold% of classes
-            // $meetsAttendanceRequirement = $record->meets_attendance_requirement ?? true;
-
-            // If student failed attendance requirement, automatic FAIL regardless of grade
-            // if (! $meetsAttendanceRequirement) {
-            //     $attendancePercentage = (float) ($record->attendance_percentage ?? 0);
-            //     $attendanceNote = "FAILED: Attendance requirement not met ({$attendancePercentage}% attendance, required >= {$attendanceThreshold}%)";
-
-            //     // Ensure we don't duplicate the note
-            //     $newNotes = $record->administrative_notes;
-            //     if (! $newNotes || ! str_contains($newNotes, "FAILED: Attendance requirement not met")) {
-            //         $newNotes = ($newNotes ? $newNotes . "\n" : '') . $attendanceNote;
-            //     }
-
-            //     $record->update([
-            //         'grade_status' => 'final',
-            //         'grade_finalized_date' => now(),
-            //         'final_letter_grade' => 'F', // Override letter grade to F for attendance failure
-            //         'grade_points' => 0.0, // F grade for attendance failure
-            //         'completion_status' => ($record->override_pass && $record->is_passed) ? 'completed' : 'failed',
-            //         'is_passed' => $record->override_pass ? $record->is_passed : false,
-            //         'credit_points_earned' => ($record->override_pass && $record->is_passed) ? $record->credit_points : 0,
-            //         'credit_hours_earned' => ($record->override_pass && $record->is_passed) ? $record->credit_hours : 0,
-            //         'affects_graduation_requirement' => true,
-            //         'satisfies_prerequisite' => ($record->override_pass && $record->is_passed),
-            //         'administrative_notes' => $newNotes,
-            //     ]);
-
-            //     $attendanceFailedCount++;
-            //     Log::warning('Student failed due to attendance', [
-            //         'student_id' => $record->student_id,
-            //         'course_offering_id' => $courseOffering->id,
-            //         'attendance_percentage' => $attendancePercentage,
-            //     ]);
-
-            //     continue;
-            // }
-
-            // STEP 2: CHECK GRADE (only if attendance requirement is met)
             // Cast to float to ensure type safety
             $finalPercentage = (float) ($record->final_percentage ?? 0);
-
-            // Determine if passing based on final percentage and course type
-            $isPassing = $finalPercentage >= $passingThreshold;
 
             // Calculate grade points from final percentage
             $gradePoints = AcademicRecord::calculateGradePoints($finalPercentage);
             $finalLetterGrade = AcademicRecord::calculateLetterGrade($finalPercentage);
 
-            if ($isPassing) {
+            // ACAD-RET-001: derive pass/fail + explicit failure_reason from grade
+            // AND attendance, so failed students route correctly (grade → resit,
+            // attendance/both → retake). Attendance % excludes excused and
+            // not-recorded sessions from the denominator.
+            $eval = FailureReasonClassifier::classify(
+                $finalPercentage,
+                (float) $passingThreshold,
+                (int) ($record->total_present ?? 0),
+                (int) ($record->total_late ?? 0),
+                (int) ($record->total_absences ?? 0),
+                (int) ($record->total_not_recorded ?? 0),
+                (int) ($record->total_class_sessions ?? 0),
+                $attendanceThreshold,
+                (bool) $record->override_pass,
+                (bool) ($record->is_passed ?? false),
+            );
+
+            if ($eval['is_passed']) {
                 $passedCount++;
+            } elseif ($eval['snapshot']['attendance_failed']) {
+                $attendanceFailedCount++;
             } else {
                 $gradeFailedCount++;
             }
@@ -189,8 +172,8 @@ class CourseCompletionService
                 $cleanNotes = trim($cleanNotes);
             }
 
-            // Determine final pass status (respect override if present)
-            $finalPassed = $record->override_pass ? $record->is_passed : $isPassing;
+            // Final pass status from the classifier (override already respected).
+            $finalPassed = $eval['is_passed'];
 
             // Snapshot credit_points at finalize time. Falls back to credit_hours
             // when credit_points is missing (legacy AR created before the
@@ -213,6 +196,8 @@ class CourseCompletionService
                 'satisfies_prerequisite' => $finalPassed,
                 'administrative_notes' => $cleanNotes ?: null,
                 'quality_points' => $finalPercentage * $creditPoints,
+                'failure_reason' => $eval['failure_reason'],
+                'failure_reason_snapshot' => $eval['snapshot'],
             ]);
         }
 
@@ -360,7 +345,7 @@ class CourseCompletionService
         $missingRecordStudents = array_diff($registeredStudentIds, $recordStudentIds);
 
         if (count($missingRecordStudents) > 0) {
-            $studentDetails = \App\Models\Student::whereIn('id', array_slice($missingRecordStudents, 0, 5))
+            $studentDetails = Student::whereIn('id', array_slice($missingRecordStudents, 0, 5))
                 ->pluck('student_id')
                 ->implode(', ');
 
