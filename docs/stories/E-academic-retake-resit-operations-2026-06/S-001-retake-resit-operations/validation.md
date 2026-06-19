@@ -205,3 +205,60 @@ Validation gap (unchanged from prior slices):
 - Deferred to later slices: exam-resit overdue/reminder monitoring, paid
   cancellation refund/reversal handling, schedule/room/invigilator surfaces,
   result update, legacy `exam_resit_fee` backfill, and student portal/API.
+
+## Slice Evidence - 2026-06-20 (Slice 4: Exam-resit completion + higher-score + history)
+
+Implemented the exam-resit (thi lại) sitting-result write-back to the final
+Academic record. Hard gate: `academic_records`. No schema migration (the
+`exam_resit_attempts` result columns and `academic_records.grade_history` already
+exist) and no new UI (the staff completion controller/route ships with the
+Academic workspace slice).
+
+- `CompleteExamResitAttemptAction` records a resit result on an approved/scheduled
+  attempt and applies the locked **higher-score rule**: the academic record's
+  `final_percentage` becomes `max(original, resit)`. A lower resit never reduces
+  the record; it is still recorded and consumes an attempt.
+- On an applied (strictly higher) resit, the record recomputes `final_letter_grade`,
+  `grade_points`, `quality_points`, pass state, `completion_status`,
+  `satisfies_prerequisite`, earned credit, and clears `failure_reason` on pass.
+  The grade threshold reuses the syllabus `min_grade_threshold` (default 60, EGC 70),
+  matching `CourseCompletionService` finalization.
+- **Attempt counting**: `attempt_number` is consumed ONLY at completion (max
+  consumed + 1), separate from the creation-time `request_sequence`.
+- **History preservation**: the pre-resit result is snapshotted on the attempt
+  (`previous_result_snapshot`) and appended to
+  `academic_records.grade_history['exam_resit_applications']`. A later Canvas sync /
+  re-finalization can overwrite the score without erasing the resit audit (proven
+  by test: grade_history + attempt result survive a later `final_percentage`
+  overwrite).
+- **Payment gate** (finance-derived): completion requires `hq_fee_status = paid`,
+  unless the snapshotted policy allows an unpaid sitting AND a visible
+  `unpaid_sitting_reason` is recorded (persisted with actor + timestamp).
+- **GPA/progression recalculation is FLAGGED, not run** (`result_snapshot.requires_gpa_recalc`),
+  honoring the execplan stop-condition that defers grade-engine recalculation to a
+  separate grading story.
+
+Commands run:
+
+```bash
+./scripts/dev.sh test tests/Feature/Academic/ExamResit/CompleteExamResitAttemptActionTest.php
+# PASS: 11 tests, 46 assertions
+
+./scripts/dev.sh test tests/Feature/Academic/ExamResit tests/Feature/Academic/RetakeCourse
+# PASS: 71 tests, 283 assertions
+
+./scripts/dev.sh composer exec pint -- --test app/Modules/Academic/Actions/CompleteExamResitAttemptAction.php tests/Feature/Academic/ExamResit/CompleteExamResitAttemptActionTest.php
+# PASS: 2 files
+
+git diff --check
+# PASS
+```
+
+Validation gap (unchanged from prior slices):
+
+- `vue-tsc --noEmit` still OOMs in the dev container; no frontend source changed
+  in this slice.
+- Deferred to later slices: exam-resit scheduling (sessions/room slots/invigilators)
+  that would gate completion behind a `scheduled` sitting, GPA/progression/warning
+  recalculation execution, overdue/reminder monitoring, paid cancellation
+  refund/reversal, legacy backfill, and the Academic staff completion UI/route.
