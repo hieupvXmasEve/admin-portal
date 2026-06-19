@@ -78,6 +78,18 @@ class CreateRetakeCourseRegistrationAction
                 ->where(fn ($q) => $q->where('override_pass', false)->orWhereNull('override_pass'))
                 ->firstOrFail();
 
+            // Failure-routing gate (ACAD-RET-001 Slice 2). Grade-only failures go to
+            // the exam-resit lane (`thi lại`), not course retake (`học lại`). Block only
+            // the explicit grade-only reason: attendance/both/manual stay eligible, and
+            // legacy un-backfilled records (failure_reason = null) keep their historical
+            // eligibility so current staff workflows are not broken. This mirrors, in
+            // reverse, the exam-resit gate in CreateExamResitAttemptAction.
+            if ($academicRecord->failure_reason === AcademicRecord::FAILURE_GRADE_FAILED) {
+                throw ValidationException::withMessages([
+                    'failure_reason' => ['Sinh viên fail do điểm phải đi luồng thi lại, không đủ điều kiện học lại.'],
+                ]);
+            }
+
             // Check for existing non-terminal registration (soft unique constraint)
             $existingActive = CourseRetakeRegistration::query()
                 ->where('student_id', $data['student_id'])
