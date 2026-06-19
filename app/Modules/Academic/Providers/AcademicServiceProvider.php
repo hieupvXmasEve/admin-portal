@@ -3,8 +3,10 @@
 namespace App\Modules\Academic\Providers;
 
 use App\Models\CourseRegistration;
+use App\Modules\Academic\Actions\SyncPaidExamResitAttemptsAction;
 use App\Modules\Academic\Actions\SyncPaidRetakeRegistrationsAction;
 use App\Modules\Academic\Observers\CourseRegistrationObserver;
+use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -14,6 +16,7 @@ class AcademicServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(RetakeRegistrationPaymentSyncer::class, SyncPaidRetakeRegistrationsAction::class);
+        $this->app->bind(ExamResitAttemptPaymentSyncer::class, SyncPaidExamResitAttemptsAction::class);
     }
 
     public function boot(): void

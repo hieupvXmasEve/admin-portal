@@ -140,6 +140,11 @@ class ExamResitAttempt extends AuditableModel
         return $this->belongsTo(Campus::class);
     }
 
+    public function chargeSemester(): BelongsTo
+    {
+        return $this->belongsTo(Semester::class, 'charge_semester_id');
+    }
+
     public function syllabusTemplate(): BelongsTo
     {
         return $this->belongsTo(SyllabusTemplate::class);
@@ -148,6 +153,41 @@ class ExamResitAttempt extends AuditableModel
     public function financeCharge(): BelongsTo
     {
         return $this->belongsTo(FinanceCharge::class);
+    }
+
+    /**
+     * HQ links a Finance charge to this attempt. This is an HQ/Finance fee-status
+     * transition only; the Academic lifecycle status (approved/scheduled/...) is
+     * untouched because payment is a parallel HQ state, not an Academic step.
+     */
+    public function transitionToChargeCreated(int $financeChargeId, int $userId): void
+    {
+        if ($this->hq_fee_status !== self::HQ_FEE_PENDING) {
+            throw new \RuntimeException("Cannot create charge from hq_fee_status: {$this->hq_fee_status}");
+        }
+
+        $this->update([
+            'hq_fee_status' => self::HQ_FEE_CHARGE_CREATED,
+            'finance_charge_id' => $financeChargeId,
+            'charge_created_by_user_id' => $userId,
+            'charge_created_at' => now(),
+        ]);
+    }
+
+    /**
+     * Mark the HQ fee as paid from canonical Finance payment/settlement evidence.
+     * Derived state only — never the primary paid truth.
+     */
+    public function transitionToPaid(?\DateTimeInterface $paidAt = null): void
+    {
+        if ($this->hq_fee_status !== self::HQ_FEE_CHARGE_CREATED) {
+            throw new \RuntimeException("Cannot mark paid from hq_fee_status: {$this->hq_fee_status}");
+        }
+
+        $this->update([
+            'hq_fee_status' => self::HQ_FEE_PAID,
+            'paid_at' => $paidAt ?? now(),
+        ]);
     }
 
     protected function getLoggingLevel(): string

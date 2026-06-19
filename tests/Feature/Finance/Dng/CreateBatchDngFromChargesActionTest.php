@@ -14,6 +14,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Modules\Finance\Actions\CancelDngPaymentRequestAction;
 use App\Modules\Finance\Actions\CreateBatchDngFromChargesAction;
+use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
 use App\Modules\Finance\Actions\CreateRetakeCourseChargeSimpleAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
@@ -96,12 +97,14 @@ function makeBatchAction(?DngPaymentRequest $fakeCreatedRequest = null, bool $dn
 
     $cancelAction = app(CancelDngPaymentRequestAction::class);
     $simpleChargeAction = app(CreateRetakeCourseChargeSimpleAction::class);
+    $examResitChargeAction = app(CreateExamResitChargeSimpleAction::class);
 
     $action = new CreateBatchDngFromChargesAction(
         $dngPaymentServiceMock,
         $campusResolverMock,
         $cancelAction,
         $simpleChargeAction,
+        $examResitChargeAction,
     );
 
     return [$action, $dngPaymentServiceMock];

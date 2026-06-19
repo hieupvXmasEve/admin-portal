@@ -9,6 +9,7 @@ use App\Models\InvoiceLine;
 use App\Models\Payment;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
+use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use Illuminate\Support\Facades\DB;
 
@@ -172,6 +173,7 @@ class AutoAllocatePaymentsAction
 
         foreach (array_values(array_unique($studentsWithAllocations)) as $studentId) {
             app(RetakeRegistrationPaymentSyncer::class)->runForStudent($studentId);
+            app(ExamResitAttemptPaymentSyncer::class)->runForStudent($studentId);
         }
 
         return $stats;

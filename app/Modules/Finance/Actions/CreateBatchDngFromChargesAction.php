@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Actions;
 
 use App\Models\CourseRetakeRegistration;
+use App\Models\ExamResitAttempt;
 use App\Models\FinanceCharge;
 use App\Models\FinanceChargeInstallment;
 use App\Models\Student;
@@ -35,6 +36,7 @@ class CreateBatchDngFromChargesAction
         protected DngCampusCodeResolver $campusCodeResolver,
         protected CancelDngPaymentRequestAction $cancelDngAction,
         protected CreateRetakeCourseChargeSimpleAction $createChargeSimpleAction,
+        protected CreateExamResitChargeSimpleAction $createExamResitChargeSimpleAction,
     ) {}
 
     /**
@@ -128,6 +130,11 @@ class CreateBatchDngFromChargesAction
             // For HL: auto-create charges for approved retake registrations without charges
             if ($dngFeeType === 'HL') {
                 $this->ensureRetakeChargesExist($student, $semesterId);
+            }
+
+            // For PTL: auto-create charges for approved exam-resit attempts without charges
+            if ($dngFeeType === 'PTL') {
+                $this->ensureExamResitChargesExist($student, $semesterId);
             }
 
             // Load active charges with positive balance
@@ -288,6 +295,37 @@ class CreateBatchDngFromChargesAction
             } catch (\Throwable $e) {
                 Log::warning('CreateBatchDngFromChargesAction: failed to auto-create retake charge', [
                     'registration_id' => $registration->id,
+                    'student_id' => $student->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * For PTL fee_type: ensure approved exam-resit attempts have charges before DNG push.
+     * Calls CreateExamResitChargeSimpleAction for each approved attempt without a charge.
+     * Charges are billed on the attempt's charge_semester, so we match on charge_semester_id.
+     */
+    private function ensureExamResitChargesExist(Student $student, int $semesterId): void
+    {
+        $pendingAttempts = ExamResitAttempt::query()
+            ->where('student_id', $student->id)
+            ->where('charge_semester_id', $semesterId)
+            ->where('status', ExamResitAttempt::STATUS_APPROVED)
+            ->where('hq_fee_status', ExamResitAttempt::HQ_FEE_PENDING)
+            ->whereNull('finance_charge_id')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($pendingAttempts as $attempt) {
+            try {
+                $this->createExamResitChargeSimpleAction->handle([
+                    'attempt_id' => $attempt->id,
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('CreateBatchDngFromChargesAction: failed to auto-create exam resit charge', [
+                    'attempt_id' => $attempt->id,
                     'student_id' => $student->id,
                     'error' => $e->getMessage(),
                 ]);

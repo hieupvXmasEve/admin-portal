@@ -143,3 +143,65 @@ Validation gap:
 - Full story remains in progress: exam-resit charge creation/worklist, payment
   monitoring, reminders, schedule/room/invigilator surfaces, result update,
   legacy backfill, and student portal/API work are deferred to later slices.
+
+## Slice Evidence - 2026-06-20 (Slice 3: HQ exam_resit_fee charge + paid syncer)
+
+Implemented the HQ Finance handoff for exam resit (thi lại), mirroring the
+existing course-retake (HL) Finance lane. Hard-gate Finance: every new path only
+creates/links charges idempotently and derives paid state from canonical Finance
+evidence. No schema migration and no new UI (the DNG worklist already exposes the
+`PTL` fee type).
+
+- HQ creates the `exam_resit_fee` charge from the Academic `ExamResitAttempt`
+  source via `CreateExamResitChargeSimpleAction`: source-linked
+  (`source_type=ExamResitAttempt`), billed on `charge_semester_id`, idempotent
+  (reuses the active source charge), and guarded by the existing
+  `finance_charges.active_source_key` unique key against concurrent duplicates.
+- `ExamResitAttempt` gains `transitionToChargeCreated()` and `transitionToPaid()`
+  fee-status transitions (hq_fee_status only; the Academic lifecycle status is
+  untouched because payment is a parallel HQ state).
+- `SyncPaidExamResitAttemptsAction` (bound to the new
+  `ExamResitAttemptPaymentSyncer` contract) flips an attempt to paid only when its
+  charge is active and `is_fully_paid` (settlement-derived), never from a manual
+  flag. Wired into the same canonical paid-detection points as retake:
+  `AllocatePaymentAction`, `AutoAllocatePaymentsAction`, and the DNG webhook
+  (`PTL` fee type).
+- `CreateBatchDngFromChargesAction` auto-creates exam-resit charges for `PTL`
+  before pushing the DNG, mirroring the HL `ensureRetakeChargesExist` path.
+- `ListDngWorklistQuery` surfaces approved exam-resit attempts without a charge as
+  `needs_charge_creation` rows under `PTL`, reusing the existing worklist row shape.
+
+Commands run:
+
+```bash
+./scripts/dev.sh test tests/Feature/Finance/ExamResitChargeActionTest.php tests/Feature/Academic/ExamResit/SyncPaidExamResitAttemptsActionTest.php tests/Feature/Academic/ExamResit/CreateExamResitAttemptActionTest.php tests/Feature/Finance/RetakeResitHqWorklistTest.php tests/Feature/Finance/RetakeResitChargeSourceTest.php tests/Feature/Finance/Dng/ListDngWorklistQueryTest.php tests/Feature/Academic/RetakeCourse/SyncPaidRetakeRegistrationsActionTest.php
+# PASS: 39 tests, 147 assertions
+
+./scripts/dev.sh test tests/Feature/Finance/Batch tests/Feature/Finance/Dng
+# PASS: 145 tests, 558 assertions
+
+./scripts/dev.sh test tests/Feature/Academic/ExamResit tests/Feature/Academic/RetakeCourse
+# PASS: 60 tests, 237 assertions
+
+./scripts/dev.sh composer exec pint -- --test <16 changed PHP files>
+# PASS: 16 files
+
+git diff --check
+# PASS
+```
+
+Regression check:
+
+- `tests/Feature/Finance/{AutoAllocatePaymentsTest,SettlementWorklistTest,PaymentPagesTest}.php`
+  report 10 fail / 4 pass both with and without this slice (verified via
+  `git stash -u`), confirming those are the documented pre-existing finance
+  baseline failures, not regressions from the allocation/webhook wiring.
+
+Validation gap (unchanged from prior slices):
+
+- `vue-tsc --noEmit` still OOMs in the dev container; no frontend source changed
+  in this slice (PTL was already a selectable worklist fee type), so no per-file
+  type-check was required.
+- Deferred to later slices: exam-resit overdue/reminder monitoring, paid
+  cancellation refund/reversal handling, schedule/room/invigilator surfaces,
+  result update, legacy `exam_resit_fee` backfill, and student portal/API.

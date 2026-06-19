@@ -9,6 +9,7 @@ use App\Models\InvoiceLine;
 use App\Models\Payment;
 use App\Models\PaymentApplication;
 use App\Modules\Finance\Services\SettlementService;
+use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -76,6 +77,7 @@ class AllocatePaymentAction
         });
 
         app(RetakeRegistrationPaymentSyncer::class)->runForChargeIds([$charge->id]);
+        app(ExamResitAttemptPaymentSyncer::class)->runForChargeIds([$charge->id]);
 
         return $application;
     }

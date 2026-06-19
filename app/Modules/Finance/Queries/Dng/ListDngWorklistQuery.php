@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Dng;
 
 use App\Models\CourseRetakeRegistration;
+use App\Models\ExamResitAttempt;
 use App\Models\FinanceCharge;
 use App\Models\FinanceChargeInstallment;
 use App\Models\Student;
@@ -130,9 +131,14 @@ class ListDngWorklistQuery
         // Fetch all student rows for summary + DNG status join
         $allStudentRows = (clone $query)->get();
         if ($dngFeeType === 'HL') {
-            $allStudentRows = $this->mergeApprovedRetakeSourcesWithoutCharge(
+            $allStudentRows = $this->mergeApprovedSourcesWithoutCharge(
                 $allStudentRows,
                 $this->loadApprovedRetakeSourceRows($campusFilter, $semesterId, $search),
+            );
+        } elseif ($dngFeeType === 'PTL') {
+            $allStudentRows = $this->mergeApprovedSourcesWithoutCharge(
+                $allStudentRows,
+                $this->loadApprovedExamResitSourceRows($campusFilter, $semesterId, $search),
             );
         }
 
@@ -271,10 +277,12 @@ class ListDngWorklistQuery
         // Attach individual charge breakdown for expandable rows (current page only)
         $chargesByStudent = $this->loadChargeBreakdown($pagedStudentIds, $chargeTypes, $semesterId);
 
-        // For HL fee_type: approved registrations without charges (needs_charge_creation)
-        $needsChargeByStudent = $dngFeeType === 'HL'
-            ? $this->loadApprovedRetakeRegistrationsWithoutCharge($pagedStudentIds, $semesterId)
-            : collect();
+        // For HL/PTL fee_type: approved Academic sources without charges (needs_charge_creation)
+        $needsChargeByStudent = match ($dngFeeType) {
+            'HL' => $this->loadApprovedRetakeRegistrationsWithoutCharge($pagedStudentIds, $semesterId),
+            'PTL' => $this->loadApprovedExamResitAttemptsWithoutCharge($pagedStudentIds, $semesterId),
+            default => collect(),
+        };
 
         $pagedRows = $pagedRows->map(function ($row) use ($chargesByStudent, $needsChargeByStudent) {
             $row->charges = $chargesByStudent->get($row->student_id, collect())->values()->all();
@@ -474,7 +482,82 @@ class ListDngWorklistQuery
             ->values();
     }
 
-    private function mergeApprovedRetakeSourcesWithoutCharge(Collection $chargeRows, Collection $sourceRows): Collection
+    /**
+     * For PTL fee_type: find approved exam-resit attempts without a charge yet.
+     * These students need charge creation before DNG can be pushed.
+     *
+     * @param  array<int, int>  $studentIds
+     * @return Collection<int, Collection> student_id → array of attempt rows
+     */
+    private function loadApprovedExamResitAttemptsWithoutCharge(array $studentIds, ?int $semesterId): Collection
+    {
+        if (empty($studentIds)) {
+            return collect();
+        }
+
+        $attempts = ExamResitAttempt::query()
+            ->whereIn('student_id', $studentIds)
+            ->where('status', ExamResitAttempt::STATUS_APPROVED)
+            ->where('hq_fee_status', ExamResitAttempt::HQ_FEE_PENDING)
+            ->whereNull('finance_charge_id')
+            ->when($semesterId !== null, fn ($query) => $query->where('charge_semester_id', $semesterId))
+            ->with(['unit:id,code,name', 'chargeSemester:id,name'])
+            ->get(['id', 'student_id', 'unit_id', 'charge_semester_id', 'fee_amount', 'status', 'hq_fee_status'])
+            ->map(fn ($attempt) => [
+                'id' => $attempt->id,
+                'student_id' => $attempt->student_id,
+                'unit_code' => $attempt->unit?->code,
+                'unit_name' => $attempt->unit?->name,
+                'semester_name' => $attempt->chargeSemester?->name,
+                'retake_fee' => (float) $attempt->fee_amount,
+            ]);
+
+        return $attempts->groupBy('student_id');
+    }
+
+    private function loadApprovedExamResitSourceRows(?int $campusId, ?int $semesterId, string $search): Collection
+    {
+        $attempts = ExamResitAttempt::query()
+            ->with(['student:id,student_id,full_name,campus_id', 'student.campus:id,name', 'campus:id,name'])
+            ->where('status', ExamResitAttempt::STATUS_APPROVED)
+            ->where('hq_fee_status', ExamResitAttempt::HQ_FEE_PENDING)
+            ->whereNull('finance_charge_id')
+            ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
+            ->when($semesterId !== null, fn ($query) => $query->where('charge_semester_id', $semesterId))
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->whereHas('student', function ($studentQuery) use ($search): void {
+                    $studentQuery->where('student_id', 'like', "%{$search}%")
+                        ->orWhere('full_name', 'like', "%{$search}%");
+                });
+            })
+            ->get();
+
+        return $attempts
+            ->groupBy('student_id')
+            ->map(function (Collection $studentAttempts) {
+                /** @var ExamResitAttempt $first */
+                $first = $studentAttempts->first();
+                $student = $first->student;
+                $campus = $first->campus ?? $student?->campus;
+                $total = (float) $studentAttempts->sum(fn (ExamResitAttempt $attempt) => (float) $attempt->fee_amount);
+
+                return (object) [
+                    'student_id' => $first->student_id,
+                    'student_code' => $student?->student_id,
+                    'student_name' => $student?->full_name,
+                    'campus_id' => $campus?->id,
+                    'campus_name' => $campus?->name,
+                    'charge_count' => 0,
+                    'total_amount' => $total,
+                    'total_paid' => 0.0,
+                    'total_discount' => 0.0,
+                    'balance' => $total,
+                ];
+            })
+            ->values();
+    }
+
+    private function mergeApprovedSourcesWithoutCharge(Collection $chargeRows, Collection $sourceRows): Collection
     {
         $merged = $chargeRows->keyBy('student_id');
 

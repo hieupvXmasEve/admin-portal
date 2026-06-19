@@ -11,6 +11,7 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
+use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,7 @@ class DngWebhookService
         protected PublishDomainEventAction $publishDomainEventAction,
         protected SettleInstallmentFromDngAction $settleInstallmentAction,
         protected RetakeRegistrationPaymentSyncer $retakeRegistrationPaymentSyncer,
+        protected ExamResitAttemptPaymentSyncer $examResitAttemptPaymentSyncer,
     ) {}
 
     /**
@@ -203,6 +205,9 @@ class DngWebhookService
 
             // Auto-enroll retake course registrations when payment confirmed.
             $this->handleRetakeCourseAutoEnroll($freshRequest);
+
+            // Sync exam-resit (thi lại) HQ paid state from canonical Finance evidence.
+            $this->handleExamResitPaymentSync($freshRequest);
         }
 
         $event->markProcessed();
@@ -357,6 +362,30 @@ class DngWebhookService
             $this->retakeRegistrationPaymentSyncer->runForStudent((int) $request->student_id);
         } catch (\Throwable $e) {
             Log::warning('DNG webhook: retake course auto-enroll failed', [
+                'dng_payment_request_id' => $request->id,
+                'finance_charge_id' => $request->finance_charge_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Sync exam-resit (thi lại) HQ paid state after payment confirmation.
+     *
+     * Only applicable to PTL fee DNG requests. Payment bridge + settlement truth
+     * identify every linked exam_resit_fee charge that is fully paid, so the syncer
+     * flips the matching ExamResitAttempt to paid from canonical Finance evidence.
+     */
+    private function handleExamResitPaymentSync(DngPaymentRequest $request): void
+    {
+        try {
+            if ($request->fee_type !== 'PTL') {
+                return;
+            }
+
+            $this->examResitAttemptPaymentSyncer->runForStudent((int) $request->student_id);
+        } catch (\Throwable $e) {
+            Log::warning('DNG webhook: exam resit payment sync failed', [
                 'dng_payment_request_id' => $request->id,
                 'finance_charge_id' => $request->finance_charge_id,
                 'error' => $e->getMessage(),
