@@ -220,9 +220,13 @@ Academic workspace slice).
   the record; it is still recorded and consumes an attempt.
 - On an applied (strictly higher) resit, the record recomputes `final_letter_grade`,
   `grade_points`, `quality_points`, pass state, `completion_status`,
-  `satisfies_prerequisite`, earned credit, and clears `failure_reason` on pass.
-  The grade threshold reuses the syllabus `min_grade_threshold` (default 60, EGC 70),
-  matching `CourseCompletionService` finalization.
+  `satisfies_prerequisite`, and earned credit. The grade threshold reuses the
+  syllabus `min_grade_threshold` (default 60, EGC 70), matching
+  `CourseCompletionService` finalization.
+- The applied resit is score-authoritative: it clears any prior manual override
+  (`override_pass`), clears `failure_reason` on pass, and normalizes a
+  still-failing result to `grade_failed` (attendance was already fine to be
+  eligible for resit). Confirmed product decision 2026-06-20.
 - **Attempt counting**: `attempt_number` is consumed ONLY at completion (max
   consumed + 1), separate from the creation-time `request_sequence`.
 - **History preservation**: the pre-resit result is snapshotted on the attempt
@@ -242,10 +246,10 @@ Commands run:
 
 ```bash
 ./scripts/dev.sh test tests/Feature/Academic/ExamResit/CompleteExamResitAttemptActionTest.php
-# PASS: 11 tests, 46 assertions
+# PASS: 12 tests, 51 assertions
 
 ./scripts/dev.sh test tests/Feature/Academic/ExamResit tests/Feature/Academic/RetakeCourse
-# PASS: 71 tests, 283 assertions
+# PASS: 72 tests, 288 assertions
 
 ./scripts/dev.sh composer exec pint -- --test app/Modules/Academic/Actions/CompleteExamResitAttemptAction.php tests/Feature/Academic/ExamResit/CompleteExamResitAttemptActionTest.php
 # PASS: 2 files
@@ -258,7 +262,18 @@ Validation gap (unchanged from prior slices):
 
 - `vue-tsc --noEmit` still OOMs in the dev container; no frontend source changed
   in this slice.
-- Deferred to later slices: exam-resit scheduling (sessions/room slots/invigilators)
-  that would gate completion behind a `scheduled` sitting, GPA/progression/warning
-  recalculation execution, overdue/reminder monitoring, paid cancellation
-  refund/reversal, legacy backfill, and the Academic staff completion UI/route.
+- Deferred to later slices: exam-resit scheduling (sessions/room slots/invigilators),
+  GPA/progression/warning recalculation execution, overdue/reminder monitoring,
+  paid cancellation refund/reversal, legacy backfill, and the Academic staff
+  completion UI/route.
+
+Confirmed product decisions 2026-06-20 (resolved unresolved questions):
+
+- Completion currently allows the `approved` state because scheduling infra does
+  not exist yet. Once the scheduling slice lands, completion must require
+  `scheduled` (no bypass). Recorded as an interim note in `assertCanComplete`.
+- GPA/progression recalculation stays deferred: this slice only flags
+  `result_snapshot.requires_gpa_recalc`; a separate grading story executes it.
+- A still-failing applied resit normalizes `failure_reason` to `grade_failed` and
+  clears any prior manual override, since a recorded resit sitting is
+  score-authoritative.

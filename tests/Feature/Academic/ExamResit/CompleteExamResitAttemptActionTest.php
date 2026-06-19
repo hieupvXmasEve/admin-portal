@@ -203,6 +203,32 @@ it('raises a higher-but-still-failing resit score without flipping pass state', 
         ->and($record->failure_reason)->toBe(AcademicRecord::FAILURE_GRADE_FAILED);
 });
 
+it('normalizes a still-failing applied resit to grade_failed and clears a manual override', function () {
+    $attempt = completableExamResitAttempt(
+        originalScore: 48.0,
+        recordOverrides: [
+            'failure_reason' => AcademicRecord::FAILURE_MANUAL_FAILED,
+            'override_pass' => true,
+        ],
+    );
+    $record = $attempt->academicRecord;
+
+    app(CompleteExamResitAttemptAction::class)->run([
+        'attempt_id' => $attempt->id,
+        'resit_score' => 55.0,
+    ]);
+
+    $record->refresh();
+
+    // A recorded resit sitting supersedes the prior manual override: the still-failing
+    // result is, by definition, a grade failure (attendance was fine to be eligible).
+    expect((float) $record->final_percentage)->toBe(55.0)
+        ->and((bool) $record->is_passed)->toBeFalse()
+        ->and($record->completion_status)->toBe('failed')
+        ->and($record->failure_reason)->toBe(AcademicRecord::FAILURE_GRADE_FAILED)
+        ->and((bool) $record->override_pass)->toBeFalse();
+});
+
 it('rejects completion when the fee is unpaid and policy forbids unpaid sitting', function () {
     $attempt = completableExamResitAttempt(attemptOverrides: [
         'hq_fee_status' => ExamResitAttempt::HQ_FEE_CHARGE_CREATED,

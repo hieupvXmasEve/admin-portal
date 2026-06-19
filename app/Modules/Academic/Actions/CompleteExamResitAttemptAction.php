@@ -19,6 +19,9 @@ use Illuminate\Validation\ValidationException;
  * - Higher-score rule: the final academic_records result uses the HIGHER of the
  *   existing final score and the resit score. A lower resit never reduces the
  *   record; it is still recorded and consumes an attempt.
+ * - On an applied (strictly higher) resit, the result is score-authoritative: it
+ *   clears any prior manual override (`override_pass`), and a still-failing result
+ *   is normalized to `grade_failed` (attendance was already fine to be eligible).
  * - Attempt counting: `attempt_number` is consumed ONLY at completion (the student
  *   actually sat the resit and a result was recorded), separate from the
  *   request/source sequence assigned at creation time.
@@ -136,6 +139,10 @@ class CompleteExamResitAttemptAction
 
     private function assertCanComplete(ExamResitAttempt $attempt): void
     {
+        // Interim: completion is allowed directly from `approved` because the
+        // exam-resit scheduling slice (sessions/room slots) does not exist yet, so
+        // nothing reaches `scheduled`. Confirmed decision: once that slice lands,
+        // completion must require `scheduled` (no bypass).
         $completable = [
             ExamResitAttempt::STATUS_APPROVED,
             ExamResitAttempt::STATUS_SCHEDULED,
@@ -301,9 +308,12 @@ class CompleteExamResitAttemptAction
             'satisfies_prerequisite' => $isPassed,
             'credit_points_earned' => $isPassed ? $creditPoints : 0,
             'credit_hours_earned' => $isPassed ? (float) $record->credit_hours : 0,
-            // Resit only repairs grade failure; clear failure_reason on pass,
-            // otherwise keep the existing (grade/manual) reason.
-            'failure_reason' => $isPassed ? null : $record->failure_reason,
+            // A recorded resit sitting is score-authoritative and supersedes any
+            // prior manual override: clear failure_reason on pass, otherwise the
+            // still-failing result is normalized to grade_failed (attendance was
+            // already fine to be eligible for resit).
+            'failure_reason' => $isPassed ? null : AcademicRecord::FAILURE_GRADE_FAILED,
+            'override_pass' => false,
             'grade_history' => $gradeHistory,
             'last_grade_change_at' => now(),
         ]);
