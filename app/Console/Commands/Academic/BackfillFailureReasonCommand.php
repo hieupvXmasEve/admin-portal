@@ -117,9 +117,9 @@ class BackfillFailureReasonCommand extends Command
         $total = (clone $pending)->count();
 
         if ($total === 0) {
-            $this->info('No retake/resit-linked failed records need backfilling.');
+            $this->info('No retake/resit-linked records need backfilling.');
         } elseif ($dryRun) {
-            $this->warn("[dry-run] {$total} retake/resit-linked failed record(s) would be labelled grade_failed.");
+            $this->warn("[dry-run] {$total} retake/resit-linked record(s) would be labelled grade_failed.");
         } else {
             $updated = 0;
             $pending->chunkById(500, function (Collection $records) use (&$updated): void {
@@ -136,7 +136,7 @@ class BackfillFailureReasonCommand extends Command
                     $updated++;
                 }
             });
-            $this->info("Labelled {$updated} retake/resit-linked failed record(s) as grade_failed.");
+            $this->info("Labelled {$updated} retake/resit-linked record(s) as grade_failed.");
         }
 
         $anomalies = $this->resitAnomalyStudentIds($resitUnits)->count();
