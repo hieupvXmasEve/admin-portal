@@ -139,22 +139,19 @@ class CompleteExamResitAttemptAction
 
     private function assertCanComplete(ExamResitAttempt $attempt): void
     {
-        // Interim: completion is allowed directly from `approved` because the
-        // exam-resit scheduling slice (sessions/room slots) does not exist yet, so
-        // nothing reaches `scheduled`. Confirmed decision: once that slice lands,
-        // completion must require `scheduled` (no bypass).
-        $completable = [
-            ExamResitAttempt::STATUS_APPROVED,
-            ExamResitAttempt::STATUS_SCHEDULED,
-        ];
-
-        if (in_array($attempt->status, $completable, true)) {
+        // Completion requires a scheduled sitting. The scheduling slice
+        // (ScheduleExamResitAttemptAction) now moves an approved attempt to
+        // `scheduled` by assigning it to a unit-scoped session, so there is no
+        // longer an approved-state bypass.
+        if ($attempt->status === ExamResitAttempt::STATUS_SCHEDULED) {
             return;
         }
 
-        $message = $attempt->status === ExamResitAttempt::STATUS_COMPLETED
-            ? 'Lần thi lại này đã được ghi nhận kết quả.'
-            : 'Trạng thái thi lại không hợp lệ để ghi nhận kết quả.';
+        $message = match ($attempt->status) {
+            ExamResitAttempt::STATUS_COMPLETED => 'Lần thi lại này đã được ghi nhận kết quả.',
+            ExamResitAttempt::STATUS_APPROVED => 'Lần thi lại chưa được xếp lịch, chưa thể ghi nhận kết quả.',
+            default => 'Trạng thái thi lại không hợp lệ để ghi nhận kết quả.',
+        };
 
         throw ValidationException::withMessages(['status' => [$message]]);
     }

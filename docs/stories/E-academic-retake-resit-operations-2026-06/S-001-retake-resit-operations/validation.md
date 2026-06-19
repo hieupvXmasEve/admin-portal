@@ -277,3 +277,87 @@ Confirmed product decisions 2026-06-20 (resolved unresolved questions):
 - A still-failing applied resit normalizes `failure_reason` to `grade_failed` and
   clears any prior manual override, since a recorded resit sitting is
   score-authoritative.
+
+## Slice Evidence - 2026-06-20 (Slice 5: Exam-resit scheduling)
+
+Implemented the dedicated exam-resit (thi lại) scheduling model and its lifecycle
+into the `scheduled` state. Exam resit is scheduled with its own session model,
+never the course `class_sessions` model, so it never looks like normal course
+delivery. Backend-only slice (no UI), matching prior slices.
+
+Schema (one migration, `2026_06_20_120000_create_exam_resit_scheduling_tables`):
+
+- `exam_room_slots` = one room + date/time block (the unit of room-conflict and
+  invigilation; capacity defaults to room capacity).
+- `exam_resit_sessions` = one unit/course exam inside a slot; multiple unit-scoped
+  sessions may share one slot, bounded by the slot's seat capacity.
+- `exam_room_slot_invigilators` = invigilators (lecturers) attached to the shared
+  room block, unique per `(slot, lecture)`.
+- `exam_resit_attempts` gains `exam_resit_session_id`, `scheduled_at`,
+  `scheduled_by_user_id` (all nullable/additive).
+
+Behavior:
+
+- `CreateExamRoomSlotAction` reserves a room block and rejects overlap with live
+  `class_sessions`, active (`pending`/`approved`) `room_bookings`, and other
+  scheduled `exam_room_slots` in the same room. Half-open overlap rule, so
+  adjacent blocks (e.g. 09:00–11:00 then 11:00–13:00) do not conflict. Capacity
+  defaults to room capacity and cannot exceed it.
+- `CreateExamResitSessionAction` creates a unit-scoped session inside a slot;
+  several different-unit sessions share one slot without conflict, and the sum of
+  their `expected_candidates` cannot exceed the slot capacity.
+- `ScheduleExamResitAttemptAction` assigns an `approved` attempt to a matching
+  unit/campus session → `scheduled`. Guards: only `approved` is schedulable; the
+  session must be live; the session's planned seats cap how many attempts it can
+  hold; the student must be free of overlapping enrolled `class_sessions` and other
+  scheduled exam-resit sessions; scheduling before payment is allowed only when the
+  snapshotted policy permits an unpaid sitting AND a visible reason is recorded
+  (payment stays a parallel HQ state, so the unpaid row remains visible).
+- `AssignExamResitInvigilatorAction` assigns a lecturer to a slot (lead/assistant/
+  backup), rejecting an invigilator who is teaching a `class_session` or already
+  invigilating another slot at an overlapping time, and duplicate assignment.
+- All conflict predicates live in one shared
+  `App\Modules\Academic\Services\ExamScheduleConflictChecker`.
+- `CompleteExamResitAttemptAction` now requires `scheduled` (the prior interim
+  `approved` bypass is removed, honoring the confirmed slice-4 decision).
+
+Commands run:
+
+```bash
+./scripts/dev.sh test tests/Feature/Academic/ExamResit
+# PASS: 55 tests, 144 assertions (10 room-slot + 5 session + 10 schedule +
+#       8 invigilator + 13 completion + 9 prior create/sync)
+
+./scripts/dev.sh test tests/Feature/Academic/ExamResit tests/Feature/Academic/RetakeCourse
+# PASS: 106 tests, 346 assertions
+
+./scripts/dev.sh test tests/Feature/Finance/ExamResitChargeActionTest.php \
+  tests/Feature/Finance/RetakeResitChargeSourceTest.php \
+  tests/Feature/Finance/RetakeResitHqWorklistTest.php \
+  tests/Feature/Finance/Dng/ListDngWorklistQueryTest.php
+# PASS: 24 tests, 65 assertions (finance exam-resit handoff unaffected)
+
+./scripts/dev.sh composer exec pint -- --test <18 new/changed PHP files>
+# PASS: 18 files
+
+git diff --check
+# PASS (clean)
+```
+
+Confirmed product decisions 2026-06-20 (slice 5):
+
+- Completion now requires `scheduled` (no `approved` bypass); the scheduling action
+  moves an approved attempt to `scheduled` by assigning it to a unit-scoped session.
+- Slot capacity defaults to room capacity and cannot exceed it; per-session
+  assignment is capped by the session's `expected_candidates`.
+- Invigilation attaches to the room slot (not a single session) because one slot may
+  host multiple unit-scoped sessions; invigilators are existing `lectures` rows.
+
+Validation gap (unchanged from prior slices):
+
+- `vue-tsc --noEmit` still OOMs in the dev container; no frontend source changed in
+  this slice.
+- Deferred to later slices: student/invigilator timetable merge of assigned
+  exam-resit sessions (Platform contract), exam-resit overdue/reminder monitoring,
+  paid cancellation refund/reversal, legacy `exam_resit_fee` backfill, the Academic
+  staff scheduling UI/routes, and student portal/API.

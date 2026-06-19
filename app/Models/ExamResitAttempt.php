@@ -53,9 +53,12 @@ class ExamResitAttempt extends AuditableModel
         'rejected_at',
         'rejection_reason',
         'status',
+        'exam_resit_session_id',
         'request_sequence',
         'attempt_number',
         'approved_at',
+        'scheduled_at',
+        'scheduled_by_user_id',
         'cancelled_at',
         'cancellation_reason',
         'no_show_at',
@@ -93,6 +96,7 @@ class ExamResitAttempt extends AuditableModel
         'reviewed_at' => 'datetime',
         'rejected_at' => 'datetime',
         'approved_at' => 'datetime',
+        'scheduled_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'no_show_at' => 'datetime',
         'completed_at' => 'datetime',
@@ -148,6 +152,11 @@ class ExamResitAttempt extends AuditableModel
     public function syllabusTemplate(): BelongsTo
     {
         return $this->belongsTo(SyllabusTemplate::class);
+    }
+
+    public function session(): BelongsTo
+    {
+        return $this->belongsTo(ExamResitSession::class, 'exam_resit_session_id');
     }
 
     public function financeCharge(): BelongsTo

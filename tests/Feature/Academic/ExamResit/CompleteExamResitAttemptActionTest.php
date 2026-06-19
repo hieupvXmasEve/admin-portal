@@ -98,7 +98,7 @@ function completableExamResitAttempt(
         'operation_semester_id' => test()->semester->id,
         'charge_semester_id' => test()->semester->id,
         'request_origin' => ExamResitAttempt::REQUEST_ORIGIN_STAFF,
-        'status' => ExamResitAttempt::STATUS_APPROVED,
+        'status' => ExamResitAttempt::STATUS_SCHEDULED,
         'request_sequence' => 1,
         'attempt_number' => null,
         'approved_at' => now(),
@@ -285,6 +285,19 @@ it('cannot complete an attempt that is already completed', function () {
     app(CompleteExamResitAttemptAction::class)->run([
         'attempt_id' => $attempt->id,
         'resit_score' => 80.0,
+    ]);
+})->throws(ValidationException::class);
+
+it('rejects completing an attempt that has not been scheduled yet', function () {
+    // Now that scheduling infra exists, completion must require `scheduled`:
+    // an approved-but-unscheduled attempt cannot be completed.
+    $attempt = completableExamResitAttempt(attemptOverrides: [
+        'status' => ExamResitAttempt::STATUS_APPROVED,
+    ]);
+
+    app(CompleteExamResitAttemptAction::class)->run([
+        'attempt_id' => $attempt->id,
+        'resit_score' => 75.0,
     ]);
 })->throws(ValidationException::class);
 
