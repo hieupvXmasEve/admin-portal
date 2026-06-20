@@ -20,7 +20,7 @@ class AllocatePaymentAction
         protected SettlementService $settlementService
     ) {}
 
-    public function run(Payment $payment, FinanceCharge $charge, float $amount, int $userId): PaymentApplication
+    public function run(Payment $payment, FinanceCharge $charge, float $amount, ?int $userId = null): PaymentApplication
     {
         // 1. Validation
         if ($amount <= 0) {

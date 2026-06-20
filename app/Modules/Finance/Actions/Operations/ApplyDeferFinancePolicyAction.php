@@ -341,7 +341,7 @@ class ApplyDeferFinancePolicyAction
                 continue;
             }
 
-            $this->allocateAction->run($payment, $adjustment, $allocate, (int) $actorId);
+            $this->allocateAction->run($payment, $adjustment, $allocate, $actorId);
             $remaining = round($remaining - $allocate, 2);
         }
     }

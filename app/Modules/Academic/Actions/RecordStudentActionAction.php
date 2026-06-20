@@ -13,6 +13,7 @@ use App\Models\FinanceCharge;
 use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\StudentChange;
+use App\Modules\Finance\Actions\Operations\ApplyDeferFinancePolicyAction;
 use App\Modules\Finance\Services\DeferCaseService;
 use App\Modules\Finance\Services\FinanceChargeService;
 use Illuminate\Support\Facades\Auth;
@@ -123,6 +124,15 @@ class RecordStudentActionAction
 
                 if ($isEgcDefer) {
                     self::createEgcDeferCredits($deferCase, $student, $data, $userId);
+                } else {
+                    // FIN-REV-020-03 (M3): auto-apply the defer finance policy for
+                    // auto-safe FULL-scope PRESERVE/FORFEIT (non-EGC) cases, in this
+                    // same transaction. The action self-gates needs-review cases
+                    // (live DNG, discount, non-FULL/PARTIAL scope) → no money
+                    // mutation, left for the operator review queue. Idempotent: a
+                    // settled case has no active obligation, so re-running is a noop.
+                    // EGC defers keep their own DEFER_CREDIT offset mechanism above.
+                    app(ApplyDeferFinancePolicyAction::class)->handle($deferCase, $userId);
                 }
             }
 
@@ -314,6 +324,7 @@ class RecordStudentActionAction
             if ($student->status === 'intake_pre_uni_gc') {
                 return 1;
             }
+
             return null;
         }
 
