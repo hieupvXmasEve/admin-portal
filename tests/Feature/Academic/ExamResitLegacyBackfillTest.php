@@ -6,11 +6,17 @@ use App\Models\AcademicRecord;
 use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\ExamResitAttempt;
+use App\Models\ExamResitSession;
+use App\Models\ExamRoomSlot;
+use App\Models\ExamRoomSlotInvigilator;
 use App\Models\FinanceCharge;
+use App\Models\Lecture;
+use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
+use App\Modules\Academic\Actions\BackfillLegacyExamResitScheduleAction;
 use App\Modules\Academic\Actions\CreateLegacyExamResitChargeFromPaidPtlAction;
 use App\Modules\Academic\Actions\ReconcileLegacyExamResitFeesAction;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
@@ -90,6 +96,21 @@ function legacyExamResitCharge(array $opts = []): FinanceCharge
         'amount' => $opts['amount'] ?? 750_000,
         'description' => $opts['description'] ?? 'Phí thi lại (legacy import)',
     ]);
+}
+
+function legacyApprovedAttempt(Unit $unit, array $overrides = []): ExamResitAttempt
+{
+    return makeApprovedExamResitAttempt(
+        test()->student,
+        test()->campus,
+        test()->semester,
+        array_merge([
+            'unit' => $unit,
+            'hq_fee_status' => ExamResitAttempt::HQ_FEE_PAID,
+            'paid_at' => now(),
+            'policy_snapshot' => ['legacy_backfill' => true],
+        ], $overrides),
+    );
 }
 
 function paidPtlDngRequest(array $opts = []): DngPaymentRequest
@@ -364,4 +385,80 @@ it('creates charge and reconciles end-to-end through the artisan command for pai
         ->sole();
 
     expect(ExamResitAttempt::query()->where('finance_charge_id', $charge->id)->exists())->toBeTrue();
+});
+
+it('backfills legacy exam-resit schedule with slot, session, invigilator, and scheduled attempt', function () {
+    Room::factory()->create(['campus_id' => $this->campus->id, 'capacity' => 50]);
+    $invigilatorUser = User::factory()->create();
+    Lecture::factory()->create([
+        'campus_id' => $this->campus->id,
+        'user_id' => $invigilatorUser->id,
+    ]);
+
+    $unit = resitUnit();
+    $attempt = legacyApprovedAttempt($unit);
+
+    $result = app(BackfillLegacyExamResitScheduleAction::class)->run(
+        examDate: '2026-04-20',
+        startTime: '09:00',
+        endTime: '11:00',
+        invigilatorUserId: $invigilatorUser->id,
+        actorUserId: $this->user->id,
+    );
+
+    expect($result['checked'])->toBe(1)
+        ->and($result['scheduled'])->toBe(1)
+        ->and($result['slots_created'])->toBe(1)
+        ->and($result['sessions_created'])->toBe(1)
+        ->and($result['invigilators_assigned'])->toBe(1);
+
+    $attempt->refresh();
+    $slot = ExamRoomSlot::query()->whereDate('exam_date', '2026-04-20')->sole();
+    $session = ExamResitSession::query()->where('exam_room_slot_id', $slot->id)->sole();
+
+    expect($attempt->status)->toBe(ExamResitAttempt::STATUS_SCHEDULED)
+        ->and($attempt->exam_resit_session_id)->toBe($session->id)
+        ->and($attempt->scheduled_at?->format('Y-m-d H:i'))->toBe('2026-04-20 09:00')
+        ->and($attempt->policy_snapshot['legacy_schedule_backfill'] ?? null)->toBeTrue()
+        ->and($slot->start_time->format('H:i:s'))->toBe('09:00:00')
+        ->and($session->unit_id)->toBe($unit->id)
+        ->and($session->actual_candidates)->toBe(1)
+        ->and(ExamRoomSlotInvigilator::query()->where('exam_room_slot_id', $slot->id)->exists())->toBeTrue();
+});
+
+it('is idempotent for legacy schedule backfill', function () {
+    Room::factory()->create(['campus_id' => $this->campus->id, 'capacity' => 50]);
+    $invigilatorUser = User::factory()->create();
+    Lecture::factory()->create([
+        'campus_id' => $this->campus->id,
+        'user_id' => $invigilatorUser->id,
+    ]);
+    legacyApprovedAttempt(resitUnit());
+
+    $action = app(BackfillLegacyExamResitScheduleAction::class);
+    $first = $action->run('2026-04-20', '09:00', '11:00', $invigilatorUser->id, $this->user->id);
+    $second = $action->run('2026-04-20', '09:00', '11:00', $invigilatorUser->id, $this->user->id);
+
+    expect($first['scheduled'])->toBe(1)
+        ->and($second['checked'])->toBe(0)
+        ->and($second['scheduled'])->toBe(0)
+        ->and(ExamRoomSlot::query()->count())->toBe(1)
+        ->and(ExamResitSession::query()->count())->toBe(1);
+});
+
+it('runs legacy schedule backfill through the artisan command', function () {
+    Room::factory()->create(['campus_id' => $this->campus->id, 'capacity' => 50]);
+    $invigilatorUser = User::factory()->create();
+    Lecture::factory()->create([
+        'campus_id' => $this->campus->id,
+        'user_id' => $invigilatorUser->id,
+    ]);
+    $attempt = legacyApprovedAttempt(resitUnit());
+
+    $this->artisan('academic:backfill-legacy-exam-resit-schedule', [
+        '--invigilator-user-id' => $invigilatorUser->id,
+        '--actor-user-id' => $this->user->id,
+    ])->assertExitCode(0);
+
+    expect($attempt->fresh()->status)->toBe(ExamResitAttempt::STATUS_SCHEDULED);
 });
