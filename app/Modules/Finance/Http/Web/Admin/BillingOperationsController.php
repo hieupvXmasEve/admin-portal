@@ -14,6 +14,7 @@ use App\Modules\Finance\Queries\Operations\GetBillingExceptionCountsQuery;
 use App\Modules\Finance\Queries\Operations\GetDueItemsSummaryQuery;
 use App\Modules\Finance\Queries\Operations\ListBillingExceptionsQuery;
 use App\Modules\Finance\Queries\Operations\ListDueItemsQuery;
+use App\Modules\Finance\Queries\Operations\ListExamResitHandoffQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -132,35 +133,44 @@ class BillingOperationsController extends Controller
     public function dueCalendar(
         Request $request,
         GetDueItemsSummaryQuery $summaryQuery,
-        ListDueItemsQuery $listQuery
+        ListDueItemsQuery $listQuery,
+        ListExamResitHandoffQuery $handoffQuery
     ): Response {
         $validated = $request->validate([
-            'semester_id' => 'nullable|integer|exists:semesters,id',
             'status' => 'nullable|string',
             'search' => 'nullable|string',
+            'source' => 'nullable|string|in:dng_request,exam_resit',
+            'fee_type' => 'nullable|string',
         ]);
 
-        $semesterId = isset($validated['semester_id']) ? (int) $validated['semester_id'] : null;
+        // Semester is driven by the global top-bar SemesterSwitcher (session-backed,
+        // active-semester fallback) — same source as the shared `semester` prop —
+        // not a per-page select.
+        $semesterId = $this->resolveSelectedSemesterId();
         $status = $validated['status'] ?? 'all';
         $search = $validated['search'] ?? '';
-
-        $currentSemester = $semesterId
-            ? Semester::find($semesterId)
-            : Semester::where('is_active', true)->first();
+        $source = $validated['source'] ?? null;
+        $feeType = $validated['fee_type'] ?? null;
 
         $summary = $summaryQuery->handle($semesterId);
-        $invoices = $listQuery->handle($semesterId, $status, $search);
-        $semesters = Semester::orderBy('start_date', 'desc')->get();
+        $invoices = $listQuery->handle($semesterId, $status, $search, $source, $feeType);
+
+        // Exam-resit (PTL) sources that are overdue but still need charge/DNG
+        // creation are surfaced as a handoff list, unless the staff is filtering
+        // to plain DNG-request rows only.
+        $handoff = $source === ListDueItemsQuery::SOURCE_DNG_REQUEST
+            ? null
+            : $handoffQuery->handle($semesterId, $search);
 
         return Inertia::render('Finance/Operations/DueCalendar', [
             'invoices' => $invoices,
+            'handoffItems' => $handoff,
             'summary' => $summary,
-            'semesters' => $semesters,
-            'currentSemester' => $currentSemester,
             'filters' => [
-                'semester_id' => $semesterId ? (string) $semesterId : null,
                 'status' => $status,
                 'search' => $search,
+                'source' => $source ?? 'all',
+                'fee_type' => $feeType ?? 'all',
             ],
         ]);
     }

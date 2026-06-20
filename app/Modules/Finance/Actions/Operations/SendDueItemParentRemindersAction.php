@@ -9,6 +9,7 @@ use App\Models\StudentInvoice;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\DngInstallmentContextResolver;
+use App\Modules\Finance\Support\ExamResitDngLinkResolver;
 use App\Modules\Finance\Support\LifecycleDueItemPredicate;
 use App\Modules\Notification\EmailContent\EmailContentRegistry;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
@@ -141,6 +142,7 @@ class SendDueItemParentRemindersAction
                 // Update last_reminder_at for DNG request if any parent email was sent
                 if ($sentAnyParent) {
                     $dngRequest->update(['last_reminder_at' => $now]);
+                    self::mirrorExamResitReminder($dngRequest, $now);
                 }
             } elseif ($type === 'invoice') {
                 // Handle Student Invoice
@@ -215,6 +217,24 @@ class SendDueItemParentRemindersAction
                 $skippedLifecycleExceptionCount,
             ),
         ];
+    }
+
+    /**
+     * Mirror a successful DNG parent reminder onto the linked exam-resit
+     * attempt(s) (ACAD-RET-002). Additive only — never changes recipient
+     * selection or delivery.
+     */
+    private static function mirrorExamResitReminder(DngPaymentRequest $dngRequest, \DateTimeInterface $now): void
+    {
+        $touched = app(ExamResitDngLinkResolver::class)->touchLinkedAttempts($dngRequest, $now);
+
+        if ($touched > 0) {
+            Log::info('Mirrored exam-resit reminder timestamp', [
+                'dng_request_id' => $dngRequest->id,
+                'exam_resit_attempts_touched' => $touched,
+                'recipient' => 'parent',
+            ]);
+        }
     }
 
     private static function extractParentEmails(?Collection $parentProfiles): Collection

@@ -4,14 +4,34 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Operations;
 
+use App\Models\ExamResitAttempt;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Support\ExamResitDngLinkResolver;
+use App\Modules\Finance\Support\ExamResitDueClassification;
+use App\Modules\Finance\Support\ExamResitDueClassifier;
+use App\Modules\Finance\Support\ExamResitDueRowPresenter;
 use App\Modules\Finance\Support\LifecycleDueItemPredicate;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class ListDueItemsQuery
 {
-    public function handle(?int $semesterId, ?string $status, ?string $search): LengthAwarePaginator
-    {
+    public const SOURCE_DNG_REQUEST = 'dng_request';
+
+    public const SOURCE_EXAM_RESIT = 'exam_resit';
+
+    public function __construct(
+        private readonly ExamResitDngLinkResolver $linkResolver = new ExamResitDngLinkResolver,
+        private readonly ExamResitDueClassifier $classifier = new ExamResitDueClassifier,
+    ) {}
+
+    public function handle(
+        ?int $semesterId,
+        ?string $status,
+        ?string $search,
+        ?string $source = null,
+        ?string $feeType = null,
+    ): LengthAwarePaginator {
         $campusId = app()->bound('campus') ? app('campus')->id : null;
         $today = now()->startOfDay();
 
@@ -22,6 +42,12 @@ class ListDueItemsQuery
             ->whereNotNull('dng_payment_requests.due_date');
 
         LifecycleDueItemPredicate::applyActiveCollectionScope($dngQuery, $campusId);
+
+        $this->applySourceFilter($dngQuery, $source);
+
+        if (! empty($feeType)) {
+            $dngQuery->where('dng_payment_requests.fee_type', $feeType);
+        }
 
         if (! empty($status)) {
             switch ($status) {
@@ -48,38 +74,76 @@ class ListDueItemsQuery
         $page = (int) request()->get('page', 1);
         $perPage = min(500, max(1, (int) request()->get('per_page', 20)));
 
-        return $dngQuery
+        $paginator = $dngQuery
             ->orderBy('dng_payment_requests.due_date')
-            ->paginate($perPage, ['*'], 'page', $page)
-            ->through(function (DngPaymentRequest $request) use ($today) {
-                $dueDate = $request->due_date;
-                $daysUntilDue = $today->diffInDays($dueDate, false);
+            ->paginate($perPage, ['*'], 'page', $page);
 
-                $requestStatus = 'upcoming';
-                if ($daysUntilDue < 0) {
-                    $requestStatus = 'overdue';
-                } elseif ($daysUntilDue === 0) {
-                    $requestStatus = 'due_today';
-                }
+        // Resolve exam-resit (PTL) linkage for just this page, batched.
+        $paginator->getCollection()->loadMissing(['chargeLinks']);
+        $attemptsByRequest = $this->linkResolver->attemptsByDngRequest($paginator->getCollection());
 
-                return [
-                    'id' => $request->id,
-                    'type' => 'dng_request',
-                    'invoice_number' => 'DNG-'.$request->id,
-                    'student_id' => $request->student_id,
-                    'student_code' => $request->student?->student_id,
-                    'student_name' => $request->student?->full_name,
-                    'student_email' => $request->student?->email,
-                    'total_amount' => (float) $request->amount,
-                    'paid_amount' => 0.0,
-                    'balance' => (float) $request->amount,
-                    'due_date' => $dueDate->toDateString(),
-                    'days_until_due' => $daysUntilDue,
-                    'status' => $requestStatus,
-                    'student_status_label' => $request->student?->status_label,
-                    'student_status_color' => $request->student?->status_color,
-                    'last_reminder_at' => $request->last_reminder_at,
-                ];
-            });
+        return $paginator->through(
+            fn (DngPaymentRequest $request) => $this->toRow($request, $today, $attemptsByRequest[$request->id] ?? null),
+        );
+    }
+
+    /**
+     * @param  Builder<DngPaymentRequest>  $query
+     */
+    private function applySourceFilter($query, ?string $source): void
+    {
+        if ($source === self::SOURCE_EXAM_RESIT) {
+            $query->where('dng_payment_requests.fee_type', ExamResitDueRowPresenter::FEE_TYPE_PTL);
+        } elseif ($source === self::SOURCE_DNG_REQUEST) {
+            $query->where('dng_payment_requests.fee_type', '!=', ExamResitDueRowPresenter::FEE_TYPE_PTL);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function toRow(DngPaymentRequest $request, $today, ?ExamResitAttempt $attempt): array
+    {
+        $dueDate = $request->due_date;
+        $daysUntilDue = $today->diffInDays($dueDate, false);
+
+        $requestStatus = 'upcoming';
+        if ($daysUntilDue < 0) {
+            $requestStatus = 'overdue';
+        } elseif ($daysUntilDue === 0) {
+            $requestStatus = 'due_today';
+        }
+
+        $row = [
+            'id' => $request->id,
+            'type' => 'dng_request',
+            'invoice_number' => 'DNG-'.$request->id,
+            'student_id' => $request->student_id,
+            'student_code' => $request->student?->student_id,
+            'student_name' => $request->student?->full_name,
+            'student_email' => $request->student?->email,
+            'total_amount' => (float) $request->amount,
+            'paid_amount' => 0.0,
+            'balance' => (float) $request->amount,
+            'due_date' => $dueDate->toDateString(),
+            'days_until_due' => $daysUntilDue,
+            'status' => $requestStatus,
+            'fee_type' => $request->fee_type,
+            'source_type' => self::SOURCE_DNG_REQUEST,
+            'source_id' => null,
+            // Plain DNG rows scoped here are active pushed requests for active
+            // students, so they remain remindable as before.
+            'reminder_state' => ExamResitDueClassification::REMINDER_STATE_REMINDABLE,
+            'student_status_label' => $request->student?->status_label,
+            'student_status_color' => $request->student?->status_color,
+            'last_reminder_at' => $request->last_reminder_at,
+        ];
+
+        if ($attempt !== null) {
+            $classification = $this->classifier->classify($attempt, hasActivePushedDng: true);
+            $row = array_merge($row, ExamResitDueRowPresenter::examResitContext($attempt, $classification));
+        }
+
+        return $row;
     }
 }

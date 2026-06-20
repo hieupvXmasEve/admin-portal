@@ -9,12 +9,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { PaginatedResponse } from '@/types';
-import { formatCurrency, type Semester } from '@/types/finance';
+import { formatCurrency } from '@/types/finance';
 import { formatDateTime } from '@/utils/date';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { AlertTriangle, ArrowRight, Bell, Calendar, CalendarClock, CalendarDays, CalendarX2, Clock, Download, Mail, Search } from 'lucide-vue-next';
+import { AlertTriangle, ArrowRight, Bell, Calendar, CalendarClock, CalendarDays, CalendarX2, Clock, Download, ExternalLink, GraduationCap, Mail, Search } from 'lucide-vue-next';
 import { ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
+
+type ReminderState = 'remindable' | 'needs_charge_or_dng' | 'blocked';
+
+interface RoomRef {
+    name: string | null;
+    code: string | null;
+}
 
 interface InvoiceDueItem {
     id: number;
@@ -32,6 +39,38 @@ interface InvoiceDueItem {
     days_until_due: number;
     status: 'upcoming' | 'due_today' | 'overdue' | 'paid';
     last_reminder_at: string | null;
+    fee_type?: string | null;
+    source_type?: string | null;
+    source_id?: number | null;
+    reminder_state?: ReminderState;
+    blocked_reason?: string | null;
+    unit_code?: string | null;
+    unit_name?: string | null;
+    exam_date?: string | null;
+    exam_start_time?: string | null;
+    exam_end_time?: string | null;
+    room?: RoomRef | null;
+    days_overdue?: number | null;
+}
+
+interface HandoffItem {
+    id: number;
+    source_type: string;
+    source_id: number;
+    fee_type: string;
+    student_id: number;
+    student_code: string | null;
+    student_name: string | null;
+    student_status_label: string | null;
+    student_status_color: string | null;
+    amount: number;
+    unit_code: string | null;
+    unit_name: string | null;
+    exam_date: string | null;
+    exam_start_time: string | null;
+    days_overdue: number | null;
+    last_reminder_at: string | null;
+    handoff: { route_name: string; label: string };
 }
 
 interface DueSummary {
@@ -43,23 +82,25 @@ interface DueSummary {
 
 interface Props {
     invoices: PaginatedResponse<InvoiceDueItem>;
+    handoffItems: PaginatedResponse<HandoffItem> | null;
     summary: DueSummary;
-    semesters: Semester[];
     filters: {
-        semester_id: string | null;
         status: string;
         search: string;
+        source: string;
+        fee_type: string;
     };
-    currentSemester: Semester | null;
 }
 
 const props = defineProps<Props>();
 const { showConfirmDialog } = useGlobalConfirmDialog();
 
-// Local filter state
-const semesterId = ref(props.filters.semester_id || (props.currentSemester?.id ? String(props.currentSemester.id) : 'all'));
+// Local filter state. Semester is driven by the global top-bar SemesterSwitcher
+// (shared `semester` prop), not a per-page select.
 const statusFilter = ref(props.filters.status || 'all');
 const search = ref(props.filters.search || '');
+const sourceFilter = ref(props.filters.source || 'all');
+const feeTypeFilter = ref(props.filters.fee_type || 'all');
 
 // Search debounce
 let searchTimeout: ReturnType<typeof setTimeout>;
@@ -70,7 +111,7 @@ watch(search, () => {
     }, 300);
 });
 
-watch([semesterId, statusFilter], () => {
+watch([statusFilter, sourceFilter, feeTypeFilter], () => {
     applyFilters();
 });
 
@@ -78,9 +119,10 @@ const applyFilters = () => {
     router.get(
         route('finance.operations.due-calendar'),
         {
-            semester_id: semesterId.value !== 'all' ? semesterId.value : undefined,
             status: statusFilter.value !== 'all' ? statusFilter.value : undefined,
             search: search.value || undefined,
+            source: sourceFilter.value !== 'all' ? sourceFilter.value : undefined,
+            fee_type: feeTypeFilter.value !== 'all' ? feeTypeFilter.value : undefined,
         },
         { preserveState: true, preserveScroll: true },
     );
@@ -149,6 +191,26 @@ const getStudentStatusClass = (color: string) => {
     return map[color] ?? map.gray;
 };
 
+// Reminder-state presentation for exam-resit (PTL) rows.
+const blockedReasonLabel = (reason?: string | null) => {
+    switch (reason) {
+        case 'paid':
+            return 'Đã thanh toán';
+        case 'cancelled':
+            return 'Đã hủy';
+        case 'lifecycle_exception':
+            return 'Ngoại lệ lifecycle';
+        case 'missing_email':
+            return 'Thiếu email';
+        default:
+            return 'Không thể nhắc';
+    }
+};
+
+const isRemindable = (row: InvoiceDueItem) => !row.reminder_state || row.reminder_state === 'remindable';
+
+const isExamResit = (row: InvoiceDueItem) => row.source_type === 'exam_resit' || row.fee_type === 'PTL';
+
 // Format days remaining
 const formatDaysRemaining = (days: number) => {
     if (days === 0) return 'Hôm nay';
@@ -156,13 +218,16 @@ const formatDaysRemaining = (days: number) => {
     return `Còn ${days} ngày`;
 };
 
-// Selected invoices for bulk actions
+// Selected invoices for bulk actions — only remindable rows can be selected.
 const selectedInvoices = ref<number[]>([]);
+const remindableRows = () => props.invoices.data.filter((i) => isRemindable(i));
+
 const toggleSelectAll = () => {
-    if (selectedInvoices.value.length === props.invoices.data.length) {
+    const ids = remindableRows().map((i) => i.id);
+    if (selectedInvoices.value.length === ids.length && ids.length > 0) {
         selectedInvoices.value = [];
     } else {
-        selectedInvoices.value = props.invoices.data.map((i) => i.id);
+        selectedInvoices.value = ids;
     }
 };
 
@@ -179,8 +244,6 @@ const toggleInvoice = (id: number) => {
 const isSendingStudentReminders = ref(false);
 const isSendingParentReminders = ref(false);
 const isExporting = ref(false);
-
-// Flash messages are handled by router.post callbacks
 
 const sendStudentReminders = () => {
     if (selectedInvoices.value.length === 0) {
@@ -282,7 +345,6 @@ const exportList = async () => {
     try {
         window.open(
             route('finance.operations.export-due-list', {
-                semester_id: semesterId.value !== 'all' ? semesterId.value : undefined,
                 status: statusFilter.value !== 'all' ? statusFilter.value : undefined,
             }),
             '_blank',
@@ -301,6 +363,19 @@ const statusOptions = [
     { value: 'overdue', label: 'Quá hạn' },
 ];
 
+const sourceOptions = [
+    { value: 'all', label: 'Tất cả nguồn' },
+    { value: 'dng_request', label: 'DNG thường' },
+    { value: 'exam_resit', label: 'Thi lại (PTL)' },
+];
+
+const feeTypeOptions = [
+    { value: 'all', label: 'Tất cả loại phí' },
+    { value: 'PTL', label: 'PTL · Thi lại' },
+    { value: 'HP', label: 'HP · Học phí' },
+    { value: 'HL', label: 'HL · Học lại' },
+];
+
 defineOptions({
     layout: AppLayout,
 });
@@ -314,23 +389,12 @@ defineOptions({
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-3xl font-bold tracking-tight">DNG Due Reminders</h1>
-                <p class="text-muted-foreground mt-1">Hàng đợi nhắc nợ DNG — không phải lịch tháng</p>
+                <p class="text-muted-foreground mt-1">Hàng đợi nhắc nợ DNG — bao gồm phí thi lại (PTL) quá hạn</p>
             </div>
             <div class="flex items-center gap-3">
                 <Link :href="route('finance.operations.lifecycle-exceptions')">
                     <Button variant="outline">Lifecycle Exceptions</Button>
                 </Link>
-                <Select v-model="semesterId">
-                    <SelectTrigger class="w-[200px]">
-                        <SelectValue placeholder="Chọn học kỳ" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Tất cả học kỳ</SelectItem>
-                        <SelectItem v-for="sem in semesters" :key="sem.id" :value="String(sem.id)">
-                            {{ sem.name }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
             </div>
         </div>
 
@@ -385,7 +449,7 @@ defineOptions({
         <Card>
             <CardContent class="pt-6">
                 <div class="flex flex-wrap items-center justify-between gap-4">
-                    <div class="flex items-center gap-3">
+                    <div class="flex flex-wrap items-center gap-3">
                         <div class="relative">
                             <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
                             <Input v-model="search" placeholder="Tìm sinh viên, mã DNG request..." class="w-[250px] pl-10" />
@@ -396,6 +460,26 @@ defineOptions({
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
+                                    {{ opt.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select v-model="sourceFilter">
+                            <SelectTrigger class="w-[170px]">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="opt in sourceOptions" :key="opt.value" :value="opt.value">
+                                    {{ opt.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select v-model="feeTypeFilter">
+                            <SelectTrigger class="w-[170px]">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="opt in feeTypeOptions" :key="opt.value" :value="opt.value">
                                     {{ opt.label }}
                                 </SelectItem>
                             </SelectContent>
@@ -435,8 +519,8 @@ defineOptions({
                             <TableHead class="w-12">
                                 <input
                                     type="checkbox"
-                                    :checked="selectedInvoices.length === invoices.data.length && invoices.data.length > 0"
-                                    :indeterminate="selectedInvoices.length > 0 && selectedInvoices.length < invoices.data.length"
+                                    :checked="selectedInvoices.length === remindableRows().length && remindableRows().length > 0"
+                                    :indeterminate="selectedInvoices.length > 0 && selectedInvoices.length < remindableRows().length"
                                     class="h-4 w-4 rounded border-gray-300"
                                     @change="toggleSelectAll"
                                 />
@@ -464,10 +548,27 @@ defineOptions({
                         </TableRow>
                         <TableRow v-for="invoice in invoices.data" :key="invoice.id" :class="{ 'bg-red-50': invoice.status === 'overdue', 'bg-yellow-50': invoice.status === 'due_today' }">
                             <TableCell>
-                                <input type="checkbox" :checked="selectedInvoices.includes(invoice.id)" class="h-4 w-4 rounded border-gray-300" @change="toggleInvoice(invoice.id)" />
+                                <input
+                                    type="checkbox"
+                                    :checked="selectedInvoices.includes(invoice.id)"
+                                    :disabled="!isRemindable(invoice)"
+                                    class="h-4 w-4 rounded border-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
+                                    @change="toggleInvoice(invoice.id)"
+                                />
                             </TableCell>
                             <TableCell>
                                 <div class="font-medium">{{ invoice.invoice_number }}</div>
+                                <div v-if="isExamResit(invoice)" class="mt-1 flex flex-wrap items-center gap-1">
+                                    <Badge class="bg-purple-100 text-purple-800">
+                                        <GraduationCap class="mr-1 h-3 w-3" />
+                                        PTL
+                                    </Badge>
+                                    <span v-if="invoice.unit_code" class="text-muted-foreground text-xs">{{ invoice.unit_code }}</span>
+                                </div>
+                                <div v-if="isExamResit(invoice) && invoice.exam_date" class="text-muted-foreground mt-0.5 text-xs">
+                                    Thi: {{ new Date(invoice.exam_date).toLocaleDateString('vi-VN') }}
+                                    <span v-if="invoice.exam_start_time">· {{ invoice.exam_start_time }}</span>
+                                </div>
                             </TableCell>
                             <TableCell>
                                 <div>
@@ -520,6 +621,9 @@ defineOptions({
                                     <component :is="getStatusIcon(invoice.status)" class="mr-1 h-3 w-3" />
                                     {{ getStatusLabel(invoice.status) }}
                                 </Badge>
+                                <Badge v-if="!isRemindable(invoice)" class="mt-1 block w-fit bg-slate-200 text-slate-700">
+                                    {{ blockedReasonLabel(invoice.blocked_reason) }}
+                                </Badge>
                             </TableCell>
                             <TableCell>
                                 <div v-if="invoice.last_reminder_at" class="flex items-center gap-1 text-green-600">
@@ -545,5 +649,66 @@ defineOptions({
 
         <!-- Pagination -->
         <DataPagination :pagination-data="invoices" @navigate="handlePaginationNavigate" />
+
+        <!-- Exam-resit handoff: overdue PTL sources still needing charge/DNG creation -->
+        <Card v-if="handoffItems && handoffItems.total > 0" class="border-amber-200">
+            <CardHeader>
+                <CardTitle class="flex items-center gap-2">
+                    <AlertTriangle class="h-5 w-5 text-amber-500" />
+                    Thi lại quá hạn cần tạo phí / DNG
+                    <Badge variant="outline" class="ml-1">{{ handoffItems.total }}</Badge>
+                </CardTitle>
+                <p class="text-muted-foreground text-sm">Các lần thi lại đã quá hạn nhưng chưa có DNG để nhắc — chuyển sang luồng tạo DNG.</p>
+            </CardHeader>
+            <CardContent class="p-0">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Môn / Lịch thi</TableHead>
+                            <TableHead>Sinh viên</TableHead>
+                            <TableHead class="text-right">Lệ phí</TableHead>
+                            <TableHead>Quá hạn</TableHead>
+                            <TableHead class="text-right">Thao tác</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableRow v-for="item in handoffItems.data" :key="`handoff-${item.id}`">
+                            <TableCell>
+                                <div class="flex items-center gap-1 font-medium">
+                                    <GraduationCap class="h-4 w-4 text-purple-500" />
+                                    {{ item.unit_code ?? '—' }}
+                                </div>
+                                <div class="text-muted-foreground text-xs">{{ item.unit_name }}</div>
+                                <div v-if="item.exam_date" class="text-muted-foreground text-xs">
+                                    Thi: {{ new Date(item.exam_date).toLocaleDateString('vi-VN') }}
+                                    <span v-if="item.exam_start_time">· {{ item.exam_start_time }}</span>
+                                </div>
+                            </TableCell>
+                            <TableCell>
+                                <div class="font-medium">{{ item.student_name }}</div>
+                                <div class="text-muted-foreground text-xs">{{ item.student_code }}</div>
+                            </TableCell>
+                            <TableCell class="text-right font-medium">{{ formatCurrency(item.amount) }}</TableCell>
+                            <TableCell>
+                                <Badge class="bg-red-100 text-red-800">
+                                    <CalendarX2 class="mr-1 h-3 w-3" />
+                                    {{ item.days_overdue ?? 0 }} ngày
+                                </Badge>
+                            </TableCell>
+                            <TableCell class="text-right">
+                                <Link :href="route(item.handoff.route_name)">
+                                    <Button variant="outline" size="sm">
+                                        <ExternalLink class="mr-2 h-4 w-4" />
+                                        {{ item.handoff.label }}
+                                    </Button>
+                                </Link>
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+
+        <DataPagination v-if="handoffItems && handoffItems.total > 0" :pagination-data="handoffItems" @navigate="handlePaginationNavigate" />
     </div>
 </template>
