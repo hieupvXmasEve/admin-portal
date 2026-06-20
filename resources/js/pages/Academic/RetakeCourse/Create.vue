@@ -143,8 +143,8 @@ const submit = () => {
                     <div
                         v-for="entry in eligible_students"
                         :key="`${entry.student.id}-${entry.unit.id}`"
-                        class="hover:bg-accent cursor-pointer rounded-lg border p-3 transition-colors"
-                        :class="{ 'border-primary bg-accent': selectedEntry?.student.id === entry.student.id && selectedEntry?.unit.id === entry.unit.id }"
+                        class="hover:bg-muted/50 cursor-pointer rounded-lg border p-3 transition-colors"
+                        :class="{ 'border-primary bg-primary/5 ring-1 ring-primary/30': selectedEntry?.student.id === entry.student.id && selectedEntry?.unit.id === entry.unit.id }"
                         @click="selectEntry(entry)"
                     >
                         <div class="flex items-start justify-between">

@@ -72,3 +72,38 @@ git mv resources/js/pages/_tmp_campuses resources/js/pages/Campuses
 ```
 
 After rename, update all `Inertia::render()` calls to match the new PascalCase path.
+
+---
+
+## 3. `bg-accent` without paired foreground — unreadable green selection
+
+### The bug
+
+In Swinx theme tokens (`resources/css/app.css`), `--accent` equals `--primary` (brand green). Agents often copy Shadcn hover classes like `hover:bg-accent` or use `bg-accent` for selected list rows, but leave child text on default `text-foreground` (near-black).
+
+Result: dark text on saturated green background — poor contrast and ugly UI (seen on `/retake-course/create` eligible-student list).
+
+### The fix
+
+**Selectable list rows / cards (persistent selected state):** use a subtle tint that keeps default text readable:
+
+```vue
+class="hover:bg-muted/50 cursor-pointer rounded-lg border p-3 transition-colors"
+:class="{ 'border-primary bg-primary/5 ring-1 ring-primary/30': isSelected }"
+```
+
+Canonical references: `resources/js/pages/Admin/Canvas/Courses/Index.vue`, `resources/js/components/finance/batch/BatchWizard.vue`.
+
+**Transient hover/focus (menus, icon buttons):** if using solid `bg-accent`, always pair foreground:
+
+```vue
+class="hover:bg-accent hover:text-accent-foreground"
+```
+
+**Never** use bare `bg-accent` (or `bg-primary`) on multi-line content blocks without switching text to `*-foreground`.
+
+### Checklist for agents
+
+- [ ] Selected row uses `bg-primary/5` + `border-primary`, not solid `bg-accent`
+- [ ] Any `bg-accent` / `bg-primary` has matching `text-accent-foreground` / `text-primary-foreground`
+- [ ] Hover on list items uses `hover:bg-muted/50`, not solid `hover:bg-accent`

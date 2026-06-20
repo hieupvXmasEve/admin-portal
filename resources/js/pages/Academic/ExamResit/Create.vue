@@ -96,8 +96,8 @@ const submit = () => {
                     <div
                         v-for="entry in eligible_students"
                         :key="`${entry.student.id}-${entry.failed_record.id}`"
-                        class="hover:bg-accent cursor-pointer rounded-lg border p-3 transition-colors"
-                        :class="{ 'border-primary bg-accent': isSelected(entry) }"
+                        class="hover:bg-muted/50 cursor-pointer rounded-lg border p-3 transition-colors"
+                        :class="{ 'border-primary bg-primary/5 ring-1 ring-primary/30': isSelected(entry) }"
                         @click="selectEntry(entry)"
                     >
                         <div class="flex items-start justify-between">

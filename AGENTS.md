@@ -138,6 +138,8 @@ These are the top mistakes AI tools make in this codebase:
 | `DatePicker` in modal without `portalTo` | `<DatePicker v-model="..." />` | `<DatePicker :portal-to="modalContentRef ?? undefined">` |
 | `useNativeDialog: true` (reverting) | Remove `putConfig` or set `true` | Keep `useNativeDialog: false` in app.ts — required for Select above modal |
 | `input[type=date]` or `input[type=time]` in forms | `<Input type="date">` | `<DatePicker>` / `<TimePicker>` from `@/components/ui` |
+| Selected list row styling | `bg-accent` / `bg-primary` with default dark text | `border-primary bg-primary/5 ring-1 ring-primary/30`; hover `hover:bg-muted/50` |
+| Accent/primary surface | `bg-accent` alone | `bg-accent text-accent-foreground` (pair mandatory) |
 
 ## Development Principles
 

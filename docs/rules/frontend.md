@@ -163,12 +163,25 @@ return Inertia::flash('message', 'Item created successfully.')->back();
 
 Frontend handles automatically via `useFlashToast()` in AppLayout — no manual `toast.success()` needed.
 
-## 6. Page Folder Naming
+## 6. Page folder naming
 
 - **New page directories:** Must be `PascalCase` — `resources/js/pages/Finance/`, `resources/js/pages/Rooms/`
 - **Existing legacy dirs:** `kebab-case` (`rooms/`, `curriculum-versions/`) and `lowercase` (`auth/`) are allowed to remain — rename during refactor only
 
-## 7. UI Logic
+## 7. Theme tokens and selection states
+
+Swinx maps `--accent` to brand green (same as `--primary`). **Never** apply solid `bg-accent` or `bg-primary` on selectable list rows while leaving default dark text.
+
+| Use case | Classes |
+|---|---|
+| Selected list row / card | `border-primary bg-primary/5 ring-1 ring-primary/30` |
+| Row hover | `hover:bg-muted/50` |
+| Menu item / icon button hover | `hover:bg-accent hover:text-accent-foreground` |
+| Solid accent surface (rare) | `bg-accent text-accent-foreground` (pair mandatory) |
+
+See `docs/rules/frontend-gotchas.md` §3 for the contrast bug and canonical file references.
+
+## 8. UI Logic
 
 - **No Business Logic**: Frontend only displays state provided by Backend.
 - **Inertia**: Do not call APIs directly from Pages; receive data via Props.

@@ -77,8 +77,8 @@ const submit = () => {
                     <label
                         v-for="session in sessions"
                         :key="session.id"
-                        class="hover:bg-accent flex cursor-pointer items-center justify-between rounded-lg border p-3 transition-colors"
-                        :class="{ 'border-primary bg-accent': form.exam_resit_session_id === session.id }"
+                        class="hover:bg-muted/50 flex cursor-pointer items-center justify-between rounded-lg border p-3 transition-colors"
+                        :class="{ 'border-primary bg-primary/5 ring-1 ring-primary/30': form.exam_resit_session_id === session.id }"
                     >
                         <span class="flex items-center gap-3">
                             <input type="radio" :value="session.id" v-model="form.exam_resit_session_id" class="accent-primary" />

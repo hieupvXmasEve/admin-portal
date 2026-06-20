@@ -28,9 +28,11 @@ Status: Active baseline
 
 ## 4) Theming and Visual Consistency
 
-- Reuse existing design tokens/CSS variables.
-- Avoid hardcoding palette values when token exists.
+- Reuse existing design tokens/CSS variables in `resources/css/app.css`.
+- Avoid hardcoding palette values when a token exists.
 - Keep spacing, typography, and icon semantics consistent with existing pages.
+- **Foreground pairing:** any `bg-accent`, `bg-primary`, `bg-secondary`, or `bg-destructive` MUST include the matching `text-*-foreground` class on the same element (or an explicit child wrapper). In Swinx, `accent` and `primary` are the same brand green — solid green backgrounds with default black text are forbidden.
+- **Selectable lists:** use subtle selection (`border-primary bg-primary/5 ring-1 ring-primary/30`) instead of solid `bg-accent`. Hover with `hover:bg-muted/50`. See `docs/rules/frontend-gotchas.md` §3.
 
 ## 5) Forms and Interaction Patterns
 
