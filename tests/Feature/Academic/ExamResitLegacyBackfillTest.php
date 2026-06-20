@@ -16,6 +16,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
+use App\Modules\Academic\Actions\BackfillLegacyExamResitCompletionAction;
 use App\Modules\Academic\Actions\BackfillLegacyExamResitScheduleAction;
 use App\Modules\Academic\Actions\CreateLegacyExamResitChargeFromPaidPtlAction;
 use App\Modules\Academic\Actions\ReconcileLegacyExamResitFeesAction;
@@ -444,6 +445,80 @@ it('is idempotent for legacy schedule backfill', function () {
         ->and($second['scheduled'])->toBe(0)
         ->and(ExamRoomSlot::query()->count())->toBe(1)
         ->and(ExamResitSession::query()->count())->toBe(1);
+});
+
+it('completes legacy scheduled attempts from the current academic record score', function () {
+    Room::factory()->create(['campus_id' => $this->campus->id, 'capacity' => 50]);
+    $invigilatorUser = User::factory()->create();
+    Lecture::factory()->create([
+        'campus_id' => $this->campus->id,
+        'user_id' => $invigilatorUser->id,
+    ]);
+
+    $unit = resitUnit();
+    $record = failedGradeRecord($unit, [
+        'final_percentage' => 72.5,
+        'final_letter_grade' => 'B',
+        'is_passed' => true,
+        'completion_status' => 'completed',
+    ]);
+    $attempt = legacyApprovedAttempt($unit, ['academic_record_id' => $record->id]);
+
+    app(BackfillLegacyExamResitScheduleAction::class)->run(
+        '2026-04-20',
+        '09:00',
+        '11:00',
+        $invigilatorUser->id,
+        $this->user->id,
+    );
+
+    $result = app(BackfillLegacyExamResitCompletionAction::class)->run(
+        completedAt: '2026-04-20 11:00:00',
+        actorUserId: $this->user->id,
+    );
+
+    $attempt->refresh();
+    $slot = ExamRoomSlot::query()->sole();
+
+    expect($result['completed'])->toBe(1)
+        ->and($result['slots_closed'])->toBe(1)
+        ->and($attempt->status)->toBe(ExamResitAttempt::STATUS_COMPLETED)
+        ->and((float) $attempt->resit_score)->toBe(72.5)
+        ->and($attempt->attempt_number)->toBe(1)
+        ->and($attempt->policy_snapshot['legacy_completion_backfill'] ?? null)->toBeTrue()
+        ->and($slot->fresh()->status)->toBe(ExamRoomSlot::STATUS_COMPLETED);
+});
+
+it('excludes named student codes from legacy completion backfill', function () {
+    Room::factory()->create(['campus_id' => $this->campus->id, 'capacity' => 50]);
+    $invigilatorUser = User::factory()->create();
+    Lecture::factory()->create([
+        'campus_id' => $this->campus->id,
+        'user_id' => $invigilatorUser->id,
+    ]);
+
+    $this->student->update(['student_id' => 'SKIPME001']);
+    $unit = resitUnit();
+    failedGradeRecord($unit, ['final_percentage' => 55]);
+    legacyApprovedAttempt($unit);
+
+    app(BackfillLegacyExamResitScheduleAction::class)->run(
+        '2026-04-20',
+        '09:00',
+        '11:00',
+        $invigilatorUser->id,
+        $this->user->id,
+    );
+
+    $result = app(BackfillLegacyExamResitCompletionAction::class)->run(
+        completedAt: '2026-04-20 11:00:00',
+        actorUserId: $this->user->id,
+        excludeStudentCodes: ['SKIPME001'],
+    );
+
+    expect($result['checked'])->toBe(0)
+        ->and($result['completed'])->toBe(0)
+        ->and(ExamResitAttempt::query()->where('status', ExamResitAttempt::STATUS_SCHEDULED)->count())->toBe(1);
 });
 
 it('runs legacy schedule backfill through the artisan command', function () {
