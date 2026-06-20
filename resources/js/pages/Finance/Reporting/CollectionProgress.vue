@@ -232,7 +232,7 @@ const lookupInvoiceUrl = (row: CollectionProgressRow): string | undefined => {
 
 <template>
     <div class="space-y-4">
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
             <Card v-for="card in summaryCards" :key="card.key">
                 <CardHeader class="pb-2">
                     <CardDescription>{{ card.label }}</CardDescription>

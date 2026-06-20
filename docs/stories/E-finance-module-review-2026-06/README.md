@@ -34,6 +34,7 @@ finally UI/BOD surfaces.
 | 17    | `FIN-REV-017-finance-reporting-fee-monitor`           | `S-017-finance-reporting-fee-monitor/`           | Build the Fee Monitor lens for expected/generated/missing fee completeness and drilldowns                                             | 016; `ACAD-RET-001` before retake/resit missing-fee completeness |
 | 18    | `FIN-REV-018-finance-reporting-collection-progress`   | `S-018-finance-reporting-collection-progress/`   | Build the Collection Progress lens using canonical settlement/ledger money truth                                                      | 016, 002                                    |
 | 19    | `FIN-REV-019-finance-reporting-dng-lifecycle`         | `S-019-finance-reporting-dng-lifecycle/`         | Build the DNG/Payment Lifecycle lens with attention buckets, webhook/payment bridge state, and related semester lineage               | 016, 005, 009                              |
+| 20    | `FIN-REV-020-defer-finance-settlement`                | `S-020-defer-finance-settlement/`                | Align academic defer item evidence, non-billable deferred registrations, and Finance ledger behavior without introducing a parallel settlement ledger | 002, 004, 005, 017                         |
 
 ## FIN-REV-010 Consolidated Stories
 
@@ -100,3 +101,8 @@ stories above for planning, status, review, and acceptance.
 - Reporting build note: `FIN-REV-012` is the requirement holder only. Runtime
   work starts with the shell in `FIN-REV-016`, then separate lens stories for
   Fee Monitor, Collection Progress, and DNG/Payment Lifecycle.
+- Defer Finance note: `FIN-REV-020` owns item-level full-scope defer backfill
+  plus runtime Finance behavior. `FORFEIT` and `PARTIAL` consume only money
+  already paid; do not create unpaid forfeit debt or a parallel settlement
+  ledger unless a later accepted decision proves existing ledger references are
+  insufficient.

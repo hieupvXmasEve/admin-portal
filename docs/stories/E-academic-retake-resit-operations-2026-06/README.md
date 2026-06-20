@@ -9,6 +9,7 @@ sources.
 | Order | Story id | Story packet | Main scope | Depends on |
 | --- | --- | --- | --- | --- |
 | 1 | `ACAD-RET-001-retake-resit-operations` | `S-001-retake-resit-operations/` | Academic source/lifecycle for staff-created course retake and exam resit, future student-request approval path, HQ fee worklist, late-payment monitoring, schedule, audit, and Finance dependency contract. | Existing Academic Records, Course Retake, Finance Charge, Payment/Ledger flows |
+| 2 | `ACAD-RET-002-exam-resit-overdue-reminders` | `S-002-exam-resit-overdue-reminders/` | Move Due Reminders into the new Finance UI and add PTL exam-resit overdue/reminder monitoring with same-page preview/send workflow. | `ACAD-RET-001`, Finance Due Reminders, DNG Worklist, Batch Studio reminder safety |
 
 ## Shared Rules
 
@@ -43,3 +44,5 @@ sources.
   evidence.
 - Finance Reporting must wait for this Academic source contract before treating
   course-retake or exam-resit fees as expected/missing sources.
+- Due/reminder monitoring belongs to HQ/Finance. Academic may see payment and
+  overdue state, but Finance owns reminder delivery and paid-state evidence.
