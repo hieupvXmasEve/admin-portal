@@ -13,6 +13,7 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Actions\LinkLegacyRetakeDngToChargeAction;
 use App\Modules\Academic\Actions\ReconcileLegacyRetakeFeesAction;
+use App\Modules\Academic\Actions\RepointCourseRetakeRegistrationChargeAction;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -167,6 +168,58 @@ it('reports duplicate legacy retake charges when a registration already owns ano
 
     $exception = collect($result['details'])->firstWhere('status', 'exception');
     expect($exception['reason'])->toBe(ReconcileLegacyRetakeFeesAction::REASON_DUPLICATE_CHARGE);
+});
+
+it('repoints a retake registration and paid HL DNG to a different active charge', function () {
+    $unit = Unit::factory()->create(['retake_fee' => 3_000_000]);
+    retakeLaneRecord($unit);
+
+    $voided = legacyRetakeCharge();
+    $voided->void($this->user->id, 'superseded');
+
+    $active = legacyRetakeCharge();
+
+    $registration = CourseRetakeRegistration::create([
+        'student_id' => $this->student->id,
+        'unit_id' => $unit->id,
+        'original_academic_record_id' => AcademicRecord::query()->where('student_id', $this->student->id)->value('id'),
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+        'original_semester_id' => $this->semester->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'status' => CourseRetakeRegistration::STATUS_PAID,
+        'request_origin' => CourseRetakeRegistration::REQUEST_ORIGIN_STAFF,
+        'hq_fee_status' => CourseRetakeRegistration::HQ_FEE_PAID,
+        'attempt_number' => 2,
+        'retake_fee' => 3_000_000,
+        'finance_charge_id' => $voided->id,
+    ]);
+
+    $voided->update([
+        'source_type' => CourseRetakeRegistration::class,
+        'source_id' => $registration->id,
+    ]);
+
+    $dng = paidHlDng(['finance_charge_id' => $voided->id]);
+
+    $result = app(RepointCourseRetakeRegistrationChargeAction::class)->run(
+        $this->student->student_id,
+        $active->id,
+    );
+
+    $registration->refresh();
+    $voided->refresh();
+    $active->refresh();
+    $dng->refresh();
+
+    expect($result['finance_charge_id'])->toBe($active->id)
+        ->and($result['dng_requests_updated'])->toBe(1)
+        ->and($registration->finance_charge_id)->toBe($active->id)
+        ->and($active->source_type)->toBe(CourseRetakeRegistration::class)
+        ->and($active->source_id)->toBe($registration->id)
+        ->and($voided->source_type)->toBeNull()
+        ->and($dng->finance_charge_id)->toBe($active->id);
 });
 
 it('runs legacy retake reconciliation through the artisan command', function () {
