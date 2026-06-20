@@ -434,3 +434,158 @@ Validation gap (unchanged from prior slices):
   overdue/reminder monitoring, paid cancellation refund/reversal, flipping
   `FeeMonitorAcadRetGate::missingInferenceEnabled()` to enable Finance Reporting
   missing-fee inference, and student portal/API.
+
+## Slice Evidence - 2026-06-20 (Slice 7: Academic Thi lại UI + worklist)
+
+Built the full Academic exam-resit (thi lại) staff UI + the backend wiring it
+needs. Course retake (Học lại) UI already shipped (slice 1); HQ fee worklist
+already lives in Finance `DngWorklist.vue` (`ListDngWorklistQuery` surfaces HL +
+PTL). This slice fills the Thi lại gap: worklist, create-from-eligible, cancel,
+scheduling authoring (room slots / unit sessions / invigilators), assign-to-session,
+and result entry. New page + sidebar entry (NOT a tabbed refactor of Học lại); no
+Approval Queue tab; `FeeMonitorAcadRetGate` flip deferred (separate Finance slice).
+
+Backend (TDD, no schema migration — slice-5/6 tables already exist):
+
+- `CancelExamResitAttemptAction`: cancellable = requested/approved/scheduled;
+  voids an unpaid `charge_created` charge + cancels the awaiting `exam_resit_fee`
+  DNG (mirrors retake cancel); **blocks paid cancellation** (HQ refund/reversal
+  deferred) and preserves payment evidence; never consumes `attempt_number`.
+  Added `ExamResitAttempt::CANCELLABLE_STATUSES` + `isCancellable()`.
+- `ListExamResitAttemptsQuery`: DB-paginated, campus/semester/status-scoped
+  worklist with derived `payment_state` (Finance-evidence-derived, never a manual
+  flag), `schedule_state`, `result_state`, `operation_state`, summary counts, and
+  `available_actions` (schedule/complete/cancel; cancel hidden when paid).
+- `ListExamResitEligibleStudentsQuery`: inverse of the retake lane — `grade_failed`
+  finals only, attendance recorded (`not_recorded` blocked), excludes passed units
+  and records with an in-flight/consumed attempt. No curriculum-units join (the
+  failed record already proves enrolment).
+- `ListExamRoomSlotsQuery`: campus slots with sessions(+unit), invigilators(+lecturer),
+  seat usage.
+- `ExamResitAttemptController` (index/create/store/scheduleForm/schedule/completeForm/
+  complete/cancel) + `ExamScheduleController` (index/storeRoomSlot/storeSession/
+  assignInvigilator). Stores wrap the existing slice 1–5 actions; conflict/capacity/
+  payment guards stay in the actions and surface as 422 validation errors.
+- 8 FormRequests, routes under `academic.exam-resit.*` + `academic.exam-schedule.*`,
+  6 new permissions (`view/create/cancel/schedule/complete_exam_resit`,
+  `manage_exam_schedule`) in `config/permission.php`.
+
+Frontend (Inertia v3 + Vue 3, swinx-frontend standards):
+
+- `Academic/ExamResit/Index.vue` (useDataTable worklist, summary cards, derived
+  badges, cancel dialog), `Create.vue` (eligible picker), `Schedule.vue`
+  (assign-to-session), `Complete.vue` (result entry + higher-score hint),
+  `Schedule/Index.vue` (slot/session/invigilator management, inline forms to dodge
+  modal date/select portal gotchas). Sidebar: "Thi lại" + "Lịch thi lại".
+
+Commands run:
+
+```bash
+./scripts/dev.sh test tests/Feature/Academic/ExamResit
+# PASS: 86 tests, 302 assertions (30 new across 6 new test files)
+
+./scripts/dev.sh test tests/Feature/Academic/ExamResit tests/Feature/Academic/RetakeCourse
+# PASS: 137 tests, 504 assertions (no retake regressions)
+
+./scripts/dev.sh test tests/Feature/Finance/ExamResitChargeActionTest.php \
+  tests/Feature/Finance/RetakeResitChargeSourceTest.php \
+  tests/Feature/Finance/RetakeResitHqWorklistTest.php \
+  tests/Feature/Finance/Dng/ListDngWorklistQueryTest.php
+# PASS: 24 tests, 65 assertions (Finance handoff unaffected)
+
+./scripts/dev.sh composer exec pint -- --test <23 changed PHP files>
+# PASS (after auto-fix)
+
+./scripts/dev.sh pnpm exec prettier --check <5 new Vue> + eslint <5 new Vue + menu-sidebar.ts>
+# PASS
+
+git diff --check
+# CLEAN
+```
+
+Confirmed product/scope decisions 2026-06-20 (slice 7):
+
+- Thi lại ships as its own page + sidebar entry, mirroring Học lại; Học lại is NOT
+  refactored into a shared tabbed shell (avoid churn on working code).
+- Approval Queue tab omitted (student self-request out of first release; model
+  already supports `requested`).
+- Paid exam-resit cancellation is blocked in the Academic action and routed to the
+  (deferred) HQ refund/reversal flow; payment evidence preserved.
+- `cancel` action is only offered in the worklist when it will succeed (cancellable
+  status AND not paid).
+
+Validation gap:
+
+- `vue-tsc --noEmit` still OOMs in the dev container; per-file eslint + prettier used
+  instead (whole-project type-check belongs on host/CI).
+- Deferred: `FeeMonitorAcadRetGate::missingInferenceEnabled()` flip (separate Finance
+  reporting-behavior slice), student/invigilator timetable merge (Platform contract),
+  exam-resit overdue/reminder monitoring, paid-cancellation refund/reversal handling,
+  and student portal/API.
+
+## Slice Evidence - 2026-06-20 (Slice 8: Fee Monitor missing-fee inference for retake/resit)
+
+Enabled the Finance Reporting Fee Monitor to infer **missing** `retake_fee` /
+`exam_resit_fee` from the Academic source contract (now that slices 1–7 + the
+slice-6 legacy reconciliation exist). Hard gate (Finance reporting behavior).
+Backend-only, no schema migration. This is the deferred follow-up the prior slices
+named; it was correctly NOT one boolean — the Fee Monitor had no expected-population
+enumeration for retake/resit, only existing-charge rows.
+
+- `ListFeeMonitorQuery::rowsFromRetakeResitExpectation()` enumerates approved
+  Academic sources for the billed semester/campus and emits a `missing` row when no
+  Finance charge exists yet:
+  - course retake: `CourseRetakeRegistration` in `NON_TERMINAL_STATUSES`
+    (approved/payment_pending/paid); `STATUS_CANCELLED`/`ENROLLED` are terminal and
+    excluded. Matches `charge_semester_id` (fallback `semester_id`).
+  - exam resit: `ExamResitAttempt` status in approved/scheduled/completed/no_show and
+    `hq_fee_status != cancelled`; matches `charge_semester_id`.
+- **Dup-free**: a row is emitted only when `resolveChargeForStudent()` is null;
+  charged rows stay owned by `rowsFromExistingSourceCharges` (generated/voided).
+- **Eligibility split is automatic**: the Fee Monitor only sees CREATED sources, and
+  `CreateExamResitAttemptAction` already blocks attendance/both failures — so an
+  attendance-failed student never has an attempt and never shows a missing resit fee.
+- Missing rows carry a `batch_handoff` pointing at the HL/PTL **DNG worklist** (the
+  HQ surface that actually creates these fees, not Batch Studio).
+- Flipped `FeeMonitorAcadRetGate::missingInferenceEnabled()` → `true`
+  (`excludedMissingSources()` now `[]`). While the gate was off, the new builder was
+  inert (missing rows dropped by the `applyRowFilters` missing-inference filter), so
+  the change is isolated to the gate flip.
+
+Commands run:
+
+```bash
+./scripts/dev.sh test tests/Feature/Finance/Reporting/FeeMonitorRetakeResitInferenceTest.php
+# PASS: 4 tests (missing retake + missing resit + no-dup-when-charged + cancelled-excluded)
+
+./scripts/dev.sh test tests/Feature/Finance/Reporting tests/Unit/Finance/Reporting
+# PASS: 45 tests, 323 assertions (gate unit test + Fee Monitor view meta flipped)
+
+./scripts/dev.sh test tests/Feature/Finance/ExamResitChargeActionTest.php \
+  tests/Feature/Finance/RetakeResitChargeSourceTest.php \
+  tests/Feature/Finance/RetakeResitHqWorklistTest.php \
+  tests/Feature/Finance/Dng/ListDngWorklistQueryTest.php
+# PASS: 24 tests (HQ handoff unaffected)
+
+./scripts/dev.sh test tests/Feature/Academic/ExamResit tests/Feature/Academic/RetakeCourse
+# PASS: 137 tests (Academic sources unaffected)
+
+./scripts/dev.sh composer exec pint -- --test <changed Finance files + tests>
+# PASS
+
+git diff --check
+# CLEAN
+```
+
+Confirmed decisions 2026-06-20 (slice 8):
+
+- Fee Monitor expected-population for retake/resit comes ONLY from approved Academic
+  sources, never from raw failed `academic_records` (honors the story contract).
+- Per-(student, source, semester) granularity is kept (matches existing Fee Monitor
+  rows); a student with multiple uncharged attempts surfaces one missing resit row.
+- Gate is a hardcoded flip (not env/config) — consistent with how it shipped; revert
+  is a one-line change if reporting needs to be paused.
+
+Remaining deferred (unchanged): student/invigilator timetable merge (Platform
+contract), exam-resit overdue/reminder monitoring, paid-cancellation refund/reversal
+handling, and student portal/API.

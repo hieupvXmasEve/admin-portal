@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Reporting;
 
+use App\Models\CourseRetakeRegistration;
+use App\Models\ExamResitAttempt;
 use App\Models\FinanceCharge;
 use App\Models\PaymentApplication;
 use App\Models\Program;
@@ -78,6 +80,7 @@ class ListFeeMonitorQuery
         $rows = $rows->merge($this->rowsFromAdmissionExpectation($semesterId, $campusId, $filters));
         $rows = $rows->merge($this->rowsFromBhytExpectation($semesterId, $campusId, $filters));
         $rows = $rows->merge($this->rowsFromExistingSourceCharges($semesterId, $campusId, $filters));
+        $rows = $rows->merge($this->rowsFromRetakeResitExpectation($semesterId, $campusId, $filters));
 
         return $this->applyRowFilters($rows, $filters)->values();
     }
@@ -384,6 +387,102 @@ class ListFeeMonitorQuery
     }
 
     /**
+     * Infer "missing" retake/resit fees from the Academic source contract
+     * (ACAD-RET-001): an approved course-retake registration or a chargeable
+     * exam-resit attempt that has no Finance charge yet is an expected fee HQ
+     * still owes. Rows whose charge already exists are owned by
+     * {@see rowsFromExistingSourceCharges}, so this only emits the un-charged
+     * (missing) ones — no duplicates. These rows stay invisible until
+     * {@see FeeMonitorAcadRetGate::missingInferenceEnabled()} is on (the
+     * missing-inference filter in {@see applyRowFilters} drops them otherwise).
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    private function rowsFromRetakeResitExpectation(int $semesterId, ?int $campusId, array $filters): Collection
+    {
+        $rows = collect();
+
+        // Course retake (học lại): non-terminal source still owes a retake_fee.
+        // STATUS_CANCELLED is terminal and therefore already excluded.
+        $retakeStudentIds = CourseRetakeRegistration::query()
+            ->whereIn('status', CourseRetakeRegistration::NON_TERMINAL_STATUSES)
+            ->where(fn ($query) => $query
+                ->where('charge_semester_id', $semesterId)
+                ->orWhere(fn ($fallback) => $fallback->whereNull('charge_semester_id')->where('semester_id', $semesterId)))
+            ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
+            ->distinct()
+            ->pluck('student_id');
+
+        foreach ($retakeStudentIds as $studentId) {
+            $row = $this->buildMissingSourceRow(
+                (int) $studentId,
+                FeeMonitorExpectedFeeCatalog::SOURCE_COURSE_RETAKE,
+                FinanceCharge::TYPE_RETAKE_FEE,
+                $semesterId,
+                $filters,
+            );
+            if ($row !== []) {
+                $rows->push($row);
+            }
+        }
+
+        // Exam resit (thi lại): an in-flight/sat attempt still owes an exam_resit_fee.
+        // Cancelled/rejected attempts and an HQ-cancelled fee are excluded.
+        $resitStudentIds = ExamResitAttempt::query()
+            ->whereIn('status', [
+                ExamResitAttempt::STATUS_APPROVED,
+                ExamResitAttempt::STATUS_SCHEDULED,
+                ExamResitAttempt::STATUS_COMPLETED,
+                ExamResitAttempt::STATUS_NO_SHOW,
+            ])
+            ->where(fn ($query) => $query
+                ->where('hq_fee_status', '!=', ExamResitAttempt::HQ_FEE_CANCELLED)
+                ->orWhereNull('hq_fee_status'))
+            ->where('charge_semester_id', $semesterId)
+            ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
+            ->distinct()
+            ->pluck('student_id');
+
+        foreach ($resitStudentIds as $studentId) {
+            $row = $this->buildMissingSourceRow(
+                (int) $studentId,
+                FeeMonitorExpectedFeeCatalog::SOURCE_EXAM_RESIT,
+                FinanceCharge::TYPE_EXAM_RESIT_FEE,
+                $semesterId,
+                $filters,
+            );
+            if ($row !== []) {
+                $rows->push($row);
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Build a single "missing" expectation row for an Academic source, or `[]`
+     * when a charge already exists (owned elsewhere) or the row is filtered out.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function buildMissingSourceRow(int $studentId, string $source, string $chargeType, int $semesterId, array $filters): array
+    {
+        if ($this->resolveChargeForStudent($studentId, $chargeType) !== null) {
+            return [];
+        }
+
+        $student = $this->resolveStudent($studentId);
+        if ($student === null) {
+            return [];
+        }
+
+        $row = $this->buildExpectationRow($student, $source, $chargeType, $semesterId, null, 'missing');
+
+        return $this->matchesStudentScopedFilters($row, $filters) ? $row : [];
+    }
+
+    /**
      * @param  array<string, mixed>  $previewRow
      */
     private function mapPreviewEligibilityToGenerationState(array $previewRow, ?FinanceCharge $charge): string
@@ -535,6 +634,18 @@ class ListFeeMonitorQuery
                 'label' => 'Batch Studio — Non-academic',
                 'fee_category' => 'non_academic',
                 'fee_type' => FeeMonitorExpectedFeeCatalog::chargeTypeForSource($source),
+            ],
+            // Retake/resit fees are created by HQ from the Academic source via the
+            // DNG worklist, not Batch Studio.
+            FeeMonitorExpectedFeeCatalog::SOURCE_COURSE_RETAKE => [
+                'label' => 'DNG worklist — Học lại',
+                'fee_category' => 'retake',
+                'fee_type' => FinanceCharge::TYPE_RETAKE_FEE,
+            ],
+            FeeMonitorExpectedFeeCatalog::SOURCE_EXAM_RESIT => [
+                'label' => 'DNG worklist — Thi lại',
+                'fee_category' => 'exam_resit',
+                'fee_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
             ],
             default => null,
         };

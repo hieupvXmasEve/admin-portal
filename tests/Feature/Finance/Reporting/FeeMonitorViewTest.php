@@ -42,8 +42,8 @@ it('renders fee monitor props with summary, filters, campus scope, and ACAD-RET 
             ->has('fee_monitor.summary')
             ->has('fee_monitor.filters')
             ->has('fee_monitor.filter_options')
-            ->where('fee_monitor.meta.acad_ret_gate.missing_inference_enabled', false)
-            ->where('fee_monitor.meta.acad_ret_gate.excluded_missing_sources', ['course_retake', 'exam_resit'])
+            ->where('fee_monitor.meta.acad_ret_gate.missing_inference_enabled', true)
+            ->where('fee_monitor.meta.acad_ret_gate.excluded_missing_sources', [])
             ->where('fee_monitor.meta.semester_id', $this->semester->id)
             ->has('fee_monitor.computed_at')
         );
@@ -74,7 +74,7 @@ it('maps missing tuition rows and supports generation-state filtering', function
         ->and(collect($rows)->every(fn (array $row) => $row['generation_state'] === 'missing'))->toBeTrue();
 });
 
-it('includes existing retake charges without inferring missing retake rows behind the ACAD-RET gate', function () {
+it('shows an existing retake charge with no Academic registration as generated, not missing', function () {
     grantFinance($this->user, ['view_finance_reporting'], $this->campus);
 
     $student = Student::factory()->forCampus($this->campus)->create([
