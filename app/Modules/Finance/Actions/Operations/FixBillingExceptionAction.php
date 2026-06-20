@@ -26,6 +26,12 @@ class FixBillingExceptionAction
             'defer_no_case' => throw new RuntimeException(
                 'Defer case creation requires manual fee-policy selection'
             ),
+            'zero_tuition_waived' => throw new RuntimeException(
+                'Zero tuition term is waived by plan and does not require a fix'
+            ),
+            'deferred_enrolled' => throw new RuntimeException(
+                'Deferred student with retained class registrations does not require a tuition fix'
+            ),
             default => throw new RuntimeException('Unsupported billing exception type'),
         };
     }

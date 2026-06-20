@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Enums\StudentActionType;
 use App\Models\Campus;
+use App\Models\AcademicRecord;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
+use App\Models\CourseRetakeRegistration;
 use App\Models\CurriculumVersion;
 use App\Models\DeferCase;
 use App\Models\DeferCaseItem;
@@ -34,6 +36,175 @@ beforeEach(function () {
     $this->program = Program::factory()->create();
 
     app()->singleton('campus', fn () => $this->campus);
+});
+
+it('lists deferred enrolled students separately from missing charge exceptions', function () {
+    $user = User::factory()->create();
+    actingAs($user);
+
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'EXC-DEFER-ENROLL-01',
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+            'status' => 'deferred',
+        ])
+        ->create();
+
+    $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
+
+    $registration = CourseRegistration::create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $this->semester->id,
+        'registration_status' => 'confirmed',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 1,
+    ]);
+
+    $actionLog = StudentActionLog::create([
+        'student_id' => $student->id,
+        'action_type' => StudentActionType::ACADEMIC_DEFER,
+        'reason' => 'Deferred but retained on class roster',
+        'from_semester_id' => $this->semester->id,
+        'changed_by_user_id' => $user->id,
+    ]);
+
+    DeferCase::create([
+        'student_action_log_id' => $actionLog->id,
+        'student_id' => $student->id,
+        'semester_id' => $this->semester->id,
+        'scope_type' => DeferCase::SCOPE_FULL,
+        'fee_policy' => DeferCase::POLICY_FORFEIT,
+        'applies_once' => true,
+        'effective_at' => now()->toDateString(),
+        'changed_by_user_id' => $user->id,
+    ]);
+
+    $counts = app(GetBillingExceptionCountsQuery::class)->handle($this->semester->id);
+    $missing = app(ListBillingExceptionsQuery::class)
+        ->handle($this->semester->id, 'missing_charge', 'http://localhost/exceptions');
+    $deferred = app(ListBillingExceptionsQuery::class)
+        ->handle($this->semester->id, 'deferred_enrolled', 'http://localhost/exceptions');
+
+    expect($counts['missing_charge'])->toBe(0)
+        ->and($counts['deferred_enrolled'])->toBe(1)
+        ->and($missing->total())->toBe(0)
+        ->and($deferred->total())->toBe(1)
+        ->and($deferred->items()[0]['type'])->toBe('deferred_enrolled')
+        ->and($deferred->items()[0]['student_code'])->toBe('EXC-DEFER-ENROLL-01')
+        ->and($deferred->items()[0]['fixable'])->toBeFalse()
+        ->and($deferred->items()[0]['context']['fee_policy'])->toBe(DeferCase::POLICY_FORFEIT)
+        ->and($deferred->items()[0]['id'])->toBe(
+            BillingExceptionIdentifier::encode('deferred_enrolled', $registration->id)
+        );
+});
+
+it('lists zero tuition waived students separately from missing charge exceptions', function () {
+    $fallSemester = Semester::factory()->create([
+        'name' => 'FALL2025',
+        'code' => 'FALL2025',
+        'start_date' => '2025-09-01',
+        'is_active' => false,
+    ]);
+    $springSemester = Semester::factory()->create([
+        'name' => 'SPRING2026',
+        'code' => 'SPRING2026',
+        'start_date' => '2026-01-05',
+        'is_active' => false,
+    ]);
+    $summerSemester = Semester::factory()->create([
+        'name' => 'SUMMER2026',
+        'code' => 'SUMMER2026',
+        'start_date' => '2026-05-04',
+        'is_active' => true,
+    ]);
+
+    $curriculumVersion = CurriculumVersion::factory()
+        ->forProgram($this->program)
+        ->withEffectiveSemester($fallSemester)
+        ->create();
+
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'EXC-WAIVED-01',
+            'intake_semester_id' => $fallSemester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+            'status' => 'intake_course',
+            'curriculum_version_id' => $curriculumVersion->id,
+            'intake_gc' => $fallSemester->id,
+            'intake_course' => (string) $springSemester->id,
+            'intake_major' => $springSemester->id,
+        ])
+        ->create();
+
+    $plan = TuitionPlan::create([
+        'curriculum_version_id' => $curriculumVersion->id,
+        'intake_semester_id' => $fallSemester->id,
+        'total_amount' => 135000000,
+        'currency' => 'VND',
+        'is_active' => true,
+    ]);
+
+    TuitionPlanTerm::create([
+        'tuition_plan_id' => $plan->id,
+        'term_number' => 1,
+        'amount' => 45000000,
+        'due_date' => '2026-01-05',
+    ]);
+    TuitionPlanTerm::create([
+        'tuition_plan_id' => $plan->id,
+        'term_number' => 2,
+        'amount' => 0,
+        'due_date' => '2026-05-04',
+    ]);
+    TuitionPlanTerm::create([
+        'tuition_plan_id' => $plan->id,
+        'term_number' => 3,
+        'amount' => 45000000,
+        'due_date' => '2026-09-01',
+    ]);
+
+    $offering = CourseOffering::factory()->create(['semester_id' => $summerSemester->id]);
+
+    $registration = CourseRegistration::create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $summerSemester->id,
+        'registration_status' => 'confirmed',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 1,
+    ]);
+
+    $counts = app(GetBillingExceptionCountsQuery::class)->handle($summerSemester->id);
+    $missing = app(ListBillingExceptionsQuery::class)
+        ->handle($summerSemester->id, 'missing_charge', 'http://localhost/exceptions');
+    $waived = app(ListBillingExceptionsQuery::class)
+        ->handle($summerSemester->id, 'zero_tuition_waived', 'http://localhost/exceptions');
+
+    expect($counts['missing_charge'])->toBe(0)
+        ->and($counts['zero_tuition_waived'])->toBe(1)
+        ->and($missing->total())->toBe(0)
+        ->and($waived->total())->toBe(1)
+        ->and($waived->items()[0]['type'])->toBe('zero_tuition_waived')
+        ->and($waived->items()[0]['student_code'])->toBe('EXC-WAIVED-01')
+        ->and($waived->items()[0]['fixable'])->toBeFalse()
+        ->and($waived->items()[0]['context']['tuition_term_number'])->toBe(2)
+        ->and($waived->items()[0]['id'])->toBe(
+            BillingExceptionIdentifier::encode('zero_tuition_waived', $registration->id)
+        );
 });
 
 it('lists missing charge exceptions with stable encoded ids', function () {
@@ -344,6 +515,94 @@ it('detects retake no charge exceptions per registration source', function () {
 
     expect($list->total())->toBe(1)
         ->and($list->items()[0]['context']['course_registration_id'])->toBe($secondRegistration->id);
+});
+
+it('does not flag retake registrations when an active charge is linked via CourseRetakeRegistration', function () {
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'EXC-CRR-RET-01',
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+            'status' => 'intake_course',
+        ])
+        ->create();
+
+    $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
+
+    $registration = CourseRegistration::create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $this->semester->id,
+        'registration_status' => 'confirmed',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 2,
+        'is_retake' => true,
+        'retake_fee' => 3000000,
+    ]);
+
+    $academicRecord = AcademicRecord::factory()->create([
+        'student_id' => $student->id,
+        'campus_id' => $this->campus->id,
+        'unit_id' => $offering->unit_id,
+        'course_offering_id' => $offering->id,
+        'completion_status' => 'failed',
+        'is_passed' => false,
+    ]);
+
+    $retakeRegistration = CourseRetakeRegistration::create([
+        'student_id' => $student->id,
+        'unit_id' => $offering->unit_id,
+        'original_academic_record_id' => $academicRecord->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+        'status' => CourseRetakeRegistration::STATUS_ENROLLED,
+        'attempt_number' => 2,
+        'retake_fee' => 3000000,
+        'course_registration_id' => $registration->id,
+        'enrolled_at' => now(),
+    ]);
+
+    $charge = FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $this->semester->id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 3000000,
+        'description' => 'Retake via course retake registration',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+        'source_type' => CourseRetakeRegistration::class,
+        'source_id' => $retakeRegistration->id,
+    ]);
+
+    $retakeRegistration->update(['finance_charge_id' => $charge->id]);
+
+    FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $this->semester->id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 3000000,
+        'description' => 'Void legacy course registration charge',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_VOID,
+        'voided_at' => now(),
+        'void_reason' => 'replaced',
+        'source_type' => CourseRegistration::class,
+        'source_id' => $registration->id,
+    ]);
+
+    $counts = app(GetBillingExceptionCountsQuery::class)->handle($this->semester->id);
+    $list = app(ListBillingExceptionsQuery::class)
+        ->handle($this->semester->id, 'retake_no_charge', 'http://localhost/exceptions');
+
+    expect($counts['retake_no_charge'])->toBe(0)
+        ->and($list->total())->toBe(0);
 });
 
 it('refuses a retake fix when defer policy skips charge creation', function () {

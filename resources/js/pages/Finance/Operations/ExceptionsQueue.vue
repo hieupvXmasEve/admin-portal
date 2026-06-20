@@ -5,18 +5,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { PaginatedResponse } from '@/types';
 import { type Semester } from '@/types/finance';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { AlertTriangle, ArrowRight, CheckCircle2, DollarSign, FileQuestion, Link2Off, RotateCcw, Wrench } from 'lucide-vue-next';
+import { AlertTriangle, ArrowRight, CheckCircle2, CircleSlash, DollarSign, FileQuestion, Link2Off, PauseCircle, RotateCcw, Wrench } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
 interface ExceptionItem {
     id: number;
-    type: 'missing_charge' | 'retake_no_charge' | 'defer_no_case' | 'mismatch';
+    type: 'missing_charge' | 'zero_tuition_waived' | 'deferred_enrolled' | 'retake_no_charge' | 'defer_no_case' | 'mismatch';
     student_id: number;
     student_code: string;
     student_name: string;
@@ -29,6 +30,8 @@ interface ExceptionItem {
 
 interface ExceptionCounts {
     missing_charge: number;
+    zero_tuition_waived: number;
+    deferred_enrolled: number;
     retake_no_charge: number;
     defer_no_case: number;
     mismatch: number;
@@ -47,10 +50,38 @@ interface Props {
 
 const props = defineProps<Props>();
 const { showConfirmDialog } = useGlobalConfirmDialog();
+const { selectedId: globalSemesterId } = useFinanceSemester();
 
-// Local filter state
-const semesterId = ref(props.filters.semester_id || (props.currentSemester?.id ? String(props.currentSemester.id) : 'all'));
+const resolveInitialSemesterId = (): string => {
+    if (props.filters.semester_id === 'all') {
+        return 'all';
+    }
+
+    if (props.filters.semester_id) {
+        return props.filters.semester_id;
+    }
+
+    if (props.currentSemester?.id) {
+        return String(props.currentSemester.id);
+    }
+
+    if (globalSemesterId.value) {
+        return String(globalSemesterId.value);
+    }
+
+    return 'all';
+};
+
+// Local filter state — default aligns with finance topbar semester context
+const semesterId = ref(resolveInitialSemesterId());
 const activeTab = ref(props.filters.type || 'all');
+
+watch(
+    () => [props.filters.semester_id, props.currentSemester?.id, globalSemesterId.value] as const,
+    () => {
+        semesterId.value = resolveInitialSemesterId();
+    },
+);
 
 watch([semesterId, activeTab], () => {
     applyFilters();
@@ -60,7 +91,7 @@ const applyFilters = () => {
     router.get(
         route('finance.operations.exceptions'),
         {
-            semester_id: semesterId.value !== 'all' ? semesterId.value : undefined,
+            semester_id: semesterId.value !== 'all' ? semesterId.value : 'all',
             type: activeTab.value !== 'all' ? activeTab.value : undefined,
         },
         { preserveState: true, preserveScroll: true },
@@ -76,6 +107,10 @@ const getTypeIcon = (type: string) => {
     switch (type) {
         case 'missing_charge':
             return DollarSign;
+        case 'zero_tuition_waived':
+            return CircleSlash;
+        case 'deferred_enrolled':
+            return PauseCircle;
         case 'retake_no_charge':
             return RotateCcw;
         case 'defer_no_case':
@@ -91,6 +126,10 @@ const getTypeLabel = (type: string) => {
     switch (type) {
         case 'missing_charge':
             return 'Missing Charge';
+        case 'zero_tuition_waived':
+            return 'Zero Tuition (Waived)';
+        case 'deferred_enrolled':
+            return 'Deferred (Retained)';
         case 'retake_no_charge':
             return 'Retake - No Charge';
         case 'defer_no_case':
@@ -106,6 +145,10 @@ const getTypeBadgeClass = (type: string) => {
     switch (type) {
         case 'missing_charge':
             return 'bg-red-100 text-red-800';
+        case 'zero_tuition_waived':
+            return 'bg-sky-100 text-sky-800';
+        case 'deferred_enrolled':
+            return 'bg-teal-100 text-teal-800';
         case 'retake_no_charge':
             return 'bg-orange-100 text-orange-800';
         case 'defer_no_case':
@@ -185,7 +228,14 @@ const fixException = (exception: ExceptionItem) => {
 
 // Total exceptions
 const totalExceptions = computed(() => {
-    return props.counts.missing_charge + props.counts.retake_no_charge + props.counts.defer_no_case + props.counts.mismatch;
+    return (
+        props.counts.missing_charge +
+        props.counts.zero_tuition_waived +
+        props.counts.deferred_enrolled +
+        props.counts.retake_no_charge +
+        props.counts.defer_no_case +
+        props.counts.mismatch
+    );
 });
 
 defineOptions({
@@ -219,7 +269,7 @@ defineOptions({
         </div>
 
         <!-- Summary Cards -->
-        <div class="grid gap-4 md:grid-cols-5">
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
             <Card :class="{ 'ring-primary ring-2': activeTab === 'all' }" class="cursor-pointer" @click="activeTab = 'all'">
                 <CardHeader class="pb-2">
                     <div class="flex items-center justify-between">
@@ -237,6 +287,26 @@ defineOptions({
                         <DollarSign class="h-4 w-4 text-red-500" />
                     </div>
                     <CardTitle class="text-2xl text-red-600">{{ counts.missing_charge }}</CardTitle>
+                </CardHeader>
+            </Card>
+
+            <Card :class="{ 'ring-2 ring-sky-500': activeTab === 'zero_tuition_waived' }" class="cursor-pointer" @click="activeTab = 'zero_tuition_waived'">
+                <CardHeader class="pb-2">
+                    <div class="flex items-center justify-between">
+                        <CardDescription>Zero Tuition</CardDescription>
+                        <CircleSlash class="h-4 w-4 text-sky-500" />
+                    </div>
+                    <CardTitle class="text-2xl text-sky-600">{{ counts.zero_tuition_waived }}</CardTitle>
+                </CardHeader>
+            </Card>
+
+            <Card :class="{ 'ring-2 ring-teal-500': activeTab === 'deferred_enrolled' }" class="cursor-pointer" @click="activeTab = 'deferred_enrolled'">
+                <CardHeader class="pb-2">
+                    <div class="flex items-center justify-between">
+                        <CardDescription>Deferred</CardDescription>
+                        <PauseCircle class="h-4 w-4 text-teal-500" />
+                    </div>
+                    <CardTitle class="text-2xl text-teal-600">{{ counts.deferred_enrolled }}</CardTitle>
                 </CardHeader>
             </Card>
 
@@ -277,12 +347,26 @@ defineOptions({
                 <CardTitle class="text-base">Mô tả loại exception</CardTitle>
             </CardHeader>
             <CardContent>
-                <div class="grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-4">
+                <div class="grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                     <div class="flex items-start gap-2">
                         <DollarSign class="mt-0.5 h-4 w-4 text-red-500" />
                         <div>
                             <span class="font-medium">Missing Charge:</span>
-                            <span class="text-muted-foreground"> SV đăng ký học nhưng chưa có phí</span>
+                            <span class="text-muted-foreground"> SV đăng ký học nhưng chưa có phí học kỳ cần thu</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <CircleSlash class="mt-0.5 h-4 w-4 text-sky-500" />
+                        <div>
+                            <span class="font-medium">Zero Tuition:</span>
+                            <span class="text-muted-foreground"> Tuition plan kỳ này = 0, không cần sinh charge (thông tin)</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <PauseCircle class="mt-0.5 h-4 w-4 text-teal-500" />
+                        <div>
+                            <span class="font-medium">Deferred (Retained):</span>
+                            <span class="text-muted-foreground"> SV bảo lưu nhưng vẫn giữ lớp — không cần sinh phí (thông tin)</span>
                         </div>
                     </div>
                     <div class="flex items-start gap-2">

@@ -12,6 +12,8 @@ final class BillingExceptionIdentifier
         'missing_charge' => 1_000_000_000,
         'retake_no_charge' => 2_000_000_000,
         'defer_no_case' => 3_000_000_000,
+        'zero_tuition_waived' => 4_000_000_000,
+        'deferred_enrolled' => 5_000_000_000,
     ];
 
     public static function encode(string $type, int $sourceId): int

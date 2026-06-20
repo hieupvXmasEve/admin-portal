@@ -104,16 +104,14 @@ class BillingOperationsController extends Controller
         ListBillingExceptionsQuery $listQuery
     ): Response {
         $validated = $request->validate([
-            'semester_id' => 'nullable|integer|exists:semesters,id',
+            'semester_id' => 'nullable',
             'type' => 'nullable|string',
         ]);
 
-        $semesterId = isset($validated['semester_id']) ? (int) $validated['semester_id'] : null;
+        [$semesterId, $semesterFilter] = $this->resolveExceptionsSemesterFilter($request);
         $type = $validated['type'] ?? 'all';
 
-        $currentSemester = $semesterId
-            ? Semester::find($semesterId)
-            : Semester::where('is_active', true)->first();
+        $currentSemester = $semesterId ? Semester::find($semesterId) : null;
 
         $counts = $countsQuery->handle($semesterId);
         $exceptions = $listQuery->handle($semesterId, $type, $request->url());
@@ -125,7 +123,7 @@ class BillingOperationsController extends Controller
             'semesters' => $semesters,
             'currentSemester' => $currentSemester,
             'filters' => [
-                'semester_id' => $semesterId ? (string) $semesterId : null,
+                'semester_id' => $semesterFilter,
                 'type' => $type,
             ],
         ]);
@@ -170,5 +168,50 @@ class BillingOperationsController extends Controller
     public function exportDueList()
     {
         return response()->json(['message' => 'Export not yet implemented']);
+    }
+
+    /**
+     * @return array{0: ?int, 1: ?string} [semesterId for queries, filter value for UI]
+     */
+    private function resolveExceptionsSemesterFilter(Request $request): array
+    {
+        if (! $request->has('semester_id')) {
+            $selectedId = $this->resolveSelectedSemesterId();
+
+            return [
+                $selectedId,
+                $selectedId !== null ? (string) $selectedId : null,
+            ];
+        }
+
+        $raw = $request->query('semester_id');
+        if ($raw === null || $raw === '' || $raw === 'all') {
+            return [null, 'all'];
+        }
+
+        $id = filter_var($raw, FILTER_VALIDATE_INT);
+        if ($id === false || ! Semester::query()->whereKey($id)->exists()) {
+            $selectedId = $this->resolveSelectedSemesterId();
+
+            return [
+                $selectedId,
+                $selectedId !== null ? (string) $selectedId : null,
+            ];
+        }
+
+        return [(int) $id, (string) $id];
+    }
+
+    private function resolveSelectedSemesterId(): ?int
+    {
+        $selectedId = session('current_semester_id');
+
+        if ($selectedId !== null) {
+            return (int) $selectedId;
+        }
+
+        $activeId = Semester::query()->where('is_active', true)->value('id');
+
+        return $activeId !== null ? (int) $activeId : null;
     }
 }
