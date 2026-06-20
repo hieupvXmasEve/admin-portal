@@ -363,3 +363,74 @@ Validation gap (unchanged from prior slices):
   exam-resit sessions (Platform contract), exam-resit overdue/reminder monitoring,
   paid cancellation refund/reversal, legacy `exam_resit_fee` backfill, the Academic
   staff scheduling UI/routes, and student portal/API.
+
+## Slice Evidence - 2026-06-20 (Slice 6: Legacy exam_resit_fee backfill / reconciliation)
+
+Reconciled legacy `exam_resit_fee` Finance charges (created before the exam-resit
+source contract, so unlinked to any `ExamResitAttempt`) into Academic exam-resit
+sources, and reported the charges that cannot be matched safely. Hard gate
+(Finance charge linkage + Academic source creation). Backend-only, no schema
+migration (resolves open question 6: **reconciliation action + exception report**,
+not a blind migration — mirroring slice-1's `academic:backfill-failure-reason`).
+
+- A "legacy" charge = ACTIVE `exam_resit_fee` `FinanceCharge` whose `source_type`
+  is not `ExamResitAttempt` AND that no attempt references via `finance_charge_id`.
+  Voided charges and already-linked charges are excluded (not completeness evidence).
+- `ReconcileLegacyExamResitFeesAction::run(dryRun)` matches each legacy charge to
+  exactly ONE exam-resit-eligible failed academic record of the same student
+  (`grade_status=final`, `is_passed=false`, no `override_pass`, `failure_reason =
+  grade_failed`, attendance recorded — the same eligibility split as
+  `CreateExamResitAttemptAction`; attendance/both-fail are ineligible). The unit is
+  resolved from a unit code named in the charge `description`, otherwise from a
+  single eligible candidate.
+- A safe match creates a legacy-linked `ExamResitAttempt` (`status=approved`,
+  `policy_snapshot.legacy_backfill=true` with the original charge source preserved)
+  and **repoints the charge** (`source_type/source_id` → the new attempt) so future
+  idempotency and Fee Monitor missing-fee inference see a queryable Academic source.
+- **Payment evidence is derived, never asserted**: `hq_fee_status` is set to `paid`
+  (with `paid_at`) when `FinanceCharge::is_fully_paid` (settlement-derived),
+  otherwise `charge_created`. `attempt_number` stays null (a legacy fee does not
+  prove a sat result).
+- Charges that cannot be matched (no eligible failed record — e.g. the student
+  passed or only failed by attendance; or ambiguous multiple units) are emitted as
+  exceptions (`no_eligible_failed_record` / `ambiguous_multiple_units`) instead of
+  guessing an Academic source.
+- Idempotent: a repointed charge is no longer "legacy", so a second run is a no-op.
+- Thin CLI wrapper `academic:reconcile-legacy-exam-resit-fees` (`--dry-run`,
+  `--report-exceptions`). Must run AFTER `academic:backfill-failure-reason` so the
+  failed records are already classified into the grade-fail lane.
+
+Commands run:
+
+```bash
+./scripts/dev.sh test tests/Feature/Academic/ExamResitLegacyBackfillTest.php
+# PASS: 12 tests, 49 assertions
+
+./scripts/dev.sh test tests/Feature/Academic/ExamResit tests/Feature/Academic/RetakeCourse
+# PASS: 107 tests, 347 assertions (no regressions)
+
+./scripts/dev.sh test tests/Feature/Finance/ExamResitChargeActionTest.php \
+  tests/Feature/Finance/RetakeResitChargeSourceTest.php \
+  tests/Feature/Finance/RetakeResitHqWorklistTest.php \
+  tests/Feature/Finance/Dng/ListDngWorklistQueryTest.php
+# PASS: 24 tests, 65 assertions (finance exam-resit handoff unaffected)
+
+./scripts/dev.sh composer exec pint -- --test \
+  app/Modules/Academic/Actions/ReconcileLegacyExamResitFeesAction.php \
+  app/Console/Commands/Academic/ReconcileLegacyExamResitFeesCommand.php \
+  tests/Feature/Academic/ExamResitLegacyBackfillTest.php
+# PASS: 3 files
+
+git diff --check
+# CLEAN
+```
+
+Validation gap (unchanged from prior slices):
+
+- `vue-tsc --noEmit` still OOMs in the dev container; no frontend source changed in
+  this slice.
+- Deferred to later slices: Academic + HQ worklist UI surfaces, the
+  student/invigilator timetable merge (Platform contract), exam-resit
+  overdue/reminder monitoring, paid cancellation refund/reversal, flipping
+  `FeeMonitorAcadRetGate::missingInferenceEnabled()` to enable Finance Reporting
+  missing-fee inference, and student portal/API.
