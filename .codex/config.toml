@@ -2,3 +2,7 @@ project_doc_max_bytes = 65536
 
 [features]
 hooks = false
+
+[mcp_servers.laravel-boost]
+command = "./scripts/dev.sh"
+args = ["artisan", "boost:mcp"]

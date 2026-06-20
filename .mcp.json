@@ -10,7 +10,7 @@
             "enabled": true
         },
         "laravel-boost": {
-            "command": "php",
+            "command": "./scripts/dev.sh",
             "args": ["artisan", "boost:mcp"]
         }
     }
