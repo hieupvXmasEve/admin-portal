@@ -589,3 +589,60 @@ Confirmed decisions 2026-06-20 (slice 8):
 Remaining deferred (unchanged): student/invigilator timetable merge (Platform
 contract), exam-resit overdue/reminder monitoring, paid-cancellation refund/reversal
 handling, and student portal/API.
+
+## Slice Evidence - 2026-06-20 (Slice 9: Student + invigilator timetable merge)
+
+Closed the Platform acceptance contract: assigned exam-resit sittings merge into the
+student timetable, and assigned invigilation duty merges into the lecturer timetable.
+Read-only, targeted (never leaks a shared room slot to unassigned students), additive
+to the existing V1 API shape. No schema migration.
+
+- `ExamResitTimetableQuery` (Student): returns ONLY the student's own
+  scheduled/completed/no_show attempts that have an assigned session, with
+  unit/room/time/invigilators/instructions/payment status, in the schedule range.
+  Wired into `TimetableService` (constructor + `generateWeeklySchedule`) as a per-day
+  `exam_resits` bucket, and surfaced through `TimetableResource.formatWeeklySchedule`
+  (the Resource rebuilds each day with a fixed key set, so the new key had to be added
+  there too — a service-only key would be dropped).
+- `InvigilationDutyQuery` (Lecturer): returns ONLY the lecturer's assigned
+  `ExamRoomSlotInvigilator` rows in the date range (slot not cancelled), with
+  role/room/time and the sessions inside the slot. Added as a top-level
+  `invigilation_duties` key on `LecturerTimetableService.getTimetable` +
+  `LecturerTimetableResource.toArray` (same fixed-key-rebuild caveat).
+- Drive-by fix: `Student\TimetableController` passed the `semester_id` query string to
+  `getStudentTimetable(?int)` → a 500 TypeError on any call with a semester. Cast to
+  int in `index()`/`weekly()`. (This bug was latent because the only existing student
+  timetable test died earlier on a missing `intake` factory field — also fixed.)
+
+Targeting proof (tests): an assigned student/lecturer sees the item; a different
+student/lecturer with no assignment sees an empty list, even though the session/slot
+exists.
+
+Commands run:
+
+```bash
+./scripts/dev.sh test tests/Feature/Api/V1/Student/StudentExamResitTimetableTest.php \
+  tests/Feature/Api/V1/Lecturer/LecturerInvigilationTimetableTest.php \
+  tests/Feature/Api/V1/Student/TimetableControllerTest.php
+# PASS: 6 tests, 32 assertions (2 new student, 2 existing student now fixed, 2 new lecturer)
+
+./scripts/dev.sh composer exec pint -- --test <changed timetable files>
+# PASS
+
+git diff --check -- <my changed files>
+# CLEAN (my files; see WORKING-TREE NOTE below)
+```
+
+Lecturer side is proven at the service + Resource level (no lecturer API feature-test
+auth pattern exists in the repo, and the actor middleware makes HTTP-level Sanctum auth
+of a Lecture non-trivial); the test asserts both the service output and the Resource
+passthrough so the API contract is covered without fighting the auth middleware.
+
+WORKING-TREE NOTE (not caused by this slice): the repo working tree is in an
+unresolved-merge state (conflict markers in `.codex/*`, `AGENTS.md`, `docs/*`,
+`scripts/README.md`; staged `.khuym/*`) plus unrelated modified Canvas files, likely
+from a khuym/codex session hook. Slice 9 was NOT committed pending that cleanup.
+
+ACAD-RET-001 acceptance status after slice 9: Platform timetable-merge contract met.
+Still deferred (not required to ship staff-only release): exam-resit overdue/reminder
+monitoring, paid-cancellation refund/reversal handling, student self-request portal/API.

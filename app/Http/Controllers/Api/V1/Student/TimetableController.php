@@ -10,6 +10,7 @@ use App\Http\Resources\Api\V1\Student\ClassSessionDetailResource;
 use App\Http\Resources\Api\V1\Student\TimetableResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\ClassSession;
+use App\Models\Student;
 use App\Services\V1\Student\TimetableService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,16 +27,16 @@ class TimetableController extends Controller
      */
     public function index(TimetableFilterRequest $request): JsonResponse
     {
-        /** @var \App\Models\Student $student */
+        /** @var Student $student */
         $student = $request->user();
 
         try {
             $filters = $request->validated();
-            $semesterId = $filters['semester_id'] ?? null;
+            $semesterId = isset($filters['semester_id']) ? (int) $filters['semester_id'] : null;
             unset($filters['semester_id']);
 
             $timetable = $this->timetableService->getStudentTimetable($student, $semesterId, $filters);
-            
+
             // Check if we got an empty timetable due to no semester
             if (empty($timetable['semester']) && isset($timetable['message'])) {
                 return ApiResponse::success(
@@ -44,7 +45,7 @@ class TimetableController extends Controller
                     $timetable['message']
                 );
             }
-            
+
             return ApiResponse::success(
                 new TimetableResource($timetable),
                 [],
@@ -56,8 +57,9 @@ class TimetableController extends Controller
                 'semester_id' => $semesterId ?? null,
                 'filters' => $filters ?? [],
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return ApiResponse::serverError('Failed to retrieve timetable');
         }
     }
@@ -67,12 +69,12 @@ class TimetableController extends Controller
      */
     public function weekly(TimetableFilterRequest $request): JsonResponse
     {
-        /** @var \App\Models\Student $student */
+        /** @var Student $student */
         $student = $request->user();
 
         try {
             $filters = $request->validated();
-            $semesterId = $filters['semester_id'] ?? null;
+            $semesterId = isset($filters['semester_id']) ? (int) $filters['semester_id'] : null;
             unset($filters['semester_id']);
 
             $weeklyTimetable = $this->timetableService->getWeeklyTimetable($student, $semesterId, $filters);
@@ -97,8 +99,9 @@ class TimetableController extends Controller
                 'semester_id' => $semesterId ?? null,
                 'filters' => $filters ?? [],
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return ApiResponse::serverError('Failed to retrieve weekly timetable');
         }
     }
@@ -108,7 +111,7 @@ class TimetableController extends Controller
      */
     public function classSessionDetail(Request $request, ClassSession $classSession): JsonResponse
     {
-        /** @var \App\Models\Student $student */
+        /** @var Student $student */
         $student = $request->user();
 
         try {
@@ -129,7 +132,7 @@ class TimetableController extends Controller
      */
     public function filterOptions(Request $request): JsonResponse
     {
-        /** @var \App\Models\Student $student */
+        /** @var Student $student */
         $student = $request->user();
 
         try {
@@ -146,8 +149,9 @@ class TimetableController extends Controller
                 'user_id' => $student->id,
                 'semester_id' => $semesterId ?? null,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return ApiResponse::serverError('Failed to retrieve filter options');
         }
     }

@@ -17,7 +17,8 @@ class TimetableService
 {
     public function __construct(
         protected ClassSessionRepository $classSessionRepository,
-        protected TimetableEventQuery $timetableEventQuery
+        protected TimetableEventQuery $timetableEventQuery,
+        protected ExamResitTimetableQuery $examResitTimetableQuery
     ) {}
 
     /**
@@ -34,6 +35,7 @@ class TimetableService
         [$scheduleStart, $scheduleEnd] = $this->resolveScheduleDateRange($semester, $filters);
         $classSessions = $this->classSessionRepository->getStudentClassSessions($student, $semester, $filters);
         $events = $this->timetableEventQuery->handle($student, $scheduleStart, $scheduleEnd, $filters);
+        $examResits = $this->examResitTimetableQuery->handle($student, $scheduleStart, $scheduleEnd);
 
         return [
             'semester' => [
@@ -43,7 +45,7 @@ class TimetableService
                 'start_date' => $semester->start_date->toDateString(),
                 'end_date' => $semester->end_date->toDateString(),
             ],
-            'weekly_schedule' => $this->generateWeeklySchedule($classSessions, $events, $scheduleStart, $scheduleEnd),
+            'weekly_schedule' => $this->generateWeeklySchedule($classSessions, $events, $examResits, $scheduleStart, $scheduleEnd),
             'schedule_summary' => $this->generateScheduleSummary($classSessions),
             'time_blocks' => $this->generateTimeBlocks($classSessions),
             'filters_applied' => $filters,
@@ -150,6 +152,7 @@ class TimetableService
     protected function generateWeeklySchedule(
         Collection $classSessions,
         Collection $events,
+        Collection $examResits,
         Carbon $scheduleStart,
         Carbon $scheduleEnd
     ): array {
@@ -181,6 +184,11 @@ class TimetableService
                     ->map(function ($session) {
                         return $this->formatSessionForSchedule($session);
                     })
+                    ->values()
+                    ->toArray(),
+                'exam_resits' => $examResits
+                    ->where('day_of_week', $day)
+                    ->sortBy('start_time')
                     ->values()
                     ->toArray(),
             ];

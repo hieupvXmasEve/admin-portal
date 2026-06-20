@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Api\V1\Lecturer;
 
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -47,6 +48,10 @@ class TimetableResource extends JsonResource
 
             'availability' => $this->resource['availability'],
 
+            // Assigned exam-resit invigilation duty, already formatted by
+            // InvigilationDutyQuery (ACAD-RET-001 slice 9).
+            'invigilation_duties' => $this->resource['invigilation_duties'] ?? [],
+
             'insights' => $this->generateInsights(),
 
             'navigation' => $this->getNavigationInfo(),
@@ -79,7 +84,7 @@ class TimetableResource extends JsonResource
         foreach ($sessions as $date => $dateSessions) {
             $formatted[$date] = [
                 'date' => $date,
-                'formatted_date' => \Carbon\Carbon::parse($date)->format('l, F j, Y'),
+                'formatted_date' => Carbon::parse($date)->format('l, F j, Y'),
                 'sessions' => collect($dateSessions)->sortBy('start_time')->values()->toArray(),
                 'session_count' => count($dateSessions),
                 'total_hours' => $this->calculateDayHours($dateSessions),
@@ -98,7 +103,7 @@ class TimetableResource extends JsonResource
         $formatted = [];
 
         foreach ($weekDays as $day) {
-            $dayDate = \Carbon\Carbon::parse($this->resource['period']['start_date'])
+            $dayDate = Carbon::parse($this->resource['period']['start_date'])
                 ->startOfWeek()
                 ->addDays(array_search($day, $weekDays))
                 ->format('Y-m-d');
@@ -108,7 +113,7 @@ class TimetableResource extends JsonResource
             $formatted[$day] = [
                 'day' => $day,
                 'date' => $dayDate,
-                'formatted_date' => \Carbon\Carbon::parse($dayDate)->format('M j'),
+                'formatted_date' => Carbon::parse($dayDate)->format('M j'),
                 'sessions' => collect($daySessions)->sortBy('start_time')->values()->toArray(),
                 'session_count' => count($daySessions),
                 'is_today' => $dayDate === now()->format('Y-m-d'),
@@ -127,7 +132,7 @@ class TimetableResource extends JsonResource
         $formatted = [];
 
         foreach ($sessions as $date => $dateSessions) {
-            $carbonDate = \Carbon\Carbon::parse($date);
+            $carbonDate = Carbon::parse($date);
 
             $formatted[$date] = [
                 'date' => $date,
@@ -149,8 +154,8 @@ class TimetableResource extends JsonResource
      */
     protected function getFormattedPeriod(): string
     {
-        $start = \Carbon\Carbon::parse($this->resource['period']['start_date']);
-        $end = \Carbon\Carbon::parse($this->resource['period']['end_date']);
+        $start = Carbon::parse($this->resource['period']['start_date']);
+        $end = Carbon::parse($this->resource['period']['end_date']);
         $view = $this->resource['period']['view'];
 
         return match ($view) {
@@ -187,7 +192,7 @@ class TimetableResource extends JsonResource
                 $maxSessions = $sessionCount;
                 $busiestDay = [
                     'date' => $date,
-                    'day_name' => \Carbon\Carbon::parse($date)->format('l'),
+                    'day_name' => Carbon::parse($date)->format('l'),
                     'session_count' => $sessionCount,
                 ];
             }
@@ -217,8 +222,8 @@ class TimetableResource extends JsonResource
         $totalMinutes = 0;
 
         foreach ($sessions as $session) {
-            $start = \Carbon\Carbon::createFromFormat('H:i', $session['start_time']);
-            $end = \Carbon\Carbon::createFromFormat('H:i', $session['end_time']);
+            $start = Carbon::createFromFormat('H:i', $session['start_time']);
+            $end = Carbon::createFromFormat('H:i', $session['end_time']);
             $totalMinutes += $start->diffInMinutes($end);
         }
 
@@ -309,8 +314,8 @@ class TimetableResource extends JsonResource
      */
     protected function getNavigationInfo(): array
     {
-        $start = \Carbon\Carbon::parse($this->resource['period']['start_date']);
-        $end = \Carbon\Carbon::parse($this->resource['period']['end_date']);
+        $start = Carbon::parse($this->resource['period']['start_date']);
+        $end = Carbon::parse($this->resource['period']['end_date']);
         $view = $this->resource['period']['view'];
 
         $previous = match ($view) {

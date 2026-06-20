@@ -22,7 +22,9 @@ it('includes campus events in weekly schedule without affecting class sessions',
         'end_date' => '2026-03-31',
     ]);
 
-    $student = Student::factory()->forCampus($campus)->create();
+    $student = Student::factory()->forCampus($campus)->create([
+        'status' => 'intake_course', 'intake' => 1, 'intake_mode' => 'sequential', 'intake_semester_id' => $semester->id,
+    ]);
     Sanctum::actingAs($student);
 
     $courseOffering = CourseOffering::factory()->create([
@@ -99,7 +101,9 @@ it('duplicates multi day events into each overlapping weekday bucket', function 
         'end_date' => '2026-03-31',
     ]);
 
-    $student = Student::factory()->forCampus($campus)->create();
+    $student = Student::factory()->forCampus($campus)->create([
+        'status' => 'intake_course', 'intake' => 1, 'intake_mode' => 'sequential', 'intake_semester_id' => $semester->id,
+    ]);
     Sanctum::actingAs($student);
 
     $event = Event::factory()->published()->create([

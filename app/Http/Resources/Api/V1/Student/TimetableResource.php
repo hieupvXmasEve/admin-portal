@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Api\V1\Student;
 
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -105,6 +106,9 @@ class TimetableResource extends JsonResource
                         'is_upcoming' => $this->isUpcomingSession($session, $day),
                     ];
                 })->toArray(),
+                // Assigned exam-resit (thi lại) sittings for this student, already
+                // formatted by ExamResitTimetableQuery (ACAD-RET-001 slice 9).
+                'exam_resits' => $dayData['exam_resits'] ?? [],
                 'total_duration' => $dayData['total_duration'],
             ];
         }
@@ -182,10 +186,10 @@ class TimetableResource extends JsonResource
     /**
      * Format time range for display
      */
-    protected function formatTimeRange(string|\Carbon\Carbon $startTime, string|\Carbon\Carbon $endTime): string
+    protected function formatTimeRange(string|Carbon $startTime, string|Carbon $endTime): string
     {
-        $start = $startTime instanceof \Carbon\Carbon ? $startTime : \Carbon\Carbon::createFromTimeString($startTime);
-        $end = $endTime instanceof \Carbon\Carbon ? $endTime : \Carbon\Carbon::createFromTimeString($endTime);
+        $start = $startTime instanceof Carbon ? $startTime : Carbon::createFromTimeString($startTime);
+        $end = $endTime instanceof Carbon ? $endTime : Carbon::createFromTimeString($endTime);
 
         return $start->format('g:i A').' - '.$end->format('g:i A');
     }
@@ -193,13 +197,13 @@ class TimetableResource extends JsonResource
     /**
      * Format single time for display
      */
-    protected function formatTime(string|\Carbon\Carbon|null $time): ?string
+    protected function formatTime(string|Carbon|null $time): ?string
     {
         if ($time === null) {
             return null;
         }
 
-        $carbonTime = $time instanceof \Carbon\Carbon ? $time : \Carbon\Carbon::createFromTimeString($time);
+        $carbonTime = $time instanceof Carbon ? $time : Carbon::createFromTimeString($time);
 
         return $carbonTime->format('g:i A');
     }
@@ -263,8 +267,8 @@ class TimetableResource extends JsonResource
         $currentDay = strtolower(now()->format('l'));
         $currentTime = now()->format('H:i');
 
-        $startTime = $session['start_time'] instanceof \Carbon\Carbon ? $session['start_time']->format('H:i') : $session['start_time'];
-        $endTime = $session['end_time'] instanceof \Carbon\Carbon ? $session['end_time']->format('H:i') : $session['end_time'];
+        $startTime = $session['start_time'] instanceof Carbon ? $session['start_time']->format('H:i') : $session['start_time'];
+        $endTime = $session['end_time'] instanceof Carbon ? $session['end_time']->format('H:i') : $session['end_time'];
 
         return $day === $currentDay &&
             $currentTime >= $startTime &&
@@ -279,7 +283,7 @@ class TimetableResource extends JsonResource
         $currentDay = strtolower(now()->format('l'));
         $currentTime = now()->format('H:i');
 
-        $startTime = $session['start_time'] instanceof \Carbon\Carbon ? $session['start_time']->format('H:i') : $session['start_time'];
+        $startTime = $session['start_time'] instanceof Carbon ? $session['start_time']->format('H:i') : $session['start_time'];
 
         return $day === $currentDay && $currentTime < $startTime;
     }
@@ -287,14 +291,14 @@ class TimetableResource extends JsonResource
     protected function isCurrentEvent(array $event): bool
     {
         return now()->betweenIncluded(
-            \Carbon\Carbon::parse($event['start_time']),
-            \Carbon\Carbon::parse($event['end_time'])
+            Carbon::parse($event['start_time']),
+            Carbon::parse($event['end_time'])
         );
     }
 
     protected function isUpcomingEvent(array $event): bool
     {
-        return now()->lt(\Carbon\Carbon::parse($event['start_time']));
+        return now()->lt(Carbon::parse($event['start_time']));
     }
 
     /**

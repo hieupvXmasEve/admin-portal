@@ -14,6 +14,10 @@ use Illuminate\Support\Facades\DB;
 
 class LecturerTimetableService
 {
+    public function __construct(
+        protected InvigilationDutyQuery $invigilationDutyQuery
+    ) {}
+
     /**
      * Get lecturer's timetable for a specific period
      */
@@ -46,6 +50,7 @@ class LecturerTimetableService
             'summary' => $this->getTimetableSummary($sessions, $startDate, $endDate),
             'conflicts' => $this->detectScheduleConflicts($sessions),
             'availability' => $this->getAvailabilitySlots($lecturer, $startDate, $endDate),
+            'invigilation_duties' => $this->invigilationDutyQuery->handle($lecturer, $startDate, $endDate),
         ];
         // });
     }
