@@ -53,6 +53,7 @@ none
   - For `deferred`: only "Quay lại học" and "Bảo lưu tiếp" (labels clear, no raw status names that can be mis-chosen).
   - For `pending_course_opening`: "Tiếp tục học Pre-Uni / EGC", "Tiếp tục học Course chính", "Bảo lưu", "Bỏ học" (labels business-oriented; backend resolves exact prior status for continue).
   - Hides NE Enrollment, Major Enrollment, and cross pre-uni <-> course where inappropriate (confirmed).
+  - **From Semester UI rule:** any `from_semester_id` field defaults to `activeSemesterId` and disables all semesters whose `start_date` is before the active semester. Past semesters remain visible but not selectable; if a stale value is present it is auto-corrected back to the active semester. `StoreStudentActionRequest` mirrors the same rule server-side.
   - New status visible + filterable on main /students list (ListStudentsQuery already supports it via statuses filter; update any UI status dropdowns/labels/badges as needed).
 - Backend enforcement still works even if a crafted request bypasses the filtered UI.
 - Status appears correctly in action history, status badges, StudentChange records, and lifecycle exports/reports (labels may need mapping).
@@ -69,7 +70,7 @@ none
   - New/updated policy method with explicit matrix from user's section 4 + the 6 rules in section 7.
   - Enhanced `resolveResumeTargetStatus` (or equivalent in RecordStudentActionAction) that walks action logs to the last valid study status (intake_pre_uni_gc / intake_course). For WAITING_COURSE_OPENING, capture + store from_semester_id + block (egc_defer_from_block_number) on the log for audit/timing.
 - UI surfaces:
-  - `resources/js/pages/Admin/Students/Actions/Index.vue`: replace unconditional `options.actionTypes` dropdown with filtered list based on student.status. Special rendering + business labels for deferred (only 2 options) and pending_course_opening (continue pre-uni / continue course / defer / dropout). Support form fields for WAITING: semester + block.
+  - `resources/js/pages/Admin/Students/Actions/Index.vue`: replace unconditional `options.actionTypes` dropdown with filtered list based on student.status. Special rendering + business labels for deferred (only 2 options) and pending_course_opening (continue pre-uni / continue course / defer / dropout). Support form fields for WAITING: semester + block. `from_semester_id` selectors use `activeSemesterId` as the floor: semesters before the active semester are disabled; defer keeps the field read-only on the current semester.
   - `resources/js/types/student-action.ts`: add WAITING_COURSE_OPENING to enum + all maps (labels, desc, badge, requiredFields, helpers).
   - `resources/js/pages/Admin/Students/Actions/Show.vue` + history: generic handling for new action + status badges (previous/new_status will show the new value).
   - Student directory (/students list page + filters): ensure `pending_course_opening` appears in status filters/badges/labels (may require small update to any hardcoded status options or formatStatus helpers).
@@ -99,7 +100,8 @@ none
   - app/Modules/Academic/Http/Requests/StoreStudentActionRequest.php (waiting rules + messages)
   - app/Modules/Academic/Actions/RecordStudentActionAction.php (policy matrix, generalized history resolver for resume, WAITING handling)
   - resources/js/types/student-action.ts (enum + labels + requiredFields)
-  - resources/js/pages/Admin/Students/Actions/Index.vue (availableActions computed per status + business labels, filtered dropdown, WAITING form fields for semester+block, confirmed hides)
+  - resources/js/pages/Admin/Students/Actions/Index.vue (availableActions computed per status + business labels, filtered dropdown, WAITING form fields for semester+block, confirmed hides, from-semester floor = active semester with past semesters disabled)
+  - app/Modules/Academic/Http/Requests/StoreStudentActionRequest.php (`fromSemesterNotBeforeActiveRules()` rejects crafted past-semester payloads)
 - Frontend quality (direct npx, no new errors introduced):
   - npx eslint ... : clean (0 errors/warnings on touched files after fixes)
   - npx prettier --check : clean

@@ -13,8 +13,11 @@ use App\Modules\Academic\Actions\RecordStudentActionAction;
 use App\Modules\Academic\Exports\StudentActionLogsExport;
 use App\Modules\Academic\Queries\ListStudentActionLogsQuery;
 use App\Modules\Academic\Support\StudentActionExcelRowMapper;
+use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+
+use function Pest\Laravel\actingAs;
 
 uses(RefreshDatabase::class);
 
@@ -170,6 +173,82 @@ it('includes egc block in student action export rows', function () {
 
     expect($export->headings())->toContain('EGC From Block')
         ->and($export->map($log))->toContain('Block 2');
+});
+
+it('rejects from semester before the active semester on store', function () {
+    ['campus' => $campus, 'program' => $program, 'user' => $user] = studentActionEgcFixture();
+
+    Semester::query()->update(['is_active' => false]);
+
+    $pastSemester = Semester::factory()->create([
+        'code' => '2025SP',
+        'name' => 'Spring 2025',
+        'start_date' => '2025-01-01',
+        'end_date' => '2025-05-31',
+        'is_active' => false,
+    ]);
+    $activeSemester = Semester::factory()->active()->create([
+        'code' => '2026SP',
+        'name' => 'Spring 2026',
+        'start_date' => '2026-01-01',
+        'end_date' => '2026-05-31',
+    ]);
+    $futureSemester = Semester::factory()->create([
+        'code' => '2026FA',
+        'name' => 'Fall 2026',
+        'start_date' => '2026-08-01',
+        'end_date' => '2026-12-31',
+        'is_active' => false,
+    ]);
+
+    $rejectedStudent = studentActionStudent($campus, $program, $activeSemester, 'EGC100010', 'intake_pre_uni_gc');
+    $acceptedStudent = studentActionStudent($campus, $program, $activeSemester, 'EGC100011', 'intake_pre_uni_gc');
+    $futureStudent = studentActionStudent($campus, $program, $activeSemester, 'EGC100012', 'intake_pre_uni_gc');
+
+    session([
+        '_token' => 'student-action-from-semester-csrf',
+        'current_campus_id' => $campus->id,
+    ]);
+
+    $permissionService = Mockery::mock(PermissionService::class);
+    $permissionService->shouldReceive('getUserPermissions')
+        ->andReturn(['view_student_action', 'change_student_status']);
+    app()->singleton(PermissionService::class, fn () => $permissionService);
+
+    actingAs($user)
+        ->post(route('students.actions.store', ['student' => $rejectedStudent->id]), [
+            '_token' => 'student-action-from-semester-csrf',
+            'student_id' => $rejectedStudent->id,
+            'action_type' => StudentActionType::WAITING_COURSE_OPENING->value,
+            'reason' => 'Waiting for course opening',
+            'from_semester_id' => $pastSemester->id,
+            'egc_defer_from_block_number' => 1,
+        ])
+        ->assertSessionHasErrors(['from_semester_id']);
+
+    actingAs($user)
+        ->post(route('students.actions.store', ['student' => $acceptedStudent->id]), [
+            '_token' => 'student-action-from-semester-csrf',
+            'student_id' => $acceptedStudent->id,
+            'action_type' => StudentActionType::WAITING_COURSE_OPENING->value,
+            'reason' => 'Waiting for course opening',
+            'from_semester_id' => $activeSemester->id,
+            'egc_defer_from_block_number' => 1,
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    actingAs($user)
+        ->post(route('students.actions.store', ['student' => $futureStudent->id]), [
+            '_token' => 'student-action-from-semester-csrf',
+            'student_id' => $futureStudent->id,
+            'action_type' => StudentActionType::WAITING_COURSE_OPENING->value,
+            'reason' => 'Waiting for course opening future',
+            'from_semester_id' => $futureSemester->id,
+            'egc_defer_from_block_number' => 2,
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
 });
 
 it('maps current and legacy import rows with egc block defaulting to block 1', function () {

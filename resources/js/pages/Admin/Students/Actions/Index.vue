@@ -105,6 +105,30 @@ const selectedActionType = computed(() => {
     return form.action_type ? (form.action_type as StudentActionType) : null;
 });
 
+const activeSemester = computed(() => {
+    const activeId = props.options.activeSemesterId;
+    if (!activeId) {
+        return null;
+    }
+
+    return props.options.semesters.find((semester) => semester.id === activeId) ?? null;
+});
+
+const isSemesterBeforeActive = (semester: Semester): boolean => {
+    const active = activeSemester.value;
+    if (!active || semester.id === active.id) {
+        return false;
+    }
+
+    if (active.start_date && semester.start_date) {
+        return new Date(semester.start_date) < new Date(active.start_date);
+    }
+
+    return false;
+};
+
+const selectableFromSemesters = computed(() => props.options.semesters.filter((semester) => !isSemesterBeforeActive(semester)));
+
 // Reset form fields when action type changes
 watch(
     () => form.action_type,
@@ -132,6 +156,27 @@ watch(
         // For waiting course opening, default block if pre-uni context
         if (form.action_type === StudentActionType.WAITING_COURSE_OPENING && props.student.status === 'intake_pre_uni_gc') {
             form.egc_defer_from_block_number = form.egc_defer_from_block_number ?? 1;
+        }
+
+        if (props.options.activeSemesterId && form.from_semester_id) {
+            const semester = props.options.semesters.find((item) => item.id === form.from_semester_id);
+            if (semester && isSemesterBeforeActive(semester)) {
+                form.from_semester_id = props.options.activeSemesterId;
+            }
+        }
+    },
+);
+
+watch(
+    () => form.from_semester_id,
+    (value) => {
+        if (!value || !props.options.activeSemesterId) {
+            return;
+        }
+
+        const semester = props.options.semesters.find((item) => item.id === value);
+        if (semester && isSemesterBeforeActive(semester)) {
+            form.from_semester_id = props.options.activeSemesterId;
         }
     },
 );
@@ -363,11 +408,12 @@ const getSummary = (log: StudentActionLog): string => {
                                             <SelectValue placeholder="Select semester" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem v-for="sem in options.semesters" :key="sem.id" :value="sem.id">
+                                            <SelectItem v-for="sem in selectableFromSemesters" :key="sem.id" :value="sem.id">
                                                 {{ sem.name }}
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
+                                    <p class="text-muted-foreground text-xs">From semester defaults to the current semester; earlier semesters cannot be selected.</p>
                                     <p v-if="form.errors.from_semester_id" class="text-sm text-red-500">{{ form.errors.from_semester_id }}</p>
                                 </div>
                                 <div class="space-y-2">
@@ -552,11 +598,12 @@ const getSummary = (log: StudentActionLog): string => {
                                             <SelectValue placeholder="Select semester" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem v-for="sem in options.semesters" :key="sem.id" :value="sem.id">
+                                            <SelectItem v-for="sem in options.semesters" :key="sem.id" :value="sem.id" :disabled="isSemesterBeforeActive(sem)">
                                                 {{ sem.name }}
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
+                                    <p class="text-muted-foreground text-xs">From semester defaults to the current semester; earlier semesters are disabled.</p>
                                     <p v-if="form.errors.from_semester_id" class="text-sm text-red-500">{{ form.errors.from_semester_id }}</p>
                                 </div>
                                 <div class="space-y-2">

@@ -8,6 +8,7 @@ use App\Enums\StudentActionType;
 use App\Models\CourseRegistration;
 use App\Models\DeferCaseItem;
 use App\Models\FinanceCharge;
+use App\Models\Semester;
 use App\Models\Student;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -57,7 +58,7 @@ class StoreStudentActionRequest extends FormRequest
     protected function deferRules(): array
     {
         return [
-            'from_semester_id' => ['required', 'integer', 'exists:semesters,id'],
+            'from_semester_id' => ['required', 'integer', 'exists:semesters,id', ...$this->fromSemesterNotBeforeActiveRules()],
             'return_semester_id' => [
                 'required',
                 'integer',
@@ -184,14 +185,14 @@ class StoreStudentActionRequest extends FormRequest
     protected function neEnrollmentRules(): array
     {
         return [
-            'from_semester_id' => ['required', 'integer', 'exists:semesters,id'],
+            'from_semester_id' => ['required', 'integer', 'exists:semesters,id', ...$this->fromSemesterNotBeforeActiveRules()],
         ];
     }
 
     protected function majorEnrollmentRules(): array
     {
         return [
-            'from_semester_id' => ['required', 'integer', 'exists:semesters,id'],
+            'from_semester_id' => ['required', 'integer', 'exists:semesters,id', ...$this->fromSemesterNotBeforeActiveRules()],
         ];
     }
 
@@ -234,8 +235,36 @@ class StoreStudentActionRequest extends FormRequest
     protected function waitingCourseOpeningRules(): array
     {
         return [
-            'from_semester_id' => ['required', 'integer', 'exists:semesters,id'],
+            'from_semester_id' => ['required', 'integer', 'exists:semesters,id', ...$this->fromSemesterNotBeforeActiveRules()],
             'egc_defer_from_block_number' => ['required', 'integer', Rule::in([1, 2])],
+        ];
+    }
+
+    /**
+     * @return array<int, \Closure>
+     */
+    protected function fromSemesterNotBeforeActiveRules(): array
+    {
+        return [
+            function (string $attribute, mixed $value, \Closure $fail): void {
+                $activeSemester = Semester::getActiveSemester();
+                if ($activeSemester === null) {
+                    return;
+                }
+
+                $selectedSemester = Semester::query()->find($value);
+                if ($selectedSemester === null) {
+                    return;
+                }
+
+                if (
+                    $selectedSemester->start_date
+                    && $activeSemester->start_date
+                    && $selectedSemester->start_date->lt($activeSemester->start_date)
+                ) {
+                    $fail('From semester cannot be before the current semester.');
+                }
+            },
         ];
     }
 
