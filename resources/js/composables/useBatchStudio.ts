@@ -8,6 +8,7 @@ interface BatchStudioConfig<TSetup extends Record<string, unknown>> {
     commitUrl: string;
     defaultSetup: TSetup;
     commitExtras?: () => Record<string, unknown>;
+    onCommitError?: (errors: Record<string, string>) => void;
     defaultInclude?: (line: BatchPreviewLineClient) => boolean;
 }
 
@@ -67,21 +68,29 @@ export function useBatchStudio<TSetup extends Record<string, unknown>>(config: B
     });
 
     function commit(): void {
+        const extras = config.commitExtras?.() ?? {};
+
         form.preview_token = previewToken.value ?? '';
         form.selected_keys = [...selected.value];
-        Object.assign(form, config.commitExtras?.() ?? {});
-        form.post(config.commitUrl, {
-            preserveScroll: true,
-            onSuccess: () => {
-                step.value = 4;
-            },
-            onError: (errors) => {
-                if (errors.preview_token) {
-                    driftMessage.value = errors.preview_token;
-                    step.value = 2;
-                }
-            },
-        });
+
+        form
+            .transform((data) => ({
+                ...data,
+                ...extras,
+            }))
+            .post(config.commitUrl, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    step.value = 4;
+                },
+                onError: (errors) => {
+                    if (errors.preview_token) {
+                        driftMessage.value = errors.preview_token;
+                        step.value = 2;
+                    }
+                    config.onCommitError?.(errors);
+                },
+            });
     }
 
     const counts = computed(() => {

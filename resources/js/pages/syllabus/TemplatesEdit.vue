@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger, ComboboxViewport } from '@/components/ui/combobox';
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumberField, NumberFieldContent, NumberFieldInput } from '@/components/ui/number-field';
@@ -50,6 +50,7 @@ interface SyllabusTemplate {
     total_sessions: number;
     min_attendance_threshold: number;
     min_grade_threshold: number;
+    exam_resit_fee: number | null;
     is_active: boolean;
     assessment_components: AssessmentComponent[];
 }
@@ -71,6 +72,7 @@ const formSchema = toTypedSchema(
         total_sessions: z.number().int({ message: 'Total sessions must be an integer' }).min(1, { message: 'Total sessions must be at least 1' }).optional(),
         min_attendance_threshold: z.number().min(0).max(100).default(80),
         min_grade_threshold: z.number().min(0).max(100).default(40),
+        exam_resit_fee: z.number().min(1, { message: 'Phí thi lại phải lớn hơn 0' }),
         unit_id: z.string({ message: 'Please select a curriculum unit' }),
         is_active: z.boolean().default(true).optional(),
         assessment_components: z.array(z.any()).optional(),
@@ -86,6 +88,7 @@ const initialValues = {
     total_sessions: Number(props.syllabusTemplate.total_sessions ?? 1),
     min_attendance_threshold: Number(props.syllabusTemplate.min_attendance_threshold ?? 80),
     min_grade_threshold: Number(props.syllabusTemplate.min_grade_threshold ?? 40),
+    exam_resit_fee: Number(props.syllabusTemplate.exam_resit_fee ?? 0) || 750000,
     unit_id: (props.syllabusTemplate.unit_id ?? props.unit.id).toString(),
     is_active: !!props.syllabusTemplate.is_active,
     assessment_components:
@@ -204,6 +207,7 @@ const onSubmit = form.handleSubmit((formData) => {
         total_sessions: formData.total_sessions,
         min_attendance_threshold: formData.min_attendance_threshold,
         min_grade_threshold: formData.min_grade_threshold,
+        exam_resit_fee: formData.exam_resit_fee,
         is_active: formData.is_active,
         assessment_components: formData.assessment_components,
         // unit_id intentionally omitted from update on backend (not supported),
@@ -400,6 +404,34 @@ const onSubmit = form.handleSubmit((formData) => {
                                 </NumberField>
                             </FormControl>
                             <FormDescription>Minimum total score required to pass the course.</FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FormField v-slot="{ componentField }" name="exam_resit_fee" :transform="(value: any) => {
+                        if (value === '' || value === null || value === undefined) return 0;
+                        const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
+                        return isNaN(num) ? 0 : num;
+                    }
+                        ">
+                        <FormItem>
+                            <FormLabel for="exam_resit_fee">Phí thi lại (VND) *</FormLabel>
+                            <FormControl>
+                                <NumberField
+                                    :model-value="typeof componentField.modelValue === 'string' ? parseFloat(componentField.modelValue) || 0 : componentField.modelValue"
+                                    @update:model-value="componentField['onUpdate:modelValue']" :step="1000" :min="1"
+                                    :format-options="{
+                                        minimumFractionDigits: 0,
+                                        maximumFractionDigits: 0,
+                                    }">
+                                    <NumberFieldContent>
+                                        <NumberFieldInput />
+                                    </NumberFieldContent>
+                                </NumberField>
+                            </FormControl>
+                            <FormDescription>Phí thi lại bắt buộc khi tạo đăng ký thi lại cho học phần này.</FormDescription>
                             <FormMessage />
                         </FormItem>
                     </FormField>

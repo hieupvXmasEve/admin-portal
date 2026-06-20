@@ -9,14 +9,15 @@ import { Checkbox } from '@/components/ui/checkbox';
 import DatePicker from '@/components/ui/DatePicker.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useBatchStudio } from '@/composables/useBatchStudio';
 import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import type { BatchResult } from '@/types/finance';
 import { financeRoutes } from '@/utils/routes';
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowLeft, Send } from 'lucide-vue-next';
-import { computed, reactive } from 'vue';
+import { ArrowLeft, CalendarIcon, Send } from 'lucide-vue-next';
+import { computed, reactive, ref } from 'vue';
 
 interface DngPrefill {
     dng_fee_type: string;
@@ -34,6 +35,24 @@ const { selectedId: semesterId, labelFor: semesterLabelFor } = useFinanceSemeste
 
 const amountOverrides = reactive<Record<string, number>>({});
 
+const now = new Date();
+const estimateTimePickerOpen = ref(false);
+const estimateMonth = ref(String(now.getMonth() + 1).padStart(2, '0'));
+const estimateYear = ref(String(now.getFullYear()));
+const defaultEstimateTime = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}`;
+
+const setupErrors = ref<Record<string, string>>({});
+
+const estimateMonthOptions = Array.from({ length: 12 }, (_, i) => ({
+    value: String(i + 1).padStart(2, '0'),
+    label: `Tháng ${String(i + 1).padStart(2, '0')}`,
+}));
+
+const estimateYearOptions = Array.from({ length: 6 }, (_, i) => {
+    const year = now.getFullYear() - 1 + i;
+    return { value: String(year), label: `Năm ${year}` };
+});
+
 const wizard = useBatchStudio({
     previewUrl: financeRoutes.batchStudio.dngPreview(),
     commitUrl: financeRoutes.batchStudio.dngCommit(),
@@ -42,8 +61,8 @@ const wizard = useBatchStudio({
         dng_fee_type: props.prefill?.dng_fee_type ?? 'HP',
         student_ids: props.prefill?.student_ids ?? ([] as number[]),
         due_date: '',
-        description: 'Yêu cầu thanh toán DNG',
-        estimate_time: '3d',
+        description: '',
+        estimate_time: defaultEstimateTime,
     },
     commitExtras: () => ({
         due_date: wizard.setup.due_date,
@@ -51,7 +70,35 @@ const wizard = useBatchStudio({
         estimate_time: wizard.setup.estimate_time,
         amount_overrides: Object.keys(amountOverrides).length ? { ...amountOverrides } : undefined,
     }),
+    onCommitError: (errors) => {
+        if (errors.due_date || errors.description || errors.estimate_time) {
+            wizard.step.value = 1;
+        }
+    },
 });
+
+function applyEstimateTimeSelection(): void {
+    wizard.setup.estimate_time = `${estimateMonth.value}/${estimateYear.value.slice(-2)}`;
+    estimateTimePickerOpen.value = false;
+    setupErrors.value.estimate_time = '';
+}
+
+function validateSetup(): boolean {
+    const errors: Record<string, string> = {};
+
+    if (!wizard.setup.description?.trim()) {
+        errors.description = 'Vui lòng nhập mô tả khoản phí.';
+    }
+    if (!wizard.setup.due_date) {
+        errors.due_date = 'Vui lòng chọn hạn thanh toán.';
+    }
+    if (!wizard.setup.estimate_time?.trim()) {
+        errors.estimate_time = 'Vui lòng chọn thời hạn thanh toán (MM/YY).';
+    }
+
+    setupErrors.value = errors;
+    return Object.keys(errors).length === 0;
+}
 
 const ack = computed({
     get: () => Boolean(wizard.form.acknowledged),
@@ -80,6 +127,9 @@ const overrideDriftCount = computed(() => {
 
 const hasOverrideDrift = computed(() => overrideDriftCount.value > 0);
 
+const fieldError = (field: 'due_date' | 'description' | 'estimate_time'): string | undefined =>
+    setupErrors.value[field] ?? (wizard.form.errors[field] as string | undefined);
+
 const summaryText = computed(() => {
     if (wizard.step.value === 1) return 'Điền thông tin yêu cầu thanh toán trước khi xem trước danh sách SV';
     const c = wizard.counts.value;
@@ -88,6 +138,7 @@ const summaryText = computed(() => {
 
 function onNext() {
     if (wizard.step.value === 1) {
+        if (!validateSetup()) return;
         wizard.setup.semester_id = wizard.setup.semester_id ?? semesterId.value;
         return void wizard.runPreview();
     }
@@ -96,6 +147,10 @@ function onNext() {
         return;
     }
     if (wizard.step.value === 3) {
+        if (!validateSetup()) {
+            wizard.step.value = 1;
+            return;
+        }
         wizard.commit();
     }
 }
@@ -165,18 +220,76 @@ function retryFailedSubset() {
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div class="space-y-2">
-                            <Label>Hạn thanh toán</Label>
-                            <DatePicker v-model="wizard.setup.due_date" />
-                        </div>
-                        <div class="space-y-2">
-                            <Label>Thời gian ước tính</Label>
-                            <Input v-model="wizard.setup.estimate_time" placeholder="3d" />
-                        </div>
+
                         <div class="space-y-2 sm:col-span-2">
-                            <Label>Mô tả</Label>
-                            <Input v-model="wizard.setup.description" />
+                            <Label for="dng-description">
+                                Mô tả khoản phí <span class="text-red-500">*</span>
+                            </Label>
+                            <Input
+                                id="dng-description"
+                                v-model="wizard.setup.description"
+                                placeholder="VD: Học phí kỳ 1 năm học 2025-2026"
+                                :class="{ 'border-red-400': fieldError('description') }"
+                                @update:model-value="setupErrors.description = ''"
+                            />
+                            <p v-if="fieldError('description')" class="text-xs text-red-500">{{ fieldError('description') }}</p>
                         </div>
+
+                        <div class="space-y-2">
+                            <Label>
+                                Hạn thanh toán nội bộ <span class="text-red-500">*</span>
+                            </Label>
+                            <DatePicker
+                                v-model="wizard.setup.due_date"
+                                placeholder="Chọn hạn thanh toán"
+                                @update:model-value="setupErrors.due_date = ''"
+                            />
+                            <p v-if="fieldError('due_date')" class="text-xs text-red-500">{{ fieldError('due_date') }}</p>
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label>Thời hạn thanh toán (MM/YY) <span class="text-red-500">*</span></Label>
+                            <Popover v-model:open="estimateTimePickerOpen">
+                                <PopoverTrigger as-child>
+                                    <Button
+                                        variant="outline"
+                                        class="w-full justify-start font-normal"
+                                        :class="{ 'border-red-400': fieldError('estimate_time') }"
+                                    >
+                                        <CalendarIcon class="mr-2 h-4 w-4" />
+                                        {{ wizard.setup.estimate_time || 'Chọn tháng/năm' }}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent class="w-64 space-y-3 p-4" align="start">
+                                    <div class="space-y-1.5">
+                                        <Label>Tháng</Label>
+                                        <Select v-model="estimateMonth">
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem v-for="m in estimateMonthOptions" :key="m.value" :value="m.value">
+                                                    {{ m.label }}
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div class="space-y-1.5">
+                                        <Label>Năm</Label>
+                                        <Select v-model="estimateYear">
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem v-for="y in estimateYearOptions" :key="y.value" :value="y.value">
+                                                    {{ y.label }}
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <Button type="button" class="w-full" @click="applyEstimateTimeSelection">Áp dụng</Button>
+                                </PopoverContent>
+                            </Popover>
+                            <p class="text-muted-foreground text-xs">Chuỗi MM/YY gửi lên hệ thống DNG.</p>
+                            <p v-if="fieldError('estimate_time')" class="text-xs text-red-500">{{ fieldError('estimate_time') }}</p>
+                        </div>
+
                         <div class="bg-muted/40 rounded-lg border px-4 py-3 text-sm sm:col-span-2">
                             <span class="text-muted-foreground">Kỳ đang chọn:</span>
                             <span class="ml-2 font-medium">{{ semesterLabelFor(wizard.setup.semester_id ?? semesterId) }}</span>
@@ -193,6 +306,11 @@ function retryFailedSubset() {
                             <CardDescription>{{ summaryText }}</CardDescription>
                         </CardHeader>
                         <CardContent class="space-y-4">
+                            <div class="bg-muted/40 space-y-1 rounded-lg border px-4 py-3 text-sm">
+                                <div><span class="text-muted-foreground">Mô tả:</span> {{ wizard.setup.description }}</div>
+                                <div><span class="text-muted-foreground">Hạn thanh toán:</span> {{ wizard.setup.due_date }}</div>
+                                <div><span class="text-muted-foreground">Thời hạn DNG:</span> {{ wizard.setup.estimate_time }}</div>
+                            </div>
                             <Alert v-if="hasOverrideDrift" variant="destructive">
                                 <AlertDescription>
                                     Số tiền ghi đè lệch tổng tính được (≥1 VND) ở {{ overrideDriftCount }} SV → khoản này thành <strong>ad-hoc</strong>, <strong>bỏ liên kết đợt</strong> và phải <strong>đối soát thủ công</strong>.
