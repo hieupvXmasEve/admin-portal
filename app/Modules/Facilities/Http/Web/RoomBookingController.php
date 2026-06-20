@@ -277,7 +277,14 @@ class RoomBookingController extends Controller
             return redirect()->back();
         }
 
-        $booking = $this->bookingService->approveBooking($roomBooking, 'user', $request->user()->id, $request->note);
+        try {
+            $booking = $this->bookingService->approveBooking($roomBooking, 'user', $request->user()->id, $request->note);
+        } catch (\InvalidArgumentException $exception) {
+            Inertia::flash('error', $exception->getMessage());
+
+            return redirect()->back();
+        }
+
         Inertia::flash('success', "Booking '{$booking->title}' has been approved.");
 
         return redirect()->route('room-bookings.show', $booking);

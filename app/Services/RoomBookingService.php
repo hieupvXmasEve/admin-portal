@@ -9,6 +9,7 @@ use App\Models\Room;
 use App\Models\RoomBooking;
 use App\Models\RoomBookingAction;
 use App\Models\User;
+use App\Modules\Facilities\Support\ExamSlotBookingConflictChecker;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -19,13 +20,17 @@ use Illuminate\Support\Facades\Log;
 class RoomBookingService
 {
     public function __construct(
-        private SystemConfigService $systemConfigService
+        private SystemConfigService $systemConfigService,
+        private ExamSlotBookingConflictChecker $examSlotConflictChecker
     ) {}
+
     /**
      * System configuration defaults (can be overridden by SystemConfig)
      */
     private const DEFAULT_BOOKING_START_TIME = '07:00';
+
     private const DEFAULT_BOOKING_END_TIME = '20:00';
+
     private const DEFAULT_STUDENT_BOOKING_LIMIT = 2;
 
     /**
@@ -149,10 +154,10 @@ class RoomBookingService
                 try {
                     $booking->load('bookedBy');
                 } catch (\Exception $e) {
-                    \Log::warning('Could not load bookedBy relationship: ' . $e->getMessage());
+                    \Log::warning('Could not load bookedBy relationship: '.$e->getMessage());
                 }
             } catch (\Exception $e) {
-                \Log::error('Error loading booking relationships: ' . $e->getMessage());
+                \Log::error('Error loading booking relationships: '.$e->getMessage());
                 // Return booking without relationships if loading fails
             }
 
@@ -214,6 +219,19 @@ class RoomBookingService
      */
     public function approveBooking(RoomBooking $booking, string $approverType, int $approverId, ?string $note = null): RoomBooking
     {
+        // An exam can be scheduled after a booking is submitted but before it is
+        // approved, so re-check exam overlap at the approval gate (see S-003).
+        // Exclude the booking's own mirror slot so it never blocks its own approval.
+        if ($this->examSlotConflictChecker->hasConflict(
+            $booking->room_id,
+            $booking->booking_date->format('Y-m-d'),
+            $booking->start_time->format('H:i'),
+            $booking->end_time->format('H:i'),
+            $booking->id
+        )) {
+            throw new \InvalidArgumentException('Cannot approve: this booking now conflicts with a scheduled exam (thi lại) block.');
+        }
+
         return DB::transaction(function () use ($booking, $approverType, $approverId, $note) {
             $oldStatus = $booking->status;
 
@@ -342,7 +360,7 @@ class RoomBookingService
     /**
      * Get class sessions for rooms in a date range (for calendar display).
      */
-    public function getClassSessionsForCalendar(?int $roomId = null, ?int $buildingId = null, ?int $campusId = null, string $startDate, string $endDate): Collection
+    public function getClassSessionsForCalendar(?int $roomId, ?int $buildingId, ?int $campusId, string $startDate, string $endDate): Collection
     {
         $query = ClassSession::query()
             ->with(['room.building', 'courseOffering.unit', 'lecture'])
@@ -371,11 +389,11 @@ class RoomBookingService
             ->get()
             ->map(function ($session) {
                 return [
-                    'id' => 'class_' . $session->id,
+                    'id' => 'class_'.$session->id,
                     'type' => 'class_session',
                     'room_id' => $session->room_id,
                     'room' => $session->room,
-                    'title' => $session->courseOffering?->unit?->code . ' - ' . $session->courseOffering?->unit?->name,
+                    'title' => $session->courseOffering?->unit?->code.' - '.$session->courseOffering?->unit?->name,
                     'description' => $session->session_title,
                     'booking_date' => $session->session_date->format('Y-m-d'),
                     'start_time' => $session->start_time->format('H:i'),
@@ -403,7 +421,7 @@ class RoomBookingService
         // Transform bookings to calendar format
         $bookingItems = collect($bookings)->map(function ($booking) {
             return [
-                'id' => 'booking_' . $booking->id,
+                'id' => 'booking_'.$booking->id,
                 'type' => 'room_booking',
                 'room_id' => $booking->room_id,
                 'room' => $booking->room,
@@ -452,7 +470,7 @@ class RoomBookingService
                 $q->where('start_time', '<', $endTime)
                     ->where('end_time', '>', $startTime);
             })
-            ->when($excludeBookingId, fn($q) => $q->where('id', '!=', $excludeBookingId))
+            ->when($excludeBookingId, fn ($q) => $q->where('id', '!=', $excludeBookingId))
             ->get();
 
         foreach ($bookingConflicts as $booking) {
@@ -472,8 +490,8 @@ class RoomBookingService
             ->whereDate('session_date', $date)
             ->whereNotIn('status', ['cancelled', 'postponed'])
             ->where(function ($q) use ($startTime, $endTime) {
-                $q->whereRaw("TIME(start_time) < ?", [$endTime])
-                    ->whereRaw("TIME(end_time) > ?", [$startTime]);
+                $q->whereRaw('TIME(start_time) < ?', [$endTime])
+                    ->whereRaw('TIME(end_time) > ?', [$startTime]);
             })
             ->with(['courseOffering.unit'])
             ->get();
@@ -482,12 +500,17 @@ class RoomBookingService
             $conflicts[] = [
                 'type' => 'class_session',
                 'id' => $session->id,
-                'title' => ($session->courseOffering?->unit?->code ?? 'Class') . ' - ' . ($session->courseOffering?->unit?->name ?? $session->session_title),
+                'title' => ($session->courseOffering?->unit?->code ?? 'Class').' - '.($session->courseOffering?->unit?->name ?? $session->session_title),
                 'start_time' => $session->start_time->format('H:i'),
                 'end_time' => $session->end_time->format('H:i'),
                 'status' => $session->status,
                 'is_editable' => false,
             ];
+        }
+
+        // Scheduled exam-resit blocks are a third occupancy source (see S-003).
+        foreach ($this->examSlotConflictChecker->conflictsFor($roomId, $date, $startTime, $endTime, $excludeBookingId) as $examConflict) {
+            $conflicts[] = $examConflict;
         }
 
         return $conflicts;
@@ -498,12 +521,12 @@ class RoomBookingService
      */
     private function validateRoomIsBookable(Room $room): void
     {
-        if (!$room->is_bookable) {
+        if (! $room->is_bookable) {
             throw new \InvalidArgumentException('This room is not available for booking.');
         }
 
-        if (!in_array($room->status, [Room::STATUS_AVAILABLE])) {
-            throw new \InvalidArgumentException('This room is currently not available (status: ' . $room->status . ').');
+        if (! in_array($room->status, [Room::STATUS_AVAILABLE])) {
+            throw new \InvalidArgumentException('This room is currently not available (status: '.$room->status.').');
         }
     }
 
@@ -552,7 +575,7 @@ class RoomBookingService
 
         // Check blocked days
         if ($room->blocked_days && in_array($bookingDate->format('l'), $room->blocked_days)) {
-            throw new \InvalidArgumentException('This room is not available on ' . $bookingDate->format('l') . '.');
+            throw new \InvalidArgumentException('This room is not available on '.$bookingDate->format('l').'.');
         }
     }
 
@@ -588,8 +611,8 @@ class RoomBookingService
             ->whereDate('session_date', $date)
             ->whereNotIn('status', ['cancelled', 'postponed'])
             ->where(function ($q) use ($startTime, $endTime) {
-                $q->whereRaw("TIME(start_time) < ?", [$endTime])
-                    ->whereRaw("TIME(end_time) > ?", [$startTime]);
+                $q->whereRaw('TIME(start_time) < ?', [$endTime])
+                    ->whereRaw('TIME(end_time) > ?', [$startTime]);
             })
             ->with(['courseOffering.unit'])
             ->first();
@@ -598,6 +621,11 @@ class RoomBookingService
             $unitCode = $sessionConflict->courseOffering?->unit?->code ?? 'a class';
             throw new \InvalidArgumentException("This time slot conflicts with {$unitCode} class session.");
         }
+
+        // Scheduled exam-resit block conflict (see S-003).
+        if ($this->examSlotConflictChecker->hasConflict($roomId, $date, $startTime, $endTime, $excludeBookingId)) {
+            throw new \InvalidArgumentException('This time slot conflicts with a scheduled exam (thi lại) block.');
+        }
     }
 
     /**
@@ -605,7 +633,7 @@ class RoomBookingService
      */
     private function checkStudentBookingLimit(int $studentId, string $date): void
     {
-        if (!$this->canStudentBook()) {
+        if (! $this->canStudentBook()) {
             throw new \InvalidArgumentException('Student booking is currently not allowed.');
         }
 
@@ -693,8 +721,8 @@ class RoomBookingService
      */
     private function applyFilters(Builder $query, array $filters): void
     {
-        if (!empty($filters['search'])) {
-            $search = '%' . $filters['search'] . '%';
+        if (! empty($filters['search'])) {
+            $search = '%'.$filters['search'].'%';
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', $search)
                     ->orWhere('description', 'like', $search)
@@ -706,39 +734,39 @@ class RoomBookingService
             });
         }
 
-        if (!empty($filters['room_id'])) {
+        if (! empty($filters['room_id'])) {
             $query->forRoom((int) $filters['room_id']);
         }
 
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
 
-        if (!empty($filters['booking_type'])) {
+        if (! empty($filters['booking_type'])) {
             $query->where('booking_type', $filters['booking_type']);
         }
 
-        if (!empty($filters['booking_date'])) {
+        if (! empty($filters['booking_date'])) {
             $query->forDate($filters['booking_date']);
         }
 
-        if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
+        if (! empty($filters['start_date']) && ! empty($filters['end_date'])) {
             $query->forDateRange($filters['start_date'], $filters['end_date']);
         }
 
-        if (!empty($filters['building_id'])) {
+        if (! empty($filters['building_id'])) {
             $query->whereHas('room', function ($roomQuery) use ($filters) {
                 $roomQuery->where('building_id', $filters['building_id']);
             });
         }
 
-        if (!empty($filters['campus_id'])) {
+        if (! empty($filters['campus_id'])) {
             $query->whereHas('room', function ($roomQuery) use ($filters) {
                 $roomQuery->where('campus_id', $filters['campus_id']);
             });
         }
 
-        if (!empty($filters['sort'])) {
+        if (! empty($filters['sort'])) {
             $direction = $filters['direction'] ?? 'desc';
             $query->orderBy($filters['sort'], $direction);
         }

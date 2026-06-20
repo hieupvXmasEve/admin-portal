@@ -17,7 +17,8 @@ class RoomBookingSlotValidator
     private const DEFAULT_BOOKING_END_TIME = '20:00';
 
     public function __construct(
-        private readonly SystemConfigService $systemConfigService
+        private readonly SystemConfigService $systemConfigService,
+        private readonly ExamSlotBookingConflictChecker $examSlotConflictChecker
     ) {}
 
     public function validateRoomAndSlot(Room $room, string $date, string $startTime, string $endTime, ?int $campusId = null): void
@@ -81,6 +82,11 @@ class RoomBookingSlotValidator
                 'class_session_id' => $session->id,
                 'is_editable' => false,
             ];
+        }
+
+        // Scheduled exam-resit blocks are a third occupancy source (see S-003).
+        foreach ($this->examSlotConflictChecker->conflictsFor($roomId, $date, $startTime, $endTime, $excludeBookingId) as $examConflict) {
+            $conflicts[] = $examConflict;
         }
 
         return $conflicts;
