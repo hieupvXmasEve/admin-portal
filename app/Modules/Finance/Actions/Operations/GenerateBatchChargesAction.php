@@ -95,9 +95,10 @@ class GenerateBatchChargesAction
                         && $studentChargeTimingResolver->shouldGenerateEgcForSemester($student, $semesterId);
                     $canGenerateTuition = in_array(FinanceCharge::TYPE_TUITION_TERM, $chargeTypes, true)
                         && $studentChargeTimingResolver->shouldGenerateTuitionForSemester($student, $semesterId);
-                    $deferCase = $deferChargeResolver->findApplicableFullCase($student, $semesterId);
-                    $shouldSkipFullCharges = $deferCase !== null;
-                    $didSkipPreserveCharge = false;
+                    // FIN-REV-020-02 (M2): a fully deferred semester enrollment is
+                    // non-billable (PRESERVE and FORFEIT alike), so no charge is
+                    // generated and an M1-voided obligation is never resurrected.
+                    $shouldSkipFullCharges = $deferChargeResolver->isSemesterEnrollmentDeferred($student, $semesterId);
 
                     $reusableInvoice = self::findReusableInvoice($student->id, $semesterId);
                     $existingTuitionCharge = null;
@@ -185,7 +186,7 @@ class GenerateBatchChargesAction
                     // Case A: Intake Pre-Uni GC -> GC Fee
                     if ($canGenerateEgc) {
                         if ($shouldSkipFullCharges) {
-                            $didSkipPreserveCharge = true;
+                            // Deferred enrollment is non-billable (FIN-REV-020-02): generate nothing.
                         } else {
                             $existingEgcIssuedInInvoice = StudentInvoice::query()
                                 ->where('student_id', $student->id)
@@ -247,7 +248,7 @@ class GenerateBatchChargesAction
                     // Case B: Intake Course -> Tuition
                     if ($canGenerateTuition) {
                         if ($shouldSkipFullCharges) {
-                            $didSkipPreserveCharge = true;
+                            // Deferred enrollment is non-billable (FIN-REV-020-02): generate nothing.
                         } else {
                             $tuitionTerm = $studentChargeTimingResolver->getTuitionTermData($student, $semesterId);
                             $amount = $tuitionTerm['amount'];
@@ -363,10 +364,6 @@ class GenerateBatchChargesAction
                             $pendingDiscount['description'],
                             $pendingDiscount['reference_id'],
                         );
-                    }
-
-                    if ($deferCase && $didSkipPreserveCharge) {
-                        $deferChargeResolver->markFullCaseApplied($deferCase, $semesterId);
                     }
 
                 } catch (\Exception $e) {

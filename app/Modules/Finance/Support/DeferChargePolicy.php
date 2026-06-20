@@ -6,29 +6,15 @@ namespace App\Modules\Finance\Support;
 
 use App\Models\DeferCase;
 
+/**
+ * Course-level (COURSES-scope) defer charge-skip policy.
+ *
+ * FULL-scope semester skipping moved to a registration_status = 'defer' signal
+ * in FIN-REV-020-02 (M2) — see DeferChargeResolver::isSemesterEnrollmentDeferred.
+ * This helper now governs only the per-course (COURSES-scope) generation path.
+ */
 final class DeferChargePolicy
 {
-    public static function shouldSkipFullSemester(array $deferCase, int $semesterId): bool
-    {
-        if (($deferCase['scope_type'] ?? null) !== DeferCase::SCOPE_FULL) {
-            return false;
-        }
-
-        if (($deferCase['fee_policy'] ?? null) !== DeferCase::POLICY_PRESERVE) {
-            return false;
-        }
-
-        if (! self::isWithinApplicableSemester($deferCase, $semesterId)) {
-            return false;
-        }
-
-        return self::isEligibleByApplyOnce(
-            (bool) ($deferCase['applies_once'] ?? true),
-            $deferCase['applied_at'] ?? null,
-            $deferCase['applied_semester_id'] ?? null
-        );
-    }
-
     public static function shouldSkipCourse(array $deferCase, array $deferItem, int $semesterId): bool
     {
         if (($deferCase['scope_type'] ?? null) !== DeferCase::SCOPE_COURSES) {

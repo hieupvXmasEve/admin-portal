@@ -12,27 +12,33 @@ use App\Modules\Finance\Support\DeferChargePolicy;
 
 class DeferChargeResolver
 {
-    public function findApplicableFullCase(Student $student, int $semesterId): ?DeferCase
+    /**
+     * Whether the student's enrollment in this semester is fully deferred and so
+     * non-billable for batch charge generation/preview.
+     *
+     * FIN-REV-020-02 (M2): a FULL-scope defer marks every active registration
+     * registration_status = 'defer' (PRESERVE and FORFEIT alike), leaving no
+     * billable registration in the semester. Generation/preview key off that
+     * directly so a voided obligation is never resurrected, regardless of fee
+     * policy. This replaces the old "PRESERVE = skip future charge" branch,
+     * which governed re-enrollment via applies_once/applied_at; re-enrollment
+     * billing now flows normally because re-enrolled students hold new,
+     * non-defer registrations. A COURSE-scope (partial) defer leaves other
+     * registrations billable, so it does NOT suppress the semester's term
+     * charges here (course-level handling stays report-only).
+     */
+    public function isSemesterEnrollmentDeferred(Student $student, int $semesterId): bool
     {
-        $cases = DeferCase::query()
+        $statuses = CourseRegistration::query()
             ->where('student_id', $student->id)
-            ->where('fee_policy', DeferCase::POLICY_PRESERVE)
-            ->where('scope_type', DeferCase::SCOPE_FULL)
-            ->orderByDesc('effective_at')
-            ->orderByDesc('id')
-            ->get();
+            ->where('semester_id', $semesterId)
+            ->pluck('registration_status');
 
-        return $cases->first(function (DeferCase $case) use ($semesterId) {
-            return DeferChargePolicy::shouldSkipFullSemester($case->toArray(), $semesterId);
-        });
-    }
+        if (! $statuses->contains('defer')) {
+            return false;
+        }
 
-    public function markFullCaseApplied(DeferCase $deferCase, int $semesterId): void
-    {
-        $deferCase->update([
-            'applied_at' => now(),
-            'applied_semester_id' => $semesterId,
-        ]);
+        return $statuses->intersect(['pending', 'registered', 'confirmed'])->isEmpty();
     }
 
     public function findApplicableCourseItem(CourseRegistration $registration): ?DeferCaseItem

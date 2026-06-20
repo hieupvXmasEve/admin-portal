@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
+use App\Models\CourseOffering;
+use App\Models\CourseRegistration;
 use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\Student;
@@ -177,4 +179,39 @@ it('hides intake_major from the student-status filter (HP lane still covers it)'
         ->toContain('intake_pre_uni_gc')
         ->toContain('intake_course')
         ->not->toContain('intake_major');
+});
+
+it('excludes a deferred-enrollment student from missing tuition rows', function () {
+    grantFinance($this->user, ['view_finance_reporting'], $this->campus);
+
+    // Billable HP student (would otherwise surface as a "missing tuition" row),
+    // but their semester enrollment is deferred (registration_status = 'defer').
+    // FIN-REV-020-02 (M2): a deferred enrollment is non-billable, so Fee-Monitor
+    // must not flag it as missing/expected.
+    $student = makeBatchHpStudent($this->campus, $this->semester, 'FM-DEFER');
+
+    $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
+    CourseRegistration::create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $this->semester->id,
+        'registration_status' => 'defer',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 1,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->get(route('finance.reporting.index', [
+            'view' => 'fee-monitor',
+            'generation_state' => 'missing',
+            'search' => 'FM-DEFER',
+        ]))
+        ->assertOk();
+
+    $rows = collect($response->original->getData()['page']['props']['fee_monitor']['rows']['data']);
+
+    expect($rows->pluck('student.student_code'))->not->toContain('FM-DEFER');
 });

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
+use App\Models\CourseOffering;
+use App\Models\CourseRegistration;
 use App\Models\CurriculumVersion;
 use App\Models\DiscountAllocation;
 use App\Models\FinanceCharge;
@@ -1031,4 +1033,75 @@ it('creates two distinct EGC charges on the Unit-fee fallback instead of collaps
     expect($charges)->toHaveCount(2)
         ->and($charges->pluck('description')->all())->toEqual(['EGC Level 3 Fee', 'EGC Level 4 Fee'])
         ->and($charges->pluck('amount')->map(fn ($a) => (float) $a)->all())->toEqual([15_000_000.0, 15_000_000.0]);
+});
+
+/**
+ * FIN-REV-020-02 (M2): make a student's semester enrollment non-billable the way
+ * a recorded FULL-scope defer does — a `registration_status = 'defer'` course
+ * registration. The student keeps status 'intake_course' so it still reaches
+ * charge generation/preview; the guard must suppress billing from the
+ * registration signal alone, so a voided obligation is never resurrected
+ * regardless of fee policy (PRESERVE or FORFEIT).
+ */
+function seedDeferredEnrollment(int $studentId, int $semesterId): CourseRegistration
+{
+    $offering = CourseOffering::factory()->create(['semester_id' => $semesterId]);
+
+    return CourseRegistration::create([
+        'student_id' => $studentId,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $semesterId,
+        'registration_status' => 'defer',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 1,
+    ]);
+}
+
+it('does not generate tuition for a deferred-enrollment student (no resurrection of a voided obligation)', function () {
+    [$student, $semester] = seedTransitionStudentScenario();
+    seedDeferredEnrollment($student->id, $semester->id);
+
+    $result = GenerateBatchChargesAction::run([
+        'semester_id' => $semester->id,
+        'scope_type' => 'upload_list',
+        'uploaded_student_ids' => [$student->student_id],
+        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
+        'skip_if_issued_or_paid' => true,
+        'only_update_draft' => true,
+        'merge_invoice' => true,
+    ]);
+
+    $tuitionCharges = FinanceCharge::query()
+        ->where('student_id', $student->id)
+        ->where('semester_id', $semester->id)
+        ->where('charge_type', FinanceCharge::TYPE_TUITION_TERM)
+        ->where('status', FinanceCharge::STATUS_ACTIVE)
+        ->count();
+
+    expect($tuitionCharges)->toBe(0)
+        ->and($result['created_count'])->toBe(0);
+});
+
+it('previews no tuition for a deferred-enrollment student', function () {
+    [$student, $semester] = seedTransitionStudentScenario();
+    seedDeferredEnrollment($student->id, $semester->id);
+
+    $preview = app(PreviewChargeGenerationQuery::class)->handle([
+        'semester_id' => $semester->id,
+        'scope_type' => 'upload_list',
+        'uploaded_student_ids' => [$student->student_id],
+        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
+        'skip_if_issued_or_paid' => true,
+        'only_update_draft' => true,
+        'merge_invoice' => true,
+    ]);
+
+    $row = collect($preview['students'])->firstWhere('student_id', $student->student_id);
+
+    expect($row)->not->toBeNull()
+        ->and((float) $row['estimated_amount'])->toBe(0.0)
+        ->and($row['will_create_invoice'])->toBeFalse();
 });

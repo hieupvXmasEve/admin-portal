@@ -8,6 +8,7 @@ use App\Models\FinanceCharge;
 use App\Models\ScholarshipDefinition;
 use App\Models\Student;
 use App\Models\StudentScholarshipAward;
+use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
@@ -19,6 +20,7 @@ class PreviewMajorChargeGenerationQuery
     public function __construct(
         private readonly StudentChargeTimingResolver $timingResolver,
         private readonly VoucherDiscountAmountResolver $voucherDiscountAmountResolver,
+        private readonly DeferChargeResolver $deferChargeResolver,
     ) {}
 
     public function handle(int $semesterId, array $filters = [], ?int $campusId = null): array
@@ -95,6 +97,15 @@ class PreviewMajorChargeGenerationQuery
     private function classify(Student $student, int $semesterId): array
     {
         $base = $this->baseRow($student);
+
+        // FIN-REV-020-02 (M2): a fully deferred semester enrollment is non-billable,
+        // so it must not surface as expected/missing tuition (regardless of policy).
+        if ($this->deferChargeResolver->isSemesterEnrollmentDeferred($student, $semesterId)) {
+            return array_merge($base, [
+                'eligibility_status' => 'ineligible',
+                'eligibility_reason' => 'deferred',
+            ]);
+        }
 
         if ($student->curriculum_version_id === null) {
             return array_merge($base, [

@@ -82,8 +82,10 @@ class PreviewChargeGenerationQuery
             $grossAmount = 0;
             $hasExistingCharge = false;
 
-            $deferCase = $deferChargeResolver->findApplicableFullCase($student, $semesterId);
-            $shouldSkipFullCharges = $deferCase !== null;
+            // FIN-REV-020-02 (M2): a fully deferred semester enrollment is non-billable
+            // (PRESERVE and FORFEIT alike); preview mirrors generation so deferred
+            // students are never shown as billable / missing.
+            $shouldSkipFullCharges = $deferChargeResolver->isSemesterEnrollmentDeferred($student, $semesterId);
 
             $reusableInvoice = StudentInvoice::query()
                 ->where('student_id', $student->id)
