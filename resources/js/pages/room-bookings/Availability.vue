@@ -22,7 +22,7 @@ interface AvailabilityFilters {
 }
 
 interface AvailabilityEvent {
-    type: 'room_booking' | 'class_session';
+    type: 'room_booking' | 'class_session' | 'exam_room_slot';
     id: number;
     title: string;
     start_time: string;
@@ -30,6 +30,8 @@ interface AvailabilityEvent {
     status: string;
     booking_id?: number;
     class_session_id?: number;
+    exam_room_slot_id?: number;
+    session_count?: number;
 }
 
 interface FreeWindow {
@@ -123,7 +125,24 @@ function formatDate(value: string): string {
 
 function eventVariant(type: string): 'default' | 'secondary' | 'outline' {
     if (type === 'class_session') return 'secondary';
+    if (type === 'exam_room_slot') return 'outline';
     return 'default';
+}
+
+function eventLabel(type: string): string {
+    if (type === 'class_session') return 'Class';
+    if (type === 'exam_room_slot') return 'Exam';
+    return 'Booking';
+}
+
+// Exam blocks get an amber treatment so they read as a distinct occupancy source
+// from room bookings (primary) and class sessions (secondary).
+function eventChipClass(type: string): string {
+    return type === 'exam_room_slot' ? 'border-amber-300 bg-amber-50' : '';
+}
+
+function eventBadgeClass(type: string): string {
+    return type === 'exam_room_slot' ? 'border-amber-400 bg-amber-100 text-amber-800' : '';
 }
 
 function timelineItems(day: AvailabilityDay): AvailabilityTimelineItem[] {
@@ -164,6 +183,12 @@ function createFromRoom(roomId: number, date: string, window?: FreeWindow) {
         <div>
             <h1 class="text-2xl font-semibold">Find Available Rooms</h1>
             <p class="text-muted-foreground mt-1">{{ availability.summary.rooms }} rooms · {{ availability.summary.dates }} dates · {{ availability.summary.busy_events }} busy blocks</p>
+            <div class="text-muted-foreground mt-2 flex flex-wrap items-center gap-3 text-xs">
+                <span class="flex items-center gap-1"><span class="inline-block h-2.5 w-2.5 rounded-sm border border-green-200 bg-green-50"></span>Free</span>
+                <span class="flex items-center gap-1"><span class="bg-primary inline-block h-2.5 w-2.5 rounded-sm"></span>Booking</span>
+                <span class="flex items-center gap-1"><span class="bg-secondary inline-block h-2.5 w-2.5 rounded-sm border"></span>Class</span>
+                <span class="flex items-center gap-1"><span class="inline-block h-2.5 w-2.5 rounded-sm border border-amber-400 bg-amber-100"></span>Exam (thi lại)</span>
+            </div>
         </div>
         <Button @click="router.visit(systemRoutes.roomBookings.create())">
             <CalendarPlus class="mr-2 h-4 w-4" />
@@ -245,12 +270,15 @@ function createFromRoom(roomId: number, date: string, window?: FreeWindow) {
                                     >
                                         Free {{ item.start_time }}-{{ item.end_time }}
                                     </button>
-                                    <div v-else class="min-w-0 rounded border px-2 py-1 text-xs">
+                                    <div v-else class="min-w-0 rounded border px-2 py-1 text-xs" :class="eventChipClass(item.event.type)">
                                         <div class="flex min-w-0 items-center justify-between gap-2">
                                             <span class="font-medium">{{ item.event.start_time }}-{{ item.event.end_time }}</span>
-                                            <Badge :variant="eventVariant(item.event.type)" class="shrink-0 text-[10px]">{{ item.event.type === 'class_session' ? 'Class' : 'Booking' }}</Badge>
+                                            <Badge :variant="eventVariant(item.event.type)" class="shrink-0 text-[10px]" :class="eventBadgeClass(item.event.type)">{{ eventLabel(item.event.type) }}</Badge>
                                         </div>
-                                        <div class="text-muted-foreground mt-1 line-clamp-2 min-w-0">{{ item.event.title }}</div>
+                                        <div class="text-muted-foreground mt-1 line-clamp-2 min-w-0">
+                                            {{ item.event.title }}
+                                            <span v-if="item.event.type === 'exam_room_slot' && (item.event.session_count ?? 0) > 1"> · {{ item.event.session_count }} môn</span>
+                                        </div>
                                     </div>
                                 </template>
                             </template>
