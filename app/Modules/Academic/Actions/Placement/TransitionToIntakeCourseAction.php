@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Actions\Placement;
 
-use App\Modules\Academic\Actions\PublishCourseStageChangedNotificationAction;
 use App\Enums\AcademicProgressionEventType;
 use App\Enums\ProgressionTriggerSource;
+use App\Enums\StudentActionType;
 use App\Models\AcademicProgressionEvent;
 use App\Models\IeltsCertificate;
 use App\Models\Student;
+use App\Models\StudentActionLog;
+use App\Modules\Academic\Actions\PublishCourseStageChangedNotificationAction;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -21,13 +23,13 @@ class TransitionToIntakeCourseAction
      * Transition a student from intake_pre_uni_gc to intake_course.
      * Requires IELTS >= 6.5 and (by default) complete documents.
      *
-     * @param array $data {
-     *     student_id: int,
-     *     semester_id: int,
-     *     ielts_certificate_id: int,
-     *     allow_missing_documents: ?bool (default false),
-     *     notes: ?string,
-     * }
+     * @param  array  $data  {
+     *                       student_id: int,
+     *                       semester_id: int,
+     *                       ielts_certificate_id: int,
+     *                       allow_missing_documents: ?bool (default false),
+     *                       notes: ?string,
+     *                       }
      */
     public static function run(array $data): Student
     {
@@ -46,16 +48,30 @@ class TransitionToIntakeCourseAction
         $previousStage = $student->status;
 
         return DB::transaction(function () use ($student, $certificate, $previousStage, $semesterId, $userId, $data) {
+            $transitionNotes = $data['notes'] ?? sprintf(
+                'Transitioned to intake_course based on IELTS score %s',
+                $certificate->overall_score
+            );
+
             // Update student snapshot
             $student->update([
                 'status' => 'intake_course',
                 'status_change_date' => now()->toDateString(),
-                'status_reason' => $data['notes'] ?? sprintf(
-                    'Transitioned to intake_course based on IELTS score %s',
-                    $certificate->overall_score
-                ),
+                'status_reason' => $transitionNotes,
                 'status_changed_by' => $userId,
                 'intake_major' => $semesterId,
+            ]);
+
+            StudentActionLog::create([
+                'student_id' => $student->id,
+                'action_type' => StudentActionType::STUDENT_MAJOR_ENROLLMENT->value,
+                'reason' => 'Student officially enters major study.',
+                'notes' => $transitionNotes,
+                'changed_by_user_id' => $userId,
+                'from_semester_id' => $semesterId,
+                'previous_status' => $previousStage,
+                'new_status' => 'intake_course',
+                'missing_documents' => $certificate->missing_documents,
             ]);
 
             // Create COURSE_STAGE_CHANGED event
@@ -69,10 +85,7 @@ class TransitionToIntakeCourseAction
                 'from_course_stage' => $previousStage,
                 'to_course_stage' => 'intake_course',
                 'ielts_certificate_id' => $certificate->id,
-                'notes' => $data['notes'] ?? sprintf(
-                    'Transitioned to intake_course based on IELTS score %s',
-                    $certificate->overall_score
-                ),
+                'notes' => $transitionNotes,
             ]);
 
             Log::info('Student transitioned to intake_course', [
