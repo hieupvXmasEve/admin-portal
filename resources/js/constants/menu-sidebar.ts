@@ -137,6 +137,18 @@ export const mainNavGroups: NavGroup[] = [
                         requiredPermissions: ['view_retake_course'],
                     },
                     {
+                        title: 'Thi lại',
+                        href: '/exam-resit',
+                        icon: GraduationCap,
+                        requiredPermissions: ['view_exam_resit'],
+                    },
+                    {
+                        title: 'Lịch thi lại',
+                        href: '/exam-schedule',
+                        icon: CalendarIcon,
+                        requiredPermissions: ['manage_exam_schedule'],
+                    },
+                    {
                         title: 'Canvas Courses',
                         href: '/admin/canvas/courses',
                         icon: Link2,

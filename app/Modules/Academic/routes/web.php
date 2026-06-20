@@ -7,6 +7,8 @@ use App\Modules\Academic\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\AcademicProgressionAuditController;
 use App\Modules\Academic\Http\Web\BuildingController;
 use App\Modules\Academic\Http\Web\CampusController;
+use App\Modules\Academic\Http\Web\ExamResitAttemptController;
+use App\Modules\Academic\Http\Web\ExamScheduleController;
 use App\Modules\Academic\Http\Web\RetakeCourseRegistrationController;
 use App\Modules\Academic\Http\Web\StudentAcademicSummaryController;
 use App\Modules\Academic\Http\Web\StudentActionAuditController;
@@ -358,5 +360,67 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{registration}/cancel', [RetakeCourseRegistrationController::class, 'cancel'])
             ->middleware('can:cancel_retake_course')
             ->name('cancel');
+    });
+
+    /**
+     * ==========================================================
+     * Exam Resit Operations (Thi lại — Đào tạo)
+     * ==========================================================
+     */
+    Route::prefix('exam-resit')->name('academic.exam-resit.')->group(function () {
+        Route::get('/', [ExamResitAttemptController::class, 'index'])
+            ->middleware('can:view_exam_resit')
+            ->name('index');
+
+        Route::get('/create', [ExamResitAttemptController::class, 'create'])
+            ->middleware('can:create_exam_resit')
+            ->name('create');
+
+        Route::post('/', [ExamResitAttemptController::class, 'store'])
+            ->middleware('can:create_exam_resit')
+            ->name('store');
+
+        Route::get('/{examResit}/schedule', [ExamResitAttemptController::class, 'scheduleForm'])
+            ->middleware('can:schedule_exam_resit')
+            ->name('schedule.create');
+
+        Route::post('/{examResit}/schedule', [ExamResitAttemptController::class, 'schedule'])
+            ->middleware('can:schedule_exam_resit')
+            ->name('schedule.store');
+
+        Route::get('/{examResit}/complete', [ExamResitAttemptController::class, 'completeForm'])
+            ->middleware('can:complete_exam_resit')
+            ->name('complete.create');
+
+        Route::post('/{examResit}/complete', [ExamResitAttemptController::class, 'complete'])
+            ->middleware('can:complete_exam_resit')
+            ->name('complete.store');
+
+        Route::post('/{examResit}/cancel', [ExamResitAttemptController::class, 'cancel'])
+            ->middleware('can:cancel_exam_resit')
+            ->name('cancel');
+    });
+
+    /**
+     * ==========================================================
+     * Exam Schedule Authoring (room slots / sessions / invigilators)
+     * ==========================================================
+     */
+    Route::prefix('exam-schedule')->name('academic.exam-schedule.')->group(function () {
+        Route::get('/', [ExamScheduleController::class, 'index'])
+            ->middleware('can:manage_exam_schedule')
+            ->name('index');
+
+        Route::post('/room-slots', [ExamScheduleController::class, 'storeRoomSlot'])
+            ->middleware('can:manage_exam_schedule')
+            ->name('room-slots.store');
+
+        Route::post('/sessions', [ExamScheduleController::class, 'storeSession'])
+            ->middleware('can:manage_exam_schedule')
+            ->name('sessions.store');
+
+        Route::post('/invigilators', [ExamScheduleController::class, 'assignInvigilator'])
+            ->middleware('can:manage_exam_schedule')
+            ->name('invigilators.store');
     });
 });

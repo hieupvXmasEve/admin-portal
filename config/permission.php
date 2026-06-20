@@ -139,6 +139,14 @@ return [
             'create_retake_course' => 'create_retake_course',
             'cancel_retake_course' => 'cancel_retake_course',
         ],
+        'exam_resit_operations' => [
+            'view_exam_resit' => 'view_exam_resit',
+            'create_exam_resit' => 'create_exam_resit',
+            'cancel_exam_resit' => 'cancel_exam_resit',
+            'schedule_exam_resit' => 'schedule_exam_resit',
+            'complete_exam_resit' => 'complete_exam_resit',
+            'manage_exam_schedule' => 'manage_exam_schedule',
+        ],
         'gpa_management' => [
             'view_gpa_finalization' => 'view_gpa_finalization',
             'create_gpa_finalization' => 'create_gpa_finalization',

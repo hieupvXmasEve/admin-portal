@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Modules\Academic\Actions\CancelExamResitAttemptAction;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ExamResitAttempt extends AuditableModel
@@ -33,6 +34,18 @@ class ExamResitAttempt extends AuditableModel
     public const HQ_FEE_PAID = 'paid';
 
     public const HQ_FEE_CANCELLED = 'cancelled';
+
+    /**
+     * Academic statuses from which a staff member may cancel the operation
+     * before the student sits the resit. Terminal states (completed, no_show,
+     * rejected, cancelled) are excluded. Cancellation never consumes an
+     * `attempt_number` (only a recorded sitting does).
+     */
+    public const CANCELLABLE_STATUSES = [
+        self::STATUS_REQUESTED,
+        self::STATUS_APPROVED,
+        self::STATUS_SCHEDULED,
+    ];
 
     protected $fillable = [
         'student_id',
@@ -149,6 +162,11 @@ class ExamResitAttempt extends AuditableModel
         return $this->belongsTo(Semester::class, 'charge_semester_id');
     }
 
+    public function operationSemester(): BelongsTo
+    {
+        return $this->belongsTo(Semester::class, 'operation_semester_id');
+    }
+
     public function syllabusTemplate(): BelongsTo
     {
         return $this->belongsTo(SyllabusTemplate::class);
@@ -197,6 +215,16 @@ class ExamResitAttempt extends AuditableModel
             'hq_fee_status' => self::HQ_FEE_PAID,
             'paid_at' => $paidAt ?? now(),
         ]);
+    }
+
+    /**
+     * Whether the academic operation is in a state a staff member may cancel.
+     * Payment-derived blocking (a paid attempt needs HQ refund/reversal first)
+     * is enforced in {@see CancelExamResitAttemptAction}.
+     */
+    public function isCancellable(): bool
+    {
+        return in_array($this->status, self::CANCELLABLE_STATUSES, true);
     }
 
     protected function getLoggingLevel(): string
