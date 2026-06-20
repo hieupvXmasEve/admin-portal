@@ -69,6 +69,12 @@ it('rejects total expected candidates exceeding the slot capacity', function () 
     runCreateExamResitSession(['expected_candidates' => 15]);
 })->throws(ValidationException::class);
 
+it('rejects creating a session with zero planned candidates', function () {
+    // A session must plan at least one seat, otherwise no attempt could ever be
+    // assigned to it (assignment is capped by expected_candidates).
+    runCreateExamResitSession(['expected_candidates' => 0]);
+})->throws(ValidationException::class);
+
 it('rejects creating a session in a cancelled room slot', function () {
     $cancelled = ExamRoomSlot::factory()->cancelled()->create([
         'campus_id' => $this->campus->id,

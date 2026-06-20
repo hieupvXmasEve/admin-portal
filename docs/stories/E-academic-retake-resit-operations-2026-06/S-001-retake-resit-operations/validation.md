@@ -305,7 +305,9 @@ Behavior:
   defaults to room capacity and cannot exceed it.
 - `CreateExamResitSessionAction` creates a unit-scoped session inside a slot;
   several different-unit sessions share one slot without conflict, and the sum of
-  their `expected_candidates` cannot exceed the slot capacity.
+  their `expected_candidates` cannot exceed the slot capacity. A session must plan
+  at least one seat (`expected_candidates >= 1`), since attempt assignment is
+  capped by it.
 - `ScheduleExamResitAttemptAction` assigns an `approved` attempt to a matching
   unit/campus session → `scheduled`. Guards: only `approved` is schedulable; the
   session must be live; the session's planned seats cap how many attempts it can
@@ -325,7 +327,7 @@ Commands run:
 
 ```bash
 ./scripts/dev.sh test tests/Feature/Academic/ExamResit
-# PASS: 55 tests, 144 assertions (10 room-slot + 5 session + 10 schedule +
+# PASS: 56 tests, 145 assertions (10 room-slot + 6 session + 10 schedule +
 #       8 invigilator + 13 completion + 9 prior create/sync)
 
 ./scripts/dev.sh test tests/Feature/Academic/ExamResit tests/Feature/Academic/RetakeCourse

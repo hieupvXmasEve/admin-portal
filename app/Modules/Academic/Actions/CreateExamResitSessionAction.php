@@ -68,9 +68,11 @@ class CreateExamResitSessionAction
     {
         $expected = (int) ($data['expected_candidates'] ?? 0);
 
-        if ($expected < 0) {
+        // A session must plan at least one seat; attempt assignment is capped by
+        // expected_candidates, so a zero-seat session could never hold anyone.
+        if ($expected < 1) {
             throw ValidationException::withMessages([
-                'expected_candidates' => ['Số thí sinh dự kiến không hợp lệ.'],
+                'expected_candidates' => ['Số thí sinh dự kiến của ca thi phải lớn hơn 0.'],
             ]);
         }
 
