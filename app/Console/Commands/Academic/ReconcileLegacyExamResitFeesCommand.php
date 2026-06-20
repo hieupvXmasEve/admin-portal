@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\Academic;
 
+use App\Modules\Academic\Actions\CreateLegacyExamResitChargeFromPaidPtlAction;
 use App\Modules\Academic\Actions\ReconcileLegacyExamResitFeesAction;
 use Illuminate\Console\Command;
 
@@ -25,9 +26,23 @@ class ReconcileLegacyExamResitFeesCommand extends Command
 
     protected $description = 'Reconcile legacy exam_resit_fee charges into Academic exam-resit sources, reporting unmatched charges (ACAD-RET-001 slice 6)';
 
-    public function handle(ReconcileLegacyExamResitFeesAction $action): int
-    {
+    public function handle(
+        CreateLegacyExamResitChargeFromPaidPtlAction $chargeFromPtl,
+        ReconcileLegacyExamResitFeesAction $action,
+    ): int {
         $dryRun = (bool) $this->option('dry-run');
+
+        $chargeResult = $chargeFromPtl->run($dryRun);
+        if ($chargeResult['checked'] > 0) {
+            $prefix = $dryRun ? '[dry-run] ' : '';
+            $this->info(sprintf(
+                '%sPaid PTL without charge: %d checked, %d charge(s) created, %d skipped.',
+                $prefix,
+                $chargeResult['checked'],
+                $chargeResult['created'],
+                $chargeResult['skipped'],
+            ));
+        }
 
         $result = $action->run($dryRun);
 

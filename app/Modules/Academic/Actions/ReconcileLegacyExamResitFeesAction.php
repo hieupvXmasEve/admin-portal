@@ -8,6 +8,7 @@ use App\Console\Commands\Academic\ReconcileLegacyExamResitFeesCommand;
 use App\Models\AcademicRecord;
 use App\Models\ExamResitAttempt;
 use App\Models\FinanceCharge;
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -23,11 +24,13 @@ use Illuminate\Support\Facades\DB;
  * charge as expected-fee completeness evidence until it has a queryable Academic
  * source (design.md "Finance Reporting Dependency").
  *
- * Each legacy charge is matched to exactly ONE exam-resit-eligible failed academic
- * record of the same student (grade-fail lane only; attendance/both fail route to
- * course retake and are ineligible — mirrors CreateExamResitAttemptAction). The
- * unit is resolved from a unit code named in the charge description, otherwise from
- * a single eligible candidate. A safe match creates a legacy-linked ExamResitAttempt
+ * Each legacy charge is matched to exactly ONE exam-resit-eligible academic record of
+ * the same student in the grade-fail lane (attendance/both fail route to course retake
+ * and are ineligible — mirrors CreateExamResitAttemptAction). Prefer a failed
+ * TEC002/TEC001 record; when the student already passed the resit unit, fall back to
+ * the passed record labelled `grade_failed` by backfill. Unit resolution uses resit
+ * unit priority (TEC002 default when both were studied), then a unit code named in the
+ * charge description. A safe match creates a legacy-linked ExamResitAttempt
  * and repoints the charge to it; an unsafe one (no eligible record, or ambiguous
  * units) is reported as an exception instead of guessing an Academic source.
  *
@@ -42,6 +45,21 @@ class ReconcileLegacyExamResitFeesAction
     public const REASON_NO_ELIGIBLE_RECORD = 'no_eligible_failed_record';
 
     public const REASON_AMBIGUOUS_UNITS = 'ambiguous_multiple_units';
+
+    /**
+     * Resit-eligible units in priority order (TEC002 default when both were studied).
+     *
+     * @var list<string>
+     */
+    private const RESIT_UNIT_CODES = ['TEC002', 'TEC001'];
+
+    private const PTL = 'PTL';
+
+    private const PAID_DNG_STATUSES = [
+        DngPaymentRequest::STATUS_PAID_UNINVOICED,
+        DngPaymentRequest::STATUS_PAID_INVOICED,
+        DngPaymentRequest::STATUS_RECONCILED,
+    ];
 
     /**
      * @return array{checked:int,reconciled:int,exceptions:int,details:array<int,array<string,mixed>>}
@@ -111,54 +129,136 @@ class ReconcileLegacyExamResitFeesAction
     }
 
     /**
-     * Resolve the single eligible failed record for a charge, or an exception
-     * reason code when it cannot be matched safely.
+     * Resolve the single eligible record for a charge, or an exception reason code.
      */
     private function matchEligibleRecord(FinanceCharge $charge): AcademicRecord|string
     {
-        $candidates = $this->eligibleRecords((int) $charge->student_id);
+        $studentId = (int) $charge->student_id;
 
+        $failed = $this->eligibleFailedResitRecords($studentId);
+        $matched = $this->resolveResitUnitRecord($failed, $charge, $studentId);
+        if ($matched instanceof AcademicRecord) {
+            return $matched;
+        }
+
+        $passed = $this->eligiblePassedResitRecords($studentId);
+        $matched = $this->resolveResitUnitRecord($passed, $charge, $studentId);
+        if ($matched instanceof AcademicRecord) {
+            return $matched;
+        }
+
+        return self::REASON_NO_ELIGIBLE_RECORD;
+    }
+
+    /**
+     * Pick one resit-unit record from candidates using TEC002-first priority and the
+     * charge description as a tie-breaker when several resit units remain.
+     *
+     * @param  Collection<int, AcademicRecord>  $candidates
+     */
+    private function resolveResitUnitRecord(Collection $candidates, FinanceCharge $charge, int $studentId): ?AcademicRecord
+    {
         if ($candidates->isEmpty()) {
-            return self::REASON_NO_ELIGIBLE_RECORD;
+            return null;
         }
 
-        if ($candidates->count() === 1) {
-            return $candidates->first();
-        }
-
-        $byDescription = $candidates->filter(
-            fn (AcademicRecord $record) => $this->descriptionNamesUnit($charge->description, $record->unit?->code)
+        $resitCandidates = $candidates->filter(
+            fn (AcademicRecord $record) => in_array($record->unit?->code, self::RESIT_UNIT_CODES, true)
         );
 
+        if ($resitCandidates->isEmpty()) {
+            return null;
+        }
+
+        foreach (self::RESIT_UNIT_CODES as $code) {
+            $forUnit = $resitCandidates->filter(fn (AcademicRecord $record) => $record->unit?->code === $code);
+            if ($forUnit->count() === 1) {
+                return $forUnit->first();
+            }
+        }
+
+        $byDescription = $resitCandidates->filter(
+            fn (AcademicRecord $record) => $this->descriptionNamesUnit($charge->description, $record->unit?->code)
+        );
         if ($byDescription->count() === 1) {
             return $byDescription->first();
         }
 
-        return self::REASON_AMBIGUOUS_UNITS;
+        if ($this->studiedBothResitUnits($studentId)) {
+            return $this->resitUnitRecord($studentId, self::RESIT_UNIT_CODES[0]);
+        }
+
+        if ($resitCandidates->count() === 1) {
+            return $resitCandidates->first();
+        }
+
+        return null;
     }
 
     /**
-     * Exam-resit-eligible failed records for a student: finalized, not passed, in the
-     * grade-fail lane, with attendance evidence recorded.
+     * @return Collection<int, AcademicRecord>
+     */
+    private function eligibleFailedResitRecords(int $studentId): Collection
+    {
+        return $this->gradeFailedResitRecordsQuery($studentId)
+            ->where('is_passed', false)
+            ->get();
+    }
+
+    /**
+     * Passed resit units that were labelled grade_failed by backfill (student already
+     * completed the resit).
      *
      * @return Collection<int, AcademicRecord>
      */
-    private function eligibleRecords(int $studentId): Collection
+    private function eligiblePassedResitRecords(int $studentId): Collection
+    {
+        return $this->gradeFailedResitRecordsQuery($studentId)
+            ->where('is_passed', true)
+            ->get();
+    }
+
+    /**
+     * @return Builder<AcademicRecord>
+     */
+    private function gradeFailedResitRecordsQuery(int $studentId): Builder
     {
         return AcademicRecord::query()
             ->where('student_id', $studentId)
             ->where('grade_status', 'final')
-            ->where('is_passed', false)
-            ->where(function (Builder $query): void {
-                $query->whereNull('override_pass')->orWhere('override_pass', false);
-            })
+            ->where(fn (Builder $query) => $query->whereNull('override_pass')->orWhere('override_pass', false))
             ->where('failure_reason', AcademicRecord::FAILURE_GRADE_FAILED)
-            ->where(function (Builder $query): void {
-                $query->whereNull('total_not_recorded')->orWhere('total_not_recorded', 0);
-            })
+            ->where(fn (Builder $query) => $query->whereNull('total_not_recorded')->orWhere('total_not_recorded', 0))
+            ->whereHas('unit', fn (Builder $query) => $query->whereIn('code', self::RESIT_UNIT_CODES))
             ->with('unit:id,code')
-            ->orderBy('id')
-            ->get();
+            ->orderBy('id');
+    }
+
+    private function studiedBothResitUnits(int $studentId): bool
+    {
+        $codes = AcademicRecord::query()
+            ->where('student_id', $studentId)
+            ->where('grade_status', 'final')
+            ->whereHas('unit', fn (Builder $query) => $query->whereIn('code', self::RESIT_UNIT_CODES))
+            ->with('unit:id,code')
+            ->get()
+            ->map(fn (AcademicRecord $record) => $record->unit?->code)
+            ->filter()
+            ->unique();
+
+        return $codes->contains('TEC002') && $codes->contains('TEC001');
+    }
+
+    private function resitUnitRecord(int $studentId, string $unitCode): ?AcademicRecord
+    {
+        return AcademicRecord::query()
+            ->where('student_id', $studentId)
+            ->where('grade_status', 'final')
+            ->where('failure_reason', AcademicRecord::FAILURE_GRADE_FAILED)
+            ->whereHas('unit', fn (Builder $query) => $query->where('code', $unitCode))
+            ->with('unit:id,code')
+            ->orderByDesc('is_passed')
+            ->first();
     }
 
     private function descriptionNamesUnit(?string $description, ?string $unitCode): bool
@@ -179,7 +279,7 @@ class ReconcileLegacyExamResitFeesAction
     {
         return DB::transaction(function () use ($charge, $record): array {
             $charge = FinanceCharge::query()->lockForUpdate()->findOrFail($charge->id);
-            $paid = (bool) $charge->is_fully_paid;
+            $paid = $this->legacyChargeIsPaid($charge);
 
             $attempt = ExamResitAttempt::create([
                 'student_id' => $record->student_id,
@@ -240,7 +340,7 @@ class ReconcileLegacyExamResitFeesAction
             'attempt_id' => null,
             'academic_record_id' => $record->id,
             'unit_id' => $record->unit_id,
-            'hq_fee_status' => $charge->is_fully_paid
+            'hq_fee_status' => $this->legacyChargeIsPaid($charge)
                 ? ExamResitAttempt::HQ_FEE_PAID
                 : ExamResitAttempt::HQ_FEE_CHARGE_CREATED,
             'paid_amount' => (float) $charge->paid_amount,
@@ -264,6 +364,19 @@ class ReconcileLegacyExamResitFeesAction
     /**
      * @return array<string, mixed>
      */
+    private function legacyChargeIsPaid(FinanceCharge $charge): bool
+    {
+        if ($charge->is_fully_paid) {
+            return true;
+        }
+
+        return DngPaymentRequest::query()
+            ->where('finance_charge_id', $charge->id)
+            ->where('fee_type', self::PTL)
+            ->whereIn('status', self::PAID_DNG_STATUSES)
+            ->exists();
+    }
+
     private function legacyMarker(FinanceCharge $charge): array
     {
         return [
