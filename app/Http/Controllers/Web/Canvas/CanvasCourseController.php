@@ -11,6 +11,7 @@ use App\Models\CanvasCourseMapping;
 use App\Models\CanvasIntegration;
 use App\Models\CourseOffering;
 use App\Models\Semester;
+use App\Models\Unit;
 use App\Services\Canvas\CanvasSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -20,12 +21,49 @@ use Inertia\Response;
 
 class CanvasCourseController extends Controller
 {
+    private const SORTABLE_COLUMNS = [
+        'canvas_course_code',
+        'canvas_course_name',
+        'canvas_course_id',
+        'sync_status',
+        'last_synced_at',
+        'created_at',
+        'updated_at',
+    ];
+
     public function __construct(
         private CanvasSyncService $syncService
     ) {}
 
     public function index(Request $request): Response
     {
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'sync_status' => ['nullable', 'string', 'in:pending,mapped,ignored'],
+            'semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
+            'unit_id' => ['nullable', 'integer', 'exists:units,id'],
+            'direction' => ['nullable', 'string', 'in:asc,desc'],
+            'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
+        ]);
+
+        $requestedSort = $request->input('sort');
+        $sort = is_string($requestedSort) && in_array($requestedSort, self::SORTABLE_COLUMNS, true)
+            ? $requestedSort
+            : 'created_at';
+
+        $requestedDirection = $validated['direction'] ?? 'desc';
+        $direction = in_array($requestedDirection, ['asc', 'desc'], true) ? $requestedDirection : 'desc';
+
+        $filters = [
+            'search' => $validated['search'] ?? null,
+            'sync_status' => $validated['sync_status'] ?? null,
+            'semester_id' => isset($validated['semester_id']) ? (int) $validated['semester_id'] : null,
+            'unit_id' => isset($validated['unit_id']) ? (int) $validated['unit_id'] : null,
+            'sort' => $sort,
+            'direction' => $direction,
+            'per_page' => isset($validated['per_page']) ? (int) $validated['per_page'] : 15,
+        ];
+
         // All campuses share one Canvas instance
         $integration = CanvasIntegration::where('is_active', true)->first();
 
@@ -34,7 +72,7 @@ class CanvasCourseController extends Controller
             $emptyPagination = new \Illuminate\Pagination\LengthAwarePaginator(
                 [],
                 0,
-                15,
+                $filters['per_page'],
                 1
             );
 
@@ -43,7 +81,7 @@ class CanvasCourseController extends Controller
                     'data' => [],
                     'current_page' => 1,
                     'last_page' => 1,
-                    'per_page' => 15,
+                    'per_page' => $filters['per_page'],
                     'total' => 0,
                     'from' => null,
                     'to' => null,
@@ -51,37 +89,59 @@ class CanvasCourseController extends Controller
                     'next_page_url' => null,
                     'links' => [],
                 ],
-                'filters' => $request->only(['search', 'sync_status', 'sort', 'direction', 'per_page']),
+                'filters' => $filters,
                 'integration' => null,
                 'semesters' => $this->getSemesterOptions(),
+                'units' => $this->getUnitOptions(),
             ]);
         }
 
-        $query = CanvasCourseMapping::with(['courseOffering.semester', 'canvasIntegration'])
+        $query = CanvasCourseMapping::with(['courseOffering.semester', 'courseOffering.unit', 'canvasIntegration'])
             ->where('canvas_integration_id', $integration->id);
 
         // Apply filters
-        if ($request->filled('search')) {
-            $search = $request->search;
+        if (! empty($filters['search'])) {
+            $search = $filters['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('canvas_course_code', 'like', "%{$search}%")
                     ->orWhere('canvas_course_name', 'like', "%{$search}%")
-                    ->orWhere('canvas_course_id', 'like', "%{$search}%");
+                    ->orWhere('canvas_course_id', 'like', "%{$search}%")
+                    ->orWhereHas('courseOffering', function ($offeringQuery) use ($search) {
+                        $offeringQuery
+                            ->where('section_code', 'like', "%{$search}%")
+                            ->orWhereHas('unit', function ($unitQuery) use ($search) {
+                                $unitQuery
+                                    ->where('code', 'like', "%{$search}%")
+                                    ->orWhere('name', 'like', "%{$search}%");
+                            });
+                    });
             });
         }
 
-        if ($request->filled('sync_status')) {
-            $query->where('sync_status', $request->sync_status);
+        if (! empty($filters['sync_status'])) {
+            $query->where('sync_status', $filters['sync_status']);
+        }
+
+        if (! empty($filters['semester_id']) || ! empty($filters['unit_id'])) {
+            $query->where('sync_status', 'mapped')
+                ->whereNotNull('course_offering_id');
+
+            if (! empty($filters['semester_id'])) {
+                $semesterId = $filters['semester_id'];
+                $query->whereHas('courseOffering', fn ($offeringQuery) => $offeringQuery->where('semester_id', $semesterId));
+            }
+
+            if (! empty($filters['unit_id'])) {
+                $unitId = $filters['unit_id'];
+                $query->whereHas('courseOffering', fn ($offeringQuery) => $offeringQuery->where('unit_id', $unitId));
+            }
         }
 
         // Sorting
-        $sortField = $request->input('sort', 'created_at');
-        $sortDirection = $request->input('direction', 'desc');
-        $query->orderBy($sortField, $sortDirection);
+        $query->orderBy($filters['sort'], $filters['direction'])->orderBy('id', 'desc');
 
         // Pagination
-        $perPage = $request->input('per_page', 15);
-        $mappings = $query->paginate($perPage);
+        $mappings = $query->paginate($filters['per_page'])->withQueryString();
 
         return Inertia::render('Admin/Canvas/Courses/Index', [
             'mappings' => [
@@ -96,7 +156,7 @@ class CanvasCourseController extends Controller
                 'next_page_url' => $mappings->nextPageUrl(),
                 'links' => $mappings->linkCollection()->toArray(),
             ],
-            'filters' => $request->only(['search', 'sync_status', 'sort', 'direction', 'per_page']),
+            'filters' => $filters,
             'integration' => [
                 'id' => $integration->id,
                 'canvas_url' => $integration->canvas_url,
@@ -106,6 +166,7 @@ class CanvasCourseController extends Controller
                 'last_sync_at' => $integration->last_sync_at?->toIso8601String(),
             ],
             'semesters' => $this->getSemesterOptions(),
+            'units' => $this->getUnitOptions(),
         ]);
     }
 
@@ -194,5 +255,12 @@ class CanvasCourseController extends Controller
         return Semester::where('is_archived', false)
             ->orderBy('start_date', 'desc')
             ->get(['id', 'name', 'code']);
+    }
+
+    private function getUnitOptions()
+    {
+        return Unit::query()
+            ->orderBy('code')
+            ->get(['id', 'code', 'name']);
     }
 }

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxItemIndicator, ComboboxTrigger, ComboboxViewport } from '@/components/ui/combobox';
+import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxItemIndicator, ComboboxList, ComboboxTrigger, ComboboxViewport } from '@/components/ui/combobox';
 import ComboboxListInline from '@/components/ui/combobox/ComboboxListInline.vue';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -14,11 +14,12 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApi } from '@/composables/useApiRequest';
+import { useDataTable } from '@/composables/useDataTable';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import type { PaginatedResponse } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ColumnDef } from '@tanstack/vue-table';
-import { AlertCircle, Award, BarChart3, Check, CheckCircle2, ChevronsUpDown, Clock, ExternalLink, EyeOff, Link2, Link2Off, ListChecks, MoreHorizontal, RefreshCw, Search } from 'lucide-vue-next';
+import { AlertCircle, Award, BarChart3, Check, CheckCircle2, ChevronsUpDown, Clock, ExternalLink, EyeOff, Link2, Link2Off, ListChecks, MoreHorizontal, RefreshCw, Search, X } from 'lucide-vue-next';
 import { computed, h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -72,30 +73,144 @@ interface SemesterOption {
     code: string;
 }
 
+interface UnitOption {
+    id: number;
+    code: string;
+    name: string;
+}
+
+interface CanvasCourseFilters {
+    search: string;
+    sync_status: string;
+    semester_id: string;
+    unit_id: string;
+    sort: string | null;
+    direction: 'asc' | 'desc' | null;
+    per_page: number;
+    page: number;
+}
+
 interface Props {
     mappings: PaginatedResponse<CanvasCourseMapping>;
-    filters: {
-        search?: string;
-        sync_status?: string;
-        sort?: string;
-        direction?: string;
-        per_page?: number;
+    filters: Partial<CanvasCourseFilters> & {
+        semester_id?: number | string | null;
+        unit_id?: number | string | null;
     };
     integration: CanvasIntegration | null;
     semesters: SemesterOption[];
+    units: UnitOption[];
 }
 
 const props = defineProps<Props>();
 const { showConfirmDialog } = useGlobalConfirmDialog();
 const api = useApi();
 
-const filters = ref({
-    search: props.filters.search || '',
-    sync_status: props.filters.sync_status || 'all',
-    sort: props.filters.sort || 'created_at',
-    direction: props.filters.direction || 'desc',
-    per_page: props.filters.per_page || 15,
+const {
+    filters: tableFilters,
+    hasActiveFilters,
+    clearAllFilters,
+    apply,
+    handleSearch,
+    handleSortChange,
+    handlePaginationNavigate,
+    handlePageSizeChange,
+    setFilter,
+    currentSort,
+    currentDirection,
+} = useDataTable<CanvasCourseFilters>({
+    baseUrl: route('admin.canvas.courses.index'),
+    initialFilters: {
+        search: props.filters.search ?? '',
+        sync_status: props.filters.sync_status ?? 'all',
+        semester_id: props.filters.semester_id ? String(props.filters.semester_id) : 'all',
+        unit_id: props.filters.unit_id ? String(props.filters.unit_id) : 'all',
+        sort: typeof props.filters.sort === 'string' ? props.filters.sort : 'created_at',
+        direction: props.filters.direction === 'asc' || props.filters.direction === 'desc' ? props.filters.direction : 'desc',
+        per_page: props.filters.per_page ?? 15,
+        page: 1,
+    },
+    defaultValues: {
+        search: '',
+        sync_status: 'all',
+        semester_id: 'all',
+        unit_id: 'all',
+        sort: 'created_at',
+        direction: 'desc',
+        per_page: 15,
+        page: 1,
+    },
+    only: ['mappings', 'filters'],
+    immediateFields: ['sync_status', 'semester_id', 'unit_id'],
 });
+
+const mappedFiltersEnabled = computed(() => tableFilters.sync_status === 'all' || tableFilters.sync_status === 'mapped');
+
+const unitFilterOpen = ref(false);
+const unitFilterSearch = ref('');
+
+const selectedFilterUnit = computed(() => {
+    if (tableFilters.unit_id === 'all') {
+        return null;
+    }
+
+    return props.units.find((unit) => String(unit.id) === tableFilters.unit_id) ?? null;
+});
+
+const filteredFilterUnits = computed(() => {
+    const query = unitFilterSearch.value.trim().toLowerCase();
+
+    if (!query) {
+        return props.units.slice(0, 50);
+    }
+
+    return props.units
+        .filter((unit) => unit.code.toLowerCase().includes(query) || unit.name.toLowerCase().includes(query))
+        .slice(0, 50);
+});
+
+const unitFilterDisplayValue = computed(() => {
+    if (!selectedFilterUnit.value) {
+        return 'All units';
+    }
+
+    return `${selectedFilterUnit.value.code} - ${selectedFilterUnit.value.name}`;
+});
+
+const handleUnitFilterSelect = (value: unknown) => {
+    if (!value || typeof value !== 'object' || !('id' in value)) {
+        return;
+    }
+
+    setFilter('unit_id', String((value as UnitOption).id));
+    unitFilterSearch.value = '';
+    unitFilterOpen.value = false;
+};
+
+const clearUnitFilter = (event: Event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setFilter('unit_id', 'all');
+    unitFilterSearch.value = '';
+    unitFilterOpen.value = false;
+};
+
+watch(unitFilterOpen, (isOpen) => {
+    if (!isOpen) {
+        unitFilterSearch.value = '';
+    }
+});
+
+const handleSyncStatusChange = (value: unknown) => {
+    const syncStatus = String(value ?? 'all');
+    const shouldClearMappedFilters = syncStatus === 'pending' || syncStatus === 'ignored';
+
+    apply({
+        sync_status: syncStatus,
+        semester_id: shouldClearMappedFilters ? 'all' : tableFilters.semester_id,
+        unit_id: shouldClearMappedFilters ? 'all' : tableFilters.unit_id,
+        page: 1,
+    });
+};
 
 const showMappingDialog = ref(false);
 const selectedMapping = ref<CanvasCourseMapping | null>(null);
@@ -120,38 +235,6 @@ const selectedGroups = ref<string[]>([]);
 const syncGradesDialogOpen = ref(false);
 const syncGradesLoading = ref(false);
 const gradesSyncSummary = ref<any>(null);
-
-const updateFilters = () => {
-    const filterParams = {
-        search: filters.value.search || undefined,
-        sync_status: filters.value.sync_status === 'all' ? undefined : filters.value.sync_status,
-        sort: filters.value.sort,
-        direction: filters.value.direction,
-        per_page: filters.value.per_page,
-    };
-
-    router.get('/admin/canvas/courses', filterParams, {
-        preserveState: true,
-        preserveScroll: true,
-    });
-};
-
-const handleSearch = (value: string | number) => {
-    filters.value.search = String(value);
-    updateFilters();
-};
-
-const handlePageChange = (url: string) => {
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-    });
-};
-
-const handlePageSizeChange = (pageSize: number) => {
-    filters.value.per_page = pageSize;
-    updateFilters();
-};
 
 const syncCourses = () => {
     if (!props.integration) {
@@ -576,6 +659,7 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
     {
         accessorKey: 'course_offering',
         header: 'Mapped To',
+        enableSorting: false,
         cell: ({ row }) => {
             const mapping = row.original;
             if (!mapping.course_offering || !mapping.course_offering.id) {
@@ -600,6 +684,7 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
     {
         accessorKey: 'statistics',
         header: 'Statistics',
+        enableSorting: false,
         cell: ({ row }) => {
             const mapping = row.original;
             if (!mapping.course_offering || !mapping.course_offering.id || !mapping.is_mapped) {
@@ -620,6 +705,7 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
     {
         id: 'actions',
         header: 'Actions',
+        enableSorting: false,
         cell: () => null, // We'll use template slot instead
     },
 ];
@@ -679,11 +765,15 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
         <!-- Filters -->
         <Card>
             <CardContent class="pt-6">
-                <div class="flex flex-wrap gap-4">
-                    <div class="min-w-[300px] flex-1">
-                        <DebouncedInput :model-value="filters.search" placeholder="Search by course code, name, or Canvas ID..." @debounced="handleSearch" />
+                <div class="flex flex-wrap items-end gap-4">
+                    <div class="min-w-[280px] flex-1">
+                        <DebouncedInput
+                            :model-value="tableFilters.search"
+                            placeholder="Search Canvas code, name, ID, section, or unit..."
+                            @debounced="handleSearch"
+                        />
                     </div>
-                    <Select v-model="filters.sync_status" @update:model-value="updateFilters">
+                    <Select :model-value="tableFilters.sync_status" @update:model-value="handleSyncStatusChange">
                         <SelectTrigger class="w-[180px]">
                             <SelectValue placeholder="Filter by status" />
                         </SelectTrigger>
@@ -694,14 +784,107 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
                             <SelectItem value="ignored">Ignored</SelectItem>
                         </SelectContent>
                     </Select>
+                    <Select
+                        :model-value="tableFilters.semester_id"
+                        :disabled="!mappedFiltersEnabled"
+                        @update:model-value="(value) => setFilter('semester_id', String(value ?? 'all'))"
+                    >
+                        <SelectTrigger class="w-[220px]">
+                            <SelectValue placeholder="Semester (mapped)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All semesters</SelectItem>
+                            <SelectItem v-for="semester in semesters" :key="semester.id" :value="String(semester.id)">
+                                {{ semester.name }} ({{ semester.code }})
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Combobox
+                        :model-value="selectedFilterUnit"
+                        by="id"
+                        v-model:open="unitFilterOpen"
+                        v-model:search-term="unitFilterSearch"
+                        :ignore-filter="true"
+                        :disabled="!mappedFiltersEnabled"
+                        @update:model-value="handleUnitFilterSelect"
+                    >
+                        <ComboboxAnchor as-child>
+                            <ComboboxTrigger as-child>
+                                <Button variant="outline" class="h-10 w-[260px] justify-between" :disabled="!mappedFiltersEnabled">
+                                    <span class="truncate" :class="{ 'text-muted-foreground': !selectedFilterUnit }">{{ unitFilterDisplayValue }}</span>
+                                    <span class="ml-2 flex shrink-0 items-center gap-1">
+                                        <span
+                                            v-if="selectedFilterUnit && mappedFiltersEnabled"
+                                            role="button"
+                                            tabindex="0"
+                                            class="hover:bg-muted-foreground/20 flex h-5 w-5 items-center justify-center rounded-sm"
+                                            @click="clearUnitFilter"
+                                            @keydown.enter="clearUnitFilter"
+                                            @keydown.space="clearUnitFilter"
+                                        >
+                                            <X class="h-3 w-3" />
+                                            <span class="sr-only">Clear unit filter</span>
+                                        </span>
+                                        <ChevronsUpDown class="text-muted-foreground h-4 w-4 opacity-50" />
+                                    </span>
+                                </Button>
+                            </ComboboxTrigger>
+                        </ComboboxAnchor>
+
+                        <ComboboxList class="w-[var(--reka-combobox-trigger-width)]">
+                            <div class="relative w-full items-center">
+                                <ComboboxInput
+                                    class="h-10 rounded-none border-0 border-b pr-4 pl-10 focus-visible:ring-0"
+                                    placeholder="Search unit code or name..."
+                                    @update:model-value="(value) => (unitFilterSearch = String(value ?? ''))"
+                                />
+                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center justify-center px-3">
+                                    <Search class="text-muted-foreground size-4" />
+                                </span>
+                            </div>
+
+                            <ComboboxViewport class="max-h-[300px] overflow-y-auto">
+                                <ComboboxEmpty v-if="filteredFilterUnits.length === 0">No units found.</ComboboxEmpty>
+                                <ComboboxGroup v-else>
+                                    <ComboboxItem
+                                        v-for="unit in filteredFilterUnits"
+                                        :key="unit.id"
+                                        :value="unit"
+                                        class="cursor-pointer"
+                                    >
+                                        <div class="flex min-w-0 flex-1 flex-col">
+                                            <span class="truncate font-medium">{{ unit.code }} - {{ unit.name }}</span>
+                                        </div>
+                                        <ComboboxItemIndicator>
+                                            <Check class="ml-2 h-4 w-4" />
+                                        </ComboboxItemIndicator>
+                                    </ComboboxItem>
+                                    <div v-if="!unitFilterSearch && units.length > filteredFilterUnits.length" class="border-t p-2 text-center">
+                                        <span class="text-muted-foreground text-xs">Showing first 50 units. Search to narrow results.</span>
+                                    </div>
+                                </ComboboxGroup>
+                            </ComboboxViewport>
+                        </ComboboxList>
+                    </Combobox>
+                    <Button v-if="hasActiveFilters" variant="outline" @click="clearAllFilters">Clear filters</Button>
                 </div>
+                <p v-if="!mappedFiltersEnabled" class="text-muted-foreground mt-3 text-sm">
+                    Semester and unit filters apply to mapped courses only. Switch status to Mapped or All Status to use them.
+                </p>
             </CardContent>
         </Card>
 
         <!-- Data Table -->
         <Card>
             <CardContent class="pt-6">
-                <DataTable :columns="columns" :data="mappings.data">
+                <DataTable
+                    :columns="columns"
+                    :data="mappings.data"
+                    enable-server-sorting
+                    :initial-sort="currentSort ?? undefined"
+                    :initial-direction="currentDirection ?? undefined"
+                    @sort-change="handleSortChange"
+                >
                     <template #cell-actions="{ row }">
                         <DropdownMenu>
                             <DropdownMenuTrigger as-child>
@@ -757,7 +940,7 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
                     </template>
                 </DataTable>
                 <div class="mt-4">
-                    <DataPagination :pagination-data="mappings" @navigate="handlePageChange" @page-size-change="handlePageSizeChange" />
+                    <DataPagination :pagination-data="mappings" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
                 </div>
             </CardContent>
         </Card>
