@@ -8,12 +8,14 @@ use App\Actions\SyllabusTemplate\CreateSyllabusTemplateAction;
 use App\Actions\SyllabusTemplate\GetSyllabusTemplateListAction;
 use App\Actions\SyllabusTemplate\UpdateSyllabusTemplateAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\SyllabusTemplate\PreviewGradingSchemeRequest;
 use App\Http\Requests\SyllabusTemplate\StoreSyllabusTemplateRequest;
 use App\Http\Requests\SyllabusTemplate\UpdateSyllabusTemplateRequest;
+use App\Http\Responses\ApiResponse;
 use App\Models\AssessmentComponent;
-use App\Models\AssessmentComponentDetail;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
+use App\Modules\Academic\Actions\PreviewSyllabusGradingSchemeAction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -56,6 +58,7 @@ class SyllabusTemplateController extends Controller
     public function pageCreate(): Response
     {
         $units = Unit::query()->orderBy('code')->get(['id', 'code', 'name']);
+
         return Inertia::render('syllabus/TemplatesCreate', [
             'assessmentTypes' => AssessmentComponent::TYPES,
             'units' => $units,
@@ -65,6 +68,7 @@ class SyllabusTemplateController extends Controller
     public function pageEdit(SyllabusTemplate $syllabusTemplate): Response
     {
         $units = Unit::query()->orderBy('code')->get(['id', 'code', 'name']);
+
         return Inertia::render('syllabus/TemplatesEdit', [
             'unit' => $syllabusTemplate->unit,
             'syllabusTemplate' => $syllabusTemplate->load(['unit', 'applicableProgram', 'applicableCampus', 'creator', 'sourceTemplate', 'assessmentComponents.details']),
@@ -157,6 +161,7 @@ class SyllabusTemplateController extends Controller
         if ($request->wantsJson()) {
             return response()->json(['data' => $syllabusTemplate]);
         }
+
         return back()->with('success', 'Status updated');
     }
 
@@ -167,6 +172,7 @@ class SyllabusTemplateController extends Controller
         if ($request->wantsJson()) {
             return response()->json(['data' => $syllabusTemplate->fresh()]);
         }
+
         return back()->with('success', 'Default set');
     }
 
@@ -189,7 +195,49 @@ class SyllabusTemplateController extends Controller
         if ($request->wantsJson()) {
             return response()->json(['data' => $cloned], 201);
         }
+
         return back()->with('success', 'Template cloned');
+    }
+
+    // Grading scheme admin endpoints (S-003)
+    public function gradingSchemeOptions(): JsonResponse
+    {
+        return ApiResponse::success([
+            'engines' => [
+                ['value' => 'default', 'label' => 'Default weighted percentage'],
+                ['value' => 'metropolia_v1', 'label' => 'Metropolia v1'],
+                ['value' => 'metropolia_v2', 'label' => 'Metropolia v2 (formula)'],
+            ],
+        ]);
+    }
+
+    public function previewGradingScheme(
+        PreviewGradingSchemeRequest $request,
+        PreviewSyllabusGradingSchemeAction $action,
+    ): JsonResponse {
+        $result = $action->execute(
+            $request->validated('grading_scheme'),
+            $request->validated('component_scores') ?? [],
+        );
+
+        if (($result['valid'] ?? false) === false) {
+            $errors = array_map(
+                static fn (string $detail): array => ['code' => 'INVALID_SCHEME', 'detail' => $detail],
+                $result['errors'] ?? [],
+            );
+
+            return ApiResponse::error('Invalid grading scheme.', $errors, 422);
+        }
+
+        return ApiResponse::success($result);
+    }
+
+    public function previewExistingGradingScheme(
+        PreviewGradingSchemeRequest $request,
+        SyllabusTemplate $syllabusTemplate,
+        PreviewSyllabusGradingSchemeAction $action,
+    ): JsonResponse {
+        return $this->previewGradingScheme($request, $action);
     }
 
     private function setDefaultForUnit(SyllabusTemplate $template): void
@@ -215,6 +263,7 @@ class SyllabusTemplateController extends Controller
             return $current; // fallback
         }
         $parts[count($parts) - 1] = ($parts[count($parts) - 1] ?? 0) + 1;
+
         return implode('.', $parts);
     }
 }

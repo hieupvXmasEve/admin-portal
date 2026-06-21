@@ -10,7 +10,10 @@ import { Label } from '@/components/ui/label';
 import { NumberField, NumberFieldContent, NumberFieldInput } from '@/components/ui/number-field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import type { GradingScheme } from '@/types/grading-scheme';
 import { Head, router } from '@inertiajs/vue3';
+import GradingSchemeEditor from './components/GradingSchemeEditor.vue';
+import GradingSchemePreview from './components/GradingSchemePreview.vue';
 import { toTypedSchema } from '@vee-validate/zod';
 import { ArrowLeft, ChevronsUpDown, Plus, Save, Trash2 } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
@@ -112,6 +115,8 @@ const form = useForm({
 
 // Form State
 const isSubmitting = ref(false);
+// Grading scheme (null = default weighted percentage)
+const gradingScheme = ref<GradingScheme | null>(null);
 // Unit search states
 const addUnitSearch = ref('');
 
@@ -139,26 +144,20 @@ const removeAssessmentComponent = (index: number) => {
 
 const addComponentDetail = (componentIndex: number) => {
     const currentComponents = form.values.assessment_components || [];
-    const newComponents = [...currentComponents];
-    if (newComponents[componentIndex]) {
-        if (!newComponents[componentIndex].details) {
-            newComponents[componentIndex].details = [];
-        }
-        newComponents[componentIndex].details.push({
-            name: '',
-            weight: null,
-        });
-        form.setFieldValue('assessment_components', newComponents);
-    }
+    // Rebuild the target component immutably — form.values is deeply readonly,
+    // so pushing into the nested details array would fail silently.
+    const newComponents = currentComponents.map((component, index) =>
+        index === componentIndex ? { ...component, details: [...(component.details || []), { name: '', weight: null }] } : component,
+    );
+    form.setFieldValue('assessment_components', newComponents);
 };
 
 const removeComponentDetail = (componentIndex: number, detailIndex: number) => {
     const currentComponents = form.values.assessment_components || [];
-    const newComponents = [...currentComponents];
-    if (newComponents[componentIndex]?.details) {
-        newComponents[componentIndex].details.splice(detailIndex, 1);
-        form.setFieldValue('assessment_components', newComponents);
-    }
+    const newComponents = currentComponents.map((component, index) =>
+        index === componentIndex ? { ...component, details: (component.details || []).filter((_, di) => di !== detailIndex) } : component,
+    );
+    form.setFieldValue('assessment_components', newComponents);
 };
 
 // Computed Values
@@ -204,15 +203,18 @@ const getAssessmentTypeColor = (type: string) => {
 
 const handleTypeChange = (componentIndex: number, newType: string) => {
     const current = (form.values.assessment_components as any[]) || [];
-    const next = [...current];
-    if (next[componentIndex]) {
-        next[componentIndex].type = newType;
+    const next = current.map((component, index) => {
+        if (index !== componentIndex) {
+            return component;
+        }
+        const updated = { ...component, type: newType };
         // If type is attendance, ensure exactly one detail with 100%
         if (newType === 'attendance') {
-            next[componentIndex].details = [{ name: 'Attendance', weight: 100 }];
+            updated.details = [{ name: 'Attendance', weight: 100 }];
         }
-        form.setFieldValue('assessment_components', next);
-    }
+        return updated;
+    });
+    form.setFieldValue('assessment_components', next);
 };
 
 // Form Submission using the shadcn-vue pattern
@@ -225,6 +227,7 @@ const onSubmit = form.handleSubmit((formData) => {
     const submitData = {
         ...formData,
         unit_id: formData.unit_id ? Number(formData.unit_id) : null,
+        grading_scheme: gradingScheme.value,
     };
 
     router.post(`/syllabus-templates`, submitData, {
@@ -272,6 +275,20 @@ const filteredAvailableUnits = computed(() => {
     </div>
 
     <form class="space-y-6" @submit="onSubmit">
+        <!-- Grading scheme (S-003) -->
+        <Card>
+            <CardHeader>
+                <CardTitle>Grading scheme</CardTitle>
+                <CardDescription>
+                    Configure and preview a rule-engine grading scheme, or keep the default weighted percentage.
+                </CardDescription>
+            </CardHeader>
+            <CardContent class="grid gap-6 lg:grid-cols-2">
+                <GradingSchemeEditor v-model="gradingScheme" />
+                <GradingSchemePreview :scheme="gradingScheme" />
+            </CardContent>
+        </Card>
+
         <!-- Basic Information -->
         <Card>
             <CardHeader>

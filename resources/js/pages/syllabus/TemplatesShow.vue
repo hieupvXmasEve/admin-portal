@@ -3,6 +3,7 @@ import Badge from '@/components/ui/badge/Badge.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import type { GradingScheme } from '@/types/grading-scheme';
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, BookOpen, Edit, FileText, Globe, MapPin, User, Users, Calendar, Clock } from 'lucide-vue-next';
 
@@ -69,6 +70,7 @@ interface SyllabusTemplate {
     creator?: User;
     source_template?: SyllabusTemplate;
     assessment_components?: AssessmentComponent[];
+    grading_scheme?: GradingScheme | null;
 }
 
 const props = defineProps<{
@@ -314,7 +316,7 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
             <CardContent>
                 <div class="space-y-4">
                     <div
-                        v-for="(component, index) in template.assessment_components"
+                        v-for="component in template.assessment_components"
                         :key="component.id"
                         class="rounded-lg border p-4 space-y-3"
                     >
@@ -366,6 +368,42 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
                         <p v-else class="mt-1 text-sm text-green-600">
                             ✓ Assessment structure is complete and valid.
                         </p>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+
+        <!-- Grading scheme (S-003) -->
+        <Card v-if="template.grading_scheme">
+            <CardHeader>
+                <CardTitle>Grading scheme</CardTitle>
+                <CardDescription>Rule-engine scheme applied to this template.</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-3">
+                <div class="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+                    <div>
+                        <span class="text-muted-foreground">Engine</span>
+                        <p class="font-medium">{{ template.grading_scheme.engine }}</p>
+                    </div>
+                    <div>
+                        <span class="text-muted-foreground">Scale</span>
+                        <p class="font-medium">{{ template.grading_scheme.scale }}</p>
+                    </div>
+                    <div v-if="template.grading_scheme.source_reference">
+                        <span class="text-muted-foreground">Source</span>
+                        <p class="font-medium">{{ template.grading_scheme.source_reference }}</p>
+                    </div>
+                </div>
+                <div v-if="template.grading_scheme.formula">
+                    <span class="text-sm text-muted-foreground">Formula</span>
+                    <p class="font-mono text-sm">{{ template.grading_scheme.formula }}</p>
+                </div>
+                <div v-if="template.grading_scheme.components?.length">
+                    <span class="text-sm text-muted-foreground">Components</span>
+                    <div class="mt-1 flex flex-wrap gap-2">
+                        <Badge v-for="component in template.grading_scheme.components" :key="component.code" variant="secondary">
+                            {{ component.label ?? component.code }}
+                        </Badge>
                     </div>
                 </div>
             </CardContent>

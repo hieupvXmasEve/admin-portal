@@ -39,6 +39,10 @@ class StoreSyllabusTemplateRequest extends FormRequest
             'is_active' => ['sometimes', 'boolean'],
             'source_template_id' => ['nullable', 'integer', 'exists:syllabus_templates,id'],
 
+            // Grading scheme JSON (null = default weighted percentage); validated
+            // against the engine contract at preview/runtime, not here.
+            'grading_scheme' => ['nullable', 'array'],
+
             // Assessment components payload (optional)
             'assessment_components' => ['nullable', 'array'],
             'assessment_components.*.name' => ['required_with:assessment_components', 'string', 'max:255'],

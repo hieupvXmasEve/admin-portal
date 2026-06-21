@@ -165,3 +165,29 @@ local mapping JSON file. Operator guidance lives in
 
 The command exits `1` if any mapping cannot resolve to exactly one template; a
 dirty plan writes nothing, so commit mode never leaves partial data behind.
+
+## Admin UI (S-003)
+
+Academic admins configure and preview a syllabus template's grading scheme from
+the syllabus template create/edit pages, and view it on the show page.
+
+- Editor: `resources/js/pages/syllabus/components/GradingSchemeEditor.vue` — pick
+  the engine (default / metropolia_v1 / metropolia_v2), edit scheme JSON, load a
+  sample, and apply.
+- Preview: `resources/js/pages/syllabus/components/GradingSchemePreview.vue` —
+  enter sample component scores and preview the computed grade. Posts to the
+  web-authenticated preview endpoint, which reuses the runtime validator and
+  calculator (a preview matches a real grade).
+- Saving sends `grading_scheme: null` for default weighted grading or the parsed
+  scheme JSON for a custom engine.
+
+Endpoints (web `auth`, `can:` guarded, under the `api` URL prefix):
+
+```text
+GET  /api/syllabus-templates/grading-scheme/options          can:view_syllabus
+POST /api/syllabus-templates/grading-scheme/preview          can:edit_syllabus
+POST /api/syllabus-templates/{syllabusTemplate}/grading-scheme/preview  can:edit_syllabus
+```
+
+The preview endpoint never writes; saving uses the existing syllabus template
+store/update path (which now accepts the `grading_scheme` field).

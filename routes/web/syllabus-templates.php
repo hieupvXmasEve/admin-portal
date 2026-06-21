@@ -62,6 +62,19 @@ Route::middleware(['auth', 'verified'])->prefix('api')->name('api.')->group(func
         ->middleware('can:create_syllabus')
         ->name('syllabus_templates.store');
 
+    // Grading scheme admin endpoints (S-003) — declared before the wildcard show route.
+    Route::get('/syllabus-templates/grading-scheme/options', [SyllabusTemplateController::class, 'gradingSchemeOptions'])
+        ->middleware('can:view_syllabus')
+        ->name('syllabus_templates.grading-scheme.options');
+
+    Route::post('/syllabus-templates/grading-scheme/preview', [SyllabusTemplateController::class, 'previewGradingScheme'])
+        ->middleware('can:edit_syllabus')
+        ->name('syllabus_templates.grading-scheme.preview');
+
+    Route::post('/syllabus-templates/{syllabusTemplate}/grading-scheme/preview', [SyllabusTemplateController::class, 'previewExistingGradingScheme'])
+        ->middleware('can:edit_syllabus')
+        ->name('syllabus_templates.grading-scheme.preview-existing');
+
     Route::get('/syllabus-templates/{syllabusTemplate}', [SyllabusTemplateController::class, 'show'])
         ->middleware('can:view_syllabus')
         ->name('syllabus_templates.show');
