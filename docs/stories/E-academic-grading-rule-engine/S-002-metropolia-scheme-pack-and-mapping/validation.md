@@ -29,7 +29,7 @@ templates listed in the mapping file.
 ```bash
 ./scripts/dev.sh test tests/Feature/Academic/Grading/MetropoliaSchemePackTest.php
 ./scripts/dev.sh test tests/Feature/Academic/Grading/ApplyMetropoliaSchemePackCommandTest.php
-./scripts/dev.sh artisan pint app/Modules/Academic/Grading app/Modules/Academic/Actions app/Console/Commands/Academic tests/Feature/Academic/Grading
+./scripts/dev.sh composer exec pint -- app/Modules/Academic/Support/Grading app/Modules/Academic/Actions/ApplyGradingSchemePackAction.php app/Console/Commands/Academic/ApplyGradingSchemePackCommand.php tests/Feature/Academic/Grading --format agent
 git diff --check -- docs/features/academic docs/stories/E-academic-grading-rule-engine docs/superpowers/plans
 ```
 

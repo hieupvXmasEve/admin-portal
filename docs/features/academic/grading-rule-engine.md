@@ -102,3 +102,30 @@ Each component may declare `gate.min_pct`. If the component score falls below th
 Migration: `2026_06_21_165309_add_grading_scheme_to_syllabus_templates.php`
 
 Column: `syllabus_templates.grading_scheme` — nullable JSON, cast to array on the model.
+
+## Applying the Metropolia scheme pack
+
+A canonical, repo-tracked Metropolia scheme pack lives at
+`docs/features/academic/metropolia-grading-schemes.json`. Each entry is stored in
+the executable `metropolia_v1` shape, so applying a pack entry writes a
+ready-to-run scheme into `syllabus_templates.grading_scheme`.
+
+- Catalog loader: `App\Modules\Academic\Support\Grading\MetropoliaSchemeCatalog`
+- Scheme validator: `App\Modules\Academic\Support\Grading\GradingSchemeValidator`
+- Apply action: `App\Modules\Academic\Actions\ApplyGradingSchemePackAction`
+- Command: `academic:apply-grading-scheme-pack`
+
+Schools share the repo but not the database, so each database opts in through a
+local mapping JSON file. Operator guidance lives in
+`docs/features/academic/metropolia-component-mapping.md`.
+
+```bash
+# Validate without writing
+./scripts/dev.sh artisan academic:apply-grading-scheme-pack --mapping=/path/map.json --dry-run
+
+# Write schemes to the matched templates in the current database
+./scripts/dev.sh artisan academic:apply-grading-scheme-pack --mapping=/path/map.json --commit
+```
+
+The command exits `1` if any mapping cannot resolve to exactly one template; a
+dirty plan writes nothing, so commit mode never leaves partial data behind.

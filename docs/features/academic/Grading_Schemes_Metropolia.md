@@ -132,3 +132,11 @@ Final Grade \= FG. All FGs are rounded to the nearest whole number, and are only
 - Assignments: 0% (Minimum 66.67% \- 8 out of 12 \- as part of requirements for passing the course).
 - Project Presentation: 100%. Graded out of 5\.
 - Grading scale: 0-5.
+## Swinx Scheme Pack
+
+The executable Swinx representation of these rules is maintained in
+`docs/features/academic/metropolia-grading-schemes.json`. Local school database
+mapping guidance is maintained in
+`docs/features/academic/metropolia-component-mapping.md`. Apply schemes to
+syllabus templates with the dry-run-first command
+`academic:apply-grading-scheme-pack`.
