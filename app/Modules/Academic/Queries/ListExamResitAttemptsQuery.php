@@ -6,6 +6,7 @@ namespace App\Modules\Academic\Queries;
 
 use App\Models\ExamResitAttempt;
 use App\Models\FinanceCharge;
+use App\Modules\Finance\Actions\BridgePaidDngRequestsForChargeAction;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
@@ -20,6 +21,10 @@ use Illuminate\Pagination\LengthAwarePaginator as Paginator;
  */
 class ListExamResitAttemptsQuery
 {
+    public function __construct(
+        private readonly BridgePaidDngRequestsForChargeAction $bridgePaidDngRequestsForChargeAction,
+    ) {}
+
     /**
      * @param  array<string,mixed>  $filters
      * @return array{attempts:LengthAwarePaginator,summary:array<string,int>}
@@ -182,11 +187,7 @@ class ListExamResitAttemptsQuery
      */
     private function derivePaymentState(ExamResitAttempt $attempt): array
     {
-        $charge = $attempt->financeCharge;
-        if (
-            $attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_PAID
-            || ($charge && $charge->status === FinanceCharge::STATUS_ACTIVE && $charge->is_fully_paid)
-        ) {
+        if ($this->hasPaidEvidence($attempt)) {
             if ($attempt->status === ExamResitAttempt::STATUS_CANCELLED) {
                 return ['value' => 'paid_no_refund', 'label' => 'Đã thu - không hoàn', 'variant' => 'success'];
             }
@@ -274,13 +275,13 @@ class ListExamResitAttemptsQuery
     private function deriveCancelContext(ExamResitAttempt $attempt): array
     {
         $charge = $attempt->financeCharge;
-        $isPaid = $attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_PAID
-            || ($charge && $charge->status === FinanceCharge::STATUS_ACTIVE && $charge->is_fully_paid);
+        $isPaid = $this->hasPaidEvidence($attempt);
 
         $hasUnpaidCharge = $attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_CHARGE_CREATED
             && $charge
             && $charge->status === FinanceCharge::STATUS_ACTIVE
-            && ! $charge->is_fully_paid;
+            && ! $charge->is_fully_paid
+            && ! $isPaid;
 
         if ($isPaid) {
             return [
@@ -312,5 +313,20 @@ class ListExamResitAttemptsQuery
             'title' => 'Hủy thi lại',
             'message' => 'Lượt thi lại sẽ bị hủy và sinh viên sẽ nhận email thông báo.',
         ];
+    }
+
+    private function hasPaidEvidence(ExamResitAttempt $attempt): bool
+    {
+        $charge = $attempt->financeCharge;
+
+        if ($attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_PAID) {
+            return true;
+        }
+
+        if ($charge !== null && $charge->status === FinanceCharge::STATUS_ACTIVE && $charge->is_fully_paid) {
+            return true;
+        }
+
+        return $this->bridgePaidDngRequestsForChargeAction->hasPaidDngForCharge($charge);
     }
 }

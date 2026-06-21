@@ -7,12 +7,17 @@ namespace App\Modules\Academic\Queries;
 use App\Models\CourseRegistration;
 use App\Models\CourseRetakeRegistration;
 use App\Models\FinanceCharge;
+use App\Modules\Finance\Actions\BridgePaidDngRequestsForChargeAction;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 
 class ListRetakeCourseRegistrationsQuery
 {
+    public function __construct(
+        private readonly BridgePaidDngRequestsForChargeAction $bridgePaidDngRequestsForChargeAction,
+    ) {}
+
     /**
      * @param  array<string,mixed>  $filters
      * @return array{registrations:LengthAwarePaginator,summary:array<string,int>}
@@ -156,11 +161,7 @@ class ListRetakeCourseRegistrationsQuery
             return ['value' => 'cancelled', 'label' => 'Đã hủy', 'variant' => 'destructive'];
         }
 
-        $charge = $registration->financeCharge;
-        if (
-            in_array($registration->status, [CourseRetakeRegistration::STATUS_PAID, CourseRetakeRegistration::STATUS_ENROLLED], true)
-            || ($charge && $charge->status === FinanceCharge::STATUS_ACTIVE && $charge->is_fully_paid)
-        ) {
+        if ($this->hasPaidEvidence($registration)) {
             return ['value' => 'paid', 'label' => 'Đã thanh toán', 'variant' => 'success'];
         }
 
@@ -262,5 +263,24 @@ class ListRetakeCourseRegistrationsQuery
             'needs_retake_mark' => 'Course registration đang active nhưng chưa được đánh dấu retake paid.',
             default => null,
         };
+    }
+
+    private function hasPaidEvidence(CourseRetakeRegistration $registration): bool
+    {
+        $charge = $registration->financeCharge;
+
+        if (in_array($registration->status, [CourseRetakeRegistration::STATUS_PAID, CourseRetakeRegistration::STATUS_ENROLLED], true)) {
+            return true;
+        }
+
+        if ($registration->hq_fee_status === CourseRetakeRegistration::HQ_FEE_PAID) {
+            return true;
+        }
+
+        if ($charge !== null && $charge->status === FinanceCharge::STATUS_ACTIVE && $charge->is_fully_paid) {
+            return true;
+        }
+
+        return $this->bridgePaidDngRequestsForChargeAction->hasPaidDngForCharge($charge);
     }
 }

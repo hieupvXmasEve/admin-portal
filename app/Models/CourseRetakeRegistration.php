@@ -241,7 +241,7 @@ class CourseRetakeRegistration extends AuditableModel
         ]);
     }
 
-    public function cancel(int $userId, string $reason): void
+    public function cancel(int $userId, string $reason, ?string $hqFeeStatus = null): void
     {
         if (! in_array($this->status, self::CANCELLABLE_STATUSES)) {
             throw new \RuntimeException(
@@ -251,7 +251,7 @@ class CourseRetakeRegistration extends AuditableModel
 
         $this->update([
             'status' => self::STATUS_CANCELLED,
-            'hq_fee_status' => self::HQ_FEE_CANCELLED,
+            'hq_fee_status' => $hqFeeStatus ?? self::HQ_FEE_CANCELLED,
             'cancelled_by_user_id' => $userId,
             'cancelled_at' => now(),
             'cancellation_reason' => $reason,

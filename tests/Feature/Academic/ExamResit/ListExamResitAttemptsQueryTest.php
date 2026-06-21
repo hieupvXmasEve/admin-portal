@@ -6,12 +6,15 @@ use App\Models\Campus;
 use App\Models\ExamResitAttempt;
 use App\Models\ExamResitSession;
 use App\Models\ExamRoomSlot;
+use App\Models\FinanceCharge;
 use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Queries\ListExamResitAttemptsQuery;
+use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -151,4 +154,39 @@ it('filters by derived operation_state', function () {
 
     expect($result['attempts']->total())->toBe(1)
         ->and($result['attempts']->items()[0]['operation_state']['value'])->toBe('awaiting_payment');
+});
+
+it('treats linked paid dng evidence as paid in the cancellation context before bridge', function () {
+    $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
+    app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
+    $attempt->refresh();
+    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+
+    $dng = DngPaymentRequest::create([
+        'student_id' => $this->student->id,
+        'campus_code' => 'TEST',
+        'student_code' => $this->student->student_id,
+        'fee_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
+        'description' => 'Exam resit fee',
+        'semester_id' => $charge->semester_id,
+        'due_date' => now()->addDays(5),
+        'item_id' => 'PTL-LIST-'.$charge->id,
+        'amount' => $charge->amount,
+        'status' => DngPaymentRequest::STATUS_PAID_INVOICED,
+        'dng_payment_id' => 'DNG-PTL-LIST-'.$charge->id,
+        'paid_at' => now(),
+        'finance_charge_id' => $charge->id,
+    ]);
+
+    $result = listExamResit();
+    $row = $result['attempts']->items()[0];
+
+    expect($row['payment_state']['value'])->toBe('paid')
+        ->and($row['operation_state']['value'])->toBe('ready_to_schedule')
+        ->and($row['cancel_context']['fee_state'])->toBe('paid_no_refund')
+        ->and($row['cancel_context']['requires_no_refund_acknowledgement'])->toBeTrue()
+        ->and($row['cancel_context']['requires_unpaid_fee_confirmation'])->toBeFalse()
+        ->and($result['summary']['ready_to_schedule'])->toBe(1)
+        ->and($result['summary']['awaiting_payment'])->toBe(0)
+        ->and($dng->fresh()->payment_id)->toBeNull();
 });

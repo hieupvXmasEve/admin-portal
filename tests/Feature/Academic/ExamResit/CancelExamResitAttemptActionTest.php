@@ -8,9 +8,11 @@ use App\Models\ExamResitAttempt;
 use App\Models\ExamResitSession;
 use App\Models\ExamRoomSlot;
 use App\Models\FinanceCharge;
+use App\Models\PaymentApplication;
 use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Actions\CancelExamResitAttemptAction;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
@@ -183,7 +185,44 @@ it('requires no-refund acknowledgement before cancelling a paid attempt', functi
     expect(fn () => runCancelExamResit($attempt->id))->toThrow(RuntimeException::class);
 });
 
-it('cancels a paid scheduled attempt without voiding, refunding or removing finance evidence', function () {
+it('bridges linked paid dng evidence before cancelling a charge_created attempt', function () {
+    Queue::fake();
+    $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
+    app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
+    $attempt->refresh();
+    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+
+    expect($charge->is_fully_paid)->toBeFalse();
+
+    $paidDng = makeExamResitDng($this->student, $charge, DngPaymentRequest::STATUS_PAID_INVOICED);
+    $paidDng->update([
+        'dng_payment_id' => 'DNG-PTL-PAID-'.$paidDng->id,
+        'paid_at' => now(),
+    ]);
+
+    $result = runCancelExamResit($attempt->id, overrides: [
+        'acknowledge_no_refund' => true,
+    ]);
+
+    $charge->refresh();
+    $paidDng->refresh();
+
+    expect($result->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
+        ->and($result->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_PAID)
+        ->and($result->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_KEPT_PAID_NO_REFUND)
+        ->and($charge->status)->toBe(FinanceCharge::STATUS_VOID)
+        ->and($charge->void_reason)->toBe('exam_resit_cancelled_paid_no_refund')
+        ->and($paidDng->status)->toBe(DngPaymentRequest::STATUS_PAID_INVOICED)
+        ->and($paidDng->payment_id)->not->toBeNull();
+
+    $payment = $paidDng->payment()->firstOrFail();
+    expect(PaymentApplication::query()
+        ->whereIn('invoice_line_id', $charge->invoiceLines()->pluck('id'))
+        ->sum('amount'))->toBe('0.00')
+        ->and($payment->unapplied_amount)->toBe(750000.0);
+});
+
+it('cancels a paid scheduled attempt and releases the paid fee to unapplied credit without cancelling dng', function () {
     Queue::fake();
     $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
     app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
@@ -197,7 +236,6 @@ it('cancels a paid scheduled attempt without voiding, refunding or removing fina
         'exam_resit_session_id' => $session->id,
         'scheduled_at' => now(),
     ]);
-    $paymentApplicationsBefore = $charge->invoiceLines()->withCount('paymentApplications')->get()->sum('payment_applications_count');
 
     $paidDng = makeExamResitDng($this->student, $charge, DngPaymentRequest::STATUS_PAID_INVOICED);
 
@@ -214,13 +252,62 @@ it('cancels a paid scheduled attempt without voiding, refunding or removing fina
         ->and($attempt->exam_resit_session_id)->toBeNull()
         ->and($attempt->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_KEPT_PAID_NO_REFUND)
         ->and($attempt->cancellation_notice_sent_at)->not->toBeNull()
-        ->and($charge->status)->toBe(FinanceCharge::STATUS_ACTIVE)
-        ->and($charge->fresh()->is_fully_paid)->toBeTrue()
+        ->and($charge->status)->toBe(FinanceCharge::STATUS_VOID)
+        ->and($charge->void_reason)->toBe('exam_resit_cancelled_paid_no_refund')
         ->and($paidDng->fresh()->status)->toBe(DngPaymentRequest::STATUS_PAID_INVOICED);
 
-    $paymentApplicationsAfter = $charge->invoiceLines()->withCount('paymentApplications')->get()->sum('payment_applications_count');
-    expect($paymentApplicationsAfter)->toBe($paymentApplicationsBefore)
+    $payment = PaymentApplication::query()
+        ->whereIn('invoice_line_id', $charge->invoiceLines()->pluck('id'))
+        ->where('entry_type', 'application')
+        ->firstOrFail()
+        ->payment()
+        ->firstOrFail();
+
+    expect(PaymentApplication::query()
+        ->whereIn('invoice_line_id', $charge->invoiceLines()->pluck('id'))
+        ->sum('amount'))->toBe('0.00')
+        ->and($payment->unapplied_amount)->toBe(750000.0)
         ->and($session->fresh()->actual_candidates)->toBe(0);
+});
+
+it('refreshes session candidate count from non-cancelled attempts after cancelling one scheduled attempt', function () {
+    Queue::fake();
+    $unit = Unit::factory()->create();
+    $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester, [
+        'unit' => $unit,
+    ]);
+    app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
+    $attempt->refresh();
+    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+    payExamResitChargeFully($charge);
+    $attempt->transitionToPaid();
+    $session = scheduledExamResitSessionForAttempt($attempt);
+    $session->update([
+        'status' => ExamResitSession::STATUS_COMPLETED,
+        'expected_candidates' => 2,
+        'actual_candidates' => 2,
+        'completed_at' => now(),
+    ]);
+    $attempt->update([
+        'status' => ExamResitAttempt::STATUS_SCHEDULED,
+        'exam_resit_session_id' => $session->id,
+        'scheduled_at' => now(),
+    ]);
+
+    makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester, [
+        'unit' => $unit,
+        'status' => ExamResitAttempt::STATUS_COMPLETED,
+        'exam_resit_session_id' => $session->id,
+        'attempt_number' => 1,
+        'hq_fee_status' => ExamResitAttempt::HQ_FEE_PAID,
+        'completed_at' => now(),
+    ]);
+
+    runCancelExamResit($attempt->id, overrides: [
+        'acknowledge_no_refund' => true,
+    ]);
+
+    expect($session->fresh()->actual_candidates)->toBe(1);
 });
 
 it('rejects cancelling a terminal (completed) attempt', function () {

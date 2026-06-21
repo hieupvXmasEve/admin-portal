@@ -7,11 +7,15 @@ use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\CourseRetakeRegistration;
 use App\Models\FinanceCharge;
+use App\Models\PaymentApplication;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
 use App\Modules\Academic\Actions\CancelRetakeCourseRegistrationAction;
+use App\Modules\Finance\Actions\CreateRetakeCourseChargeSimpleAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -52,6 +56,33 @@ function createCancelTestRegistration(string $status = 'approved', array $overri
         'approved_by_user_id' => $user->id,
         'approved_at' => now(),
     ], $overrides));
+}
+
+function createPaidRetakeDngForCharge(CourseRetakeRegistration $registration, FinanceCharge $charge): DngPaymentRequest
+{
+    $dng = DngPaymentRequest::create([
+        'student_id' => $registration->student_id,
+        'campus_code' => 'TEST',
+        'student_code' => $registration->student->student_id,
+        'fee_type' => 'HL',
+        'description' => 'Retake fee',
+        'semester_id' => $charge->semester_id,
+        'due_date' => now()->addDays(5),
+        'item_id' => 'HL-'.$charge->id,
+        'amount' => $charge->amount,
+        'status' => DngPaymentRequest::STATUS_PAID_UNINVOICED,
+        'dng_payment_id' => 'DNG-HL-PAID-'.$charge->id,
+        'paid_at' => now(),
+        'finance_charge_id' => null,
+    ]);
+
+    DngPaymentRequestCharge::create([
+        'dng_payment_request_id' => $dng->id,
+        'finance_charge_id' => $charge->id,
+        'amount' => $charge->amount,
+    ]);
+
+    return $dng;
 }
 
 beforeEach(function () {
@@ -105,6 +136,42 @@ it('cancels a payment_pending registration and voids charge', function () {
     ]);
 
     expect($result->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED);
+});
+
+it('bridges linked paid dng evidence before cancelling a payment_pending registration', function () {
+    $reg = createCancelTestRegistration('approved');
+    app(CreateRetakeCourseChargeSimpleAction::class)->handle([
+        'registration_id' => $reg->id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 5000000,
+        'description' => 'Retake fee',
+    ]);
+    $reg->refresh();
+    $charge = FinanceCharge::findOrFail($reg->finance_charge_id);
+    $paidDng = createPaidRetakeDngForCharge($reg, $charge);
+
+    expect($charge->is_fully_paid)->toBeFalse();
+
+    $result = CancelRetakeCourseRegistrationAction::run([
+        'registration_id' => $reg->id,
+        'reason' => 'Student request after DNG paid',
+    ]);
+
+    $charge->refresh();
+    $paidDng->refresh();
+
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED)
+        ->and($result->hq_fee_status)->toBe(CourseRetakeRegistration::HQ_FEE_PAID)
+        ->and($charge->status)->toBe(FinanceCharge::STATUS_VOID)
+        ->and($charge->void_reason)->toBe('retake_course_cancelled_paid_no_refund')
+        ->and($paidDng->status)->toBe(DngPaymentRequest::STATUS_PAID_UNINVOICED)
+        ->and($paidDng->payment_id)->not->toBeNull();
+
+    $payment = $paidDng->payment()->firstOrFail();
+    expect(PaymentApplication::query()
+        ->whereIn('invoice_line_id', $charge->invoiceLines()->pluck('id'))
+        ->sum('amount'))->toBe('0.00')
+        ->and($payment->unapplied_amount)->toBe(5000000.0);
 });
 
 it('throws when cancelling a paid registration', function () {

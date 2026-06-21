@@ -6,6 +6,7 @@ namespace App\Modules\Academic\Http\Requests\ExamResit;
 
 use App\Models\ExamResitAttempt;
 use App\Models\FinanceCharge;
+use App\Modules\Finance\Actions\BridgePaidDngRequestsForChargeAction;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -38,8 +39,10 @@ class CancelExamResitRequest extends FormRequest
 
             $attempt->loadMissing('financeCharge');
             $charge = $attempt->financeCharge;
+            $hasPaidDng = app(BridgePaidDngRequestsForChargeAction::class)->hasPaidDngForCharge($charge);
             $isPaid = $attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_PAID
-                || ($charge !== null && $charge->status === FinanceCharge::STATUS_ACTIVE && $charge->is_fully_paid);
+                || ($charge !== null && $charge->status === FinanceCharge::STATUS_ACTIVE && $charge->is_fully_paid)
+                || $hasPaidDng;
 
             if ($isPaid && ! $this->boolean('acknowledge_no_refund')) {
                 $validator->errors()->add(
@@ -51,7 +54,8 @@ class CancelExamResitRequest extends FormRequest
             $hasUnpaidCharge = $attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_CHARGE_CREATED
                 && $charge !== null
                 && $charge->status === FinanceCharge::STATUS_ACTIVE
-                && ! $charge->is_fully_paid;
+                && ! $charge->is_fully_paid
+                && ! $hasPaidDng;
 
             if ($hasUnpaidCharge && $this->input('confirmation') !== ExamResitAttempt::CONFIRM_VOID_UNPAID_EXAM_RESIT_FEE) {
                 $validator->errors()->add(

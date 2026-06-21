@@ -28,9 +28,11 @@ deferred the HQ refund/reversal path.
 
 This is too strict for the operational case where Academic needs to cancel an
 exam-resit sitting after the student has already paid, but the business decision
-is **no refund**. In that case the fee/payment evidence must stay visible in the
-student portal, and the staff action should cancel the exam-resit operation or
-schedule without voiding charges or reversing payment applications.
+is **no refund**. In that case the provider/payment evidence must stay visible
+in the student portal, and the staff action should cancel the exam-resit
+operation or schedule without refunding the paid DNG/payment. The later
+`ACAD-RET-004` ledger contract clarifies that the cancelled source charge is
+voided and released cash remains as unapplied credit.
 
 There is a second unsafe edge: if HQ already created the `exam_resit_fee` charge
 and DNG request but the student has not paid yet, cancellation should still be
@@ -46,9 +48,9 @@ resit and no no-show result has been recorded.
 Cancellation has two fee outcomes:
 
 - **Paid attempt:** cancel the Academic exam-resit operation or assigned sitting,
-  keep the Finance charge/payment/invoice evidence intact, do not refund, do not
-  void the charge, do not cancel paid DNG evidence, and keep the paid fee visible
-  in the student Finance portal.
+  keep paid DNG/payment evidence intact, do not refund, do not cancel paid DNG
+  evidence, void the cancelled source charge, and keep the paid amount visible
+  in the student Finance portal as unapplied credit.
 - **Charge created but unpaid:** require an explicit staff confirmation message,
   then cancel the Academic exam-resit operation, void the active
   `exam_resit_fee` charge, cancel any awaiting DNG request for that charge, and
@@ -62,7 +64,8 @@ been cancelled.
 
 Student timetable behavior must remain precise: a cancelled exam-resit sitting
 must not appear as an upcoming scheduled exam. Student Finance must still show
-paid invoices/payments for paid attempts because payment evidence is retained.
+paid payment/credit evidence for paid attempts because payment evidence is
+retained.
 
 ## Affected Users
 
@@ -83,9 +86,8 @@ paid invoices/payments for paid attempts because payment evidence is retained.
 
 ## Non-Goals
 
-- Do not implement a refund, reversal, unapplied-credit, or reallocation flow.
-- Do not erase payment records, invoice lines, payment applications, or DNG paid
-  evidence for paid attempts.
+- Do not implement an external refund or auto-reallocation flow.
+- Do not erase payment records or DNG paid evidence for paid attempts.
 - Do not allow cancellation after a completed resit result or recorded no-show.
 - Do not add student self-service cancellation.
 - Do not change DNG provider webhook semantics.

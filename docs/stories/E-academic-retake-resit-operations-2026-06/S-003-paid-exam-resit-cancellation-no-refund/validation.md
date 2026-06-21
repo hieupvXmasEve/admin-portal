@@ -3,21 +3,22 @@
 ## Proof Strategy
 
 The story is complete when Academic staff can cancel a scheduled or paid
-exam-resit attempt without triggering any refund/reversal, paid Finance evidence
-remains visible to the student, unpaid pending fee collection is cancelled only
-after explicit confirmation, and the student receives a cancellation email.
+exam-resit attempt without triggering any external refund or provider reversal,
+paid DNG/payment evidence remains visible to the student, unpaid pending fee
+collection is cancelled only after explicit confirmation, and the student
+receives a cancellation email.
 
 ## Test Plan
 
 | Layer | Cases |
 | --- | --- |
-| Unit | Cancellation classifier derives `kept_paid_no_refund`, `voided_unpaid_charge`, or `no_charge`; completed/no-show attempts are blocked; paid state is derived from `hq_fee_status` and active fully paid charge evidence. |
-| Integration | Paid scheduled attempt can be cancelled; attempt becomes cancelled or otherwise removed from active schedule; linked charge/invoice/payment/payment applications/DNG paid evidence remain unchanged; no void/refund/reversal action is called. |
+| Unit | Cancellation classifier derives `kept_paid_no_refund`, `voided_unpaid_charge`, or `no_charge`; completed/no-show attempts are blocked; paid state is derived from `hq_fee_status`, active fully paid charge evidence, or linked paid DNG evidence. |
+| Integration | Paid scheduled attempt can be cancelled; attempt becomes cancelled or otherwise removed from active schedule; paid DNG/payment evidence remains; source charge is voided and released to unapplied credit without external refund or provider reversal. |
 | Integration | Charge-created unpaid attempt requires confirmation; after confirmation the active `exam_resit_fee` charge is voided, awaiting DNG collection is cancelled, attempt becomes cancelled, and the student email is queued/sent. |
 | Integration | No-charge attempt cancels without Finance mutation and still sends the student email. |
 | Integration | Existing unpaid scheduled cancellation still works, but now uses the clearer confirmation copy and notification path. |
 | E2E | Staff sees the correct cancel dialog on `/exam-resit` for paid, unpaid charge-created, and no-charge attempts; after submit the row updates and the student no longer sees the cancelled sitting in timetable. |
-| Platform | Student portal timetable remains accurate; student Finance portal still shows paid invoice/payment history for paid cancellations. |
+| Platform | Student portal timetable remains accurate; student Finance portal still shows paid payment/credit evidence for paid cancellations. |
 | Performance | Cancellation locks one attempt and only linked charge/DNG rows; no broad scans across all charges or requests. |
 | Logs/Audit | Audit/log records actor, reason, fee disposition, prior schedule, Finance mutation/no-mutation, and email outcome. |
 

@@ -14,6 +14,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Modules\Academic\Queries\ListRetakeCourseRegistrationsQuery;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -124,4 +125,39 @@ it('keeps summary counts independent from the selected operation filter', functi
         ->and($result['summary']['total'])->toBe(2)
         ->and($result['summary']['paid_waiting_class'])->toBe(1)
         ->and($result['summary']['awaiting_payment'])->toBe(1);
+});
+
+it('treats linked paid dng evidence as paid before ledger bridge', function () {
+    ['campus' => $campus, 'registration' => $registration] = createRetakeListRegistration(paid: false);
+    $charge = FinanceCharge::findOrFail($registration->finance_charge_id);
+
+    $dng = DngPaymentRequest::create([
+        'student_id' => $registration->student_id,
+        'campus_code' => 'TEST',
+        'student_code' => $registration->student->student_id,
+        'fee_type' => 'HL',
+        'description' => 'Retake fee',
+        'semester_id' => $charge->semester_id,
+        'due_date' => now()->addDays(5),
+        'item_id' => 'HL-LIST-'.$charge->id,
+        'amount' => $charge->amount,
+        'status' => DngPaymentRequest::STATUS_PAID_UNINVOICED,
+        'dng_payment_id' => 'DNG-HL-LIST-'.$charge->id,
+        'paid_at' => now(),
+        'finance_charge_id' => $charge->id,
+    ]);
+
+    $result = app(ListRetakeCourseRegistrationsQuery::class)->handle([
+        'operation_state' => 'paid_waiting_class',
+        'per_page' => 15,
+    ], $campus->id);
+    $rows = $result['registrations']->items();
+
+    expect($result['registrations']->total())->toBe(1)
+        ->and($rows[0]['id'])->toBe($registration->id)
+        ->and($rows[0]['payment_state']['value'])->toBe('paid')
+        ->and($rows[0]['operation_state']['value'])->toBe('paid_waiting_class')
+        ->and($result['summary']['paid_waiting_class'])->toBe(1)
+        ->and($result['summary']['awaiting_payment'])->toBe(0)
+        ->and($dng->fresh()->payment_id)->toBeNull();
 });

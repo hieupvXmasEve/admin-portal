@@ -6,6 +6,7 @@ namespace App\Modules\Academic\Actions;
 
 use App\Models\ExamResitAttempt;
 use App\Models\FinanceCharge;
+use App\Modules\Finance\Actions\BridgePaidDngRequestsForChargeAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
@@ -25,7 +26,9 @@ use Illuminate\Support\Facades\Log;
  *   `charge_created` charge is voided and its awaiting exam_resit_fee DNG request
  *   is cancelled, so no stale obligation remains.
  * - Paid cancellation is allowed only with explicit no-refund acknowledgement:
- *   Academic cancels the sitting while Finance evidence remains intact.
+ *   Academic cancels the sitting, keeps DNG/payment evidence, and voids the
+ *   local source charge without reallocation so collected cash becomes
+ *   unapplied credit instead of a stale collectible fee.
  */
 class CancelExamResitAttemptAction
 {
@@ -33,6 +36,7 @@ class CancelExamResitAttemptAction
 
     public function __construct(
         private readonly SendExamResitCancellationNoticeAction $sendCancellationNoticeAction,
+        private readonly BridgePaidDngRequestsForChargeAction $bridgePaidDngRequestsForChargeAction,
     ) {}
 
     /**
@@ -58,13 +62,30 @@ class CancelExamResitAttemptAction
             }
 
             $charge = $attempt->financeCharge;
-            $isPaid = $this->isPaidAttempt($attempt, $charge);
-            $hasUnpaidCharge = $this->hasUnpaidActiveCharge($attempt, $charge);
+            $hasPaidDng = $this->bridgePaidDngRequestsForChargeAction->hasPaidDngForCharge($charge);
+            if ($hasPaidDng && $charge !== null && ! $charge->is_fully_paid) {
+                $this->bridgePaidDngRequestsForChargeAction->handle($charge);
+                $charge = $charge->fresh();
+                $this->assertPaidDngCoveredCharge($charge);
+            }
+
+            $isPaid = $this->isPaidAttempt($attempt, $charge) || $hasPaidDng;
+            $hasUnpaidCharge = $this->hasUnpaidActiveCharge($attempt, $charge) && ! $isPaid;
             $feeDisposition = $this->feeDisposition($isPaid, $hasUnpaidCharge);
             $previousSessionId = $attempt->exam_resit_session_id;
 
             if ($isPaid) {
                 $this->assertNoRefundAcknowledged((bool) ($data['acknowledge_no_refund'] ?? false));
+            }
+
+            if ($isPaid && $charge !== null && $charge->status === FinanceCharge::STATUS_ACTIVE) {
+                app(VoidFinanceChargeAction::class)->handle(
+                    chargeId: $charge->id,
+                    reason: 'exam_resit_cancelled_paid_no_refund',
+                    userId: auth()->id(),
+                    autoReallocate: false,
+                );
+                $charge = $charge->fresh();
             }
 
             if ($hasUnpaidCharge && $charge !== null) {
@@ -154,6 +175,15 @@ class CancelExamResitAttemptAction
         }
     }
 
+    private function assertPaidDngCoveredCharge(?FinanceCharge $charge): void
+    {
+        if ($charge === null || $charge->status !== FinanceCharge::STATUS_ACTIVE || ! $charge->is_fully_paid) {
+            throw new \RuntimeException(
+                'DNG đã ghi nhận thanh toán phí thi lại nhưng chưa thể phân bổ đủ vào khoản phí nội bộ. Vui lòng kiểm tra liên kết DNG/charge trước khi hủy.'
+            );
+        }
+    }
+
     private function cancelAwaitingDngRequestsForCharge(int $chargeId): int
     {
         $directIds = DngPaymentRequest::query()
@@ -184,7 +214,11 @@ class CancelExamResitAttemptAction
     {
         $count = ExamResitAttempt::query()
             ->where('exam_resit_session_id', $sessionId)
-            ->where('status', ExamResitAttempt::STATUS_SCHEDULED)
+            ->whereIn('status', [
+                ExamResitAttempt::STATUS_SCHEDULED,
+                ExamResitAttempt::STATUS_COMPLETED,
+                ExamResitAttempt::STATUS_NO_SHOW,
+            ])
             ->count();
 
         DB::table('exam_resit_sessions')

@@ -15,7 +15,8 @@ Relevant source records:
   cancelling the room slot or other unit sessions.
 - `finance_charges`, `student_invoices`, `invoice_lines`, `payments`, and
   `payment_applications`: own fee and payment evidence. Paid attempts must keep
-  these records unchanged.
+  paid DNG/payment evidence, while the later ACAD-RET-004 ledger contract voids
+  the cancelled source charge and releases its allocation to unapplied credit.
 - `dng_payment_requests` and `dng_payment_request_charges`: own provider payment
   request state. Awaiting unpaid requests may be cancelled; paid/reconciled
   requests must remain evidence.
@@ -48,8 +49,10 @@ during implementation discovery.
    - Set the Academic attempt to cancelled.
    - Clear or detach the schedule assignment so the sitting leaves student and
      invigilator timetable views.
-   - Keep `hq_fee_status = paid`, `finance_charge_id`, `paid_at`, active charge,
-     invoice lines, payments, payment applications, and paid DNG evidence.
+   - Keep `hq_fee_status = paid`, `finance_charge_id`, `paid_at`, payments, and
+     paid DNG evidence.
+   - Void the cancelled source charge and release its allocations to unapplied
+     credit without auto-reallocation.
    - Record `kept_paid_no_refund`.
 5. For charge-created unpaid attempts:
    - Require the explicit confirmation token/body from the FormRequest.
@@ -95,7 +98,7 @@ charge is fully paid.
 Student-facing contract:
 
 - Timetable should not show cancelled exam-resit sittings as upcoming sessions.
-- Finance endpoints must continue to show paid invoices/payments/charges for
+- Finance endpoints must continue to show paid payments/credit evidence for
   paid attempts.
 - If a student-facing exam-resit history/status endpoint is later added, it
   should show cancelled with the no-refund fee disposition for paid attempts.
@@ -114,9 +117,9 @@ If the current audit log already captures actor, before/after state, and
 notification outcome in a queryable way, avoid extra columns and document the
 chosen evidence path in validation.
 
-No migration may delete or mutate paid finance evidence. Paid cancellation must
-not call `VoidFinanceChargeAction`, provider reversal, refund, or payment
-reallocation code.
+No migration may delete or mutate paid DNG/payment evidence. Paid cancellation
+must not call provider reversal, external refund, or payment auto-reallocation
+code.
 
 ## UI / Platform Impact
 
@@ -133,7 +136,7 @@ Student portal impact is expected through existing APIs:
 
 - `/api/v1/student/timetable`: cancelled exam-resit schedule disappears from the
   timetable.
-- `/api/v1/student/finance/*`: paid fee evidence remains visible.
+- `/api/v1/student/finance/*`: paid payment/credit evidence remains visible.
 
 If TypeScript types or UI copy in `FE/student-nuxt` rely on exam-resit timetable
 or finance status, update that nested repo separately.

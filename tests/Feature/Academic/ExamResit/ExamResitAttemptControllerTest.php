@@ -7,12 +7,14 @@ use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\ExamResitAttempt;
 use App\Models\FinanceCharge;
+use App\Models\PaymentApplication;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
+use App\Modules\Finance\Queries\GetStudentBalanceQuery;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -193,8 +195,22 @@ it('cancels paid attempts through the controller when no-refund is acknowledged'
     expect($attempt->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
         ->and($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_PAID)
         ->and($attempt->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_KEPT_PAID_NO_REFUND)
-        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE)
-        ->and($charge->fresh()->is_fully_paid)->toBeTrue();
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID)
+        ->and($charge->fresh()->void_reason)->toBe('exam_resit_cancelled_paid_no_refund');
+
+    $payment = PaymentApplication::query()
+        ->whereIn('invoice_line_id', $charge->invoiceLines()->pluck('id'))
+        ->where('entry_type', 'application')
+        ->firstOrFail()
+        ->payment()
+        ->firstOrFail();
+
+    expect(PaymentApplication::query()
+        ->whereIn('invoice_line_id', $charge->invoiceLines()->pluck('id'))
+        ->sum('amount'))->toBe('0.00')
+        ->and($payment->unapplied_amount)->toBe(750000.0);
+
+    expect(app(GetStudentBalanceQuery::class)->handle($this->student->id)['unapplied_credit'])->toBe(750000.0);
 });
 
 it('renders the create page with eligible students', function () {

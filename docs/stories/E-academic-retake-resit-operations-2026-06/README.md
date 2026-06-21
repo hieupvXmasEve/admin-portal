@@ -11,6 +11,7 @@ sources.
 | 1 | `ACAD-RET-001-retake-resit-operations` | `S-001-retake-resit-operations/` | Academic source/lifecycle for staff-created course retake and exam resit, future student-request approval path, HQ fee worklist, late-payment monitoring, schedule, audit, and Finance dependency contract. | Existing Academic Records, Course Retake, Finance Charge, Payment/Ledger flows |
 | 2 | `ACAD-RET-002-exam-resit-overdue-reminders` | `S-002-exam-resit-overdue-reminders/` | Move Due Reminders into the new Finance UI and add PTL exam-resit overdue/reminder monitoring with same-page preview/send workflow. | `ACAD-RET-001`, Finance Due Reminders, DNG Worklist, Batch Studio reminder safety |
 | 3 | `ACAD-RET-003-paid-exam-resit-cancellation-no-refund` | `S-003-paid-exam-resit-cancellation-no-refund/` | Allow staff to cancel scheduled or paid exam-resit attempts without refund, preserve paid Finance evidence in the student portal, confirm unpaid fee/DNG cancellation before voiding, and email the student after cancellation. | `ACAD-RET-001`, `ACAD-RET-002`, Finance charge/payment evidence, Notification email delivery, Student timetable/finance portal |
+| 4 | `ACAD-RET-004-dng-paid-ledger-bridge-before-cancellation` | `S-004-dng-paid-ledger-bridge-before-cancellation/` | Bridge linked paid DNG evidence into local Payment/PaymentApplication ledger before cancelling retake/resit sources, then void the source charge without refund/reallocation so paid fees stop showing as unpaid and become student unapplied credit without cancelling paid DNG. | `ACAD-RET-003`, DNG payment bridge, Finance ledger, Student Finance portal |
 
 ## Shared Rules
 
@@ -48,7 +49,13 @@ sources.
 - Due/reminder monitoring belongs to HQ/Finance. Academic may see payment and
   overdue state, but Finance owns reminder delivery and paid-state evidence.
 - Paid exam-resit cancellation can be an Academic cancellation with no refund:
-  paid charge, invoice, payment, payment applications, and paid DNG evidence stay
-  intact and student-visible. Unpaid charge-created cancellation must require a
-  clear staff confirmation before voiding the pending fee/DNG collection and must
-  notify the student.
+  paid DNG/payment evidence stays intact, the cancelled source charge is voided,
+  released paid allocation is not auto-reallocated, and the amount remains
+  student-visible as unapplied credit. Unpaid charge-created cancellation must
+  require a clear staff confirmation before voiding the pending fee/DNG
+  collection and must notify the student.
+- A provider-paid DNG request is payment evidence, not a cancellable collection
+  request. If local ledger allocation is missing, bridge the paid DNG to
+  `payments` / `payment_applications` first, then void the cancelled source
+  charge with `autoReallocate=false`; do not change student Finance balance
+  formulas to hide the symptom.

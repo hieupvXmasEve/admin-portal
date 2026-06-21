@@ -13,8 +13,9 @@ In scope:
 - Update exam-resit cancellation behavior for `requested`, `approved`, and
   `scheduled` attempts before completion/no-show.
 - Allow paid attempts to be cancelled with explicit no-refund acknowledgement.
-- Keep paid Finance charge, invoice, payment, payment application, and DNG paid
-  evidence intact and visible in student Finance portal.
+- Keep paid DNG/payment evidence intact and visible in student Finance portal;
+  ACAD-RET-004 defines the current local ledger treatment as voiding the
+  cancelled source charge and exposing released cash as unapplied credit.
 - For unpaid charge-created attempts, require explicit confirmation before
   voiding the pending `exam_resit_fee` charge and cancelling awaiting DNG
   collection.
@@ -25,7 +26,8 @@ In scope:
 
 Out of scope:
 
-- Refund, reversal, unapplied-credit, or reallocation implementation.
+- External refund or provider reversal implementation.
+- Auto-reallocation implementation.
 - Student self-service cancellation.
 - Cancelling completed or no-show exam-resit attempts.
 - Changing DNG webhook/provider paid semantics.
@@ -46,7 +48,7 @@ Risk flags:
 
 Hard gates:
 
-- Any mutation of Finance charge/payment/invoice/DNG paid evidence.
+- Any cancellation/refund of paid DNG/payment evidence.
 - Any email delivery or notification-template change.
 - Any student API or portal contract change.
 - Any weakening of completion/no-show cancellation guards.
@@ -66,8 +68,9 @@ Hard gates:
    - Keep the migration additive only.
 3. Backend command
    - Refactor cancellation into a fee-aware action.
-   - Paid branch: cancel Academic operation/schedule, keep Finance evidence,
-     mark fee disposition `kept_paid_no_refund`.
+   - Paid branch: cancel Academic operation/schedule, keep paid DNG/payment
+     evidence, void the cancelled source charge without auto-reallocation, mark
+     fee disposition `kept_paid_no_refund`.
    - Unpaid charge-created branch: require confirmation, void active charge,
      cancel awaiting linked DNG, mark fee disposition `voided_unpaid_charge`.
    - No-charge branch: cancel Academic operation and mark `no_charge`.
@@ -83,7 +86,7 @@ Hard gates:
    - Keep Inertia v3 `useForm` page-form conventions.
 6. Student-facing proof
    - Verify cancelled attempts disappear from student timetable.
-   - Verify paid Finance evidence remains visible through student finance
+   - Verify paid payment/credit evidence remains visible through student finance
      endpoints and, if needed, student portal UI/types.
 7. Validation and Harness
    - Run targeted Academic, Finance, notification, student API, frontend, and
@@ -96,8 +99,8 @@ Pause for human confirmation if:
 
 - Product wants a paid cancellation to keep the exam-resit source active but only
   remove the schedule, instead of cancelling the attempt.
-- Finance requires any refund, reversal, credit, or reallocation after paid
-  cancellation.
+- Finance requires any external refund, provider reversal, or auto-reallocation
+  after paid cancellation.
 - DNG provider state cannot safely distinguish awaiting collection from paid
   evidence.
 - Notification delivery has no reliable outbox/retry path.
