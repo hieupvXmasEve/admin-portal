@@ -128,6 +128,15 @@ class CancelDngPaymentRequestAction
         $reason = "DNG payment request #{$request->id} cancelled";
 
         foreach ($charges as $charge) {
+            if ($charge->status === FinanceCharge::STATUS_VOID) {
+                Log::info('Skipping void for already-voided charge during DNG cancel', [
+                    'dng_payment_request_id' => $request->id,
+                    'finance_charge_id' => $charge->id,
+                ]);
+
+                continue;
+            }
+
             // Cancel retake registration first (before void, to avoid mutation conflicts)
             $this->cancelRetakeRegistration($charge, $userId, $reason);
 

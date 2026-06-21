@@ -130,7 +130,7 @@ function mockDngClientFailure(): void
 {
     $mock = Mockery::mock(DngClient::class);
     $mock->shouldReceive('buildInsertNewRecordPayload')->andReturn(['mock' => 'payload']);
-    $mock->shouldReceive('cancelRecord')->andThrow(new \RuntimeException('DNG API error'));
+    $mock->shouldReceive('cancelRecord')->andThrow(new RuntimeException('DNG API error'));
     app()->instance(DngClient::class, $mock);
 }
 
@@ -313,7 +313,7 @@ it('DNG API failure — does not change status', function () {
     $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PUSHED_TO_DNG);
 
     expect(fn () => app(CancelDngPaymentRequestAction::class)->run($request))
-        ->toThrow(\RuntimeException::class);
+        ->toThrow(RuntimeException::class);
 
     expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
 });
@@ -325,7 +325,7 @@ it('DNG API failure — does not void linked charge', function () {
     $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PUSHED_TO_DNG, $charge);
 
     expect(fn () => app(CancelDngPaymentRequestAction::class)->run($request))
-        ->toThrow(\RuntimeException::class);
+        ->toThrow(RuntimeException::class);
 
     expect($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE);
 });
@@ -336,7 +336,7 @@ it('DNG API failure — stores attempted cancel payload for audit', function () 
     $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PUSHED_TO_DNG);
 
     expect(fn () => app(CancelDngPaymentRequestAction::class)->run($request))
-        ->toThrow(\RuntimeException::class);
+        ->toThrow(RuntimeException::class);
 
     // cancel_push_payload should be persisted even on failure for audit trail
     expect($request->fresh()->cancel_push_payload)->not->toBeNull();
@@ -346,5 +346,37 @@ it('throws when attempting to cancel a non-cancellable status', function () {
     $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PAID_UNINVOICED);
 
     expect(fn () => app(CancelDngPaymentRequestAction::class)->run($request))
-        ->toThrow(\RuntimeException::class);
+        ->toThrow(RuntimeException::class);
+});
+
+it('cancels a pending request when the linked charge is already voided', function () {
+    ['charge' => $charge] = makeRetakeChargeLinked($this->ctx);
+    $charge->update([
+        'status' => FinanceCharge::STATUS_VOID,
+        'voided_at' => now(),
+        'void_reason' => 'Voided before DNG cancel',
+    ]);
+
+    $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PENDING, $charge);
+
+    app(CancelDngPaymentRequestAction::class)->run($request);
+
+    expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED);
+});
+
+it('cancels a pushed_to_dng request when the linked charge is already voided', function () {
+    mockDngClientSuccess();
+
+    ['charge' => $charge] = makeRetakeChargeLinked($this->ctx);
+    $charge->update([
+        'status' => FinanceCharge::STATUS_VOID,
+        'voided_at' => now(),
+        'void_reason' => 'Voided before DNG cancel',
+    ]);
+
+    $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PUSHED_TO_DNG, $charge);
+
+    app(CancelDngPaymentRequestAction::class)->run($request);
+
+    expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG);
 });
