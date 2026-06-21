@@ -35,6 +35,7 @@ finally UI/BOD surfaces.
 | 18    | `FIN-REV-018-finance-reporting-collection-progress`   | `S-018-finance-reporting-collection-progress/`   | Build the Collection Progress lens using canonical settlement/ledger money truth                                                      | 016, 002                                    |
 | 19    | `FIN-REV-019-finance-reporting-dng-lifecycle`         | `S-019-finance-reporting-dng-lifecycle/`         | Build the DNG/Payment Lifecycle lens with attention buckets, webhook/payment bridge state, and related semester lineage               | 016, 005, 009                              |
 | 20    | `FIN-REV-020-defer-finance-settlement`                | `S-020-defer-finance-settlement/`                | Align academic defer item evidence, non-billable deferred registrations, and Finance ledger behavior without introducing a parallel settlement ledger | 002, 004, 005, 017                         |
+| 21    | `FIN-REV-021-egc-post-sync-charge-reconciliation`     | `S-021-egc-post-sync-charge-reconciliation/`     | After EGC block-result sync confirms `fail`, auto-relevel pre-generated future blocks/charges and auto-apply 50% retake discount (including paid invoices and single-block semesters) | 004, 015; `SyncEgcBlockResultsAction`, `ApplyEgcRetakeDiscountAction` |
 
 ## FIN-REV-020 Money-Phase Child Stories
 
@@ -122,3 +123,7 @@ stories above for planning, status, review, and acceptance.
   already paid; do not create unpaid forfeit debt or a parallel settlement
   ledger unless a later accepted decision proves existing ledger references are
   insufficient.
+- EGC early-charge note: `FIN-REV-021` owns post-sync reconciliation when
+  charges were generated ahead of prior-semester results. Do not ask staff to
+  manually relevel blocks or apply retake discounts for the common pre-paid
+  mis-projection case; auto reconcile during block-result sync instead.

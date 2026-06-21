@@ -48,7 +48,11 @@ class SyncEgcBlockResultsAction
             }
         }
 
-        return ['synced' => $synced, 'total' => $blocks->count()];
+        return [
+            'synced' => $synced,
+            'total' => $blocks->count(),
+            'reconciliation' => ReconcileEgcChargesAfterSyncAction::run($semesterId),
+        ];
     }
 
     /**

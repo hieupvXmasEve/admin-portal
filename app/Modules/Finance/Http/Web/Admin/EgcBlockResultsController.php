@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Semester;
 use App\Modules\Finance\Actions\Egc\SyncEgcBlockResultsAction;
 use App\Modules\Finance\Queries\Egc\ListEgcBlockResultsQuery;
+use App\Modules\Finance\Queries\Egc\ListEgcRetakeAdjustmentsQuery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,12 +18,13 @@ class EgcBlockResultsController extends Controller
 {
     public function index(
         Request $request,
-        ListEgcBlockResultsQuery $query
+        ListEgcBlockResultsQuery $query,
+        ListEgcRetakeAdjustmentsQuery $adjustmentsQuery,
     ): Response {
         $validated = $request->validate([
             'semester_id' => 'nullable|integer|exists:semesters,id',
             'search' => 'nullable|string|max:100',
-            'result' => 'nullable|string|in:pending,pass,fail',
+            'result' => 'nullable|string|in:all,pending,pass,fail',
             'per_page' => 'nullable|integer|in:20,50,100',
             'page' => 'nullable|integer|min:1',
         ]);
@@ -34,10 +36,17 @@ class EgcBlockResultsController extends Controller
             : $currentSemester?->id;
 
         $blocks = $semesterId ? $query->handle($semesterId, $validated, $currentCampusId) : collect();
+        $adjustments = $semesterId ? $adjustmentsQuery->handle($semesterId, $currentCampusId) : [
+            'eligible_with_targets' => [],
+            'eligible_no_targets' => [],
+            'ineligible' => [],
+            'already_discounted' => [],
+        ];
         $semesters = Semester::orderBy('start_date', 'desc')->get();
 
         return Inertia::render('Finance/EgcOperations/BlockResults', [
             'blocks' => $blocks,
+            'adjustments' => $adjustments,
             'semesters' => $semesters,
             'currentSemester' => $semesterId ? Semester::find($semesterId) : $currentSemester,
             'filters' => [
@@ -57,9 +66,16 @@ class EgcBlockResultsController extends Controller
         ]);
 
         $result = SyncEgcBlockResultsAction::run((int) $validated['semester_id']);
+        $reconciliation = $result['reconciliation'];
+        $message = "Synced {$result['synced']} of {$result['total']} blocks. "
+            ."Reconciled {$reconciliation['students_reconciled']} students "
+            ."({$reconciliation['releveled_blocks']} blocks releveled, "
+            ."{$reconciliation['discounts_applied']} auto discounts).";
+
+        Inertia::flash('success', $message);
+        Inertia::flash('egc_reconciliation', $reconciliation);
 
         return redirect()
-            ->route('finance.egc.block-results.index', ['semester_id' => $validated['semester_id']])
-            ->with('success', "Synced {$result['synced']} of {$result['total']} blocks.");
+            ->route('finance.egc.block-results.index', ['semester_id' => $validated['semester_id']]);
     }
 }

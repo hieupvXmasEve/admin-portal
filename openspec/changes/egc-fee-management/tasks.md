@@ -52,5 +52,14 @@
 - [x] 8.1 Create artisan command `php artisan egc:backfill-blocks` — scope: students with `status = intake_pre_uni_gc` only; source: `course_registrations` JOIN `course_offerings` JOIN `units WHERE unit_type = egc`; create one `egc_block` per registration row; `block_number` = position ordered by `course_registration.id ASC` within `(student_id, semester_id)`; same level allowed in block 1 and block 2 (no dedup by level); skip if `egc_block` for that `(student_id, semester_id, block_number)` already exists
 - [x] 8.2 Link `finance_charge_id` during backfill — for each egc_block, lookup `finance_charges WHERE student_id = X AND semester_id = Y AND description LIKE '%Level {N}%' AND status = active`; take first unlinked match; leave null if none found (studied but not charged)
 - [x] 8.3 Sync results during backfill — reuse `SyncEgcBlockResultsAction` logic per semester; set `result` and `attendance_rate` from `academic_records`; `is_retake = false` for all FALL2025 (sem 1) blocks regardless of outcome (policy not in effect)
-- [x] 8.4 Apply `is_retake` for SPRING2026 (sem 2) blocks — after syncing FALL2025 results, scan SPRING2026 blocks: if student has a FALL2025 block with `result = fail` AND `attendance_rate ≥ 80` for the same `level_number`, set `is_retake = true` on the matching SPRING2026 block; leave `retake_discount_id = null` (staff applies discount manually via Retake Adjustments page)
+- [x] 8.4 Apply `is_retake` for SPRING2026 (sem 2) blocks — after syncing FALL2025 results, scan SPRING2026 blocks: if student has a FALL2025 block with `result = fail` AND `attendance_rate ≥ 80` for the same `level_number`, set `is_retake = true` on the matching SPRING2026 block; leave `retake_discount_id = null` until post-sync reconciliation or manual repair applies the discount
 - [x] 8.5 Verify backfill output — query and log: total egc_blocks created, blocks with finance_charge_id null, blocks with is_retake = true, blocks with result = fail
+
+## 9. Post-Sync Reconciliation (FIN-REV-021)
+
+- [x] 9.1 Create `app/Modules/Finance/Actions/Egc/ReconcileEgcChargesAfterSyncAction.php` — after sync, relevel safe future/same-semester-later pending EGC blocks and update linked `finance_charges` + `invoice_lines`
+- [x] 9.2 Wire `SyncEgcBlockResultsAction` to run reconciliation and return summary counts for students, releveled blocks, discounts, settlement releases, skips, and manual-repair rows
+- [x] 9.3 Reuse `ApplyEgcRetakeDiscountAction` and `SettlementService::releaseLineOverpayment` for eligible attendance and paid-invoice overpayment release
+- [x] 9.4 Merge Block Results and Retake Adjustments operator workflow into the combined `Finance/EgcOperations/BlockResults.vue` surface; keep old retake route as a section-focused redirect
+- [x] 9.5 Add Finance Office (New UI) sidebar entry under `Sinh phí` for the combined EGC results/retake reconciliation workflow
+- [x] 9.6 Add Pest regression coverage for relevel + discount, paid invoice release, idempotency, ineligible attendance, query buckets, sync hook, and legacy redirect

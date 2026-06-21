@@ -5,48 +5,25 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Semester;
 use App\Modules\Finance\Actions\Egc\ApplyEgcMajorEntryCreditAction;
 use App\Modules\Finance\Actions\Egc\ApplyEgcRetakeDiscountAction;
-use App\Modules\Finance\Queries\Egc\ListEgcRetakeAdjustmentsQuery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Inertia\Response;
 
 class EgcRetakeAdjustmentsController extends Controller
 {
     public function index(
-        Request $request,
-        ListEgcRetakeAdjustmentsQuery $query
-    ): Response {
+        Request $request
+    ): RedirectResponse {
         $validated = $request->validate([
             'semester_id' => 'nullable|integer|exists:semesters,id',
         ]);
 
-        $currentSemester = Semester::where('is_active', true)->first();
-        $currentCampusId = session('current_campus_id') ? (int) session('current_campus_id') : null;
-        $semesterId = isset($validated['semester_id'])
-            ? (int) $validated['semester_id']
-            : $currentSemester?->id;
-
-        $adjustments = $semesterId ? $query->handle($semesterId, $currentCampusId) : [
-            'eligible_with_targets' => [],
-            'eligible_no_targets' => [],
-            'ineligible' => [],
-            'already_discounted' => [],
-        ];
-
-        $semesters = Semester::orderBy('start_date', 'desc')->get();
-
-        return Inertia::render('Finance/EgcOperations/RetakeAdjustments', [
-            'adjustments' => $adjustments,
-            'semesters' => $semesters,
-            'currentSemester' => $semesterId ? Semester::find($semesterId) : $currentSemester,
-            'filters' => [
-                'semester_id' => $semesterId ? (string) $semesterId : null,
-            ],
-        ]);
+        return redirect()->route('finance.egc.block-results.index', array_filter([
+            'semester_id' => $validated['semester_id'] ?? null,
+            'section' => 'retake-adjustments',
+        ]));
     }
 
     public function store(Request $request): RedirectResponse
@@ -61,9 +38,9 @@ class EgcRetakeAdjustmentsController extends Controller
             (int) $validated['target_charge_id']
         );
 
-        return redirect()
-            ->back()
-            ->with('success', 'Retake discount applied successfully.');
+        Inertia::flash('success', 'Retake discount applied successfully.');
+
+        return redirect()->back();
     }
 
     public function applyMajorEntryCredit(Request $request): RedirectResponse
@@ -78,8 +55,8 @@ class EgcRetakeAdjustmentsController extends Controller
             (int) $validated['semester_id']
         );
 
-        return redirect()
-            ->back()
-            ->with('success', 'Major entry credit applied successfully.');
+        Inertia::flash('success', 'Major entry credit applied successfully.');
+
+        return redirect()->back();
     }
 }

@@ -22,8 +22,8 @@ The system SHALL automatically include deferred egc_blocks (finance_charge_id = 
 - **WHEN** Generate EGC Charges is confirmed for semester S+1
 - **THEN** the deferred egc_block is charged (finance_charge_id set), and a new egc_level_fee FinanceCharge is created
 
-### Requirement: Retake-eligible blocks are flagged at charge generation, but discount is applied manually
-The system SHALL detect students eligible for a retake discount (prior semester egc_block with result = fail, attendance_rate ≥ 80%, retake_discount_id IS NULL) and mark the new egc_block as `is_retake = true`. The charge is always generated at full price (15,000,000 VND). Staff then applies the 50% discount manually via the Retake Adjustments page by selecting a target charge.
+### Requirement: Retake-eligible blocks are flagged at charge generation, but discount is applied after results are synced
+The system SHALL detect students eligible for a retake discount (prior semester egc_block with result = fail, attendance_rate ≥ 80%, retake_discount_id IS NULL) and mark the new egc_block as `is_retake = true`. The charge is always generated at full price (15,000,000 VND). After block results are synced, the system automatically applies the 50% discount when it can safely reconcile the target charge; staff can still apply the discount manually from the combined EGC retake repair surface when automatic reconciliation skips the row.
 
 #### Scenario: Retake-eligible block flagged at generation
 - **WHEN** Generate EGC Charges runs for a student who failed a prior block with attendance ≥ 80% and retake_discount_id IS NULL

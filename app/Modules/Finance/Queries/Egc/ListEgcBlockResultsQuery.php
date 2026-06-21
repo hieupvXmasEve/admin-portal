@@ -14,11 +14,11 @@ class ListEgcBlockResultsQuery
         return EgcBlock::where('semester_id', $semesterId)
             ->when($campusId !== null, fn ($query) => $query->whereHas('student', fn ($studentQuery) => $studentQuery->where('campus_id', $campusId)))
             ->with(['student:id,full_name,student_id', 'semester:id,name'])
-            ->when(isset($filters['search']), function ($q) use ($filters) {
+            ->when(($filters['search'] ?? '') !== '', function ($q) use ($filters) {
                 $q->whereHas('student', fn ($sq) => $sq->where('full_name', 'like', "%{$filters['search']}%")
                     ->orWhere('student_id', 'like', "%{$filters['search']}%"));
             })
-            ->when(isset($filters['result']), fn ($q) => $q->where('result', $filters['result']))
+            ->when(($filters['result'] ?? 'all') !== 'all', fn ($q) => $q->where('result', $filters['result']))
             ->orderBy('student_id')
             ->orderBy('block_number')
             ->paginate($filters['per_page'] ?? 50)

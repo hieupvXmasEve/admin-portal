@@ -7,17 +7,17 @@ EGC students (intake_pre_uni_gc) follow a block-based fee model fundamentally di
 - Create `egc_blocks` table as the central entity tracking each EGC block per student per semester (level, result, attendance, linked charges)
 - Separate the Finance sidebar into **EGC Operations** and **Major Operations** sections — each scoped to its respective staff team
 - Add **Generate EGC Charges** page: supports 1-block or 2-block charging per student, handles deferred blocks from prior semester, flags retake-eligible blocks (`is_retake = true`) — all charges are at full price (15,000,000 VND)
-- Add **Block Results** page: staff-triggered sync from `academic_records` (is_passed, override_pass, attendance_percentage) to update egc_block results
-- Add **Retake Adjustments** page: lists fail-result blocks with attendance ≥ 80%; staff selects a target charge (current or next semester) and applies the 50% discount (7,500,000 VND) as an InvoiceDiscount on that charge's invoice — only available when target charge + invoice already exist
+- Add **Block Results + Retake Reconciliation** page: staff-triggered sync from `academic_records` (is_passed, override_pass, attendance_percentage) updates egc_block results, then automatically reconciles safe post-sync retake charge changes
+- Keep **Retake Adjustments** as the manual repair path: lists fail-result blocks with attendance ≥ 80%; staff selects a target charge when auto-reconciliation cannot safely resolve the target
 
 ## Capabilities
 
 ### New Capabilities
 
 - `egc-block-tracking`: Core entity `egc_blocks` tracking each student's block per semester — level, result, attendance, charge links, retake status, and deferred-to-semester logic
-- `egc-charge-generation`: Generate EGC charges with 1-or-2-block selection, deferred block carry-forward, and retake eligibility flagging (`is_retake = true`) — all charges at full price; discount applied separately via Retake Adjustments
-- `egc-block-results-sync`: Sync block results from academic_records into egc_blocks via staff-triggered action
-- `egc-retake-adjustments`: Surface eligible fail-result blocks (attendance ≥ 80%); staff selects target charge (current or next semester, must already exist with invoice) and applies 50% InvoiceDiscount — tracked in `egc_retake_discount_links`
+- `egc-charge-generation`: Generate EGC charges with 1-or-2-block selection, deferred block carry-forward, and retake eligibility flagging (`is_retake = true`) — all charges start at full price; discount is applied by post-sync reconciliation or manual repair
+- `egc-block-results-sync`: Sync block results from academic_records into egc_blocks via staff-triggered action and run safe post-sync charge reconciliation
+- `egc-retake-adjustments`: Surface eligible fail-result blocks (attendance ≥ 80%); auto-reconciled rows are shown as applied, while staff can still select a target charge for repair cases — tracked in `egc_retake_discount_links`
 
 ### Modified Capabilities
 

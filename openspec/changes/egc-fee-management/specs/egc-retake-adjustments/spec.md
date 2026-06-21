@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
-### Requirement: Retake Adjustments page lists eligible source blocks with available target charges
-The system SHALL display all egc_blocks for the selected semester where `result = fail` and `attendance_rate ≥ 80%` and `retake_discount_id IS NULL`, each annotated with a list of candidate target charges (egc_level_fee charges for the same level in current or next semester that have an invoice and no existing retake discount link). Blocks without any available target are shown with a disabled state. Blocks already consumed (`retake_discount_id IS NOT NULL`) are shown in a separate "Applied" section.
+### Requirement: Combined EGC reconciliation page lists eligible source blocks with available target charges
+The system SHALL display all egc_blocks for the selected semester where `result = fail` and `attendance_rate ≥ 80%` and `retake_discount_id IS NULL`, each annotated with a list of candidate target charges (egc_level_fee charges for the same level in current or next semester that have an invoice and no existing retake discount link). Blocks without any available target are shown with a disabled/manual-repair state. Blocks already consumed (`retake_discount_id IS NOT NULL`) are shown in a separate "Applied" section. The common safe case is auto-reconciled after Sync Results; this manual target selection remains for repair rows.
 
 #### Scenario: Eligible block with available targets shown with selector
 - **WHEN** an egc_block has `result = fail`, `attendance_rate ≥ 80%`, `retake_discount_id = null`, and at least one candidate target charge exists
@@ -22,6 +22,10 @@ The system SHALL display all egc_blocks for the selected semester where `result 
 #### Scenario: Applied discounts listed in Applied section
 - **WHEN** an egc_block has `retake_discount_id IS NOT NULL`
 - **THEN** the row appears in the Applied section with: discount amount, target charge reference, target semester, applied date
+
+#### Scenario: Auto-reconciled discounts listed in Applied section
+- **WHEN** Sync Results auto-applies an EGC retake discount through post-sync reconciliation
+- **THEN** the consumed source block appears in the Applied section without requiring staff to visit a separate Retake Adjustments page
 
 ### Requirement: Apply action validates source, target, and uniqueness before writing
 The system SHALL enforce a 6-step validation sequence before applying the retake discount.
@@ -50,7 +54,7 @@ The system SHALL enforce a 6-step validation sequence before applying the retake
 - **WHEN** a student has two fail-eligible egc_blocks in the same semester (different levels)
 - **THEN** each block can independently apply a discount to a different target charge; the two discounts do not interfere with each other
 
-### Requirement: Staff can manually apply early major entry credit on the Retake Adjustments page
+### Requirement: Staff can manually apply early major entry credit on the combined EGC reconciliation page
 The system SHALL provide an "Apply Early Major Entry Credit" action for EGC students who have transitioned to major (student status no longer `intake_pre_uni_gc`). When applied, the system SHALL create a `TYPE_EGC_EXEMPT_CREDIT` FinanceCharge of -15,000,000 VND on the student's current semester invoice and recalculate invoice totals. The action SHALL be guarded against double-apply (one credit per student per semester).
 
 #### Scenario: Credit applied to transitioned student
@@ -70,7 +74,7 @@ The system SHALL provide an "Apply Early Major Entry Credit" action for EGC stud
 - **THEN** the early major entry credit action is not shown for that student
 
 ### Requirement: Semester filter controls which semester's source blocks are shown
-The system SHALL allow staff to filter the Retake Adjustments page by the semester of the failed (source) block.
+The system SHALL allow staff to filter the combined EGC reconciliation page by the semester of the failed (source) block.
 
 #### Scenario: Default to current semester
 - **WHEN** the page loads without a semester query parameter

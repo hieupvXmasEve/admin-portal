@@ -30,8 +30,8 @@ The system SHALL use `App\Models\EgcBlock` as the Eloquent model for `egc_blocks
 The system SHALL set `egc_block.retake_discount_id` (nullable FK → `invoice_discounts`) when the block's entitlement is consumed. A consumed entitlement cannot be used again.
 
 #### Scenario: Source block marked as consumed after apply
-- **WHEN** staff applies a retake discount sourced from an egc_block
-- **THEN** `egc_block.retake_discount_id` is set to the InvoiceDiscount id, and the block no longer appears as an available source in the Retake Adjustments UI
+- **WHEN** the system or staff applies a retake discount sourced from an egc_block
+- **THEN** `egc_block.retake_discount_id` is set to the InvoiceDiscount id, and the block no longer appears as an available source in the manual-repair section
 
 #### Scenario: Same source block cannot be used twice
 - **WHEN** `egc_block.retake_discount_id` is already set

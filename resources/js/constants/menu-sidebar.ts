@@ -342,7 +342,15 @@ export const mainNavGroups: NavGroup[] = [
                 title: 'Sinh phí',
                 href: '#',
                 icon: DollarSign,
-                children: [{ title: 'Batch Studio', href: financeRoutes.batchStudio.hub(), icon: Layers, requiredPermissions: ['view_finance_batch_studio'] }],
+                children: [
+                    { title: 'Batch Studio', href: financeRoutes.batchStudio.hub(), icon: Layers, requiredPermissions: ['view_finance_batch_studio'] },
+                    {
+                        title: 'EGC · Kết quả & học lại',
+                        href: financeRoutes.feeGeneration.egcBlockResults(),
+                        icon: TrendingUp,
+                        requiredPermissions: ['view_egc_block_results'],
+                    },
+                ],
             },
             {
                 title: 'Thu & Đối soát',

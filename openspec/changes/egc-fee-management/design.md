@@ -14,7 +14,7 @@ Constraints: shared infra (`FinanceCharge`, `StudentInvoice`, `Payment`) must no
 **Goals:**
 - Introduce `egc_blocks` as a first-class entity linking academic outcome to finance charge
 - Separate EGC and Major finance navigation per staff team
-- Enable: block-aware charge generation (1 or 2 blocks, deferred carry-forward, retake eligibility flagging), result sync from academic_records, and manual retake discount application via Retake Adjustments
+- Enable: block-aware charge generation (1 or 2 blocks, deferred carry-forward, retake eligibility flagging), result sync from academic_records, automatic safe post-sync retake reconciliation, and manual repair via Retake Adjustments
 
 **Non-Goals:**
 - Changing invoice, payment, or settlement infrastructure
@@ -27,7 +27,7 @@ Constraints: shared infra (`FinanceCharge`, `StudentInvoice`, `Payment`) must no
 
 **Chosen**: Dedicated `egc_blocks` table with finance charge links.
 
-**Rationale**: `academic_records` is owned by the Academic module and carries unit-level grade data; it should not hold finance references. `students.gc_current_level` is a scalar counter, not a history of blocks. A dedicated table provides: audit trail per block, direct FK to finance charges, retake/deferred state, and a clean source for the Retake Adjustments page.
+**Rationale**: `academic_records` is owned by the Academic module and carries unit-level grade data; it should not hold finance references. `students.gc_current_level` is a scalar counter, not a history of blocks. A dedicated table provides: audit trail per block, direct FK to finance charges, retake/deferred state, and a clean source for the combined EGC reconciliation page.
 
 **Alternative considered**: Add columns to `academic_records` — rejected because it couples Academic and Finance modules.
 
@@ -59,7 +59,7 @@ egc_retake_discount_links
 - A student can hold multiple block entitlements in the same semester — each maps to a different target charge
 - If the target invoice is already paid when discount is applied, the system still applies and the overpaid amount is released as unapplied payment following the existing settlement flow
 
-**Staff selects the target**: current semester or next semester's retake level charge. UI shows only charges that (a) exist, (b) have an invoice, and (c) have no existing `egc_retake_discount_links` record.
+**Target resolution**: post-sync reconciliation automatically picks the safe current/later target charge when generated levels were too high. Staff can still select a current or next semester retake level charge in the manual repair path. UI shows only charges that (a) exist, (b) have an invoice, and (c) have no existing `egc_retake_discount_links` record.
 
 **Rationale**: `egc_retake_discount_links.UNIQUE(target_finance_charge_id)` enforces the "one discount per target charge" rule at the DB level, no application-layer race condition possible. Storing both FKs explicitly enables traceability ("block X discounted charge Y") without joining through DiscountAllocation → InvoiceLine on every query.
 
@@ -73,17 +73,25 @@ egc_retake_discount_links
 
 ### D5: Block result sync reads academic_records directly (no intermediate cache)
 
-**Chosen**: Sync action queries `academic_records` on demand, joining on `student_id` + `semester_id` + EGC unit level. Staff clicks "Sync Results" on the Block Results page.
+**Chosen**: Sync action queries `academic_records` on demand, joining on `student_id` + `semester_id` + EGC unit level. Staff clicks "Sync Results" on the combined Block Results + Retake Reconciliation page.
 
 **Rationale**: academic_records are updated by Academic module staff; EGC Finance staff need to pull results when ready. A push/event approach would require cross-module coupling. On-demand sync is simple and auditable via `egc_block.synced_at`.
+
+### D5.1: Post-sync reconciliation handles pre-generated levels before manual repair
+
+**Chosen**: After sync confirms a source block failed, Finance runs `ReconcileEgcChargesAfterSyncAction` for safe cases where later pending EGC blocks were generated at levels that are now too high. The action relevels the pending block sequence, updates linked `finance_charges` and `invoice_lines`, recalculates invoice totals, applies the 50% retake discount when attendance is at least 80%, and releases overpayment through the existing settlement service when the invoice is already paid.
+
+**Rationale**: Staff should not sync results on one page and then discover on a second page that the target retake charge is missing only because the pre-generated charge was L4 while the academic retake is L3. Sync is the point where Finance learns the final fail result, so it is also the safest point to realign pending Finance charge artifacts.
+
+**Safety guards**: reconciliation skips rows that are already consumed, have no active target charge, have multiple active invoice lines, have a cancelled/void invoice, already have a retake link for the target, exceed the student's GC total level, or contain non-retake positive discount allocations on the target line. Skipped rows remain visible for manual repair.
 
 ## Risks / Trade-offs
 
 - **Risk**: Student has egc_block deferred to S+1 AND a retake discount eligible from same prior semester — double discount applied at generation time.
   → **Mitigation**: `GenerateEgcChargesAction` checks `retake_discount_id IS NULL AND is_retake = false` before marking a block eligible; `UNIQUE(target_finance_charge_id)` in `egc_retake_discount_links` is the final DB-level guard.
 
-- **Risk**: Target invoice is already fully paid when staff applies discount → negative balance on invoice.
-  → **Mitigation**: Follow existing settlement flow — discount application triggers invoice recalculation; overpaid amount becomes unapplied payment on the student account (same as scholarship applied to paid invoice).
+- **Risk**: Target invoice is already fully paid when a discount is applied → negative balance on invoice.
+  → **Mitigation**: Follow existing settlement flow — discount application or post-sync relevel triggers invoice recalculation; overpaid amount becomes unapplied payment on the student account (same as scholarship applied to paid invoice).
 
 - **Risk**: `academic_records` for EGC units may have multiple records per student per level (e.g., supplementary assessments).
   → **Mitigation**: Sync logic takes the final result: `override_pass = true` takes precedence, else latest `is_passed` by `recorded_at` DESC.
@@ -128,10 +136,10 @@ Rollback: migration is additive; removing the new menu section and pages leaves 
 
 ## Decisions (continued)
 
-### D8: Early major entry credit is a manual staff action on the Retake Adjustments page
+### D8: Early major entry credit is a manual staff action on the combined EGC reconciliation page
 
-**Chosen**: Staff applies the -15M `TYPE_EGC_EXEMPT_CREDIT` credit manually from the Retake Adjustments page. No Academic module event hook required.
+**Chosen**: Staff applies the -15M `TYPE_EGC_EXEMPT_CREDIT` credit manually from the combined EGC reconciliation page. No Academic module event hook required.
 
 **Rationale**: Coupling to `STUDENT_MAJOR_ENROLLMENT` would introduce cross-module dependency and require Academic module changes. The credit is a finance operation — keeping it staff-initiated on the finance page preserves module boundaries and allows staff to verify timing.
 
-**Implementation**: A dedicated "Apply Early Major Entry Credit" action on the Retake Adjustments page, scoped to students with at least one egc_block who have transitioned to major (detectable via student status change or explicit staff selection). Creates a `TYPE_EGC_EXEMPT_CREDIT` FinanceCharge of -15,000,000 and triggers invoice recalculation.
+**Implementation**: A dedicated "Apply Early Major Entry Credit" action on the combined EGC results/retake page, scoped to students with at least one egc_block who have transitioned to major (detectable via student status change or explicit staff selection). Creates a `TYPE_EGC_EXEMPT_CREDIT` FinanceCharge of -15,000,000 and triggers invoice recalculation.
