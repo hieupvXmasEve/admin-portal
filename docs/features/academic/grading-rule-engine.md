@@ -91,6 +91,42 @@ Each component may declare `gate.min_pct`. If the component score falls below th
 }
 ```
 
+## metropolia_v2 (formula engine)
+
+Where `metropolia_v1` sums independently converted component grades,
+`metropolia_v2` evaluates a single arithmetic expression over the raw component
+percentages. This faithfully reproduces Metropolia rules that use a weighted
+total with a global offset — e.g. Cloud Computing's `(LAB + QUIZ + EXAM/2 - 40)/10`
+— which the summation engine could only approximate.
+
+```json
+{
+  "engine": "metropolia_v2",
+  "scale": "0-5",
+  "formula": "(LAB + QUIZ + EXAM / 2 - 40) / 10",
+  "rounding_stage": "after_total",
+  "clamp_min": 0,
+  "clamp_max": 5,
+  "pass_requirements": [{ "code": "ASSIGNMENT", "min_pct": 40 }],
+  "components": [{ "code": "LAB", "label": "Labs" }]
+}
+```
+
+- `formula` variables are component codes; scores are percentages (0-100); a
+  missing component score is treated as 0.
+- `rounding_stage`: `after_total` (round the final result to the nearest integer)
+  or `none`. Default `after_total`.
+- `clamp_min` / `clamp_max`: grade range, default 0-5.
+- `pass_requirements`: optional course-level gates; an unmet gate fails the
+  course regardless of the computed grade.
+
+The formula is parsed by `SafeArithmeticEvaluator`, a whitelist recursive-descent
+parser (numbers, identifiers, `+ - * /`, unary minus, parentheses) — never PHP
+`eval` — so operator-authored schemes cannot execute arbitrary code.
+
+Implementation: `App\Modules\Academic\Support\Grading\MetropoliaV2Calculator`,
+`App\Modules\Academic\Support\Grading\SafeArithmeticEvaluator`.
+
 ## Adding a new engine
 
 1. Create a class implementing `GradingCalculator`.

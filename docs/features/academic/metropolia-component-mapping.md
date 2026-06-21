@@ -77,21 +77,27 @@ Commit only after a clean dry-run:
 If any mapping is unresolved or ambiguous, the whole run aborts with exit code
 `1` and writes nothing, so commit mode can never leave partial data behind.
 
-## Modeling notes to confirm before a pilot
+## Engines used by the pack
 
-A few Metropolia prose rules are weighted-total or point-based formulas that the
-per-component `metropolia_v1` engine reproduces through documented affine
-approximations. Confirm these with academic staff before a pilot database goes
-live:
+Most schemes use `metropolia_v1` (sum of independently converted components).
+Three formula-based courses use `metropolia_v2`, which evaluates the source
+expression directly, so they reproduce the reference document exactly:
 
-- `hardware_2.cloud_computing` — distributes the formula's global `-40` offset
-  across components; exact for balanced score profiles, more generous than the
-  formula for heavily skewed profiles.
-- `hardware_1.networking` — only the "50% total = grade 1" floor is fixed in the
-  prose; grades 2-5 are modeled as a linear split.
-- `hardware_1.health_technology` — `FG = (assignment% - 40) / 10` is modeled as a
-  single linear conversion (50% = 1, 90% = 5).
-- `software_2.web_development` — assignment and exam fractions are modeled as
-  `direct` conversions scaled to grades 2 and 3.
+- `hardware_2.cloud_computing` — `(LAB + QUIZ + EXAM/2 - 40) / 10`
+- `hardware_1.health_technology` — `(ASSIGNMENT - 40) / 10`
+- `software_2.web_development` — `HTML_CSS * 2 / 100 + EXAM * 3 / 100`
+  (with HTML+CSS and JavaScript assignment 40% gates)
+
+`metropolia_v2` formulas are evaluated by a whitelisted arithmetic parser (no
+`eval`), so operator-authored schemes cannot execute code.
+
+## Remaining modeling note to confirm before a pilot
+
+One scheme is still an approximation because the source document is incomplete,
+not because the engine cannot express it:
+
+- `hardware_1.networking` — the prose only fixes "50% total = grade 1"; grades
+  2-5 are unspecified and modeled as a linear split. Confirm the intended 2-5
+  boundaries with academic staff before relying on this course's grades.
 
 See the per-scheme `notes` field in the JSON pack for the exact reasoning.

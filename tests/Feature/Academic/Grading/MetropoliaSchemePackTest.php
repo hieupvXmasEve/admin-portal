@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Modules\Academic\Support\Grading\GradingCalculatorResolver;
 use App\Modules\Academic\Support\Grading\GradingSchemeValidator;
 use App\Modules\Academic\Support\Grading\MetropoliaSchemeCatalog;
-use App\Modules\Academic\Support\Grading\MetropoliaV1Calculator;
 
 it('loads every metropolia scheme key from the canonical pack', function () {
     $catalog = app(MetropoliaSchemeCatalog::class);
@@ -47,15 +47,17 @@ it('throws for an unknown scheme key', function () {
 
 it('exposes only engine values the resolver and calculator can execute', function () {
     $catalog = app(MetropoliaSchemeCatalog::class);
+    $resolver = app(GradingCalculatorResolver::class);
 
     foreach ($catalog->keys() as $key) {
         $scheme = $catalog->get($key);
-        expect($scheme['engine'])->toBe('metropolia_v1')
+        expect($scheme['engine'])->toBeIn(['metropolia_v1', 'metropolia_v2'])
             ->and($scheme['scale'])->toBeIn(['0-5', 'pass_fail']);
 
-        // Every scheme must run through the real calculator without error.
-        $result = app(MetropoliaV1Calculator::class)->calculate([], $scheme);
-        expect($result->gradeBreakdown['engine'])->toBe('metropolia_v1');
+        // The resolver must accept every scheme and the resolved calculator must
+        // run it without error, tagging the breakdown with the declared engine.
+        $result = $resolver->resolve($scheme)->calculate([], $scheme);
+        expect($result->gradeBreakdown['engine'])->toBe($scheme['engine']);
     }
 });
 
@@ -70,42 +72,35 @@ it('validates every canonical metropolia scheme', function () {
 
 it('computes faithful grades for representative catalog schemes', function () {
     $catalog = app(MetropoliaSchemeCatalog::class);
-    $calculator = app(MetropoliaV1Calculator::class);
+    $resolver = app(GradingCalculatorResolver::class);
 
-    // Programming: exam at 88% with the assignment gate met => top grade 5.
-    $programming = $calculator->calculate(
-        ['ASSIGNMENT' => 90, 'EXAM' => 88],
-        $catalog->get('software_1.programming'),
-    );
-    expect($programming->finalGrade)->toBe('5')
-        ->and($programming->passed)->toBeTrue();
+    $calculate = function (string $key, array $scores) use ($catalog, $resolver) {
+        $scheme = $catalog->get($key);
 
-    // Programming: failing the assignment gate fails the course regardless of exam.
-    $gated = $calculator->calculate(
-        ['ASSIGNMENT' => 30, 'EXAM' => 88],
-        $catalog->get('software_1.programming'),
-    );
-    expect($gated->passed)->toBeFalse();
+        return $resolver->resolve($scheme)->calculate($scores, $scheme);
+    };
 
-    // Database: pass/fail at the 80% threshold.
-    $dbPass = $calculator->calculate(['ASSIGNMENT' => 80], $catalog->get('software_1.database'));
-    $dbFail = $calculator->calculate(['ASSIGNMENT' => 79], $catalog->get('software_1.database'));
-    expect($dbPass->finalGrade)->toBe('P')
-        ->and($dbFail->finalGrade)->toBe('F');
+    // Programming (metropolia_v1): exam at 88% with the assignment gate met => grade 5.
+    expect($calculate('software_1.programming', ['ASSIGNMENT' => 90, 'EXAM' => 88])->finalGrade)->toBe('5');
+    // Failing the assignment gate fails the course regardless of exam.
+    expect($calculate('software_1.programming', ['ASSIGNMENT' => 30, 'EXAM' => 88])->passed)->toBeFalse();
 
-    // Maths & Physics: assignment grade + exam grade (2 + 3 = 5).
-    $maths = $calculator->calculate(
-        ['ASSIGNMENT' => 70, 'EXAM' => 85],
-        $catalog->get('software_1.maths_physics'),
-    );
-    expect($maths->finalGrade)->toBe('5');
+    // Database (metropolia_v1): pass/fail at the 80% threshold.
+    expect($calculate('software_1.database', ['ASSIGNMENT' => 80])->finalGrade)->toBe('P')
+        ->and($calculate('software_1.database', ['ASSIGNMENT' => 79])->finalGrade)->toBe('F');
 
-    // Cloud Computing: balanced 30% profile reproduces the source formula (grade 4).
-    $cloud = $calculator->calculate(
-        ['LAB' => 30, 'QUIZ' => 30, 'EXAM' => 30],
-        $catalog->get('hardware_2.cloud_computing'),
-    );
-    expect($cloud->gradeBreakdown['fg_sum_raw'])->toEqualWithDelta(3.5, 0.01);
+    // Maths & Physics (metropolia_v1): assignment grade + exam grade (2 + 3 = 5).
+    expect($calculate('software_1.maths_physics', ['ASSIGNMENT' => 70, 'EXAM' => 85])->finalGrade)->toBe('5');
+
+    // Cloud Computing (metropolia_v2): exact source formula, both balanced and skewed.
+    expect($calculate('hardware_2.cloud_computing', ['LAB' => 30, 'QUIZ' => 30, 'EXAM' => 30])->finalGrade)->toBe('4')
+        ->and($calculate('hardware_2.cloud_computing', ['LAB' => 0, 'QUIZ' => 0, 'EXAM' => 100])->finalGrade)->toBe('1');
+
+    // Health Technology (metropolia_v2): (assignment - 40) / 10.
+    expect($calculate('hardware_1.health_technology', ['ASSIGNMENT' => 90])->finalGrade)->toBe('5');
+
+    // Web Development (metropolia_v2): JS assignment gate unmet fails the course.
+    expect($calculate('software_2.web_development', ['HTML_CSS' => 100, 'JS_ASSIGNMENT' => 10, 'EXAM' => 100])->passed)->toBeFalse();
 });
 
 it('reports concrete validation errors for malformed schemes', function () {

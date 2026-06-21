@@ -12,6 +12,7 @@ class GradingCalculatorResolver
     public function __construct(
         private readonly DefaultWeightedPercentageCalculator $defaultCalculator,
         private readonly MetropoliaV1Calculator $metropoliaV1Calculator,
+        private readonly MetropoliaV2Calculator $metropoliaV2Calculator,
     ) {}
 
     /**
@@ -24,6 +25,7 @@ class GradingCalculatorResolver
         return match ($engine) {
             null, 'default_weighted_percentage' => $this->defaultCalculator,
             'metropolia_v1' => $this->metropoliaV1Calculator,
+            'metropolia_v2' => $this->metropoliaV2Calculator,
             default => throw new InvalidArgumentException("Unknown grading engine: {$engine}"),
         };
     }

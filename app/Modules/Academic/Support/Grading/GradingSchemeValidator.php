@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Support\Grading;
 
+use InvalidArgumentException;
+
 /**
- * Validates a single grading scheme against the metropolia_v1 contract before it
- * is stored on a syllabus template. The vocabulary mirrors what
- * {@see MetropoliaV1Calculator} can actually execute, so a scheme that passes
- * validation is guaranteed to be runnable by the engine.
+ * Validates a single grading scheme against the engine contract it declares
+ * before it is stored on a syllabus template. The vocabulary mirrors what the
+ * {@see MetropoliaV1Calculator} and {@see MetropoliaV2Calculator} can actually
+ * execute, so a scheme that passes validation is guaranteed runnable.
  *
  * Returns a flat list of human-readable error strings. An empty array means the
  * scheme is valid.
@@ -17,9 +19,15 @@ final class GradingSchemeValidator
 {
     private const REQUIRED_KEYS = ['engine', 'version', 'scale', 'components'];
 
+    private const VALID_ENGINES = ['metropolia_v1', 'metropolia_v2'];
+
     private const VALID_SCALES = ['0-5', 'pass_fail'];
 
     private const VALID_CONVERSION_TYPES = ['linear', 'threshold', 'direct', 'pass_fail'];
+
+    public function __construct(
+        private readonly SafeArithmeticEvaluator $evaluator = new SafeArithmeticEvaluator,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $scheme
@@ -35,8 +43,10 @@ final class GradingSchemeValidator
             }
         }
 
-        if (($scheme['engine'] ?? null) !== 'metropolia_v1') {
-            $errors[] = 'engine must be metropolia_v1';
+        $engine = $scheme['engine'] ?? null;
+
+        if (! in_array($engine, self::VALID_ENGINES, true)) {
+            $errors[] = 'engine must be one of '.implode(', ', self::VALID_ENGINES);
         }
 
         if (! in_array($scheme['scale'] ?? null, self::VALID_SCALES, true)) {
@@ -51,17 +61,118 @@ final class GradingSchemeValidator
             return array_values(array_unique($errors));
         }
 
-        foreach ($components as $index => $component) {
-            $errors = [...$errors, ...$this->validateComponent($index, $component)];
-        }
+        $errors = $engine === 'metropolia_v2'
+            ? [...$errors, ...$this->validateV2($scheme, $components)]
+            : [...$errors, ...$this->validateV1Components($components)];
 
         return array_values(array_unique($errors));
     }
 
     /**
+     * @param  array<int, mixed>  $components
      * @return array<int, string>
      */
-    private function validateComponent(int|string $index, mixed $component): array
+    private function validateV1Components(array $components): array
+    {
+        $errors = [];
+
+        foreach ($components as $index => $component) {
+            $errors = [...$errors, ...$this->validateV1Component($index, $component)];
+        }
+
+        return $errors;
+    }
+
+    /**
+     * @param  array<string, mixed>  $scheme
+     * @param  array<int, mixed>  $components
+     * @return array<int, string>
+     */
+    private function validateV2(array $scheme, array $components): array
+    {
+        $errors = [];
+
+        $declaredCodes = [];
+
+        foreach ($components as $index => $component) {
+            if (! is_array($component) || ! isset($component['code']) || ! is_string($component['code']) || $component['code'] === '') {
+                $errors[] = "components.{$index}.code is required";
+
+                continue;
+            }
+
+            $declaredCodes[] = $component['code'];
+        }
+
+        $formula = $scheme['formula'] ?? null;
+
+        if (! is_string($formula) || $formula === '') {
+            $errors[] = 'formula is required for metropolia_v2';
+
+            return $errors;
+        }
+
+        try {
+            $identifiers = $this->evaluator->identifiers($formula);
+            // Probe-evaluate with every declared code set to a sample value to
+            // catch structural errors (unbalanced parens, dangling operators).
+            $this->evaluator->evaluate($formula, array_fill_keys($declaredCodes, 1.0));
+        } catch (InvalidArgumentException $exception) {
+            $errors[] = 'formula is invalid: '.$exception->getMessage();
+
+            return $errors;
+        }
+
+        foreach ($identifiers as $identifier) {
+            if (! in_array($identifier, $declaredCodes, true)) {
+                $errors[] = "formula references undeclared component [{$identifier}]";
+            }
+        }
+
+        return [...$errors, ...$this->validatePassRequirements($scheme['pass_requirements'] ?? [], $declaredCodes)];
+    }
+
+    /**
+     * @param  array<int, string>  $declaredCodes
+     * @return array<int, string>
+     */
+    private function validatePassRequirements(mixed $requirements, array $declaredCodes): array
+    {
+        if ($requirements === [] || $requirements === null) {
+            return [];
+        }
+
+        if (! is_array($requirements)) {
+            return ['pass_requirements must be an array'];
+        }
+
+        $errors = [];
+
+        foreach ($requirements as $index => $requirement) {
+            if (! is_array($requirement)) {
+                $errors[] = "pass_requirements.{$index} must be an object";
+
+                continue;
+            }
+
+            $code = $requirement['code'] ?? null;
+
+            if (! is_string($code) || ! in_array($code, $declaredCodes, true)) {
+                $errors[] = "pass_requirements.{$index}.code must reference a declared component";
+            }
+
+            if (! $this->isNumeric($requirement['min_pct'] ?? null)) {
+                $errors[] = "pass_requirements.{$index}.min_pct must be numeric";
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function validateV1Component(int|string $index, mixed $component): array
     {
         if (! is_array($component)) {
             return ["components.{$index} must be an object"];
