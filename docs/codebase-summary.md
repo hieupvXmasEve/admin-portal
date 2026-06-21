@@ -51,8 +51,9 @@ Current counts:
 - AI module (`app/Modules/AI/`) now has provider settings and backend-only audit/evaluation foundations:
     - Provider settings table: `ai_provider_settings`
     - Audit/evaluation tables: `ai_conversations`, `ai_messages`, `ai_agent_traces`, `ai_tool_calls`, `ai_provider_usages`, `ai_feedback`, `ai_evaluation_cases`, `ai_evaluation_runs`, `ai_evaluation_results`
-    - Support services: `AiRedactor`, `AiAuditRecorder`, `AiProviderUsageRecorder`, `AiEvaluationRunner`
-    - Runtime boundary: no chat UI, metric tools, MCP exposure, write/action mode, or student/lecturer portal behavior yet.
+    - Support services: `AiRedactor`, `AiAuditRecorder`, `AiProviderUsageRecorder`, `AiEvaluationRunner`, `BusinessGlossary`, `MetricCatalog`, `QueryPlanValidator`
+    - Metric catalog/query-plan foundation: aggregate-only `metric-catalog:v1`, `query_metrics:v1` schema identity, `view_ai_metrics` permission, and deterministic staff metric evaluation cases exist before tool execution.
+    - Runtime boundary: no chat UI, `query_metrics` execution, MCP exposure, write/action mode, or student/lecturer portal behavior yet.
 - Academic progression baseline uses `academic_progression_events` as semantic history:
     - `ENGLISH_LEVEL_CHANGED` for EGC level changes (manual & auto progression)
     - `COURSE_STAGE_CHANGED` for stage transitions (e.g., `intake_pre_uni_gc` → `intake_course`)

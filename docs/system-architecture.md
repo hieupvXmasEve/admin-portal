@@ -253,11 +253,12 @@ Phase 1 guardrails:
 - Canonical recipient identity is `recipient_user_id` in `notification_messages`; non-user targets are resolved to user ids before message/delivery persist.
 - No legacy backfill in Phase 1: new tables are clean-slate and legacy `notifications` history is not migrated.
     - Current implementation baseline for new student-facing academic notifications is V2-only. Course completion, EGC completion/progression, EGC program completion, and course-stage transition notifications publish domain events and persist through the Notification V2 outbox pipeline.
-- AI: `app/Modules/AI` (provider settings plus audit/evaluation foundation)
+- AI: `app/Modules/AI` (provider settings, audit/evaluation foundation, metric catalog/query-plan validation)
     - Provider settings: `ai_provider_settings` stores one encrypted staff-owned provider setting per user with provider/model allowlists, key masking, cost limits, and provider test metadata.
     - Audit/evaluation foundation: `ai_conversations`, `ai_messages`, `ai_agent_traces`, `ai_tool_calls`, `ai_provider_usages`, `ai_feedback`, `ai_evaluation_cases`, `ai_evaluation_runs`, and `ai_evaluation_results`.
-    - Support services: `AiRedactor`, `AiAuditRecorder`, `AiProviderUsageRecorder`, and `AiEvaluationRunner`.
-    - Current boundary: backend-only product audit/evaluation records; no chat UI, metric tools, MCP exposure, write/action mode, or student/lecturer portal behavior.
+    - Metric catalog/query-plan foundation: code-defined aggregate MetricCatalog v1, business glossary subset, query-plan DTO/validator, `view_ai_metrics` permission, and deterministic staff metric evaluation cases.
+    - Support services: `AiRedactor`, `AiAuditRecorder`, `AiProviderUsageRecorder`, `AiEvaluationRunner`, `BusinessGlossary`, `MetricCatalog`, and `QueryPlanValidator`.
+    - Current boundary: backend-only product audit/evaluation and query-plan validation records; no chat UI, `query_metrics` execution, MCP exposure, write/action mode, or student/lecturer portal behavior.
 
 ## 7) Runtime Scheduled Commands
 

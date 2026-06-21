@@ -241,6 +241,9 @@ return [
         ],
 
         // AI Governance
+        'ai_metrics' => [
+            'view_ai_metrics' => 'view_ai_metrics',
+        ],
         'ai_provider_settings' => [
             'view_ai_provider_settings' => 'view_ai_provider_settings',
             'manage_ai_provider_settings' => 'manage_ai_provider_settings',

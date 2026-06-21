@@ -219,7 +219,7 @@ Acceptance criteria:
 - New academic notifications for students are persisted through Notification V2 tables, not legacy `notifications`.
 - Tuition transition logic reads `students.status` and `students.intake_major`.
 
-### FR-11 AI Provider Settings and Audit Foundation
+### FR-11 AI Provider Settings, Audit Foundation, and Metric Query Planning
 
 Code baseline:
 
@@ -232,6 +232,10 @@ Code baseline:
   evaluation runs, and evaluation results.
 - AI support services redact secrets and raw provider payloads before product
   audit/evaluation persistence.
+- AI metric catalog/query-plan foundation defines aggregate-only metric
+  contracts, business glossary mappings, query-plan validation, campus scope,
+  `view_ai_metrics` permission checks, source report identity, and deterministic
+  staff metric evaluation cases before any tool execution.
 
 Acceptance criteria:
 
@@ -240,6 +244,10 @@ Acceptance criteria:
   authorization headers, API keys, or unredacted tool/source payloads.
 - AI evaluation evidence can be recorded with deterministic fixtures and without
   live provider credentials.
+- AI query plans are allowlisted, aggregate-only, campus-scoped, permission
+  checked, and denied before execution when they contain SQL/table/column
+  payloads, unsupported filters/groupings, cross-campus scope, or unbounded
+  result requests.
 - No AI chat UI, business-data tool runtime, MCP exposure, write/action mode, or
   student/lecturer portal behavior is exposed by this foundation.
 
