@@ -399,7 +399,7 @@ export const mainNavGroups: NavGroup[] = [
     //                 { title: 'Sinh phí EGC', href: financeRoutes.feeGeneration.egcCharges(), icon: GraduationCap, requiredPermissions: ['generate_egc_finance_charges'] },
     //                 { title: 'EGC - Block Results', href: financeRoutes.feeGeneration.egcBlockResults(), icon: CheckSquare, requiredPermissions: ['view_egc_block_results'] },
     //                 { title: 'EGC - Retake Adjustments', href: financeRoutes.feeGeneration.egcRetakeAdjustments(), icon: TrendingUp, requiredPermissions: ['view_egc_retake_adjustments'] },
-                    
+
     //             ],
     //         },
     //         {
@@ -698,6 +698,12 @@ export const mainNavGroups: NavGroup[] = [
                         href: '/admin/canvas/integrations',
                         icon: Settings2,
                         requiredPermissions: ['view_canvas_integration'],
+                    },
+                    {
+                        title: 'Staff Copilot',
+                        href: systemRoutes.aiCopilot.index(),
+                        icon: MessageSquare,
+                        requiredPermissions: ['view_ai_metrics'],
                     },
                     {
                         title: 'AI Provider Settings',

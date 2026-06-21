@@ -219,7 +219,7 @@ Acceptance criteria:
 - New academic notifications for students are persisted through Notification V2 tables, not legacy `notifications`.
 - Tuition transition logic reads `students.status` and `students.intake_major`.
 
-### FR-11 AI Provider Settings, Audit Foundation, and Metric Query Planning
+### FR-11 AI Provider Settings, Audit Foundation, Metric Query Planning, and Staff Copilot
 
 Code baseline:
 
@@ -236,6 +236,12 @@ Code baseline:
   contracts, business glossary mappings, query-plan validation, campus scope,
   `view_ai_metrics` permission checks, source report identity, and deterministic
   staff metric evaluation cases before any tool execution.
+- AI staff copilot MVP exposes an internal `/ai/copilot` Inertia page and
+  `/ai/copilot/messages` form endpoint for staff with `view_ai_metrics`.
+- Staff copilot questions are deterministic in this slice: the browser submits
+  only a bounded natural-language question, backend planning maps it to
+  MetricCatalog v1/`query_metrics`, and answer props are rendered from audited
+  `QueryMetricsResult` evidence.
 
 Acceptance criteria:
 
@@ -248,8 +254,11 @@ Acceptance criteria:
   checked, and denied before execution when they contain SQL/table/column
   payloads, unsupported filters/groupings, cross-campus scope, or unbounded
   result requests.
-- No AI chat UI, business-data tool runtime, MCP exposure, write/action mode, or
-  student/lecturer portal behavior is exposed by this foundation.
+- Staff copilot answers that contain numbers or record facts cite source report,
+  normalized filters, campus scope, freshness, hidden sections, warnings, and
+  confidence.
+- No live provider prompt runtime, MCP exposure, write/action mode, source-row
+  dumps, or student/lecturer portal behavior is exposed by this MVP.
 
 ## 4) Non-Functional Requirements
 

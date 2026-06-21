@@ -28,6 +28,16 @@ export const SYSTEM_AI_PROVIDER_SETTINGS_ROUTE_PATHS = {
     KEY_DESTROY: '/ai/provider-settings/key',
 } as const;
 
+export const SYSTEM_AI_COPILOT_ROUTE_NAMES = {
+    INDEX: 'ai.copilot.index',
+    MESSAGES_STORE: 'ai.copilot.messages.store',
+} as const;
+
+export const SYSTEM_AI_COPILOT_ROUTE_PATHS = {
+    INDEX: '/ai/copilot',
+    MESSAGES_STORE: '/ai/copilot/messages',
+} as const;
+
 export const SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES = {
     INDEX: 'system.email-configuration.index',
     TEMPLATES: 'system.email-templates.index',

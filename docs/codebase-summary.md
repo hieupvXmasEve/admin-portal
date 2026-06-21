@@ -48,14 +48,15 @@ Current counts:
     - Actions: `PublishDomainEventAction`, `DispatchOutboxBatchAction`, `SendManualNotificationV2Action`, retry actions
     - Channels: `EmailChannelAdapter`, `RealtimeChannelAdapter`
     - Email configuration: `email_configurations` table is campus-scoped (`nullable campus_id`); email dispatch resolves campus-specific SMTP config with fallback to global config
-- AI module (`app/Modules/AI/`) now has provider settings, backend-only audit/evaluation foundations, metric catalog/query-plan validation, and internal query-metrics tool execution:
+- AI module (`app/Modules/AI/`) now has provider settings, audit/evaluation foundations, metric catalog/query-plan validation, internal query-metrics tool execution, and the first staff copilot chat surface:
     - Provider settings table: `ai_provider_settings`
     - Audit/evaluation tables: `ai_conversations`, `ai_messages`, `ai_agent_traces`, `ai_tool_calls`, `ai_provider_usages`, `ai_feedback`, `ai_evaluation_cases`, `ai_evaluation_runs`, `ai_evaluation_results`
     - Support services: `AiRedactor`, `AiAuditRecorder`, `AiProviderUsageRecorder`, `AiEvaluationRunner`, `BusinessGlossary`, `MetricCatalog`, `QueryPlanValidator`, `ToolRegistry`, `ToolDispatcher`, `QueryMetricsTool`, and MetricCatalog v1 resolvers.
     - Metric catalog/query-plan foundation: aggregate-only `metric-catalog:v1`, `query_metrics:v1` schema identity, `view_ai_metrics` permission, deterministic staff metric evaluation cases, and validated QueryPlan contracts.
     - Query metrics tool MVP: internal read-only `query_metrics` execution returns bounded aggregate output with normalized filters, grouped summaries, source references, warnings/confidence, and AI tool-call audit for completed, denied, failed, or partial results.
+    - Staff copilot MVP: `/ai/copilot` and `/ai/copilot/messages` are gated by `view_ai_metrics`, use deterministic `StaffCopilotAgentRunner` planning over MetricCatalog v1, persist conversation/message/trace/tool-call evidence, and render structured source-cited answer props in `resources/js/pages/AI/StaffCopilot/Index.vue`.
     - Cross-module source reads for AI metrics go through shared contracts (`App\Shared\Contracts\Academic\AiAcademicMetricReader`, `App\Shared\Contracts\Finance\AiFinanceMetricReader`) and thin adapters in the owning Academic/Finance modules.
-    - Runtime boundary: no chat UI, provider prompt runtime, MCP exposure, write/action mode, or student/lecturer portal behavior yet.
+    - Runtime boundary: deterministic staff metric chat only; no live provider prompt runtime, MCP exposure, write/action mode, raw source-row exposure, or student/lecturer portal behavior yet.
 - Academic progression baseline uses `academic_progression_events` as semantic history:
     - `ENGLISH_LEVEL_CHANGED` for EGC level changes (manual & auto progression)
     - `COURSE_STAGE_CHANGED` for stage transitions (e.g., `intake_pre_uni_gc` → `intake_course`)

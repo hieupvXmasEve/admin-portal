@@ -163,8 +163,12 @@ class QueryMetricsResult
         return [
             'allowed' => $this->allowed,
             'metric' => $this->metric,
+            'normalized_filters' => $this->normalizedFilters,
+            'group_by' => $this->groupBy,
             'summary' => $this->summary,
+            'groups' => $this->groups,
             'group_count' => count($this->groups),
+            'freshness' => $this->freshness,
             'warnings' => $this->warnings,
             'confidence' => $this->confidence,
             'safe_error_code' => $this->safeErrorCode,
