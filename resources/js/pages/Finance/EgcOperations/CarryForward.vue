@@ -9,9 +9,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useInertiaFilters } from '@/composables/useInertiaFilters';
+import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { AlertTriangle, ArrowRightLeft, CheckCircle2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -72,16 +71,7 @@ const props = defineProps<{
     filters: { semester_id: string | null };
 }>();
 
-const { filters } = useInertiaFilters({
-    baseUrl: route('finance.egc.carry-forward.index'),
-    initialFilters: {
-        semester_id: props.filters.semester_id ?? String(props.currentSemester?.id ?? ''),
-    },
-    defaultValues: {
-        semester_id: String(props.currentSemester?.id ?? ''),
-    },
-    only: ['candidates', 'filters'],
-});
+const { selectedLabel } = useFinanceSemester();
 
 const confirmDialog = ref(false);
 const confirmingCandidate = ref<Candidate | null>(null);
@@ -125,7 +115,7 @@ function formatUnusedCharges(candidate: Candidate): string {
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-2xl font-bold">EGC Carry Forward</h1>
-                <p class="text-muted-foreground text-sm">Release unused paid EGC charges back to unapplied balance for transitioned students</p>
+                <p class="text-muted-foreground text-sm">Release unused paid EGC charges back to unapplied balance for transitioned students · {{ selectedLabel }}</p>
             </div>
             <div class="text-right">
                 <div class="text-muted-foreground text-sm">Eligible release total</div>
@@ -133,20 +123,7 @@ function formatUnusedCharges(candidate: Candidate): string {
             </div>
         </div>
 
-        <Card>
-            <CardContent class="pt-4">
-                <Select :model-value="filters.semester_id" @update:model-value="(value) => (filters.semester_id = value)">
-                    <SelectTrigger class="w-48">
-                        <SelectValue placeholder="Select semester" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem v-for="sem in semesters" :key="sem.id" :value="String(sem.id)">
-                            {{ sem.name }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
-            </CardContent>
-        </Card>
+
 
         <Card v-if="candidates.eligible.length > 0">
             <CardHeader>

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useDataTable } from '@/composables/useDataTable';
+import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import { Head, useForm } from '@inertiajs/vue3';
 import { AlertCircle, AlertTriangle, Play, RefreshCw, Search } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -95,17 +96,17 @@ const props = defineProps<{
 }>();
 
 interface EgcChargeFilters {
-    semester_id: string;
     search: string;
     ignore_student_ids: string;
     per_page: number;
     page: number;
 }
 
+const { selectedId, selectedLabel } = useFinanceSemester();
+
 const { filters, setFilter, handleSearch, handlePaginationNavigate, handlePageSizeChange } = useDataTable<EgcChargeFilters>({
     baseUrl: route('finance.egc.charges.index'),
     initialFilters: {
-        semester_id: props.filters.semester_id ?? String(props.currentSemester?.id ?? ''),
         search: props.filters.search ?? '',
         ignore_student_ids: props.filters.ignore_student_ids ?? '',
         per_page: props.filters.per_page ?? 20,
@@ -118,8 +119,6 @@ const { filters, setFilter, handleSearch, handlePaginationNavigate, handlePageSi
         page: 1,
     },
     only: ['preview', 'filters', 'currentSemester'],
-    // Semester is a select → navigate immediately; search/ignore-list stay debounced.
-    immediateFields: ['semester_id'],
 });
 
 // UI-SAFE-3: a block-count override is entered per student per page, but the
@@ -193,11 +192,6 @@ function clearOverrides() {
     overrides.value = {};
 }
 
-function handleSemesterChange(value: string) {
-    clearOverrides();
-    setFilter('semester_id', value);
-}
-
 function handleSearchChange(value: string | number) {
     clearOverrides();
     handleSearch(value);
@@ -219,7 +213,7 @@ const form = useForm({
 });
 
 function confirmGeneration() {
-    form.semester_id = filters.semester_id;
+    form.semester_id = selectedId.value ? String(selectedId.value) : '';
     form.due_date = dueDate.value;
     form.search = filters.search;
     form.ignore_student_ids = filters.ignore_student_ids;
@@ -265,23 +259,12 @@ function rowNumber(index: number): number {
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-2xl font-bold">EGC Generate Charges</h1>
-                <p class="text-muted-foreground text-sm">Filter trên backend, preview theo điều kiện hiện tại, rồi tạo charge theo đúng tập lọc.</p>
+                <p class="text-muted-foreground text-sm">Filter trên backend, preview theo điều kiện hiện tại, rồi tạo charge theo đúng tập lọc. · {{ selectedLabel }}</p>
             </div>
         </div>
 
         <Card>
             <CardContent class="flex flex-wrap gap-4 pt-4">
-                <Select :model-value="filters.semester_id" @update:model-value="handleSemesterChange">
-                    <SelectTrigger class="w-52">
-                        <SelectValue placeholder="Select semester" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem v-for="sem in semesters" :key="sem.id" :value="String(sem.id)">
-                            {{ sem.name }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
-
                 <div class="relative min-w-72 flex-1">
                     <Search class="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
                     <Input
@@ -302,7 +285,7 @@ function rowNumber(index: number): number {
             </CardContent>
         </Card>
 
-        <template v-if="filters.semester_id">
+        <template v-if="selectedId">
             <div class="grid grid-cols-3 gap-4">
                 <Card>
                     <CardContent class="pt-6">

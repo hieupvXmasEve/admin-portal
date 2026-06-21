@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useDataTable } from '@/composables/useDataTable';
+import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import { useLookupSelection } from '@/composables/useLookupSelection';
 import { usePermission } from '@/composables/usePermission';
 import type { PaginatedResponse } from '@/types';
@@ -51,6 +52,7 @@ const props = defineProps<{
 
 const permission = usePermission();
 const sel = useLookupSelection();
+const { selectedLabel } = useFinanceSemester();
 
 const chargesIndexRoute = computed(() => (props.student ? route('finance.students.charges', props.student.id) : financeRoutes.lookup.chargeLedger()));
 
@@ -63,7 +65,6 @@ const { filters, setFilter, handleSearch, handleSortChange, handlePaginationNavi
     initialFilters: {
         search: props.filters.search ?? '',
         student_id: props.filters.student_id ?? null,
-        semester_id: props.filters.semester_id ?? null,
         charge_type: props.filters.charge_type ?? 'all',
         status: props.filters.status ?? 'all',
         sort: props.filters.sort ?? null,
@@ -101,7 +102,7 @@ function openStudent(row: ChargeRow): void {
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-3xl font-bold tracking-tight">Finance Charges</h1>
-                <p class="text-muted-foreground mt-1">{{ pageDescription }}</p>
+                <p class="text-muted-foreground mt-1">{{ pageDescription }} · {{ selectedLabel }}</p>
             </div>
             <Link :href="createChargeRoute">
                 <Button>
@@ -124,17 +125,6 @@ function openStudent(row: ChargeRow): void {
                     <SelectItem value="all">Mọi trạng thái</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="void">Void</SelectItem>
-                </SelectContent>
-            </Select>
-            <Select :model-value="String(filters.semester_id ?? 'all')" @update:model-value="(value) => setFilter('semester_id', value === 'all' ? null : Number(value))">
-                <SelectTrigger class="w-44">
-                    <SelectValue placeholder="Học kỳ" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">Mọi kỳ</SelectItem>
-                    <SelectItem v-for="semester in semesters" :key="semester.id" :value="String(semester.id)">
-                        {{ semester.name }}
-                    </SelectItem>
                 </SelectContent>
             </Select>
             <Select :model-value="filters.charge_type" @update:model-value="(value) => setFilter('charge_type', String(value))">

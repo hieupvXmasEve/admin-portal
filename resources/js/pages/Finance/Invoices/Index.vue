@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useDataTable } from '@/composables/useDataTable';
+import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import { useLookupSelection } from '@/composables/useLookupSelection';
 import { usePermission } from '@/composables/usePermission';
 import type { PaginatedResponse } from '@/types';
@@ -50,12 +51,12 @@ const props = defineProps<{
 
 const permission = usePermission();
 const sel = useLookupSelection();
+const { selectedLabel } = useFinanceSemester();
 
 const { filters, setFilter, handleSearch, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection } = useDataTable<InvoiceFilters>({
     baseUrl: financeRoutes.lookup.invoices(),
     initialFilters: {
         search: props.filters.search ?? '',
-        semester_id: props.filters.semester_id ?? null,
         status: props.filters.status ?? 'all',
         sort: props.filters.sort ?? null,
         direction: props.filters.direction ?? null,
@@ -87,8 +88,6 @@ function handleExport(): void {
     const params = new URLSearchParams();
     if (filters.search) params.append('search', filters.search);
     if (filters.status && filters.status !== 'all') params.append('status', filters.status);
-    if (filters.semester_id) params.append('semester_id', String(filters.semester_id));
-
     window.location.href = `${route('finance.invoices.export')}?${params.toString()}`;
 }
 
@@ -115,7 +114,7 @@ function getStatusBadgeVariant(status: string): 'default' | 'destructive' | 'out
         <div class="flex items-center justify-between">
             <div>
                 <h2 class="text-3xl font-bold tracking-tight">Invoices</h2>
-                <p class="text-muted-foreground">Tra cứu invoice — sort, filter, chọn nhiều dòng để Batch Studio.</p>
+                <p class="text-muted-foreground">Tra cứu invoice — sort, filter, chọn nhiều dòng để Batch Studio. · {{ selectedLabel }}</p>
             </div>
             <Button variant="outline" @click="handleExport">
                 <FileDown class="mr-2 h-4 w-4" />

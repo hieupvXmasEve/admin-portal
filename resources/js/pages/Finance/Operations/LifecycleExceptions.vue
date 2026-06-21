@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useDataTable } from '@/composables/useDataTable';
+import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { PaginatedResponse } from '@/types';
 import { formatCurrency, type Semester } from '@/types/finance';
@@ -107,6 +108,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const { selectedLabel } = useFinanceSemester();
 
 const filterProps = props.filters && !Array.isArray(props.filters) ? props.filters : {};
 const stringFilter = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null);
@@ -130,7 +132,6 @@ const {
 } = useDataTable<Filters>({
     baseUrl: route('finance.operations.lifecycle-exceptions'),
     initialFilters: {
-        semester_id: numberFilter(filterProps.semester_id),
         lifecycle_status: stringFilter(filterProps.lifecycle_status),
         review_status: stringFilter(filterProps.review_status) ?? 'open',
         due_status: stringFilter(filterProps.due_status) ?? 'all',
@@ -145,14 +146,13 @@ const {
         review_status: 'open',
         due_status: 'all',
         search: '',
-        semester_id: null,
         lifecycle_status: null,
         fee_type: null,
         sort: null,
         direction: null,
     },
     only: ['exceptions', 'filters', 'summary'],
-    immediateFields: ['semester_id', 'lifecycle_status', 'review_status', 'due_status'],
+    immediateFields: ['lifecycle_status', 'review_status', 'due_status'],
 });
 
 const selectedRow = ref<LifecycleExceptionRow | null>(null);
@@ -231,23 +231,12 @@ defineOptions({
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <h1 class="text-3xl font-bold tracking-tight">Lifecycle Exceptions</h1>
-                <p class="text-muted-foreground mt-1">Rà soát DNG đến hạn của sinh viên ngoài trạng thái thu phí bình thường</p>
+                <p class="text-muted-foreground mt-1">Rà soát DNG đến hạn của sinh viên ngoài trạng thái thu phí bình thường · {{ selectedLabel }}</p>
             </div>
             <div class="flex items-center gap-3">
                 <Link :href="route('finance.operations.due-calendar')">
                     <Button variant="outline">DNG Due Reminders</Button>
                 </Link>
-                <Select :model-value="tableFilters.semester_id ? String(tableFilters.semester_id) : 'all'" @update:model-value="(value) => setFilter('semester_id', value === 'all' ? null : Number(value))">
-                    <SelectTrigger class="w-[220px]">
-                        <SelectValue placeholder="Chọn học kỳ" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Tất cả học kỳ</SelectItem>
-                        <SelectItem v-for="sem in semesters" :key="sem.id" :value="String(sem.id)">
-                            {{ sem.name }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
             </div>
         </div>
 

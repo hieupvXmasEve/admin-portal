@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Lookup;
 
 use App\Models\StudentInvoice;
+use App\Modules\Finance\Support\FinanceSemesterContextResolver;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -28,7 +29,13 @@ final class ListStudentInvoicesQuery
             $query->forCampus((int) $campusId);
         }
 
-        $query->when($request->filled('semester_id'), fn ($q) => $q->forSemester((int) $request->input('semester_id')));
+        $semesterId = $request->filled('semester_id')
+            ? (int) $request->input('semester_id')
+            : FinanceSemesterContextResolver::selectedId();
+
+        if ($semesterId !== null) {
+            $query->forSemester($semesterId);
+        }
         $query->when($request->filled('search'), fn ($q) => $q->search((string) $request->input('search')));
 
         $status = $request->input('status');

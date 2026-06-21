@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import { financeRoutes } from '@/utils/routes';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import { ArrowRightLeft, BarChart3, CheckCircle2, DollarSign, Play, RefreshCw, TrendingUp } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { computed } from 'vue';
 
 interface Semester {
     id: number;
@@ -19,22 +19,16 @@ interface KpiStats {
     discounts_applied: number;
 }
 
-const props = defineProps<{
+defineProps<{
     stats: KpiStats;
     semesters: Semester[];
     currentSemester: Semester | null;
     filters: { semester_id: string | null };
 }>();
 
-const selectedSemesterId = ref(props.filters.semester_id ?? String(props.currentSemester?.id ?? ''));
+const { selectedId, selectedLabel } = useFinanceSemester();
 
-function onSemesterChange(val: string) {
-    selectedSemesterId.value = val;
-    router.visit(route('finance.egc.dashboard'), {
-        data: { semester_id: val },
-        preserveState: false,
-    });
-}
+const semesterQuery = computed(() => (selectedId.value ? { semester_id: selectedId.value } : {}));
 </script>
 
 <template>
@@ -44,18 +38,8 @@ function onSemesterChange(val: string) {
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-2xl font-bold">EGC Operations</h1>
-                <p class="text-muted-foreground text-sm">EGC student finance management dashboard</p>
+                <p class="text-muted-foreground text-sm">EGC student finance management dashboard · {{ selectedLabel }}</p>
             </div>
-            <Select :model-value="selectedSemesterId" @update:model-value="onSemesterChange">
-                <SelectTrigger class="w-48">
-                    <SelectValue placeholder="Select semester" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem v-for="sem in semesters" :key="sem.id" :value="String(sem.id)">
-                        {{ sem.name }}
-                    </SelectItem>
-                </SelectContent>
-            </Select>
         </div>
 
         <!-- KPI Cards -->
@@ -103,7 +87,7 @@ function onSemesterChange(val: string) {
 
         <!-- Quick Actions -->
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Link :href="financeRoutes.batchStudio.charges({ fee_category: 'egc', semester_id: selectedSemesterId })">
+            <Link :href="financeRoutes.batchStudio.charges({ fee_category: 'egc', ...semesterQuery })">
                 <Card class="hover:bg-muted/50 cursor-pointer transition-colors">
                     <CardContent class="flex items-center gap-3 pt-6">
                         <Play class="h-8 w-8 text-blue-500" />
@@ -115,7 +99,7 @@ function onSemesterChange(val: string) {
                 </Card>
             </Link>
 
-            <Link :href="route('finance.egc.block-results.index', { semester_id: selectedSemesterId })">
+            <Link :href="route('finance.egc.block-results.index', semesterQuery)">
                 <Card class="hover:bg-muted/50 cursor-pointer transition-colors">
                     <CardContent class="flex items-center gap-3 pt-6">
                         <TrendingUp class="h-8 w-8 text-green-500" />
@@ -127,7 +111,7 @@ function onSemesterChange(val: string) {
                 </Card>
             </Link>
 
-            <Link :href="route('finance.egc.retake-adjustments.index', { semester_id: selectedSemesterId })">
+            <Link :href="route('finance.egc.retake-adjustments.index', semesterQuery)">
                 <Card class="hover:bg-muted/50 cursor-pointer transition-colors">
                     <CardContent class="flex items-center gap-3 pt-6">
                         <RefreshCw class="h-8 w-8 text-orange-500" />
@@ -139,7 +123,7 @@ function onSemesterChange(val: string) {
                 </Card>
             </Link>
 
-            <Link :href="route('finance.egc.carry-forward.index', { semester_id: selectedSemesterId })">
+            <Link :href="route('finance.egc.carry-forward.index', semesterQuery)">
                 <Card class="hover:bg-muted/50 cursor-pointer transition-colors">
                     <CardContent class="flex items-center gap-3 pt-6">
                         <ArrowRightLeft class="h-8 w-8 text-purple-500" />

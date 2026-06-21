@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Semester;
 use App\Modules\Finance\Actions\Egc\ApplyEgcCarryForwardAction;
 use App\Modules\Finance\Queries\Egc\ListEgcCarryForwardCandidatesQuery;
+use App\Modules\Finance\Support\FinanceSemesterContextResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,15 +18,8 @@ class EgcCarryForwardController extends Controller
 {
     public function index(Request $request, ListEgcCarryForwardCandidatesQuery $query): Response
     {
-        $validated = $request->validate([
-            'semester_id' => 'nullable|integer|exists:semesters,id',
-        ]);
-
-        $currentSemester = Semester::where('is_active', true)->first();
         $currentCampusId = session('current_campus_id') ? (int) session('current_campus_id') : null;
-        $semesterId = isset($validated['semester_id'])
-            ? (int) $validated['semester_id']
-            : $currentSemester?->id;
+        $semesterId = FinanceSemesterContextResolver::selectedId();
 
         $candidates = $semesterId ? $query->handle($semesterId, $currentCampusId) : [
             'eligible' => [],
@@ -38,10 +32,8 @@ class EgcCarryForwardController extends Controller
         return Inertia::render('Finance/EgcOperations/CarryForward', [
             'candidates' => $candidates,
             'semesters' => $semesters,
-            'currentSemester' => $semesterId ? Semester::find($semesterId) : $currentSemester,
-            'filters' => [
-                'semester_id' => $semesterId ? (string) $semesterId : null,
-            ],
+            'currentSemester' => $semesterId ? Semester::find($semesterId) : null,
+            'filters' => [],
         ]);
     }
 

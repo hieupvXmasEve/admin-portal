@@ -9,6 +9,7 @@ use App\Models\Semester;
 use App\Modules\Finance\Actions\Egc\SyncEgcBlockResultsAction;
 use App\Modules\Finance\Queries\Egc\ListEgcBlockResultsQuery;
 use App\Modules\Finance\Queries\Egc\ListEgcRetakeAdjustmentsQuery;
+use App\Modules\Finance\Support\FinanceSemesterContextResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -22,18 +23,14 @@ class EgcBlockResultsController extends Controller
         ListEgcRetakeAdjustmentsQuery $adjustmentsQuery,
     ): Response {
         $validated = $request->validate([
-            'semester_id' => 'nullable|integer|exists:semesters,id',
             'search' => 'nullable|string|max:100',
             'result' => 'nullable|string|in:all,pending,pass,fail',
             'per_page' => 'nullable|integer|in:20,50,100',
             'page' => 'nullable|integer|min:1',
         ]);
 
-        $currentSemester = Semester::where('is_active', true)->first();
         $currentCampusId = session('current_campus_id') ? (int) session('current_campus_id') : null;
-        $semesterId = isset($validated['semester_id'])
-            ? (int) $validated['semester_id']
-            : $currentSemester?->id;
+        $semesterId = FinanceSemesterContextResolver::selectedId();
 
         $blocks = $semesterId ? $query->handle($semesterId, $validated, $currentCampusId) : collect();
         $adjustments = $semesterId ? $adjustmentsQuery->handle($semesterId, $currentCampusId) : [
@@ -48,9 +45,8 @@ class EgcBlockResultsController extends Controller
             'blocks' => $blocks,
             'adjustments' => $adjustments,
             'semesters' => $semesters,
-            'currentSemester' => $semesterId ? Semester::find($semesterId) : $currentSemester,
+            'currentSemester' => $semesterId ? Semester::find($semesterId) : null,
             'filters' => [
-                'semester_id' => $semesterId ? (string) $semesterId : null,
                 'search' => $validated['search'] ?? '',
                 'result' => $validated['result'] ?? 'all',
                 'per_page' => (int) ($validated['per_page'] ?? 50),
@@ -75,7 +71,6 @@ class EgcBlockResultsController extends Controller
         Inertia::flash('success', $message);
         Inertia::flash('egc_reconciliation', $reconciliation);
 
-        return redirect()
-            ->route('finance.egc.block-results.index', ['semester_id' => $validated['semester_id']]);
+        return redirect()->route('finance.egc.block-results.index');
     }
 }

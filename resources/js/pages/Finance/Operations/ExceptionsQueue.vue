@@ -3,7 +3,6 @@ import DataPagination from '@/components/DataPagination.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
@@ -50,40 +49,12 @@ interface Props {
 
 const props = defineProps<Props>();
 const { showConfirmDialog } = useGlobalConfirmDialog();
-const { selectedId: globalSemesterId } = useFinanceSemester();
+const { selectedId: globalSemesterId, selectedLabel } = useFinanceSemester();
 
-const resolveInitialSemesterId = (): string => {
-    if (props.filters.semester_id === 'all') {
-        return 'all';
-    }
-
-    if (props.filters.semester_id) {
-        return props.filters.semester_id;
-    }
-
-    if (props.currentSemester?.id) {
-        return String(props.currentSemester.id);
-    }
-
-    if (globalSemesterId.value) {
-        return String(globalSemesterId.value);
-    }
-
-    return 'all';
-};
-
-// Local filter state — default aligns with finance topbar semester context
-const semesterId = ref(resolveInitialSemesterId());
+// Semester is driven by the global top-bar SemesterSwitcher (shared `semester` prop).
 const activeTab = ref(props.filters.type || 'all');
 
-watch(
-    () => [props.filters.semester_id, props.currentSemester?.id, globalSemesterId.value] as const,
-    () => {
-        semesterId.value = resolveInitialSemesterId();
-    },
-);
-
-watch([semesterId, activeTab], () => {
+watch(activeTab, () => {
     applyFilters();
 });
 
@@ -91,7 +62,6 @@ const applyFilters = () => {
     router.get(
         route('finance.operations.exceptions'),
         {
-            semester_id: semesterId.value !== 'all' ? semesterId.value : 'all',
             type: activeTab.value !== 'all' ? activeTab.value : undefined,
         },
         { preserveState: true, preserveScroll: true },
@@ -192,7 +162,7 @@ const runFixException = async (exception: ExceptionItem) => {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
             },
             body: JSON.stringify({
-                semester_id: semesterId.value !== 'all' ? Number(semesterId.value) : undefined,
+                semester_id: globalSemesterId.value ?? undefined,
             }),
         });
 
@@ -251,20 +221,7 @@ defineOptions({
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-3xl font-bold tracking-tight">Billing Exceptions</h1>
-                <p class="text-muted-foreground mt-1">Hàng đợi các trường hợp thiếu dữ liệu billing</p>
-            </div>
-            <div class="flex items-center gap-3">
-                <Select v-model="semesterId">
-                    <SelectTrigger class="w-[200px]">
-                        <SelectValue placeholder="Chọn học kỳ" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Tất cả học kỳ</SelectItem>
-                        <SelectItem v-for="sem in semesters" :key="sem.id" :value="String(sem.id)">
-                            {{ sem.name }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
+                <p class="text-muted-foreground mt-1">Hàng đợi các trường hợp thiếu dữ liệu billing · {{ selectedLabel }}</p>
             </div>
         </div>
 

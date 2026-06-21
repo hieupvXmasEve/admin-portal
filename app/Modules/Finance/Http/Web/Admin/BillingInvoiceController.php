@@ -14,6 +14,7 @@ use App\Modules\Finance\Http\Export\InvoiceExport;
 use App\Modules\Finance\Http\Requests\Lookup\FilterStudentInvoicesRequest;
 use App\Modules\Finance\Queries\Lookup\ListStudentInvoicesQuery;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\FinanceSemesterContextResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -31,7 +32,10 @@ class BillingInvoiceController extends Controller
     ) {
         return Inertia::render('Finance/Invoices/Index', [
             'invoices' => $query->handle($request)['items'],
-            'filters' => $request->only(['search', 'semester_id', 'status', 'sort', 'direction', 'per_page']),
+            'filters' => array_merge(
+                $request->only(['search', 'status', 'sort', 'direction', 'per_page']),
+                ['semester_id' => FinanceSemesterContextResolver::selectedId()],
+            ),
         ]);
     }
 

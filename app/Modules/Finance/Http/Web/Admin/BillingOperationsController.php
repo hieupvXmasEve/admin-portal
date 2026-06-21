@@ -15,6 +15,7 @@ use App\Modules\Finance\Queries\Operations\GetDueItemsSummaryQuery;
 use App\Modules\Finance\Queries\Operations\ListBillingExceptionsQuery;
 use App\Modules\Finance\Queries\Operations\ListDueItemsQuery;
 use App\Modules\Finance\Queries\Operations\ListExamResitHandoffQuery;
+use App\Modules\Finance\Support\FinanceSemesterContextResolver;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -29,7 +30,6 @@ class BillingOperationsController extends Controller
         GetBillingDashboardStudentsQuery $studentsQuery
     ): Response {
         $validated = $request->validate([
-            'semester_id' => 'nullable|integer|exists:semesters,id',
             'status' => 'nullable|string',
             'stage' => 'nullable|string',
             'defer' => 'nullable|string',
@@ -41,13 +41,8 @@ class BillingOperationsController extends Controller
             'direction' => 'nullable|string|in:asc,desc',
         ]);
 
-        $currentSemester = Semester::where('is_active', true)->first();
-
-        $semesterId = isset($validated['semester_id'])
-            ? (int) $validated['semester_id']
-            : ($currentSemester?->id);
-
-        $currentSemesterObj = $semesterId ? Semester::find($semesterId) : $currentSemester;
+        $semesterId = FinanceSemesterContextResolver::selectedId();
+        $currentSemesterObj = $semesterId ? Semester::find($semesterId) : null;
 
         $kpiStats = $statsQuery->handle($semesterId);
         $students = $studentsQuery->handle($semesterId, $validated);
@@ -59,7 +54,6 @@ class BillingOperationsController extends Controller
             'semesters' => $semesters,
             'currentSemester' => $currentSemesterObj,
             'filters' => [
-                'semester_id' => $semesterId ? (string) $semesterId : null,
                 'status' => $validated['status'] ?? 'all',
                 'stage' => $validated['stage'] ?? 'all',
                 'defer' => $validated['defer'] ?? 'all',
@@ -105,11 +99,10 @@ class BillingOperationsController extends Controller
         ListBillingExceptionsQuery $listQuery
     ): Response {
         $validated = $request->validate([
-            'semester_id' => 'nullable',
             'type' => 'nullable|string',
         ]);
 
-        [$semesterId, $semesterFilter] = $this->resolveExceptionsSemesterFilter($request);
+        [$semesterId, $semesterFilter] = $this->resolveExceptionsSemesterFilter();
         $type = $validated['type'] ?? 'all';
 
         $currentSemester = $semesterId ? Semester::find($semesterId) : null;
@@ -146,7 +139,7 @@ class BillingOperationsController extends Controller
         // Semester is driven by the global top-bar SemesterSwitcher (session-backed,
         // active-semester fallback) — same source as the shared `semester` prop —
         // not a per-page select.
-        $semesterId = $this->resolveSelectedSemesterId();
+        $semesterId = FinanceSemesterContextResolver::selectedId();
         $status = $validated['status'] ?? 'all';
         $search = $validated['search'] ?? '';
         $source = $validated['source'] ?? null;
@@ -183,45 +176,13 @@ class BillingOperationsController extends Controller
     /**
      * @return array{0: ?int, 1: ?string} [semesterId for queries, filter value for UI]
      */
-    private function resolveExceptionsSemesterFilter(Request $request): array
+    private function resolveExceptionsSemesterFilter(): array
     {
-        if (! $request->has('semester_id')) {
-            $selectedId = $this->resolveSelectedSemesterId();
+        $selectedId = FinanceSemesterContextResolver::selectedId();
 
-            return [
-                $selectedId,
-                $selectedId !== null ? (string) $selectedId : null,
-            ];
-        }
-
-        $raw = $request->query('semester_id');
-        if ($raw === null || $raw === '' || $raw === 'all') {
-            return [null, 'all'];
-        }
-
-        $id = filter_var($raw, FILTER_VALIDATE_INT);
-        if ($id === false || ! Semester::query()->whereKey($id)->exists()) {
-            $selectedId = $this->resolveSelectedSemesterId();
-
-            return [
-                $selectedId,
-                $selectedId !== null ? (string) $selectedId : null,
-            ];
-        }
-
-        return [(int) $id, (string) $id];
-    }
-
-    private function resolveSelectedSemesterId(): ?int
-    {
-        $selectedId = session('current_semester_id');
-
-        if ($selectedId !== null) {
-            return (int) $selectedId;
-        }
-
-        $activeId = Semester::query()->where('is_active', true)->value('id');
-
-        return $activeId !== null ? (int) $activeId : null;
+        return [
+            $selectedId,
+            $selectedId !== null ? (string) $selectedId : null,
+        ];
     }
 }

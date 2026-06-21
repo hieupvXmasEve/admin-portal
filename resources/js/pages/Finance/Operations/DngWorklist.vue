@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useDataTable } from '@/composables/useDataTable';
+import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import type { PaginatedResponse } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { AlertTriangle, ArrowLeft, CalendarIcon, ChevronDown, ChevronRight, Send } from 'lucide-vue-next';
@@ -101,6 +102,7 @@ interface Props {
 // ---------------------------------------------------------------------------
 
 const props = defineProps<Props>();
+const { selectedId, selectedLabel } = useFinanceSemester();
 
 const expandedRows = ref<Set<number>>(new Set());
 const amountOverrides = ref<Record<number, number>>({});
@@ -125,7 +127,6 @@ const { filters, hasActiveFilters, clearAllFilters, handleSearch, handlePaginati
             dng_fee_type: props.filters.dng_fee_type ?? 'HP',
             search: props.filters.search ?? '',
             campus_id: props.filters.campus_id ?? null,
-            semester_id: props.filters.semester_id ?? null,
             dng_status: props.filters.dng_status ?? 'all',
             per_page: props.filters.per_page ?? 50,
             sort: props.filters.sort ?? null,
@@ -135,7 +136,6 @@ const { filters, hasActiveFilters, clearAllFilters, handleSearch, handlePaginati
             dng_fee_type: 'HP',
             search: '',
             campus_id: null,
-            semester_id: null,
             dng_status: 'all',
             per_page: 50,
             sort: null,
@@ -143,7 +143,7 @@ const { filters, hasActiveFilters, clearAllFilters, handleSearch, handlePaginati
         },
         only: ['students', 'summary', 'filters'],
         debounce: 300,
-        immediateFields: ['dng_fee_type', 'campus_id', 'semester_id', 'dng_status'],
+        immediateFields: ['dng_fee_type', 'campus_id', 'dng_status'],
     });
 
 // ---------------------------------------------------------------------------
@@ -154,7 +154,7 @@ const pushForm = useForm({
     student_ids: [] as number[],
     dng_fee_type: props.filters.dng_fee_type ?? 'HP',
     due_date: '',
-    semester_id: props.filters.semester_id ?? null,
+    semester_id: selectedId.value,
     description: '',
     estimate_time: estimateTime.value,
     amount_overrides: {} as Record<number, number>,
@@ -253,7 +253,7 @@ const openPushDialog = () => {
     pushForm.student_ids = [...selectedIds.value];
     pushForm.dng_fee_type = filters.dng_fee_type;
     pushForm.amount_overrides = { ...amountOverrides.value };
-    pushForm.semester_id = filters.semester_id ?? null;
+    pushForm.semester_id = selectedId.value;
     pushForm.estimate_time = estimateTime.value;
     pushForm.due_date = '';
     pushForm.description = '';
@@ -338,6 +338,7 @@ const dngStatusOptions = [
                 </Link>
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight">DNG Worklist</h1>
+                    <p class="text-muted-foreground text-sm">{{ selectedLabel }}</p>
                     <p class="text-muted-foreground text-sm">
                         Tạo yêu cầu thanh toán DNG từ khoản phí thực tế — tất cả DNG được liên kết đến charge nguồn.
                     </p>
@@ -419,7 +420,7 @@ const dngStatusOptions = [
             </CardHeader>
             <CardContent class="space-y-4">
                 <!-- Filters -->
-                <FilterPanel :has-active-filters="hasActiveFilters" :columns="4" @clear="clearAllFilters">
+                <FilterPanel :has-active-filters="hasActiveFilters" :columns="3" @clear="clearAllFilters">
                     <FilterSearchInput
                         :model-value="filters.search ?? ''"
                         placeholder="Tìm sinh viên..."
@@ -433,14 +434,6 @@ const dngStatusOptions = [
                         all-label="Tất cả campus"
                         @update:model-value="(v) => setFilter('campus_id', v ? Number(v) : null)"
                         @change="() => setFilter('campus_id', filters.campus_id)"
-                    />
-                    <FilterSelect
-                        :model-value="String(filters.semester_id ?? '')"
-                        :options="props.semesters.map((s) => ({ value: String(s.id), label: s.name }))"
-                        placeholder="Kỳ học"
-                        all-label="Tất cả kỳ"
-                        @update:model-value="(v) => setFilter('semester_id', v ? Number(v) : null)"
-                        @change="() => setFilter('semester_id', filters.semester_id)"
                     />
                     <FilterSelect
                         :model-value="filters.dng_status ?? 'all'"
@@ -673,19 +666,10 @@ const dngStatusOptions = [
                     <p v-if="pushForm.errors.due_date" class="text-xs text-red-500">{{ pushForm.errors.due_date }}</p>
                 </div>
 
-                <!-- Semester -->
+                <!-- Semester (global top-bar context) -->
                 <div class="space-y-2">
-                    <Label>Kỳ học <span class="text-red-500">*</span></Label>
-                    <Select v-model="pushForm.semester_id">
-                        <SelectTrigger :class="{ 'border-red-400': pushForm.errors.semester_id }">
-                            <SelectValue placeholder="Chọn kỳ học" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem v-for="s in props.semesters" :key="s.id" :value="s.id">
-                                {{ s.name }} ({{ s.code }})
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <Label>Kỳ học</Label>
+                    <p class="text-sm font-medium">{{ selectedLabel }}</p>
                     <p v-if="pushForm.errors.semester_id" class="text-xs text-red-500">{{ pushForm.errors.semester_id }}</p>
                 </div>
 

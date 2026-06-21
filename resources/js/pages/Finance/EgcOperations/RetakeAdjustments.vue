@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useInertiaFilters } from '@/composables/useInertiaFilters';
+import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import { Head, useForm } from '@inertiajs/vue3';
 import { CheckCircle2 } from 'lucide-vue-next';
 import { ref, watchEffect } from 'vue';
@@ -61,16 +61,7 @@ const props = defineProps<{
     filters: { semester_id: string | null };
 }>();
 
-const { filters } = useInertiaFilters({
-    baseUrl: route('finance.egc.retake-adjustments.index'),
-    initialFilters: {
-        semester_id: props.filters.semester_id ?? String(props.currentSemester?.id ?? ''),
-    },
-    defaultValues: {
-        semester_id: String(props.currentSemester?.id ?? ''),
-    },
-    only: ['adjustments', 'filters'],
-});
+const { selectedLabel } = useFinanceSemester();
 
 const selectedTargets = ref<Record<number, string>>({});
 
@@ -127,25 +118,11 @@ function formatTargetLabel(target: TargetOption): string {
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-2xl font-bold">EGC Retake Adjustments</h1>
-                <p class="text-muted-foreground text-sm">Apply retake discounts for failed EGC blocks with valid target charges</p>
+                <p class="text-muted-foreground text-sm">Apply retake discounts for failed EGC blocks with valid target charges · {{ selectedLabel }}</p>
             </div>
         </div>
 
-        <!-- Semester Selector -->
-        <Card>
-            <CardContent class="pt-4">
-                <Select :model-value="filters.semester_id" @update:model-value="(value) => (filters.semester_id = value)">
-                    <SelectTrigger class="w-48">
-                        <SelectValue placeholder="Select semester" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem v-for="sem in semesters" :key="sem.id" :value="String(sem.id)">
-                            {{ sem.name }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
-            </CardContent>
-        </Card>
+
 
         <!-- Eligible with targets -->
         <Card v-if="adjustments.eligible_with_targets.length > 0">

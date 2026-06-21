@@ -20,6 +20,7 @@ use App\Modules\Finance\Exceptions\InvalidInstallmentPlanException;
 use App\Modules\Finance\Http\Requests\Charges\SplitChargeIntoInstallmentsRequest;
 use App\Modules\Finance\Http\Requests\Lookup\FilterFinanceChargesRequest;
 use App\Modules\Finance\Queries\Lookup\ListFinanceChargesQuery;
+use App\Modules\Finance\Support\FinanceSemesterContextResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -106,7 +107,7 @@ class FinanceChargeController extends Controller
             'filters' => [
                 'search' => $request->input('search', ''),
                 'student_id' => $selectedStudent?->id ?? ($request->filled('student_id') ? (int) $request->input('student_id') : null),
-                'semester_id' => $request->filled('semester_id') ? (int) $request->input('semester_id') : null,
+                'semester_id' => FinanceSemesterContextResolver::selectedId(),
                 'charge_type' => $request->input('charge_type', 'all'),
                 'status' => $request->input('status', 'all'),
                 'sort' => $request->input('sort'),

@@ -16,6 +16,7 @@ use App\Modules\Finance\Http\Requests\Operations\ListLifecycleDueExceptionsReque
 use App\Modules\Finance\Http\Requests\Operations\ResolveLifecycleDueExceptionRequest;
 use App\Modules\Finance\Queries\Operations\GetLifecycleDueExceptionSummaryQuery;
 use App\Modules\Finance\Queries\Operations\ListLifecycleDueExceptionsQuery;
+use App\Modules\Finance\Support\FinanceSemesterContextResolver;
 use App\Modules\Finance\Support\LifecycleDueItemPredicate;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\RedirectResponse;
@@ -41,10 +42,9 @@ class LifecycleDueExceptionController extends Controller
             'direction' => 'asc',
         ], $request->validated());
 
-        $semesterId = $validated['semester_id'] !== null ? (int) $validated['semester_id'] : null;
-        $currentSemester = $semesterId
-            ? Semester::find($semesterId)
-            : Semester::where('is_active', true)->first();
+        $semesterId = FinanceSemesterContextResolver::selectedId();
+        $validated['semester_id'] = $semesterId;
+        $currentSemester = $semesterId ? Semester::find($semesterId) : null;
 
         $summaryFilters = collect($validated)
             ->only(['fee_type', 'due_status', 'search'])

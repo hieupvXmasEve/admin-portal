@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import { Head, useForm } from '@inertiajs/vue3';
 import { AlertCircle, AlertTriangle, Play, RefreshCw, Search } from 'lucide-vue-next';
@@ -81,10 +82,11 @@ const props = defineProps<{
     filters: { semester_id: string | null; search: string; ignore_student_ids: string; per_page: number; page: number };
 }>();
 
+const { selectedId, selectedLabel } = useFinanceSemester();
+
 const { filters, handleSearch, handlePaginationNavigate, handlePageSizeChange } = useInertiaFilters({
     baseUrl: route('finance.major.charges.index'),
     initialFilters: {
-        semester_id: props.filters.semester_id ?? String(props.currentSemester?.id ?? ''),
         search: props.filters.search ?? '',
         ignore_student_ids: props.filters.ignore_student_ids ?? '',
         per_page: props.filters.per_page ?? 20,
@@ -117,11 +119,6 @@ const totalNet = computed(() =>
     eligibleStudents.value.reduce((sum, student) => sum + (student.net_amount ?? student.amount ?? 0), 0),
 );
 
-function handleSemesterChange(value: string) {
-    filters.semester_id = value;
-    filters.page = 1;
-}
-
 function handleSearchChange(value: string | number) {
     handleSearch(value);
     filters.page = 1;
@@ -142,7 +139,7 @@ const form = useForm({
 });
 
 function confirmGeneration() {
-    form.semester_id = filters.semester_id;
+    form.semester_id = selectedId.value ? String(selectedId.value) : '';
     form.due_date = dueDate.value;
     form.search = filters.search;
     form.ignore_student_ids = filters.ignore_student_ids;
@@ -183,24 +180,13 @@ function rowNumber(index: number): number {
             <div>
                 <h1 class="text-2xl font-bold">Major — Generate Học phí HP</h1>
                 <p class="text-muted-foreground text-sm">
-                    Phát sinh HP theo kỳ cho sinh viên <code>intake_course</code>. Nếu kỳ đã có charge HP active thì không tạo lại.
+                    Phát sinh HP theo kỳ cho sinh viên <code>intake_course</code>. Nếu kỳ đã có charge HP active thì không tạo lại. · {{ selectedLabel }}
                 </p>
             </div>
         </div>
 
         <Card>
             <CardContent class="flex flex-wrap gap-4 pt-4">
-                <Select :model-value="filters.semester_id" @update:model-value="handleSemesterChange">
-                    <SelectTrigger class="w-52">
-                        <SelectValue placeholder="Select semester" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem v-for="sem in semesters" :key="sem.id" :value="String(sem.id)">
-                            {{ sem.name }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
-
                 <div class="relative min-w-72 flex-1">
                     <Search class="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
                     <Input

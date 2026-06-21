@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApi } from '@/composables/useApiRequest';
+import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import { type Semester } from '@/types/finance';
 import { Head } from '@inertiajs/vue3';
 import { AlertTriangle, CheckCircle2, Download, Upload } from 'lucide-vue-next';
@@ -44,10 +45,10 @@ interface Props {
 // ---------------------------------------------------------------------------
 
 const props = defineProps<Props>();
+const { selectedId, selectedLabel } = useFinanceSemester();
 
 // Form fields
 const selectedFeeType = ref('');
-const selectedSemesterId = ref('');
 const amount = ref('');
 const dueDate = ref('');
 const note = ref('');
@@ -68,7 +69,7 @@ function onFileChange(event: Event) {
 }
 
 async function onSubmit() {
-    if (!selectedFeeType.value || !selectedSemesterId.value || !amount.value || !dueDate.value || !csvFile.value) {
+    if (!selectedFeeType.value || !selectedId.value || !amount.value || !dueDate.value || !csvFile.value) {
         toast.error('Vui lòng điền đầy đủ thông tin và tải lên file CSV.');
         return;
     }
@@ -78,7 +79,7 @@ async function onSubmit() {
 
     const formData = new FormData();
     formData.append('fee_type', selectedFeeType.value);
-    formData.append('semester_id', selectedSemesterId.value);
+    formData.append('semester_id', String(selectedId.value));
     formData.append('amount', amount.value);
     formData.append('due_date', dueDate.value);
     formData.append('note', note.value);
@@ -128,9 +129,9 @@ function downloadTemplate() {
         <div>
             <h1 class="text-2xl font-bold">Tạo Non-Academic Charges</h1>
             <p class="text-muted-foreground mt-1 text-sm">
-                Upload danh sách mã sinh viên (CSV) để tạo phí hàng loạt.
+                Upload danh sách mã sinh viên (CSV) để tạo phí hàng loạt · {{ selectedLabel }}
                 <span v-if="props.currentCampus" class="font-medium">
-                    Campus: {{ props.currentCampus.name ?? props.currentCampus.id }}
+                    · Campus: {{ props.currentCampus.name ?? props.currentCampus.id }}
                 </span>
             </p>
         </div>
@@ -156,25 +157,6 @@ function downloadTemplate() {
                                     :value="ft.value"
                                 >
                                     {{ ft.label }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <!-- Semester -->
-                    <div class="space-y-1.5">
-                        <Label for="semester">Học kỳ <span class="text-destructive">*</span></Label>
-                        <Select v-model="selectedSemesterId">
-                            <SelectTrigger id="semester">
-                                <SelectValue placeholder="Chọn học kỳ" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem
-                                    v-for="s in props.semesters"
-                                    :key="s.id"
-                                    :value="String(s.id)"
-                                >
-                                    {{ s.name }}
                                 </SelectItem>
                             </SelectContent>
                         </Select>

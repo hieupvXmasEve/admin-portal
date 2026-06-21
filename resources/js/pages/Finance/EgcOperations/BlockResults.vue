@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useDataTable } from '@/composables/useDataTable';
+import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import { Head, useForm } from '@inertiajs/vue3';
 import { CheckCircle2, RefreshCw, Search } from 'lucide-vue-next';
 import { computed, ref, watchEffect } from 'vue';
@@ -79,7 +80,6 @@ interface EgcAdjustments {
 }
 
 interface EgcReconciliationFilters {
-    semester_id: string;
     search: string;
     result: string;
     per_page: number;
@@ -94,27 +94,27 @@ const props = defineProps<{
     filters: { semester_id: string | null; search: string; result: string; per_page?: number; page?: number };
 }>();
 
+const { selectedId, selectedLabel } = useFinanceSemester();
+
 const { filters, setFilter, handleSearch, handlePaginationNavigate, handlePageSizeChange } = useDataTable<EgcReconciliationFilters>({
     baseUrl: route('finance.egc.block-results.index'),
     initialFilters: {
-        semester_id: props.filters.semester_id ?? String(props.currentSemester?.id ?? ''),
         search: props.filters.search ?? '',
         result: props.filters.result ?? 'all',
         per_page: props.filters.per_page ?? 50,
         page: props.filters.page ?? 1,
     },
     defaultValues: {
-        semester_id: String(props.currentSemester?.id ?? ''),
         search: '',
         result: 'all',
         per_page: 50,
         page: 1,
     },
     only: ['blocks', 'adjustments', 'filters', 'currentSemester'],
-    immediateFields: ['semester_id', 'result', 'per_page'],
+    immediateFields: ['result', 'per_page'],
 });
 
-const syncForm = useForm({ semester_id: '' });
+const syncForm = useForm({ semester_id: 0 });
 const discountForm = useForm({ egc_block_id: 0, target_charge_id: 0 });
 const selectedTargets = ref<Record<number, string>>({});
 const confirmDialog = ref(false);
@@ -132,10 +132,6 @@ watchEffect(() => {
     }
 });
 
-function handleSemesterChange(value: string) {
-    setFilter('semester_id', value);
-}
-
 function handleResultChange(value: string) {
     setFilter('result', value);
 }
@@ -145,7 +141,11 @@ function handleSearchChange(value: string | number) {
 }
 
 function syncResults() {
-    syncForm.semester_id = filters.semester_id;
+    if (!selectedId.value) {
+        return;
+    }
+
+    syncForm.semester_id = selectedId.value;
     syncForm.post(route('finance.egc.block-results.sync'));
 }
 
@@ -200,9 +200,9 @@ function formatTargetLabel(target: TargetOption): string {
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <h1 class="text-2xl font-bold">EGC · Kết quả & học lại</h1>
-                <p class="text-muted-foreground text-sm">Sync block results, reconcile generated charges, and handle retake discounts in one workflow</p>
+                <p class="text-muted-foreground text-sm">Sync block results, reconcile generated charges, and handle retake discounts in one workflow · {{ selectedLabel }}</p>
             </div>
-            <Button :disabled="!filters.semester_id || syncForm.processing" variant="outline" @click="syncResults">
+            <Button :disabled="!selectedId || syncForm.processing" variant="outline" @click="syncResults">
                 <RefreshCw :class="['mr-2 h-4 w-4', syncForm.processing && 'animate-spin']" />
                 {{ syncForm.processing ? 'Syncing...' : 'Sync Results' }}
             </Button>
@@ -229,17 +229,6 @@ function formatTargetLabel(target: TargetOption): string {
 
         <Card>
             <CardContent class="flex flex-wrap gap-4 pt-4">
-                <Select :model-value="filters.semester_id" @update:model-value="handleSemesterChange">
-                    <SelectTrigger class="w-48">
-                        <SelectValue placeholder="Select semester" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem v-for="semester in semesters" :key="semester.id" :value="String(semester.id)">
-                            {{ semester.name }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
-
                 <Select :model-value="filters.result" @update:model-value="handleResultChange">
                     <SelectTrigger class="w-36">
                         <SelectValue placeholder="Result" />

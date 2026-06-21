@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { PaginatedResponse } from '@/types';
@@ -94,12 +94,12 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const { selectedLabel } = useFinanceSemester();
 
 // Use Inertia filters composable
 const { filters, handleSelectFilter, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection } = useInertiaFilters<DashboardFilters>({
     baseUrl: route('finance.operations.dashboard'),
     initialFilters: {
-        semester_id: typeof props.filters?.semester_id === 'string' ? props.filters.semester_id : null,
         status: (typeof props.filters?.status === 'string' ? props.filters.status : 'all') || 'all',
         stage: (typeof props.filters?.stage === 'string' ? props.filters.stage : 'all') || 'all',
         defer: (typeof props.filters?.defer === 'string' ? props.filters.defer : 'all') || 'all',
@@ -111,7 +111,6 @@ const { filters, handleSelectFilter, handleSortChange, handlePaginationNavigate,
         page: props.students.current_page || 1,
     },
     defaultValues: {
-        semester_id: null,
         status: 'all',
         stage: 'all',
         defer: 'all',
@@ -249,20 +248,7 @@ defineOptions({
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-3xl font-bold tracking-tight">Billing Dashboard</h1>
-                <p class="text-muted-foreground mt-1">Tổng quan billing theo kỳ học</p>
-            </div>
-            <div class="flex items-center gap-3">
-                <Select :model-value="filters.semester_id || 'all'" @update:model-value="(val) => handleSelectFilter('semester_id', val)">
-                    <SelectTrigger class="w-[200px]">
-                        <SelectValue placeholder="Chọn học kỳ" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Tất cả học kỳ</SelectItem>
-                        <SelectItem v-for="sem in semesters" :key="sem.id" :value="String(sem.id)">
-                            {{ sem.name }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
+                <p class="text-muted-foreground mt-1">Tổng quan billing theo kỳ học · {{ selectedLabel }}</p>
             </div>
         </div>
 

@@ -12,6 +12,7 @@ use App\Modules\Finance\Http\Requests\Reporting\ListFeeMonitorRequest;
 use App\Modules\Finance\Queries\Reporting\ListCollectionProgressQuery;
 use App\Modules\Finance\Queries\Reporting\ListDngLifecycleQuery;
 use App\Modules\Finance\Queries\Reporting\ListFeeMonitorQuery;
+use App\Modules\Finance\Support\FinanceSemesterContextResolver;
 use App\Modules\Finance\Support\Reporting\FeeMonitorAcadRetGate;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
@@ -317,13 +318,7 @@ class FinanceReportingController extends Controller
 
     private function resolveSemesterId(): ?int
     {
-        $selectedId = session('current_semester_id');
-
-        if ($selectedId) {
-            return (int) $selectedId;
-        }
-
-        return Semester::query()->where('is_active', true)->value('id');
+        return FinanceSemesterContextResolver::selectedId();
     }
 
     private function activeView(string $candidate): string

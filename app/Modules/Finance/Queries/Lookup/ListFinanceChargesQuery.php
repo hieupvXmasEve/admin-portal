@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Lookup;
 
 use App\Models\FinanceCharge;
+use App\Modules\Finance\Support\FinanceSemesterContextResolver;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -35,7 +36,13 @@ final class ListFinanceChargesQuery
             });
         }
 
-        $query->when($request->filled('semester_id'), fn ($q) => $q->where('semester_id', (int) $request->input('semester_id')));
+        $semesterId = $request->filled('semester_id')
+            ? (int) $request->input('semester_id')
+            : FinanceSemesterContextResolver::selectedId();
+
+        if ($semesterId !== null) {
+            $query->where('semester_id', $semesterId);
+        }
 
         $chargeType = $request->input('charge_type');
         if ($request->filled('charge_type') && $chargeType !== 'all') {
