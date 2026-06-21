@@ -39,5 +39,36 @@ when `grading_scheme` is null.
 
 ## Acceptance Evidence
 
-Acceptance evidence is recorded after implementation and validation commands
-run.
+**Date:** 2026-06-21
+
+### Test results
+
+```
+Tests: 24 passed (49 assertions) — tests/Feature/Academic/Grading
+Tests: 58 passed (144 assertions) — tests/Feature/Academic/Grading + Gpa (regression check)
+```
+
+### Test coverage
+
+| Suite | Count | Status |
+| --- | --- | --- |
+| GradingCalculatorResolverTest | 4 | ✅ all pass |
+| DefaultWeightedPercentageCalculatorTest | 4 | ✅ all pass |
+| MetropoliaV1CalculatorTest | 13 | ✅ all pass |
+| GradingAggregationIntegrationTest | 3 | ✅ all pass |
+| Academic/Gpa (regression) | 34 | ✅ no regressions |
+
+### Key assertions verified
+
+- Null `grading_scheme` → `DefaultWeightedPercentageCalculator` → existing behavior unchanged.
+- `metropolia_v1` linear: 88% → grade 5, 40% → grade 1, 64% → grade 3.
+- Gate failure: ASSIGNMENT 30% < 40% gate → `passed=false`, `gate_failures` populated in breakdown.
+- `pass_fail` scale: 85% → P/passed, 70% → F/failed.
+- `direct` conversion: 100% → grade 5, 60% → grade 3.
+- `grade_breakdown` written to `academic_records` with engine, gates_passed, component details, final_grade, grade_points.
+- Canvas total skip: `CanvasGradeSyncService` does NOT overwrite `final_percentage` when custom engine active.
+- `finalizeAcademicRecords` reads grade_points from breakdown (not recalculated) when custom engine detected.
+
+### Pint
+
+3 files fixed (phpdoc_align, ordered_imports, minor style) — no logic changes.

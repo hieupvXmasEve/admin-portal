@@ -40,6 +40,7 @@ class SyllabusTemplate extends AuditableModel
         'is_active',
         'source_template_id',
         'created_by',
+        'grading_scheme',
     ];
 
     protected $casts = [
@@ -57,6 +58,7 @@ class SyllabusTemplate extends AuditableModel
         'required_materials' => 'array',
         'is_default' => 'boolean',
         'is_active' => 'boolean',
+        'grading_scheme' => 'array',
     ];
 
     // Relationships

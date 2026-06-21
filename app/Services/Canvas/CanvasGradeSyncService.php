@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Services\Canvas;
 
 use App\Exceptions\CanvasConnectionException;
+use App\Models\AcademicRecord;
 use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CanvasCourseMapping;
 use App\Models\CourseRegistration;
+use App\Models\CurriculumUnit;
 use App\Models\Student;
+use App\Models\Unit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -131,7 +134,7 @@ class CanvasGradeSyncService
                 'components_count' => $canvasComponents->count(),
                 'total_assignment_ids' => count($assignmentIds),
                 'assignment_ids' => $assignmentIds,
-                'components_details' => $canvasComponents->map(fn($c) => [
+                'components_details' => $canvasComponents->map(fn ($c) => [
                     'id' => $c->id,
                     'name' => $c->component_name,
                     'canvas_group_id' => $c->canvas_assignment_group_id,
@@ -400,25 +403,41 @@ class CanvasGradeSyncService
 
             if ($canvasTotal !== null) {
                 // Check if academic record already exists
-                $existingRecord = \App\Models\AcademicRecord::where('student_id', $student->id)
+                $existingRecord = AcademicRecord::where('student_id', $student->id)
                     ->where('course_offering_id', $courseOffering->id)
                     ->first();
 
                 if ($existingRecord) {
-                    // Update existing record
-                    $finalPercentage = round($canvasTotal, 2);
-                    $existingRecord->update([
-                        'final_percentage' => $finalPercentage,
-                        'final_letter_grade' => \App\Models\AcademicRecord::calculateLetterGrade($finalPercentage),
-                    ]);
+                    // When the syllabus has a custom grading engine, Canvas total must NOT
+                    // overwrite the rule-engine result — the local calculator is authoritative.
+                    $gradingScheme = $courseOffering->syllabusTemplate?->grading_scheme;
+                    $hasCustomEngine = $gradingScheme !== null
+                        && isset($gradingScheme['engine'])
+                        && $gradingScheme['engine'] !== 'default_weighted_percentage';
 
-                    Log::info('Updated Canvas total grade in existing academic record', [
-                        'student_id' => $student->id,
-                        'academic_record_id' => $existingRecord->id,
-                        'canvas_total' => $canvasTotal,
-                        'final_percentage' => $finalPercentage,
-                        'final_letter_grade' => $existingRecord->final_letter_grade,
-                    ]);
+                    if ($hasCustomEngine) {
+                        Log::info('Skipped Canvas total overwrite: custom grading engine is authoritative', [
+                            'student_id' => $student->id,
+                            'course_offering_id' => $courseOffering->id,
+                            'engine' => $gradingScheme['engine'],
+                            'canvas_total' => $canvasTotal,
+                        ]);
+                    } else {
+                        // Update existing record
+                        $finalPercentage = round($canvasTotal, 2);
+                        $existingRecord->update([
+                            'final_percentage' => $finalPercentage,
+                            'final_letter_grade' => AcademicRecord::calculateLetterGrade($finalPercentage),
+                        ]);
+
+                        Log::info('Updated Canvas total grade in existing academic record', [
+                            'student_id' => $student->id,
+                            'academic_record_id' => $existingRecord->id,
+                            'canvas_total' => $canvasTotal,
+                            'final_percentage' => $finalPercentage,
+                            'final_letter_grade' => $existingRecord->final_letter_grade,
+                        ]);
+                    }
                 } else {
                     // Try to create new record with all required fields
                     $finalPercentage = round($canvasTotal, 2);
@@ -426,7 +445,7 @@ class CanvasGradeSyncService
                         'student_id' => $student->id,
                         'course_offering_id' => $courseOffering->id,
                         'final_percentage' => $finalPercentage,
-                        'final_letter_grade' => \App\Models\AcademicRecord::calculateLetterGrade($finalPercentage),
+                        'final_letter_grade' => AcademicRecord::calculateLetterGrade($finalPercentage),
                         'enrollment_date' => now()->toDateString(),
                     ];
 
@@ -440,7 +459,7 @@ class CanvasGradeSyncService
                     // Get credit_points from unit - this is REQUIRED
                     $creditHours = $courseOffering->unit->credit_points ?? null;
                     if ($creditHours === null) {
-                        $unit = \App\Models\Unit::find($courseOffering->unit_id);
+                        $unit = Unit::find($courseOffering->unit_id);
                         $creditHours = $unit->credit_points ?? null;
                     }
 
@@ -451,7 +470,7 @@ class CanvasGradeSyncService
                         // Get program_id
                         $programId = $student->program_id ?? null;
                         if (! $programId && $courseOffering->unit_id) {
-                            $curriculumUnit = \App\Models\CurriculumUnit::where('unit_id', $courseOffering->unit_id)
+                            $curriculumUnit = CurriculumUnit::where('unit_id', $courseOffering->unit_id)
                                 ->with('curriculumVersion')
                                 ->first();
                             $programId = $curriculumUnit->curriculumVersion->program_id ?? null;
@@ -462,10 +481,10 @@ class CanvasGradeSyncService
 
                             // Check all required fields
                             $required = ['semester_id', 'unit_id', 'campus_id', 'credit_hours', 'enrollment_date'];
-                            $missing = array_filter($required, fn($f) => empty($academicRecordData[$f]));
+                            $missing = array_filter($required, fn ($f) => empty($academicRecordData[$f]));
 
                             if (empty($missing)) {
-                                $newRecord = \App\Models\AcademicRecord::create($academicRecordData);
+                                $newRecord = AcademicRecord::create($academicRecordData);
                                 Log::info('Created new academic record with Canvas total grade', [
                                     'student_id' => $student->id,
                                     'academic_record_id' => $newRecord->id,
@@ -625,7 +644,6 @@ class CanvasGradeSyncService
             default => 'not_submitted',
         };
     }
-
 
     /**
      * Get grade sync summary

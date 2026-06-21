@@ -11,6 +11,7 @@ use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\Student;
 use App\Modules\Academic\Support\FailureReasonClassifier;
+use App\Modules\Academic\Support\Grading\GradingCalculatorResolver;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use Carbon\CarbonImmutable;
@@ -23,6 +24,7 @@ class CourseCompletionService
         protected EgcLevelProgressionService $egcService,
         protected CourseSurveyService $courseSurveyService,
         protected PublishDomainEventAction $publishDomainEventAction,
+        protected GradingCalculatorResolver $gradingResolver,
     ) {}
 
     /**
@@ -135,9 +137,22 @@ class CourseCompletionService
             // Cast to float to ensure type safety
             $finalPercentage = (float) ($record->final_percentage ?? 0);
 
-            // Calculate grade points from final percentage
-            $gradePoints = AcademicRecord::calculateGradePoints($finalPercentage);
-            $finalLetterGrade = AcademicRecord::calculateLetterGrade($finalPercentage);
+            // When a custom grading engine produced a breakdown, use its grade/points
+            // directly rather than recomputing from final_percentage (which may be a
+            // diagnostic proxy, not a real percentage for schemes like "pass_fail").
+            $breakdown = is_array($record->grade_breakdown) ? $record->grade_breakdown : null;
+            $isCustomEngine = $breakdown !== null
+                && isset($breakdown['engine'])
+                && $breakdown['engine'] !== 'default_weighted_percentage';
+
+            if ($isCustomEngine) {
+                $gradePoints = (float) ($breakdown['grade_points'] ?? AcademicRecord::calculateGradePoints($finalPercentage));
+                $finalLetterGrade = (string) ($breakdown['final_grade'] ?? AcademicRecord::calculateLetterGrade($finalPercentage));
+            } else {
+                // Calculate grade points from final percentage
+                $gradePoints = AcademicRecord::calculateGradePoints($finalPercentage);
+                $finalLetterGrade = AcademicRecord::calculateLetterGrade($finalPercentage);
+            }
 
             // ACAD-RET-001: derive pass/fail + explicit failure_reason from grade
             // AND attendance, so failed students route correctly (grade → resit,
@@ -224,6 +239,9 @@ class CourseCompletionService
             return;
         }
 
+        $scheme = $syllabus->grading_scheme;
+        $calculator = $this->gradingResolver->resolve($scheme);
+
         // Get all assessment components with their details
         $components = AssessmentComponent::where('syllabus_template_id', $syllabus->id)
             ->with('details')
@@ -251,6 +269,7 @@ class CourseCompletionService
 
             $totalWeightedScore = 0;
             $totalWeight = 0;
+            $componentAggregates = []; // component code => aggregated percentage
 
             foreach ($components as $component) {
                 $componentWeightedScore = 0;
@@ -276,27 +295,33 @@ class CourseCompletionService
                 if ($hasComponentScores && $componentWeight > 0) {
                     // Calculate component percentage (average of its details)
                     $componentAverage = $componentWeightedScore / $componentWeight;
+                    $componentAggregates[$component->code] = $componentAverage;
                     // Apply component weight to overall score
                     $totalWeightedScore += ($componentAverage * $component->weight);
                     $totalWeight += $component->weight;
                 }
             }
 
-            // Calculate final percentage (assuming syllabus total weight is 100 or using weighted average)
-            $finalPercentage = $totalWeight > 0 ? round($totalWeightedScore / $totalWeight, 2) : 0;
+            // Pass the weighted average under a sentinel key for the default calculator
+            $weightedAverage = $totalWeight > 0 ? round($totalWeightedScore / $totalWeight, 2) : 0.0;
+            $componentAggregates['__weighted_average__'] = $weightedAverage;
 
-            // Update or create academic record with aggregated results
+            $result = $calculator->calculate($componentAggregates, $scheme);
+
+            // Update academic record with calculator result
             AcademicRecord::where('course_offering_id', $courseOffering->id)
                 ->where('student_id', $studentId)
                 ->update([
-                    'final_percentage' => $finalPercentage,
-                    'final_letter_grade' => AcademicRecord::calculateLetterGrade($finalPercentage),
+                    'final_percentage' => $result->finalPercentage ?? $weightedAverage,
+                    'final_letter_grade' => $result->finalGrade,
+                    'grade_breakdown' => array_merge($result->gradeBreakdown, ['grade_points' => $result->gradePoints]),
                 ]);
         }
 
         Log::info('Aggregated manual grades for course offering', [
             'course_offering_id' => $courseOffering->id,
             'students_count' => count($registeredStudentIds),
+            'engine' => $scheme['engine'] ?? 'default_weighted_percentage',
         ]);
     }
 
