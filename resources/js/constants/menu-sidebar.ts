@@ -693,6 +693,12 @@ export const mainNavGroups: NavGroup[] = [
                         icon: Settings2,
                         requiredPermissions: ['view_canvas_integration'],
                     },
+                    {
+                        title: 'AI Provider Settings',
+                        href: systemRoutes.aiProviderSettings.index(),
+                        icon: Sparkles,
+                        requiredPermissions: ['view_ai_provider_settings'],
+                    },
                 ],
             },
             {

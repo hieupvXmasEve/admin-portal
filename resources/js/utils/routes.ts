@@ -21,7 +21,7 @@ import {
     USER_ROUTE_NAMES,
 } from '@/constants';
 import { FINANCE_ROUTE_NAMES } from '@/constants/finance-routes';
-import { SYSTEM_ACTIVITY_LOG_ROUTE_NAMES, SYSTEM_CONFIG_ROUTE_NAMES, SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES } from '@/constants/system-routes';
+import { SYSTEM_ACTIVITY_LOG_ROUTE_NAMES, SYSTEM_AI_PROVIDER_SETTINGS_ROUTE_NAMES, SYSTEM_CONFIG_ROUTE_NAMES, SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES } from '@/constants/system-routes';
 import { route } from 'ziggy-js';
 
 /**
@@ -102,6 +102,12 @@ export const systemRoutes = {
     // activity logs
     activityLogs: {
         index: () => route(SYSTEM_ACTIVITY_LOG_ROUTE_NAMES.INDEX),
+    },
+    aiProviderSettings: {
+        index: () => route(SYSTEM_AI_PROVIDER_SETTINGS_ROUTE_NAMES.INDEX),
+        update: () => route(SYSTEM_AI_PROVIDER_SETTINGS_ROUTE_NAMES.UPDATE),
+        test: () => route(SYSTEM_AI_PROVIDER_SETTINGS_ROUTE_NAMES.TEST),
+        destroyKey: () => route(SYSTEM_AI_PROVIDER_SETTINGS_ROUTE_NAMES.KEY_DESTROY),
     },
     // email
     emailConfiguration: {

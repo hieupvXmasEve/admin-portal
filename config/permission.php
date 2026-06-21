@@ -240,6 +240,13 @@ return [
             'map_canvas_courses' => 'map_canvas_courses',
         ],
 
+        // AI Governance
+        'ai_provider_settings' => [
+            'view_ai_provider_settings' => 'view_ai_provider_settings',
+            'manage_ai_provider_settings' => 'manage_ai_provider_settings',
+            'test_ai_provider_settings' => 'test_ai_provider_settings',
+        ],
+
         // Financial Management
         'fees' => [
             'view_fees' => 'view_fees',

@@ -14,6 +14,20 @@ export const SYSTEM_ACTIVITY_LOG_ROUTE_PATHS = {
     INDEX: '/system/activity-logs',
 } as const;
 
+export const SYSTEM_AI_PROVIDER_SETTINGS_ROUTE_NAMES = {
+    INDEX: 'ai.provider-settings.index',
+    UPDATE: 'ai.provider-settings.update',
+    TEST: 'ai.provider-settings.test',
+    KEY_DESTROY: 'ai.provider-settings.key.destroy',
+} as const;
+
+export const SYSTEM_AI_PROVIDER_SETTINGS_ROUTE_PATHS = {
+    INDEX: '/ai/provider-settings',
+    UPDATE: '/ai/provider-settings',
+    TEST: '/ai/provider-settings/test',
+    KEY_DESTROY: '/ai/provider-settings/key',
+} as const;
+
 export const SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES = {
     INDEX: 'system.email-configuration.index',
     TEMPLATES: 'system.email-templates.index',
