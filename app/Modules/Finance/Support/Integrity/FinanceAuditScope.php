@@ -18,11 +18,12 @@ final class FinanceAuditScope
      */
     public function __construct(
         public readonly array $studentIds = [],
+        public readonly ?int $semesterId = null,
     ) {}
 
     public function isEmpty(): bool
     {
-        return $this->studentIdsCsv() === '';
+        return $this->studentIdsCsv() === '' && $this->semesterId === null;
     }
 
     public function studentIdsCsv(): string

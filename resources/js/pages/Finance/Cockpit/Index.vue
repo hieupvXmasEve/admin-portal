@@ -21,7 +21,7 @@ const props = defineProps<{
     data_health?: CockpitDataHealth;
 }>();
 
-usePoll(90000, { only: ['kpi', 'queues', 'phase'] });
+usePoll(90000, { only: ['kpi', 'queues', 'phase', 'data_health'] });
 
 const { can } = usePermissions();
 const visibleQueues = computed(() => props.queues.filter((q) => can(q.permission)));
@@ -47,20 +47,14 @@ defineOptions({
     <div class="space-y-4">
         <div class="flex items-center justify-between">
             <h1 class="text-xl font-semibold tracking-tight">Hôm nay</h1>
-            <Button size="sm" variant="outline" :disabled="refreshing" @click="refreshAll">
-                <RefreshCw class="mr-1 size-4" :class="{ 'animate-spin': refreshing }" /> Làm mới
-            </Button>
+            <Button size="sm" variant="outline" :disabled="refreshing" @click="refreshAll"> <RefreshCw class="mr-1 size-4" :class="{ 'animate-spin': refreshing }" /> Làm mới </Button>
         </div>
 
-        <CriticalBanner :critical-count="props.data_health?.critical_count ?? 0" />
+        <CriticalBanner :data-health="props.data_health" />
 
         <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
             <StatsCard title="Tổng phải thu" :value="formatCurrency(props.kpi.total_receivable)" />
-            <StatsCard
-                title="Đã thu"
-                :value="`${props.kpi.collected_pct}%`"
-                :sub-items="[{ label: 'Số tiền', value: formatCurrency(props.kpi.total_collected) }]"
-            />
+            <StatsCard title="Đã thu" :value="`${props.kpi.collected_pct}%`" :sub-items="[{ label: 'Số tiền', value: formatCurrency(props.kpi.total_collected) }]" />
             <StatsCard title="SV chưa sinh phí" :value="props.kpi.uncharged_count" />
         </div>
 

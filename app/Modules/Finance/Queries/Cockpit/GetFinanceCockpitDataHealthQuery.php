@@ -24,9 +24,9 @@ class GetFinanceCockpitDataHealthQuery
     ) {}
 
     /** @return array<string,mixed> */
-    public function handle(?int $campusId, bool $allCampus): array
+    public function handle(?int $campusId, bool $allCampus, ?int $semesterId = null): array
     {
-        [$scope, $studentIds, $scopeBadge] = $this->resolveScope($campusId, $allCampus);
+        [$scope, $studentIds, $scopeBadge] = $this->resolveScope($campusId, $allCampus, $semesterId);
 
         $summary = $this->auditor->summarize($scope);
 
@@ -51,36 +51,44 @@ class GetFinanceCockpitDataHealthQuery
             'scope_badge' => $scopeBadge,
             'critical_count' => (int) $criticalCount,
             'invariants' => $invariants,
-            'balance_match' => $this->balanceMatch($studentIds, $allCampus),
+            'balance_match' => $this->balanceMatch($studentIds, $allCampus, $semesterId),
         ];
     }
 
     /**
      * @return array{0:?FinanceAuditScope,1:?list<int>,2:string}
      */
-    private function resolveScope(?int $campusId, bool $allCampus): array
+    private function resolveScope(?int $campusId, bool $allCampus, ?int $semesterId): array
     {
         if ($allCampus) {
+            if ($semesterId !== null) {
+                return [new FinanceAuditScope(semesterId: $semesterId), null, 'semester'];
+            }
+
             return [null, null, 'all_campus'];
         }
 
         if ($campusId === null) {
-            return [new FinanceAuditScope([]), [], 'campus'];
+            return [new FinanceAuditScope(semesterId: $semesterId), [], 'campus'];
         }
 
         $ids = Student::query()->where('campus_id', $campusId)->pluck('id')->map(fn ($id) => (int) $id)->all();
 
-        return [new FinanceAuditScope($ids), $ids, 'campus'];
+        return [new FinanceAuditScope($ids, $semesterId), $ids, 'campus'];
     }
 
     /**
      * @param  list<int>|null  $studentIds
      * @return array{match_pct:float,matched:int,denominator:int}
      */
-    private function balanceMatch(?array $studentIds, bool $allCampus): array
+    private function balanceMatch(?array $studentIds, bool $allCampus, ?int $semesterId): array
     {
         $query = StudentInvoice::query()
             ->with(['invoiceLines.charge', 'invoiceLines.paymentApplications', 'invoiceLines.discountAllocations']);
+
+        if ($semesterId !== null) {
+            $query->where('semester_id', $semesterId);
+        }
 
         if (! $allCampus) {
             $query->whereIn('student_id', $studentIds ?? []);

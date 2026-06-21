@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 use App\Modules\Finance\Support\Integrity\FinanceAuditScope;
 
-it('reports empty when no student ids', function () {
-    expect((new FinanceAuditScope())->isEmpty())->toBeTrue();
+it('reports empty when no student ids and no semester', function () {
+    expect((new FinanceAuditScope)->isEmpty())->toBeTrue();
+});
+
+it('is not empty when only a semester is set', function () {
+    expect((new FinanceAuditScope(semesterId: 12))->isEmpty())->toBeFalse();
 });
 
 it('exposes a comma-separated int list of student ids', function () {

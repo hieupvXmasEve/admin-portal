@@ -120,13 +120,58 @@ class FinanceIntegrityAuditor
 
     private function resolve(string $template, FinanceInvariant $invariant, ?FinanceAuditScope $scope): string
     {
-        if ($scope === null || $scope->isEmpty()) {
+        if ($scope === null) {
             return str_replace('{scope}', '1=1', $template);
         }
 
-        // studentIdsCsv() is sanitized to positive ints only — safe to interpolate.
-        $predicate = str_replace('{ids}', $scope->studentIdsCsv(), $invariant->studentScopePredicate);
+        if ($scope->isEmpty()) {
+            return str_replace('{scope}', '1=1', $template);
+        }
 
-        return str_replace('{scope}', $predicate, $template);
+        return str_replace('{scope}', $this->buildScopeClause($invariant, $scope), $template);
+    }
+
+    private function buildScopeClause(FinanceInvariant $invariant, FinanceAuditScope $scope): string
+    {
+        $studentIdsCsv = $scope->studentIdsCsv();
+        $semesterId = $scope->semesterId;
+
+        if ($studentIdsCsv === '') {
+            if ($semesterId === null) {
+                return '1=1';
+            }
+
+            return $this->semesterFilterFragment($invariant->code, $semesterId) ?? '1=1';
+        }
+
+        $predicate = str_replace('{ids}', $studentIdsCsv, $invariant->studentScopePredicate);
+
+        if ($semesterId === null) {
+            return $predicate;
+        }
+
+        $semesterFragment = $this->semesterFilterFragment($invariant->code, $semesterId);
+
+        if ($semesterFragment === null) {
+            return $predicate;
+        }
+
+        return "({$predicate}) AND ({$semesterFragment})";
+    }
+
+    private function semesterFilterFragment(string $code, int $semesterId): ?string
+    {
+        $id = (int) $semesterId;
+
+        return match ($code) {
+            'INV-2' => "si.semester_id = {$id}",
+            'INV-3', 'INV-8', 'INV-13' => "fc.semester_id = {$id}",
+            'INV-6', 'INV-9' => "semester_id = {$id}",
+            'INV-4', 'INV-5' => "il.invoice_id IN (SELECT id FROM student_invoices WHERE semester_id = {$id})",
+            'INV-12', 'INV-14' => "dpr.semester_id = {$id}",
+            'INV-1', 'INV-10' => "p.student_id IN (SELECT DISTINCT student_id FROM student_invoices WHERE semester_id = {$id})",
+            'INV-11', 'INV-15' => "dng_payment_request_id IN (SELECT id FROM dng_payment_requests WHERE semester_id = {$id})",
+            default => null,
+        };
     }
 }

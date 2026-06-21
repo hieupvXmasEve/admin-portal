@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
+use App\Models\Semester;
 use App\Modules\Finance\Queries\Cockpit\GetFinanceCockpitDataHealthQuery;
 
 it('returns a data_health payload with invariants and balance-match metric', function () {
@@ -24,4 +25,15 @@ it('uses an all-system scope badge for all-campus scope', function () {
     $result = app(GetFinanceCockpitDataHealthQuery::class)->handle($campus->id, true);
 
     expect($result['scope_badge'])->toBe('all_campus');
+});
+
+it('uses a semester scope badge when all-campus operators pass a semester id', function () {
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->create();
+
+    $scoped = app(GetFinanceCockpitDataHealthQuery::class)->handle($campus->id, true, $semester->id);
+    $global = app(GetFinanceCockpitDataHealthQuery::class)->handle($campus->id, true);
+
+    expect($scoped['scope_badge'])->toBe('semester')
+        ->and($global['scope_badge'])->toBe('all_campus');
 });

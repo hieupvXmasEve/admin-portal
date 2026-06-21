@@ -65,6 +65,17 @@ it('marks webhook/unallocated queues as semester-agnostic and due/lifecycle as s
         });
 });
 
+it('uses the active semester when session has no explicit semester selection', function () {
+    $active = Semester::query()->where('is_active', true)->first();
+    $user = grantCockpit(['view_finance_cockpit']);
+
+    actingAs($user)->get('/finance/cockpit')
+        ->assertInertia(fn ($page) => $page
+            ->component('Finance/Cockpit/Index')
+            ->has('kpi')
+            ->has('queues'));
+});
+
 it('routes installment retry queue to the Batch Studio DNG wizard', function () {
     $user = grantCockpit(['view_finance_cockpit', 'create_finance_payments']);
 

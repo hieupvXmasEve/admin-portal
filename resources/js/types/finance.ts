@@ -426,7 +426,7 @@ export interface CockpitInvariant {
 }
 
 export interface CockpitDataHealth {
-    scope_badge: 'campus' | 'all_campus';
+    scope_badge: 'campus' | 'all_campus' | 'semester';
     critical_count: number;
     invariants: CockpitInvariant[];
     balance_match: { match_pct: number; matched: number; denominator: number };
