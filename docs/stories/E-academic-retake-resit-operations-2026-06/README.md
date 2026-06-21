@@ -10,6 +10,7 @@ sources.
 | --- | --- | --- | --- | --- |
 | 1 | `ACAD-RET-001-retake-resit-operations` | `S-001-retake-resit-operations/` | Academic source/lifecycle for staff-created course retake and exam resit, future student-request approval path, HQ fee worklist, late-payment monitoring, schedule, audit, and Finance dependency contract. | Existing Academic Records, Course Retake, Finance Charge, Payment/Ledger flows |
 | 2 | `ACAD-RET-002-exam-resit-overdue-reminders` | `S-002-exam-resit-overdue-reminders/` | Move Due Reminders into the new Finance UI and add PTL exam-resit overdue/reminder monitoring with same-page preview/send workflow. | `ACAD-RET-001`, Finance Due Reminders, DNG Worklist, Batch Studio reminder safety |
+| 3 | `ACAD-RET-003-paid-exam-resit-cancellation-no-refund` | `S-003-paid-exam-resit-cancellation-no-refund/` | Allow staff to cancel scheduled or paid exam-resit attempts without refund, preserve paid Finance evidence in the student portal, confirm unpaid fee/DNG cancellation before voiding, and email the student after cancellation. | `ACAD-RET-001`, `ACAD-RET-002`, Finance charge/payment evidence, Notification email delivery, Student timetable/finance portal |
 
 ## Shared Rules
 
@@ -46,3 +47,8 @@ sources.
   course-retake or exam-resit fees as expected/missing sources.
 - Due/reminder monitoring belongs to HQ/Finance. Academic may see payment and
   overdue state, but Finance owns reminder delivery and paid-state evidence.
+- Paid exam-resit cancellation can be an Academic cancellation with no refund:
+  paid charge, invoice, payment, payment applications, and paid DNG evidence stay
+  intact and student-visible. Unpaid charge-created cancellation must require a
+  clear staff confirmation before voiding the pending fee/DNG collection and must
+  notify the student.

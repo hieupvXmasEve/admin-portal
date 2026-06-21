@@ -152,6 +152,10 @@ class ListExamResitAttemptsQuery
             'completed_at' => $attempt->completed_at,
             'created_at' => $attempt->created_at,
             'hq_fee_status' => $attempt->hq_fee_status,
+            'finance_charge_id' => $attempt->finance_charge_id,
+            'cancellation_fee_disposition' => $attempt->cancellation_fee_disposition,
+            'cancellation_notice_sent_at' => $attempt->cancellation_notice_sent_at,
+            'cancellation_notice_error' => $attempt->cancellation_notice_error,
             'resit_score' => $attempt->resit_score,
             'final_chosen_score' => $attempt->final_chosen_score,
             'resit_passed' => $attempt->resit_passed,
@@ -169,6 +173,7 @@ class ListExamResitAttemptsQuery
             'result_state' => $this->deriveResultState($attempt),
             'operation_state' => $this->deriveOperationState($attempt),
             'available_actions' => $this->deriveAvailableActions($attempt),
+            'cancel_context' => $this->deriveCancelContext($attempt),
         ];
     }
 
@@ -177,16 +182,20 @@ class ListExamResitAttemptsQuery
      */
     private function derivePaymentState(ExamResitAttempt $attempt): array
     {
-        if ($attempt->status === ExamResitAttempt::STATUS_CANCELLED) {
-            return ['value' => 'cancelled', 'label' => 'Đã hủy', 'variant' => 'destructive'];
-        }
-
         $charge = $attempt->financeCharge;
         if (
             $attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_PAID
             || ($charge && $charge->status === FinanceCharge::STATUS_ACTIVE && $charge->is_fully_paid)
         ) {
+            if ($attempt->status === ExamResitAttempt::STATUS_CANCELLED) {
+                return ['value' => 'paid_no_refund', 'label' => 'Đã thu - không hoàn', 'variant' => 'success'];
+            }
+
             return ['value' => 'paid', 'label' => 'Đã thanh toán', 'variant' => 'success'];
+        }
+
+        if ($attempt->status === ExamResitAttempt::STATUS_CANCELLED) {
+            return ['value' => 'cancelled', 'label' => 'Đã hủy', 'variant' => 'destructive'];
         }
 
         return ['value' => 'awaiting_payment', 'label' => 'Chờ thanh toán', 'variant' => 'warning'];
@@ -252,12 +261,56 @@ class ListExamResitAttemptsQuery
             $actions[] = 'complete';
         }
 
-        // Cancel is offered only where the action will actually succeed: a paid
-        // attempt must go through the HQ refund/reversal flow first.
-        if ($attempt->isCancellable() && $attempt->hq_fee_status !== ExamResitAttempt::HQ_FEE_PAID) {
+        if ($attempt->isCancellable()) {
             $actions[] = 'cancel';
         }
 
         return $actions;
+    }
+
+    /**
+     * @return array{fee_state:string,requires_no_refund_acknowledgement:bool,requires_unpaid_fee_confirmation:bool,confirmation_token:string|null,title:string,message:string}
+     */
+    private function deriveCancelContext(ExamResitAttempt $attempt): array
+    {
+        $charge = $attempt->financeCharge;
+        $isPaid = $attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_PAID
+            || ($charge && $charge->status === FinanceCharge::STATUS_ACTIVE && $charge->is_fully_paid);
+
+        $hasUnpaidCharge = $attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_CHARGE_CREATED
+            && $charge
+            && $charge->status === FinanceCharge::STATUS_ACTIVE
+            && ! $charge->is_fully_paid;
+
+        if ($isPaid) {
+            return [
+                'fee_state' => 'paid_no_refund',
+                'requires_no_refund_acknowledgement' => true,
+                'requires_unpaid_fee_confirmation' => false,
+                'confirmation_token' => null,
+                'title' => 'Hủy thi lại đã thanh toán',
+                'message' => 'Sinh viên đã thanh toán phí thi lại. Hủy lượt thi lại sẽ giữ nguyên bằng chứng thu phí và không tạo hoàn phí.',
+            ];
+        }
+
+        if ($hasUnpaidCharge) {
+            return [
+                'fee_state' => 'unpaid_charge',
+                'requires_no_refund_acknowledgement' => false,
+                'requires_unpaid_fee_confirmation' => true,
+                'confirmation_token' => ExamResitAttempt::CONFIRM_VOID_UNPAID_EXAM_RESIT_FEE,
+                'title' => 'Hủy thi lại và hủy phí đang chờ thu',
+                'message' => 'Hệ thống đã tạo phí/DNG nhưng sinh viên chưa thanh toán. Sau xác nhận, khoản phí đang chờ thu sẽ bị hủy và sinh viên sẽ nhận email thông báo.',
+            ];
+        }
+
+        return [
+            'fee_state' => 'no_charge',
+            'requires_no_refund_acknowledgement' => false,
+            'requires_unpaid_fee_confirmation' => false,
+            'confirmation_token' => null,
+            'title' => 'Hủy thi lại',
+            'message' => 'Lượt thi lại sẽ bị hủy và sinh viên sẽ nhận email thông báo.',
+        ];
     }
 }

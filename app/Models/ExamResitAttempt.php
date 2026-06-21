@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Modules\Academic\Actions\CancelExamResitAttemptAction;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ExamResitAttempt extends AuditableModel
@@ -34,6 +33,14 @@ class ExamResitAttempt extends AuditableModel
     public const HQ_FEE_PAID = 'paid';
 
     public const HQ_FEE_CANCELLED = 'cancelled';
+
+    public const CANCELLATION_FEE_KEPT_PAID_NO_REFUND = 'kept_paid_no_refund';
+
+    public const CANCELLATION_FEE_VOIDED_UNPAID_CHARGE = 'voided_unpaid_charge';
+
+    public const CANCELLATION_FEE_NO_CHARGE = 'no_charge';
+
+    public const CONFIRM_VOID_UNPAID_EXAM_RESIT_FEE = 'void_unpaid_exam_resit_fee';
 
     /**
      * Academic statuses from which a staff member may cancel the operation
@@ -73,7 +80,12 @@ class ExamResitAttempt extends AuditableModel
         'scheduled_at',
         'scheduled_by_user_id',
         'cancelled_at',
+        'cancelled_by_user_id',
         'cancellation_reason',
+        'cancellation_fee_disposition',
+        'cancellation_notice_sent_at',
+        'cancellation_notice_email_log_id',
+        'cancellation_notice_error',
         'no_show_at',
         'completed_at',
         'hq_fee_status',
@@ -111,6 +123,7 @@ class ExamResitAttempt extends AuditableModel
         'approved_at' => 'datetime',
         'scheduled_at' => 'datetime',
         'cancelled_at' => 'datetime',
+        'cancellation_notice_sent_at' => 'datetime',
         'no_show_at' => 'datetime',
         'completed_at' => 'datetime',
         'fee_amount' => 'decimal:2',
@@ -177,6 +190,16 @@ class ExamResitAttempt extends AuditableModel
         return $this->belongsTo(ExamResitSession::class, 'exam_resit_session_id');
     }
 
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by_user_id');
+    }
+
+    public function cancellationNoticeEmailLog(): BelongsTo
+    {
+        return $this->belongsTo(EmailLog::class, 'cancellation_notice_email_log_id');
+    }
+
     public function financeCharge(): BelongsTo
     {
         return $this->belongsTo(FinanceCharge::class);
@@ -219,8 +242,9 @@ class ExamResitAttempt extends AuditableModel
 
     /**
      * Whether the academic operation is in a state a staff member may cancel.
-     * Payment-derived blocking (a paid attempt needs HQ refund/reversal first)
-     * is enforced in {@see CancelExamResitAttemptAction}.
+     * Payment-derived handling is enforced by the cancellation action: paid
+     * attempts require explicit no-refund acknowledgement; unpaid active charges
+     * require explicit confirmation before the charge/DNG is cancelled.
      */
     public function isCancellable(): bool
     {

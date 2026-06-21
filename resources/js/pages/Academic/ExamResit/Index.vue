@@ -4,6 +4,7 @@ import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -25,6 +26,15 @@ interface ExamResitState {
     variant: BadgeVariant;
 }
 
+interface CancelContext {
+    fee_state: 'paid_no_refund' | 'unpaid_charge' | 'no_charge' | string;
+    requires_no_refund_acknowledgement: boolean;
+    requires_unpaid_fee_confirmation: boolean;
+    confirmation_token: string | null;
+    title: string;
+    message: string;
+}
+
 interface ExamResitRow {
     id: number;
     student: { id: number; full_name: string; student_id: string };
@@ -40,6 +50,10 @@ interface ExamResitRow {
     completed_at: string | null;
     created_at: string;
     hq_fee_status: string;
+    finance_charge_id: number | null;
+    cancellation_fee_disposition: string | null;
+    cancellation_notice_sent_at: string | null;
+    cancellation_notice_error: string | null;
     resit_score: string | null;
     final_chosen_score: string | null;
     resit_passed: boolean | null;
@@ -57,6 +71,7 @@ interface ExamResitRow {
     result_state: ExamResitState;
     operation_state: ExamResitState;
     available_actions: string[];
+    cancel_context: CancelContext;
 }
 
 interface Filters {
@@ -155,23 +170,63 @@ const formatDate = (value: string | null): string => (value ? new Date(value).to
 // Cancel dialog state
 const cancelDialogOpen = ref(false);
 const cancelTarget = ref<ExamResitRow | null>(null);
-const cancelForm = useForm({ reason: '' });
+const cancelAcknowledged = ref(false);
+const cancelForm = useForm({
+    reason: '',
+    acknowledge_no_refund: false,
+    confirmation: null as string | null,
+});
+
+const cancelRequiresAcknowledgement = computed(() => Boolean(cancelTarget.value?.cancel_context.requires_no_refund_acknowledgement || cancelTarget.value?.cancel_context.requires_unpaid_fee_confirmation));
+
+const cancelAcknowledgementLabel = computed(() => {
+    if (cancelTarget.value?.cancel_context.requires_no_refund_acknowledgement) {
+        return 'Tôi xác nhận hủy lượt thi lại, giữ nguyên khoản phí đã thu và không tạo hoàn phí.';
+    }
+
+    if (cancelTarget.value?.cancel_context.requires_unpaid_fee_confirmation) {
+        return 'Tôi xác nhận hủy khoản phí/DNG đang chờ thu và gửi email thông báo cho sinh viên.';
+    }
+
+    return '';
+});
+
+const cancelWarningClass = computed(() => {
+    if (cancelTarget.value?.cancel_context.fee_state === 'paid_no_refund') {
+        return 'border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100';
+    }
+
+    if (cancelTarget.value?.cancel_context.fee_state === 'unpaid_charge') {
+        return 'border-destructive/30 bg-destructive/5 text-foreground';
+    }
+
+    return 'border-border bg-muted/40 text-foreground';
+});
+
+const cancelSubmitDisabled = computed(() => cancelForm.processing || (cancelRequiresAcknowledgement.value && !cancelAcknowledged.value));
 
 const openCancelDialog = (attempt: ExamResitRow) => {
     cancelTarget.value = attempt;
     cancelForm.reset();
     cancelForm.clearErrors();
+    cancelAcknowledged.value = false;
     cancelDialogOpen.value = true;
 };
 
 const submitCancel = () => {
     if (!cancelTarget.value) return;
+
+    const context = cancelTarget.value.cancel_context;
+    cancelForm.acknowledge_no_refund = context.requires_no_refund_acknowledgement && cancelAcknowledged.value;
+    cancelForm.confirmation = context.requires_unpaid_fee_confirmation && cancelAcknowledged.value ? context.confirmation_token : null;
+
     cancelForm.post(route('academic.exam-resit.cancel', cancelTarget.value.id), {
         preserveScroll: true,
         onSuccess: () => {
             cancelDialogOpen.value = false;
             cancelTarget.value = null;
             cancelForm.reset();
+            cancelAcknowledged.value = false;
         },
     });
 };
@@ -336,26 +391,36 @@ const columns: ColumnDef<ExamResitRow>[] = [
 
     <!-- Cancel Dialog -->
     <Dialog v-model:open="cancelDialogOpen">
-        <DialogContent class="sm:max-w-md">
+        <DialogContent class="sm:max-w-lg">
             <DialogHeader>
-                <DialogTitle>Hủy thi lại</DialogTitle>
-                <DialogDescription v-if="cancelTarget">
-                    {{ cancelTarget.student.full_name }} ({{ cancelTarget.student.student_id }}) — {{ cancelTarget.unit.code }}
-                    <template v-if="cancelTarget.hq_fee_status === 'charge_created'">
-                        <br />
-                        <span class="text-destructive font-medium">Charge và DNG liên quan sẽ bị hủy.</span>
-                    </template>
-                </DialogDescription>
+                <DialogTitle>{{ cancelTarget?.cancel_context.title ?? 'Hủy thi lại' }}</DialogTitle>
+                <DialogDescription v-if="cancelTarget"> {{ cancelTarget.student.full_name }} ({{ cancelTarget.student.student_id }}) — {{ cancelTarget.unit.code }} </DialogDescription>
             </DialogHeader>
             <form @submit.prevent="submitCancel" class="space-y-4">
+                <div v-if="cancelTarget" class="rounded-md border p-3 text-sm leading-relaxed" :class="cancelWarningClass">
+                    <div class="flex items-start gap-2">
+                        <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0" />
+                        <div class="min-w-0">
+                            <p class="font-medium">{{ cancelTarget.cancel_context.title }}</p>
+                            <p class="mt-1">{{ cancelTarget.cancel_context.message }}</p>
+                            <p v-if="cancelTarget.cancel_context.fee_state === 'paid_no_refund'" class="mt-1 text-xs">Student portal vẫn giữ lịch sử khoản phí đã thanh toán; thao tác này không hoàn tiền và không void charge.</p>
+                        </div>
+                    </div>
+                </div>
                 <div class="space-y-1.5">
                     <Label>Lý do hủy <span class="text-destructive">*</span></Label>
                     <Textarea v-model="cancelForm.reason" placeholder="Nhập lý do hủy (tối thiểu 5 ký tự)..." rows="3" />
                     <p v-if="cancelForm.errors.reason" class="text-destructive text-xs">{{ cancelForm.errors.reason }}</p>
                 </div>
+                <label v-if="cancelRequiresAcknowledgement" class="flex items-start gap-3 rounded-md border p-3 text-sm leading-relaxed">
+                    <Checkbox v-model="cancelAcknowledged" class="mt-0.5" />
+                    <span>{{ cancelAcknowledgementLabel }}</span>
+                </label>
+                <p v-if="cancelForm.errors.acknowledge_no_refund" class="text-destructive text-xs">{{ cancelForm.errors.acknowledge_no_refund }}</p>
+                <p v-if="cancelForm.errors.confirmation" class="text-destructive text-xs">{{ cancelForm.errors.confirmation }}</p>
                 <DialogFooter>
                     <Button type="button" variant="outline" @click="cancelDialogOpen = false">Đóng</Button>
-                    <Button type="submit" variant="destructive" :disabled="cancelForm.processing">
+                    <Button type="submit" variant="destructive" :disabled="cancelSubmitDisabled">
                         {{ cancelForm.processing ? 'Đang xử lý...' : 'Xác nhận hủy' }}
                     </Button>
                 </DialogFooter>

@@ -110,7 +110,8 @@ it('derives payment, operation state and actions across the lifecycle and counts
 
     expect($rows['ready_to_schedule']['payment_state']['value'])->toBe('paid')
         ->and($rows['ready_to_schedule']['available_actions'])->toContain('schedule')
-        ->and($rows['ready_to_schedule']['available_actions'])->not->toContain('cancel');
+        ->and($rows['ready_to_schedule']['available_actions'])->toContain('cancel')
+        ->and($rows['ready_to_schedule']['cancel_context']['requires_no_refund_acknowledgement'])->toBeTrue();
 
     expect($rows['awaiting_payment']['payment_state']['value'])->toBe('awaiting_payment')
         ->and($rows['awaiting_payment']['available_actions'])->toContain('cancel')

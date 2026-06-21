@@ -6,13 +6,16 @@ use App\Models\AcademicRecord;
 use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\ExamResitAttempt;
+use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\User;
+use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 
 use function Pest\Laravel\actingAs;
 
@@ -20,6 +23,8 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->user = User::factory()->create();
+    actingAs($this->user);
+
     $this->campus = Campus::factory()->create();
     $this->semester = Semester::factory()->create();
     $this->student = Student::factory()->forCampus($this->campus)->create([
@@ -115,6 +120,7 @@ it('normalizes scalar filters from exam-resit list query params', function () {
 });
 
 it('cancels an attempt through the controller and flashes success', function () {
+    Queue::fake();
     $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
 
     actingAs($this->user)
@@ -123,6 +129,72 @@ it('cancels an attempt through the controller and flashes success', function () 
         ->assertRedirect();
 
     expect($attempt->fresh()->status)->toBe(ExamResitAttempt::STATUS_CANCELLED);
+});
+
+it('rejects paid cancellation without no-refund acknowledgement', function () {
+    $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
+    app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
+    $attempt->refresh();
+
+    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+    payExamResitChargeFully($charge);
+    $attempt->transitionToPaid();
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id, '_token' => 'test-token'])
+        ->post(route('academic.exam-resit.cancel', $attempt->id), [
+            '_token' => 'test-token',
+            'reason' => 'Sinh viên xin rút',
+        ])
+        ->assertSessionHasErrors('acknowledge_no_refund');
+
+    expect($attempt->fresh()->status)->toBe(ExamResitAttempt::STATUS_APPROVED)
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE);
+});
+
+it('rejects unpaid charge-created cancellation without fee confirmation', function () {
+    $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
+    app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
+    $attempt->refresh();
+    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id, '_token' => 'test-token'])
+        ->post(route('academic.exam-resit.cancel', $attempt->id), [
+            '_token' => 'test-token',
+            'reason' => 'Sinh viên xin rút',
+        ])
+        ->assertSessionHasErrors('confirmation');
+
+    expect($attempt->fresh()->status)->toBe(ExamResitAttempt::STATUS_APPROVED)
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE);
+});
+
+it('cancels paid attempts through the controller when no-refund is acknowledged', function () {
+    Queue::fake();
+    $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
+    app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
+    $attempt->refresh();
+
+    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+    payExamResitChargeFully($charge);
+    $attempt->transitionToPaid();
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id, '_token' => 'test-token'])
+        ->post(route('academic.exam-resit.cancel', $attempt->id), [
+            '_token' => 'test-token',
+            'reason' => 'Sinh viên xin rút',
+            'acknowledge_no_refund' => true,
+        ])
+        ->assertRedirect();
+
+    $attempt->refresh();
+    expect($attempt->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
+        ->and($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_PAID)
+        ->and($attempt->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_KEPT_PAID_NO_REFUND)
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE)
+        ->and($charge->fresh()->is_fully_paid)->toBeTrue();
 });
 
 it('renders the create page with eligible students', function () {

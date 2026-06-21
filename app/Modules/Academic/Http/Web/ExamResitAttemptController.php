@@ -201,17 +201,21 @@ class ExamResitAttemptController extends Controller
     }
 
     /**
-     * Cancel an exam-resit operation before sitting. Paid sources are blocked in
-     * the action and must be handled through the HQ refund/reversal flow.
+     * Cancel an exam-resit operation before sitting. Paid sources are retained
+     * without refund when staff explicitly acknowledge the no-refund outcome.
      */
     public function cancel(
         CancelExamResitRequest $request,
         ExamResitAttempt $examResit,
         CancelExamResitAttemptAction $action,
     ): RedirectResponse {
+        $validated = $request->validated();
+
         $action->run([
             'attempt_id' => $examResit->id,
-            'reason' => $request->validated('reason'),
+            'reason' => $validated['reason'],
+            'acknowledge_no_refund' => (bool) ($validated['acknowledge_no_refund'] ?? false),
+            'confirmation' => $validated['confirmation'] ?? null,
         ]);
 
         Inertia::flash('success', 'Đã hủy thi lại.');
