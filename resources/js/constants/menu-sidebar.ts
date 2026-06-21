@@ -381,6 +381,8 @@ export const mainNavGroups: NavGroup[] = [
                     { title: 'Audit Workspace', href: financeRoutes.audit(), icon: Search, requiredPermissions: ['view_finance_audit_workspace'] },
                     { title: 'Charge Ledger (Global)', href: financeRoutes.lookup.chargeLedger(), icon: BarChart3, requiredPermissions: ['view_finance_charges'] },
                     { title: 'Invoices', href: financeRoutes.lookup.invoices(), icon: Receipt, requiredPermissions: ['view_finance_invoices'] },
+                    { title: 'DNG Payment Requests', href: financeRoutes.collect.dngPaymentRequests(), icon: Receipt, requiredPermissions: ['view_finance_dng_payment_requests'] },
+                    { title: 'DNG Webhook Events', href: financeRoutes.collect.dngWebhookEvents(), icon: Receipt, requiredPermissions: ['view_finance_dng_webhook_events'] },
                 ],
             },
         ],
@@ -405,10 +407,7 @@ export const mainNavGroups: NavGroup[] = [
                 title: 'Legacy Thu & Đối soát',
                 href: '#',
                 icon: Send,
-                children: [
-                    { title: 'DNG Payment Requests', href: financeRoutes.collect.dngPaymentRequests(), icon: Receipt, requiredPermissions: ['view_finance_dng_payment_requests'] },
-                    { title: 'DNG Webhook Events', href: financeRoutes.collect.dngWebhookEvents(), icon: Receipt, requiredPermissions: ['view_finance_dng_webhook_events'] },
-                ],
+                children: [],
             },
             {
                 title: 'Legacy Reports',
