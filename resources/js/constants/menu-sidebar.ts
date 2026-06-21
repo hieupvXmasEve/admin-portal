@@ -11,7 +11,6 @@ import {
     Calculator,
     Calendar,
     Calendar as CalendarIcon,
-    CheckSquare,
     ClipboardCheck,
     ClipboardList,
     Clock,
@@ -30,7 +29,6 @@ import {
     MailPlus,
     MessageSquare,
     Package,
-    Play,
     Receipt,
     RefreshCcw,
     School,
@@ -350,6 +348,7 @@ export const mainNavGroups: NavGroup[] = [
                         icon: TrendingUp,
                         requiredPermissions: ['view_egc_block_results'],
                     },
+                    { title: 'EGC - Carry Forward', href: financeRoutes.feeGeneration.egcCarryForward(), icon: ArrowRightLeft, requiredPermissions: ['view_egc_retake_adjustments'] },
                 ],
             },
             {
@@ -387,36 +386,36 @@ export const mainNavGroups: NavGroup[] = [
             },
         ],
     },
-    {
-        label: 'Finance Legacy (Old UI)',
-        items: [
-            {
-                title: 'Legacy Sinh phí',
-                href: '#',
-                icon: DollarSign,
-                children: [
-                    { title: 'Sinh HP/Tuition', href: financeRoutes.feeGeneration.majorCharges(), icon: Play, requiredPermissions: ['create_finance_charges'] },
-                    { title: 'Batch Studio Sinh phí', href: financeRoutes.feeGeneration.batchCharges(), icon: Layers, requiredPermissions: ['view_finance_batch_studio'] },
-                    { title: 'Sinh phí EGC', href: financeRoutes.feeGeneration.egcCharges(), icon: GraduationCap, requiredPermissions: ['generate_egc_finance_charges'] },
-                    { title: 'EGC · Block Results', href: financeRoutes.feeGeneration.egcBlockResults(), icon: CheckSquare, requiredPermissions: ['view_egc_block_results'] },
-                    { title: 'EGC · Retake Adjustments', href: financeRoutes.feeGeneration.egcRetakeAdjustments(), icon: TrendingUp, requiredPermissions: ['view_egc_retake_adjustments'] },
-                    { title: 'EGC · Carry Forward', href: financeRoutes.feeGeneration.egcCarryForward(), icon: ArrowRightLeft, requiredPermissions: ['view_egc_retake_adjustments'] },
-                ],
-            },
-            {
-                title: 'Legacy Thu & Đối soát',
-                href: '#',
-                icon: Send,
-                children: [],
-            },
-            {
-                title: 'Legacy Reports',
-                href: '#',
-                icon: LayoutDashboard,
-                children: [{ title: 'Billing KPIs (Legacy)', href: financeRoutes.today.dashboard(), icon: LayoutDashboard, requiredPermissions: ['view_finance_operations_dashboard'] }],
-            },
-        ],
-    },
+    // {
+    //     label: 'Finance Legacy (Old UI)',
+    //     items: [
+    //         {
+    //             title: 'Legacy Sinh phí',
+    //             href: '#',
+    //             icon: DollarSign,
+    //             children: [
+    //                 { title: 'Sinh HP/Tuition', href: financeRoutes.feeGeneration.majorCharges(), icon: Play, requiredPermissions: ['create_finance_charges'] },
+    //                 { title: 'Batch Studio Sinh phí', href: financeRoutes.feeGeneration.batchCharges(), icon: Layers, requiredPermissions: ['view_finance_batch_studio'] },
+    //                 { title: 'Sinh phí EGC', href: financeRoutes.feeGeneration.egcCharges(), icon: GraduationCap, requiredPermissions: ['generate_egc_finance_charges'] },
+    //                 { title: 'EGC - Block Results', href: financeRoutes.feeGeneration.egcBlockResults(), icon: CheckSquare, requiredPermissions: ['view_egc_block_results'] },
+    //                 { title: 'EGC - Retake Adjustments', href: financeRoutes.feeGeneration.egcRetakeAdjustments(), icon: TrendingUp, requiredPermissions: ['view_egc_retake_adjustments'] },
+                    
+    //             ],
+    //         },
+    //         {
+    //             title: 'Legacy Thu & Đối soát',
+    //             href: '#',
+    //             icon: Send,
+    //             children: [],
+    //         },
+    //         {
+    //             title: 'Legacy Reports',
+    //             href: '#',
+    //             icon: LayoutDashboard,
+    //             children: [{ title: 'Billing KPIs (Legacy)', href: financeRoutes.today.dashboard(), icon: LayoutDashboard, requiredPermissions: ['view_finance_operations_dashboard'] }],
+    //         },
+    //     ],
+    // },
     {
         label: 'Discounts & Funding',
         items: [
