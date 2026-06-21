@@ -10,8 +10,9 @@ use App\Modules\Finance\Queries\Operations\GetBillingExceptionCountsQuery;
 use App\Modules\Finance\Queries\Operations\GetDueItemsSummaryQuery;
 use App\Modules\Finance\Queries\Operations\GetInstallmentPushFailureCountQuery;
 use App\Modules\Finance\Queries\Operations\GetLifecycleDueExceptionSummaryQuery;
+use App\Modules\Finance\Queries\Operations\ListSettlementWorklistQuery;
 use App\Modules\Finance\Support\FinanceCollectionPhase;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
 
 /**
  * Light cockpit overview: KPI ribbon + the six "Cần xử lý" queue counts + phase.
@@ -27,6 +28,7 @@ class GetFinanceCockpitOverviewQuery
         private GetLifecycleDueExceptionSummaryQuery $lifecycleSummary,
         private GetBillingExceptionCountsQuery $exceptionCounts,
         private GetInstallmentPushFailureCountQuery $installmentFailures,
+        private ListSettlementWorklistQuery $settlementWorklist,
     ) {}
 
     /** @return array<string,mixed> */
@@ -66,10 +68,12 @@ class GetFinanceCockpitOverviewQuery
             ]);
         $webhookCount = (clone $webhook)->count();
 
-        $unappliedCount = DB::table('payments')
-            ->where('status', 'completed')
-            ->whereColumn('amount', '>', DB::raw('(select coalesce(sum(pa.amount),0) from payment_applications pa where pa.payment_id = payments.id)'))
-            ->count();
+        $settlement = $this->settlementWorklist->handle(Request::create(
+            route('finance.operations.settlement.index'),
+            'GET',
+            ['readiness' => 'ready', 'per_page' => 1],
+        ));
+        $readySettlementCount = (int) $settlement['summary']['ready_students'];
 
         $due = $this->dueSummary->handle($semesterId);
         $lifecycle = $this->lifecycleSummary->handle($semesterId);
@@ -79,8 +83,8 @@ class GetFinanceCockpitOverviewQuery
         return [
             $this->queue('webhook_errors', 'Webhook DNG lỗi', $webhookCount, false, 'campus',
                 'view_finance_dng_webhook_events', route('finance.dng.webhook-events.index'), $webhookCount > 0 ? 'critical' : 'normal'),
-            $this->queue('unallocated', 'Tiền chờ phân bổ', $unappliedCount, false, 'campus',
-                'allocate_finance_payment', route('finance.operations.settlement.index'), $unappliedCount > 0 ? 'action' : 'normal'),
+            $this->queue('unallocated', 'Tiền chờ phân bổ', $readySettlementCount, false, 'campus',
+                'allocate_finance_payment', route('finance.operations.settlement.index', ['readiness' => 'ready']), $readySettlementCount > 0 ? 'action' : 'normal'),
             $this->queue('dng_due', 'DNG đến hạn', (int) $due['overdue_count'] + (int) $due['due_today_count'], true, 'semester',
                 'view_finance_operations_due_calendar', route('finance.operations.due-calendar'), (int) $due['overdue_count'] > 0 ? 'action' : 'normal'),
             $this->queue('lifecycle', 'Ngoại lệ lifecycle chờ review', (int) $lifecycle['total_count'], true, 'semester',

@@ -85,3 +85,14 @@ it('does not reveal a cross-campus invoice number', function () {
             ->component('Finance/Audit/Workspace')
             ->where('resolution.status', 'empty'));
 });
+
+it('accepts cockpit semester drilldown params without redirecting away', function () {
+    $user = grantAuditWorkspace(['view_finance_audit_workspace', 'view_finance_all_campus']);
+
+    actingAs($user)->get('/finance/audit?finding_code=INV-5&scope=semester')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Finance/Audit/Workspace')
+            ->where('filters.finding_code', 'INV-5')
+            ->where('filters.scope', 'semester'));
+});

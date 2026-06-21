@@ -30,7 +30,7 @@ class FinanceCockpitController extends Controller
 
         $props['data_health'] = Inertia::defer(fn () => $dataHealth->handle(
             $this->currentCampusId(),
-            $request->user()?->can('view_finance_all_campus') ?? false,
+            false,
             $semesterId,
         ));
 

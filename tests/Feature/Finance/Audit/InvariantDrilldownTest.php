@@ -43,7 +43,7 @@ it('resolves invoice_line sample ids to invoice targets', function () {
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
     $invoice = StudentInvoice::create([
-        'invoice_number' => 'INV-DRILL-001',
+        'invoice_number' => "INV-DRILL-{$student->id}-{$semester->id}",
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'status' => 'pending',

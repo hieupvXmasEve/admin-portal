@@ -26,7 +26,7 @@ class FinanceAuditSearchRequest extends FormRequest
             'billing_cycle_id' => 'nullable|integer|exists:billing_cycles,id',
             'finding_code' => 'nullable|string|regex:/^INV-\\d{1,2}$/',
             'sample_id' => 'nullable|integer|min:1',
-            'scope' => 'nullable|string|in:campus,all_campus',
+            'scope' => 'nullable|string|in:campus,all_campus,semester',
         ];
     }
 }

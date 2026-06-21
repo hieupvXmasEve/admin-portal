@@ -167,10 +167,13 @@ class FinanceIntegrityAuditor
             'INV-2' => "si.semester_id = {$id}",
             'INV-3', 'INV-8', 'INV-13' => "fc.semester_id = {$id}",
             'INV-6', 'INV-9' => "semester_id = {$id}",
-            'INV-4', 'INV-5' => "il.invoice_id IN (SELECT id FROM student_invoices WHERE semester_id = {$id})",
+            'INV-4' => "il.invoice_id IN (SELECT id FROM student_invoices WHERE semester_id = {$id})",
+            'INV-5' => "idc.invoice_id IN (SELECT id FROM student_invoices WHERE semester_id = {$id})",
             'INV-12', 'INV-14' => "dpr.semester_id = {$id}",
-            'INV-1', 'INV-10' => "p.student_id IN (SELECT DISTINCT student_id FROM student_invoices WHERE semester_id = {$id})",
-            'INV-11', 'INV-15' => "dng_payment_request_id IN (SELECT id FROM dng_payment_requests WHERE semester_id = {$id})",
+            'INV-1' => "p.student_id IN (SELECT DISTINCT student_id FROM student_invoices WHERE semester_id = {$id})",
+            'INV-10' => "student_id IN (SELECT DISTINCT student_id FROM student_invoices WHERE semester_id = {$id})",
+            'INV-11' => "dng_payment_request_id IN (SELECT id FROM dng_payment_requests WHERE semester_id = {$id})",
+            'INV-15' => "dprc.dng_payment_request_id IN (SELECT id FROM dng_payment_requests WHERE semester_id = {$id})",
             default => null,
         };
     }

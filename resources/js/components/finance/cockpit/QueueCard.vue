@@ -12,7 +12,7 @@ const dotClass: Record<string, string> = {
     action: 'bg-orange-500',
     normal: 'bg-slate-300',
 };
-const badgeLabel: Record<string, string> = { campus: 'Toàn campus', semester: 'Theo kỳ', multi: 'Đa kỳ' };
+const badgeLabel: Record<string, string> = { campus: 'Campus hiện tại', semester: 'Theo kỳ', multi: 'Đa kỳ' };
 </script>
 
 <template>

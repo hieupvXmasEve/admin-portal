@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Semester;
 use App\Modules\Finance\Support\Integrity\FinanceAuditScope;
 use App\Modules\Finance\Support\Integrity\FinanceIntegrityAuditor;
 use App\Modules\Finance\Support\Integrity\FinanceInvariant;
@@ -41,7 +42,7 @@ it('findForScope() returns nothing for an empty scope rather than scanning globa
     $student = auditStudent();
     seedOverAllocatedPayment($student);
 
-    expect(app(FinanceIntegrityAuditor::class)->findForScope(new FinanceAuditScope()))->toBe([]);
+    expect(app(FinanceIntegrityAuditor::class)->findForScope(new FinanceAuditScope))->toBe([]);
 });
 
 it('runs every one of the 15 invariants cleanly, globally and scoped (no SQL errors)', function () {
@@ -55,6 +56,19 @@ it('runs every one of the 15 invariants cleanly, globally and scoped (no SQL err
     foreach ($registry->all() as $invariant) {
         expect($auditor->count($invariant, null))->toBeInt()
             ->and($auditor->count($invariant, $scope))->toBeInt()
+            ->and($auditor->samples($invariant, $scope))->toBeArray();
+    }
+});
+
+it('runs every invariant cleanly when scope combines students with a semester', function () {
+    $student = auditStudent();
+    $semester = Semester::factory()->create();
+    $registry = app(FinanceInvariantRegistry::class);
+    $auditor = app(FinanceIntegrityAuditor::class);
+    $scope = new FinanceAuditScope(studentIds: [$student->id], semesterId: $semester->id);
+
+    foreach ($registry->all() as $invariant) {
+        expect($auditor->count($invariant, $scope))->toBeInt()
             ->and($auditor->samples($invariant, $scope))->toBeArray();
     }
 });

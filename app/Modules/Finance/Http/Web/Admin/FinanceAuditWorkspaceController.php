@@ -15,6 +15,7 @@ use App\Modules\Finance\Queries\Audit\GetFinanceAuditGraphQuery;
 use App\Modules\Finance\Queries\Audit\ResolveFinanceAuditSearchQuery;
 use App\Modules\Finance\Support\Audit\FinanceAuditWarningBuilder;
 use App\Modules\Finance\Support\Audit\FinanceLedgerTimelineBuilder;
+use App\Modules\Finance\Support\FinanceSemesterContextResolver;
 use App\Modules\Finance\Support\Integrity\FinanceAuditScope;
 use App\Modules\Finance\Support\Integrity\FinanceIntegrityAuditor;
 use App\Modules\Finance\Support\Integrity\FinanceInvariantRegistry;
@@ -227,8 +228,10 @@ class FinanceAuditWorkspaceController extends Controller
         }
 
         $canAllCampus = $request->user()?->can('view_finance_all_campus') ?? false;
-        if (($data['scope'] ?? 'campus') === 'all_campus' && ! $canAllCampus) {
+        $scopeKey = (string) ($data['scope'] ?? 'campus');
+        if (in_array($scopeKey, ['all_campus', 'semester'], true) && ! $canAllCampus) {
             $data['scope'] = 'campus';
+            $scopeKey = 'campus';
         }
 
         $listUrl = $resolver->listUrlFor($code);
@@ -240,10 +243,8 @@ class FinanceAuditWorkspaceController extends Controller
         $sampleId = isset($data['sample_id']) ? (int) $data['sample_id'] : null;
         if ($sampleId === null) {
             $invariant = $registry->find($code);
-            $scope = ($data['scope'] ?? 'campus') === 'all_campus'
-                ? null
-                : new FinanceAuditScope($this->campusStudentIds($campusId));
-            $sampleId = $invariant !== null ? ($auditor->samples($invariant, $scope)[0] ?? null) : null;
+            $auditScope = $this->drilldownAuditScope($data, $campusId, $scopeKey);
+            $sampleId = $invariant !== null ? ($auditor->samples($invariant, $auditScope)[0] ?? null) : null;
         }
 
         if ($sampleId === null) {
@@ -259,6 +260,25 @@ class FinanceAuditWorkspaceController extends Controller
         $data['target_id'] = $targetId;
 
         return [$data, null];
+    }
+
+    /**
+     * Mirrors Cockpit data_health scoping so a drilldown sample matches the tile the
+     * operator clicked (campus, all-campus, or all-campus + selected semester).
+     *
+     * @param  array<string,mixed>  $data
+     */
+    private function drilldownAuditScope(array $data, ?int $campusId, string $scopeKey): ?FinanceAuditScope
+    {
+        $semesterId = isset($data['semester_id']) ? (int) $data['semester_id'] : FinanceSemesterContextResolver::selectedId();
+
+        if ($scopeKey === 'semester' || $scopeKey === 'all_campus') {
+            return $semesterId !== null
+                ? new FinanceAuditScope(semesterId: $semesterId)
+                : null;
+        }
+
+        return new FinanceAuditScope($this->campusStudentIds($campusId), $semesterId);
     }
 
     /** @return list<int> */

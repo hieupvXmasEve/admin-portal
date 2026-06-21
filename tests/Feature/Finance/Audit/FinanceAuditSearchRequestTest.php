@@ -40,9 +40,10 @@ it('denies a user without the workspace permission', function () {
 });
 
 it('accepts valid filters and rejects an invalid target_type', function () {
-    $rules = (new FinanceAuditSearchRequest())->rules();
+    $rules = (new FinanceAuditSearchRequest)->rules();
 
     expect(Validator::make(['q' => 'INV-1', 'target_type' => 'invoice', 'target_id' => 5], $rules)->passes())->toBeTrue()
+        ->and(Validator::make(['finding_code' => 'INV-5', 'scope' => 'semester'], $rules)->passes())->toBeTrue()
         ->and(Validator::make(['target_type' => 'nonsense'], $rules)->passes())->toBeFalse()
         ->and(Validator::make(['target_id' => 0], $rules)->passes())->toBeFalse();
 });
