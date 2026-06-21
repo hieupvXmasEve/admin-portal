@@ -219,6 +219,30 @@ Acceptance criteria:
 - New academic notifications for students are persisted through Notification V2 tables, not legacy `notifications`.
 - Tuition transition logic reads `students.status` and `students.intake_major`.
 
+### FR-11 AI Provider Settings and Audit Foundation
+
+Code baseline:
+
+- AI provider settings live in `app/Modules/AI` and store staff-owned provider
+  configuration in `ai_provider_settings`.
+- Provider keys are encrypted at rest and exposed to staff only as masked
+  metadata after save.
+- AI audit/evaluation foundation tables exist for conversations, messages,
+  agent traces, tool calls, provider usage, feedback, evaluation cases,
+  evaluation runs, and evaluation results.
+- AI support services redact secrets and raw provider payloads before product
+  audit/evaluation persistence.
+
+Acceptance criteria:
+
+- AI provider settings never return raw or encrypted API keys to the frontend.
+- AI audit/evaluation records do not store raw provider request/response bodies,
+  authorization headers, API keys, or unredacted tool/source payloads.
+- AI evaluation evidence can be recorded with deterministic fixtures and without
+  live provider credentials.
+- No AI chat UI, business-data tool runtime, MCP exposure, write/action mode, or
+  student/lecturer portal behavior is exposed by this foundation.
+
 ## 4) Non-Functional Requirements
 
 - Security:

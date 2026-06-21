@@ -48,6 +48,11 @@ Current counts:
     - Actions: `PublishDomainEventAction`, `DispatchOutboxBatchAction`, `SendManualNotificationV2Action`, retry actions
     - Channels: `EmailChannelAdapter`, `RealtimeChannelAdapter`
     - Email configuration: `email_configurations` table is campus-scoped (`nullable campus_id`); email dispatch resolves campus-specific SMTP config with fallback to global config
+- AI module (`app/Modules/AI/`) now has provider settings and backend-only audit/evaluation foundations:
+    - Provider settings table: `ai_provider_settings`
+    - Audit/evaluation tables: `ai_conversations`, `ai_messages`, `ai_agent_traces`, `ai_tool_calls`, `ai_provider_usages`, `ai_feedback`, `ai_evaluation_cases`, `ai_evaluation_runs`, `ai_evaluation_results`
+    - Support services: `AiRedactor`, `AiAuditRecorder`, `AiProviderUsageRecorder`, `AiEvaluationRunner`
+    - Runtime boundary: no chat UI, metric tools, MCP exposure, write/action mode, or student/lecturer portal behavior yet.
 - Academic progression baseline uses `academic_progression_events` as semantic history:
     - `ENGLISH_LEVEL_CHANGED` for EGC level changes (manual & auto progression)
     - `COURSE_STAGE_CHANGED` for stage transitions (e.g., `intake_pre_uni_gc` → `intake_course`)
