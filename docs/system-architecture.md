@@ -1,8 +1,8 @@
 # System Architecture
 
-Last updated: 2026-04-21  
-Owner: Platform Team  
-Status: Current-state architecture map  
+Last updated: 2026-06-21
+Owner: Platform Team
+Status: Current-state architecture map
 Source of truth: route files, middleware, module providers, runtime entrypoints
 
 ## 1) Architecture Overview
@@ -253,12 +253,14 @@ Phase 1 guardrails:
 - Canonical recipient identity is `recipient_user_id` in `notification_messages`; non-user targets are resolved to user ids before message/delivery persist.
 - No legacy backfill in Phase 1: new tables are clean-slate and legacy `notifications` history is not migrated.
     - Current implementation baseline for new student-facing academic notifications is V2-only. Course completion, EGC completion/progression, EGC program completion, and course-stage transition notifications publish domain events and persist through the Notification V2 outbox pipeline.
-- AI: `app/Modules/AI` (provider settings, audit/evaluation foundation, metric catalog/query-plan validation)
+- AI: `app/Modules/AI` (provider settings, audit/evaluation foundation, metric catalog/query-plan validation, query metrics tool execution)
     - Provider settings: `ai_provider_settings` stores one encrypted staff-owned provider setting per user with provider/model allowlists, key masking, cost limits, and provider test metadata.
     - Audit/evaluation foundation: `ai_conversations`, `ai_messages`, `ai_agent_traces`, `ai_tool_calls`, `ai_provider_usages`, `ai_feedback`, `ai_evaluation_cases`, `ai_evaluation_runs`, and `ai_evaluation_results`.
     - Metric catalog/query-plan foundation: code-defined aggregate MetricCatalog v1, business glossary subset, query-plan DTO/validator, `view_ai_metrics` permission, and deterministic staff metric evaluation cases.
-    - Support services: `AiRedactor`, `AiAuditRecorder`, `AiProviderUsageRecorder`, `AiEvaluationRunner`, `BusinessGlossary`, `MetricCatalog`, and `QueryPlanValidator`.
-    - Current boundary: backend-only product audit/evaluation and query-plan validation records; no chat UI, `query_metrics` execution, MCP exposure, write/action mode, or student/lecturer portal behavior.
+    - Query metrics tool MVP: internal `ToolRegistry`/`ToolDispatcher`, read-only `query_metrics` execution, bounded aggregate `QueryMetricsResult`, and MetricCatalog v1 resolvers for Academic status/defer, Finance collection, Fee Monitor, and DNG lifecycle metrics.
+    - AI cross-module metric reads use shared contracts (`App\Shared\Contracts\Academic\AiAcademicMetricReader`, `App\Shared\Contracts\Finance\AiFinanceMetricReader`) with owning-module adapters; AI does not import Academic/Finance query classes directly.
+    - Support services: `AiRedactor`, `AiAuditRecorder`, `AiProviderUsageRecorder`, `AiEvaluationRunner`, `BusinessGlossary`, `MetricCatalog`, `QueryPlanValidator`, `ToolRegistry`, `ToolDispatcher`, and `QueryMetricsTool`.
+    - Current boundary: backend-only product audit/evaluation, query-plan validation, and internal aggregate tool execution; no chat UI, provider prompt runtime, MCP exposure, write/action mode, or student/lecturer portal behavior.
 
 ## 7) Runtime Scheduled Commands
 

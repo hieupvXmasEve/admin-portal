@@ -16,6 +16,8 @@ use App\Modules\Finance\Services\FinanceChargeService;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Services\PaymentService;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\AiFinanceMetricReader as ModuleAiFinanceMetricReader;
+use App\Shared\Contracts\Finance\AiFinanceMetricReader;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -26,6 +28,8 @@ class FinanceServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(AiFinanceMetricReader::class, ModuleAiFinanceMetricReader::class);
+
         // Register services as singletons
         $this->app->singleton(FinanceChargeService::class);
         $this->app->singleton(PaymentService::class);

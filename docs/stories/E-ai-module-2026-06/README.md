@@ -15,8 +15,8 @@ allowlisted, and audited.
 
 ## Master Story
 
-| Story id | Story packet | Status | Purpose |
-| --- | --- | --- | --- |
+| Story id                       | Story packet               | Status      | Purpose                                                                                           |
+| ------------------------------ | -------------------------- | ----------- | ------------------------------------------------------------------------------------------------- |
 | `AI-MOD-000-ai-module-roadmap` | `S-000-ai-module-roadmap/` | implemented | Master roadmap, phase tracker, shared guardrails, and split criteria for future AI child stories. |
 
 ## Phase And Story Order
@@ -24,25 +24,25 @@ allowlisted, and audited.
 Child story packets are created only when a phase is selected for execution.
 Until then, this table is the source of truth for planned AI work.
 
-| Order | Story id | Planned packet | Status | Main scope | Depends on |
-| --- | --- | --- | --- | --- | --- |
-| 0 | `AI-MOD-000-ai-module-roadmap` | `S-000-ai-module-roadmap/` | implemented | Initiative tracker, phase map, non-goals, validation expectations, and risk guardrails | None |
-| 1.1 | `AI-MOD-001-ai-governance-provider-settings` | `S-001-ai-governance-provider-settings/` | implemented | AI module shell, permissions, provider config boundary, encrypted API keys, model selection, cost limits, and provider test flow | 000 |
-| 1.2 | `AI-MOD-002-ai-audit-evaluation-foundation` | `S-002-ai-audit-evaluation-foundation/` | implemented | Conversation/message/tool-call/provider-usage audit records, redaction rules, and baseline evaluation dataset | 000 |
-| 1.3 | `AI-MOD-003-metric-catalog-query-plan` | `S-003-metric-catalog-query-plan/` | implemented | Business glossary subset, MetricCatalog, filter/group-by allowlists, QueryPlanValidator, and 3-5 real staff questions | 001, 002 |
-| 1.4 | `AI-MOD-004-query-metrics-tool-mvp` | `S-004-query-metrics-tool-mvp/` | planned | ToolRegistry/ToolDispatcher foundation and read-only `query_metrics` tool backed by existing Academic/Finance queries | 003 |
-| 1.5 | `AI-MOD-005-staff-copilot-chat-mvp` | `S-005-staff-copilot-chat-mvp/` | planned | Internal staff chat surface, AgentRunner loop, structured output, answer sources, hidden-section notices, and dashboard parity proof | 004 |
-| 2.1 | `AI-MOD-006-entity-catalog-search` | `S-006-entity-catalog-search/` | planned | EntityCatalog for student/class/program/semester, `search_entities`, scoped identifiers, and PII-safe search result limits | 005 |
-| 2.2 | `AI-MOD-007-student-profile-sections` | `S-007-student-profile-sections/` | planned | `get_entity_profile` for student profile sections with section-level permission and hidden-section reporting | 006 |
-| 2.3 | `AI-MOD-008-conversation-context` | `S-008-conversation-context/` | planned | Resolved entities, current filters, current term, conversation summary, tool history, and bounded context rebuild | 006, 007 |
-| 3.1 | `AI-MOD-009-compare-metrics-tool` | `S-009-compare-metrics-tool/` | planned | `compare_metrics` for current-vs-previous term and scoped trend explanations with source filters | 004, 008 |
-| 3.2 | `AI-MOD-010-risk-and-recommendation-rules` | `S-010-risk-and-recommendation-rules/` | planned | Rule-based risk factors, recommendation builder, missing-data handling, confidence levels, and no-ML default | 007, 009 |
-| 3.3 | `AI-MOD-011-feedback-and-evaluation-loop` | `S-011-feedback-and-evaluation-loop/` | planned | Feedback controls, evaluation runner, expected answer fixtures, tool-call assertions, and regression tracking | 002, 005, 010 |
-| 4.1 | `AI-MOD-012-admin-governance-quota` | `S-012-admin-governance-quota/` | planned | Admin tool/model/provider toggles, quota enforcement, rate limits, data-access preview, and audit viewer | 001, 002, 005 |
-| 4.2 | `AI-MOD-013-prompt-tool-versioning` | `S-013-prompt-tool-versioning/` | planned | Prompt versions, tool schema versions, catalog version stamps, answer traceability, and rollback strategy | 002, 004 |
-| 4.3 | `AI-MOD-014-mcp-ready-resources-tools` | `S-014-mcp-ready-resources-tools/` | planned | MCP-ready mapping for tools/resources/prompts after internal core is stable; no MCP server before this story | 012, 013 |
-| 5.1 | `AI-MOD-015-student-portal-assistant-spike` | `S-015-student-portal-assistant-spike/` | planned | Separate student-portal feasibility spike only after internal staff assistant proves permission, audit, and evaluation gates | 011, 012 |
-| 5.2 | `AI-MOD-016-write-approval-mode` | `S-016-write-approval-mode/` | planned | Explicit human-approved write/action mode; mutations remain out of scope until a separate high-risk story accepts it | 011, 012 |
+| Order | Story id                                     | Planned packet                           | Status      | Main scope                                                                                                                           | Depends on    |
+| ----- | -------------------------------------------- | ---------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
+| 0     | `AI-MOD-000-ai-module-roadmap`               | `S-000-ai-module-roadmap/`               | implemented | Initiative tracker, phase map, non-goals, validation expectations, and risk guardrails                                               | None          |
+| 1.1   | `AI-MOD-001-ai-governance-provider-settings` | `S-001-ai-governance-provider-settings/` | implemented | AI module shell, permissions, provider config boundary, encrypted API keys, model selection, cost limits, and provider test flow     | 000           |
+| 1.2   | `AI-MOD-002-ai-audit-evaluation-foundation`  | `S-002-ai-audit-evaluation-foundation/`  | implemented | Conversation/message/tool-call/provider-usage audit records, redaction rules, and baseline evaluation dataset                        | 000           |
+| 1.3   | `AI-MOD-003-metric-catalog-query-plan`       | `S-003-metric-catalog-query-plan/`       | implemented | Business glossary subset, MetricCatalog, filter/group-by allowlists, QueryPlanValidator, and 3-5 real staff questions                | 001, 002      |
+| 1.4   | `AI-MOD-004-query-metrics-tool-mvp`          | `S-004-query-metrics-tool-mvp/`          | implemented | ToolRegistry/ToolDispatcher foundation and read-only `query_metrics` tool backed by existing Academic/Finance queries                | 003           |
+| 1.5   | `AI-MOD-005-staff-copilot-chat-mvp`          | `S-005-staff-copilot-chat-mvp/`          | planned     | Internal staff chat surface, AgentRunner loop, structured output, answer sources, hidden-section notices, and dashboard parity proof | 004           |
+| 2.1   | `AI-MOD-006-entity-catalog-search`           | `S-006-entity-catalog-search/`           | planned     | EntityCatalog for student/class/program/semester, `search_entities`, scoped identifiers, and PII-safe search result limits           | 005           |
+| 2.2   | `AI-MOD-007-student-profile-sections`        | `S-007-student-profile-sections/`        | planned     | `get_entity_profile` for student profile sections with section-level permission and hidden-section reporting                         | 006           |
+| 2.3   | `AI-MOD-008-conversation-context`            | `S-008-conversation-context/`            | planned     | Resolved entities, current filters, current term, conversation summary, tool history, and bounded context rebuild                    | 006, 007      |
+| 3.1   | `AI-MOD-009-compare-metrics-tool`            | `S-009-compare-metrics-tool/`            | planned     | `compare_metrics` for current-vs-previous term and scoped trend explanations with source filters                                     | 004, 008      |
+| 3.2   | `AI-MOD-010-risk-and-recommendation-rules`   | `S-010-risk-and-recommendation-rules/`   | planned     | Rule-based risk factors, recommendation builder, missing-data handling, confidence levels, and no-ML default                         | 007, 009      |
+| 3.3   | `AI-MOD-011-feedback-and-evaluation-loop`    | `S-011-feedback-and-evaluation-loop/`    | planned     | Feedback controls, evaluation runner, expected answer fixtures, tool-call assertions, and regression tracking                        | 002, 005, 010 |
+| 4.1   | `AI-MOD-012-admin-governance-quota`          | `S-012-admin-governance-quota/`          | planned     | Admin tool/model/provider toggles, quota enforcement, rate limits, data-access preview, and audit viewer                             | 001, 002, 005 |
+| 4.2   | `AI-MOD-013-prompt-tool-versioning`          | `S-013-prompt-tool-versioning/`          | planned     | Prompt versions, tool schema versions, catalog version stamps, answer traceability, and rollback strategy                            | 002, 004      |
+| 4.3   | `AI-MOD-014-mcp-ready-resources-tools`       | `S-014-mcp-ready-resources-tools/`       | planned     | MCP-ready mapping for tools/resources/prompts after internal core is stable; no MCP server before this story                         | 012, 013      |
+| 5.1   | `AI-MOD-015-student-portal-assistant-spike`  | `S-015-student-portal-assistant-spike/`  | planned     | Separate student-portal feasibility spike only after internal staff assistant proves permission, audit, and evaluation gates         | 011, 012      |
+| 5.2   | `AI-MOD-016-write-approval-mode`             | `S-016-write-approval-mode/`             | planned     | Explicit human-approved write/action mode; mutations remain out of scope until a separate high-risk story accepts it                 | 011, 012      |
 
 ## Shared Rules
 
