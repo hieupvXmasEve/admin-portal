@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\StudentActionType;
-use App\Models\Campus;
 use App\Models\AcademicRecord;
+use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\CourseRetakeRegistration;
@@ -700,4 +700,100 @@ it('refuses defer_no_case auto-fix with a clear unsupported message', function (
 
     expect(fn () => FixBillingExceptionAction::run(['exception_id' => $exceptionId]))
         ->toThrow(RuntimeException::class, 'Defer case creation requires manual fee-policy selection');
+});
+
+it('does not flag a defer-marked registration as an enrolled-without-charge exception', function () {
+    $user = User::factory()->create();
+    actingAs($user);
+
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'EXC-DEFER-MARKED-01',
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+            'status' => 'intake_course',
+        ])
+        ->create();
+
+    $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
+
+    $registration = CourseRegistration::create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $this->semester->id,
+        'registration_status' => 'defer',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 1,
+    ]);
+
+    $actionLog = StudentActionLog::create([
+        'student_id' => $student->id,
+        'action_type' => StudentActionType::ACADEMIC_DEFER,
+        'reason' => 'Course-scope defer',
+        'from_semester_id' => $this->semester->id,
+        'changed_by_user_id' => $user->id,
+    ]);
+
+    $deferCase = DeferCase::create([
+        'student_action_log_id' => $actionLog->id,
+        'student_id' => $student->id,
+        'semester_id' => $this->semester->id,
+        'scope_type' => DeferCase::SCOPE_COURSES,
+        'fee_policy' => DeferCase::POLICY_FORFEIT,
+        'applies_once' => true,
+        'effective_at' => now()->toDateString(),
+        'changed_by_user_id' => $user->id,
+    ]);
+
+    DeferCaseItem::create([
+        'defer_case_id' => $deferCase->id,
+        'course_registration_id' => $registration->id,
+        'fee_policy' => DeferCase::POLICY_FORFEIT,
+    ]);
+
+    $counts = app(GetBillingExceptionCountsQuery::class)->handle($this->semester->id);
+
+    expect($counts['missing_charge'])->toBe(0)
+        ->and($counts['deferred_enrolled'])->toBe(0)
+        ->and($counts['zero_tuition_waived'])->toBe(0);
+});
+
+it('does not flag a defer-marked retake registration as a retake-no-charge exception', function () {
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'EXC-DEFER-RETAKE-01',
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+            'status' => 'intake_course',
+        ])
+        ->create();
+
+    $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
+
+    CourseRegistration::create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $this->semester->id,
+        'registration_status' => 'defer',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 2,
+        'is_retake' => true,
+        'retake_fee' => 1500000,
+    ]);
+
+    $counts = app(GetBillingExceptionCountsQuery::class)->handle($this->semester->id);
+
+    expect($counts['retake_no_charge'])->toBe(0);
 });

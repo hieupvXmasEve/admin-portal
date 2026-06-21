@@ -365,7 +365,9 @@ final class BillingExceptionCollector
         return CourseRegistration::query()
             ->when($campusId, fn ($q) => $q->whereHas('student', fn ($sq) => $sq->where('campus_id', $campusId)))
             ->when($semesterId, fn ($q) => $q->whereHas('courseOffering', fn ($cq) => $cq->where('semester_id', $semesterId)))
-            ->whereNotIn('registration_status', ['dropped', 'withdrawn'])
+            // FIN-REV-020: a deferred original registration is non-billable, so it
+            // must not surface as a missing/zero/deferred enrolled-without-charge exception.
+            ->whereNotIn('registration_status', ['defer', 'dropped', 'withdrawn'])
             ->whereNotExists(function ($query) use ($semesterId) {
                 $query->select(DB::raw(1))
                     ->from('finance_charges')
@@ -404,7 +406,8 @@ final class BillingExceptionCollector
             ->where('is_retake', true)
             ->when($campusId, fn ($q) => $q->whereHas('student', fn ($sq) => $sq->where('campus_id', $campusId)))
             ->when($semesterId, fn ($q) => $q->whereHas('courseOffering', fn ($cq) => $cq->where('semester_id', $semesterId)))
-            ->whereNotIn('registration_status', ['dropped', 'withdrawn'])
+            // FIN-REV-020: a deferred retake registration is non-billable.
+            ->whereNotIn('registration_status', ['defer', 'dropped', 'withdrawn'])
             ->whereNotExists(fn ($query) => $this->applyLegacyRetakeChargeExistsConstraint($query, $semesterId))
             ->whereNotExists(fn ($query) => $this->applyCourseRetakeRegistrationChargeExistsConstraint($query, $semesterId));
     }

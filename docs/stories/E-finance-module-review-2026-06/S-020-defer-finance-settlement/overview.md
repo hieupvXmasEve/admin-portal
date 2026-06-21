@@ -116,3 +116,18 @@ contract.
 - Do not add DB constraints until a dry-run proves historical data is clean or a
   human-approved remediation plan exists.
 - Do not change student or lecturer portal APIs in this story.
+
+## Implementation Slices
+
+Slice 1 (item-level evidence, non-billable deferred registrations, backfill
+dry-run) is implemented — see `validation.md`. The money-settlement slice is
+decomposed into ordered high-risk child stories (see the epic README
+"FIN-REV-020 Money-Phase Child Stories"):
+
+- `FIN-REV-020-01-defer-policy-settlement-action` — `ApplyDeferFinancePolicyAction` (FULL PRESERVE/FORFEIT), isolated.
+- `FIN-REV-020-02-defer-generation-non-billable` — defer-aware generation; remove preserve-skip.
+- `FIN-REV-020-03-defer-runtime-auto-apply` — runtime auto-apply for auto-safe cases.
+- `FIN-REV-020-04-defer-reenrollment-allocation` — re-enrollment charge + preserved-cash allocation.
+
+PARTIAL and COURSE-scope settlement stay report-only (needs-review) until a later
+increment defines a course-fee allocation rule.

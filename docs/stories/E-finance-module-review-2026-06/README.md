@@ -36,6 +36,22 @@ finally UI/BOD surfaces.
 | 19    | `FIN-REV-019-finance-reporting-dng-lifecycle`         | `S-019-finance-reporting-dng-lifecycle/`         | Build the DNG/Payment Lifecycle lens with attention buckets, webhook/payment bridge state, and related semester lineage               | 016, 005, 009                              |
 | 20    | `FIN-REV-020-defer-finance-settlement`                | `S-020-defer-finance-settlement/`                | Align academic defer item evidence, non-billable deferred registrations, and Finance ledger behavior without introducing a parallel settlement ledger | 002, 004, 005, 017                         |
 
+## FIN-REV-020 Money-Phase Child Stories
+
+`FIN-REV-020` slice 1 (item-level defer evidence, non-billable deferred
+registrations, backfill dry-run) is implemented. The money-settlement slice is
+decomposed into small high-risk increments, executed in order, each TDD with a
+clean `finance:audit-invariants` pass. PARTIAL and COURSE-scope settlement stay
+report-only (needs-review) until a later increment defines a course-fee
+allocation rule.
+
+| Order | Story id                                        | Story packet                               | Main scope                                                                                                       | Depends on            |
+| ----- | ----------------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | --------------------- |
+| 20.1  | `FIN-REV-020-01-defer-policy-settlement-action` | `S-020-01-defer-policy-settlement-action/` | `ApplyDeferFinancePolicyAction` FULL-scope PRESERVE/FORFEIT, isolated; void-and-release → consume; auto-safe gate | 020 slice 1, 002, 005 |
+| 20.2  | `FIN-REV-020-02-defer-generation-non-billable`  | `S-020-02-defer-generation-non-billable/`  | Generation/preview treat defer as non-billable; remove preserve-skip so M1 voids are not regenerated             | 020.1                 |
+| 20.3  | `FIN-REV-020-03-defer-runtime-auto-apply`       | `S-020-03-defer-runtime-auto-apply/`       | Wire runtime auto-apply for auto-safe FULL PRESERVE/FORFEIT; needs-review recorded + flagged; idempotent          | 020.1, 020.2          |
+| 20.4  | `FIN-REV-020-04-defer-reenrollment-allocation`  | `S-020-04-defer-reenrollment-allocation/`  | Re-enrollment generates a normal charge + AutoAllocate uses preserved cash                                       | 020.1, 020.2, 020.3   |
+
 ## FIN-REV-010 Consolidated Stories
 
 FIN-REV-010 is tracked as milestone-sized Harness stories. The old

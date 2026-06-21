@@ -55,6 +55,14 @@ class DeferCaseService
                 $this->addDeferCaseItems($deferCase, $data['course_registration_ids'], $data['course_fee_policies'] ?? []);
             }
 
+            // FIN-REV-020: a full-scope defer must also capture item-level course
+            // evidence for the student's active enrollments in the defer semester,
+            // mirroring the COURSES-scope path so those registrations become
+            // non-billable (registration_status = 'defer').
+            if ($deferCase->scope_type === DeferCase::SCOPE_FULL) {
+                $this->itemizeFullScope($deferCase);
+            }
+
             // Process fee policy and create credit charge if applicable
             $this->processFeePolicy($deferCase);
 
@@ -100,6 +108,55 @@ class DeferCaseService
         }
 
         return $items;
+    }
+
+    /**
+     * Capture item-level course evidence for a full-scope defer case.
+     *
+     * Resolves the student's active enrollments in the defer semester and
+     * itemizes them (creating defer_case_items and marking the registrations
+     * non-billable). Idempotent: registrations already covered by an item are
+     * skipped, so this is safe to run from both the runtime defer flow and the
+     * historical backfill command.
+     */
+    public function itemizeFullScope(DeferCase $deferCase): Collection
+    {
+        $registrationIds = $this->resolveActiveRegistrationIdsForSemester(
+            (int) $deferCase->student_id,
+            (int) $deferCase->semester_id,
+        );
+
+        $existingIds = $deferCase->items()->pluck('course_registration_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $missingIds = array_values(array_diff($registrationIds, $existingIds));
+
+        if (empty($missingIds)) {
+            return collect();
+        }
+
+        return $this->addDeferCaseItems($deferCase, $missingIds);
+    }
+
+    /**
+     * Resolve the student's active course registration ids in a semester.
+     *
+     * Active enrollments mirror CourseRegistration::scopeActive so a full-scope
+     * defer preserves exactly the courses the student is currently enrolled in,
+     * leaving already-dropped/withdrawn/completed registrations untouched.
+     *
+     * @return array<int, int>
+     */
+    protected function resolveActiveRegistrationIdsForSemester(int $studentId, int $semesterId): array
+    {
+        return CourseRegistration::query()
+            ->where('student_id', $studentId)
+            ->where('semester_id', $semesterId)
+            ->whereIn('registration_status', ['pending', 'registered', 'confirmed'])
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 
     /**
