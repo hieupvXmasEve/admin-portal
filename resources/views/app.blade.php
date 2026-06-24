@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @class(['dark'=> ($appearance ?? 'system') == 'dark'])>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="{{ $themeName ?? 'green' }}" @class(['dark'=> ($appearance ?? 'system') == 'dark'])>
 
 <head>
     <meta charset="utf-8">
@@ -21,14 +21,22 @@
         })();
     </script>
 
-    {{-- Inline style to set the HTML background color based on our theme in app.css --}}
+    {{-- Deploy-time brand theme tokens from APP_THEME --}}
     <style>
-        html {
-            background-color: oklch(1 0 0);
+        :root {
+            @foreach (($themeVariables['light'] ?? []) as $name => $value)
+            {{ $name }}: {{ $value }};
+            @endforeach
         }
 
-        html.dark {
-            background-color: oklch(0.145 0 0);
+        html {
+            background-color: var(--background);
+        }
+
+        .dark {
+            @foreach (($themeVariables['dark'] ?? []) as $name => $value)
+            {{ $name }}: {{ $value }};
+            @endforeach
         }
     </style>
 
@@ -43,6 +51,22 @@
 
     @routes
     @vite(['resources/js/app.ts'])
+
+    {{-- Re-apply after Vite CSS so APP_THEME wins the cascade --}}
+    <style>
+        :root {
+            @foreach (($themeVariables['light'] ?? []) as $name => $value)
+            {{ $name }}: {{ $value }};
+            @endforeach
+        }
+
+        .dark {
+            @foreach (($themeVariables['dark'] ?? []) as $name => $value)
+            {{ $name }}: {{ $value }};
+            @endforeach
+        }
+    </style>
+
     @inertiaHead
 </head>
 
