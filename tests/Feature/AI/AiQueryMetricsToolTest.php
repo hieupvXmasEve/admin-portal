@@ -46,12 +46,13 @@ beforeEach(function () {
     app()->singleton(PermissionService::class, fn () => $permissionService);
 });
 
-it('registers the query metrics tool alongside entity search', function () {
+it('registers the query metrics tool alongside entity and profile tools', function () {
     $registry = app(ToolRegistry::class);
 
-    expect($registry->toolNames())->toBe(['query_metrics', 'search_entities'])
+    expect($registry->toolNames())->toBe(['query_metrics', 'search_entities', 'get_entity_profile'])
         ->and($registry->has('query_metrics'))->toBeTrue()
         ->and($registry->has('search_entities'))->toBeTrue()
+        ->and($registry->has('get_entity_profile'))->toBeTrue()
         ->and($registry->definition('query_metrics')->toArray())->toMatchArray([
             'name' => 'query_metrics',
             'schema_version' => 'query_metrics:v1',
@@ -60,6 +61,11 @@ it('registers the query metrics tool alongside entity search', function () {
         ->and($registry->definition('search_entities')->toArray())->toMatchArray([
             'name' => 'search_entities',
             'schema_version' => 'search_entities:v1',
+            'permission' => 'view_ai_metrics',
+        ])
+        ->and($registry->definition('get_entity_profile')->toArray())->toMatchArray([
+            'name' => 'get_entity_profile',
+            'schema_version' => 'get_entity_profile:v1',
             'permission' => 'view_ai_metrics',
         ]);
 });

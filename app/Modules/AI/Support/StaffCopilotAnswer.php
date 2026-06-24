@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\AI\Support;
 
+use App\Modules\AI\Support\Tools\EntityProfileResult;
 use App\Modules\AI\Support\Tools\EntitySearchResult;
 use App\Modules\AI\Support\Tools\QueryMetricsResult;
 
@@ -22,7 +23,7 @@ class StaffCopilotAnswer
         private readonly bool $toolExecuted,
     ) {}
 
-    public static function fromResult(QueryMetricsResult|EntitySearchResult $result): self
+    public static function fromResult(QueryMetricsResult|EntitySearchResult|EntityProfileResult $result): self
     {
         $payload = $result->toArray();
         $sourceReport = (string) ($payload['source_references'][0]['source_report'] ?? 'allowlisted source report');
@@ -43,7 +44,7 @@ class StaffCopilotAnswer
      * @param  array<string, mixed>  $payload
      */
     private static function contentForResult(
-        QueryMetricsResult|EntitySearchResult $result,
+        QueryMetricsResult|EntitySearchResult|EntityProfileResult $result,
         string $status,
         string $sourceReport,
         array $payload,
@@ -56,6 +57,12 @@ class StaffCopilotAnswer
             }
 
             return 'This entity lookup could not be answered safely from the allowlisted entity catalog.';
+        }
+
+        if ($result instanceof EntityProfileResult) {
+            return in_array($status, ['completed', 'partial'], true)
+                ? "Profile sections returned from {$sourceReport}."
+                : 'This student profile could not be answered safely from the allowlisted profile section catalog.';
         }
 
         return in_array($status, ['completed', 'partial'], true)
@@ -96,7 +103,7 @@ class StaffCopilotAnswer
 
     /**
      * @param  array<string, mixed>  $finalAnswer
-     * @param  list<QueryMetricsResult|EntitySearchResult>  $toolResults
+     * @param  list<QueryMetricsResult|EntitySearchResult|EntityProfileResult>  $toolResults
      */
     public static function fromLiveFinalAnswer(array $finalAnswer, array $toolResults): self
     {

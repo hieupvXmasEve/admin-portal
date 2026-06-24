@@ -41,6 +41,7 @@ interface AnswerPayload {
         tool_schema_version: string;
         metric?: string;
         entity_type?: string;
+        section?: string;
     }>;
     normalized_filters: Record<string, unknown>;
     group_by: string[];
@@ -60,6 +61,11 @@ interface AnswerPayload {
     }>;
     entity_types: string[];
     normalized_query: string | null;
+    profile_sections: Record<string, unknown>;
+    requested_sections: string[];
+    returned_sections: string[];
+    profile_catalog_version: string | null;
+    profile_entity_type: string | null;
     result_limit: number | null;
     warnings: string[];
     confidence: {
@@ -99,6 +105,7 @@ const props = defineProps<{
         tool_names: string[];
         catalog_version: string;
         entity_catalog_version: string;
+        profile_catalog_version: string;
         tool_schema_version: string;
         tool_schema_versions: Record<string, string>;
         sdk_installed: boolean;
@@ -190,6 +197,12 @@ const summaryEntries = (summary: Record<string, unknown> | null): Array<[string,
 const metricsEntries = (metrics: Record<string, unknown>): Array<[string, unknown]> => Object.entries(metrics);
 
 const safeIdentifierEntries = (identifiers: Record<string, unknown>): Array<[string, unknown]> => Object.entries(identifiers);
+
+const profileSectionEntries = (sections: Record<string, unknown>): Array<[string, unknown]> => Object.entries(sections);
+
+const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const profileValueEntries = (value: unknown): Array<[string, unknown]> => (isRecord(value) ? Object.entries(value) : [['value', value]]);
 
 const parsePayload = (event: MessageEvent<string>): RuntimePayload => {
     try {
@@ -367,6 +380,22 @@ const formatValue = (value: unknown): string => {
     return String(value);
 };
 
+const formatProfileValue = (value: unknown): string => {
+    if (Array.isArray(value)) {
+        return `${value.length} item${value.length === 1 ? '' : 's'}`;
+    }
+
+    if (isRecord(value)) {
+        const entries = Object.entries(value)
+            .slice(0, 3)
+            .map(([key, entryValue]) => `${formatLabel(key)}: ${Array.isArray(entryValue) || isRecord(entryValue) ? 'details' : formatValue(entryValue)}`);
+
+        return entries.length > 0 ? entries.join(' · ') : '-';
+    }
+
+    return formatValue(value);
+};
+
 watch(
     () => props.messages,
     (messages) => {
@@ -535,11 +564,29 @@ defineOptions({
                                         </div>
                                     </div>
 
+                                    <div v-if="profileSectionEntries(message.answer.profile_sections).length > 0" class="space-y-2">
+                                        <p class="text-muted-foreground text-xs font-semibold tracking-widest uppercase">Profile</p>
+                                        <div class="grid gap-2 lg:grid-cols-2">
+                                            <div v-for="[section, value] in profileSectionEntries(message.answer.profile_sections)" :key="section" class="rounded-md border p-3">
+                                                <div class="mb-2 flex items-center justify-between gap-2">
+                                                    <p class="text-sm font-medium">{{ formatLabel(section) }}</p>
+                                                    <Badge variant="outline">{{ message.answer.profile_entity_type ?? 'student' }}</Badge>
+                                                </div>
+                                                <div class="grid gap-1 text-xs">
+                                                    <div v-for="[key, entryValue] in profileValueEntries(value)" :key="key" class="flex items-center justify-between gap-3">
+                                                        <span class="text-muted-foreground">{{ formatLabel(key) }}</span>
+                                                        <span class="max-w-[60%] truncate text-right font-medium">{{ formatProfileValue(entryValue) }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div v-if="message.answer.source_references.length > 0" class="space-y-2">
                                         <p class="text-muted-foreground text-xs font-semibold tracking-widest uppercase">Sources</p>
                                         <div
                                             v-for="source in message.answer.source_references"
-                                            :key="`${source.source_report}-${source.metric ?? source.entity_type ?? 'source'}`"
+                                            :key="`${source.source_report}-${source.metric ?? source.section ?? source.entity_type ?? 'source'}`"
                                             class="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-xs"
                                         >
                                             <FileText class="text-muted-foreground h-3.5 w-3.5" />

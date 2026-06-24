@@ -251,9 +251,12 @@ Code baseline:
   `/ai/copilot/runs/{run}/retry` when owned by the current staff/campus scope.
 - Staff copilot can use an enabled, successfully tested staff-owned provider
   setting for live structured planning and final answer synthesis. The live
-  model can only propose `query_metrics` and `search_entities`; Swinx validates
-  every proposed tool call server-side and executes accepted calls through
-  ToolDispatcher.
+  model can only propose `query_metrics`, `search_entities`, and
+  `get_entity_profile`; Swinx validates every proposed tool call server-side and
+  executes accepted calls through ToolDispatcher.
+- `get_entity_profile:v1` supports internal student profile sections only from
+  opaque `search_entities` `entity_ref` values. Sections are current-campus
+  scoped, permission-checked, audited, bounded, and PII-limited.
 - Deterministic planning remains the fallback when live mode is disabled,
   unavailable, or fails safely.
 

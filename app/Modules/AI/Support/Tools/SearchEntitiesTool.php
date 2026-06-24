@@ -6,8 +6,8 @@ namespace App\Modules\AI\Support\Tools;
 
 use App\Modules\AI\Support\AiAuditRecorder;
 use App\Modules\AI\Support\EntityCatalog;
+use App\Modules\AI\Support\EntityReferenceResolver;
 use App\Shared\Contracts\Academic\AiAcademicEntitySearchReader;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Gate;
 use Throwable;
 
@@ -23,6 +23,7 @@ class SearchEntitiesTool
         private readonly EntityCatalog $catalog,
         private readonly AiAcademicEntitySearchReader $reader,
         private readonly AiAuditRecorder $auditRecorder,
+        private readonly EntityReferenceResolver $entityReferenceResolver,
     ) {}
 
     /**
@@ -195,14 +196,7 @@ class SearchEntitiesTool
      */
     private function entityRef(array $entityResult, array $definition, QueryMetricsExecutionContext $context): string
     {
-        return Crypt::encryptString(json_encode([
-            'entity_type' => $entityResult['entity_type'],
-            'source_id' => $entityResult['source_id'],
-            'campus_id' => $context->campus?->id,
-            'catalog_version' => $this->catalog->version(),
-            'scope_rule' => $definition['campus_scope_rule'],
-            'issued_at' => now()->toISOString(),
-        ], JSON_THROW_ON_ERROR));
+        return $this->entityReferenceResolver->encodeReference($entityResult, $definition, $context->campus);
     }
 
     /**

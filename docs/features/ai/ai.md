@@ -1014,20 +1014,20 @@ EntityCatalog v1 và `search_entities:v1` cho candidate lookup nội bộ, read-
 permission-aware, campus-scoped, và PII-limited. `AI-MOD-017-live-provider-staff-copilot-agent`
 đã bổ sung live provider agent để Staff Copilot có thể diễn giải prompt tự
 nhiên hơn, nhưng vẫn buộc mọi data access đi qua ToolDispatcher và các tool
-allowlisted. `AI-MOD-018-provider-agnostic-sse-chat-runtime` được đề xuất để
-chuyển Staff Copilot từ flow request/response blocking sang chat runtime có
-durable run lifecycle, normalized provider events, downstream SSE, optimistic UI,
-reload recovery, cancellation/retry, và không cần WebSocket ở giai đoạn này; slice
-đầu tiên đã triển khai queued run + downstream SSE trên runtime fallback snapshot
-để giữ toàn bộ provider/tool execution phía backend.
+allowlisted. `AI-MOD-018-provider-agnostic-sse-chat-runtime` đã triển khai
+queued run + downstream SSE trên runtime fallback snapshot để giữ toàn bộ
+provider/tool execution phía backend. `AI-MOD-007-student-profile-sections` đã
+triển khai `student-profile-sections:v1` và `get_entity_profile:v1` cho các
+section hồ sơ sinh viên nội bộ, chỉ từ opaque `entity_ref`, có campus scope,
+section-level permission, hidden-section reporting, audit và PII limit.
 
 ```text
 1. Tạo EntityCatalog — implemented in AI-MOD-006
 2. Tạo search_entities — implemented in AI-MOD-006
 3. Tạo live-provider Staff Copilot agent — implemented in AI-MOD-017
 4. Tạo provider-agnostic SSE chat runtime — implemented in AI-MOD-018
-5. Tạo get_entity_profile
-6. Thêm section-level permission
+5. Tạo get_entity_profile — implemented in AI-MOD-007
+6. Thêm section-level permission — implemented in AI-MOD-007
 7. Thêm conversation state
 8. Thêm resolved_entities
 9. Thêm current_filters/current_term

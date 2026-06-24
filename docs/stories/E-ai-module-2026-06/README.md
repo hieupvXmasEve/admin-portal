@@ -35,7 +35,7 @@ Until then, this table is the source of truth for planned AI work.
 | 2.1   | `AI-MOD-006-entity-catalog-search`              | `S-006-entity-catalog-search/`              | implemented | EntityCatalog for student/class/program/semester, `search_entities`, scoped identifiers, and PII-safe search result limits                    | 005                     |
 | 2.2   | `AI-MOD-017-live-provider-staff-copilot-agent`  | `S-017-live-provider-staff-copilot-agent/`  | implemented | Live provider Staff Copilot agent that interprets natural-language prompts and chooses allowlisted tools through ToolDispatcher               | 001-006                 |
 | 2.3   | `AI-MOD-018-provider-agnostic-sse-chat-runtime` | `S-018-provider-agnostic-sse-chat-runtime/` | implemented | Provider-agnostic SSE chat runtime with durable run lifecycle, normalized events, optimistic UI, reload recovery, and no WebSocket dependency | 017                     |
-| 2.4   | `AI-MOD-007-student-profile-sections`           | `S-007-student-profile-sections/`           | planned     | `get_entity_profile` as a Live Copilot capability for student profile sections with section-level permission and hidden-section reporting     | 006, 017                |
+| 2.4   | `AI-MOD-007-student-profile-sections`           | `S-007-student-profile-sections/`           | implemented | `get_entity_profile` as a Live Copilot capability for student profile sections with section-level permission and hidden-section reporting     | 006, 017                |
 | 2.5   | `AI-MOD-008-conversation-context`               | `S-008-conversation-context/`               | planned     | Live Copilot context: resolved entities, current filters, current term, conversation summary, tool history, and bounded context rebuild       | 007, 017, 018           |
 | 3.1   | `AI-MOD-009-compare-metrics-tool`               | `S-009-compare-metrics-tool/`               | planned     | `compare_metrics` for current-vs-previous term and scoped trend explanations with source filters                                              | 004, 008                |
 | 3.2   | `AI-MOD-010-risk-and-recommendation-rules`      | `S-010-risk-and-recommendation-rules/`      | planned     | Rule-backed Live Copilot recommendations with missing-data handling, confidence levels, and no-ML default                                     | 007, 009, 017           |
@@ -65,6 +65,12 @@ placeholders, persists normalized `ai_run_events`, exposes
 run cancellation/retry, and keeps AI-MOD-017 provider/tool execution behind the
 backend with fallback snapshot deltas.
 
+Implemented profile slice: Staff Copilot can execute `get_entity_profile:v1`
+for student entities selected through opaque `search_entities` `entity_ref`
+values. The section catalog is code-defined as
+`student-profile-sections:v1`; reads remain current-campus scoped,
+permission-checked per section, audited, bounded, and PII-limited.
+
 The intended layering is:
 
 ```text
@@ -82,7 +88,8 @@ Capability expansion after `AI-MOD-017` and `AI-MOD-018`:
 
 - `AI-MOD-018`: adds SSE chat runtime, active run lifecycle, normalized stream
   events, reload recovery, and no-WebSocket delivery.
-- `AI-MOD-007`: adds safe profile-section reads for selected entities.
+- `AI-MOD-007`: implemented; adds safe profile-section reads for selected
+  student entities.
 - `AI-MOD-008`: adds resolved entity/current filter/current term context for
   follow-up questions.
 - `AI-MOD-009`: adds comparison and trend tools.

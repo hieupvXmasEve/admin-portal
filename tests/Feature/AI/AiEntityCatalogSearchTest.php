@@ -116,11 +116,16 @@ it('exposes entity catalog definitions and registers the search entities tool', 
             'campus_scope_rule' => 'current_campus_only',
             'max_results' => 5,
         ])
-        ->and($registry->toolNames())->toBe(['query_metrics', 'search_entities'])
+        ->and($registry->toolNames())->toBe(['query_metrics', 'search_entities', 'get_entity_profile'])
         ->and($registry->has('search_entities'))->toBeTrue()
         ->and($registry->definition('search_entities')?->toArray())->toMatchArray([
             'name' => 'search_entities',
             'schema_version' => 'search_entities:v1',
+            'permission' => 'view_ai_metrics',
+        ])
+        ->and($registry->definition('get_entity_profile')?->toArray())->toMatchArray([
+            'name' => 'get_entity_profile',
+            'schema_version' => 'get_entity_profile:v1',
             'permission' => 'view_ai_metrics',
         ]);
 });

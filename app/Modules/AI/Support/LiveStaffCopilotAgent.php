@@ -10,6 +10,7 @@ use App\Modules\AI\Agents\LiveStaffCopilotFinalAnswerAgent;
 use App\Modules\AI\Agents\LiveStaffCopilotPlannerAgent;
 use App\Modules\AI\Models\AiAgentTrace;
 use App\Modules\AI\Models\AiProviderSetting;
+use App\Modules\AI\Support\Tools\EntityProfileResult;
 use App\Modules\AI\Support\Tools\EntitySearchResult;
 use App\Modules\AI\Support\Tools\QueryMetricsResult;
 use App\Modules\AI\Support\Tools\ToolDispatcher;
@@ -30,6 +31,7 @@ class LiveStaffCopilotAgent
         private readonly LaravelAiProviderResolver $providerResolver,
         private readonly MetricCatalog $metricCatalog,
         private readonly EntityCatalog $entityCatalog,
+        private readonly StudentProfileSectionCatalog $studentProfileSectionCatalog,
         private readonly ToolRegistry $toolRegistry,
         private readonly ToolDispatcher $toolDispatcher,
         private readonly AiAuditRecorder $auditRecorder,
@@ -116,8 +118,8 @@ class LiveStaffCopilotAgent
             'provider' => (string) $resolvedProvider['provider'],
             'model' => (string) $resolvedProvider['model'],
             'prompt_version' => self::PROMPT_VERSION,
-            'catalog_version' => $this->metricCatalog->version().'|'.$this->entityCatalog->version(),
-            'tool_schema_version' => $this->metricCatalog->toolSchemaVersion().'|'.$this->entityCatalog->toolSchemaVersion(),
+            'catalog_version' => $this->metricCatalog->version().'|'.$this->entityCatalog->version().'|'.$this->studentProfileSectionCatalog->version(),
+            'tool_schema_version' => $this->metricCatalog->toolSchemaVersion().'|'.$this->entityCatalog->toolSchemaVersion().'|'.$this->studentProfileSectionCatalog->toolSchemaVersion(),
         ])->save();
     }
 
@@ -151,7 +153,7 @@ class LiveStaffCopilotAgent
     }
 
     /**
-     * @param  list<QueryMetricsResult|EntitySearchResult>  $toolResults
+     * @param  list<QueryMetricsResult|EntitySearchResult|EntityProfileResult>  $toolResults
      * @param  array<string, mixed>  $resolvedProvider
      */
     private function promptFinalAnswer(string $question, array $toolResults, array $resolvedProvider): AgentResponse
@@ -187,6 +189,7 @@ class LiveStaffCopilotAgent
             ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             'MetricCatalog: '.$this->catalogSummary(),
             'EntityCatalog: '.$this->entityCatalogSummary(),
+            'StudentProfileSectionCatalog: '.$this->studentProfileSectionSummary(),
             'Available tools: '.$this->toolSummary(),
         ]);
     }
@@ -208,19 +211,19 @@ class LiveStaffCopilotAgent
     }
 
     /**
-     * @param  list<QueryMetricsResult|EntitySearchResult>  $toolResults
+     * @param  list<QueryMetricsResult|EntitySearchResult|EntityProfileResult>  $toolResults
      */
     private function finalAnswerPrompt(string $question, array $toolResults): string
     {
         return 'Staff question: '.$question."\n\nRedacted tool results:\n".json_encode(
-            array_map(fn (QueryMetricsResult|EntitySearchResult $result): array => $result->toArray(), $toolResults),
+            array_map(fn (QueryMetricsResult|EntitySearchResult|EntityProfileResult $result): array => $result->toArray(), $toolResults),
             JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES,
         );
     }
 
     /**
      * @param  array<string, mixed>  $plannerOutput
-     * @return list<QueryMetricsResult|EntitySearchResult>
+     * @return list<QueryMetricsResult|EntitySearchResult|EntityProfileResult>
      */
     private function executePlannerOutput(array $plannerOutput, User $actor, ?Campus $campus, AiAgentTrace $trace): array
     {
@@ -385,6 +388,25 @@ class LiveStaffCopilotAgent
                 ->all(),
             JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES,
         );
+    }
+
+    private function studentProfileSectionSummary(): string
+    {
+        return json_encode([
+            'catalog_version' => $this->studentProfileSectionCatalog->version(),
+            'tool_schema_version' => $this->studentProfileSectionCatalog->toolSchemaVersion(),
+            'sections' => collect($this->studentProfileSectionCatalog->sections())
+                ->map(fn (array $section): array => Arr::only($section, [
+                    'key',
+                    'aliases',
+                    'required_permission',
+                    'source_report',
+                    'source_reference_policy',
+                    'fields',
+                ]))
+                ->values()
+                ->all(),
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
     }
 
     private function toolSummary(): string

@@ -15,6 +15,7 @@ use App\Modules\AI\Models\AiToolCall;
 use App\Modules\AI\Support\EntityCatalog;
 use App\Modules\AI\Support\MetricCatalog;
 use App\Modules\AI\Support\StaffMetricQuestionDataset;
+use App\Modules\AI\Support\StudentProfileSectionCatalog;
 use App\Modules\AI\Support\Tools\ToolRegistry;
 use Illuminate\Support\Collection;
 
@@ -23,6 +24,7 @@ class StaffCopilotPageQuery
     public function __construct(
         private readonly MetricCatalog $catalog,
         private readonly EntityCatalog $entityCatalog,
+        private readonly StudentProfileSectionCatalog $studentProfileSectionCatalog,
         private readonly StaffMetricQuestionDataset $dataset,
         private readonly ToolRegistry $toolRegistry,
     ) {}
@@ -43,10 +45,12 @@ class StaffCopilotPageQuery
                 'tool_names' => $this->toolRegistry->toolNames(),
                 'catalog_version' => $this->catalog->version(),
                 'entity_catalog_version' => $this->entityCatalog->version(),
+                'profile_catalog_version' => $this->studentProfileSectionCatalog->version(),
                 'tool_schema_version' => $this->catalog->toolSchemaVersion(),
                 'tool_schema_versions' => [
                     'query_metrics' => $this->catalog->toolSchemaVersion(),
                     'search_entities' => $this->entityCatalog->toolSchemaVersion(),
+                    'get_entity_profile' => $this->studentProfileSectionCatalog->toolSchemaVersion(),
                 ],
                 'sdk_installed' => class_exists('Laravel\\Ai\\Enums\\Lab'),
                 'live_provider_enabled' => $this->liveProviderEnabled($actor),
@@ -217,6 +221,11 @@ class StaffCopilotPageQuery
                 'entity_results' => [],
                 'entity_types' => [],
                 'normalized_query' => null,
+                'profile_sections' => [],
+                'requested_sections' => [],
+                'returned_sections' => [],
+                'profile_catalog_version' => null,
+                'profile_entity_type' => null,
                 'result_limit' => null,
                 'campus_scope_snapshot' => [],
                 'freshness' => [],
@@ -240,6 +249,11 @@ class StaffCopilotPageQuery
             'entity_results' => $resultSummary['results'] ?? [],
             'entity_types' => $resultSummary['entity_types'] ?? [],
             'normalized_query' => $resultSummary['normalized_query'] ?? null,
+            'profile_sections' => $resultSummary['sections'] ?? [],
+            'requested_sections' => $resultSummary['requested_sections'] ?? [],
+            'returned_sections' => $resultSummary['returned_sections'] ?? [],
+            'profile_catalog_version' => $resultSummary['profile_catalog_version'] ?? null,
+            'profile_entity_type' => $resultSummary['entity_type'] ?? null,
             'result_limit' => $resultSummary['result_limit'] ?? null,
             'campus_scope_snapshot' => $toolCall->campus_scope_snapshot ?? [],
             'freshness' => $resultSummary['freshness'] ?? [],

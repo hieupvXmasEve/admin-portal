@@ -6,14 +6,17 @@ namespace App\Modules\AI\Support\Tools;
 
 use App\Modules\AI\Support\EntityCatalog;
 use App\Modules\AI\Support\MetricCatalog;
+use App\Modules\AI\Support\StudentProfileSectionCatalog;
 
 class ToolRegistry
 {
     public function __construct(
         private readonly QueryMetricsTool $queryMetricsTool,
         private readonly SearchEntitiesTool $searchEntitiesTool,
+        private readonly GetEntityProfileTool $getEntityProfileTool,
         private readonly MetricCatalog $catalog,
         private readonly EntityCatalog $entityCatalog,
+        private readonly StudentProfileSectionCatalog $studentProfileSectionCatalog,
     ) {}
 
     /**
@@ -21,7 +24,7 @@ class ToolRegistry
      */
     public function toolNames(): array
     {
-        return ['query_metrics', 'search_entities'];
+        return ['query_metrics', 'search_entities', 'get_entity_profile'];
     }
 
     public function has(string $toolName): bool
@@ -60,15 +63,23 @@ class ToolRegistry
                 description: 'Search allowlisted academic entity candidates without exposing raw source records.',
                 safeErrorCodes: $this->entityCatalog->safeErrorCodes(),
             ),
+            'get_entity_profile' => new AiToolDefinition(
+                name: 'get_entity_profile',
+                schemaVersion: $this->studentProfileSectionCatalog->toolSchemaVersion(),
+                permission: 'view_ai_metrics',
+                description: 'Return allowlisted student profile sections from an opaque entity_ref.',
+                safeErrorCodes: $this->studentProfileSectionCatalog->safeErrorCodes(),
+            ),
             default => null,
         };
     }
 
-    public function tool(string $toolName): QueryMetricsTool|SearchEntitiesTool|null
+    public function tool(string $toolName): QueryMetricsTool|SearchEntitiesTool|GetEntityProfileTool|null
     {
         return match ($toolName) {
             'query_metrics' => $this->queryMetricsTool,
             'search_entities' => $this->searchEntitiesTool,
+            'get_entity_profile' => $this->getEntityProfileTool,
             default => null,
         };
     }
