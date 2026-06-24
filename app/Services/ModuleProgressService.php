@@ -10,6 +10,10 @@ use Illuminate\Support\Collection;
 
 class ModuleProgressService
 {
+    public function __construct(
+        private readonly ModuleGradeCalculator $moduleGradeCalculator = new ModuleGradeCalculator,
+    ) {}
+
     public function getStudentModuleProgress(Student $student): Collection
     {
         $curriculumVersion = $student->curriculumVersion;
@@ -37,13 +41,8 @@ class ModuleProgressService
             ->with(['unit', 'courseOffering'])
             ->get();
 
-        // Use grading_type from module_units pivot, not from course_offering
-        [$gradedRecords, $passFailRecords] = $academicRecords->partition(function ($record) use ($subUnits) {
-            $unit = $subUnits->firstWhere('id', $record->unit_id);
-            return $unit && $unit->pivot->grading_type === 'grade';
-        });
-
-        $moduleGrade = $this->calculateModuleGrade($gradedRecords, $module);
+        // Graded vs pass/fail is decided by the module_units pivot inside the calculator.
+        $moduleGrade = $this->moduleGradeCalculator->calculate($academicRecords, $module);
         $moduleStatus = $this->calculateModuleStatus($academicRecords, $subUnits);
 
         $completedCount = $academicRecords->whereIn('completion_status', ['completed', 'failed'])->count();
@@ -58,48 +57,6 @@ class ModuleProgressService
             'total_count' => $totalCount,
             'sub_units' => $this->mapSubUnitsProgress($subUnits, $academicRecords),
         ];
-    }
-
-    private function calculateModuleGrade(Collection $gradedRecords, Module $module): ?float
-    {
-        if ($gradedRecords->isEmpty()) {
-            return null;
-        }
-
-        $subUnits = $module->units()->get();
-        $hasWeights = $subUnits->whereNotNull('pivot.weight')->isNotEmpty();
-
-        if ($hasWeights) {
-            return $this->calculateWeightedAverage($gradedRecords, $subUnits);
-        }
-
-        $average = $gradedRecords->avg('final_percentage');
-        
-        return $average !== null ? round($average, 2) : null;
-    }
-
-    private function calculateWeightedAverage(Collection $gradedRecords, Collection $subUnits): ?float
-    {
-        $totalWeight = 0;
-        $weightedSum = 0;
-
-        foreach ($gradedRecords as $record) {
-            if ($record->final_percentage === null) {
-                continue;
-            }
-
-            $unit = $subUnits->firstWhere('id', $record->unit_id);
-            $weight = $unit?->pivot->weight ?? 1;
-
-            $weightedSum += $record->final_percentage * $weight;
-            $totalWeight += $weight;
-        }
-
-        if ($totalWeight == 0) {
-            return null;
-        }
-
-        return round($weightedSum / $totalWeight, 2);
     }
 
     private function calculateModuleStatus(Collection $academicRecords, Collection $subUnits): string

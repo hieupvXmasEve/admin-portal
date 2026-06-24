@@ -9,6 +9,7 @@ use App\Models\GpaCalculation;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
+use App\Services\ModuleGradeCalculator;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -17,6 +18,7 @@ class GradeService
 {
     public function __construct(
         private readonly GradeDisplayPresenter $gradeDisplayPresenter,
+        private readonly ModuleGradeCalculator $moduleGradeCalculator = new ModuleGradeCalculator,
     ) {}
 
     /**
@@ -1105,45 +1107,16 @@ class GradeService
     }
 
     /**
-     * Calculate module grade from all enrolled units
+     * Calculate the module grade as a whole 0-5 value.
+     *
+     * Delegates to the shared ModuleGradeCalculator so this surface and
+     * ModuleProgressService cannot diverge: graded vs pass/fail is decided by the
+     * module_units pivot, the grade is a credit-weighted average of the 0-5
+     * sub-unit grades, and it is withheld until every graded sub-unit has passed.
      */
     protected function calculateModuleGrade($module, Collection $allModuleRecords): ?float
     {
-        // Only calculate from graded units with completed status
-        $gradedRecords = $allModuleRecords->filter(
-            fn ($r) => $r->courseOffering &&
-                $r->courseOffering->grading_type === 'grade' &&
-                $r->completion_status === 'completed' &&
-                $r->final_percentage !== null
-        );
-
-        if ($gradedRecords->isEmpty()) {
-            return null;
-        }
-
-        // Check if weights are used
-        $firstUnit = $module->units->first();
-        $usesWeights = $firstUnit && isset($firstUnit->pivot->weight) && $firstUnit->pivot->weight !== null;
-
-        if ($usesWeights) {
-            // Weighted average
-            $totalWeight = 0;
-            $weightedSum = 0;
-
-            foreach ($gradedRecords as $record) {
-                $unit = $module->units->find($record->unit_id);
-                if ($unit && isset($unit->pivot->weight) && $unit->pivot->weight) {
-                    $weight = $unit->pivot->weight;
-                    $totalWeight += $weight;
-                    $weightedSum += $record->final_percentage * $weight;
-                }
-            }
-
-            return $totalWeight > 0 ? round($weightedSum / $totalWeight, 2) : null;
-        }
-
-        // Simple average
-        return round($gradedRecords->avg('final_percentage'), 2);
+        return $this->moduleGradeCalculator->calculate($allModuleRecords, $module);
     }
 
     /**
