@@ -39,10 +39,28 @@ interface AnswerPayload {
         source_reference_policy: string;
         catalog_version: string;
         tool_schema_version: string;
-        metric: string;
+        metric?: string;
+        entity_type?: string;
     }>;
     normalized_filters: Record<string, unknown>;
     group_by: string[];
+    entity_results: Array<{
+        entity_type: string;
+        entity_ref: string;
+        label: string;
+        safe_identifiers: Record<string, unknown>;
+        match_reason: string;
+        source_reference: {
+            source_report: string;
+            source_reference_policy: string;
+            catalog_version: string;
+            tool_schema_version: string;
+            entity_type: string;
+        };
+    }>;
+    entity_types: string[];
+    normalized_query: string | null;
+    result_limit: number | null;
     warnings: string[];
     confidence: {
         level: string;
@@ -121,6 +139,8 @@ const usePrompt = (prompt: SuggestedPrompt): void => {
 const summaryEntries = (summary: Record<string, unknown> | null): Array<[string, unknown]> => Object.entries(summary ?? {});
 
 const metricsEntries = (metrics: Record<string, unknown>): Array<[string, unknown]> => Object.entries(metrics);
+
+const safeIdentifierEntries = (identifiers: Record<string, unknown>): Array<[string, unknown]> => Object.entries(identifiers);
 
 const formatLabel = (value: string): string =>
     value
@@ -238,9 +258,34 @@ defineOptions({
                                         </div>
                                     </div>
 
+                                    <div v-if="message.answer.entity_results.length > 0" class="space-y-2">
+                                        <p class="text-muted-foreground text-xs font-semibold tracking-widest uppercase">Candidates</p>
+                                        <div class="grid gap-2 lg:grid-cols-2">
+                                            <div v-for="candidate in message.answer.entity_results" :key="candidate.entity_ref" class="rounded-md border p-3">
+                                                <div class="mb-2 flex items-start justify-between gap-2">
+                                                    <div class="min-w-0">
+                                                        <p class="truncate text-sm font-medium">{{ candidate.label }}</p>
+                                                        <p class="text-muted-foreground text-xs">{{ candidate.match_reason }}</p>
+                                                    </div>
+                                                    <Badge variant="outline">{{ candidate.entity_type }}</Badge>
+                                                </div>
+                                                <div class="grid gap-1 text-xs">
+                                                    <div v-for="[key, value] in safeIdentifierEntries(candidate.safe_identifiers)" :key="key" class="flex items-center justify-between gap-3">
+                                                        <span class="text-muted-foreground">{{ formatLabel(key) }}</span>
+                                                        <span class="font-medium">{{ formatValue(value) }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div v-if="message.answer.source_references.length > 0" class="space-y-2">
                                         <p class="text-muted-foreground text-xs font-semibold tracking-widest uppercase">Sources</p>
-                                        <div v-for="source in message.answer.source_references" :key="`${source.source_report}-${source.metric}`" class="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-xs">
+                                        <div
+                                            v-for="source in message.answer.source_references"
+                                            :key="`${source.source_report}-${source.metric ?? source.entity_type ?? 'source'}`"
+                                            class="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-xs"
+                                        >
                                             <FileText class="text-muted-foreground h-3.5 w-3.5" />
                                             <span class="font-medium">{{ source.source_report }}</span>
                                             <span class="text-muted-foreground">{{ source.source_reference_policy }}</span>

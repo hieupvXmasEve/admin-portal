@@ -23,6 +23,20 @@ class StaffCopilotAgentRunner
 
     public function run(string $question, User $actor, ?Campus $campus, AiAgentTrace $trace): StaffCopilotAnswer
     {
+        $entitySearchPlan = $this->entitySearchPlan($question);
+
+        if ($entitySearchPlan !== null) {
+            $result = $this->toolDispatcher->dispatch(
+                toolName: 'search_entities',
+                arguments: $entitySearchPlan,
+                actor: $actor,
+                campus: $campus,
+                trace: $trace,
+            );
+
+            return StaffCopilotAnswer::fromResult($result);
+        }
+
         $plan = $this->planFor($question);
 
         if ($plan === null) {
@@ -38,6 +52,66 @@ class StaffCopilotAgentRunner
         );
 
         return StaffCopilotAnswer::fromResult($result);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function entitySearchPlan(string $question): ?array
+    {
+        foreach ($this->entitySearchPatterns() as $entityType => $patterns) {
+            foreach ($patterns as $pattern) {
+                if (! preg_match($pattern, $question, $matches)) {
+                    continue;
+                }
+
+                $query = $this->sanitizeEntityQuery((string) ($matches['query'] ?? $matches[1] ?? ''));
+
+                if (mb_strlen($query) < 3) {
+                    continue;
+                }
+
+                return [
+                    'query' => $query,
+                    'entity_types' => [$entityType],
+                    'options' => [
+                        'limit' => 5,
+                    ],
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private function entitySearchPatterns(): array
+    {
+        $verbs = '(?:find|search|lookup|tìm|tim)';
+
+        return [
+            'student' => [
+                "/\\b{$verbs}\\s+(?:student|sinh\\s+vi[eê]n|sv)\\s+(?<query>[A-Z0-9._-]{3,100})\\b/iu",
+            ],
+            'program' => [
+                "/\\b{$verbs}\\s+(?:program|major|ng[aà]nh)\\s+(?<query>[A-Z0-9._-]{3,100})\\b/iu",
+            ],
+            'semester' => [
+                "/\\b{$verbs}\\s+(?:semester|term|k[yỳ])\\s+(?<query>[A-Z0-9._-]{3,100})\\b/iu",
+            ],
+            'course_offering' => [
+                "/\\b{$verbs}\\s+(?:class|section|l[oớ]p)\\s+(?<query>[A-Z0-9._-]{3,100})\\b/iu",
+            ],
+        ];
+    }
+
+    private function sanitizeEntityQuery(string $query): string
+    {
+        return Str::of($query)
+            ->trim(" \t\n\r\0\x0B.,;:!?")
+            ->toString();
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\AI\Support;
 
+use App\Modules\AI\Support\Tools\EntitySearchResult;
 use App\Modules\AI\Support\Tools\QueryMetricsResult;
 
 class StaffCopilotAnswer
@@ -21,14 +22,12 @@ class StaffCopilotAnswer
         private readonly bool $toolExecuted,
     ) {}
 
-    public static function fromResult(QueryMetricsResult $result): self
+    public static function fromResult(QueryMetricsResult|EntitySearchResult $result): self
     {
         $payload = $result->toArray();
         $sourceReport = (string) ($payload['source_references'][0]['source_report'] ?? 'allowlisted source report');
         $status = (string) $payload['status'];
-        $content = in_array($status, ['completed', 'partial'], true)
-            ? "Answer generated from {$sourceReport}."
-            : 'This question could not be answered safely from the allowlisted metric catalog.';
+        $content = self::contentForResult($result, $status, $sourceReport, $payload);
 
         return new self(
             status: $status,
@@ -38,6 +37,30 @@ class StaffCopilotAnswer
             hiddenSections: $payload['hidden_sections'] ?? [],
             toolExecuted: true,
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private static function contentForResult(
+        QueryMetricsResult|EntitySearchResult $result,
+        string $status,
+        string $sourceReport,
+        array $payload,
+    ): string {
+        if ($result instanceof EntitySearchResult) {
+            if (in_array($status, ['completed', 'partial'], true)) {
+                $count = (int) ($payload['result_count'] ?? 0);
+
+                return "Found {$count} entity candidate(s) from {$sourceReport}.";
+            }
+
+            return 'This entity lookup could not be answered safely from the allowlisted entity catalog.';
+        }
+
+        return in_array($status, ['completed', 'partial'], true)
+            ? "Answer generated from {$sourceReport}."
+            : 'This question could not be answered safely from the allowlisted metric catalog.';
     }
 
     public static function unsupported(): self

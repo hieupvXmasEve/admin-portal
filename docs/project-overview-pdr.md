@@ -1,8 +1,8 @@
 # Project Overview and PDR
 
-Last updated: 2026-05-31
-Owner: Platform Team  
-Status: Current-state baseline (evidence-first)  
+Last updated: 2026-06-24
+Owner: Platform Team
+Status: Current-state baseline (evidence-first)
 Source of truth: code in `app/`, `routes/`, `resources/` + scout reports in `plans/reports/`
 
 ## 1) Product Summary
@@ -219,7 +219,7 @@ Acceptance criteria:
 - New academic notifications for students are persisted through Notification V2 tables, not legacy `notifications`.
 - Tuition transition logic reads `students.status` and `students.intake_major`.
 
-### FR-11 AI Provider Settings, Audit Foundation, Metric Query Planning, and Staff Copilot
+### FR-11 AI Provider Settings, Audit Foundation, Metric/Entity Tools, and Staff Copilot
 
 Code baseline:
 
@@ -236,12 +236,18 @@ Code baseline:
   contracts, business glossary mappings, query-plan validation, campus scope,
   `view_ai_metrics` permission checks, source report identity, and deterministic
   staff metric evaluation cases before any tool execution.
+- AI entity catalog/search foundation defines EntityCatalog v1 for `student`,
+  `program`, `semester`, and `course_offering`, with `class` as the
+  course-offering alias, entity-specific permission checks, campus scope for
+  campus-bound entities, opaque scoped entity references, safe identifiers, and
+  source-reference/audit evidence.
 - AI staff copilot MVP exposes an internal `/ai/copilot` Inertia page and
   `/ai/copilot/messages` form endpoint for staff with `view_ai_metrics`.
 - Staff copilot questions are deterministic in this slice: the browser submits
-  only a bounded natural-language question, backend planning maps it to
-  MetricCatalog v1/`query_metrics`, and answer props are rendered from audited
-  `QueryMetricsResult` evidence.
+  only a bounded natural-language question, backend planning maps metric
+  questions to MetricCatalog v1/`query_metrics` and explicit lookup questions
+  to EntityCatalog v1/`search_entities`, and answer props are rendered from
+  audited result evidence.
 
 Acceptance criteria:
 
@@ -257,8 +263,12 @@ Acceptance criteria:
 - Staff copilot answers that contain numbers or record facts cite source report,
   normalized filters, campus scope, freshness, hidden sections, warnings, and
   confidence.
+- Staff copilot entity candidate lists return only bounded safe labels,
+  allowlisted identifiers, match reasons, source references, campus scope,
+  hidden sections, warnings, confidence, and opaque entity refs.
 - No live provider prompt runtime, MCP exposure, write/action mode, source-row
-  dumps, or student/lecturer portal behavior is exposed by this MVP.
+  dumps, profile-section reads, or student/lecturer portal behavior is exposed
+  by this MVP.
 
 ## 4) Non-Functional Requirements
 

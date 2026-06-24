@@ -25,7 +25,7 @@ class ToolDispatcher
         User $actor,
         ?Campus $campus = null,
         ?AiAgentTrace $trace = null,
-    ): QueryMetricsResult {
+    ): QueryMetricsResult|EntitySearchResult {
         $tool = $this->registry->tool($toolName);
 
         if (! $tool) {

@@ -1009,9 +1009,14 @@ Tài liệu bạn gửi cũng đề xuất kiến trúc Vue/Inertia → Controll
 
 ## Phase 2 — Entity và context
 
+Trạng thái hiện tại: `AI-MOD-006-entity-catalog-search` đã triển khai
+EntityCatalog v1 và `search_entities:v1` cho candidate lookup nội bộ, read-only,
+permission-aware, campus-scoped, và PII-limited. Các bước profile/context bên
+dưới vẫn thuộc story sau.
+
 ```text
-1. Tạo EntityCatalog
-2. Tạo search_entities
+1. Tạo EntityCatalog — implemented in AI-MOD-006
+2. Tạo search_entities — implemented in AI-MOD-006
 3. Tạo get_entity_profile
 4. Thêm section-level permission
 5. Thêm conversation state
