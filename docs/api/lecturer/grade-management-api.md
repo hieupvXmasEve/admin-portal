@@ -213,7 +213,46 @@ interface ExportParams {
 - **Content-Type**: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` (Excel) or `text/csv` (CSV)
 - **Body**: Binary file data
 
-### 5. Standard API Response Wrapper
+### 5. Grade Display (Custom Grading Schemes)
+
+The grade matrix (`/courses/{courseOffering}/assessments/report/grade-matrix`)
+attaches an optional, display-safe `grade_display` object to each
+`student_grades[]` row, derived from `academic_records.grade_breakdown`. It is
+`null` when a student has no academic record. For default weighted-percentage
+courses, `scheme_engine` is `default_weighted_percentage` and the existing
+`letter_grade` / `final_percentage` fields remain authoritative.
+
+Prefer `grade_display.final_label` for read-only final display and fall back to
+`letter_grade` for older payloads. Editable per-assessment score fields are
+unaffected. Internal calculation fields are never exposed.
+
+```json
+"grade_display": {
+  "scheme_engine": "metropolia_v1",
+  "scale": "numeric_0_5",
+  "final_label": "5",
+  "final_numeric": 5,
+  "pass_status": "passed",
+  "components": [
+    {
+      "code": "EXAM",
+      "label": "Exam",
+      "raw_percentage": 88,
+      "converted_grade": 5,
+      "requirement_status": "passed"
+    }
+  ]
+}
+```
+
+Field notes:
+
+- `scale`: `numeric_0_5` | `pass_fail` | `percentage`.
+- `final_numeric`: scheme grade for custom schemes, diagnostic percentage for
+  default; `null` for pass/fail schemes.
+- `pass_status`: `passed` | `failed`.
+
+### 6. Standard API Response Wrapper
 All endpoints return responses wrapped in:
 ```typescript
 interface ApiResponse<T> {

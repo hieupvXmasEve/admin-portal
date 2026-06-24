@@ -8,8 +8,12 @@ use App\Models\CourseRegistration;
 use App\Modules\Academic\Actions\SyncPaidExamResitAttemptsAction;
 use App\Modules\Academic\Actions\SyncPaidRetakeRegistrationsAction;
 use App\Modules\Academic\Observers\CourseRegistrationObserver;
+use App\Modules\Academic\Support\AiAcademicEntitySearchReader as ModuleAiAcademicEntitySearchReader;
 use App\Modules\Academic\Support\AiAcademicMetricReader as ModuleAiAcademicMetricReader;
+use App\Modules\Academic\Support\AiAcademicStudentProfileReader as ModuleAiAcademicStudentProfileReader;
+use App\Shared\Contracts\Academic\AiAcademicEntitySearchReader;
 use App\Shared\Contracts\Academic\AiAcademicMetricReader;
+use App\Shared\Contracts\Academic\AiAcademicStudentProfileReader;
 use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use Illuminate\Support\Facades\Route;
@@ -20,6 +24,8 @@ class AcademicServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(AiAcademicMetricReader::class, ModuleAiAcademicMetricReader::class);
+        $this->app->bind(AiAcademicEntitySearchReader::class, ModuleAiAcademicEntitySearchReader::class);
+        $this->app->bind(AiAcademicStudentProfileReader::class, ModuleAiAcademicStudentProfileReader::class);
         $this->app->bind(RetakeRegistrationPaymentSyncer::class, SyncPaidRetakeRegistrationsAction::class);
         $this->app->bind(ExamResitAttemptPaymentSyncer::class, SyncPaidExamResitAttemptsAction::class);
     }

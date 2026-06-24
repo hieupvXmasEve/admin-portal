@@ -192,6 +192,48 @@ interface CreditsSummary {
 
 ---
 
+## Grade Display (Custom Grading Schemes)
+
+When a course's syllabus uses a custom grading scheme (e.g. Metropolia
+`metropolia_v1`), each graded row includes an optional, display-safe
+`grade_display` object derived from `academic_records.grade_breakdown`. It is
+`null` for units that have not been graded. For default weighted-percentage
+courses, `scheme_engine` is `default_weighted_percentage` and the existing
+percentage/letter fields remain authoritative.
+
+Prefer `grade_display.final_label` when present and fall back to the existing
+`final_grade` field for older payloads. Internal calculation fields (gates, raw
+sums) are never exposed.
+
+`grade_display` is attached to each curriculum unit, module sub-unit, and EGC
+unit row.
+
+```json
+"grade_display": {
+  "scheme_engine": "metropolia_v1",
+  "scale": "numeric_0_5",
+  "final_label": "5",
+  "final_numeric": 5,
+  "pass_status": "passed",
+  "components": [
+    {
+      "code": "EXAM",
+      "label": "Exam",
+      "raw_percentage": 88,
+      "converted_grade": 5,
+      "requirement_status": "passed"
+    }
+  ]
+}
+```
+
+Field notes:
+
+- `scale`: `numeric_0_5` | `pass_fail` | `percentage`.
+- `final_numeric`: scheme grade for custom schemes, diagnostic percentage for
+  default; `null` for pass/fail schemes.
+- `pass_status`: `passed` | `failed`.
+
 ## Request Example
 
 ```typescript

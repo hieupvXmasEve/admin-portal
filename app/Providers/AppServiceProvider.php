@@ -10,11 +10,13 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
 use App\Policies\ApiActorPolicy;
+use App\Support\ThemeConfig;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -36,6 +38,13 @@ class AppServiceProvider extends ServiceProvider
         $this->registerApiActorGates();
         $this->configureRateLimiting();
         $this->configureMorphMap();
+        $this->shareThemeWithViews();
+    }
+
+    protected function shareThemeWithViews(): void
+    {
+        View::share('themeName', ThemeConfig::activeName());
+        View::share('themeVariables', ThemeConfig::variables());
     }
 
     protected function registerApiActorGates(): void

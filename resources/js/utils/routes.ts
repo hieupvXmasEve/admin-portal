@@ -21,7 +21,7 @@ import {
     USER_ROUTE_NAMES,
 } from '@/constants';
 import { FINANCE_ROUTE_NAMES } from '@/constants/finance-routes';
-import { SYSTEM_ACTIVITY_LOG_ROUTE_NAMES, SYSTEM_AI_PROVIDER_SETTINGS_ROUTE_NAMES, SYSTEM_CONFIG_ROUTE_NAMES, SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES } from '@/constants/system-routes';
+import { SYSTEM_ACTIVITY_LOG_ROUTE_NAMES, SYSTEM_AI_COPILOT_ROUTE_NAMES, SYSTEM_AI_PROVIDER_SETTINGS_ROUTE_NAMES, SYSTEM_CONFIG_ROUTE_NAMES, SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES } from '@/constants/system-routes';
 import { route } from 'ziggy-js';
 
 /**
@@ -108,6 +108,10 @@ export const systemRoutes = {
         update: () => route(SYSTEM_AI_PROVIDER_SETTINGS_ROUTE_NAMES.UPDATE),
         test: () => route(SYSTEM_AI_PROVIDER_SETTINGS_ROUTE_NAMES.TEST),
         destroyKey: () => route(SYSTEM_AI_PROVIDER_SETTINGS_ROUTE_NAMES.KEY_DESTROY),
+    },
+    aiCopilot: {
+        index: () => route(SYSTEM_AI_COPILOT_ROUTE_NAMES.INDEX),
+        storeMessage: () => route(SYSTEM_AI_COPILOT_ROUTE_NAMES.MESSAGES_STORE),
     },
     // email
     emailConfiguration: {

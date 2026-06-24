@@ -1,6 +1,6 @@
 # System Architecture
 
-Last updated: 2026-06-21
+Last updated: 2026-06-24
 Owner: Platform Team
 Status: Current-state architecture map
 Source of truth: route files, middleware, module providers, runtime entrypoints
@@ -253,14 +253,17 @@ Phase 1 guardrails:
 - Canonical recipient identity is `recipient_user_id` in `notification_messages`; non-user targets are resolved to user ids before message/delivery persist.
 - No legacy backfill in Phase 1: new tables are clean-slate and legacy `notifications` history is not migrated.
     - Current implementation baseline for new student-facing academic notifications is V2-only. Course completion, EGC completion/progression, EGC program completion, and course-stage transition notifications publish domain events and persist through the Notification V2 outbox pipeline.
-- AI: `app/Modules/AI` (provider settings, audit/evaluation foundation, metric catalog/query-plan validation, query metrics tool execution)
+- AI: `app/Modules/AI` (provider settings, audit/evaluation foundation, metric catalog/query-plan validation, query metrics/entity search/student profile-section tool execution, staff copilot chat/SSE runtime)
     - Provider settings: `ai_provider_settings` stores one encrypted staff-owned provider setting per user with provider/model allowlists, key masking, cost limits, and provider test metadata.
-    - Audit/evaluation foundation: `ai_conversations`, `ai_messages`, `ai_agent_traces`, `ai_tool_calls`, `ai_provider_usages`, `ai_feedback`, `ai_evaluation_cases`, `ai_evaluation_runs`, and `ai_evaluation_results`.
+    - Audit/evaluation/runtime foundation: `ai_conversations`, `ai_messages`, `ai_agent_traces`, `ai_tool_calls`, `ai_provider_usages`, `ai_feedback`, `ai_evaluation_cases`, `ai_evaluation_runs`, `ai_evaluation_results`, `ai_chat_runs`, and `ai_run_events`.
     - Metric catalog/query-plan foundation: code-defined aggregate MetricCatalog v1, business glossary subset, query-plan DTO/validator, `view_ai_metrics` permission, and deterministic staff metric evaluation cases.
     - Query metrics tool MVP: internal `ToolRegistry`/`ToolDispatcher`, read-only `query_metrics` execution, bounded aggregate `QueryMetricsResult`, and MetricCatalog v1 resolvers for Academic status/defer, Finance collection, Fee Monitor, and DNG lifecycle metrics.
-    - AI cross-module metric reads use shared contracts (`App\Shared\Contracts\Academic\AiAcademicMetricReader`, `App\Shared\Contracts\Finance\AiFinanceMetricReader`) with owning-module adapters; AI does not import Academic/Finance query classes directly.
-    - Support services: `AiRedactor`, `AiAuditRecorder`, `AiProviderUsageRecorder`, `AiEvaluationRunner`, `BusinessGlossary`, `MetricCatalog`, `QueryPlanValidator`, `ToolRegistry`, `ToolDispatcher`, and `QueryMetricsTool`.
-    - Current boundary: backend-only product audit/evaluation, query-plan validation, and internal aggregate tool execution; no chat UI, provider prompt runtime, MCP exposure, write/action mode, or student/lecturer portal behavior.
+    - Entity catalog/search MVP: code-defined EntityCatalog v1, `search_entities:v1`, `SearchEntitiesTool`, bounded `EntitySearchResult`, scoped opaque entity references, and first accepted entity types `student`, `program`, `semester`, and `course_offering` with `class` as the user-facing course-offering alias.
+    - Student profile-section MVP: code-defined StudentProfileSectionCatalog v1, `get_entity_profile:v1`, `EntityReferenceResolver`, `GetEntityProfileTool`, bounded `EntityProfileResult`, current-campus opaque `entity_ref` validation, and accepted student sections `identity`, `academic_summary`, `enrollments`, `attendance_summary`, `finance_summary`, and `lifecycle_actions` with section-level hidden-section reporting.
+    - Staff copilot: `/ai/copilot` renders `resources/js/pages/AI/StaffCopilot/Index.vue`; `/ai/copilot/messages` accepts a bounded question only and queues a durable assistant run; `/ai/copilot/runs/{run}/events` replays normalized Laravel SSE events and executes the live/deterministic runner; `/ai/copilot/runs/{run}/cancel` cancels queued active runs with owner/campus checks; `/ai/copilot/runs/{run}/retry` retries failed runs without duplicating the original user message. Completed runs still record conversation/user-message/trace/tool-call/provider-usage/assistant-message evidence and return source-cited structured answer props from audited `query_metrics`, explicit `search_entities`, or `get_entity_profile` results.
+    - AI cross-module metric/entity/profile reads use shared contracts (`App\Shared\Contracts\Academic\AiAcademicMetricReader`, `App\Shared\Contracts\Academic\AiAcademicEntitySearchReader`, `App\Shared\Contracts\Academic\AiAcademicStudentProfileReader`, `App\Shared\Contracts\Finance\AiFinanceMetricReader`, `App\Shared\Contracts\Finance\AiFinanceStudentProfileReader`) with owning-module adapters; AI does not own broad Academic/Finance source queries directly.
+    - Support services: `AiRedactor`, `AiAuditRecorder`, `AiProviderUsageRecorder`, `AiEvaluationRunner`, `BusinessGlossary`, `MetricCatalog`, `EntityCatalog`, `StudentProfileSectionCatalog`, `EntityReferenceResolver`, `QueryPlanValidator`, `ToolRegistry`, `ToolDispatcher`, `QueryMetricsTool`, `SearchEntitiesTool`, `GetEntityProfileTool`, `StaffCopilotSseRuntime`, `LiveStaffCopilotAgent`, and fallback-aware `StaffCopilotAgentRunner`.
+    - Current boundary: internal staff chat can use provider-agnostic downstream SSE and a staff-owned live provider setting for structured planning/final synthesis, but data access remains read-only through MetricCatalog v1, EntityCatalog v1, StudentProfileSectionCatalog v1, `query_metrics`, `search_entities`, and `get_entity_profile`; no WebSocket/Reverb/Pusher dependency, MCP exposure, write/action mode, raw profile/source-row exports, or student/lecturer portal behavior.
 
 ## 7) Runtime Scheduled Commands
 

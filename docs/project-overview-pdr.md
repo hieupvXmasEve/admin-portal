@@ -1,8 +1,8 @@
 # Project Overview and PDR
 
-Last updated: 2026-05-31
-Owner: Platform Team  
-Status: Current-state baseline (evidence-first)  
+Last updated: 2026-06-24
+Owner: Platform Team
+Status: Current-state baseline (evidence-first)
 Source of truth: code in `app/`, `routes/`, `resources/` + scout reports in `plans/reports/`
 
 ## 1) Product Summary
@@ -219,7 +219,7 @@ Acceptance criteria:
 - New academic notifications for students are persisted through Notification V2 tables, not legacy `notifications`.
 - Tuition transition logic reads `students.status` and `students.intake_major`.
 
-### FR-11 AI Provider Settings, Audit Foundation, and Metric Query Planning
+### FR-11 AI Provider Settings, Audit Foundation, Metric/Entity Tools, and Staff Copilot
 
 Code baseline:
 
@@ -236,20 +236,52 @@ Code baseline:
   contracts, business glossary mappings, query-plan validation, campus scope,
   `view_ai_metrics` permission checks, source report identity, and deterministic
   staff metric evaluation cases before any tool execution.
+- AI entity catalog/search foundation defines EntityCatalog v1 for `student`,
+  `program`, `semester`, and `course_offering`, with `class` as the
+  course-offering alias, entity-specific permission checks, campus scope for
+  campus-bound entities, opaque scoped entity references, safe identifiers, and
+  source-reference/audit evidence.
+- AI staff copilot exposes an internal `/ai/copilot` Inertia page and
+  `/ai/copilot/messages` form endpoint for staff with `view_ai_metrics`.
+- Staff copilot message submission now queues a durable assistant run, stores a
+  placeholder assistant message, and streams normalized run/status/tool/message
+  events through `/ai/copilot/runs/{run}/events` using SSE. Active runs are
+  recovered on page reload and can be cancelled through
+  `/ai/copilot/runs/{run}/cancel` or retried through
+  `/ai/copilot/runs/{run}/retry` when owned by the current staff/campus scope.
+- Staff copilot can use an enabled, successfully tested staff-owned provider
+  setting for live structured planning and final answer synthesis. The live
+  model can only propose `query_metrics`, `search_entities`, and
+  `get_entity_profile`; Swinx validates every proposed tool call server-side and
+  executes accepted calls through ToolDispatcher.
+- `get_entity_profile:v1` supports internal student profile sections only from
+  opaque `search_entities` `entity_ref` values. Sections are current-campus
+  scoped, permission-checked, audited, bounded, and PII-limited.
+- Deterministic planning remains the fallback when live mode is disabled,
+  unavailable, or fails safely.
 
 Acceptance criteria:
 
 - AI provider settings never return raw or encrypted API keys to the frontend.
 - AI audit/evaluation records do not store raw provider request/response bodies,
   authorization headers, API keys, or unredacted tool/source payloads.
-- AI evaluation evidence can be recorded with deterministic fixtures and without
-  live provider credentials.
+- AI evaluation and live-agent evidence can be recorded with deterministic/SDK
+  fakes and without live provider credentials.
+- Staff copilot SSE events are persisted as redacted run events, replayable by
+  cursor, owner/campus checked, and do not require WebSocket/Reverb/Pusher.
 - AI query plans are allowlisted, aggregate-only, campus-scoped, permission
   checked, and denied before execution when they contain SQL/table/column
   payloads, unsupported filters/groupings, cross-campus scope, or unbounded
   result requests.
-- No AI chat UI, business-data tool runtime, MCP exposure, write/action mode, or
-  student/lecturer portal behavior is exposed by this foundation.
+- Staff copilot answers that contain numbers or record facts cite source report,
+  normalized filters, campus scope, freshness, hidden sections, warnings, and
+  confidence.
+- Staff copilot entity candidate lists return only bounded safe labels,
+  allowlisted identifiers, match reasons, source references, campus scope,
+  hidden sections, warnings, confidence, and opaque entity refs.
+- No MCP exposure, write/action mode, source-row dumps, profile-section reads,
+  or student/lecturer portal behavior is exposed by the current Staff Copilot
+  runtime.
 
 ## 4) Non-Functional Requirements
 

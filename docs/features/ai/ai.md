@@ -369,11 +369,11 @@ Agent chỉ được tạo query object:
 
 ```json
 {
-  "metric": "tuition_revenue",
-  "filters": {
-    "term": "current"
-  },
-  "group_by": ["program"]
+    "metric": "tuition_revenue",
+    "filters": {
+        "term": "current"
+    },
+    "group_by": ["program"]
 }
 ```
 
@@ -429,11 +429,11 @@ Ví dụ:
 
 ```json
 {
-  "metric": "defer_students_count",
-  "filters": {
-    "term": "current"
-  },
-  "group_by": []
+    "metric": "defer_students_count",
+    "filters": {
+        "term": "current"
+    },
+    "group_by": []
 }
 ```
 
@@ -441,9 +441,9 @@ Hoặc:
 
 ```json
 {
-  "entity": "student",
-  "id": 123,
-  "sections": ["basic", "academic", "attendance", "finance"]
+    "entity": "student",
+    "id": 123,
+    "sections": ["basic", "academic", "attendance", "finance"]
 }
 ```
 
@@ -723,14 +723,14 @@ Ví dụ output tổng quát:
 
 ```json
 {
-  "answer": "string",
-  "metrics": [],
-  "key_findings": [],
-  "risks": [],
-  "recommendations": [],
-  "missing_data": [],
-  "sources": [],
-  "confidence": "low|medium|high"
+    "answer": "string",
+    "metrics": [],
+    "key_findings": [],
+    "risks": [],
+    "recommendations": [],
+    "missing_data": [],
+    "sources": [],
+    "confidence": "low|medium|high"
 }
 ```
 
@@ -738,15 +738,15 @@ Ví dụ output cho student:
 
 ```json
 {
-  "student_summary": {},
-  "academic_status": {},
-  "attendance_status": {},
-  "finance_status": {},
-  "risk_level": "low|medium|high",
-  "risk_factors": [],
-  "recommended_actions": [],
-  "hidden_sections": [],
-  "confidence": "low|medium|high"
+    "student_summary": {},
+    "academic_status": {},
+    "attendance_status": {},
+    "finance_status": {},
+    "risk_level": "low|medium|high",
+    "risk_factors": [],
+    "recommended_actions": [],
+    "hidden_sections": [],
+    "confidence": "low|medium|high"
 }
 ```
 
@@ -1009,15 +1009,29 @@ Tài liệu bạn gửi cũng đề xuất kiến trúc Vue/Inertia → Controll
 
 ## Phase 2 — Entity và context
 
+Trạng thái hiện tại: `AI-MOD-006-entity-catalog-search` đã triển khai
+EntityCatalog v1 và `search_entities:v1` cho candidate lookup nội bộ, read-only,
+permission-aware, campus-scoped, và PII-limited. `AI-MOD-017-live-provider-staff-copilot-agent`
+đã bổ sung live provider agent để Staff Copilot có thể diễn giải prompt tự
+nhiên hơn, nhưng vẫn buộc mọi data access đi qua ToolDispatcher và các tool
+allowlisted. `AI-MOD-018-provider-agnostic-sse-chat-runtime` đã triển khai
+queued run + downstream SSE trên runtime fallback snapshot để giữ toàn bộ
+provider/tool execution phía backend. `AI-MOD-007-student-profile-sections` đã
+triển khai `student-profile-sections:v1` và `get_entity_profile:v1` cho các
+section hồ sơ sinh viên nội bộ, chỉ từ opaque `entity_ref`, có campus scope,
+section-level permission, hidden-section reporting, audit và PII limit.
+
 ```text
-1. Tạo EntityCatalog
-2. Tạo search_entities
-3. Tạo get_entity_profile
-4. Thêm section-level permission
-5. Thêm conversation state
-6. Thêm resolved_entities
-7. Thêm current_filters/current_term
-8. Thêm conversation summary
+1. Tạo EntityCatalog — implemented in AI-MOD-006
+2. Tạo search_entities — implemented in AI-MOD-006
+3. Tạo live-provider Staff Copilot agent — implemented in AI-MOD-017
+4. Tạo provider-agnostic SSE chat runtime — implemented in AI-MOD-018
+5. Tạo get_entity_profile — implemented in AI-MOD-007
+6. Thêm section-level permission — implemented in AI-MOD-007
+7. Thêm conversation state
+8. Thêm resolved_entities
+9. Thêm current_filters/current_term
+10. Thêm conversation summary
 ```
 
 ## Phase 3 — Phân tích và chất lượng đầu ra

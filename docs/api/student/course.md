@@ -253,6 +253,45 @@ interface TotalGrade {
 }
 ```
 
+## Grade Display (Custom Grading Schemes)
+
+When the course's syllabus uses a custom grading scheme (e.g. Metropolia
+`metropolia_v1`), `total_grade` includes an optional, display-safe
+`grade_display` object derived from `academic_records.grade_breakdown`. For
+default weighted-percentage courses, `scheme_engine` is
+`default_weighted_percentage` and the existing percentage/letter fields remain
+authoritative.
+
+Prefer `grade_display.final_label` when present and fall back to
+`final_letter_grade` for older payloads. Internal calculation fields are never
+exposed.
+
+```json
+"grade_display": {
+  "scheme_engine": "metropolia_v1",
+  "scale": "numeric_0_5",
+  "final_label": "5",
+  "final_numeric": 5,
+  "pass_status": "passed",
+  "components": [
+    {
+      "code": "EXAM",
+      "label": "Exam",
+      "raw_percentage": 88,
+      "converted_grade": 5,
+      "requirement_status": "passed"
+    }
+  ]
+}
+```
+
+Field notes:
+
+- `scale`: `numeric_0_5` | `pass_fail` | `percentage`.
+- `final_numeric`: scheme grade for custom schemes, diagnostic percentage for
+  default; `null` for pass/fail schemes.
+- `pass_status`: `passed` | `failed`.
+
 ## Error Responses
 
 ### Not Enrolled (400)

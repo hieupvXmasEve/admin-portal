@@ -8,6 +8,7 @@ use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
 use App\Models\Student;
+use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -114,7 +115,7 @@ class AssessmentReportService
         // Calculate histogram data (10-point intervals)
         $histogram = [];
         for ($i = 0; $i < 100; $i += 10) {
-            $rangeLabel = $i . '-' . ($i + 9);
+            $rangeLabel = $i.'-'.($i + 9);
             $count = $percentageScores->filter(function ($score) use ($i) {
                 return $score >= $i && $score < ($i + 10);
             })->count();
@@ -1018,7 +1019,6 @@ class AssessmentReportService
             $students = $students->whereIn('id', $filters['student_ids']);
         }
 
-
         // Get assessment components
         $assessmentComponents = $syllabus->assessmentComponents()
             ->with(['details'])
@@ -1081,14 +1081,18 @@ class AssessmentReportService
             $scoresIndex[$score->student_id][$score->detail_id] = $score;
         }
 
-        // Get academic records for all students to retrieve final_percentage
+        // Get academic records for all students to retrieve final_percentage.
+        // grade_breakdown + is_passed back the display-safe grade_display object;
+        // a single keyed query keeps the matrix free of N+1 lookups.
         $academicRecords = DB::table('academic_records')
             ->where('course_offering_id', $courseOffering->id)
             ->whereIn('student_id', $students->pluck('id'))
             ->whereNull('deleted_at')
-            ->select('student_id', 'final_percentage', 'final_letter_grade')
+            ->select('student_id', 'final_percentage', 'final_letter_grade', 'grade_breakdown', 'is_passed')
             ->get()
             ->keyBy('student_id');
+
+        $gradeDisplayPresenter = app(GradeDisplayPresenter::class);
 
         // Build grade matrix with simplified statistics
         $gradeMatrix = [];
@@ -1189,6 +1193,16 @@ class AssessmentReportService
             $studentRow['final_percentage'] = round((float) $finalPercentage, 2);
             $studentRow['letter_grade'] = $letterGrade;
             $studentRow['missing_assessments'] = $studentMissingCount;
+            $studentRow['grade_display'] = $academicRecord
+                ? $gradeDisplayPresenter->fromParts(
+                    is_string($academicRecord->grade_breakdown ?? null)
+                        ? (json_decode($academicRecord->grade_breakdown, true) ?: [])
+                        : [],
+                    $academicRecord->final_letter_grade,
+                    $academicRecord->final_percentage,
+                    (bool) ($academicRecord->is_passed ?? false),
+                )
+                : null;
 
             // Track for class statistics
             if ($finalPercentage > 0) {
@@ -1385,11 +1399,11 @@ class AssessmentReportService
 
         // Calculate simplified performance metrics
         $performanceMetrics = [
-            'students_above_90' => count(array_filter($gradeMatrix, fn($row) => $row['final_percentage'] >= 90)),
-            'students_above_80' => count(array_filter($gradeMatrix, fn($row) => $row['final_percentage'] >= 80)),
-            'students_above_70' => count(array_filter($gradeMatrix, fn($row) => $row['final_percentage'] >= 70)),
-            'students_below_60' => count(array_filter($gradeMatrix, fn($row) => $row['final_percentage'] < 60)),
-            'students_with_missing' => count(array_filter($gradeMatrix, fn($row) => $row['missing_assessments'] > 0)),
+            'students_above_90' => count(array_filter($gradeMatrix, fn ($row) => $row['final_percentage'] >= 90)),
+            'students_above_80' => count(array_filter($gradeMatrix, fn ($row) => $row['final_percentage'] >= 80)),
+            'students_above_70' => count(array_filter($gradeMatrix, fn ($row) => $row['final_percentage'] >= 70)),
+            'students_below_60' => count(array_filter($gradeMatrix, fn ($row) => $row['final_percentage'] < 60)),
+            'students_with_missing' => count(array_filter($gradeMatrix, fn ($row) => $row['missing_assessments'] > 0)),
         ];
 
         return [
@@ -2002,7 +2016,7 @@ class AssessmentReportService
                 'bin' => $i + 1,
                 'range_min' => round($rangeMin, 1),
                 'range_max' => round($rangeMax, 1),
-                'range_label' => round($rangeMin, 1) . '-' . round($rangeMax, 1) . '%',
+                'range_label' => round($rangeMin, 1).'-'.round($rangeMax, 1).'%',
                 'count' => $count,
                 'percentage' => $scores->count() > 0 ? round(($count / $scores->count()) * 100, 2) : 0,
                 'density' => $scores->count() > 0 ? round($count / ($scores->count() * $binSize), 4) : 0,
