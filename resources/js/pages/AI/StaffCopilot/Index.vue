@@ -86,9 +86,12 @@ const props = defineProps<{
     capabilities: {
         tool_names: string[];
         catalog_version: string;
+        entity_catalog_version: string;
         tool_schema_version: string;
+        tool_schema_versions: Record<string, string>;
         sdk_installed: boolean;
         live_provider_enabled: boolean;
+        runtime_mode: 'deterministic' | 'live_provider' | 'fallback';
     };
 }>();
 
@@ -187,7 +190,7 @@ defineOptions({
                 </Badge>
                 <Badge :variant="capabilities.live_provider_enabled ? 'success' : 'outline'">
                     <ShieldCheck class="h-3.5 w-3.5" />
-                    {{ capabilities.live_provider_enabled ? 'Live provider' : 'Deterministic' }}
+                    {{ capabilities.runtime_mode === 'live_provider' ? 'Live provider' : 'Deterministic' }}
                 </Badge>
             </div>
         </div>
@@ -351,7 +354,7 @@ defineOptions({
                         </div>
                         <div class="flex items-center justify-between gap-3">
                             <span class="text-muted-foreground">Provider</span>
-                            <Badge variant="outline">deterministic</Badge>
+                            <Badge :variant="capabilities.live_provider_enabled ? 'success' : 'outline'">{{ capabilities.runtime_mode }}</Badge>
                         </div>
                         <div class="flex items-center justify-between gap-3">
                             <span class="text-muted-foreground">Evidence</span>

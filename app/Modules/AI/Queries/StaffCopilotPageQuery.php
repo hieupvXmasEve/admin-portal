@@ -9,7 +9,9 @@ use App\Models\User;
 use App\Modules\AI\Models\AiAgentTrace;
 use App\Modules\AI\Models\AiConversation;
 use App\Modules\AI\Models\AiMessage;
+use App\Modules\AI\Models\AiProviderSetting;
 use App\Modules\AI\Models\AiToolCall;
+use App\Modules\AI\Support\EntityCatalog;
 use App\Modules\AI\Support\MetricCatalog;
 use App\Modules\AI\Support\StaffMetricQuestionDataset;
 use App\Modules\AI\Support\Tools\ToolRegistry;
@@ -19,6 +21,7 @@ class StaffCopilotPageQuery
 {
     public function __construct(
         private readonly MetricCatalog $catalog,
+        private readonly EntityCatalog $entityCatalog,
         private readonly StaffMetricQuestionDataset $dataset,
         private readonly ToolRegistry $toolRegistry,
     ) {}
@@ -37,11 +40,27 @@ class StaffCopilotPageQuery
             'capabilities' => [
                 'tool_names' => $this->toolRegistry->toolNames(),
                 'catalog_version' => $this->catalog->version(),
+                'entity_catalog_version' => $this->entityCatalog->version(),
                 'tool_schema_version' => $this->catalog->toolSchemaVersion(),
+                'tool_schema_versions' => [
+                    'query_metrics' => $this->catalog->toolSchemaVersion(),
+                    'search_entities' => $this->entityCatalog->toolSchemaVersion(),
+                ],
                 'sdk_installed' => class_exists('Laravel\\Ai\\Enums\\Lab'),
-                'live_provider_enabled' => false,
+                'live_provider_enabled' => $this->liveProviderEnabled($actor),
+                'runtime_mode' => $this->liveProviderEnabled($actor) ? 'live_provider' : 'deterministic',
             ],
         ];
+    }
+
+    private function liveProviderEnabled(User $actor): bool
+    {
+        return AiProviderSetting::query()
+            ->where('user_id', $actor->id)
+            ->where('enabled', true)
+            ->where('last_test_status', 'success')
+            ->whereNotNull('encrypted_api_key')
+            ->exists();
     }
 
     private function conversationFor(User $actor, ?Campus $campus): ?AiConversation

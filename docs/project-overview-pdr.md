@@ -241,21 +241,23 @@ Code baseline:
   course-offering alias, entity-specific permission checks, campus scope for
   campus-bound entities, opaque scoped entity references, safe identifiers, and
   source-reference/audit evidence.
-- AI staff copilot MVP exposes an internal `/ai/copilot` Inertia page and
+- AI staff copilot exposes an internal `/ai/copilot` Inertia page and
   `/ai/copilot/messages` form endpoint for staff with `view_ai_metrics`.
-- Staff copilot questions are deterministic in this slice: the browser submits
-  only a bounded natural-language question, backend planning maps metric
-  questions to MetricCatalog v1/`query_metrics` and explicit lookup questions
-  to EntityCatalog v1/`search_entities`, and answer props are rendered from
-  audited result evidence.
+- Staff copilot can use an enabled, successfully tested staff-owned provider
+  setting for live structured planning and final answer synthesis. The live
+  model can only propose `query_metrics` and `search_entities`; Swinx validates
+  every proposed tool call server-side and executes accepted calls through
+  ToolDispatcher.
+- Deterministic planning remains the fallback when live mode is disabled,
+  unavailable, or fails safely.
 
 Acceptance criteria:
 
 - AI provider settings never return raw or encrypted API keys to the frontend.
 - AI audit/evaluation records do not store raw provider request/response bodies,
   authorization headers, API keys, or unredacted tool/source payloads.
-- AI evaluation evidence can be recorded with deterministic fixtures and without
-  live provider credentials.
+- AI evaluation and live-agent evidence can be recorded with deterministic/SDK
+  fakes and without live provider credentials.
 - AI query plans are allowlisted, aggregate-only, campus-scoped, permission
   checked, and denied before execution when they contain SQL/table/column
   payloads, unsupported filters/groupings, cross-campus scope, or unbounded
@@ -266,9 +268,9 @@ Acceptance criteria:
 - Staff copilot entity candidate lists return only bounded safe labels,
   allowlisted identifiers, match reasons, source references, campus scope,
   hidden sections, warnings, confidence, and opaque entity refs.
-- No live provider prompt runtime, MCP exposure, write/action mode, source-row
-  dumps, profile-section reads, or student/lecturer portal behavior is exposed
-  by this MVP.
+- No MCP exposure, write/action mode, source-row dumps, profile-section reads,
+  or student/lecturer portal behavior is exposed by the current Staff Copilot
+  runtime.
 
 ## 4) Non-Functional Requirements
 

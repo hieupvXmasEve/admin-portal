@@ -15,6 +15,7 @@ class StaffCopilotAgentRunner
     public const PROMPT_VERSION = 'staff-copilot-mvp:v1';
 
     public function __construct(
+        private readonly LiveStaffCopilotAgent $liveAgent,
         private readonly BusinessGlossary $glossary,
         private readonly MetricCatalog $catalog,
         private readonly StaffMetricQuestionDataset $dataset,
@@ -23,6 +24,12 @@ class StaffCopilotAgentRunner
 
     public function run(string $question, User $actor, ?Campus $campus, AiAgentTrace $trace): StaffCopilotAnswer
     {
+        $liveAnswer = $this->liveAgent->run($question, $actor, $campus, $trace);
+
+        if ($liveAnswer instanceof StaffCopilotAnswer) {
+            return $liveAnswer;
+        }
+
         $entitySearchPlan = $this->entitySearchPlan($question);
 
         if ($entitySearchPlan !== null) {

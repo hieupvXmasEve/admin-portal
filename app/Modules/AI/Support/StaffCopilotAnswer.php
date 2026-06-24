@@ -78,6 +78,55 @@ class StaffCopilotAnswer
         );
     }
 
+    public static function clarification(string $question): self
+    {
+        return new self(
+            status: 'completed',
+            content: $question,
+            payload: [
+                'status' => 'completed',
+                'clarification_question' => $question,
+                'confidence' => ['level' => 'none', 'basis' => 'clarification_required'],
+            ],
+            safeErrorCode: null,
+            hiddenSections: [],
+            toolExecuted: false,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $finalAnswer
+     * @param  list<QueryMetricsResult|EntitySearchResult>  $toolResults
+     */
+    public static function fromLiveFinalAnswer(array $finalAnswer, array $toolResults): self
+    {
+        $primaryPayload = $toolResults[0]?->toArray() ?? [];
+        $status = (string) ($finalAnswer['status'] ?? $primaryPayload['status'] ?? 'failed');
+        $safeErrorCode = isset($finalAnswer['safe_error_code'])
+            ? (string) $finalAnswer['safe_error_code']
+            : (isset($primaryPayload['safe_error_code']) ? (string) $primaryPayload['safe_error_code'] : null);
+
+        return new self(
+            status: $status,
+            content: (string) ($finalAnswer['answer'] ?? 'The live copilot could not synthesize a safe answer.'),
+            payload: array_replace_recursive($primaryPayload, [
+                'status' => $status,
+                'safe_error_code' => $safeErrorCode,
+                'confidence' => is_array($finalAnswer['confidence'] ?? null)
+                    ? $finalAnswer['confidence']
+                    : ($primaryPayload['confidence'] ?? ['level' => 'none', 'basis' => 'not_available']),
+                'source_references' => is_array($finalAnswer['source_references'] ?? null)
+                    ? $finalAnswer['source_references']
+                    : ($primaryPayload['source_references'] ?? []),
+                'limitations' => is_array($finalAnswer['limitations'] ?? null) ? $finalAnswer['limitations'] : [],
+                'referenced_tool_call_ids' => is_array($finalAnswer['referenced_tool_call_ids'] ?? null) ? $finalAnswer['referenced_tool_call_ids'] : [],
+            ]),
+            safeErrorCode: $safeErrorCode,
+            hiddenSections: $primaryPayload['hidden_sections'] ?? [],
+            toolExecuted: $toolResults !== [],
+        );
+    }
+
     public function isSuccessful(): bool
     {
         return in_array($this->status, ['completed', 'partial'], true);

@@ -56,7 +56,7 @@ class RunStaffCopilotMessageAction
                 'status' => $answer->status(),
                 'step_count' => $answer->toolExecuted() ? 1 : 0,
                 'duration_ms' => max(0, (int) round((microtime(true) - $started) * 1000)),
-                'safe_error_code' => $answer->safeErrorCode(),
+                'safe_error_code' => $answer->safeErrorCode() ?? $trace->safe_error_code,
                 'final_answer_id' => $finalAnswerId,
             ])->save();
         });
