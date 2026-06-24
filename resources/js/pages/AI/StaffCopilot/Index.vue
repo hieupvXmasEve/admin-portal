@@ -3,9 +3,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head, useForm } from '@inertiajs/vue3';
-import { AlertTriangle, Bot, Database, FileText, Send, ShieldCheck, Sparkles, UserRound } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { Head, router, useForm } from '@inertiajs/vue3';
+import { AlertTriangle, Bot, CircleStop, Database, FileText, LoaderCircle, RefreshCw, Send, ShieldCheck, Sparkles, UserRound, Wifi } from 'lucide-vue-next';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 
 interface Conversation {
@@ -76,12 +76,24 @@ interface CopilotMessage {
     content: string;
     created_at: string | null;
     hidden_sections: string[];
+    run_id: number | null;
+    run_status: string | null;
     answer: AnswerPayload | null;
+}
+
+interface ActiveRun {
+    id: number;
+    status: string;
+    assistant_message_id: number;
+    last_event_id: number | null;
+    stream_url: string;
+    can_cancel: boolean;
 }
 
 const props = defineProps<{
     conversation: Conversation | null;
     messages: CopilotMessage[];
+    active_run: ActiveRun | null;
     suggested_prompts: SuggestedPrompt[];
     capabilities: {
         tool_names: string[];
@@ -92,26 +104,44 @@ const props = defineProps<{
         sdk_installed: boolean;
         live_provider_enabled: boolean;
         runtime_mode: 'deterministic' | 'live_provider' | 'fallback';
+        stream_transport: 'sse';
+        streaming_enabled: boolean;
+        websocket_required: boolean;
+        supported_provider_stream_modes: Record<string, string>;
     };
 }>();
+
+type RuntimePayload = Record<string, unknown>;
 
 const form = useForm({
     conversation_id: props.conversation?.id ?? null,
     question: '',
 });
 
-const latestAssistantMessage = computed(() => [...props.messages].reverse().find((message) => message.role === 'assistant'));
+const localMessages = ref<CopilotMessage[]>(props.messages.map((message) => ({ ...message })));
+const activeRunStatus = ref<string | null>(props.active_run?.status ?? null);
+const lastEventId = ref<number>(props.active_run?.last_event_id ?? 0);
+const isStreaming = ref(false);
+const eventSource = ref<EventSource | null>(null);
+
+const terminalStatuses = ['completed', 'failed', 'cancelled'];
+
+const displayMessages = computed(() => localMessages.value);
+
+const latestAssistantMessage = computed(() => [...localMessages.value].reverse().find((message) => message.role === 'assistant'));
+
+const canCancelActiveRun = computed(() => props.active_run?.can_cancel === true && activeRunStatus.value !== null && !terminalStatuses.includes(activeRunStatus.value));
 
 const statusVariant = (status: string): 'success' | 'warning' | 'destructive' | 'outline' => {
     if (status === 'completed') {
         return 'success';
     }
 
-    if (status === 'partial') {
+    if (status === 'partial' || ['queued', 'running', 'planning', 'tool_running', 'streaming'].includes(status)) {
         return 'warning';
     }
 
-    if (status === 'failed' || status === 'denied') {
+    if (status === 'failed' || status === 'denied' || status === 'cancelled') {
         return 'destructive';
     }
 
@@ -124,6 +154,22 @@ const submit = (): void => {
     if (!question) {
         return;
     }
+
+    const optimisticId = Date.now() * -1;
+
+    localMessages.value = [
+        ...localMessages.value,
+        {
+            id: optimisticId,
+            role: 'user',
+            content: question,
+            created_at: null,
+            hidden_sections: [],
+            run_id: null,
+            run_status: null,
+            answer: null,
+        },
+    ];
 
     form.conversation_id = props.conversation?.id ?? null;
     form.question = question;
@@ -145,6 +191,164 @@ const metricsEntries = (metrics: Record<string, unknown>): Array<[string, unknow
 
 const safeIdentifierEntries = (identifiers: Record<string, unknown>): Array<[string, unknown]> => Object.entries(identifiers);
 
+const parsePayload = (event: MessageEvent<string>): RuntimePayload => {
+    try {
+        const decoded: unknown = JSON.parse(event.data);
+
+        return decoded && typeof decoded === 'object' ? (decoded as RuntimePayload) : {};
+    } catch {
+        return {};
+    }
+};
+
+const payloadNumber = (payload: RuntimePayload, key: string): number | null => (typeof payload[key] === 'number' ? payload[key] : null);
+
+const payloadString = (payload: RuntimePayload, key: string): string | null => (typeof payload[key] === 'string' ? payload[key] : null);
+
+const updateLastEventId = (payload: RuntimePayload): void => {
+    const eventId = payloadNumber(payload, 'event_id');
+
+    if (eventId !== null) {
+        lastEventId.value = eventId;
+    }
+};
+
+const assistantMessageFor = (messageId: number): CopilotMessage | undefined => localMessages.value.find((message) => message.id === messageId && message.role === 'assistant');
+
+const applyStatusPayload = (payload: RuntimePayload): void => {
+    updateLastEventId(payload);
+
+    const status = payloadString(payload, 'status');
+
+    if (status) {
+        activeRunStatus.value = status;
+    }
+};
+
+const applyMessageDelta = (event: MessageEvent<string>): void => {
+    const payload = parsePayload(event);
+    updateLastEventId(payload);
+
+    const messageId = payloadNumber(payload, 'message_id');
+    const delta = payloadString(payload, 'delta');
+
+    if (messageId === null || delta === null) {
+        return;
+    }
+
+    const message = assistantMessageFor(messageId);
+
+    if (!message) {
+        return;
+    }
+
+    message.content += delta;
+    message.run_status = 'streaming';
+    activeRunStatus.value = 'streaming';
+};
+
+const applyMessageCompleted = (event: MessageEvent<string>): void => {
+    const payload = parsePayload(event);
+    updateLastEventId(payload);
+
+    const messageId = payloadNumber(payload, 'message_id');
+    const status = payloadString(payload, 'status');
+
+    if (messageId === null || status === null) {
+        return;
+    }
+
+    const message = assistantMessageFor(messageId);
+
+    if (message) {
+        message.run_status = status;
+    }
+};
+
+const disconnectStream = (): void => {
+    eventSource.value?.close();
+    eventSource.value = null;
+    isStreaming.value = false;
+};
+
+const finishRun = (status: string): void => {
+    activeRunStatus.value = status;
+    disconnectStream();
+    router.reload({
+        only: ['conversation', 'messages', 'active_run', 'capabilities'],
+        preserveScroll: true,
+    });
+};
+
+const handleTerminalEvent =
+    (status: string) =>
+    (event: Event): void => {
+        applyStatusPayload(parsePayload(event as MessageEvent<string>));
+        finishRun(status);
+    };
+
+const connectToActiveRun = (): void => {
+    if (!props.active_run || terminalStatuses.includes(props.active_run.status) || typeof EventSource === 'undefined') {
+        return;
+    }
+
+    disconnectStream();
+
+    activeRunStatus.value = props.active_run.status;
+    lastEventId.value = props.active_run.last_event_id ?? 0;
+
+    const separator = props.active_run.stream_url.includes('?') ? '&' : '?';
+    const source = new EventSource(`${props.active_run.stream_url}${separator}cursor=${lastEventId.value}`);
+    eventSource.value = source;
+    isStreaming.value = true;
+
+    ['run.started', 'run.status', 'tool.started', 'tool.completed', 'tool.denied', 'tool.failed', 'provider.failed'].forEach((eventName) => {
+        source.addEventListener(eventName, (event) => applyStatusPayload(parsePayload(event as MessageEvent<string>)));
+    });
+
+    source.addEventListener('message.delta', (event) => applyMessageDelta(event as MessageEvent<string>));
+    source.addEventListener('message.completed', (event) => applyMessageCompleted(event as MessageEvent<string>));
+    source.addEventListener('run.completed', handleTerminalEvent('completed'));
+    source.addEventListener('run.failed', handleTerminalEvent('failed'));
+    source.addEventListener('run.cancelled', handleTerminalEvent('cancelled'));
+    source.addEventListener('update', (event) => {
+        if ((event as MessageEvent<string>).data === '</stream>') {
+            disconnectStream();
+        }
+    });
+    source.onerror = () => {
+        isStreaming.value = false;
+    };
+};
+
+const cancelActiveRun = (): void => {
+    if (!props.active_run || !canCancelActiveRun.value) {
+        return;
+    }
+
+    router.post(
+        route('ai.copilot.runs.cancel', props.active_run.id),
+        {},
+        {
+            preserveScroll: true,
+        },
+    );
+};
+
+const retryRun = (runId: number | null): void => {
+    if (runId === null) {
+        return;
+    }
+
+    router.post(
+        route('ai.copilot.runs.retry', runId),
+        {},
+        {
+            preserveScroll: true,
+        },
+    );
+};
+
 const formatLabel = (value: string): string =>
     value
         .split('_')
@@ -162,6 +366,35 @@ const formatValue = (value: unknown): string => {
 
     return String(value);
 };
+
+watch(
+    () => props.messages,
+    (messages) => {
+        localMessages.value = messages.map((message) => ({ ...message }));
+    },
+    { deep: true },
+);
+
+watch(
+    () => props.active_run,
+    (run) => {
+        activeRunStatus.value = run?.status ?? null;
+
+        if (run) {
+            connectToActiveRun();
+        } else {
+            disconnectStream();
+        }
+    },
+);
+
+onMounted(() => {
+    connectToActiveRun();
+});
+
+onBeforeUnmount(() => {
+    disconnectStream();
+});
 
 defineOptions({
     layout: AppLayout,
@@ -192,6 +425,10 @@ defineOptions({
                     <ShieldCheck class="h-3.5 w-3.5" />
                     {{ capabilities.runtime_mode === 'live_provider' ? 'Live provider' : 'Deterministic' }}
                 </Badge>
+                <Badge :variant="isStreaming ? 'warning' : 'outline'">
+                    <Wifi class="h-3.5 w-3.5" />
+                    {{ activeRunStatus ?? capabilities.stream_transport }}
+                </Badge>
             </div>
         </div>
 
@@ -206,19 +443,23 @@ defineOptions({
                         <Badge v-if="latestAssistantMessage?.answer" :variant="statusVariant(latestAssistantMessage.answer.status)">
                             {{ latestAssistantMessage.answer.status }}
                         </Badge>
+                        <Badge v-else-if="activeRunStatus" :variant="statusVariant(activeRunStatus)">
+                            <LoaderCircle v-if="isStreaming" class="h-3.5 w-3.5 animate-spin" />
+                            {{ activeRunStatus }}
+                        </Badge>
                     </div>
                 </CardHeader>
 
                 <CardContent class="flex min-h-[560px] flex-col gap-4 p-4">
                     <div class="flex-1 space-y-4">
-                        <div v-if="messages.length === 0" class="border-border bg-muted/30 flex min-h-[280px] items-center justify-center rounded-md border border-dashed p-6 text-center">
+                        <div v-if="displayMessages.length === 0" class="border-border bg-muted/30 flex min-h-[280px] items-center justify-center rounded-md border border-dashed p-6 text-center">
                             <div class="max-w-sm space-y-3">
                                 <Bot class="text-muted-foreground mx-auto h-9 w-9" />
                                 <p class="text-sm font-medium">Choose a prompt or ask for an allowlisted metric.</p>
                             </div>
                         </div>
 
-                        <div v-for="message in messages" :key="message.id" class="flex gap-3" :class="message.role === 'user' ? 'justify-end' : 'justify-start'">
+                        <div v-for="message in displayMessages" :key="message.id" class="flex gap-3" :class="message.role === 'user' ? 'justify-end' : 'justify-start'">
                             <div v-if="message.role === 'assistant'" class="bg-primary/10 text-primary mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
                                 <Bot class="h-4 w-4" />
                             </div>
@@ -229,11 +470,23 @@ defineOptions({
                                     <p class="text-sm leading-6 whitespace-pre-wrap">{{ message.content }}</p>
                                 </div>
 
+                                <div v-if="message.role === 'assistant' && message.run_status && !message.answer" class="flex flex-wrap items-center gap-2 border-t pt-3">
+                                    <Badge :variant="statusVariant(message.run_status)">
+                                        <LoaderCircle v-if="!terminalStatuses.includes(message.run_status)" class="h-3.5 w-3.5 animate-spin" />
+                                        {{ message.run_status }}
+                                    </Badge>
+                                    <span class="text-muted-foreground text-xs">Run #{{ message.run_id }}</span>
+                                </div>
+
                                 <div v-if="message.answer" class="space-y-3 border-t pt-3">
                                     <div class="flex flex-wrap items-center gap-2">
                                         <Badge :variant="statusVariant(message.answer.status)">{{ message.answer.status }}</Badge>
                                         <Badge variant="outline">{{ message.answer.confidence.level }}</Badge>
                                         <Badge v-if="message.answer.safe_error_code" variant="destructive">{{ message.answer.safe_error_code }}</Badge>
+                                        <Button v-if="message.run_id && message.answer.status === 'failed'" type="button" size="sm" variant="outline" @click="retryRun(message.run_id)">
+                                            <RefreshCw class="h-3.5 w-3.5" />
+                                            Retry
+                                        </Button>
                                     </div>
 
                                     <div v-if="message.answer.summary" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -315,10 +568,16 @@ defineOptions({
                                 </p>
                                 <span v-else class="text-muted-foreground text-xs">{{ form.question.length }}/1000</span>
 
-                                <Button type="submit" :disabled="form.processing || !form.question.trim()">
-                                    <Send class="h-4 w-4" />
-                                    {{ form.processing ? 'Sending' : 'Send' }}
-                                </Button>
+                                <div class="flex items-center gap-2">
+                                    <Button v-if="canCancelActiveRun" type="button" variant="outline" @click="cancelActiveRun">
+                                        <CircleStop class="h-4 w-4" />
+                                        Stop
+                                    </Button>
+                                    <Button type="submit" :disabled="form.processing || !form.question.trim()">
+                                        <Send class="h-4 w-4" />
+                                        {{ form.processing ? 'Queueing' : 'Send' }}
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     </form>
@@ -355,6 +614,10 @@ defineOptions({
                         <div class="flex items-center justify-between gap-3">
                             <span class="text-muted-foreground">Provider</span>
                             <Badge :variant="capabilities.live_provider_enabled ? 'success' : 'outline'">{{ capabilities.runtime_mode }}</Badge>
+                        </div>
+                        <div class="flex items-center justify-between gap-3">
+                            <span class="text-muted-foreground">Stream</span>
+                            <Badge :variant="capabilities.streaming_enabled ? 'success' : 'outline'">{{ capabilities.stream_transport }}</Badge>
                         </div>
                         <div class="flex items-center justify-between gap-3">
                             <span class="text-muted-foreground">Evidence</span>

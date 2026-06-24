@@ -18,6 +18,18 @@ Route::middleware(['web', 'auth'])
             ->middleware('can:view_ai_metrics')
             ->name('copilot.messages.store');
 
+        Route::get('/copilot/runs/{run}/events', [StaffCopilotController::class, 'events'])
+            ->middleware('can:view_ai_metrics')
+            ->name('copilot.runs.events');
+
+        Route::post('/copilot/runs/{run}/cancel', [StaffCopilotController::class, 'cancel'])
+            ->middleware('can:view_ai_metrics')
+            ->name('copilot.runs.cancel');
+
+        Route::post('/copilot/runs/{run}/retry', [StaffCopilotController::class, 'retry'])
+            ->middleware('can:view_ai_metrics')
+            ->name('copilot.runs.retry');
+
         Route::get('/provider-settings', [AiProviderSettingsController::class, 'index'])
             ->middleware('can:view_ai_provider_settings')
             ->name('provider-settings.index');

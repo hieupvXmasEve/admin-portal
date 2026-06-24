@@ -7,6 +7,7 @@ namespace App\Modules\AI\Queries;
 use App\Models\Campus;
 use App\Models\User;
 use App\Modules\AI\Models\AiAgentTrace;
+use App\Modules\AI\Models\AiChatRun;
 use App\Modules\AI\Models\AiConversation;
 use App\Modules\AI\Models\AiMessage;
 use App\Modules\AI\Models\AiProviderSetting;
@@ -36,6 +37,7 @@ class StaffCopilotPageQuery
         return [
             'conversation' => $conversation ? $this->conversationPayload($conversation) : null,
             'messages' => $conversation ? $this->messagePayloads($conversation) : [],
+            'active_run' => $conversation ? $this->activeRunPayload($conversation) : null,
             'suggested_prompts' => $this->suggestedPrompts(),
             'capabilities' => [
                 'tool_names' => $this->toolRegistry->toolNames(),
@@ -49,6 +51,15 @@ class StaffCopilotPageQuery
                 'sdk_installed' => class_exists('Laravel\\Ai\\Enums\\Lab'),
                 'live_provider_enabled' => $this->liveProviderEnabled($actor),
                 'runtime_mode' => $this->liveProviderEnabled($actor) ? 'live_provider' : 'deterministic',
+                'stream_transport' => 'sse',
+                'streaming_enabled' => true,
+                'websocket_required' => false,
+                'supported_provider_stream_modes' => [
+                    'openai' => 'sdk_stream_or_fallback',
+                    'openrouter' => 'sdk_stream_or_adapter',
+                    'anthropic' => 'sdk_stream_or_adapter',
+                    'gemini' => 'sdk_stream_or_adapter',
+                ],
             ],
         ];
     }
@@ -103,20 +114,61 @@ class StaffCopilotPageQuery
             ->get();
 
         $traces = $this->tracesForMessages($messages);
+        $runs = AiChatRun::query()
+            ->where('ai_conversation_id', $conversation->id)
+            ->whereIn('assistant_message_id', $messages->pluck('id')->all())
+            ->get()
+            ->keyBy('assistant_message_id');
 
         return $messages
-            ->map(fn (AiMessage $message): array => [
-                'id' => $message->id,
-                'role' => $message->role,
-                'content' => $message->redacted_content,
-                'created_at' => $message->created_at?->toISOString(),
-                'hidden_sections' => $message->hidden_sections ?? [],
-                'answer' => $message->role === 'assistant'
-                    ? $this->answerPayload($traces->get((string) $message->final_answer_id))
-                    : null,
-            ])
+            ->map(function (AiMessage $message) use ($traces, $runs): array {
+                /** @var AiChatRun|null $run */
+                $run = $runs->get($message->id);
+
+                return [
+                    'id' => $message->id,
+                    'role' => $message->role,
+                    'content' => $message->redacted_content,
+                    'created_at' => $message->created_at?->toISOString(),
+                    'hidden_sections' => $message->hidden_sections ?? [],
+                    'run_id' => $run?->id,
+                    'run_status' => $run?->status,
+                    'answer' => $message->role === 'assistant'
+                        ? $this->answerPayload($traces->get((string) $message->final_answer_id))
+                        : null,
+                ];
+            })
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function activeRunPayload(AiConversation $conversation): ?array
+    {
+        $run = AiChatRun::query()
+            ->where('ai_conversation_id', $conversation->id)
+            ->whereNotIn('status', [
+                AiChatRun::STATUS_COMPLETED,
+                AiChatRun::STATUS_FAILED,
+                AiChatRun::STATUS_CANCELLED,
+            ])
+            ->latest('id')
+            ->first();
+
+        if (! $run instanceof AiChatRun) {
+            return null;
+        }
+
+        return [
+            'id' => $run->id,
+            'status' => $run->status,
+            'assistant_message_id' => $run->assistant_message_id,
+            'last_event_id' => $run->last_event_id,
+            'stream_url' => route('ai.copilot.runs.events', $run, false),
+            'can_cancel' => true,
+        ];
     }
 
     /**

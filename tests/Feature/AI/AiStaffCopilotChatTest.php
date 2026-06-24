@@ -6,6 +6,7 @@ use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\User;
 use App\Modules\AI\Models\AiAgentTrace;
+use App\Modules\AI\Models\AiChatRun;
 use App\Modules\AI\Models\AiConversation;
 use App\Modules\AI\Models\AiMessage;
 use App\Modules\AI\Models\AiToolCall;
@@ -113,7 +114,16 @@ it('answers a supported finance prompt through query metrics and records audited
             'question' => 'Current semester outstanding tuition by program là bao nhiêu?',
         ])
         ->assertRedirect(route('ai.copilot.index'))
-        ->assertInertiaFlash('success', 'AI copilot answer generated.');
+        ->assertInertiaFlash('success', 'AI copilot run queued.');
+
+    $run = AiChatRun::query()->firstOrFail();
+
+    $response = $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.runs.events', $run));
+
+    $response->assertStreamed();
+
+    expect($response->streamedContent())->toContain('event: run.completed');
 
     $conversation = AiConversation::query()->firstOrFail();
 
@@ -178,7 +188,16 @@ it('fails unsupported staff questions safely without source execution', function
             'question' => 'Write an email to all students',
         ])
         ->assertRedirect(route('ai.copilot.index'))
-        ->assertInertiaFlash('error', 'AI copilot could not answer this question yet.');
+        ->assertInertiaFlash('success', 'AI copilot run queued.');
+
+    $run = AiChatRun::query()->firstOrFail();
+
+    $response = $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.runs.events', $run));
+
+    $response->assertStreamed();
+
+    expect($response->streamedContent())->toContain('event: run.failed');
 
     $trace = AiAgentTrace::query()->firstOrFail();
 

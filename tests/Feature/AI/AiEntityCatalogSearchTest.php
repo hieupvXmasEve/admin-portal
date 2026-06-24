@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\AI\Models\AiAgentTrace;
+use App\Modules\AI\Models\AiChatRun;
 use App\Modules\AI\Models\AiConversation;
 use App\Modules\AI\Models\AiMessage;
 use App\Modules\AI\Models\AiToolCall;
@@ -349,7 +350,16 @@ it('answers staff copilot entity lookup prompts through search entities', functi
             'question' => 'Find student AUS24001',
         ])
         ->assertRedirect(route('ai.copilot.index'))
-        ->assertInertiaFlash('success', 'AI copilot answer generated.');
+        ->assertInertiaFlash('success', 'AI copilot run queued.');
+
+    $run = AiChatRun::query()->firstOrFail();
+
+    $response = $this->actingAs($this->fullAccessUser)
+        ->get(route('ai.copilot.runs.events', $run));
+
+    $response->assertStreamed();
+
+    expect($response->streamedContent())->toContain('event: run.completed');
 
     expect(AiConversation::query()->count())->toBe(1)
         ->and(AiMessage::query()->where('role', 'user')->count())->toBe(1)

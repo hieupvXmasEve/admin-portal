@@ -24,26 +24,27 @@ allowlisted, and audited.
 Child story packets are created only when a phase is selected for execution.
 Until then, this table is the source of truth for planned AI work.
 
-| Order | Story id                                       | Planned packet                             | Status      | Main scope                                                                                                                                | Depends on         |
-| ----- | ---------------------------------------------- | ------------------------------------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| 0     | `AI-MOD-000-ai-module-roadmap`                 | `S-000-ai-module-roadmap/`                 | implemented | Initiative tracker, phase map, non-goals, validation expectations, and risk guardrails                                                    | None               |
-| 1.1   | `AI-MOD-001-ai-governance-provider-settings`   | `S-001-ai-governance-provider-settings/`   | implemented | AI module shell, permissions, provider config boundary, encrypted API keys, model selection, cost limits, and provider test flow          | 000                |
-| 1.2   | `AI-MOD-002-ai-audit-evaluation-foundation`    | `S-002-ai-audit-evaluation-foundation/`    | implemented | Conversation/message/tool-call/provider-usage audit records, redaction rules, and baseline evaluation dataset                             | 000                |
-| 1.3   | `AI-MOD-003-metric-catalog-query-plan`         | `S-003-metric-catalog-query-plan/`         | implemented | Business glossary subset, MetricCatalog, filter/group-by allowlists, QueryPlanValidator, and 3-5 real staff questions                     | 001, 002           |
-| 1.4   | `AI-MOD-004-query-metrics-tool-mvp`            | `S-004-query-metrics-tool-mvp/`            | implemented | ToolRegistry/ToolDispatcher foundation and read-only `query_metrics` tool backed by existing Academic/Finance queries                     | 003                |
-| 1.5   | `AI-MOD-005-staff-copilot-chat-mvp`            | `S-005-staff-copilot-chat-mvp/`            | implemented | Internal staff chat surface, AgentRunner loop, structured output, answer sources, hidden-section notices, and dashboard parity proof      | 004                |
-| 2.1   | `AI-MOD-006-entity-catalog-search`             | `S-006-entity-catalog-search/`             | implemented | EntityCatalog for student/class/program/semester, `search_entities`, scoped identifiers, and PII-safe search result limits                | 005                |
-| 2.2   | `AI-MOD-017-live-provider-staff-copilot-agent` | `S-017-live-provider-staff-copilot-agent/` | implemented | Live provider Staff Copilot agent that interprets natural-language prompts and chooses allowlisted tools through ToolDispatcher           | 001-006            |
-| 2.3   | `AI-MOD-007-student-profile-sections`          | `S-007-student-profile-sections/`          | planned     | `get_entity_profile` as a Live Copilot capability for student profile sections with section-level permission and hidden-section reporting | 006, 017           |
-| 2.4   | `AI-MOD-008-conversation-context`              | `S-008-conversation-context/`              | planned     | Live Copilot context: resolved entities, current filters, current term, conversation summary, tool history, and bounded context rebuild   | 007, 017           |
-| 3.1   | `AI-MOD-009-compare-metrics-tool`              | `S-009-compare-metrics-tool/`              | planned     | `compare_metrics` for current-vs-previous term and scoped trend explanations with source filters                                          | 004, 008           |
-| 3.2   | `AI-MOD-010-risk-and-recommendation-rules`     | `S-010-risk-and-recommendation-rules/`     | planned     | Rule-backed Live Copilot recommendations with missing-data handling, confidence levels, and no-ML default                                 | 007, 009, 017      |
-| 3.3   | `AI-MOD-011-feedback-and-evaluation-loop`      | `S-011-feedback-and-evaluation-loop/`      | planned     | Feedback controls, evaluation runner, expected answer fixtures, tool-call assertions, and Live Copilot regression tracking                | 002, 005, 010, 017 |
-| 4.1   | `AI-MOD-012-admin-governance-quota`            | `S-012-admin-governance-quota/`            | planned     | Admin tool/model/provider toggles, quota enforcement, rate limits, data-access preview, and audit viewer for live/deterministic modes     | 001, 002, 005, 017 |
-| 4.2   | `AI-MOD-013-prompt-tool-versioning`            | `S-013-prompt-tool-versioning/`            | planned     | Prompt versions, tool schema versions, catalog version stamps, answer traceability, and rollback strategy for Live Copilot                | 002, 004, 017      |
-| 4.3   | `AI-MOD-014-mcp-ready-resources-tools`         | `S-014-mcp-ready-resources-tools/`         | planned     | MCP-ready mapping for tools/resources/prompts after internal core is stable; no MCP server before this story                              | 012, 013           |
-| 5.1   | `AI-MOD-015-student-portal-assistant-spike`    | `S-015-student-portal-assistant-spike/`    | planned     | Separate student-portal feasibility spike only after internal staff assistant proves permission, audit, and evaluation gates              | 011, 012           |
-| 5.2   | `AI-MOD-016-write-approval-mode`               | `S-016-write-approval-mode/`               | planned     | Explicit human-approved write/action mode; mutations remain out of scope until a separate high-risk story accepts it                      | 011, 012           |
+| Order | Story id                                        | Planned packet                              | Status      | Main scope                                                                                                                                    | Depends on              |
+| ----- | ----------------------------------------------- | ------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| 0     | `AI-MOD-000-ai-module-roadmap`                  | `S-000-ai-module-roadmap/`                  | implemented | Initiative tracker, phase map, non-goals, validation expectations, and risk guardrails                                                        | None                    |
+| 1.1   | `AI-MOD-001-ai-governance-provider-settings`    | `S-001-ai-governance-provider-settings/`    | implemented | AI module shell, permissions, provider config boundary, encrypted API keys, model selection, cost limits, and provider test flow              | 000                     |
+| 1.2   | `AI-MOD-002-ai-audit-evaluation-foundation`     | `S-002-ai-audit-evaluation-foundation/`     | implemented | Conversation/message/tool-call/provider-usage audit records, redaction rules, and baseline evaluation dataset                                 | 000                     |
+| 1.3   | `AI-MOD-003-metric-catalog-query-plan`          | `S-003-metric-catalog-query-plan/`          | implemented | Business glossary subset, MetricCatalog, filter/group-by allowlists, QueryPlanValidator, and 3-5 real staff questions                         | 001, 002                |
+| 1.4   | `AI-MOD-004-query-metrics-tool-mvp`             | `S-004-query-metrics-tool-mvp/`             | implemented | ToolRegistry/ToolDispatcher foundation and read-only `query_metrics` tool backed by existing Academic/Finance queries                         | 003                     |
+| 1.5   | `AI-MOD-005-staff-copilot-chat-mvp`             | `S-005-staff-copilot-chat-mvp/`             | implemented | Internal staff chat surface, AgentRunner loop, structured output, answer sources, hidden-section notices, and dashboard parity proof          | 004                     |
+| 2.1   | `AI-MOD-006-entity-catalog-search`              | `S-006-entity-catalog-search/`              | implemented | EntityCatalog for student/class/program/semester, `search_entities`, scoped identifiers, and PII-safe search result limits                    | 005                     |
+| 2.2   | `AI-MOD-017-live-provider-staff-copilot-agent`  | `S-017-live-provider-staff-copilot-agent/`  | implemented | Live provider Staff Copilot agent that interprets natural-language prompts and chooses allowlisted tools through ToolDispatcher               | 001-006                 |
+| 2.3   | `AI-MOD-018-provider-agnostic-sse-chat-runtime` | `S-018-provider-agnostic-sse-chat-runtime/` | implemented | Provider-agnostic SSE chat runtime with durable run lifecycle, normalized events, optimistic UI, reload recovery, and no WebSocket dependency | 017                     |
+| 2.4   | `AI-MOD-007-student-profile-sections`           | `S-007-student-profile-sections/`           | planned     | `get_entity_profile` as a Live Copilot capability for student profile sections with section-level permission and hidden-section reporting     | 006, 017                |
+| 2.5   | `AI-MOD-008-conversation-context`               | `S-008-conversation-context/`               | planned     | Live Copilot context: resolved entities, current filters, current term, conversation summary, tool history, and bounded context rebuild       | 007, 017, 018           |
+| 3.1   | `AI-MOD-009-compare-metrics-tool`               | `S-009-compare-metrics-tool/`               | planned     | `compare_metrics` for current-vs-previous term and scoped trend explanations with source filters                                              | 004, 008                |
+| 3.2   | `AI-MOD-010-risk-and-recommendation-rules`      | `S-010-risk-and-recommendation-rules/`      | planned     | Rule-backed Live Copilot recommendations with missing-data handling, confidence levels, and no-ML default                                     | 007, 009, 017           |
+| 3.3   | `AI-MOD-011-feedback-and-evaluation-loop`       | `S-011-feedback-and-evaluation-loop/`       | planned     | Feedback controls, evaluation runner, expected answer fixtures, tool-call assertions, and Live Copilot regression tracking                    | 002, 005, 010, 017, 018 |
+| 4.1   | `AI-MOD-012-admin-governance-quota`             | `S-012-admin-governance-quota/`             | planned     | Admin tool/model/provider toggles, quota enforcement, rate limits, data-access preview, and audit viewer for live/deterministic modes         | 001, 002, 005, 017, 018 |
+| 4.2   | `AI-MOD-013-prompt-tool-versioning`             | `S-013-prompt-tool-versioning/`             | planned     | Prompt versions, tool schema versions, catalog version stamps, answer traceability, and rollback strategy for Live Copilot                    | 002, 004, 017, 018      |
+| 4.3   | `AI-MOD-014-mcp-ready-resources-tools`          | `S-014-mcp-ready-resources-tools/`          | planned     | MCP-ready mapping for tools/resources/prompts after internal core is stable; no MCP server before this story                                  | 012, 013                |
+| 5.1   | `AI-MOD-015-student-portal-assistant-spike`     | `S-015-student-portal-assistant-spike/`     | planned     | Separate student-portal feasibility spike only after internal staff assistant proves permission, audit, and evaluation gates                  | 011, 012                |
+| 5.2   | `AI-MOD-016-write-approval-mode`                | `S-016-write-approval-mode/`                | planned     | Explicit human-approved write/action mode; mutations remain out of scope until a separate high-risk story accepts it                          | 011, 012                |
 
 ## Live Copilot Capability Model
 
@@ -52,18 +53,35 @@ deterministic Staff Copilot to a live provider-backed agent. It should not make
 the remaining planned stories obsolete. Instead, it turns the remaining stories
 into safe capabilities that the live agent can use.
 
+`AI-MOD-018-provider-agnostic-sse-chat-runtime` is the bridge from safe live
+provider execution to modern AI chat UX. It owns durable run lifecycle,
+provider-normalized events, downstream SSE delivery, optimistic UI, reload
+recovery, cancellation, and retry behavior. It deliberately uses SSE rather than
+WebSocket/Reverb/Pusher for the first streaming runtime.
+
+Implemented slice: Staff Copilot now queues `ai_chat_runs` with assistant
+placeholders, persists normalized `ai_run_events`, exposes
+`/ai/copilot/runs/{run}/events` via Laravel SSE, supports owner/campus-checked
+run cancellation/retry, and keeps AI-MOD-017 provider/tool execution behind the
+backend with fallback snapshot deltas.
+
 The intended layering is:
 
 ```text
-Live provider Staff Copilot agent
+Staff Copilot browser UI
+  -> sends message and listens to Swinx SSE run events
+  -> provider-agnostic chat runtime persists messages/runs/events
+  -> Live provider Staff Copilot agent plans and synthesizes
   -> chooses allowlisted tool calls from natural-language prompts
   -> ToolDispatcher validates and executes Swinx-owned tools
   -> domain modules read source-of-truth data through shared contracts
   -> agent synthesizes answer with source/campus/permission/audit evidence
 ```
 
-Capability expansion after `AI-MOD-017`:
+Capability expansion after `AI-MOD-017` and `AI-MOD-018`:
 
+- `AI-MOD-018`: adds SSE chat runtime, active run lifecycle, normalized stream
+  events, reload recovery, and no-WebSocket delivery.
 - `AI-MOD-007`: adds safe profile-section reads for selected entities.
 - `AI-MOD-008`: adds resolved entity/current filter/current term context for
   follow-up questions.

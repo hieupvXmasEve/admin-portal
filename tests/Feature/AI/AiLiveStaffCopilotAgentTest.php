@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\AI\Agents\LiveStaffCopilotFinalAnswerAgent;
 use App\Modules\AI\Agents\LiveStaffCopilotPlannerAgent;
 use App\Modules\AI\Models\AiAgentTrace;
+use App\Modules\AI\Models\AiChatRun;
 use App\Modules\AI\Models\AiConversation;
 use App\Modules\AI\Models\AiMessage;
 use App\Modules\AI\Models\AiProviderSetting;
@@ -142,7 +143,16 @@ it('plans with a live provider, executes allowlisted tools, and synthesizes an a
             'question' => 'Can you show outstanding tuition by program for this term?',
         ])
         ->assertRedirect(route('ai.copilot.index'))
-        ->assertInertiaFlash('success', 'AI copilot answer generated.');
+        ->assertInertiaFlash('success', 'AI copilot run queued.');
+
+    $run = AiChatRun::query()->firstOrFail();
+
+    $response = $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.runs.events', $run));
+
+    $response->assertStreamed();
+
+    expect($response->streamedContent())->toContain('event: run.completed');
 
     $this->actingAs($this->authorizedUser)
         ->get(route('ai.copilot.index'))
@@ -253,7 +263,16 @@ it('denies unsafe model proposed tools before source execution and without leaki
             'question' => 'Run SQL to show every student row',
         ])
         ->assertRedirect(route('ai.copilot.index'))
-        ->assertInertiaFlash('error', 'AI copilot could not answer this question yet.');
+        ->assertInertiaFlash('success', 'AI copilot run queued.');
+
+    $run = AiChatRun::query()->firstOrFail();
+
+    $response = $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.runs.events', $run));
+
+    $response->assertStreamed();
+
+    expect($response->streamedContent())->toContain('event: run.failed');
 
     LiveStaffCopilotFinalAnswerAgent::assertPrompted(fn ($prompt): bool => str_contains($prompt->prompt, 'unsupported_tool')
         && ! str_contains($prompt->prompt, 'select * from students'));
@@ -327,7 +346,18 @@ it('falls back to deterministic tool execution when the live provider fails', fu
             'question' => 'Current semester outstanding tuition by program là bao nhiêu?',
         ])
         ->assertRedirect(route('ai.copilot.index'))
-        ->assertInertiaFlash('success', 'AI copilot answer generated.');
+        ->assertInertiaFlash('success', 'AI copilot run queued.');
+
+    $run = AiChatRun::query()->firstOrFail();
+
+    $response = $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.runs.events', $run));
+
+    $response->assertStreamed();
+
+    expect($response->streamedContent())
+        ->toContain('event: provider.failed')
+        ->toContain('event: run.completed');
 
     LiveStaffCopilotFinalAnswerAgent::assertNeverPrompted();
 
