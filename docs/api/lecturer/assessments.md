@@ -118,6 +118,40 @@ type SubmissionStatus =
 
 ## API Usage Examples
 
+## Grade Display (Custom Grading Schemes)
+
+For custom grading schemes (e.g. Metropolia `metropolia_v1`), the grade matrix
+report attaches an optional, display-safe `grade_display` object to each
+`student_grades[]` row, derived from `academic_records.grade_breakdown`. It is
+`null` when a student has no academic record. For default weighted-percentage
+courses, `scheme_engine` is `default_weighted_percentage` and existing fields
+remain authoritative. Prefer `grade_display.final_label` for read-only final
+display; editable per-assessment scores are unaffected.
+
+```json
+"grade_display": {
+  "scheme_engine": "metropolia_v1",
+  "scale": "numeric_0_5",
+  "final_label": "5",
+  "final_numeric": 5,
+  "pass_status": "passed",
+  "components": [
+    {
+      "code": "EXAM",
+      "label": "Exam",
+      "raw_percentage": 88,
+      "converted_grade": 5,
+      "requirement_status": "passed"
+    }
+  ]
+}
+```
+
+- `scale`: `numeric_0_5` | `pass_fail` | `percentage`.
+- `final_numeric`: scheme grade for custom schemes, diagnostic percentage for
+  default; `null` for pass/fail schemes.
+- `pass_status`: `passed` | `failed`.
+
 ## HTTP Status Codes
 
 | Status Code | Description |

@@ -8,11 +8,17 @@ use App\Models\AssessmentComponentDetailScore;
 use App\Models\GpaCalculation;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 class GradeService
 {
+    public function __construct(
+        private readonly GradeDisplayPresenter $gradeDisplayPresenter,
+    ) {}
+
     /**
      * Get student's grades for a specific semester or all semesters
      */
@@ -50,12 +56,12 @@ class GradeService
 
         // Separate curriculum vs EGC records
         $curriculumRecords = $academicRecords->filter(
-            fn($r) => in_array($r->unit_id, $curriculumUnitIds)
+            fn ($r) => in_array($r->unit_id, $curriculumUnitIds)
         );
 
         // EGC = only units with unit_type = 'egc'
         $egcRecords = $academicRecords->filter(
-            fn($r) => $r->unit->unit_type === 'egc'
+            fn ($r) => $r->unit->unit_type === 'egc'
         );
 
         $gradesBySemester = $this->buildGradesBySemester($student, $curriculumRecords);
@@ -139,6 +145,7 @@ class GradeService
                 'quality_points' => $academicRecord->quality_points,
                 'completion_status' => $academicRecord->completion_status,
                 'completion_date' => $academicRecord->completion_date?->toDateString(),
+                'grade_display' => $this->gradeDisplayPresenter->present($academicRecord),
             ],
             'assessment_breakdown' => $this->formatAssessmentBreakdown($assessmentScores),
             'grade_calculation' => $this->calculateGradeBreakdown($assessmentScores),
@@ -350,7 +357,7 @@ class GradeService
 
         if (! empty($filters['unit_code'])) {
             $query->whereHas('unit', function ($q) use ($filters) {
-                $q->where('code', 'like', '%' . $filters['unit_code'] . '%');
+                $q->where('code', 'like', '%'.$filters['unit_code'].'%');
             });
         }
 
@@ -382,7 +389,7 @@ class GradeService
 
         if (! empty($filters['course_code'])) {
             $query->whereHas('courseOffering.unit', function ($q) use ($filters) {
-                $q->where('code', 'like', '%' . $filters['course_code'] . '%');
+                $q->where('code', 'like', '%'.$filters['course_code'].'%');
             });
         }
 
@@ -436,7 +443,7 @@ class GradeService
         }
 
         $mean = $gpas->avg();
-        $variance = $gpas->map(fn($gpa) => pow($gpa - $mean, 2))->avg();
+        $variance = $gpas->map(fn ($gpa) => pow($gpa - $mean, 2))->avg();
         $stdDev = sqrt($variance);
 
         return match (true) {
@@ -516,8 +523,8 @@ class GradeService
 
         $sumX = array_sum($x);
         $sumY = array_sum($y);
-        $sumXY = array_sum(array_map(fn($i) => $x[$i] * $y[$i], range(0, $n - 1)));
-        $sumX2 = array_sum(array_map(fn($val) => $val * $val, $x));
+        $sumXY = array_sum(array_map(fn ($i) => $x[$i] * $y[$i], range(0, $n - 1)));
+        $sumX2 = array_sum(array_map(fn ($val) => $val * $val, $x));
 
         $slope = ($n * $sumXY - $sumX * $sumY) / ($n * $sumX2 - $sumX * $sumX);
         $intercept = ($sumY - $slope * $sumX) / $n;
@@ -639,7 +646,7 @@ class GradeService
         return [
             'performance_level' => $this->getPerformanceLevel($averagePercentage),
             'average_percentage' => round($averagePercentage, 1),
-            'performance_by_type' => $performanceByType->map(fn($avg) => round($avg, 1))->toArray(),
+            'performance_by_type' => $performanceByType->map(fn ($avg) => round($avg, 1))->toArray(),
             'strengths' => $this->identifyStrengths($performanceByType),
             'areas_for_improvement' => $this->identifyWeaknesses($performanceByType),
             'trend' => $this->analyzeAssessmentTrend($completedAssessments),
@@ -793,7 +800,7 @@ class GradeService
             return 'unknown';
         }
 
-        $due = \Carbon\Carbon::parse($dueDate);
+        $due = Carbon::parse($dueDate);
         $daysUntil = now()->diffInDays($due, false);
 
         return match (true) {
@@ -810,7 +817,7 @@ class GradeService
      */
     protected function identifyStrengths(Collection $performanceByType): array
     {
-        return $performanceByType->filter(fn($avg) => $avg >= 75)
+        return $performanceByType->filter(fn ($avg) => $avg >= 75)
             ->keys()
             ->toArray();
     }
@@ -820,7 +827,7 @@ class GradeService
      */
     protected function identifyWeaknesses(Collection $performanceByType): array
     {
-        return $performanceByType->filter(fn($avg) => $avg < 65)
+        return $performanceByType->filter(fn ($avg) => $avg < 65)
             ->keys()
             ->toArray();
     }
@@ -879,7 +886,7 @@ class GradeService
 
             // Get academic records for units in this logical semester
             $unitIds = $semesterUnits->pluck('unit_id')->toArray();
-            $semesterRecords = $curriculumRecords->filter(fn($r) => in_array($r->unit_id, $unitIds));
+            $semesterRecords = $curriculumRecords->filter(fn ($r) => in_array($r->unit_id, $unitIds));
 
             // Format all curriculum units (với hoặc không có điểm)
             $allUnits = $semesterUnits->map(function ($cu) use ($semesterRecords) {
@@ -898,6 +905,7 @@ class GradeService
                     'final_grade' => $record?->final_letter_grade,
                     'numeric_grade' => $record?->final_numeric_grade,
                     'grade_points' => $record?->grade_points,
+                    'grade_display' => $record ? $this->gradeDisplayPresenter->present($record) : null,
                     'completion_status' => $record?->completion_status ?? 'not_enrolled',
                     'completion_date' => $record?->completion_date?->toDateString(),
                     'is_passed' => $record?->is_passed ?? false,
@@ -958,10 +966,10 @@ class GradeService
     protected function buildSimpleSummary(Student $student, array $gradesBySemester, Collection $egcRecords): array
     {
         // Count all curriculum units (EGC excluded from statistics)
-        $allCurriculumUnits = collect($gradesBySemester)->flatMap(fn($s) => $s['curriculum_units']);
+        $allCurriculumUnits = collect($gradesBySemester)->flatMap(fn ($s) => $s['curriculum_units']);
 
         // Count all modules
-        $allModules = collect($gradesBySemester)->flatMap(fn($s) => $s['modules'] ?? []);
+        $allModules = collect($gradesBySemester)->flatMap(fn ($s) => $s['modules'] ?? []);
 
         // Unit statistics (only curriculum units, EGC not included)
         $totalUnits = $allCurriculumUnits->count();
@@ -1055,6 +1063,7 @@ class GradeService
                     'final_percentage' => $record?->final_percentage,
                     'final_grade' => $record?->final_letter_grade,
                     'numeric_grade' => $record?->final_numeric_grade,
+                    'grade_display' => $record ? $this->gradeDisplayPresenter->present($record) : null,
                     'status' => $record?->completion_status ?? 'not_enrolled',
                     'completion_date' => $record?->completion_date?->toDateString(),
                     'is_passed' => $record?->is_passed ?? false,
@@ -1102,7 +1111,7 @@ class GradeService
     {
         // Only calculate from graded units with completed status
         $gradedRecords = $allModuleRecords->filter(
-            fn($r) => $r->courseOffering &&
+            fn ($r) => $r->courseOffering &&
                 $r->courseOffering->grading_type === 'grade' &&
                 $r->completion_status === 'completed' &&
                 $r->final_percentage !== null
@@ -1154,6 +1163,7 @@ class GradeService
                 'final_percentage' => $record->final_percentage,
                 'final_grade' => $record->final_letter_grade,
                 'numeric_grade' => $record->final_numeric_grade,
+                'grade_display' => $this->gradeDisplayPresenter->present($record),
                 'completion_status' => $record->completion_status,
                 'completion_date' => $record->completion_date?->toDateString(),
                 'is_passed' => $record->is_passed ?? false,
