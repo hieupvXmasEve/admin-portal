@@ -149,6 +149,14 @@ it('uses a searchable combobox for the default model selector', function () {
         ->toContain('Search models');
 });
 
+it('binds the enabled status switch through the reka model value contract', function () {
+    $component = file_get_contents(resource_path('js/pages/AI/ProviderSettings/Index.vue'));
+
+    expect($component)
+        ->toContain('<Switch v-model:model-value="form.enabled"')
+        ->not->toContain('v-model:checked="form.enabled"');
+});
+
 it('denies provider settings access to staff without AI settings permissions', function () {
     $this->actingAs($this->unauthorizedUser)
         ->get(route('ai.provider-settings.index'))

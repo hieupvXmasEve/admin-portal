@@ -262,7 +262,7 @@ const clearKey = () => {
                     <div class="space-y-2">
                         <Label>Status</Label>
                         <div class="flex h-9 items-center gap-3 rounded-md border px-3">
-                            <Switch v-model:checked="form.enabled" :disabled="!permissions.can_manage" />
+                            <Switch v-model:model-value="form.enabled" :disabled="!permissions.can_manage" />
                             <span class="text-sm font-medium">{{ form.enabled ? 'Enabled' : 'Disabled' }}</span>
                         </div>
                         <p v-if="form.errors.enabled" class="text-destructive text-sm">{{ form.errors.enabled }}</p>
