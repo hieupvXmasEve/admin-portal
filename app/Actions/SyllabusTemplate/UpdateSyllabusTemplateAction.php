@@ -44,6 +44,7 @@ class UpdateSyllabusTemplateAction
                         $component = $existingComponents[$componentId];
                         $component->fill([
                             'name' => $compData['name'] ?? $component->name,
+                            'code' => $compData['code'] ?? $component->code,
                             'weight' => $compData['weight'] ?? $component->weight,
                             'type' => $compData['type'] ?? $component->type,
                             'sort_order' => $idx,
@@ -52,6 +53,7 @@ class UpdateSyllabusTemplateAction
                     } else {
                         $component = new AssessmentComponent([
                             'name' => $compData['name'] ?? null,
+                            'code' => $compData['code'] ?? null,
                             'weight' => $compData['weight'] ?? 0,
                             'type' => $compData['type'] ?? 'other',
                             'sort_order' => $idx,

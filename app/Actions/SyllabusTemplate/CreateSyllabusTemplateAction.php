@@ -29,6 +29,7 @@ class CreateSyllabusTemplateAction
 
                     $component = new AssessmentComponent([
                         'name' => $comp['name'] ?? null,
+                        'code' => $comp['code'] ?? null,
                         'weight' => $comp['weight'] ?? 0,
                         'type' => $comp['type'] ?? 'other',
                         'sort_order' => $idx,

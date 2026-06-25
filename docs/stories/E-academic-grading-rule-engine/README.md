@@ -21,8 +21,33 @@ for deployments that do not configure a custom scheme.
 | 2 | `S-002-metropolia-scheme-pack-and-mapping` | `S-002-metropolia-scheme-pack-and-mapping/` | Convert `Grading_Schemes_Metropolia.md` into concrete JSON scheme fixtures, map component codes per syllabus, and add deterministic import/seed guidance per school database | 001 |
 | 3 | `S-003-syllabus-grading-scheme-admin-ui` | `S-003-syllabus-grading-scheme-admin-ui/` | Add guarded admin UI to view/edit/validate `grading_scheme` on syllabus templates, with preview calculation for sample scores | 001, 002 |
 | 4 | `S-004-grade-breakdown-api-and-portal-display` | `S-004-grade-breakdown-api-and-portal-display/` | Expose safe grade breakdown fields where needed and update affected student/lecturer portal types/views without changing unrelated portal behavior | 001, 003 if UI copy depends on scheme labels |
-| 5 | `S-005-grading-recalculation-ops` | `S-005-grading-recalculation-ops/` | Add a controlled recalculation command/workflow for existing academic records, with dry-run, per-course targeting, audit evidence, and rollback guidance | 001, 002 |
+| 5 | `S-005-grading-recalculation-ops` | `S-005-grading-recalculation-ops/` | **Deferred** — controlled recalculation command/workflow for existing academic records, with dry-run, per-course targeting, audit evidence, and rollback guidance. See _Deferred Stories_ below | 001, 002 |
 | 6 | `S-006-grading-rollout-validation` | `S-006-grading-rollout-validation/` | Validate a full Metropolia pilot database: scheme coverage, sample student outcomes, Canvas boundary behavior, GPA source, portal display, and operator docs | 002, 003, 004, 005 |
+| 7 | `S-007-metropolia-scheme-form-builder` | `S-007-metropolia-scheme-form-builder/` | Replace the S-003 raw-JSON scheme editor with a form-only Metropolia builder (both engines + scales) and a guide modal with worked examples; wire `assessment_components.code` end-to-end so grading receives real component scores. Supersedes the S-003 "no visual rule builder" non-goal | 003 |
+
+## Deferred Stories
+
+`S-005-grading-recalculation-ops` is deferred while the feature is built from
+scratch. Its backfill scenario does not apply — there are no historical
+`AcademicRecord` rows to recalculate yet — and the forward calculation path
+(S-001 finalization) is the blocking work.
+
+Reactivate S-005 when **either** condition holds:
+
+- Finalization runs in production against real data, producing finalized
+  `AcademicRecord` rows; **or**
+- Editing a syllabus `grading_scheme` after records are finalized becomes
+  allowed (scheme corrections, weight fixes), creating the need to recalculate
+  already-graded students.
+
+To keep S-005 cheap to add later, S-001 must preserve two design properties:
+
+- Grade calculation goes through a **shared aggregation action/calculator**, not
+  logic embedded in finalization, so recalculation can reuse it.
+- `academic_records.grade_breakdown` stores **enough detail to recompute** an
+  outcome without re-deriving inputs.
+
+With those in place, S-005 becomes a thin console command rather than a refactor.
 
 ## Detailed Plans
 
