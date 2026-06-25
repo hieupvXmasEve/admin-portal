@@ -42,6 +42,7 @@ interface AssessmentComponentDetail {
 interface AssessmentComponent {
     id: number;
     name: string;
+    code?: string;
     weight: number;
     type: string;
     is_required_to_sit_final_exam: boolean;
@@ -323,6 +324,9 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-3">
                                 <div class="font-medium">{{ component.name }}</div>
+                                <Badge v-if="component.code" variant="secondary" class="font-mono text-xs">
+                                    {{ component.code }}
+                                </Badge>
                                 <Badge :class="getAssessmentTypeColor(component.type)">
                                     {{ getAssessmentTypeLabel(component.type) }}
                                 </Badge>

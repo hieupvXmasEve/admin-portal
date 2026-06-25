@@ -12,8 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import type { GradingScheme } from '@/types/grading-scheme';
 import { Head, router } from '@inertiajs/vue3';
-import GradingSchemeEditor from './components/GradingSchemeEditor.vue';
+import MetropoliaSchemeBuilder from './components/MetropoliaSchemeBuilder.vue';
 import GradingSchemePreview from './components/GradingSchemePreview.vue';
+import type { ExampleComponent } from './components/grading-scheme-examples';
+import { METROPOLIA_COMPONENT_CODES } from './components/metropolia-component-codes';
 import { toTypedSchema } from '@vee-validate/zod';
 import { ArrowLeft, ChevronsUpDown, Plus, Save, Trash2 } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
@@ -52,6 +54,7 @@ const formSchema = toTypedSchema(
             .array(
                 z.object({
                     name: z.string().min(1, { message: 'Component name is required' }),
+                    code: z.string().optional(),
                     weight: z.number().min(0, { message: 'Weight must be non-negative' }).max(100, { message: 'Weight cannot exceed 100%' }),
                     type: z.enum(['quiz', 'assignment', 'project', 'exam', 'online_activity', 'attendance', 'other'], {
                         errorMap: () => ({ message: 'Please select a valid assessment type' }),
@@ -105,6 +108,7 @@ const form = useForm({
         assessment_components: [
             {
                 name: 'Final Exam',
+                code: 'EXAM',
                 weight: 100,
                 type: 'exam',
                 details: [],
@@ -117,6 +121,18 @@ const form = useForm({
 const isSubmitting = ref(false);
 // Grading scheme (null = default weighted percentage)
 const gradingScheme = ref<GradingScheme | null>(null);
+// Assessment components surfaced to the builder (single source of truth).
+const builderComponents = computed(() =>
+    ((form.values.assessment_components as Array<{ code?: string; name?: string }>) || []).map((component) => ({ code: component.code ?? '', label: component.name ?? '' })),
+);
+
+// Guide-modal example fills the Assessment Components below + the scheme.
+const applyExampleComponents = (components: ExampleComponent[]) => {
+    form.setFieldValue(
+        'assessment_components',
+        components.map((component) => ({ name: component.name, code: component.code, weight: component.weight, type: component.type, details: [] })),
+    );
+};
 // Unit search states
 const addUnitSearch = ref('');
 
@@ -127,6 +143,7 @@ const addAssessmentComponent = () => {
         ...currentComponents,
         {
             name: '',
+            code: '',
             weight: 0,
             type: 'assignment',
             // is_required_to_sit_final_exam: true,
@@ -275,6 +292,10 @@ const filteredAvailableUnits = computed(() => {
     </div>
 
     <form class="space-y-6" @submit="onSubmit">
+        <datalist id="metropolia-component-codes">
+            <option v-for="entry in METROPOLIA_COMPONENT_CODES" :key="entry.code" :value="entry.code">{{ entry.label }}</option>
+        </datalist>
+
         <!-- Grading scheme (S-003) -->
         <Card>
             <CardHeader>
@@ -284,7 +305,7 @@ const filteredAvailableUnits = computed(() => {
                 </CardDescription>
             </CardHeader>
             <CardContent class="grid gap-6 lg:grid-cols-2">
-                <GradingSchemeEditor v-model="gradingScheme" />
+                <MetropoliaSchemeBuilder v-model="gradingScheme" :components="builderComponents" @apply-components="applyExampleComponents" />
                 <GradingSchemePreview :scheme="gradingScheme" />
             </CardContent>
         </Card>
@@ -556,6 +577,19 @@ const filteredAvailableUnits = computed(() => {
                                         <Input :id="`component_name_${componentIndex}`" placeholder="e.g., Final Exam"
                                             v-bind="componentField" />
                                     </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            </FormField>
+
+                            <FormField v-slot="{ componentField }"
+                                :name="`assessment_components.${componentIndex}.code`">
+                                <FormItem>
+                                    <FormLabel :for="`component_code_${componentIndex}`">Code</FormLabel>
+                                    <FormControl>
+                                        <Input :id="`component_code_${componentIndex}`" list="metropolia-component-codes"
+                                            placeholder="e.g., EXAM" class="font-mono uppercase" v-bind="componentField" />
+                                    </FormControl>
+                                    <FormDescription>Chọn mã chuẩn hoặc tự nhập. Bắt buộc khi dùng chấm điểm Metropolia.</FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             </FormField>

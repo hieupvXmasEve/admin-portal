@@ -1,14 +1,47 @@
-// Shared admin types for the syllabus grading scheme editor/preview (S-003).
+// Shared admin types for the syllabus grading scheme editor/preview (S-003, S-007).
 // Mirrors the executable contract in app/Modules/Academic/Support/Grading.
 
 export type GradingSchemeEngine = 'default' | 'metropolia_v1' | 'metropolia_v2';
 export type GradingSchemeScale = '0-5' | 'pass_fail';
 
+// metropolia_v1 per-component conversion vocabulary (MetropoliaV1Calculator).
+export type GradingConversionType = 'linear' | 'threshold' | 'direct' | 'pass_fail';
+
+export interface LinearConversion {
+    type: 'linear';
+    min_pct: number;
+    max_pct: number;
+    min_grade: number;
+    max_grade: number;
+}
+
+export interface ThresholdStep {
+    min_pct: number;
+    grade: number;
+}
+
+export interface ThresholdConversion {
+    type: 'threshold';
+    steps: ThresholdStep[];
+}
+
+export interface DirectConversion {
+    type: 'direct';
+    max_grade: number;
+}
+
+export interface PassFailConversion {
+    type: 'pass_fail';
+    min_pct: number;
+}
+
+export type GradingConversion = LinearConversion | ThresholdConversion | DirectConversion | PassFailConversion;
+
 export interface GradingSchemeComponent {
     code: string;
     label?: string;
     gate?: { min_pct: number };
-    conversion?: Record<string, unknown>;
+    conversion?: GradingConversion;
 }
 
 export interface GradingSchemePassRequirement {
