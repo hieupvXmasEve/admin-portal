@@ -1114,11 +1114,6 @@ const exportApplications = async () => {
                 Convert {{ selectedApplications.length }} to Students
             </Button>
 
-            <Button @click="() => router.visit(route('student-applications.import'))" variant="outline" class="border-purple-300 text-purple-600 hover:bg-purple-50">
-                <FileSpreadsheet class="mr-2 h-4 w-4" />
-                Import
-            </Button>
-
             <Button @click="openExportDialog()" variant="outline" class="border-gray-300">
                 <Download class="mr-2 h-4 w-4" />
                 Export

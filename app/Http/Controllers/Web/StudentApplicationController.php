@@ -2,9 +2,8 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Exports\StudentApplicationExport;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\ImportStudentApplicationPreviewRequest;
-use App\Http\Requests\ImportStudentApplicationProcessRequest;
 use App\Http\Requests\StoreStudentApplicationRequest;
 use App\Http\Requests\UpdateStudentApplicationRequest;
 use App\Models\Campus;
@@ -12,24 +11,20 @@ use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Specialization;
 use App\Models\StudentApplication;
-use App\Services\StudentApplicationImportService;
 use App\Services\StudentApplicationService;
-use App\Exports\StudentApplicationExport;
-use Maatwebsite\Excel\Excel;
-use Maatwebsite\Excel\Facades\Excel as ExcelFacade;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Excel;
+use Maatwebsite\Excel\Facades\Excel as ExcelFacade;
 
 class StudentApplicationController extends Controller
 {
     public function __construct(
-        private StudentApplicationService $studentApplicationService,
-        private StudentApplicationImportService $importService
+        private StudentApplicationService $studentApplicationService
     ) {}
 
     /**
@@ -57,11 +52,11 @@ class StudentApplicationController extends Controller
         // Apply search filter
         if ($filters['search']) {
             $query->where(function ($q) use ($filters) {
-                $q->where('full_name', 'like', '%' . $filters['search'] . '%')
-                    ->orWhere('email', 'like', '%' . $filters['search'] . '%')
-                    ->orWhere('student_code', 'like', '%' . $filters['search'] . '%')
-                    ->orWhere('national_id', 'like', '%' . $filters['search'] . '%')
-                    ->orWhere('phone', 'like', '%' . $filters['search'] . '%');
+                $q->where('full_name', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('email', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('student_code', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('national_id', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('phone', 'like', '%'.$filters['search'].'%');
             });
         }
 
@@ -95,8 +90,8 @@ class StudentApplicationController extends Controller
                 default => '='
             };
             // $query->where('overall', $operator, $filters['overall_value']);
-            $query->whereRaw('COALESCE(overall, 0) ' . $operator . ' ?', [
-                $filters['overall_value']
+            $query->whereRaw('COALESCE(overall, 0) '.$operator.' ?', [
+                $filters['overall_value'],
             ]);
         }
 
@@ -340,7 +335,7 @@ class StudentApplicationController extends Controller
         } catch (\Exception $e) {
             return redirect()
                 ->back()
-                ->with('error', 'Batch conversion failed: ' . $e->getMessage())
+                ->with('error', 'Batch conversion failed: '.$e->getMessage())
                 ->withInput();
         }
     }
@@ -462,113 +457,8 @@ class StudentApplicationController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update application statuses: ' . $e->getMessage(),
+                'message' => 'Failed to update application statuses: '.$e->getMessage(),
             ], 500);
-        }
-    }
-
-    /**
-     * Show the import form
-     */
-    public function showImportForm()
-    {
-        return Inertia::render('student-applications/Import', [
-            'maxFileSize' => '10MB',
-            'allowedExtensions' => ['xlsx', 'xls', 'csv'],
-        ]);
-    }
-
-    /**
-     * Preview import data
-     */
-    public function previewImport(ImportStudentApplicationPreviewRequest $request): JsonResponse
-    {
-        try {
-            $result = $this->importService->previewImport(
-                $request->file('file'),
-                $request->validated('options', [])
-            );
-
-            return response()->json($result);
-        } catch (\Exception $e) {
-            Log::error('Student application import preview failed', [
-                'error' => $e->getMessage(),
-                'user_id' => auth()->id(),
-                'file' => $request->file('file')?->getClientOriginalName(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Process import
-     */
-    public function processImport(ImportStudentApplicationProcessRequest $request): JsonResponse
-    {
-        try {
-            Log::info('Starting student application import processing', [
-                'user_id' => auth()->user()?->id,
-                'file_name' => $request->file('file')?->getClientOriginalName(),
-                'file_size' => $request->file('file')?->getSize(),
-                'column_mapping' => $request->validated('column_mapping'),
-                'options' => $request->validated('options', []),
-            ]);
-
-            $result = $this->importService->processImport(
-                $request->file('file'),
-                $request->validated('column_mapping'),
-                $request->validated('options', [])
-            );
-
-            Log::info('Student application import service completed', [
-                'user_id' => auth()->user()?->id,
-                'service_result' => $result,
-                'file' => $request->file('file')?->getClientOriginalName(),
-            ]);
-
-            Log::info('Student application import completed', [
-                'user_id' => auth()->user()?->id,
-                'results' => $result['data'] ?? [],
-                'file' => $request->file('file')?->getClientOriginalName(),
-            ]);
-
-            return response()->json($result);
-        } catch (\Exception $e) {
-            Log::error('Student application import processing failed', [
-                'error' => $e->getMessage(),
-                'user_id' => auth()->user()?->id,
-                'file' => $request->file('file')?->getClientOriginalName(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Download import template
-     */
-    public function downloadTemplate(): \Symfony\Component\HttpFoundation\BinaryFileResponse
-    {
-        try {
-            $filePath = $this->importService->generateTemplate();
-            $filename = 'student_applications_template_' . date('Y-m-d') . '.xlsx';
-
-            return response()->download($filePath, $filename)->deleteFileAfterSend();
-        } catch (\Exception $e) {
-            Log::error('Failed to generate student application import template', [
-                'error' => $e->getMessage(),
-                'user_id' => auth()->id(),
-            ]);
-
-            abort(500, 'Failed to generate template: ' . $e->getMessage());
         }
     }
 
@@ -598,10 +488,10 @@ class StudentApplicationController extends Controller
                 // Apply search filter
                 if ($filters['search']) {
                     $query->where(function ($q) use ($filters) {
-                        $q->where('full_name', 'like', '%' . $filters['search'] . '%')
-                            ->orWhere('email', 'like', '%' . $filters['search'] . '%')
-                            ->orWhere('national_id', 'like', '%' . $filters['search'] . '%')
-                            ->orWhere('phone', 'like', '%' . $filters['search'] . '%');
+                        $q->where('full_name', 'like', '%'.$filters['search'].'%')
+                            ->orWhere('email', 'like', '%'.$filters['search'].'%')
+                            ->orWhere('national_id', 'like', '%'.$filters['search'].'%')
+                            ->orWhere('phone', 'like', '%'.$filters['search'].'%');
                     });
                 }
 
@@ -653,13 +543,13 @@ class StudentApplicationController extends Controller
 
             return ExcelFacade::download($export, "{$filename}.xlsx");
         } catch (\Exception $e) {
-            Log::error('Export failed: ' . $e->getMessage(), [
+            Log::error('Export failed: '.$e->getMessage(), [
                 'exception' => $e,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
-                'error' => 'Export failed: ' . $e->getMessage()
+                'error' => 'Export failed: '.$e->getMessage(),
             ], 500);
         }
     }

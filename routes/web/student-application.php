@@ -19,23 +19,6 @@ Route::middleware('auth')->prefix('student-applications')->name('student-applica
         ->middleware('can:view_student_application')
         ->name('export');
 
-    // Import routes (must come before {studentApplication} route)
-    Route::get('/import', [StudentApplicationController::class, 'showImportForm'])
-        ->middleware('can:import_student_application')
-        ->name('import');
-
-    Route::post('/import/preview', [StudentApplicationController::class, 'previewImport'])
-        ->middleware('can:import_student_application')
-        ->name('import.preview');
-
-    Route::post('/import/process', [StudentApplicationController::class, 'processImport'])
-        ->middleware('can:import_student_application')
-        ->name('import.process');
-
-    Route::get('/import/template', [StudentApplicationController::class, 'downloadTemplate'])
-        ->middleware('can:export_student_application')
-        ->name('import.template');
-
     // API routes for forms
     Route::get('/api/conversion-options', [StudentApplicationController::class, 'getConversionOptions'])
         ->middleware('can:view_student_application')
