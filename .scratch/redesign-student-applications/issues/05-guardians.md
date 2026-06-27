@@ -1,6 +1,6 @@
 # Guardians (1-n) on Applications
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
@@ -20,12 +20,12 @@ Existing `parent_*` columns remain populated for legacy rows until the migration
 
 ## Acceptance criteria
 
-- [ ] `application_guardians` exists with the fields above; `relationship` is validated in the backend, addable values need no migration.
-- [ ] Exactly one Guardian can be primary; the constraint is enforced.
-- [ ] Staff can add/edit/remove Guardians on a `pending` Application via the UI.
-- [ ] On approve, the primary Guardian maps to the Student emergency contact and creates/links a Parent account with the real name and relationship.
-- [ ] `handleParentAssignment` handles structured, possibly-multiple Guardians (no `null`-name / hardcoded "Parent" relationship).
-- [ ] Feature tests cover guardian CRUD and the approve-time mapping/parent linkage.
+- [x] `application_guardians` exists with the fields above; `relationship` is validated in the backend, addable values need no migration.
+- [x] Exactly one Guardian can be primary; the constraint is enforced (DB generated-column unique index + service invariant).
+- [x] Staff can add/edit/remove Guardians on a `pending` Application via the UI.
+- [x] On approve, the primary Guardian maps to the Student emergency contact and creates/links a Parent account with the real name and relationship.
+- [x] `handleParentAssignment` handles structured, possibly-multiple Guardians (no `null`-name / hardcoded "Parent" relationship).
+- [x] Feature tests cover guardian CRUD and the approve-time mapping/parent linkage.
 
 ## Blocked by
 
