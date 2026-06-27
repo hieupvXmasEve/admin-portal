@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Models\Student;
 use App\Models\StudentApplication;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -54,31 +56,57 @@ class StudentApplicationFactory extends Factory
             'sut_id' => fake()->optional()->numerify('SUT######'),
             'is_international_applicant' => fake()->boolean(20),
             'exception_units' => fake()->optional()->sentence(),
-            'status' => fake()->randomElement(['pending', 'approved', 'rejected']),
+            'status' => StudentApplication::STATUS_PENDING,
             'student_id' => null,
-            'student_code' => fake()->unique()->regexify('SWU[0-9]{6}'),
+            'student_code' => fake()->unique()->numerify('S#######'),
+            'approved_by' => null,
+            'approved_at' => null,
+            'rejected_by' => null,
+            'rejected_at' => null,
+            'rejected_reason' => null,
         ];
     }
 
     /**
-     * Indicate that the application has been converted to a student.
-     */
-    public function converted(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'status' => 'approved',
-            'student_id' => \App\Models\Student::factory(),
-        ]);
-    }
-
-    /**
-     * Indicate that the application is pending conversion.
+     * Indicate that the application is pending (the default lifecycle state).
      */
     public function pending(): static
     {
         return $this->state(fn (array $attributes) => [
-            'status' => 'pending',
+            'status' => StudentApplication::STATUS_PENDING,
             'student_id' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+            'rejected_by' => null,
+            'rejected_at' => null,
+            'rejected_reason' => null,
+        ]);
+    }
+
+    /**
+     * Indicate that the application has been approved and the student enrolled.
+     */
+    public function enrolled(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => StudentApplication::STATUS_ENROLLED,
+            'student_id' => Student::factory(),
+            'approved_by' => User::factory(),
+            'approved_at' => now(),
+        ]);
+    }
+
+    /**
+     * Indicate that the application has been rejected.
+     */
+    public function rejected(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => StudentApplication::STATUS_REJECTED,
+            'student_id' => null,
+            'rejected_by' => User::factory(),
+            'rejected_at' => now(),
+            'rejected_reason' => fake()->sentence(),
         ]);
     }
 

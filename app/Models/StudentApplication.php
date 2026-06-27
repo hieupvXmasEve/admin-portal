@@ -9,6 +9,27 @@ class StudentApplication extends AuditableModel
 {
     use HasFactory;
 
+    /**
+     * Application lifecycle statuses (BE-validated allow-list, not a DB enum).
+     */
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_ENROLLED = 'enrolled';
+
+    public const STATUS_REJECTED = 'rejected';
+
+    /**
+     * @return list<string>
+     */
+    public static function statuses(): array
+    {
+        return [
+            self::STATUS_PENDING,
+            self::STATUS_ENROLLED,
+            self::STATUS_REJECTED,
+        ];
+    }
+
     protected $fillable = [
         'full_name',
         'gender',
@@ -50,6 +71,11 @@ class StudentApplication extends AuditableModel
         'status',
         'student_id',
         'student_code',
+        'approved_by',
+        'approved_at',
+        'rejected_by',
+        'rejected_at',
+        'rejected_reason',
     ];
 
     protected $casts = [
@@ -64,6 +90,8 @@ class StudentApplication extends AuditableModel
         'overall' => 'decimal:2',
         'is_international_applicant' => 'boolean',
         'status' => 'string',
+        'approved_at' => 'datetime',
+        'rejected_at' => 'datetime',
         'submitted_photo' => 'string',
         'submitted_cccd' => 'string',
         'submitted_ccta' => 'string',
@@ -79,7 +107,7 @@ class StudentApplication extends AuditableModel
      */
     protected $attributes = [
         'is_international_applicant' => false,
-        'status' => 'approved',
+        'status' => self::STATUS_PENDING,
     ];
 
     /**
@@ -88,6 +116,40 @@ class StudentApplication extends AuditableModel
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
+    }
+
+    /**
+     * Staff member who approved this application.
+     *
+     * Named `approvedByUser` (not `approvedBy`) so the serialized relation key
+     * (`approved_by_user`) does not collide with the `approved_by` FK column.
+     */
+    public function approvedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    /**
+     * Staff member who rejected this application.
+     */
+    public function rejectedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+
+    public function isPending(): bool
+    {
+        return $this->status === self::STATUS_PENDING;
+    }
+
+    public function isEnrolled(): bool
+    {
+        return $this->status === self::STATUS_ENROLLED;
+    }
+
+    public function isRejected(): bool
+    {
+        return $this->status === self::STATUS_REJECTED;
     }
 
     /**
@@ -145,6 +207,10 @@ class StudentApplication extends AuditableModel
             'status',
             'student_id',
             'student_code',
+            'approved_by',
+            'approved_at',
+            'rejected_by',
+            'rejected_at',
         ];
     }
 
@@ -170,7 +236,7 @@ class StudentApplication extends AuditableModel
         if (! empty($this->full_name)) {
             $campus = $this->campus_code ? " ({$this->campus_code})" : '';
 
-            return $this->full_name . $campus;
+            return $this->full_name.$campus;
         }
 
         if (! empty($this->email)) {
@@ -220,171 +286,5 @@ class StudentApplication extends AuditableModel
     public function campus(): BelongsTo
     {
         return $this->belongsTo(Campus::class, 'campus_code', 'code');
-    }
-
-    /**
-     * Resolve campus ID from campus code
-     */
-    public function resolveCampusId(): ?int
-    {
-        if (empty($this->campus_code)) {
-            return null;
-        }
-
-        $campus = Campus::where('code', $this->campus_code)->first();
-        return $campus?->id;
-    }
-
-    /**
-     * Resolve program ID from intended program using mapping
-     */
-    public function resolveProgramId(): ?int
-    {
-        if (empty($this->intended_program)) {
-            return null;
-        }
-
-        $mappingService = app(\App\Services\ProgramMappingService::class);
-        return $mappingService->getProgramIdFromIntendedCode($this->intended_program);
-    }
-
-    /**
-     * Resolve curriculum version ID from intake and program
-     */
-    public function resolveCurriculumVersionId(): ?int
-    {
-        if (empty($this->intake)) {
-            return null;
-        }
-
-        $programId = $this->resolveProgramId();
-        if (!$programId) {
-            return null;
-        }
-
-        $mappingService = app(\App\Services\ProgramMappingService::class);
-        return $mappingService->getCurriculumVersionId($this->intake, $programId);
-    }
-
-    /**
-     * Get complete mapping data for student conversion
-     */
-    public function getConversionMappingData(): array
-    {
-        $mappingService = app(\App\Services\ProgramMappingService::class);
-
-        return $mappingService->resolveApplicationMappingData([
-            'campus_code' => $this->campus_code,
-            'intended_program' => $this->intended_program,
-            'intake' => $this->intake,
-        ]);
-    }
-
-    /**
-     * Check if application data is complete for conversion
-     */
-    public function isReadyForConversion(): bool
-    {
-        \Log::info("Checking conversion readiness for application {$this->id}", [
-            'application_id' => $this->id,
-            'full_name' => $this->full_name,
-            'email' => $this->email,
-            'campus_code' => $this->campus_code,
-            'student_code' => $this->student_code,
-            'intended_program' => $this->intended_program,
-            'intake' => $this->intake,
-        ]);
-
-        // Allow already converted applications for updates
-        if ($this->isConverted()) {
-            \Log::info("Application {$this->id} already converted (student_id: {$this->student_id}) - allowing for updates");
-            // Continue checking other requirements instead of returning false
-        }
-
-        // Required basic data including student_code
-        $requiredFields = [
-            'full_name' => $this->full_name,
-            'email' => $this->email,
-            'campus_code' => $this->campus_code,
-            'student_code' => $this->student_code,
-        ];
-
-        foreach ($requiredFields as $field => $value) {
-            if (empty($value)) {
-                \Log::warning("Application {$this->id} missing required field: {$field}");
-                return false;
-            }
-        }
-
-        // Check if mapping data can be resolved
-        \Log::info("Getting conversion mapping data for application {$this->id}");
-        $mappingData = $this->getConversionMappingData();
-
-        \Log::info("Mapping data resolved for application {$this->id}", [
-            'mapping_data' => $mappingData,
-            'campus_id_resolved' => !empty($mappingData['campus_id']),
-            'program_id_resolved' => !empty($mappingData['program_id']),
-            'curriculum_version_id_resolved' => !empty($mappingData['curriculum_version_id']),
-        ]);
-
-        $isReady = !empty($mappingData['campus_id']) &&
-            !empty($mappingData['program_id']) &&
-            !empty($mappingData['curriculum_version_id']);
-
-        \Log::info("Application {$this->id} readiness result: " . ($isReady ? 'READY' : 'NOT READY'));
-
-        return $isReady;
-    }
-
-    /**
-     * Get validation errors for conversion readiness
-     */
-    public function getConversionValidationErrors(): array
-    {
-        $errors = [];
-
-        // if ($this->isConverted()) {
-        //     $errors[] = 'Application has already been converted';
-        //     return $errors;
-        // }
-
-        if (empty($this->full_name)) {
-            $errors[] = 'Full name is required';
-        }
-
-        if (empty($this->email)) {
-            $errors[] = 'Email is required';
-        }
-
-        if (empty($this->campus_code)) {
-            $errors[] = 'Campus code is required';
-        }
-
-        if (empty($this->student_code)) {
-            $errors[] = 'Student code is required';
-        }
-
-        if (empty($this->intended_program)) {
-            $errors[] = 'Intended program is required';
-        }
-
-        if (empty($this->intake)) {
-            $errors[] = 'Intake is required';
-        }
-
-        // Check mapping resolution
-        if (!empty($this->campus_code) && !$this->resolveCampusId()) {
-            $errors[] = "Campus not found for code: {$this->campus_code}";
-        }
-
-        if (!empty($this->intended_program) && !$this->resolveProgramId()) {
-            $errors[] = "Program not found for intended program: {$this->intended_program}";
-        }
-
-        if (!empty($this->intake) && !empty($this->intended_program) && !$this->resolveCurriculumVersionId()) {
-            $errors[] = "Curriculum version not found for intake: {$this->intake}";
-        }
-
-        return $errors;
     }
 }

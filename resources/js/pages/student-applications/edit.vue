@@ -67,7 +67,7 @@ interface StudentApplication {
     sut_id: string | null;
     is_international_applicant: boolean;
     exception_units: string | null;
-    status: 'pending' | 'reviewed' | 'approved' | 'rejected';
+    status: 'pending' | 'enrolled' | 'rejected';
 }
 
 interface Props {
@@ -123,7 +123,6 @@ const formSchema = toTypedSchema(
         sut_id: z.string().max(50).nullable(),
         is_international_applicant: z.boolean(),
         exception_units: z.string().nullable(),
-        status: z.enum(['pending', 'reviewed', 'approved', 'rejected']),
         student_code: z.string().min(1, 'Student code is required').max(20),
     }),
 );
@@ -169,7 +168,6 @@ const { handleSubmit } = useForm({
         sut_id: props.application.sut_id,
         is_international_applicant: props.application.is_international_applicant,
         exception_units: props.application.exception_units,
-        status: props.application.status,
         student_code: props.application.student_code,
     },
 });
@@ -695,26 +693,6 @@ const handleCancel = () => {
                 </CardHeader>
                 <CardContent class="space-y-4">
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <FormField v-slot="{ componentField }" name="status">
-                            <FormItem>
-                                <FormLabel>Status *</FormLabel>
-                                <FormControl>
-                                    <Select v-bind="componentField">
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select status" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="pending">Pending</SelectItem>
-                                            <SelectItem value="reviewed">Reviewed</SelectItem>
-                                            <SelectItem value="approved">Approved</SelectItem>
-                                            <SelectItem value="rejected">Rejected</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
                         <FormField v-slot="{ componentField }" name="study_link_status">
                             <FormItem>
                                 <FormLabel>StudyLink Status</FormLabel>

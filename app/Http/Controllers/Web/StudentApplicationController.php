@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Web;
 
 use App\Exports\StudentApplicationExport;
@@ -7,19 +9,18 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreStudentApplicationRequest;
 use App\Http\Requests\UpdateStudentApplicationRequest;
 use App\Models\Campus;
-use App\Models\CurriculumVersion;
 use App\Models\Program;
-use App\Models\Specialization;
 use App\Models\StudentApplication;
 use App\Services\StudentApplicationService;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Database\QueryException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Excel;
 use Maatwebsite\Excel\Facades\Excel as ExcelFacade;
+use RuntimeException;
+use Throwable;
 
 class StudentApplicationController extends Controller
 {
@@ -28,20 +29,18 @@ class StudentApplicationController extends Controller
     ) {}
 
     /**
-     * Display a listing of student applications
+     * Display a listing of student applications.
      */
     public function index(Request $request)
     {
         $filters = [
             'search' => $request->get('search'),
             'status' => $request->get('status'),
-            'converted' => $request->get('converted'),
             'campus_code' => $request->get('campus_code'),
+            'intake' => $request->get('intake'),
             'per_page' => min((int) $request->get('per_page', 15), 200),
             'sort' => $request->get('sort', 'created_at'),
             'direction' => $request->get('direction', 'desc'),
-            'overall_operator' => $request->get('overall_operator'),
-            'overall_value' => $request->get('overall_value'),
         ];
 
         $query = StudentApplication::query()
@@ -49,7 +48,6 @@ class StudentApplicationController extends Controller
                 $query->select('id', 'student_id', 'full_name');
             }]);
 
-        // Apply search filter
         if ($filters['search']) {
             $query->where(function ($q) use ($filters) {
                 $q->where('full_name', 'like', '%'.$filters['search'].'%')
@@ -60,72 +58,43 @@ class StudentApplicationController extends Controller
             });
         }
 
-        // Apply status filter
-        if ($filters['status']) {
+        if ($filters['status'] && $filters['status'] !== 'all') {
             $query->where('status', $filters['status']);
         }
 
-        // Apply converted filter
-        if ($filters['converted'] !== null && $filters['converted'] !== '') {
-            if ($filters['converted'] === 'yes') {
-                $query->whereNotNull('student_id');
-            } elseif ($filters['converted'] === 'no') {
-                $query->whereNull('student_id');
-            }
-        }
-
-        //        // Apply campus filter
         if ($filters['campus_code'] !== null && $filters['campus_code'] !== 'all') {
             $query->where('campus_code', $filters['campus_code']);
         }
 
-        // Apply overall score filter
-        if ($filters['overall_operator'] && $filters['overall_value'] !== null) {
-            $operator = match ($filters['overall_operator']) {
-                'gt' => '>',
-                'gte' => '>=',
-                'lt' => '<',
-                'lte' => '<=',
-                'eq' => '=',
-                default => '='
-            };
-            // $query->where('overall', $operator, $filters['overall_value']);
-            $query->whereRaw('COALESCE(overall, 0) '.$operator.' ?', [
-                $filters['overall_value'],
-            ]);
+        if ($filters['intake'] !== null && $filters['intake'] !== '' && $filters['intake'] !== 'all') {
+            $query->where('intake', $filters['intake']);
         }
 
-        // Apply sorting
         $query->orderBy($filters['sort'], $filters['direction']);
+
         $applications = $query
-            //            ->where('campus_code', app('campus')->code)
             ->paginate($filters['per_page'])
             ->withQueryString();
 
-        // Get filter options
         $campuses = Campus::select('code', 'name')->get();
-        $statusOptions = [
-            ['value' => 'pending', 'label' => 'Pending'],
-            ['value' => 'reviewed', 'label' => 'Reviewed'],
-            ['value' => 'approved', 'label' => 'Approved'],
-            ['value' => 'rejected', 'label' => 'Rejected'],
-        ];
-        $conversionOptions = [
-            ['value' => 'yes', 'label' => 'Converted to Student'],
-            ['value' => 'no', 'label' => 'Not Converted'],
-        ];
+        $intakes = StudentApplication::query()
+            ->whereNotNull('intake')
+            ->where('intake', '!=', '')
+            ->distinct()
+            ->orderBy('intake')
+            ->pluck('intake');
 
         return Inertia::render('student-applications/index', [
             'applications' => $applications,
             'filters' => $filters,
             'campuses' => $campuses,
-            'statusOptions' => $statusOptions,
-            'conversionOptions' => $conversionOptions,
+            'intakes' => $intakes,
+            'statusOptions' => $this->statusOptions(),
         ]);
     }
 
     /**
-     * Show the form for creating a new student application
+     * Show the form for creating a new student application.
      */
     public function create()
     {
@@ -139,7 +108,7 @@ class StudentApplicationController extends Controller
     }
 
     /**
-     * Store a newly created student application
+     * Store a newly created (pending) student application.
      */
     public function store(StoreStudentApplicationRequest $request)
     {
@@ -151,13 +120,17 @@ class StudentApplicationController extends Controller
     }
 
     /**
-     * Display the specified student application
+     * Display the specified student application.
      */
     public function show(StudentApplication $studentApplication)
     {
-        $studentApplication->load(['student' => function ($query) {
-            $query->select('id', 'student_id', 'full_name', 'email', 'status');
-        }]);
+        $studentApplication->load([
+            'student' => function ($query) {
+                $query->select('id', 'student_id', 'full_name', 'email', 'status');
+            },
+            'approvedByUser:id,name,email',
+            'rejectedByUser:id,name,email',
+        ]);
 
         return Inertia::render('student-applications/show', [
             'application' => $studentApplication,
@@ -165,7 +138,7 @@ class StudentApplicationController extends Controller
     }
 
     /**
-     * Show the form for editing the specified student application
+     * Show the form for editing the specified student application.
      */
     public function edit(StudentApplication $studentApplication)
     {
@@ -180,27 +153,26 @@ class StudentApplicationController extends Controller
     }
 
     /**
-     * Update the specified student application
+     * Update the specified student application.
      */
     public function update(UpdateStudentApplicationRequest $request, StudentApplication $studentApplication)
     {
         $studentApplication->update($request->validated());
 
         return redirect()
-            ->route('student-applications.index', $studentApplication)
+            ->route('student-applications.show', $studentApplication)
             ->with('success', 'Student application updated successfully.');
     }
 
     /**
-     * Remove the specified student application
+     * Remove the specified student application.
      */
     public function destroy(StudentApplication $studentApplication)
     {
-        // Only allow deletion if not converted to student
         if ($studentApplication->isConverted()) {
             return redirect()
                 ->route('student-applications.index')
-                ->with('error', 'Cannot delete application that has been converted to a student.');
+                ->with('error', 'Cannot delete an application that is linked to a student.');
         }
 
         $studentApplication->delete();
@@ -211,259 +183,90 @@ class StudentApplicationController extends Controller
     }
 
     /**
-     * Update the status of a student application
+     * Approve a pending application: atomically create the enrolled student.
      */
-    public function updateStatus(Request $request, StudentApplication $studentApplication)
+    public function approve(Request $request, StudentApplication $studentApplication): RedirectResponse
     {
-        $request->validate([
-            'status' => 'required|in:pending,reviewed,approved,rejected',
-        ]);
-
-        $studentApplication->update([
-            'status' => $request->status,
-        ]);
-
-        return redirect()
-            ->back()
-            ->with('success', 'Application status updated successfully.');
-    }
-
-    /**
-     * Convert a single student application to a student
-     */
-    public function convert(Request $request, StudentApplication $studentApplication)
-    {
-        $request->validate([
-            'program_id' => 'required|exists:programs,id',
-            'curriculum_version_id' => 'required|exists:curriculum_versions,id',
-            'specialization_id' => 'nullable|exists:specializations,id',
-            'admission_date' => 'required|date',
-            'expected_graduation_date' => 'nullable|date|after:admission_date',
-        ]);
-
-        $result = $this->studentApplicationService->convertSingleApplication(
-            $studentApplication->id,
-            $request->only([
-                'program_id',
-                'curriculum_version_id',
-                'specialization_id',
-                'admission_date',
-                'expected_graduation_date',
-            ])
-        );
-
-        if ($result['success']) {
-            return redirect()
-                ->route('student-applications.show', $studentApplication)
-                ->with('success', 'Application successfully converted to student.');
-        }
-
-        return redirect()
-            ->back()
-            ->withErrors($result['errors'] ?? ['error' => $result['error']])
-            ->with('error', 'Failed to convert application.');
-    }
-
-    /**
-     * Convert multiple student applications to students
-     * Now with automatic campus_id and curriculum_version_id resolution
-     */
-    public function batchConvert(Request $request)
-    {
-        $request->validate([
-            'application_ids' => 'required|array|min:1',
-            'application_ids.*' => 'exists:student_applications,id',
-            'admission_date' => 'required|date',
+        $validated = $request->validate([
+            'admission_date' => 'nullable|date',
             'expected_graduation_date' => 'nullable|date|after:admission_date',
         ]);
 
         try {
-            // The service will now automatically resolve campus_id, program_id, and curriculum_version_id
-            // from the application's campus_code, intended_program, and intake fields
-            $result = $this->studentApplicationService->convertBatchApplications(
-                $request->application_ids,
-                $request->only([
-                    'admission_date',
-                    'expected_graduation_date',
-                ])
+            $this->studentApplicationService->approve(
+                $studentApplication,
+                $request->user(),
+                $validated
             );
+        } catch (QueryException $e) {
+            // A persistence failure (e.g. duplicate student code) rolled the whole
+            // approval back — log the detail, never surface raw SQL to the user.
+            Log::warning('Application approval failed (database)', [
+                'application_id' => $studentApplication->id,
+                'error' => $e->getMessage(),
+            ]);
 
-            $message = "Batch conversion completed: {$result['success_count']} successful, {$result['error_count']} failed.";
-
-            // Detailed success message with mapping info
-            if ($result['success_count'] > 0) {
-                $successDetails = [];
-                foreach ($result['successful'] as $success) {
-                    $student = $success['student'];
-                    $application = $success['application'];
-                    $successDetails[] = "✓ {$application['full_name']} → Student ID: {$student['student_id']}";
-                }
-
-                session()->flash('success_details', $successDetails);
-            }
-
-            // Detailed error information
-            if ($result['error_count'] > 0) {
-                $errorDetails = [];
-                foreach ($result['failed'] as $failed) {
-                    $errorDetails[] = [
-                        'application_id' => $failed['application_id'],
-                        'error' => $failed['error'],
-                        'details' => $failed['errors'],
-                    ];
-                }
-
-                return redirect()
-                    ->back()
-                    ->with('warning', $message)
-                    ->with('batch_errors', $errorDetails)
-                    ->with('conversion_summary', [
-                        'total' => count($request->application_ids),
-                        'successful' => $result['success_count'],
-                        'failed' => $result['error_count'],
-                    ]);
-            }
-
-            return redirect()
-                ->route('student-applications.index')
-                ->with('success', $message)
-                ->with('conversion_summary', [
-                    'total' => count($request->application_ids),
-                    'successful' => $result['success_count'],
-                    'failed' => $result['error_count'],
-                ]);
-        } catch (\Exception $e) {
             return redirect()
                 ->back()
-                ->with('error', 'Batch conversion failed: '.$e->getMessage())
-                ->withInput();
+                ->with('error', 'Failed to approve the application. Please verify the data and try again.');
+        } catch (RuntimeException $e) {
+            // Domain guard messages (e.g. "Only a pending application…") are safe.
+            return redirect()
+                ->back()
+                ->with('error', $e->getMessage());
+        } catch (Throwable $e) {
+            Log::warning('Application approval failed', [
+                'application_id' => $studentApplication->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()
+                ->back()
+                ->with('error', 'Failed to approve the application. Please try again.');
         }
+
+        return redirect()
+            ->route('student-applications.show', $studentApplication)
+            ->with('success', 'Application approved. The student has been enrolled.');
     }
 
     /**
-     * Get conversion options for forms
+     * Reject a pending application with a reason; no student is created.
      */
-    public function getConversionOptions(Request $request)
+    public function reject(Request $request, StudentApplication $studentApplication): RedirectResponse
     {
-        $data = [];
-
-        // Get programs
-        $data['programs'] = Program::select('id', 'name', 'code')->get();
-
-        // Get curriculum versions for selected program
-        if ($request->program_id) {
-            $data['curriculumVersions'] = CurriculumVersion::where('program_id', $request->program_id)
-                ->select('id', 'version_name', 'effective_date')
-                ->get();
-        }
-
-        // Get specializations for selected program
-        if ($request->program_id) {
-            $data['specializations'] = Specialization::where('program_id', $request->program_id)
-                ->select('id', 'name')
-                ->get();
-        }
-
-        return response()->json($data);
-    }
-
-    /**
-     * Check which applications are ready for batch conversion
-     */
-    public function checkConversionReadiness(Request $request): JsonResponse
-    {
-        $request->validate([
-            'application_ids' => 'required|array|min:1',
-            'application_ids.*' => 'exists:student_applications,id',
+        $validated = $request->validate([
+            'rejected_reason' => 'required|string|max:1000',
         ]);
-
-        $applications = StudentApplication::whereIn('id', $request->application_ids)->get();
-        $ready = [];
-        $notReady = [];
-
-        foreach ($applications as $application) {
-            $status = [
-                'id' => $application->id,
-                'full_name' => $application->full_name,
-                'campus_code' => $application->campus_code,
-                'intended_program' => $application->intended_program,
-                'intake' => $application->intake,
-            ];
-
-            if ($application->isReadyForConversion()) {
-                $mappingData = $application->getConversionMappingData();
-                $status['mapping'] = [
-                    'campus_id' => $mappingData['campus_id'] ?? null,
-                    'program_id' => $mappingData['program_id'] ?? null,
-                    'curriculum_version_id' => $mappingData['curriculum_version_id'] ?? null,
-                ];
-                $ready[] = $status;
-            } else {
-                $status['errors'] = $application->getConversionValidationErrors();
-                $notReady[] = $status;
-            }
-        }
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'ready' => $ready,
-                'not_ready' => $notReady,
-                'summary' => [
-                    'total' => count($applications),
-                    'ready_count' => count($ready),
-                    'not_ready_count' => count($notReady),
-                ],
-            ],
-        ]);
-    }
-
-    /**
-     * Update the status of multiple student applications
-     */
-    public function updateBulkStatus(Request $request): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'application_ids' => 'required|array|min:1',
-            'application_ids.*' => 'required|integer|exists:student_applications,id',
-            'status' => 'required|in:pending,reviewed,approved,rejected',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
 
         try {
-            $applicationIds = $request->application_ids;
-            $newStatus = $request->status;
-
-            $updated = DB::transaction(function () use ($applicationIds, $newStatus) {
-                return StudentApplication::whereIn('id', $applicationIds)
-                    ->update(['status' => $newStatus]);
-            });
-
-            return response()->json([
-                'success' => true,
-                'message' => "Successfully updated status for {$updated} application(s)",
-                'data' => [
-                    'updated_count' => $updated,
-                    'new_status' => $newStatus,
-                ],
+            $this->studentApplicationService->reject(
+                $studentApplication,
+                $request->user(),
+                $validated['rejected_reason']
+            );
+        } catch (RuntimeException $e) {
+            return redirect()
+                ->back()
+                ->with('error', $e->getMessage());
+        } catch (Throwable $e) {
+            Log::warning('Application rejection failed', [
+                'application_id' => $studentApplication->id,
+                'error' => $e->getMessage(),
             ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update application statuses: '.$e->getMessage(),
-            ], 500);
+
+            return redirect()
+                ->back()
+                ->with('error', 'Failed to reject the application. Please try again.');
         }
+
+        return redirect()
+            ->route('student-applications.show', $studentApplication)
+            ->with('success', 'Application rejected.');
     }
 
     /**
-     * Export student applications to Excel or CSV
+     * Export student applications to Excel or CSV.
      */
     public function export(Request $request)
     {
@@ -476,16 +279,13 @@ class StudentApplicationController extends Controller
             $filters = [
                 'search' => $request->get('search'),
                 'status' => $request->get('status'),
-                'converted' => $request->get('converted'),
                 'campus_code' => $request->get('campus_code'),
-                'overall_operator' => $request->get('overall_operator'),
-                'overall_value' => $request->get('overall_value'),
+                'intake' => $request->get('intake'),
             ];
 
             $query = StudentApplication::query();
 
             if ($request->scope === 'filtered') {
-                // Apply search filter
                 if ($filters['search']) {
                     $query->where(function ($q) use ($filters) {
                         $q->where('full_name', 'like', '%'.$filters['search'].'%')
@@ -495,40 +295,19 @@ class StudentApplicationController extends Controller
                     });
                 }
 
-                // Apply status filter
-                if ($filters['status']) {
+                if ($filters['status'] && $filters['status'] !== 'all') {
                     $query->where('status', $filters['status']);
                 }
 
-                // Apply converted filter
-                if ($filters['converted'] !== null && $filters['converted'] !== '') {
-                    if ($filters['converted'] === 'yes') {
-                        $query->whereNotNull('student_id');
-                    } elseif ($filters['converted'] === 'no') {
-                        $query->whereNull('student_id');
-                    }
-                }
-
-                // Apply campus filter
                 if ($filters['campus_code'] !== null && $filters['campus_code'] !== 'all') {
                     $query->where('campus_code', $filters['campus_code']);
                 }
 
-                // Apply overall score filter
-                if ($filters['overall_operator'] && $filters['overall_value'] !== null) {
-                    $operator = match ($filters['overall_operator']) {
-                        'gt' => '>',
-                        'gte' => '>=',
-                        'lt' => '<',
-                        'lte' => '<=',
-                        'eq' => '=',
-                        default => '='
-                    };
-                    $query->where('overall', $operator, $filters['overall_value']);
+                if ($filters['intake'] !== null && $filters['intake'] !== '' && $filters['intake'] !== 'all') {
+                    $query->where('intake', $filters['intake']);
                 }
             }
 
-            // Apply sorting
             $sort = $request->get('sort', 'created_at');
             $direction = $request->get('direction', 'desc');
             $query->orderBy($sort, $direction);
@@ -542,15 +321,26 @@ class StudentApplicationController extends Controller
             }
 
             return ExcelFacade::download($export, "{$filename}.xlsx");
-        } catch (\Exception $e) {
-            Log::error('Export failed: '.$e->getMessage(), [
-                'exception' => $e,
-                'trace' => $e->getTraceAsString(),
-            ]);
+        } catch (Throwable $e) {
+            Log::error('Export failed: '.$e->getMessage());
 
             return response()->json([
                 'error' => 'Export failed: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Status filter options for the staff UI.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    private function statusOptions(): array
+    {
+        return [
+            ['value' => StudentApplication::STATUS_PENDING, 'label' => 'Pending'],
+            ['value' => StudentApplication::STATUS_ENROLLED, 'label' => 'Enrolled'],
+            ['value' => StudentApplication::STATUS_REJECTED, 'label' => 'Rejected'],
+        ];
     }
 }

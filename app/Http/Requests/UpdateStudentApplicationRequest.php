@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateStudentApplicationRequest extends FormRequest
@@ -17,7 +18,7 @@ class UpdateStudentApplicationRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -29,10 +30,10 @@ class UpdateStudentApplicationRequest extends FormRequest
             'ethnicity' => ['nullable', 'string', 'max:100'],
             'birth_day' => ['nullable', 'integer', 'min:1', 'max:31'],
             'birth_month' => ['nullable', 'integer', 'min:1', 'max:12'],
-            'birth_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
-            'national_id' => ['nullable', 'string', 'max:20', 'unique:student_applications,national_id,' . $applicationId],
+            'birth_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
+            'national_id' => ['nullable', 'string', 'max:20', 'unique:student_applications,national_id,'.$applicationId],
             'phone' => ['required', 'string', 'max:20'],
-            'email' => ['required', 'email', 'max:255', 'unique:student_applications,email,' . $applicationId],
+            'email' => ['required', 'email', 'max:255', 'unique:student_applications,email,'.$applicationId],
             'address' => ['nullable', 'string'],
             'health_information' => ['nullable', 'string'],
             'parent_phone' => ['nullable', 'string', 'max:20'],
@@ -61,8 +62,9 @@ class UpdateStudentApplicationRequest extends FormRequest
             'sut_id' => ['nullable', 'string', 'max:50'],
             'is_international_applicant' => ['nullable', 'boolean'],
             'exception_units' => ['nullable', 'string'],
-            'status' => ['required', 'in:pending,reviewed,approved,rejected'],
-            'student_code' => ['required', 'string', 'max:20', 'unique:student_applications,student_code,' . $applicationId],
+            // `status` is intentionally not editable here — lifecycle transitions
+            // happen only through Approve/Reject (no path auto-approves).
+            'student_code' => ['required', 'string', 'max:20', 'unique:student_applications,student_code,'.$applicationId],
         ];
     }
 
@@ -82,8 +84,6 @@ class UpdateStudentApplicationRequest extends FormRequest
             'campus_code.required' => 'The campus code is required.',
             'campus_code.exists' => 'The selected campus does not exist.',
             'national_id.unique' => 'This national ID is already registered.',
-            'status.required' => 'The status field is required.',
-            'status.in' => 'The status must be one of: pending, reviewed, approved, rejected.',
             'birth_day.integer' => 'Birth day must be a number.',
             'birth_day.min' => 'Birth day must be between 1 and 31.',
             'birth_day.max' => 'Birth day must be between 1 and 31.',

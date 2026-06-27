@@ -19,16 +19,6 @@ Route::middleware('auth')->prefix('student-applications')->name('student-applica
         ->middleware('can:view_student_application')
         ->name('export');
 
-    // API routes for forms
-    Route::get('/api/conversion-options', [StudentApplicationController::class, 'getConversionOptions'])
-        ->middleware('can:view_student_application')
-        ->name('conversion-options');
-
-    // Batch operations
-    Route::post('/batch-convert', [StudentApplicationController::class, 'batchConvert'])
-        ->middleware('can:edit_student_application')
-        ->name('batch-convert');
-
     // Store route
     Route::post('/', [StudentApplicationController::class, 'store'])
         ->middleware('can:create_student_application')
@@ -47,10 +37,12 @@ Route::middleware('auth')->prefix('student-applications')->name('student-applica
     Route::delete('/{studentApplication}', [StudentApplicationController::class, 'destroy'])
         ->middleware('can:delete_student_application')
         ->name('destroy');
-    Route::patch('/{studentApplication}/status', [StudentApplicationController::class, 'updateStatus'])
+
+    // Lifecycle actions (dedicated campus-scoped permissions arrive in slice 03).
+    Route::post('/{studentApplication}/approve', [StudentApplicationController::class, 'approve'])
         ->middleware('can:edit_student_application')
-        ->name('update-status');
-    Route::post('/{studentApplication}/convert', [StudentApplicationController::class, 'convert'])
+        ->name('approve');
+    Route::post('/{studentApplication}/reject', [StudentApplicationController::class, 'reject'])
         ->middleware('can:edit_student_application')
-        ->name('convert');
+        ->name('reject');
 });

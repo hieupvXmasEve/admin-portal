@@ -15,7 +15,6 @@ use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\FormController;
 use App\Http\Controllers\Web\LectureController;
 use App\Http\Controllers\Web\RoomController;
-use App\Http\Controllers\Web\StudentApplicationController as WebStudentApplicationController;
 use App\Modules\Academic\Http\Web\StudentController as WebStudentController;
 use App\Modules\Notification\Http\Api\V1\Admin\NotificationTemplateController as NotificationTemplateApiController;
 use Illuminate\Support\Facades\Route;
@@ -43,9 +42,6 @@ Route::middleware(['web', 'auth'])->name('api.admin.')->group(function () {
     // Lecturer Impersonation
     Route::post('/lecturers/impersonate', [AdminLecturerImpersonationController::class, 'impersonateLecturer'])->name('lecturers.impersonate');
     Route::get('/lecturers/impersonation-sessions', [AdminLecturerImpersonationController::class, 'getImpersonationSessions'])->name('lecturers.impersonation-sessions');
-
-    // Student Applications
-    Route::patch('/student-applications/bulk/status', [WebStudentApplicationController::class, 'updateBulkStatus']);
 
     // Email Configuration Management
     Route::prefix('email-configurations')->group(function () {
