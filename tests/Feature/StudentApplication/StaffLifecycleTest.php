@@ -21,15 +21,19 @@ uses(RefreshDatabase::class);
 const SA_CSRF = 'student-application-test-csrf';
 
 /**
- * The lifecycle permissions a staff member needs for this slice. The dedicated
- * campus-scoped approve/reject permissions arrive in slice 03; here approve and
- * reject ride on `edit_student_application` (matching the routes).
+ * The lifecycle permissions a staff member needs for the staff seam. Approve and
+ * reject are gated by the campus-scoped StudentApplicationPolicy (slice 03), so
+ * the mocked PermissionService grants those codes here; campus-scoping itself is
+ * exercised against the real service in AuthorizationTest.
  */
 const SA_PERMISSIONS = [
     'view_student_application',
     'create_student_application',
     'edit_student_application',
     'delete_student_application',
+    'approve_student_application',
+    'reject_student_application',
+    'revoke_student_application',
 ];
 
 beforeEach(function () {

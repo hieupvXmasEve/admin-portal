@@ -128,6 +128,10 @@ class RoleAndPermissionSeeder extends Seeder
                 'view_course',
                 'create_course',
                 'edit_course',
+                // Student application lifecycle (campus-scoped via StudentApplicationPolicy).
+                'approve_student_application',
+                'reject_student_application',
+                'revoke_student_application',
             ],
             'truong_phong' => [
                 'view_user',
@@ -155,6 +159,10 @@ class RoleAndPermissionSeeder extends Seeder
                 'view_finance_batch_studio',
                 'view_finance_cockpit',
                 'view_finance_reporting',
+                // Student application lifecycle (campus-scoped via StudentApplicationPolicy).
+                'approve_student_application',
+                'reject_student_application',
+                'revoke_student_application',
             ],
             'can_bo' => [
                 'view_user',
@@ -176,6 +184,10 @@ class RoleAndPermissionSeeder extends Seeder
                 'view_finance_batch_studio',
                 'view_finance_cockpit',
                 'view_finance_reporting',
+                // Student application lifecycle (campus-scoped via StudentApplicationPolicy).
+                'approve_student_application',
+                'reject_student_application',
+                'revoke_student_application',
             ],
         ];
 

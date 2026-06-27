@@ -38,11 +38,13 @@ Route::middleware('auth')->prefix('student-applications')->name('student-applica
         ->middleware('can:delete_student_application')
         ->name('destroy');
 
-    // Lifecycle actions (dedicated campus-scoped permissions arrive in slice 03).
+    // Lifecycle actions: gated by the campus-scoped StudentApplicationPolicy.
+    // `can:<ability>,studentApplication` resolves the route-bound Application and
+    // checks the permission at *that Application's* campus (not the session campus).
     Route::post('/{studentApplication}/approve', [StudentApplicationController::class, 'approve'])
-        ->middleware('can:edit_student_application')
+        ->middleware('can:approve,studentApplication')
         ->name('approve');
     Route::post('/{studentApplication}/reject', [StudentApplicationController::class, 'reject'])
-        ->middleware('can:edit_student_application')
+        ->middleware('can:reject,studentApplication')
         ->name('reject');
 });

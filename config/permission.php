@@ -173,6 +173,10 @@ return [
             'edit_student_application' => 'edit_student_application',
             'delete_student_application' => 'delete_student_application',
             'export_student_application' => 'export_student_application',
+            // Campus-scoped lifecycle permissions (enforced via StudentApplicationPolicy).
+            'approve_student_application' => 'approve_student_application',
+            'reject_student_application' => 'reject_student_application',
+            'revoke_student_application' => 'revoke_student_application',
         ],
 
         // Attendance Management

@@ -8,8 +8,10 @@ use App\Models\Lecture;
 use App\Models\RoomBooking;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Models\StudentApplication;
 use App\Models\User;
 use App\Policies\ApiActorPolicy;
+use App\Policies\StudentApplicationPolicy;
 use App\Support\ThemeConfig;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -36,6 +38,7 @@ class AppServiceProvider extends ServiceProvider
     {
         umask(0002);
         $this->registerApiActorGates();
+        $this->registerPolicies();
         $this->configureRateLimiting();
         $this->configureMorphMap();
         $this->shareThemeWithViews();
@@ -52,6 +55,15 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('api.actor.student_or_parent', [ApiActorPolicy::class, 'accessStudentOrParent']);
         Gate::define('api.actor.parent', [ApiActorPolicy::class, 'accessParent']);
         Gate::define('api.actor.lecturer', [ApiActorPolicy::class, 'accessLecturer']);
+    }
+
+    /**
+     * Register model policies explicitly (this codebase wires authorization in
+     * providers rather than relying on convention-based auto-discovery).
+     */
+    protected function registerPolicies(): void
+    {
+        Gate::policy(StudentApplication::class, StudentApplicationPolicy::class);
     }
 
     /**
