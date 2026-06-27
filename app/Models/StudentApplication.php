@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class StudentApplication extends AuditableModel
 {
@@ -119,6 +120,24 @@ class StudentApplication extends AuditableModel
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
+    }
+
+    /**
+     * Guardians (parents / responsible adults) on this Application (1-n).
+     */
+    public function guardians(): HasMany
+    {
+        return $this->hasMany(ApplicationGuardian::class);
+    }
+
+    /**
+     * The primary Guardian, if one has been recorded. Exactly one Guardian is
+     * primary whenever any exist (DB + service invariant), so this is the
+     * Guardian that maps to the Student's emergency contact on approval.
+     */
+    public function primaryGuardian(): ?ApplicationGuardian
+    {
+        return $this->guardians()->where('is_primary', true)->first();
     }
 
     /**

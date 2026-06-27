@@ -14,8 +14,11 @@ use App\Models\Role;
 use App\Models\Specialization;
 use App\Models\Student;
 use App\Models\User;
+use App\Shared\Support\Enums\UserType;
 use Exception;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
@@ -45,8 +48,8 @@ class StudentService
             $user = User::create([
                 'name' => $data['full_name'],
                 'email' => $data['email'],
-                'password' => \Illuminate\Support\Facades\Hash::make('123456'), // Default password
-                'type' => \App\Shared\Support\Enums\UserType::STUDENT,
+                'password' => Hash::make('123456'), // Default password
+                'type' => UserType::STUDENT,
                 'status' => User::STATUS_ACTIVE,
                 'email_verified_at' => now(),
             ]);
@@ -216,8 +219,8 @@ class StudentService
             $user = User::create([
                 'name' => $data['full_name'],
                 'email' => $data['email'],
-                'password' => \Illuminate\Support\Facades\Hash::make('123456'), // Default password
-                'type' => \App\Shared\Support\Enums\UserType::STUDENT,
+                'password' => Hash::make('123456'), // Default password
+                'type' => UserType::STUDENT,
                 'status' => User::STATUS_ACTIVE,
                 'email_verified_at' => now(),
             ]);
@@ -281,7 +284,7 @@ class StudentService
     /**
      * Get students filtered by campus
      */
-    public function getStudentsByCampus(int $campusId, array $filters = []): \Illuminate\Pagination\LengthAwarePaginator
+    public function getStudentsByCampus(int $campusId, array $filters = []): LengthAwarePaginator
     {
         $query = Student::with(['campus', 'program', 'specialization'])
             ->where('campus_id', $campusId);
@@ -358,9 +361,9 @@ class StudentService
     {
         // Sinh mã student_id dựa trên campusCode và 6 số ngẫu nhiên từ thời gian hiện tại
         $prefix = strtoupper($campusCode);
-        $randomSix = substr(strval(mt_rand(100000, 999999) . time()), 0, 6);
+        $randomSix = substr(strval(mt_rand(100000, 999999).time()), 0, 6);
 
-        return $prefix . $randomSix;
+        return $prefix.$randomSix;
     }
 
     /**
@@ -459,9 +462,9 @@ class StudentService
                     'is_active' => true,
                 ]);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Silently skip if graduation requirements table doesn't exist yet
-            \Illuminate\Support\Facades\Log::info('Graduation requirements not available: ' . $e->getMessage());
+            Log::info('Graduation requirements not available: '.$e->getMessage());
         }
     }
 
@@ -486,7 +489,7 @@ class StudentService
                 $expectedDate = $student->admission_date->addYears(4);
                 $student->update(['expected_graduation_date' => $expectedDate]);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Default calculation if graduation requirements not available
             $expectedDate = $student->admission_date->addYears(4);
             $student->update(['expected_graduation_date' => $expectedDate]);
@@ -575,7 +578,7 @@ class StudentService
                     }
                     $deletedCounts['course_registrations']++;
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::warning("Could not delete course registrations: {$e->getMessage()}");
             }
 
@@ -596,7 +599,7 @@ class StudentService
                     }
                     $deletedCounts['enrollments']++;
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::warning("Could not delete enrollments: {$e->getMessage()}");
             }
 
@@ -618,7 +621,7 @@ class StudentService
                         }
                         $deletedCounts['academic_records']++;
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::warning("Could not delete academic records: {$e->getMessage()}");
                 }
             }
@@ -641,7 +644,7 @@ class StudentService
                         }
                         $deletedCounts['academic_standings']++;
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::warning("Could not delete academic standings: {$e->getMessage()}");
                 }
             }
@@ -664,7 +667,7 @@ class StudentService
                         }
                         $deletedCounts['academic_holds']++;
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::warning("Could not delete academic holds: {$e->getMessage()}");
                 }
             }
@@ -687,7 +690,7 @@ class StudentService
                         }
                         $deletedCounts['gpa_calculations']++;
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::warning("Could not delete GPA calculations: {$e->getMessage()}");
                 }
             }
@@ -710,7 +713,7 @@ class StudentService
                         }
                         $deletedCounts['program_change_requests']++;
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::warning("Could not delete program change requests: {$e->getMessage()}");
                 }
             }
@@ -733,7 +736,7 @@ class StudentService
                         }
                         $deletedCounts['attendances']++;
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::warning("Could not delete attendances: {$e->getMessage()}");
                 }
             }
@@ -763,8 +766,14 @@ class StudentService
      * 2. Student already has a parent -> Update or replace
      * 3. Parent email already used by another user -> Various validation checks
      */
-    public function handleParentAssignment(Student $student, string $parentEmail, ?string $parentName): void
-    {
+    public function handleParentAssignment(
+        Student $student,
+        string $parentEmail,
+        ?string $parentName,
+        string $relationship = 'guardian',
+        bool $isPrimary = true,
+        ?string $parentPhone = null,
+    ): void {
         // Normalize email
         $parentEmail = strtolower(trim($parentEmail));
 
@@ -774,60 +783,29 @@ class StudentService
                 'student_id' => $student->id,
                 'email' => $parentEmail,
             ]);
+
             return;
         }
 
-        // 1. Check if student already has a parent linked
-        $existingParentProfile = $student->parentProfiles()->first();
-
-        if ($existingParentProfile) {
-            $parentUser = $existingParentProfile->user;
-
-            // If we have an existing parent user, update their info
-            if ($parentUser) {
-                // Check if the new email is already taken by ANOTHER user
-                $emailOwner = User::where('email', $parentEmail)
-                    ->where('id', '!=', $parentUser->id)
-                    ->first();
-
-                if ($emailOwner) {
-                    // If the email is taken by another parent, link to that one and we'll handle the old one
-                    $this->linkToExistingParentAndCleanup($student, $existingParentProfile, $emailOwner, $parentName);
-                    return;
-                }
-
-                // Otherwise, update the existing user and profile directly
-                $parentUser->update([
-                    'email' => $parentEmail,
-                    'name' => $parentName ?? $parentUser->name,
-                    'type' => \App\Shared\Support\Enums\UserType::PARENT // Ensure type is correct
-                ]);
-
-                $existingParentProfile->update([
-                    'full_name' => $parentName ?? $existingParentProfile->full_name,
-                    'email_snapshot' => $parentEmail
-                ]);
-
-                Log::info('Updated existing parent info for student', [
-                    'student_id' => $student->id,
-                    'parent_user_id' => $parentUser->id,
-                    'new_email' => $parentEmail
-                ]);
-
-                return;
-            }
-        }
-
-        // 2. Case: No parent linked or something went wrong with the existing one
-        // Fallback to finding by email or creating new
-        $this->assignParentByEmail($student, $parentEmail, $parentName);
+        // Each Guardian email maps to exactly one Parent account. Find-or-create
+        // the Parent for this email and link it to the student. A student may have
+        // several guardians (distinct emails), of which one is primary — so we no
+        // longer overwrite "the student's first parent"; that conflated distinct
+        // guardians and broke multi-guardian approval.
+        $this->assignParentByEmail($student, $parentEmail, $parentName, $relationship, $isPrimary, $parentPhone);
     }
 
     /**
      * Internal helper to assign parent by email (find existing or create new)
      */
-    private function assignParentByEmail(Student $student, string $parentEmail, ?string $parentName): void
-    {
+    private function assignParentByEmail(
+        Student $student,
+        string $parentEmail,
+        ?string $parentName,
+        string $relationship = 'guardian',
+        bool $isPrimary = true,
+        ?string $parentPhone = null,
+    ): void {
         $parentUser = User::where('email', $parentEmail)->first();
 
         if ($parentUser) {
@@ -837,41 +815,20 @@ class StudentService
                 $parentUser->update(['name' => $parentName]);
             }
 
-            if (!$parentUser->isParent()) {
-                $parentUser->update(['type' => \App\Shared\Support\Enums\UserType::PARENT]);
+            if (! $parentUser->isParent()) {
+                $parentUser->update(['type' => UserType::PARENT]);
             }
         } else {
             $parentUser = User::create([
                 'name' => $parentName ?? 'Parent',
                 'email' => $parentEmail,
                 'status' => User::STATUS_ACTIVE,
-                'type' => \App\Shared\Support\Enums\UserType::PARENT,
+                'type' => UserType::PARENT,
             ]);
         }
 
-        $parentProfile = $this->ensureParentProfile($parentUser, $parentName, $parentEmail);
-        $this->linkParentToStudent($parentProfile, $student);
-    }
-
-    /**
-     * Handle switching to an existing user's parent account and cleanup old one if necessary
-     */
-    private function linkToExistingParentAndCleanup(Student $student, ParentProfile $oldProfile, User $newParentUser, ?string $parentName): void
-    {
-        $this->validateExistingUserAsParent($student, $newParentUser);
-
-        // Update name if provided
-        if ($parentName !== null) {
-            $newParentUser->update(['name' => $parentName]);
-        }
-
-        $newProfile = $this->ensureParentProfile($newParentUser, $parentName, $newParentUser->email);
-
-        // Link new, this will automatically delete the old link due to our logic in linkParentToStudent
-        $this->linkParentToStudent($newProfile, $student);
-
-        // Optional: If old parent user has no more students linked, we could cleanup here
-        // But for now we just let them exist as orphaned users.
+        $parentProfile = $this->ensureParentProfile($parentUser, $parentName, $parentEmail, $parentPhone);
+        $this->linkParentToStudent($parentProfile, $student, $relationship, $isPrimary);
     }
 
     /**
@@ -918,7 +875,7 @@ class StudentService
             if ($existingStudentViaParentStudent) {
                 $linkedStudent = Student::find($existingStudentViaParentStudent->student_id);
                 throw new Exception(
-                    'Email này đã được liên kết với sinh viên khác (Mã SV: ' . ($linkedStudent?->student_id ?? 'N/A') . '). ' .
+                    'Email này đã được liên kết với sinh viên khác (Mã SV: '.($linkedStudent?->student_id ?? 'N/A').'). '.
                     'Mỗi phụ huynh chỉ có thể liên kết với một sinh viên qua hệ thống này.'
                 );
             }
@@ -928,7 +885,7 @@ class StudentService
     /**
      * Ensure ParentProfile exists for the user
      */
-    private function ensureParentProfile(User $parentUser, ?string $parentName, string $parentEmail): ParentProfile
+    private function ensureParentProfile(User $parentUser, ?string $parentName, string $parentEmail, ?string $parentPhone = null): ParentProfile
     {
         $parentProfile = ParentProfile::where('user_id', $parentUser->id)->first();
 
@@ -938,6 +895,7 @@ class StudentService
                 'user_id' => $parentUser->id,
                 'full_name' => $parentName ?? $parentUser->name ?? 'Parent',
                 'email_snapshot' => $parentEmail,
+                'phone' => $parentPhone,
                 'status' => 'active',
             ]);
 
@@ -946,11 +904,14 @@ class StudentService
                 'user_id' => $parentUser->id,
             ]);
         } else {
-            // Update existing ParentProfile if name is provided
-            if ($parentName !== null) {
-                $parentProfile->update([
-                    'full_name' => $parentName,
-                ]);
+            // Update existing ParentProfile if name / phone is provided
+            $updates = array_filter([
+                'full_name' => $parentName,
+                'phone' => $parentPhone,
+            ], fn ($value) => $value !== null);
+
+            if (! empty($updates)) {
+                $parentProfile->update($updates);
             }
         }
 
@@ -958,36 +919,58 @@ class StudentService
     }
 
     /**
-     * Link parent to student via parent_student pivot table
+     * Link a parent to a student via the parent_student pivot.
+     *
+     * A student may have several guardians, of which exactly one is primary.
+     * When linking a primary parent, any existing primary is demoted first so a
+     * second primary never coexists. The (parent, student) pair is upserted, so
+     * re-linking the same parent updates the existing row instead of duplicating.
      */
-    private function linkParentToStudent(ParentProfile $parentProfile, Student $student): void
-    {
-        // Enforcement of "one parent per student" as requested:
-        // Remove any existing links for this student before adding the new one
-        $deleted = DB::table('parent_student')->where('student_id', $student->id)->delete();
-
-        if ($deleted > 0) {
-            Log::info('Removed existing parent links for student to replace with new one', [
-                'student_id' => $student->id,
-                'removed_count' => $deleted
-            ]);
+    private function linkParentToStudent(
+        ParentProfile $parentProfile,
+        Student $student,
+        string $relationship = 'guardian',
+        bool $isPrimary = true,
+    ): void {
+        if ($isPrimary) {
+            // Demote the student's current primary parent (if any) before this
+            // one takes over, keeping "exactly one primary" intact.
+            DB::table('parent_student')
+                ->where('student_id', $student->id)
+                ->where('parent_id', '!=', $parentProfile->id)
+                ->where('is_primary', true)
+                ->update(['is_primary' => false, 'updated_at' => now()]);
         }
 
-        // Create new link (always set as primary)
-        DB::table('parent_student')->insert([
-            'parent_id' => $parentProfile->id,
-            'student_id' => $student->id,
-            'relationship' => 'guardian',
-            'is_primary' => true,
-            'access_level' => 'read_only',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $existing = DB::table('parent_student')
+            ->where('parent_id', $parentProfile->id)
+            ->where('student_id', $student->id)
+            ->first();
+
+        if ($existing) {
+            DB::table('parent_student')
+                ->where('id', $existing->id)
+                ->update([
+                    'relationship' => $relationship,
+                    'is_primary' => $isPrimary,
+                    'updated_at' => now(),
+                ]);
+        } else {
+            DB::table('parent_student')->insert([
+                'parent_id' => $parentProfile->id,
+                'student_id' => $student->id,
+                'relationship' => $relationship,
+                'is_primary' => $isPrimary,
+                'access_level' => 'read_only',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
 
         Log::info('Linked parent to student', [
             'parent_profile_id' => $parentProfile->id,
             'student_id' => $student->id,
-            'is_primary' => true,
+            'is_primary' => $isPrimary,
         ]);
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\ApplicationGuardian;
 use App\Models\Campus;
 use App\Models\CampusUserRole;
 use App\Models\CurriculumVersion;
@@ -90,14 +91,12 @@ class StudentApplicationService
             // 3. Assign the student role within the campus.
             $this->studentService->assignStudentRole($student);
 
-            // 4. Link the primary Guardian as a Parent account when present.
-            if (! empty($application->parent_email)) {
-                $this->studentService->handleParentAssignment(
-                    $student,
-                    $application->parent_email,
-                    null
-                );
-            }
+            // 4. Link Guardians as Parent accounts. Each Guardian with an email
+            //    becomes/links a Parent (a login needs an email); the primary
+            //    Guardian is linked as the primary parent with its real name and
+            //    relationship. Legacy rows without Guardians fall back to the thin
+            //    parent_email pair until the migration slice (08).
+            $this->linkGuardiansAsParents($application, $student);
 
             // 5. Move the Application to `enrolled` and record who approved it.
             $application->update([
@@ -109,6 +108,59 @@ class StudentApplicationService
 
             return $student;
         });
+    }
+
+    /**
+     * Link the Application's Guardians to the Student as Parent accounts.
+     *
+     * A Parent account is a login, so only Guardians that carry an email can be
+     * linked. The primary Guardian is linked as the primary parent (carrying its
+     * real name and relationship); additional Guardians are linked as secondary
+     * parents. Legacy rows with no Guardians fall back to the thin `parent_email`
+     * pair until the migration slice (08).
+     */
+    private function linkGuardiansAsParents(StudentApplication $application, Student $student): void
+    {
+        // A Parent account is a login, so only Guardians carrying an email can be
+        // linked.
+        $linkable = $application->guardians()
+            ->orderByDesc('is_primary')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (ApplicationGuardian $guardian): bool => ! empty($guardian->email))
+            ->values();
+
+        if ($linkable->isEmpty()) {
+            if (! empty($application->parent_email)) {
+                $this->studentService->handleParentAssignment(
+                    $student,
+                    $application->parent_email,
+                    null,
+                    'guardian',
+                    true,
+                    $application->parent_phone,
+                );
+            }
+
+            return;
+        }
+
+        // The primary parent is the primary Guardian when it has an email;
+        // otherwise the first email-bearing Guardian takes the primary-parent
+        // slot, so the Student always ends up with exactly one primary parent
+        // even when the primary Guardian has no email of its own.
+        $primaryGuardian = $linkable->firstWhere('is_primary', true) ?? $linkable->first();
+
+        foreach ($linkable as $guardian) {
+            $this->studentService->handleParentAssignment(
+                $student,
+                $guardian->email,
+                $guardian->full_name,
+                $guardian->relationship ?: 'guardian',
+                $guardian->id === $primaryGuardian->id,
+                $guardian->phone,
+            );
+        }
     }
 
     /**
@@ -284,6 +336,11 @@ class StudentApplicationService
      */
     public function mapApplicationToStudentData(StudentApplication $application, array $additionalData): array
     {
+        // The primary Guardian populates the Student's emergency contact; legacy
+        // rows without Guardians fall back to the thin `parent_*` pair until the
+        // migration slice (08) moves and drops those columns.
+        $primaryGuardian = $application->primaryGuardian();
+
         $mappedData = [
             // Basic information
             'full_name' => $application->full_name,
@@ -294,10 +351,10 @@ class StudentApplicationService
             'national_id' => $application->national_id,
             'address' => $application->address,
 
-            // Emergency contact (primary Guardian moves out in slice 05)
-            'emergency_contact_phone' => $application->parent_phone,
-            'emergency_contact_name' => null,
-            'emergency_contact_relationship' => 'Parent',
+            // Emergency contact from the primary Guardian (legacy fallback).
+            'emergency_contact_name' => $primaryGuardian?->full_name,
+            'emergency_contact_phone' => $primaryGuardian?->phone ?? $application->parent_phone,
+            'emergency_contact_relationship' => $primaryGuardian?->relationship ?? 'Parent',
 
             // Academic information
             'campus_id' => $additionalData['campus_id'],

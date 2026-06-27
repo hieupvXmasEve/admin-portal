@@ -8,6 +8,7 @@ use App\Exports\StudentApplicationExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreStudentApplicationRequest;
 use App\Http\Requests\UpdateStudentApplicationRequest;
+use App\Models\ApplicationGuardian;
 use App\Models\Campus;
 use App\Models\Program;
 use App\Models\StudentApplication;
@@ -128,6 +129,9 @@ class StudentApplicationController extends Controller
             'student' => function ($query) {
                 $query->select('id', 'student_id', 'full_name', 'email', 'status');
             },
+            'guardians' => function ($query) {
+                $query->orderByDesc('is_primary')->orderBy('id');
+            },
             'approvedByUser:id,name,email',
             'rejectedByUser:id,name,email',
             'revokedByUser:id,name,email',
@@ -135,6 +139,7 @@ class StudentApplicationController extends Controller
 
         return Inertia::render('student-applications/show', [
             'application' => $studentApplication,
+            'guardianRelationships' => ApplicationGuardian::relationships(),
         ]);
     }
 

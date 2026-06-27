@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Web\ApplicationGuardianController;
 use App\Http\Controllers\Web\StudentApplicationController;
 use Illuminate\Support\Facades\Route;
 
@@ -50,4 +51,17 @@ Route::middleware('auth')->prefix('student-applications')->name('student-applica
     Route::post('/{studentApplication}/revoke', [StudentApplicationController::class, 'revoke'])
         ->middleware('can:revoke,studentApplication')
         ->name('revoke');
+
+    // Guardian management on a pending Application. Editing Guardians is part of
+    // editing the Application, so it reuses `edit_student_application`; the
+    // controller refuses changes once the Application is frozen.
+    Route::post('/{studentApplication}/guardians', [ApplicationGuardianController::class, 'store'])
+        ->middleware('can:edit_student_application')
+        ->name('guardians.store');
+    Route::put('/{studentApplication}/guardians/{guardian}', [ApplicationGuardianController::class, 'update'])
+        ->middleware('can:edit_student_application')
+        ->name('guardians.update');
+    Route::delete('/{studentApplication}/guardians/{guardian}', [ApplicationGuardianController::class, 'destroy'])
+        ->middleware('can:edit_student_application')
+        ->name('guardians.destroy');
 });
