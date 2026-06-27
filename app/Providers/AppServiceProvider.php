@@ -12,6 +12,7 @@ use App\Models\StudentApplication;
 use App\Models\User;
 use App\Policies\ApiActorPolicy;
 use App\Policies\StudentApplicationPolicy;
+use App\Shared\Support\Admissions\AdmissionsIngestion;
 use App\Support\ThemeConfig;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -169,5 +170,16 @@ class AppServiceProvider extends ServiceProvider
 
         // Notification template test-send: limit admin self-testing to 5 per minute (C2).
         RateLimiter::for('notification-template-test-send', fn (Request $r) => Limit::perMinute(5)->by($r->user()?->id ?: $r->ip()));
+
+        // Admissions CRM ingestion (ADR-0004): per-caller throttle, tunable via
+        // config so the limit can be hardened per environment (and exercised in
+        // tests). The throttle middleware reads this each request.
+        RateLimiter::for(AdmissionsIngestion::RATE_LIMITER, function (Request $request) {
+            $max = (int) config('admissions.ingest.rate_limit.max_attempts', 120);
+            $decay = (int) config('admissions.ingest.rate_limit.decay_minutes', 1);
+            $key = $request->user()?->id ?: $request->ip();
+
+            return Limit::perMinutes($decay, $max)->by(AdmissionsIngestion::RATE_LIMITER.':'.$key);
+        });
     }
 }

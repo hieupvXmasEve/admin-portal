@@ -1,6 +1,6 @@
 # CRM ingestion auth scaffolding (service token + /api/v1)
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
@@ -19,11 +19,11 @@ End-to-end behavior:
 
 ## Acceptance criteria
 
-- [ ] `UserType::SERVICE` exists and a service-account User can be created that cannot authenticate to the web UI.
-- [ ] A Sanctum token with ability `admissions:ingest` can be minted for the service account.
-- [ ] The `/api/v1` admissions ping endpoint returns success (in the `ApiResponse` envelope) only with a valid token carrying the ability; missing/invalid token or missing ability is rejected.
-- [ ] Rate-limit and IP allowlist apply to the group; calls are audit-logged.
-- [ ] Feature tests cover authorized, missing-ability, and unauthenticated cases against the ping endpoint.
+- [x] `UserType::SERVICE` exists and a service-account User can be created that cannot authenticate to the web UI (staff-only web login gate rejects it).
+- [x] A Sanctum token with ability `admissions:ingest` can be minted for the service account (`AdmissionsServiceAccountManager` + `admissions:mint-ingest-token` command).
+- [x] The `/api/v1` admissions ping endpoint returns success (in the `ApiResponse` envelope) only with a valid token carrying the ability; missing/invalid token (401) or missing ability (403) is rejected.
+- [x] Rate-limit (named `admissions-ingest` limiter, config-tunable) and IP allowlist apply to the group; each call is audit-logged via activity-log channel `admissions-ingestion`.
+- [x] Feature tests cover authorized, missing-ability, and unauthenticated cases against the ping endpoint (plus minting, web-login lockout, IP allowlist, rate-limit, and audit).
 
 ## Blocked by
 

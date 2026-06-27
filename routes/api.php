@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\SystemConfigController;
+use App\Modules\Finance\Dng\Http\Controllers\DngWebhookController;
+use App\Shared\Support\Admissions\AdmissionsIngestion;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
@@ -27,7 +29,7 @@ Route::post('/system-config/upload', [SystemConfigController::class, 'uploadFile
 Route::get('/system-config/{key}', [SystemConfigController::class, 'show'])->name('api.system-config.show');
 
 // DNG payment webhook (public, no auth — checksum verified in controller)
-Route::post('/webhooks/dng/payment', \App\Modules\Finance\Dng\Http\Controllers\DngWebhookController::class)
+Route::post('/webhooks/dng/payment', DngWebhookController::class)
     ->middleware('throttle:60,1')
     ->name('api.webhooks.dng.payment');
 
@@ -59,3 +61,20 @@ Route::prefix('v1/student')->name('v1.student.')->group(function () {
 Route::prefix('v1/lecturer')->name('v1.lecturer.')->group(function () {
     require __DIR__.'/api/v1/lecturer.php';
 });
+
+// Admissions CRM ingestion (server-to-server). Hardened group: Sanctum token +
+// IP allowlist + admissions:ingest ability + rate limit + per-call audit log.
+Route::prefix('v1/admissions')
+    ->name('v1.admissions.')
+    ->middleware([
+        // Audit runs right after authentication and outside the authorization
+        // check, so both successful ingestion calls and authenticated-but-denied
+        // attempts (bad IP / missing ability) are recorded with their causer.
+        'auth:sanctum',
+        'admissions.audit',
+        'admissions.ingest',
+        'throttle:'.AdmissionsIngestion::RATE_LIMITER,
+    ])
+    ->group(function () {
+        require __DIR__.'/api/v1/admissions.php';
+    });

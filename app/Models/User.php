@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Shared\Support\Enums\UserType;
 use App\Traits\HasNotifications;
 use App\Traits\LazyPermissions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -54,7 +55,7 @@ class User extends UserAuditableModel
         'email_verified_at' => 'datetime',
         'last_login_at' => 'datetime',
         'password' => 'hashed',
-        'type' => \App\Shared\Support\Enums\UserType::class,
+        'type' => UserType::class,
     ];
 
     /**
@@ -100,7 +101,7 @@ class User extends UserAuditableModel
     {
         return Str::of($this->name)
             ->split('/[\s,]+/')
-            ->map(fn($word) => Str::substr($word, 0, 1))
+            ->map(fn ($word) => Str::substr($word, 0, 1))
             ->slice(0, 2)
             ->join('');
     }
@@ -313,22 +314,27 @@ class User extends UserAuditableModel
 
     public function isStudent(): bool
     {
-        return $this->type === \App\Shared\Support\Enums\UserType::STUDENT;
+        return $this->type === UserType::STUDENT;
     }
 
     public function isLecturer(): bool
     {
-        return $this->type === \App\Shared\Support\Enums\UserType::LECTURER;
+        return $this->type === UserType::LECTURER;
     }
 
     public function isParent(): bool
     {
-        return $this->type === \App\Shared\Support\Enums\UserType::PARENT;
+        return $this->type === UserType::PARENT;
     }
 
     public function isStaff(): bool
     {
-        return $this->type === \App\Shared\Support\Enums\UserType::STAFF;
+        return $this->type === UserType::STAFF;
+    }
+
+    public function isService(): bool
+    {
+        return $this->type === UserType::SERVICE;
     }
 
     /**

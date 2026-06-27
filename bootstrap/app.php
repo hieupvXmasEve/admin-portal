@@ -1,11 +1,21 @@
 <?php
 
+use App\Exceptions\ApiExceptionHandler;
 use App\Http\Middleware\AdminMiddleware;
+use App\Http\Middleware\Admissions\AuditAdmissionsIngest;
+use App\Http\Middleware\Admissions\AuthorizeAdmissionsIngest;
+use App\Http\Middleware\ApiActorAuthorize;
+use App\Http\Middleware\ApiLogging;
 use App\Http\Middleware\CheckCampusSelected;
 use App\Http\Middleware\EitherMiddleware;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\LecturerApiAuthorization;
+use App\Http\Middleware\LecturerApiRateLimiter;
+use App\Http\Middleware\ParentStudentAccess;
 use App\Http\Middleware\SetCampus;
+use App\Http\Middleware\StudentApiAuthorization;
+use App\Http\Middleware\StudentApiRateLimiter;
 use App\Http\Middleware\StudentMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -40,21 +50,23 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => AdminMiddleware::class,
             'student' => StudentMiddleware::class,
             'campus.selected' => CheckCampusSelected::class,
-            'student.api.auth' => \App\Http\Middleware\StudentApiAuthorization::class,
-            'student.api.rate' => \App\Http\Middleware\StudentApiRateLimiter::class,
-            'lecturer.api.auth' => \App\Http\Middleware\LecturerApiAuthorization::class,
-            'lecturer.api.rate' => \App\Http\Middleware\LecturerApiRateLimiter::class,
-            'parent.student.access' => \App\Http\Middleware\ParentStudentAccess::class,
-            'api.actor' => \App\Http\Middleware\ApiActorAuthorize::class,
-            'api.logging' => \App\Http\Middleware\ApiLogging::class,
+            'student.api.auth' => StudentApiAuthorization::class,
+            'student.api.rate' => StudentApiRateLimiter::class,
+            'lecturer.api.auth' => LecturerApiAuthorization::class,
+            'lecturer.api.rate' => LecturerApiRateLimiter::class,
+            'parent.student.access' => ParentStudentAccess::class,
+            'api.actor' => ApiActorAuthorize::class,
+            'api.logging' => ApiLogging::class,
             'either' => EitherMiddleware::class,
+            'admissions.ingest' => AuthorizeAdmissionsIngest::class,
+            'admissions.audit' => AuditAdmissionsIngest::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (Throwable $e, $request) {
             // Handle API exceptions with custom handler
             if ($request->is('api/*') || $request->expectsJson()) {
-                return app(\App\Exceptions\ApiExceptionHandler::class)->handle($e, $request);
+                return app(ApiExceptionHandler::class)->handle($e, $request);
             }
         });
     })->create();

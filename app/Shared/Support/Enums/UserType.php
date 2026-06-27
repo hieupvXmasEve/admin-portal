@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Shared\Support\Enums;
 
 enum UserType: string
@@ -8,6 +10,9 @@ enum UserType: string
     case STUDENT = 'student';
     case LECTURER = 'lecturer';
     case PARENT = 'parent';
+    // A non-human, server-to-server account (e.g. the admissions CRM). Cannot
+    // authenticate to the web UI; acts only through scoped Sanctum tokens.
+    case SERVICE = 'service';
 
     public function label(): string
     {
@@ -16,6 +21,7 @@ enum UserType: string
             self::STUDENT => 'Student',
             self::LECTURER => 'Lecturer',
             self::PARENT => 'Parent',
+            self::SERVICE => 'Service Account',
         };
     }
 
