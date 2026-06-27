@@ -308,29 +308,36 @@ Every core doc has: **last updated date, owner, status, unresolved questions**. 
 
 ---
 
+## Glossary / Ubiquitous Language
+
+> **Discipline (see `docs/agents/documentation-rules.md`):** this is the project's domain glossary, **not** a notebook. Add only **stable business terms**, max **1–2 sentences** each. No implementation detail, dates, bug logs, or decisions. Grow it **lazily** — add a term when it's actually used, not in bulk. When your output names a domain concept (issue title, test name, proposal), use the term **as defined here**; if a concept isn't here yet, that's a signal to add it (or reconsider the wording).
+
+Seed terms (cross-cutting platform language; extend per domain as work lands):
+
+| Term | Definition |
+|---|---|
+| **Campus scoping** | All data is scoped to the active campus, taken from `session('current_campus_id')`. Cross-campus access is never implicit. |
+| **Actor** | The segmented caller identity — `student`, `parent`, or `lecturer` — resolved by actor middleware on top of Sanctum auth. |
+| **Module** | A bounded domain unit under `app/Modules/{Identity, Academic, Finance, Notification}` owning its own Actions, Queries, routes, and policies. |
+| **Action** | A write-path use case, named `VerbEntityAction` with `static run(array $data)`. |
+| **Query** | A read model, named `VerbEntityContextQuery` with `handle(...$args)`. |
+| **ApiResponse envelope** | The mandatory API response shape `{ success, timestamp, data?, meta?, message?, errors? }` produced via `ApiResponse::*`. |
+| **Application** _(Admissions)_ | A prospective student's dossier, captured before they become a Student; created by the admissions CRM via API or entered manually by staff. |
+| **Applicant** _(Admissions)_ | The person an Application is about; becomes a Student only when approved, and is neither a User nor a Student until then. |
+| **Approve** _(Admissions)_ | The decision to admit an Applicant so they become a Student. Not "convert", "admit", or "enroll". |
+| **Reject** _(Admissions)_ | The decision that an Applicant will not become a Student. Not "decline" or "deny". |
+| **Guardian** _(Admissions)_ | A parent or other responsible adult linked to an Applicant or Student. Use over "parent" when the relationship may not be a parent. |
+| **Revoke** _(Admissions)_ | Undoing a mistaken approval while the new Student has no downstream activity: it returns the Application to pending. Distinct from Withdraw. |
+| **Withdraw** _(Admissions)_ | Removing a Student who has already studied, preserving all their academic/financial history. Distinct from Revoke. |
+| **Document type** _(Admissions)_ | A category of admission document (e.g. CCCD, transcript), defined by the admissions CRM's catalog and mirrored into Swinx. |
+
 ## Onward Pointers
 
+- Architecture decisions (ADRs) → `docs/adr/` (legacy decision records live in `docs/decisions/`)
+- Documentation boundaries / anti-bloat rules → `docs/agents/documentation-rules.md`
 - Deep snapshot → `docs/codebase-discovery-2026-05-12.md`
 - Architecture truth → `docs/system-architecture.md`
 - Standards → `docs/code-standards.md` and `docs/rules/`
 - Frontend Inertia v3 reference → `docs/inertiajs-vue-info.md`
 - Canonical filter/table pattern → `docs/useDataTable-examples.md`
 - AI agent quick-start → `AGENTS.md`
-
----
-
-## Unresolved Questions
-
-Top items to resolve before deep changes:
-
-1. `/api/system-config*` — move behind admin auth?
-2. Finance API — migrate to `auth:sanctum` + actor?
-3. When does `app/Shared/Contracts/{Domain}/` get created and which existing internal-module Contracts get promoted?
-4. Decomposition seam for the largest legacy services (Assessment, StudentAcademicSummary, EventParticipation, UnitExcelImport)?
-5. Deadline for `useDataTable` migration across all pages?
-6. CI reactivation — which checks become hard merge blockers?
-7. Canonical deploy entrypoint among `scripts/{prod.sh, deploy.sh, deploy-production.sh}`?
-8. Notification V2 cutover plan beyond Phase 1?
-9. Drop schedule for `payment_allocations` and `students.gc_to_course_transition_semester`?
-10. `.gitignore` for `repomix-output.xml`?
-11. Pin `inertiajs/inertia-laravel` to a tagged release once one is published?
