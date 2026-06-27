@@ -192,3 +192,21 @@ Vue components must have a single root element.
 - IMPORTANT: Activate `inertia-vue-development` when working with Inertia Vue client-side patterns.
 
 </laravel-boost-guidelines>
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs live as local markdown under `.scratch/<feature-slug>/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), recorded as a `Status:` line in each issue file. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one root `CONTEXT.md` (domain glossary) + `docs/adr/` (architectural decisions). See `docs/agents/domain.md`.
+
+### Documentation boundaries
+
+Knowledge is kept small by discipline + file boundaries, not automation. Each knowledge type has one home: `CONTEXT.md` = stable glossary only, `docs/adr/` = decisions, `docs/prd/` = large specs, `.scratch/<feature>/` = tasks/status, commits/PRs = code history, `/handoff` = temporary. Never duplicate; reference by path. See `docs/agents/documentation-rules.md`.
