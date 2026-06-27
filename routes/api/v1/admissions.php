@@ -18,3 +18,8 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/ping', [IngestionController::class, 'ping'])->name('ping');
+
+// Idempotent create-or-update of a pending Application (+ Guardians, Documents)
+// keyed by crm_admission_id. Frozen-at-approval records return 409.
+Route::post('/applications', [IngestionController::class, 'upsertApplication'])
+    ->name('applications.upsert');

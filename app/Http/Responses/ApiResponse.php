@@ -20,7 +20,7 @@ final class ApiResponse
         int $status = Response::HTTP_OK
     ): JsonResponse {
         $body = [
-            'success'   => true,
+            'success' => true,
             'timestamp' => now()->toISOString(),
         ];
 
@@ -28,7 +28,7 @@ final class ApiResponse
             $body['data'] = $data;
         }
 
-        if (!empty($meta)) {
+        if (! empty($meta)) {
             $body['meta'] = $meta;
         }
 
@@ -48,9 +48,9 @@ final class ApiResponse
         int $status = Response::HTTP_BAD_REQUEST
     ): JsonResponse {
         return response()->json([
-            'success'   => false,
-            'message'   => $message,
-            'errors'    => array_values($errors), // normalize to indexed array
+            'success' => false,
+            'message' => $message,
+            'errors' => array_values($errors), // normalize to indexed array
             'timestamp' => now()->toISOString(),
         ], $status);
     }
@@ -66,10 +66,10 @@ final class ApiResponse
         // Nếu $errors là dạng ["field" => ["msg1","msg2"]], chuyển sang itemized
         $normalized = [];
         foreach ($errors as $field => $messages) {
-            foreach ((array)$messages as $detail) {
+            foreach ((array) $messages as $detail) {
                 $normalized[] = [
-                    'code'   => 'VALIDATION_ERROR',
-                    'field'  => (string) $field,
+                    'code' => 'VALIDATION_ERROR',
+                    'field' => (string) $field,
                     'detail' => (string) $detail,
                 ];
             }
@@ -112,6 +112,17 @@ final class ApiResponse
         ], Response::HTTP_INTERNAL_SERVER_ERROR);
     }
 
+    /**
+     * Conflict (409): the request collides with the resource's current state,
+     * e.g. an attempt to update an Application that is frozen at approval.
+     */
+    public static function conflict(string $message = 'Conflict'): JsonResponse
+    {
+        return self::error($message, [
+            ['code' => 'CONFLICT', 'field' => null, 'detail' => null],
+        ], Response::HTTP_CONFLICT);
+    }
+
     public static function businessLogicError(
         string $message,
         array $errors = []
@@ -139,9 +150,9 @@ final class ApiResponse
         ?string $message = null
     ): JsonResponse {
         $meta = [
-            'page'        => $paginator->currentPage(),
-            'per_page'    => $paginator->perPage(),
-            'total'       => $paginator->total(),
+            'page' => $paginator->currentPage(),
+            'per_page' => $paginator->perPage(),
+            'total' => $paginator->total(),
             'total_pages' => $paginator->lastPage(),
         ];
 
