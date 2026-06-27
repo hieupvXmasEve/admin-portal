@@ -90,7 +90,6 @@ function makePendingApplication(Campus $campus, array $overrides = []): StudentA
         'intended_program' => 'IT',
         'intake' => 'FA25',
         'student_code' => 'S'.fake()->unique()->numerify('#######'),
-        'parent_email' => null,
     ], $overrides));
 }
 

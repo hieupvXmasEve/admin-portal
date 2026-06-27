@@ -41,8 +41,6 @@ interface StudentApplication {
     email: string;
     address: string | null;
     health_information: string | null;
-    parent_phone: string | null;
-    parent_email: string | null;
     campus_code: string;
     intended_program: string | null;
     intended_specialization: string | null;
@@ -54,14 +52,6 @@ interface StudentApplication {
     writing: number | null;
     speaking: number | null;
     overall: number | null;
-    submitted_photo: string | null;
-    submitted_cccd: string | null;
-    submitted_ccta: string | null;
-    submitted_tn_translate: string | null;
-    submitted_hb_translate: string | null;
-    submitted_other: string | null;
-    submitted_insurance_card: string | null;
-    submitted_exemption_gc: string | null;
     study_link_status: string | null;
     english_qualifications: string | null;
     sut_id: string | null;
@@ -97,8 +87,6 @@ const formSchema = toTypedSchema(
         email: z.string().email('Email must be a valid email address').max(255),
         address: z.string().nullable(),
         health_information: z.string().nullable(),
-        parent_phone: z.string().max(20).nullable(),
-        parent_email: z.string().email('Parent email must be valid').or(z.literal('')).nullable(),
         campus_code: z.string().min(1, 'Campus is required'),
         intended_program: z.string().max(255).nullable(),
         intended_specialization: z.string().max(255).nullable(),
@@ -110,14 +98,6 @@ const formSchema = toTypedSchema(
         writing: z.number().min(0).max(10).nullable(),
         speaking: z.number().min(0).max(10).nullable(),
         overall: z.number().min(0).max(10).nullable(),
-        submitted_photo: z.string().nullable(),
-        submitted_cccd: z.string().nullable(),
-        submitted_ccta: z.string().nullable(),
-        submitted_tn_translate: z.string().nullable(),
-        submitted_hb_translate: z.string().nullable(),
-        submitted_other: z.string().nullable(),
-        submitted_insurance_card: z.string().nullable(),
-        submitted_exemption_gc: z.string().nullable(),
         study_link_status: z.string().max(50).nullable(),
         english_qualifications: z.string().nullable(),
         sut_id: z.string().max(50).nullable(),
@@ -142,8 +122,6 @@ const { handleSubmit } = useForm({
         email: props.application.email,
         address: props.application.address,
         health_information: props.application.health_information,
-        parent_phone: props.application.parent_phone,
-        parent_email: props.application.parent_email,
         campus_code: props.application.campus_code,
         intended_program: props.application.intended_program,
         intended_specialization: props.application.intended_specialization,
@@ -155,14 +133,6 @@ const { handleSubmit } = useForm({
         writing: props.application.writing,
         speaking: props.application.speaking,
         overall: props.application.overall,
-        submitted_photo: props.application.submitted_photo,
-        submitted_cccd: props.application.submitted_cccd,
-        submitted_ccta: props.application.submitted_ccta,
-        submitted_tn_translate: props.application.submitted_tn_translate,
-        submitted_hb_translate: props.application.submitted_hb_translate,
-        submitted_other: props.application.submitted_other,
-        submitted_insurance_card: props.application.submitted_insurance_card,
-        submitted_exemption_gc: props.application.submitted_exemption_gc,
         study_link_status: props.application.study_link_status,
         english_qualifications: props.application.english_qualifications,
         sut_id: props.application.sut_id,
@@ -185,12 +155,10 @@ const onSubmit = handleSubmit((formValues) => {
         writing: formValues.writing ? Number(formValues.writing) : null,
         speaking: formValues.speaking ? Number(formValues.speaking) : null,
         overall: formValues.overall ? Number(formValues.overall) : null,
-        parent_email: formValues.parent_email || null,
         national_id: formValues.national_id || null,
         ethnicity: formValues.ethnicity || null,
         address: formValues.address || null,
         health_information: formValues.health_information || null,
-        parent_phone: formValues.parent_phone || null,
         intended_program: formValues.intended_program || null,
         intended_specialization: formValues.intended_specialization || null,
         intake: formValues.intake || null,
@@ -393,28 +361,6 @@ const handleCancel = () => {
                         </FormItem>
                     </FormField>
 
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <FormField v-slot="{ componentField }" name="parent_email">
-                            <FormItem>
-                                <FormLabel>Parent Email</FormLabel>
-                                <FormControl>
-                                    <Input v-bind="componentField" type="email" placeholder="parent@example.com" />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ componentField }" name="parent_phone">
-                            <FormItem>
-                                <FormLabel>Parent Phone</FormLabel>
-                                <FormControl>
-                                    <Input v-bind="componentField" placeholder="Enter parent phone" />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-                    </div>
-
                     <FormField v-slot="{ componentField }" name="health_information">
                         <FormItem>
                             <FormLabel>Health Information</FormLabel>
@@ -599,89 +545,6 @@ const handleCancel = () => {
                             <FormMessage />
                         </FormItem>
                     </FormField>
-                </CardContent>
-            </Card>
-
-            <!-- Submitted Documents -->
-            <Card>
-                <CardHeader>
-                    <CardTitle>Submitted Documents</CardTitle>
-                    <CardDescription>Check the documents that have been submitted</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <FormField v-slot="{ value, handleChange }" name="submitted_photo">
-                            <FormItem>
-                                <FormLabel class="font-normal">Photo</FormLabel>
-                                <FormControl>
-                                    <Input :model-value="value" @update:model-value="handleChange" />
-                                </FormControl>
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ value, handleChange }" name="submitted_cccd">
-                            <FormItem>
-                                <FormControl>
-                                    <FormLabel class="font-normal">CCCD</FormLabel>
-                                    <Input :model-value="value" @update:model-value="handleChange" />
-                                </FormControl>
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ value, handleChange }" name="submitted_ccta">
-                            <FormItem>
-                                <FormControl>
-                                    <FormLabel class="font-normal">CCTA</FormLabel>
-                                    <Input :model-value="value" @update:model-value="handleChange" />
-                                </FormControl>
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ value, handleChange }" name="submitted_tn_translate">
-                            <FormItem>
-                                <FormControl>
-                                    <FormLabel class="font-normal">TN Translate</FormLabel>
-                                    <Input :model-value="value" @update:model-value="handleChange" />
-                                </FormControl>
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ value, handleChange }" name="submitted_hb_translate">
-                            <FormItem>
-                                <FormControl>
-                                    <FormLabel class="font-normal">HB Translate</FormLabel>
-                                    <Input :model-value="value" @update:model-value="handleChange" />
-                                </FormControl>
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ value, handleChange }" name="submitted_insurance_card">
-                            <FormItem>
-                                <FormControl>
-                                    <FormLabel class="font-normal">Insurance Card</FormLabel>
-                                    <Input :model-value="value" @update:model-value="handleChange" />
-                                </FormControl>
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ value, handleChange }" name="submitted_exemption_gc">
-                            <FormItem>
-                                <FormControl>
-                                    <FormLabel class="font-normal">Exemption GC</FormLabel>
-                                    <Input :model-value="value" @update:model-value="handleChange" />
-                                </FormControl>
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ value, handleChange }" name="submitted_other">
-                            <FormItem>
-                                <FormControl>
-                                    <FormLabel class="font-normal">Other Documents</FormLabel>
-                                    <Input :model-value="value" @update:model-value="handleChange" />
-                                </FormControl>
-                            </FormItem>
-                        </FormField>
-                    </div>
                 </CardContent>
             </Card>
 

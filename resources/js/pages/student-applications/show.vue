@@ -53,8 +53,6 @@ interface StudentApplication {
     email: string;
     address: string | null;
     health_information: string | null;
-    parent_phone: string | null;
-    parent_email: string | null;
     campus_code: string;
     intended_program: string | null;
     intended_specialization: string | null;
@@ -436,14 +434,6 @@ const relationshipLabel = (value: string | null): string => {
                         <div class="sm:col-span-2">
                             <p class="text-muted-foreground text-xs">Address</p>
                             <p class="font-medium">{{ application.address ?? '—' }}</p>
-                        </div>
-                        <div>
-                            <p class="text-muted-foreground text-xs">Guardian email</p>
-                            <p class="font-medium">{{ application.parent_email ?? '—' }}</p>
-                        </div>
-                        <div>
-                            <p class="text-muted-foreground text-xs">Guardian phone</p>
-                            <p class="font-medium">{{ application.parent_phone ?? '—' }}</p>
                         </div>
                     </CardContent>
                 </Card>

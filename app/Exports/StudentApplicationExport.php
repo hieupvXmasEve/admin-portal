@@ -2,20 +2,20 @@
 
 namespace App\Exports;
 
-use App\Models\StudentApplication;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithStyles;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class StudentApplicationExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize, WithStyles
+class StudentApplicationExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapping, WithStyles
 {
     protected Builder $query;
+
     protected array $filters;
 
     public function __construct(Builder $query, array $filters = [])
@@ -44,8 +44,6 @@ class StudentApplicationExport implements FromQuery, WithHeadings, WithMapping, 
             'Email',
             'Address',
             'Health Information',
-            'Parent Phone',
-            'Parent Email',
             'Campus',
             'Intended Program',
             'Intended Specialization',
@@ -57,14 +55,6 @@ class StudentApplicationExport implements FromQuery, WithHeadings, WithMapping, 
             'Writing',
             'Speaking',
             'Overall Score',
-            'Photo Submitted',
-            'CCCD Submitted',
-            'CCTA Submitted',
-            'TN Translate Submitted',
-            'HB Translate Submitted',
-            'Other Docs Submitted',
-            'Insurance Card Submitted',
-            'Exemption GC Submitted',
             'StudyLink Status',
             'English Qualifications',
             'SUT ID',
@@ -91,8 +81,6 @@ class StudentApplicationExport implements FromQuery, WithHeadings, WithMapping, 
             $application->email ?? 'N/A',
             $application->address ?? 'N/A',
             $application->health_information ?? 'N/A',
-            $application->parent_phone ?? 'N/A',
-            $application->parent_email ?? 'N/A',
             $application->campus_code ?? 'N/A',
             $application->intended_program ?? 'N/A',
             $application->intended_specialization ?? 'N/A',
@@ -104,14 +92,6 @@ class StudentApplicationExport implements FromQuery, WithHeadings, WithMapping, 
             $application->writing ?? 'N/A',
             $application->speaking ?? 'N/A',
             $application->overall ?? 'N/A',
-            $application->submitted_photo ? 'Yes' : 'No',
-            $application->submitted_cccd ? 'Yes' : 'No',
-            $application->submitted_ccta ? 'Yes' : 'No',
-            $application->submitted_tn_translate ? 'Yes' : 'No',
-            $application->submitted_hb_translate ? 'Yes' : 'No',
-            $application->submitted_other ? 'Yes' : 'No',
-            $application->submitted_insurance_card ? 'Yes' : 'No',
-            $application->submitted_exemption_gc ? 'Yes' : 'No',
             $application->study_link_status ?? 'N/A',
             $application->english_qualifications ?? 'N/A',
             $application->sut_id ?? 'N/A',
@@ -128,7 +108,7 @@ class StudentApplicationExport implements FromQuery, WithHeadings, WithMapping, 
     public function styles(Worksheet $sheet)
     {
         // Style the header row
-        $sheet->getStyle('A1:' . $sheet->getHighestColumn() . '1')->applyFromArray([
+        $sheet->getStyle('A1:'.$sheet->getHighestColumn().'1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FFFFFF'],
@@ -151,10 +131,10 @@ class StudentApplicationExport implements FromQuery, WithHeadings, WithMapping, 
 
     private function formatBirthDate($application): string
     {
-        if (!$application->birth_day || !$application->birth_month || !$application->birth_year) {
+        if (! $application->birth_day || ! $application->birth_month || ! $application->birth_year) {
             return 'N/A';
         }
-        
+
         return sprintf(
             '%02d/%02d/%04d',
             $application->birth_day,

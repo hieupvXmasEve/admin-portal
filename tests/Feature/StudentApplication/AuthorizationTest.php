@@ -69,7 +69,6 @@ function authzPendingApplication(Campus $campus, array $overrides = []): Student
         'intended_program' => 'IT',
         'intake' => 'FA25',
         'student_code' => 'S'.fake()->unique()->numerify('#######'),
-        'parent_email' => null,
     ], $overrides));
 }
 

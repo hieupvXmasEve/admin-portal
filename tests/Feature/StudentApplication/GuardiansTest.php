@@ -58,8 +58,6 @@ function guardianApplication(Campus $campus, array $overrides = []): StudentAppl
         'intended_program' => 'IT',
         'intake' => 'FA25',
         'student_code' => 'S'.fake()->unique()->numerify('#######'),
-        'parent_email' => null,
-        'parent_phone' => null,
     ], $overrides));
 }
 

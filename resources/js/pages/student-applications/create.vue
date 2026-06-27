@@ -33,8 +33,6 @@ const form = useForm({
     intended_program: '',
     intake: '',
     address: '',
-    parent_email: '',
-    parent_phone: '',
 });
 
 const goBack = () => window.history.back();
@@ -47,8 +45,6 @@ const submit = () => {
         intended_program: data.intended_program || null,
         intake: data.intake || null,
         address: data.address || null,
-        parent_email: data.parent_email || null,
-        parent_phone: data.parent_phone || null,
     })).post(route('student-applications.store'), {
         onSuccess: () => toast.success('Application created.'),
         onError: () => toast.error('Please fix the highlighted fields.'),
@@ -125,15 +121,6 @@ const submit = () => {
                     <div class="space-y-1 sm:col-span-2">
                         <Label for="address">Address</Label>
                         <Textarea id="address" v-model="form.address" rows="2" placeholder="Address" />
-                    </div>
-                    <div class="space-y-1">
-                        <Label for="parent_email">Guardian email</Label>
-                        <Input id="parent_email" v-model="form.parent_email" type="email" placeholder="Guardian email" />
-                        <p v-if="form.errors.parent_email" class="text-destructive text-xs">{{ form.errors.parent_email }}</p>
-                    </div>
-                    <div class="space-y-1">
-                        <Label for="parent_phone">Guardian phone</Label>
-                        <Input id="parent_phone" v-model="form.parent_phone" placeholder="Guardian phone" />
                     </div>
                 </CardContent>
             </Card>

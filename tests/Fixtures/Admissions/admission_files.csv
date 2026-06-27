@@ -1,0 +1,5 @@
+"student_code","id","user_id","admission_id","file_id","original_name","name_file","gg_file_id","gg_folder_id","stt_file","mime_type","size","status","notes","created_at","updated_at"
+MATCH001,9001,500,700,1,front.jpeg,id_card_front_500_0.jpeg,GG_FRONT_1,FOLDER_A,0,image/jpeg,1000,active,,"2025-06-21 15:46:46","2025-06-21 15:46:46"
+MATCH001,9002,500,700,3,hb1.jpeg,transcript_500_0.jpeg,GG_HB_1,FOLDER_A,0,image/jpeg,2000,active,,"2025-06-21 15:47:51","2025-06-21 15:47:51"
+MATCH001,9003,500,700,3,hb2.jpeg,transcript_500_1.jpeg,GG_HB_2,FOLDER_A,1,image/jpeg,3000,active,,"2025-06-21 15:48:00","2025-06-21 15:48:00"
+MATCH002,9100,600,800,8,photo.jpeg,student_photo_600_0.jpeg,GG_PHOTO_1,FOLDER_B,0,image/jpeg,1500,active,,"2025-06-22 10:00:00","2025-06-22 10:00:00"

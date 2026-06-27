@@ -43,8 +43,6 @@ class StudentApplication extends AuditableModel
         'email',
         'address',
         'health_information',
-        'parent_phone',
-        'parent_email',
         'campus_code',
         'intended_program',
         'intended_specialization',
@@ -56,14 +54,6 @@ class StudentApplication extends AuditableModel
         'writing',
         'speaking',
         'overall',
-        'submitted_photo',
-        'submitted_cccd',
-        'submitted_ccta',
-        'submitted_tn_translate',
-        'submitted_hb_translate',
-        'submitted_other',
-        'submitted_insurance_card',
-        'submitted_exemption_gc',
         'study_link_status',
         'english_qualifications',
         'sut_id',
@@ -97,14 +87,6 @@ class StudentApplication extends AuditableModel
         'approved_at' => 'datetime',
         'rejected_at' => 'datetime',
         'revoked_at' => 'datetime',
-        'submitted_photo' => 'string',
-        'submitted_cccd' => 'string',
-        'submitted_ccta' => 'string',
-        'submitted_tn_translate' => 'string',
-        'submitted_hb_translate' => 'string',
-        'submitted_other' => 'string',
-        'submitted_insurance_card' => 'string',
-        'submitted_exemption_gc' => 'string',
     ];
 
     /**
@@ -265,8 +247,6 @@ class StudentApplication extends AuditableModel
         return [
             'national_id', // Sensitive personal information
             'address', // Personal address
-            'parent_phone',
-            'parent_email', // Parent contact info
             'health_information', // Medical information
         ];
     }

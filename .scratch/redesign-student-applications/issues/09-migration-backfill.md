@@ -1,6 +1,6 @@
 # Migration & backfill of existing Applications
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
@@ -20,12 +20,25 @@ End-to-end behavior:
 
 ## Acceptance criteria
 
-- [ ] Every legacy row's parent contact lands in `application_guardians`; every submitted document URL lands in `application_documents`.
-- [ ] Converted rows become `enrolled` with the correct `student_id`; unconverted rows become `pending`.
-- [ ] No identity/contact data is lost; counts reconcile before vs after.
-- [ ] Legacy `parent_*` and `submitted_*` columns are dropped only after a successful backfill.
-- [ ] A dry-run mode reports planned changes without writing.
-- [ ] The migration is verified against a copy of real dev data.
+- [x] Every legacy row's parent contact lands in `application_guardians`; every submitted document URL lands in `application_documents`.
+- [x] Converted rows become `enrolled` with the correct `student_id`; unconverted rows become `pending`.
+- [x] No identity/contact data is lost; counts reconcile before vs after.
+- [x] Legacy `parent_*` and `submitted_*` columns are dropped only after a successful backfill.
+- [x] A dry-run mode reports planned changes without writing.
+- [x] The migration is verified against a copy of real dev data.
+
+## Implementation notes
+
+- Document source resolved with the operator: CRM export (`Asia_NE_2025_AdmissionFiles.csv`) is authoritative
+  (joined by `student_code`); `submitted_*` URLs are the fallback for applications absent from the export, so the
+  ~51 rows the export does not cover keep their documents and nothing is duplicated.
+- `applications:backfill` (service `ApplicationBackfillService` + command): read-only dry-run by default, `--apply`
+  to commit; seeds the document-type catalog from `Asia_File_Types.csv`, moves `parent_*` → one primary guardian,
+  builds `application_documents`, and remaps status (converted → `enrolled`, else → `pending`). Idempotent.
+- The legacy columns are dropped by `2026_06_27_170000_drop_legacy_parent_and_submitted_columns`, gated by
+  `LegacyColumnDropGuard` which refuses while applications exist but the target tables are empty.
+- Verified against the real 241-row dev DB (dry-run): 93 guardians, 12 catalog types, 1493 CSV docs (190 apps)
+  + 16 fallback docs, 229 enrolled + 12 pending — counts reconcile to 241.
 
 ## Blocked by
 
