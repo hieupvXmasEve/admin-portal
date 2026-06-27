@@ -1,6 +1,6 @@
 # Documents (1-n) + mirrored Document type catalog
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
@@ -20,11 +20,11 @@ Existing `submitted_*` columns remain for legacy rows until the migration slice 
 
 ## Acceptance criteria
 
-- [ ] `application_documents` exists with the fields above and supports multiple files per `file_type_code`.
-- [ ] `application_document_types` exists and can be synced from the CRM catalog.
-- [ ] The document list and per-type grouping render in the UI from the new table.
-- [ ] Missing required documents are surfaced (international applicants honor `int_required`).
-- [ ] Feature tests cover document listing, multiple-files-per-type, and the missing-required-documents check.
+- [x] `application_documents` exists with the fields above and supports multiple files per `file_type_code` (no unique on the type; idempotency rides on the unique `crm_file_id`).
+- [x] `application_document_types` exists and can be synced from the CRM catalog (idempotent upsert by `code` via `ApplicationDocumentTypeSyncService`).
+- [x] The document list and per-type grouping render in the UI from the new table (Documents card on the show screen, fed by `documentChecklist`).
+- [x] Missing required documents are surfaced (international applicants honor `int_required` via `ApplicationDocumentType::isRequiredFor()`).
+- [x] Feature tests cover document listing, multiple-files-per-type, and the missing-required-documents check.
 
 ## Blocked by
 

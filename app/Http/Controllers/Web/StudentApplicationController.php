@@ -12,6 +12,7 @@ use App\Models\ApplicationGuardian;
 use App\Models\Campus;
 use App\Models\Program;
 use App\Models\StudentApplication;
+use App\Services\ApplicationDocumentService;
 use App\Services\StudentApplicationService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
@@ -123,7 +124,7 @@ class StudentApplicationController extends Controller
     /**
      * Display the specified student application.
      */
-    public function show(StudentApplication $studentApplication)
+    public function show(StudentApplication $studentApplication, ApplicationDocumentService $documentService)
     {
         $studentApplication->load([
             'student' => function ($query) {
@@ -131,6 +132,9 @@ class StudentApplicationController extends Controller
             },
             'guardians' => function ($query) {
                 $query->orderByDesc('is_primary')->orderBy('id');
+            },
+            'documents' => function ($query) {
+                $query->orderBy('file_type_code')->orderBy('page_index')->orderBy('id');
             },
             'approvedByUser:id,name,email',
             'rejectedByUser:id,name,email',
@@ -140,6 +144,7 @@ class StudentApplicationController extends Controller
         return Inertia::render('student-applications/show', [
             'application' => $studentApplication,
             'guardianRelationships' => ApplicationGuardian::relationships(),
+            'documentChecklist' => $documentService->checklist($studentApplication),
         ]);
     }
 

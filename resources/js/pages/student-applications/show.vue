@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Head, router } from '@inertiajs/vue3';
-import { ArrowLeft, CheckCircle2, Pencil, Plus, Star, Trash2, Undo2, XCircle } from 'lucide-vue-next';
+import { AlertTriangle, ArrowLeft, CheckCircle2, ExternalLink, FileText, Pencil, Plus, Star, Trash2, Undo2, XCircle } from 'lucide-vue-next';
 import { computed, reactive, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
@@ -80,14 +80,55 @@ interface StudentApplication {
     revoked_by_user?: Actor | null;
 }
 
+interface ApplicationDocument {
+    id: number;
+    page_index: number;
+    original_name: string | null;
+    link: string;
+    mime_type: string | null;
+    size: number | null;
+    status: string | null;
+}
+
+interface DocumentGroup {
+    code: string;
+    name: string;
+    required: boolean;
+    is_missing: boolean;
+    documents: ApplicationDocument[];
+}
+
+interface DocumentChecklist {
+    groups: DocumentGroup[];
+    missing_required: string[];
+}
+
 interface Props {
     application: StudentApplication;
     guardianRelationships: string[];
+    documentChecklist: DocumentChecklist;
 }
 
 const props = defineProps<Props>();
 
 const guardians = computed<Guardian[]>(() => props.application.guardians ?? []);
+
+const documentGroups = computed<DocumentGroup[]>(() => props.documentChecklist?.groups ?? []);
+const missingRequired = computed<string[]>(() => props.documentChecklist?.missing_required ?? []);
+const hasDocuments = computed(() => documentGroups.value.some((group) => group.documents.length > 0));
+
+const formatFileSize = (bytes: number | null): string => {
+    if (!bytes) {
+        return '';
+    }
+    if (bytes < 1024) {
+        return `${bytes} B`;
+    }
+    if (bytes < 1024 * 1024) {
+        return `${(bytes / 1024).toFixed(0)} KB`;
+    }
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 const isPending = computed(() => props.application.status === 'pending');
 const isEnrolled = computed(() => props.application.status === 'enrolled');
@@ -469,6 +510,68 @@ const relationshipLabel = (value: string | null): string => {
                                     <Trash2 class="h-4 w-4" />
                                 </Button>
                             </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <!-- Documents -->
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Documents</CardTitle>
+                        <CardDescription>External link references from the admissions catalog, grouped by type.</CardDescription>
+                    </CardHeader>
+                    <CardContent class="space-y-4">
+                        <div
+                            v-if="missingRequired.length > 0"
+                            class="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50/60 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/10 dark:text-amber-300"
+                        >
+                            <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0" />
+                            <span>
+                                <span class="font-semibold">{{ missingRequired.length }} required document(s) missing.</span>
+                                Approving an incomplete dossier is discouraged.
+                            </span>
+                        </div>
+
+                        <p v-if="documentGroups.length === 0" class="text-muted-foreground text-sm">
+                            No document types in the catalog yet.
+                        </p>
+                        <p v-else-if="!hasDocuments && missingRequired.length === 0" class="text-muted-foreground text-sm">
+                            No documents recorded yet.
+                        </p>
+
+                        <div
+                            v-for="docGroup in documentGroups"
+                            :key="docGroup.code"
+                            class="rounded-lg border p-4"
+                            :class="docGroup.is_missing ? 'border-amber-300 bg-amber-50/40 dark:border-amber-700 dark:bg-amber-900/10' : ''"
+                        >
+                            <div class="flex flex-wrap items-center gap-2">
+                                <p class="font-semibold">{{ docGroup.name }}</p>
+                                <Badge v-if="docGroup.required" variant="secondary">Required</Badge>
+                                <Badge
+                                    v-if="docGroup.is_missing"
+                                    class="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                                >
+                                    Missing
+                                </Badge>
+                            </div>
+
+                            <ul v-if="docGroup.documents.length > 0" class="mt-2 space-y-1.5">
+                                <li v-for="doc in docGroup.documents" :key="doc.id" class="flex items-center gap-2 text-sm">
+                                    <FileText class="text-muted-foreground h-4 w-4 shrink-0" />
+                                    <a
+                                        :href="doc.link"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                                    >
+                                        {{ doc.original_name ?? doc.link }}
+                                        <ExternalLink class="h-3 w-3" />
+                                    </a>
+                                    <span v-if="doc.size" class="text-muted-foreground text-xs">{{ formatFileSize(doc.size) }}</span>
+                                </li>
+                            </ul>
+                            <p v-else class="text-muted-foreground mt-1 text-sm">No file provided.</p>
                         </div>
                     </CardContent>
                 </Card>

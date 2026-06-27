@@ -131,6 +131,15 @@ class StudentApplication extends AuditableModel
     }
 
     /**
+     * Documents on this Application (1-n external link references). Multiple
+     * documents may share a `file_type_code` (e.g. a multi-page transcript).
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(ApplicationDocument::class);
+    }
+
+    /**
      * The primary Guardian, if one has been recorded. Exactly one Guardian is
      * primary whenever any exist (DB + service invariant), so this is the
      * Guardian that maps to the Student's emergency contact on approval.
