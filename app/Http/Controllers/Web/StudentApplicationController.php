@@ -130,6 +130,7 @@ class StudentApplicationController extends Controller
             },
             'approvedByUser:id,name,email',
             'rejectedByUser:id,name,email',
+            'revokedByUser:id,name,email',
         ]);
 
         return Inertia::render('student-applications/show', [
@@ -263,6 +264,39 @@ class StudentApplicationController extends Controller
         return redirect()
             ->route('student-applications.show', $studentApplication)
             ->with('success', 'Application rejected.');
+    }
+
+    /**
+     * Revoke a mistaken approval within the safe window: tear down the created
+     * Student + User + roles and return the application to `pending`.
+     */
+    public function revoke(Request $request, StudentApplication $studentApplication): RedirectResponse
+    {
+        try {
+            $this->studentApplicationService->revoke(
+                $studentApplication,
+                $request->user()
+            );
+        } catch (RuntimeException $e) {
+            // Domain guard messages (not enrolled / has activity → use Withdraw)
+            // are safe to surface and nothing was changed.
+            return redirect()
+                ->back()
+                ->with('error', $e->getMessage());
+        } catch (Throwable $e) {
+            Log::warning('Application revoke failed', [
+                'application_id' => $studentApplication->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()
+                ->back()
+                ->with('error', 'Failed to revoke the application. Please try again.');
+        }
+
+        return redirect()
+            ->route('student-applications.show', $studentApplication)
+            ->with('success', 'Approval revoked. The application is pending again.');
     }
 
     /**

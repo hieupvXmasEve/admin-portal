@@ -76,6 +76,8 @@ class StudentApplication extends AuditableModel
         'rejected_by',
         'rejected_at',
         'rejected_reason',
+        'revoked_by',
+        'revoked_at',
     ];
 
     protected $casts = [
@@ -92,6 +94,7 @@ class StudentApplication extends AuditableModel
         'status' => 'string',
         'approved_at' => 'datetime',
         'rejected_at' => 'datetime',
+        'revoked_at' => 'datetime',
         'submitted_photo' => 'string',
         'submitted_cccd' => 'string',
         'submitted_ccta' => 'string',
@@ -135,6 +138,14 @@ class StudentApplication extends AuditableModel
     public function rejectedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'rejected_by');
+    }
+
+    /**
+     * Staff member who revoked a mistaken approval of this application.
+     */
+    public function revokedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'revoked_by');
     }
 
     public function isPending(): bool
@@ -211,6 +222,8 @@ class StudentApplication extends AuditableModel
             'approved_at',
             'rejected_by',
             'rejected_at',
+            'revoked_by',
+            'revoked_at',
         ];
     }
 

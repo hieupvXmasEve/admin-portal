@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\PermissionService;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -37,6 +38,11 @@ const SA_PERMISSIONS = [
 ];
 
 beforeEach(function () {
+    // ProgramMappingService caches campus/program/curriculum code→id lookups; the
+    // array cache persists across tests in one process, so flush to avoid an
+    // earlier test's (rolled-back) ids resolving for this test's fresh fixtures.
+    Cache::flush();
+
     $campus = Campus::factory()->create();
     $this->campus = $campus;
 
@@ -237,6 +243,169 @@ it('cannot approve an application that is not pending', function () {
     $response->assertSessionHas('error');
     expect($application->fresh()->status)->toBe(StudentApplication::STATUS_REJECTED);
     expect(Student::count())->toBe(0);
+});
+
+/**
+ * Approve an application through the staff HTTP seam and return the refreshed model.
+ */
+function approveViaHttp(StudentApplication $application, User $staff): StudentApplication
+{
+    test()->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->post(route('student-applications.approve', $application), [
+            'admission_date' => now()->toDateString(),
+        ])
+        ->assertRedirect();
+
+    return $application->fresh();
+}
+
+it('revokes an enrolled application within the safe window, tearing down student, user, and roles', function () {
+    setupApprovalMapping($this->campus);
+    $staff = makeStaff();
+    $application = makePendingApplication($this->campus, [
+        'email' => 'revoke-me@example.com',
+        'student_code' => 'SREV0001',
+    ]);
+
+    $application = approveViaHttp($application, $staff);
+    $studentId = $application->student_id;
+    $userId = Student::find($studentId)->user_id;
+
+    expect($studentId)->not->toBeNull();
+    expect(DB::table('campus_user_roles')->where('user_id', $userId)->exists())->toBeTrue();
+
+    $response = $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->post(route('student-applications.revoke', $application));
+
+    $response->assertRedirect(route('student-applications.show', $application));
+
+    // Application returned to pending and records who revoked it.
+    $application->refresh();
+    expect($application->status)->toBe(StudentApplication::STATUS_PENDING);
+    expect($application->student_id)->toBeNull();
+    expect($application->revoked_by)->toBe($staff->id);
+    expect($application->revoked_at)->not->toBeNull();
+    expect($application->approved_by)->toBeNull();
+    expect($application->approved_at)->toBeNull();
+
+    // Student, User, and campus roles are torn down.
+    expect(Student::find($studentId))->toBeNull();
+    expect(User::find($userId))->toBeNull();
+    expect(DB::table('campus_user_roles')->where('user_id', $userId)->exists())->toBeFalse();
+
+    // Activity log records the revoking staff causer.
+    expect(
+        DB::table('activity_log')
+            ->where('subject_id', $application->id)
+            ->where('subject_type', StudentApplication::class)
+            ->where('causer_id', $staff->id)
+            ->exists()
+    )->toBeTrue();
+});
+
+it('blocks revoke once the student has downstream activity, deleting nothing', function () {
+    setupApprovalMapping($this->campus);
+    $staff = makeStaff();
+    $application = makePendingApplication($this->campus, [
+        'email' => 'has-activity@example.com',
+        'student_code' => 'SREV0002',
+    ]);
+
+    $application = approveViaHttp($application, $staff);
+    $student = Student::find($application->student_id);
+
+    // Downstream activity: a recorded academic action for the student.
+    $student->actionLogs()->create([
+        'action_type' => 'ACADEMIC_DEFER',
+        'reason' => 'Recorded activity that must block revoke.',
+        'changed_by_user_id' => $staff->id,
+    ]);
+
+    $response = $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->from(route('student-applications.show', $application))
+        ->post(route('student-applications.revoke', $application));
+
+    $response->assertRedirect(route('student-applications.show', $application));
+    $response->assertSessionHas('error');
+
+    // Nothing torn down; still enrolled.
+    $application->refresh();
+    expect($application->status)->toBe(StudentApplication::STATUS_ENROLLED);
+    expect($application->student_id)->toBe($student->id);
+    expect(Student::find($student->id))->not->toBeNull();
+    expect(User::find($student->user_id))->not->toBeNull();
+});
+
+it('blocks revoke once the student has logged in', function () {
+    setupApprovalMapping($this->campus);
+    $staff = makeStaff();
+    $application = makePendingApplication($this->campus, [
+        'email' => 'logged-in@example.com',
+        'student_code' => 'SREV0004',
+    ]);
+
+    $application = approveViaHttp($application, $staff);
+    $student = Student::find($application->student_id);
+
+    // A login is downstream activity too: the student's account has signed in.
+    User::whereKey($student->user_id)->update(['last_login_at' => now()]);
+
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->from(route('student-applications.show', $application))
+        ->post(route('student-applications.revoke', $application))
+        ->assertSessionHas('error');
+
+    $application->refresh();
+    expect($application->status)->toBe(StudentApplication::STATUS_ENROLLED);
+    expect(Student::find($student->id))->not->toBeNull();
+});
+
+it('cannot revoke an application that is not enrolled', function () {
+    $staff = makeStaff();
+    $application = makePendingApplication($this->campus);
+
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->from(route('student-applications.show', $application))
+        ->post(route('student-applications.revoke', $application))
+        ->assertSessionHas('error');
+
+    expect($application->fresh()->status)->toBe(StudentApplication::STATUS_PENDING);
+});
+
+it('allows an application to be approved again after a revoke', function () {
+    setupApprovalMapping($this->campus);
+    $staff = makeStaff();
+    $application = makePendingApplication($this->campus, [
+        'email' => 'again@example.com',
+        'student_code' => 'SREV0003',
+    ]);
+
+    $application = approveViaHttp($application, $staff);
+
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->post(route('student-applications.revoke', $application))
+        ->assertRedirect();
+
+    expect($application->fresh()->status)->toBe(StudentApplication::STATUS_PENDING);
+
+    // Re-approve: a new Student is created with the same CRM-issued code.
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->post(route('student-applications.approve', $application), [
+            'admission_date' => now()->toDateString(),
+        ])
+        ->assertRedirect(route('student-applications.show', $application));
+
+    $application->refresh();
+    expect($application->status)->toBe(StudentApplication::STATUS_ENROLLED);
+    expect($application->student_id)->not->toBeNull();
+    expect(Student::where('student_id', 'SREV0003')->count())->toBe(1);
 });
 
 it('creates a manual application as pending with no auto-approve', function () {

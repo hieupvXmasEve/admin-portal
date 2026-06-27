@@ -47,4 +47,7 @@ Route::middleware('auth')->prefix('student-applications')->name('student-applica
     Route::post('/{studentApplication}/reject', [StudentApplicationController::class, 'reject'])
         ->middleware('can:reject,studentApplication')
         ->name('reject');
+    Route::post('/{studentApplication}/revoke', [StudentApplicationController::class, 'revoke'])
+        ->middleware('can:revoke,studentApplication')
+        ->name('revoke');
 });

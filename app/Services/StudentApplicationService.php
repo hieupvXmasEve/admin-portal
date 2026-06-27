@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Campus;
+use App\Models\CampusUserRole;
 use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Specialization;
@@ -129,6 +130,120 @@ class StudentApplicationService
         ]);
 
         return $application;
+    }
+
+    /**
+     * Student relations that represent real downstream activity. The presence of
+     * any record here means the Student has been operated on (academically or
+     * financially) and a Revoke must be refused — that is the Withdraw path's job
+     * (ADR-0002). A freshly-approved Student has none of these.
+     *
+     * @var list<string>
+     */
+    private const DOWNSTREAM_ACTIVITY_RELATIONS = [
+        // Academic
+        'courseRegistrations',
+        'enrollments',
+        'academicRecords',
+        'attendances',
+        'gpaCalculations',
+        'academicStandings',
+        'academicHolds',
+        'programChangeRequests',
+        'academicProgressionEvents',
+        'actionLogs',
+        'ieltsCertificates',
+        'egcProgress',
+        // Financial
+        'financeCharges',
+        'payments',
+        'invoices',
+        'deferCases',
+        'voucherApplications',
+        'dngPaymentRequests',
+        'goldTransactions',
+        'wallet',
+        'scholarshipAward',
+        // Engagement
+        'clubMemberships',
+        'formResponses',
+    ];
+
+    /**
+     * Revoke a mistaken approval while it is still safe to do so.
+     *
+     * Within the safe window (the linked Student has zero downstream activity),
+     * this transactionally tears down the created Student + User + campus roles,
+     * records the actor, and returns the Application to `pending` for correction
+     * and re-approval. Outside the window it refuses and changes nothing,
+     * directing staff to the (separate) Withdraw path (ADR-0002).
+     *
+     * @throws RuntimeException when the Application is not enrolled, has no linked
+     *                          Student, or the Student already has activity
+     */
+    public function revoke(StudentApplication $application, User $actor): StudentApplication
+    {
+        if (! $application->isEnrolled()) {
+            throw new RuntimeException('Only an enrolled application can be revoked.');
+        }
+
+        $student = $application->student;
+
+        if ($student === null) {
+            throw new RuntimeException('This application has no linked student to revoke.');
+        }
+
+        return DB::transaction(function () use ($application, $actor, $student): StudentApplication {
+            // Re-check the safe window inside the transaction so the guard and the
+            // teardown are atomic — no activity can be recorded between them.
+            if ($this->studentHasDownstreamActivity($student)) {
+                throw new RuntimeException(
+                    'This student already has academic or financial activity and cannot be revoked. '
+                    .'Use the Withdraw process to remove a student who has already studied.'
+                );
+            }
+
+            $user = $student->user;
+
+            // Detach the Application from the Student first so deleting the
+            // Student cannot trip a foreign-key constraint, and record the revoke.
+            $application->update([
+                'status' => StudentApplication::STATUS_PENDING,
+                'student_id' => null,
+                'approved_by' => null,
+                'approved_at' => null,
+                'revoked_by' => $actor->id,
+                'revoked_at' => now(),
+            ]);
+
+            // Tear down the campus roles, the Student, then the User account. The
+            // parent account (if any) is intentionally left intact — parents are
+            // shared across siblings; the parent_student pivot cascades on delete.
+            if ($user !== null) {
+                CampusUserRole::where('user_id', $user->id)->delete();
+            }
+
+            $student->delete();
+
+            $user?->delete();
+
+            return $application;
+        });
+    }
+
+    /**
+     * Whether the Student has any record indicating real downstream activity.
+     */
+    private function studentHasDownstreamActivity(Student $student): bool
+    {
+        foreach (self::DOWNSTREAM_ACTIVITY_RELATIONS as $relation) {
+            if ($student->{$relation}()->exists()) {
+                return true;
+            }
+        }
+
+        // A login is activity too: a freshly-created account has never signed in.
+        return $student->user?->last_login_at !== null;
     }
 
     /**

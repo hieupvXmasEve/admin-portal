@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Head, router } from '@inertiajs/vue3';
-import { ArrowLeft, CheckCircle2, Pencil, XCircle } from 'lucide-vue-next';
+import { ArrowLeft, CheckCircle2, Pencil, Undo2, XCircle } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
@@ -58,9 +58,11 @@ interface StudentApplication {
     approved_at: string | null;
     rejected_at: string | null;
     rejected_reason: string | null;
+    revoked_at: string | null;
     student?: LinkedStudent | null;
     approved_by_user?: Actor | null;
     rejected_by_user?: Actor | null;
+    revoked_by_user?: Actor | null;
 }
 
 interface Props {
@@ -70,7 +72,9 @@ interface Props {
 const props = defineProps<Props>();
 
 const isPending = computed(() => props.application.status === 'pending');
+const isEnrolled = computed(() => props.application.status === 'enrolled');
 const showRejectDialog = ref(false);
+const showRevokeDialog = ref(false);
 const rejectReason = ref('');
 const isSubmitting = ref(false);
 
@@ -141,6 +145,25 @@ const submitReject = () => {
         },
     );
 };
+
+const submitRevoke = () => {
+    isSubmitting.value = true;
+    router.post(
+        route('student-applications.revoke', props.application.id),
+        {},
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Approval revoked. The application is pending again.');
+                showRevokeDialog.value = false;
+            },
+            onError: () => toast.error('Failed to revoke application.'),
+            onFinish: () => {
+                isSubmitting.value = false;
+            },
+        },
+    );
+};
 </script>
 
 <template>
@@ -177,6 +200,10 @@ const submitReject = () => {
                 <Button v-if="isPending" variant="destructive" :disabled="isSubmitting" @click="showRejectDialog = true">
                     <XCircle class="mr-2 h-4 w-4" />
                     Reject
+                </Button>
+                <Button v-if="isEnrolled" variant="outline" :disabled="isSubmitting" @click="showRevokeDialog = true">
+                    <Undo2 class="mr-2 h-4 w-4" />
+                    Revoke
                 </Button>
             </div>
         </div>
@@ -294,7 +321,14 @@ const submitReject = () => {
                             </div>
                         </div>
 
-                        <p v-else class="text-muted-foreground">Awaiting a decision. Approve to enroll the student, or reject with a reason.</p>
+                        <template v-else>
+                            <p class="text-muted-foreground">Awaiting a decision. Approve to enroll the student, or reject with a reason.</p>
+                            <div v-if="application.revoked_at" class="border-t pt-3">
+                                <p class="text-muted-foreground text-xs">Previously revoked by</p>
+                                <p class="font-medium">{{ application.revoked_by_user?.name ?? 'Unknown' }}</p>
+                                <p class="text-muted-foreground text-xs">{{ formatDateTime(application.revoked_at) }}</p>
+                            </div>
+                        </template>
                     </CardContent>
                 </Card>
 
@@ -328,6 +362,25 @@ const submitReject = () => {
             <DialogFooter>
                 <Button variant="outline" :disabled="isSubmitting" @click="showRejectDialog = false">Cancel</Button>
                 <Button variant="destructive" :disabled="isSubmitting" @click="submitReject">Confirm rejection</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Revoke dialog -->
+    <Dialog v-model:open="showRevokeDialog">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Revoke approval</DialogTitle>
+                <DialogDescription>
+                    This tears down the enrolled student account, user, and roles, and returns the application to pending for
+                    correction. It is only possible while the student has no academic or financial activity. Use Withdraw for a
+                    student who has already studied.
+                </DialogDescription>
+            </DialogHeader>
+
+            <DialogFooter>
+                <Button variant="outline" :disabled="isSubmitting" @click="showRevokeDialog = false">Cancel</Button>
+                <Button variant="destructive" :disabled="isSubmitting" @click="submitRevoke">Confirm revoke</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>
