@@ -1,6 +1,6 @@
 # CRM ingestion: full create/update of Applications, Guardians, Documents
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
@@ -21,12 +21,12 @@ End-to-end behavior:
 
 ## Acceptance criteria
 
-- [ ] Creating an Application via the API persists the core record plus its Guardians and Document references.
-- [ ] Re-sending the same `crm_admission_id` updates the existing Application (no duplicate); re-sending the same `crm_file_id` updates the existing Document (no duplicate).
-- [ ] Updating a `pending` Application overwrites fields; updating an `enrolled`/`rejected` Application returns `409 Conflict`.
-- [ ] `student_code` from the payload is stored; no code is generated.
-- [ ] The API exposes no approve/reject/revoke capability.
-- [ ] Ingestion-seam feature tests cover create, idempotent upsert (application + document), update-while-pending, and the 409-after-approve case, using a service token.
+- [x] Creating an Application via the API persists the core record plus its Guardians and Document references.
+- [x] Re-sending the same `crm_admission_id` updates the existing Application (no duplicate); re-sending the same `crm_file_id` updates the existing Document (no duplicate).
+- [x] Updating a `pending` Application overwrites fields; updating an `enrolled`/`rejected` Application returns `409 Conflict`.
+- [x] `student_code` from the payload is stored; no code is generated.
+- [x] The API exposes no approve/reject/revoke capability.
+- [x] Ingestion-seam feature tests cover create, idempotent upsert (application + document), update-while-pending, and the 409-after-approve case, using a service token.
 
 ## Blocked by
 
