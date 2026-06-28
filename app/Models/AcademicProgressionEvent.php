@@ -26,6 +26,7 @@ class AcademicProgressionEvent extends Model
         'from_english_level',
         'to_english_level',
         'ielts_certificate_id',
+        'decision_id',
         'notes',
     ];
 
@@ -63,6 +64,17 @@ class AcademicProgressionEvent extends Model
     public function ieltsCertificate(): BelongsTo
     {
         return $this->belongsTo(IeltsCertificate::class);
+    }
+
+    /**
+     * The decision that authorized this transition, if any (ADR-0008).
+     *
+     * Nullable: a requires-decision transition can be recorded first and the
+     * decision attached later. Records authorization provenance.
+     */
+    public function decision(): BelongsTo
+    {
+        return $this->belongsTo(StudentDecision::class, 'decision_id');
     }
 
     // =====================

@@ -41,6 +41,37 @@ enum AcademicProgressionEventType: string
         };
     }
 
+    /**
+     * Whether a progression transition of this type needs an authorizing
+     * Decision (ADR-0008).
+     *
+     * The stage transitions (initial placement and the move into intake_course)
+     * are governed; pure progression records (English-level change, IELTS) never
+     * require a Decision. Soft rule: the Decision may be attached afterwards.
+     */
+    public function requiresDecision(): bool
+    {
+        return match ($this) {
+            self::PLACEMENT_INITIALIZED,
+            self::COURSE_STAGE_CHANGED => true,
+            self::ENGLISH_LEVEL_CHANGED,
+            self::IELTS_RECORDED => false,
+        };
+    }
+
+    /**
+     * String values of the event types that require an authorizing Decision.
+     *
+     * @return array<int, string>
+     */
+    public static function requiresDecisionValues(): array
+    {
+        return array_values(array_map(
+            fn (self $type): string => $type->value,
+            array_filter(self::cases(), fn (self $type): bool => $type->requiresDecision())
+        ));
+    }
+
     public static function values(): array
     {
         return array_column(self::cases(), 'value');

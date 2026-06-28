@@ -412,6 +412,19 @@ class Student extends StudentAuditableModel
     }
 
     /**
+     * Decisions whose coverage roster includes this student (ADR-0008).
+     */
+    public function decisions(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            StudentDecision::class,
+            'student_decision_student',
+            'student_id',
+            'student_decision_id'
+        )->withTimestamps();
+    }
+
+    /**
      * Get the student's finance charges (tuition, fees, credits).
      */
     public function financeCharges(): HasMany

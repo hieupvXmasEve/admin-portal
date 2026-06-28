@@ -9,6 +9,7 @@ use App\Enums\ProgressionTriggerSource;
 use App\Http\Controllers\Controller;
 use App\Models\Campus;
 use App\Models\Semester;
+use App\Modules\Academic\Queries\GetMissingDecisionReportQuery;
 use App\Modules\Academic\Queries\Placement\GetAcademicProgressionAuditQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -83,6 +84,30 @@ class AcademicProgressionAuditController extends Controller
 
         return Inertia::render('Admin/Reports/AcademicProgressionAudit/MissingDocuments', [
             'certificates' => $missingDocs,
+            'filters' => [
+                'search' => $validated['search'] ?? null,
+                'per_page' => $validated['per_page'] ?? 25,
+            ],
+        ]);
+    }
+
+    /**
+     * Show the missing-decision report (ADR-0008).
+     *
+     * Requires-decision transitions from both lifecycle streams that still lack
+     * an authorizing Decision; attaching one removes the row.
+     */
+    public function missingDecisions(Request $request, GetMissingDecisionReportQuery $query): Response
+    {
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $missingDecisions = $query->handle($validated, session('current_campus_id'));
+
+        return Inertia::render('Admin/Reports/AcademicProgressionAudit/MissingDecisions', [
+            'transitions' => $missingDecisions,
             'filters' => [
                 'search' => $validated['search'] ?? null,
                 'per_page' => $validated['per_page'] ?? 25,

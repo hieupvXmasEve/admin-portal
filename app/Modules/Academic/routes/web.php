@@ -236,6 +236,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:view_student_action')
             ->name('missing-documents');
 
+        Route::get('/missing-decisions', [AcademicProgressionAuditController::class, 'missingDecisions'])
+            ->middleware('can:view_student_action')
+            ->name('missing-decisions');
+
         Route::get('/export', [AcademicProgressionAuditController::class, 'export'])
             ->middleware('can:view_student_action')
             ->name('export');

@@ -47,12 +47,26 @@ class BulkLinkStudentsToDecisionAction
         }
 
         $linkedActionCount = DB::transaction(function () use ($decision, $actionLogIds, $actionType, $campusId): int {
-            return StudentActionLog::query()
+            $count = StudentActionLog::query()
                 ->whereKey($actionLogIds)
                 ->whereNull('decision_id')
                 ->where('action_type', $actionType)
                 ->when($campusId, fn ($query) => $query->whereHas('student', fn ($studentQuery) => $studentQuery->where('campus_id', $campusId)))
                 ->update(['decision_id' => $decision->id]);
+
+            // Keep the coverage roster in step with the links just made (ADR-0008):
+            // one decision covers the many students it now authorizes.
+            $linkedStudentIds = StudentActionLog::query()
+                ->whereKey($actionLogIds)
+                ->where('decision_id', $decision->id)
+                ->distinct()
+                ->pluck('student_id')
+                ->map(fn ($id): int => (int) $id)
+                ->all();
+
+            $decision->cover(...$linkedStudentIds);
+
+            return $count;
         });
 
         Log::info('Student decision bulk link completed', [

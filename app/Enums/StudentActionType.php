@@ -110,6 +110,38 @@ enum StudentActionType: string
         return $this === self::CAMPUS_TRANSFER;
     }
 
+    /**
+     * Whether a transition of this type needs an authorizing Decision (ADR-0008).
+     *
+     * Soft rule: the Decision may be attached after the transition is recorded
+     * (no creation-time block); the missing-decision report surfaces transitions
+     * in this set that still lack one. Admission deferral and pure enrolment /
+     * waiting records never require a Decision.
+     */
+    public function requiresDecision(): bool
+    {
+        return match ($this) {
+            self::ACADEMIC_DEFER,
+            self::ACADEMIC_RESUME,
+            self::ACADEMIC_DROPOUT,
+            self::CAMPUS_TRANSFER => true,
+            default => false,
+        };
+    }
+
+    /**
+     * String values of the action types that require an authorizing Decision.
+     *
+     * @return array<int, string>
+     */
+    public static function requiresDecisionValues(): array
+    {
+        return array_values(array_map(
+            fn (self $type): string => $type->value,
+            array_filter(self::cases(), fn (self $type): bool => $type->requiresDecision())
+        ));
+    }
+
     public static function values(): array
     {
         return array_column(self::cases(), 'value');
@@ -118,7 +150,7 @@ enum StudentActionType: string
     public static function options(): array
     {
         return array_map(
-            fn(self $type) => [
+            fn (self $type) => [
                 'value' => $type->value,
                 'label' => $type->label(),
                 'labelEn' => $type->labelEn(),

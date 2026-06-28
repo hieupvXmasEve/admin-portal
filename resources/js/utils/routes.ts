@@ -226,6 +226,7 @@ export const studentRoutes = {
     // Academic Progression Audit Reports
     academicProgressionAudit: () => route('reports.academic-progression.index'),
     academicProgressionMissingDocuments: () => route('reports.academic-progression.missing-documents'),
+    academicProgressionMissingDecisions: () => route('reports.academic-progression.missing-decisions'),
     academicProgressionExport: () => route('reports.academic-progression.export'),
     studentLifecycleYearlyAnalysis: () => route('reports.student-lifecycle-yearly.index'),
     studentLifecycleYearlyAnalysisExport: () => route('reports.student-lifecycle-yearly.export'),
