@@ -4,49 +4,31 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Http\Web;
 
-use App\Enums\StudentActionType;
 use App\Http\Controllers\Controller;
-use App\Models\Campus;
-use App\Models\FinanceCharge;
-use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentActionLog;
-use App\Models\StudentDecision;
 use App\Modules\Academic\Actions\RecordStudentActionAction;
 use App\Modules\Academic\Actions\UpdateStudentActionAction;
 use App\Modules\Academic\Actions\UploadActionAttachmentAction;
 use App\Modules\Academic\Http\Requests\StoreStudentActionRequest;
 use App\Modules\Academic\Http\Requests\UpdateStudentActionRequest;
 use App\Modules\Academic\Http\Requests\UploadActionAttachmentRequest;
-use App\Modules\Academic\Queries\GetStudentActionHistoryQuery;
+use App\Modules\Academic\Support\LifecycleFormOptions;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class StudentActionController extends Controller
 {
     /**
-     * Show the action history for a specific student.
+     * Retired standalone Student Actions page.
+     *
+     * Student Actions are now recorded in place on the Hub's Lifecycle tab
+     * (ADR-0009); this route redirects there so old bookmarks keep working.
      */
-    public function index(Request $request, Student $student, GetStudentActionHistoryQuery $query): Response
+    public function index(Student $student): RedirectResponse
     {
-        $validated = $request->validate([
-            'action_type' => ['nullable', 'string'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-        ]);
-
-        $actionLogs = $query->handle($student->id, $validated);
-
-        return Inertia::render('Admin/Students/Actions/Index', [
-            'student' => $student->load('campus'),
-            'actionLogs' => $actionLogs,
-            'filters' => [
-                'action_type' => $validated['action_type'] ?? null,
-                'per_page' => $validated['per_page'] ?? 10,
-            ],
-            'options' => $this->getFormOptions($student),
-        ]);
+        return redirect()->route('students.academic-summary.lifecycle', $student->id);
     }
 
     /**
@@ -117,85 +99,12 @@ class StudentActionController extends Controller
 
     /**
      * Get form options for creating actions.
+     *
+     * Delegates to the shared {@see LifecycleFormOptions} builder so the Show
+     * page and the Hub Lifecycle tab present an identical option shape.
      */
     protected function getFormOptions(?Student $student = null): array
     {
-        $activeSemester = Semester::getActiveSemester();
-
-        $options = [
-            'actionTypes' => StudentActionType::options(),
-            'semesters' => Semester::query()
-                ->select('id', 'name', 'code', 'start_date', 'end_date')
-                ->orderBy('start_date', 'desc')
-                ->get(),
-            'activeSemesterId' => $activeSemester?->id,
-            'campuses' => Campus::query()
-                ->select('id', 'name', 'code')
-                ->orderBy('name')
-                ->get(),
-            'deferScopeTypes' => [
-                ['value' => 'FULL', 'label' => 'Toàn kỳ (Full Semester)'],
-                ['value' => 'COURSES', 'label' => 'Theo môn (Specific Courses)'],
-            ],
-            'deferFeePolicies' => [
-                ['value' => 'PRESERVE', 'label' => 'Bảo lưu học phí (Preserve Fee)'],
-                ['value' => 'FORFEIT', 'label' => 'Mất học phí (Forfeit Fee)'],
-                ['value' => 'PARTIAL', 'label' => 'Bảo lưu một phần (Partial Preserve)'],
-            ],
-            'egcDeferBlocks' => [
-                ['value' => 1, 'label' => 'Block 1'],
-                ['value' => 2, 'label' => 'Block 2'],
-            ],
-            'studentDecisions' => StudentDecision::query()
-                ->select('id', 'decision_name', 'decision_number', 'issued_at', 'expires_at')
-                ->orderByDesc('issued_at')
-                ->orderByDesc('id')
-                ->get(),
-        ];
-
-        // Add course registrations for the student (for COURSES scope selection)
-        if ($student) {
-            if (! $activeSemester) {
-                $activeSemester = Semester::getActiveSemester();
-            }
-
-            $activeSemesterId = $activeSemester?->id;
-            $options['courseRegistrations'] = $student->courseRegistrations()
-                ->with(['courseOffering.unit', 'courseOffering.semester'])
-                ->whereHas('courseOffering', function ($query) {
-                    $query->whereHas('semester', function ($q) {
-                        $q->where('is_active', true);
-                    });
-                })
-                ->when($activeSemesterId, fn ($query) => $query->where('semester_id', $activeSemesterId))
-                ->get()
-                ->map(fn ($reg) => [
-                    'id' => $reg->id,
-                    'course_code' => $reg->courseOffering?->unit?->code ?? 'N/A',
-                    'course_name' => $reg->courseOffering?->unit?->name ?? 'N/A',
-                    'semester_name' => $reg->courseOffering?->semester?->name ?? 'N/A',
-                    'semester_id' => $reg->courseOffering?->semester_id,
-                    'registration_status' => $reg->registration_status,
-                ]);
-
-            $options['egcCharges'] = FinanceCharge::query()
-                ->where('student_id', $student->id)
-                ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
-                ->where('status', FinanceCharge::STATUS_ACTIVE)
-                ->when($activeSemesterId, fn ($query) => $query->where('semester_id', $activeSemesterId))
-                ->orderBy('effective_at')
-                ->get()
-                ->map(fn (FinanceCharge $charge) => [
-                    'id' => $charge->id,
-                    'semester_id' => $charge->semester_id,
-                    'amount' => $charge->amount,
-                    'description' => $charge->description,
-                    'effective_at' => $charge->effective_at?->toDateString(),
-                    'paid_amount' => $charge->paid_amount,
-                    'is_fully_paid' => $charge->is_fully_paid,
-                ]);
-        }
-
-        return $options;
+        return (new LifecycleFormOptions)->actionOptions($student);
     }
 }

@@ -10,7 +10,7 @@ import { STUDENT_HUB_TABS } from '@/pages/students/AcademicSummary/hub-tabs';
 import type { Student, StudentHubContext } from '@/types/models';
 import { studentRoutes } from '@/utils/routes';
 import { Link, router } from '@inertiajs/vue3';
-import { ArrowLeft, ChevronDown, ClipboardCheck, Download, Edit, GraduationCap, LogIn, RotateCw } from 'lucide-vue-next';
+import { Activity, ArrowLeft, ChevronDown, Download, Edit, GraduationCap, LogIn } from 'lucide-vue-next';
 import { computed } from 'vue';
 import { route } from 'ziggy-js';
 
@@ -59,12 +59,8 @@ const editStudent = () => {
     router.visit(studentRoutes.edit(props.student.id));
 };
 
-const goToStudentPlacementAndProgression = () => {
-    router.visit(studentRoutes.studentPlacement(props.student.id));
-};
-
-const goToStudentActions = () => {
-    router.visit(studentRoutes.studentStatusActionIndex(props.student.id));
+const goToLifecycle = () => {
+    router.visit(route('students.academic-summary.lifecycle', props.student.id));
 };
 
 const getStatusBadgeVariant = (status: string) => {
@@ -136,13 +132,9 @@ const formatStatus = (status: string) => status.replace(/_/g, ' ').toUpperCase()
                                 <Edit class="h-4 w-4" />
                                 Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem v-if="can('change_student_status')" class="flex items-center gap-2" @click="goToStudentPlacementAndProgression">
-                                <RotateCw class="h-4 w-4" />
-                                EGC Placement &amp; Progression
-                            </DropdownMenuItem>
-                            <DropdownMenuItem v-if="can('view_student_action')" class="flex items-center gap-2" @click="goToStudentActions">
-                                <ClipboardCheck class="h-4 w-4" />
-                                View Student Actions
+                            <DropdownMenuItem v-if="can('view_student_action')" class="flex items-center gap-2" @click="goToLifecycle">
+                                <Activity class="h-4 w-4" />
+                                Lifecycle (Actions &amp; EGC)
                             </DropdownMenuItem>
                             <DropdownMenuItem class="flex items-center gap-2" @click="exportSummary">
                                 <Download class="h-4 w-4" />

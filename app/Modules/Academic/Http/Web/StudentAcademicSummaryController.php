@@ -10,13 +10,17 @@ use App\Http\Controllers\Api\StudentWalletController;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Student\GetRegistrationsRequest;
 use App\Models\Student;
+use App\Modules\Academic\Actions\AttachDecisionToTransitionAction;
 use App\Modules\Academic\Exports\StudentAcademicSummaryExport;
 use App\Modules\Academic\Queries\GetStudentAttendanceDetailsQuery;
 use App\Modules\Academic\Queries\GetStudentAttendanceQuery;
 use App\Modules\Academic\Queries\GetStudentFeeSummaryQuery;
+use App\Modules\Academic\Queries\GetStudentLifecycleTimelineQuery;
+use App\Modules\Academic\Support\LifecycleFormOptions;
 use App\Services\ExcelExportService;
 use App\Services\StudentAcademicSummaryService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -46,9 +50,13 @@ class StudentAcademicSummaryController extends Controller
             'scores',
             'attendance',
             'graduation',
+            'lifecycle',
             'gold',
             'export',
         ]);
+
+        // Backfilling an authorizing Decision is an act-capable operation.
+        $this->middleware('can:change_student_status')->only(['attachDecision']);
     }
 
     /**
@@ -224,6 +232,65 @@ class StudentAcademicSummaryController extends Controller
             'student' => $this->hubStudentContext($student),
             'graduation' => $graduationData,
         ]);
+    }
+
+    /**
+     * Display the Lifecycle tab: one chronological timeline merged from Student
+     * Actions and EGC Academic Progression, with authorizing Decisions inline
+     * and EGC level / IELTS detail in a sub-panel (ADR-0009). Status changes and
+     * EGC placement/progression are recorded in place here, so the standalone
+     * actions and placement pages redirect into this tab.
+     *
+     * @return Response Inertia response with the merged timeline and act payloads
+     */
+    public function lifecycle(
+        Student $student,
+        Request $request,
+        GetStudentLifecycleTimelineQuery $query,
+        LifecycleFormOptions $options,
+    ): Response {
+        $lifecycle = $query->handle($student);
+
+        $user = $request->user();
+        $canChangeStatus = $user?->can('change_student_status') ?? false;
+        $canViewActions = $user?->can('view_student_action') ?? false;
+
+        return Inertia::render('students/AcademicSummary/Lifecycle', [
+            'student' => $this->hubStudentContext($student),
+            'timeline' => $lifecycle['timeline'],
+            'egc' => $lifecycle['egc'],
+            'can_act' => $canChangeStatus || $canViewActions,
+            'can_change_status' => $canChangeStatus,
+            'options' => [
+                'action' => $options->actionOptions($student),
+                'placement' => $options->placementOptions(),
+                'decisions' => $options->decisionOptions(),
+            ],
+        ]);
+    }
+
+    /**
+     * Backfill an authorizing Decision onto an existing lifecycle transition
+     * (ADR-0008). The transition was recordable without a Decision; attaching one
+     * later clears its missing-decision flag and adds the student to the
+     * Decision's coverage roster.
+     */
+    public function attachDecision(Student $student, Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'source' => ['required', 'in:action,progression'],
+            'source_id' => ['required', 'integer'],
+            'decision_id' => ['required', 'integer', 'exists:student_decisions,id'],
+        ]);
+
+        AttachDecisionToTransitionAction::run([
+            'student_id' => $student->id,
+            'source' => $validated['source'],
+            'source_id' => (int) $validated['source_id'],
+            'decision_id' => (int) $validated['decision_id'],
+        ]);
+
+        return back()->with('success', 'Decision attached to the transition.');
     }
 
     /**

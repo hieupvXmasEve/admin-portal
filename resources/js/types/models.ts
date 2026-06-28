@@ -535,6 +535,88 @@ export interface StudentHubContext {
     specialization?: { id: number; name: string; code: string } | null;
 }
 
+// ── Lifecycle tab (ADR-0009): unified Student Actions + EGC Progression timeline ──
+
+/** The authorizing Decision rendered inline on a transition. */
+export interface LifecycleDecision {
+    id: number;
+    decision_name: string | null;
+    decision_number: string | null;
+    decision_signer: string | null;
+    issued_at: string | null;
+}
+
+/** Source-specific detail fields carried by a timeline row. */
+export interface LifecycleTimelineDetail {
+    reason?: string | null;
+    notes?: string | null;
+    previous_status?: string | null;
+    new_status?: string | null;
+    from_campus?: { id: number; name: string; code: string } | null;
+    to_campus?: { id: number; name: string; code: string } | null;
+    semester?: { id: number; name: string; code: string } | null;
+    from_course_stage?: string | null;
+    to_course_stage?: string | null;
+    from_english_level?: number | null;
+    to_english_level?: number | null;
+}
+
+/** One row in the merged Lifecycle timeline (a status action or a status-changing progression event). */
+export interface LifecycleTimelineRow {
+    id: string;
+    source: 'action' | 'progression';
+    source_id: number;
+    type: string;
+    label: string;
+    occurred_at: string | null;
+    requires_decision: boolean;
+    missing_decision: boolean;
+    decision: LifecycleDecision | null;
+    actor: { id: number; name: string } | null;
+    detail: LifecycleTimelineDetail;
+}
+
+/** A non-status EGC progression record (English-level change or IELTS event) for the sub-panel. */
+export interface EgcHistoryRow {
+    id: number;
+    event_type: string;
+    label: string;
+    occurred_at: string | null;
+    from_english_level: number | null;
+    to_english_level: number | null;
+    trigger_source: string | null;
+    actor: { id: number; name: string } | null;
+    notes: string | null;
+}
+
+/** An IELTS certificate record for the EGC sub-panel. */
+export interface EgcIeltsRecord {
+    id: number;
+    overall_score: number | string | null;
+    issue_date: string | null;
+    missing_documents: boolean;
+    upload_record_id: number | null;
+    notes: string | null;
+}
+
+/** The EGC secondary detail panel under the timeline. */
+export interface EgcPanel {
+    current_level: number | null;
+    starting_level: number | null;
+    history: EgcHistoryRow[];
+    ielts: EgcIeltsRecord[];
+}
+
+/** A Decision available to authorize / backfill a transition. */
+export interface LifecycleDecisionOption {
+    id: number;
+    decision_name: string | null;
+    decision_number: string | null;
+    decision_signer?: string | null;
+    issued_at: string | null;
+    expires_at?: string | null;
+}
+
 // Course Registration interfaces for Academic Summary
 export interface CourseRegistrationRecord {
     course_offering_id: number;
