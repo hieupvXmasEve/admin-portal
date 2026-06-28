@@ -42,7 +42,6 @@ class StudentAcademicSummaryController extends Controller
             'registrations',
             'scores',
             'attendance',
-            'gpa',
             'graduation',
             'gold',
         ]);
@@ -203,23 +202,6 @@ class StudentAcademicSummaryController extends Controller
         return Inertia::render('students/AcademicSummary/Attendance', [
             'student' => $this->hubStudentContext($student),
             'attendance' => $attendanceData,
-        ]);
-    }
-
-    /**
-     * Display the GPA tab for academic summary
-     *
-     * @param  Student  $student  The student to display GPA for
-     * @return Response Inertia response with GPA data
-     */
-    public function gpa(Student $student): Response
-    {
-
-        $gpaData = $this->academicSummaryService->getGpaData($student);
-
-        return Inertia::render('students/AcademicSummary/Gpa', [
-            'student' => $this->hubStudentContext($student),
-            'gpa' => $gpaData,
         ]);
     }
 

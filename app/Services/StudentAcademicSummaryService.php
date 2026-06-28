@@ -238,9 +238,10 @@ class StudentAcademicSummaryService
 
             );
 
-        // Apply filters
+        // Apply filters. Columns are table-qualified because the academic_records
+        // left join also carries a semester_id, which would otherwise be ambiguous.
         if (! empty($filters['semester_id'])) {
-            $query->where('semester_id', $filters['semester_id']);
+            $query->where('course_registrations.semester_id', $filters['semester_id']);
         }
 
         if (! empty($filters['academic_year'])) {
@@ -271,11 +272,11 @@ class StudentAcademicSummaryService
         }
 
         if (! empty($filters['status'])) {
-            $query->where('registration_status', $filters['status']);
+            $query->where('course_registrations.registration_status', $filters['status']);
         }
 
         if (! empty($filters['is_retake'])) {
-            $query->where('is_retake', $filters['is_retake'] === 'true');
+            $query->where('course_registrations.is_retake', $filters['is_retake'] === 'true');
         }
 
         // Apply sorting
@@ -1005,17 +1006,6 @@ class StudentAcademicSummaryService
     }
 
     /**
-     * Get GPA data
-     *
-     * @param  Student  $student  The student model
-     * @return array GPA data
-     */
-    public function getGpaData(Student $student): array
-    {
-        return $this->getGpaTranscript($student);
-    }
-
-    /**
      * Get graduation data
      *
      * @param  Student  $student  The student model
@@ -1185,90 +1175,6 @@ class StudentAcademicSummaryService
         }
 
         return 'critical';
-    }
-
-    /**
-     * Get GPA and transcript data
-     *
-     * @param  Student  $student  The student model
-     * @return array GPA and transcript data
-     */
-    private function getGpaTranscript(Student $student): array
-    {
-        $gpaCalculations = $student->gpaCalculations()
-            ->with(['semester:id,name,code,start_date,end_date'])
-            ->orderBy('semester_id', 'desc')
-            ->get()
-            ->map(function ($gpa) {
-                return [
-                    'id' => $gpa->id,
-                    'semester' => $gpa->semester->name ?? 'N/A',
-                    'semester_code' => $gpa->semester->code ?? 'N/A',
-                    'academic_year' => 'N/A', // Column missing in table
-                    'semester_gpa' => $gpa->semester_gpa,
-                    'cumulative_gpa' => $gpa->cumulative_gpa,
-                    'credit_points_attempted' => $gpa->semester_credit_points,
-                    'credit_points_earned' => $gpa->semester_credit_points_earned,
-                    'quality_points' => $gpa->semester_quality_points,
-                    'academic_standing' => $gpa->academic_standing,
-                    'dean_list_eligible' => $gpa->dean_list_eligible ?? false,
-                    'honors_eligible' => $gpa->honors_eligible ?? false,
-                    'probation_status' => $gpa->academic_standing === 'probation',
-                    'warning_status' => $gpa->academic_standing === 'warning',
-                    'calculation_date' => $gpa->created_at,
-                ];
-            });
-
-        $currentGpa = $gpaCalculations->first();
-
-        return [
-            'data' => $gpaCalculations,
-            'summary' => [
-                'current_semester_gpa' => $currentGpa['semester_gpa'] ?? 0,
-                'current_cumulative_gpa' => $currentGpa['cumulative_gpa'] ?? 0,
-                'total_credit_points_earned' => $gpaCalculations->sum('credit_points_earned'),
-                'total_quality_points' => $gpaCalculations->sum('quality_points'),
-                'current_academic_standing' => $currentGpa['academic_standing'] ?? 'unknown',
-                'dean_list_semesters' => $gpaCalculations->where('dean_list_eligible', true)->count(),
-                'probation_semesters' => $gpaCalculations->where('probation_status', true)->count(),
-                'warning_semesters' => $gpaCalculations->where('warning_status', true)->count(),
-                'gpa_trend' => $this->calculateGpaTrend($gpaCalculations),
-            ],
-        ];
-    }
-
-    /**
-     * Calculate GPA trend over time
-     *
-     * @param  Collection  $gpaCalculations
-     * @return string Trend indicator
-     */
-    private function calculateGpaTrend($gpaCalculations): string
-    {
-        if ($gpaCalculations->count() < 2) {
-            return 'insufficient_data';
-        }
-
-        $recent = $gpaCalculations->take(3)->pluck('semester_gpa');
-        $older = $gpaCalculations->skip(3)->take(3)->pluck('semester_gpa');
-
-        if ($recent->isEmpty() || $older->isEmpty()) {
-            return 'insufficient_data';
-        }
-
-        $recentAvg = $recent->avg();
-        $olderAvg = $older->avg();
-
-        $difference = $recentAvg - $olderAvg;
-
-        if ($difference > 0.2) {
-            return 'improving';
-        }
-        if ($difference < -0.2) {
-            return 'declining';
-        }
-
-        return 'stable';
     }
 
     /**

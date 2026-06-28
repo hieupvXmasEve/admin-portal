@@ -162,10 +162,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:view_student_summary')
             ->name('students.academic-summary.attendance');
 
-        Route::get('/gpa', [StudentAcademicSummaryController::class, 'gpa'])
-            ->middleware('can:view_student_summary')
-            ->name('students.academic-summary.gpa');
-
         Route::get('/graduation', [StudentAcademicSummaryController::class, 'graduation'])
             ->middleware('can:view_student_summary')
             ->name('students.academic-summary.graduation');

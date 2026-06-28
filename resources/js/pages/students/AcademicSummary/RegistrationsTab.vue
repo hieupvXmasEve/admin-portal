@@ -3,6 +3,7 @@ import { Link } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { BookOpen, CheckCircle, Clock, Eye, X } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import { route } from 'ziggy-js';
 
 // UI Components
 import { Badge } from '@/components/ui/badge';
@@ -33,7 +34,7 @@ const props = defineProps<Props>();
 const loading = ref(false);
 const isDetailsModalOpen = ref(false);
 const selectedRegistration = ref<CourseRegistrationRecord | null>(null);
-console.log('registrations.data', props.registrations.data);
+
 // Filters using useInertiaFilters
 const { filters, hasActiveFilters, clearFilters, handleSelectFilter, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection } = useInertiaFilters<RegistrationsFilters>({
     baseUrl: `/students/${props.studentId}/academic-summary/registrations`,
@@ -300,7 +301,7 @@ onMounted(() => {
             <DataTable :data="registrations.data" :columns="columns" :loading="loading" :initial-sort="currentSort" :initial-direction="currentDirection" enable-server-sorting @sort-change="handleSortChange">
                 <template #cell-course="{ row }">
                     <div>
-                        <Link :href="`/course-offerings/${row.original.course_offering_id}`" class="font-medium text-blue-600 hover:underline">
+                        <Link :href="route('course-offerings.show', row.original.course_offering_id)" class="font-medium text-blue-600 hover:underline">
                             {{ row.original.course_name }}
                         </Link>
                         <p class="text-sm text-gray-500">
@@ -394,7 +395,7 @@ onMounted(() => {
                     <div class="mb-3 flex items-start justify-between">
                         <div class="flex-1">
                             <h3 class="font-medium text-blue-600">
-                                <Link :href="`/course-offerings/${registration.course_offering_id}`" class="hover:underline">
+                                <Link :href="route('course-offerings.show', registration.course_offering_id)" class="hover:underline">
                                     {{ registration.course_name }}
                                 </Link>
                             </h3>

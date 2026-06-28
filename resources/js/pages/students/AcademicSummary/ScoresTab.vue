@@ -148,6 +148,10 @@ const courseGroups = computed<SemesterGroup[]>(() => {
 
 const cumulative = computed(() => props.scores.cumulative ?? null);
 
+// GPA history: every finalized semester snapshot, independent of whether that
+// semester also has per-assessment score detail (the transcript view).
+const gpaHistory = computed<SemesterGpaSnapshot[]>(() => props.scores.semesters ?? []);
+
 // ───────────────────────────── actions ─────────────────────────────
 
 const openScoreDetails = (course: CourseScores): void => {
@@ -222,6 +226,49 @@ const openScoreDetails = (course: CourseScores): void => {
                         <p class="text-muted-foreground text-sm">No GPA has been finalized yet for this student.</p>
                     </div>
                 </div>
+            </section>
+
+            <!-- ────────── GPA history (transcript) ────────── -->
+            <section v-if="gpaHistory.length > 0" aria-labelledby="gpa-history-heading" class="border-border bg-card overflow-hidden rounded-xl border">
+                <header class="border-border bg-muted/30 flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
+                    <div class="flex items-baseline gap-3">
+                        <p class="text-muted-foreground text-[11px] font-medium tracking-[0.18em] uppercase">Transcript</p>
+                        <h2 id="gpa-history-heading" class="text-lg font-semibold tracking-tight">GPA history</h2>
+                    </div>
+                    <span class="text-muted-foreground text-xs">{{ gpaHistory.length }} semester{{ gpaHistory.length === 1 ? '' : 's' }}</span>
+                </header>
+                <Table>
+                    <TableHeader>
+                        <TableRow class="bg-transparent">
+                            <TableHead class="text-muted-foreground text-[11px] tracking-wider uppercase">Semester</TableHead>
+                            <TableHead class="text-muted-foreground w-[130px] text-right text-[11px] tracking-wider uppercase">Semester GPA</TableHead>
+                            <TableHead class="text-muted-foreground w-[150px] text-right text-[11px] tracking-wider uppercase">Credits</TableHead>
+                            <TableHead class="text-muted-foreground w-[130px] text-right text-[11px] tracking-wider uppercase">Standing</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableRow v-for="sem in gpaHistory" :key="sem.semester_id" class="hover:bg-muted/40 transition-colors">
+                            <TableCell>
+                                <p class="font-medium">{{ sem.semester_name }}</p>
+                                <Badge v-if="!sem.is_finalized" variant="outline" class="mt-0.5 text-[10px] tracking-wider uppercase">Pending</Badge>
+                            </TableCell>
+                            <TableCell class="text-right">
+                                <span class="font-mono text-sm font-semibold tabular-nums" :class="gpaToneClass(sem.semester_gpa)">{{ formatNumber(sem.semester_gpa, 3) }}</span>
+                            </TableCell>
+                            <TableCell class="text-right font-mono text-sm tabular-nums">
+                                <span class="text-emerald-700 dark:text-emerald-400">{{ formatNumber(sem.credit_points_earned, 1) }}</span>
+                                <span class="text-muted-foreground"> / </span>
+                                <span>{{ formatNumber(sem.credit_points_attempted, 1) }}</span>
+                            </TableCell>
+                            <TableCell class="text-right">
+                                <Badge v-if="sem.academic_standing" variant="outline" class="border" :class="standingTone(sem.academic_standing).class">
+                                    {{ standingTone(sem.academic_standing).label }}
+                                </Badge>
+                                <span v-else class="text-muted-foreground text-sm">—</span>
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
             </section>
 
             <!-- ────────── Summary chips ────────── -->
