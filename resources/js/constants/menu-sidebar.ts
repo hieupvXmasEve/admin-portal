@@ -228,6 +228,14 @@ export const mainNavGroups: NavGroup[] = [
         label: 'Student Services',
         items: [
             {
+                // Single entry point into the per-student Student Hub (ADR-0007).
+                // Full nav consolidation of the items below is tracked in issue 07.
+                title: 'Students',
+                href: studentRoutes.list(),
+                icon: Users,
+                requiredPermissions: ['view_student'],
+            },
+            {
                 title: 'Student Records',
                 href: '#',
                 icon: User,

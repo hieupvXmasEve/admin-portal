@@ -7,16 +7,19 @@ import { Separator } from '@/components/ui/separator';
 import type { StudentOverview } from '@/types/models';
 import { capitalizeFirst } from '@/utils/string';
 import { useQRCode } from '@vueuse/integrations/useQRCode';
-import { AlertTriangle, Award, BookOpen, Building, Calendar, GraduationCap, Mail, MapPin, Phone, TrendingUp, User, Users } from 'lucide-vue-next';
+import { AlertTriangle, Award, BookOpen, Building, Calendar, GraduationCap, Info, Mail, MapPin, Phone, TrendingUp, User, Users } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface Props {
     overview: StudentOverview;
     loading?: boolean;
+    /** False for view-only roles that receive a reduced read-only field set (ADR-0007). */
+    canAct?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
     loading: false,
+    canAct: true,
 });
 const qrcode = useQRCode(props.overview.student_info.student_id);
 // Status badge styling
@@ -90,6 +93,15 @@ const hasAcademicConcerns = computed(() => {
     const { academic_standing, active_holds } = props.overview.academic_stats;
     return active_holds > 0 || ['warning', 'probation', 'suspension'].includes(academic_standing);
 });
+
+// Additional info folded from the retired Show page.
+const hasAdditionalInfo = computed(() => {
+    const info = props.overview.additional_info;
+    return !!(info && (info.high_school_name || info.high_school_graduation_year || info.entrance_exam_score || info.admission_notes));
+});
+
+// Recent registrations folded from the retired Show page.
+const recentRegistrations = computed(() => props.overview.recent_registrations ?? []);
 </script>
 
 <template>
@@ -106,6 +118,12 @@ const hasAcademicConcerns = computed(() => {
 
         <!-- Content -->
         <div v-else>
+            <!-- Reduced read-only view notice -->
+            <Alert v-if="!canAct" class="mb-6">
+                <Info class="h-4 w-4" />
+                <AlertDescription> You're viewing a limited read-only profile. Full operational details are available to Academic Affairs staff. </AlertDescription>
+            </Alert>
+
             <!-- Student Header -->
             <div class="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
                 <!-- <StudentAvatar :student-id="overview.student_info.id" :current-avatar="overview.student_info.avatar_url" size="xl" /> -->
@@ -514,6 +532,64 @@ const hasAcademicConcerns = computed(() => {
                     </Card>
                 </div>
             </div>
+
+            <!-- Additional Information (folded from the retired Show page) -->
+            <Card v-if="hasAdditionalInfo" class="mt-6">
+                <CardHeader>
+                    <CardTitle class="flex items-center gap-2">
+                        <GraduationCap class="h-5 w-5" />
+                        Additional Information
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div v-if="overview.additional_info?.high_school_name">
+                            <p class="text-muted-foreground text-sm">High School</p>
+                            <p class="font-medium">{{ overview.additional_info.high_school_name }}</p>
+                        </div>
+                        <div v-if="overview.additional_info?.high_school_graduation_year">
+                            <p class="text-muted-foreground text-sm">Graduation Year</p>
+                            <p class="font-medium">{{ overview.additional_info.high_school_graduation_year }}</p>
+                        </div>
+                        <div v-if="overview.additional_info?.entrance_exam_score">
+                            <p class="text-muted-foreground text-sm">Entrance Exam Score</p>
+                            <p class="font-medium">{{ overview.additional_info.entrance_exam_score }}</p>
+                        </div>
+                        <div v-if="overview.additional_info?.admission_notes" class="md:col-span-2">
+                            <p class="text-muted-foreground text-sm">Admission Notes</p>
+                            <p class="font-medium">{{ overview.additional_info.admission_notes }}</p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <!-- Recent Course Registrations (folded from the retired Show page) -->
+            <Card v-if="recentRegistrations.length > 0" class="mt-6">
+                <CardHeader>
+                    <CardTitle class="flex items-center gap-2">
+                        <BookOpen class="h-5 w-5" />
+                        Recent Course Registrations
+                    </CardTitle>
+                </CardHeader>
+                <CardContent class="space-y-3">
+                    <div v-for="registration in recentRegistrations" :key="registration.id" class="flex items-center justify-between gap-4 rounded-lg border p-3">
+                        <div class="min-w-0">
+                            <p class="truncate font-medium">{{ registration.unit_name || 'N/A' }}</p>
+                            <p class="text-muted-foreground text-sm">
+                                <span v-if="registration.unit_code">{{ registration.unit_code }}</span>
+                                <span v-if="registration.credit_points"> • {{ registration.credit_points }} credits</span>
+                                <span v-if="registration.semester"> • {{ registration.semester }}</span>
+                            </p>
+                        </div>
+                        <div class="shrink-0 text-right">
+                            <Badge :variant="registration.registration_status === 'completed' ? 'default' : 'outline'">
+                                {{ formatStatus(registration.registration_status) }}
+                            </Badge>
+                            <p class="text-muted-foreground mt-1 text-xs">{{ formatDate(registration.registration_date) }}</p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     </div>
 </template>

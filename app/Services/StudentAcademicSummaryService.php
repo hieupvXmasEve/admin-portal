@@ -48,6 +48,33 @@ class StudentAcademicSummaryService
                 ->count();
         }
 
+        // Recent course registrations (last 5) — folded in from the retired Show page.
+        $recentRegistrations = $student->courseRegistrations()
+            ->with([
+                'courseOffering.unit:id,name,code,credit_points',
+                'courseOffering.semester:id,name,code',
+            ])
+            ->orderByDesc('registration_date')
+            ->limit(5)
+            ->get()
+            ->map(function ($registration) {
+                $unit = $registration->courseOffering?->unit;
+                $semester = $registration->courseOffering?->semester;
+
+                return [
+                    'id' => $registration->id,
+                    'course_offering_id' => $registration->course_offering_id,
+                    'unit_name' => $unit?->name,
+                    'unit_code' => $unit?->code,
+                    'credit_points' => $unit?->credit_points,
+                    'semester' => $semester?->name,
+                    'registration_status' => $registration->registration_status,
+                    'registration_date' => $registration->registration_date,
+                ];
+            })
+            ->values()
+            ->all();
+
         return [
             'student_info' => [
                 'id' => $student->id,
@@ -171,6 +198,7 @@ class StudentAcademicSummaryService
                 'entrance_exam_score' => $student->entrance_exam_score,
                 'admission_notes' => $student->admission_notes,
             ],
+            'recent_registrations' => $recentRegistrations,
         ];
     }
 
@@ -887,14 +915,57 @@ class StudentAcademicSummaryService
     }
 
     /**
-     * Get student overview data
+     * Get student overview data.
+     *
+     * Academic Affairs (act-capable) staff receive the full overview. Other
+     * roles with only `view_student_summary` receive a reduced read-only field
+     * set (ADR-0007: reduced fields for non-owning roles).
      *
      * @param  Student  $student  The student model
+     * @param  bool  $full  Whether to return the full overview or the reduced read-only set
      * @return array Overview data
      */
-    public function getOverviewData(Student $student): array
+    public function getOverviewData(Student $student, bool $full = true): array
     {
-        return $this->getStudentOverview($student);
+        $overview = $this->getStudentOverview($student);
+
+        return $full ? $overview : $this->reduceOverviewForReadOnly($overview);
+    }
+
+    /**
+     * Reduce the overview to a read-only field set for non act-capable roles.
+     *
+     * Drops personal PII (national id, addresses, emergency contacts, parent
+     * login, etc.) and the folded operational blocks (additional info, recent
+     * registrations); keeps identity, program context, and aggregate stats.
+     *
+     * @param  array<string, mixed>  $overview
+     * @return array<string, mixed>
+     */
+    private function reduceOverviewForReadOnly(array $overview): array
+    {
+        $keepStudentInfo = [
+            'id',
+            'student_id',
+            'full_name',
+            'email',
+            'status',
+            'academic_status',
+            'avatar_url',
+            'admission_date',
+            'expected_graduation_date',
+            'intake_semester',
+        ];
+
+        return [
+            'student_info' => array_intersect_key(
+                $overview['student_info'],
+                array_flip($keepStudentInfo)
+            ),
+            'academic_info' => $overview['academic_info'],
+            'program_info' => $overview['program_info'],
+            'academic_stats' => $overview['academic_stats'],
+        ];
     }
 
     /**

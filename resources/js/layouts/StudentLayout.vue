@@ -1,19 +1,22 @@
 <script setup lang="ts">
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { usePermission } from '@/composables/usePermission';
 import { useStudentImpersonation } from '@/composables/useStudentImpersonation';
-import type { Student } from '@/types/models';
+import { STUDENT_HUB_TABS } from '@/pages/students/AcademicSummary/hub-tabs';
+import type { Student, StudentHubContext } from '@/types/models';
 import { studentRoutes } from '@/utils/routes';
 import { Link, router } from '@inertiajs/vue3';
-import { ArrowLeft, BookOpen, ChevronDown, ClipboardCheck, Download, Edit, LogIn, Receipt, RotateCw, Target, User, Users, Wallet } from 'lucide-vue-next';
+import { ArrowLeft, ChevronDown, ClipboardCheck, Download, Edit, GraduationCap, LogIn, RotateCw } from 'lucide-vue-next';
+import { computed } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
 
 interface Props {
-    student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status' | 'email' | 'intake'>;
+    student: StudentHubContext;
     currentTab?: string;
 }
 
@@ -21,28 +24,49 @@ const props = withDefaults(defineProps<Props>(), {
     currentTab: 'overview',
 });
 
-// Student impersonation composable
 const { loginAsStudent } = useStudentImpersonation();
 const { can } = usePermission();
+
+// Data-driven, permission-aware tabs: later slices add tabs in hub-tabs.ts,
+// never here in the shell (ADR-0007).
+const visibleTabs = computed(() => STUDENT_HUB_TABS.filter((tab) => !tab.permission || can(tab.permission)));
+
+const programLabel = computed(() => {
+    const program = props.student.program?.name;
+    const specialization = props.student.specialization?.name;
+    return [program, specialization].filter(Boolean).join(' • ');
+});
+
+const initials = computed(() =>
+    props.student.full_name
+        .split(' ')
+        .filter(Boolean)
+        .slice(-2)
+        .map((part) => part[0]?.toUpperCase() ?? '')
+        .join(''),
+);
+
 const goBack = () => {
     router.visit(studentRoutes.list());
 };
 
 const exportSummary = () => {
-    // TODO: Implement export functionality
-    console.log('Export academic summary for student:', props.student.id);
+    // Real export lands in issue 04; placeholder until then.
     toast.warning('The feature is coming soon!');
 };
 
-const editStudent = (student: Pick<Student, 'id'>) => {
-    router.visit(studentRoutes.edit(student.id));
+const editStudent = () => {
+    router.visit(studentRoutes.edit(props.student.id));
 };
-const goToStudentPlacementAndProgression = (student: Pick<Student, 'id'>) => {
-    router.visit(studentRoutes.studentPlacement(student.id));
+
+const goToStudentPlacementAndProgression = () => {
+    router.visit(studentRoutes.studentPlacement(props.student.id));
 };
-const goToStudentActions = (student: Pick<Student, 'id'>) => {
-    router.visit(studentRoutes.studentStatusActionIndex(student.id));
+
+const goToStudentActions = () => {
+    router.visit(studentRoutes.studentStatusActionIndex(props.student.id));
 };
+
 const getStatusBadgeVariant = (status: string) => {
     const variants: Record<string, string> = {
         admitted: 'secondary',
@@ -57,88 +81,90 @@ const getStatusBadgeVariant = (status: string) => {
     return variants[status] || 'outline';
 };
 
-const formatStatus = (status: string) => {
-    return status.replace(/_/g, ' ').toUpperCase();
-};
-
-// Navigation tabs
-const tabs = [
-    { key: 'overview', label: 'Overview', icon: User, route: 'students.academic-summary.overview' },
-    { key: 'registrations', label: 'Registrations', icon: BookOpen, route: 'students.academic-summary.registrations' },
-    { key: 'scores', label: 'Scores', icon: Target, route: 'students.academic-summary.scores' },
-    { key: 'attendance', label: 'Attendance', icon: Users, route: 'students.academic-summary.attendance' },
-    // { key: 'gpa', label: 'GPA', icon: BarChart3, route: 'students.academic-summary.gpa' },
-    // { key: 'graduation', label: 'Graduation', icon: GraduationCap, route: 'students.academic-summary.graduation' },
-    { key: 'fees', label: 'Fees', icon: Receipt, route: 'students.academic-summary.fees' },
-    { key: 'gold', label: 'Gold', icon: Wallet, route: 'students.academic-summary.gold' },
-];
+const formatStatus = (status: string) => status.replace(/_/g, ' ').toUpperCase();
 </script>
 
 <template>
     <div class="space-y-6">
-        <!-- Header -->
-        <div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-            <div class="flex items-center gap-4">
-                <Button variant="ghost" size="sm" @click="goBack" class="flex items-center gap-2">
-                    <ArrowLeft class="h-4 w-4" />
-                    Back to list
-                </Button>
-                <div>
-                    <h1 class="text-2xl font-bold">Academic Summary</h1>
-                    <div class="mt-1 flex items-center gap-2">
-                        <span class="text-muted-foreground">{{ student.full_name }} - {{ student.student_id }} - K{{ student.intake }}</span>
-                        <Badge :variant="getStatusBadgeVariant(student.status) as any">
-                            {{ formatStatus(student.status) }}
-                        </Badge>
+        <!-- Persistent context bar (present on every tab) -->
+        <Card class="overflow-hidden">
+            <div class="from-primary/10 via-primary/5 h-1.5 w-full bg-gradient-to-r to-transparent" />
+            <CardContent class="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex items-center gap-4">
+                    <Button variant="ghost" size="icon" class="hidden shrink-0 sm:inline-flex" aria-label="Back to student list" @click="goBack">
+                        <ArrowLeft class="h-4 w-4" />
+                    </Button>
+
+                    <Avatar class="ring-border size-16 shrink-0 ring-2">
+                        <AvatarImage :src="student.avatar_url || '/placeholder.svg'" :alt="student.full_name" />
+                        <AvatarFallback>{{ initials || 'AU' }}</AvatarFallback>
+                    </Avatar>
+
+                    <div class="min-w-0">
+                        <h1 class="truncate text-xl font-bold tracking-tight">{{ student.full_name }}</h1>
+                        <div class="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                            <span class="font-medium">{{ student.student_id }}</span>
+                            <span aria-hidden="true">·</span>
+                            <Badge :variant="getStatusBadgeVariant(student.status) as any">{{ formatStatus(student.status) }}</Badge>
+                            <template v-if="student.intake">
+                                <span aria-hidden="true">·</span>
+                                <span>K{{ student.intake }}</span>
+                            </template>
+                        </div>
+                        <p v-if="programLabel" class="text-muted-foreground mt-1 flex items-center gap-1.5 truncate text-sm">
+                            <GraduationCap class="h-3.5 w-3.5 shrink-0" />
+                            <span class="truncate">{{ programLabel }}</span>
+                        </p>
                     </div>
                 </div>
-            </div>
 
-            <div class="flex items-center gap-2">
-                <DropdownMenu>
-                    <DropdownMenuTrigger as-child>
-                        <Button variant="outline" size="sm" class="flex items-center gap-2">
-                            Actions
-                            <ChevronDown class="h-4 w-4" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuItem @click="() => loginAsStudent(student as Student)" class="flex items-center gap-2">
-                            <LogIn class="h-4 w-4" />
-                            Login as student
-                        </DropdownMenuItem>
-                        <DropdownMenuItem @click="() => editStudent(student)" class="flex items-center gap-2">
-                            <Edit class="h-4 w-4" />
-                            Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem v-if="can('change_student_status')" @click="() => goToStudentPlacementAndProgression(student)" class="flex items-center gap-2">
-                            <RotateCw class="h-4 w-4" />
-                            EGC Placement & Progression
-                        </DropdownMenuItem>
-                        <DropdownMenuItem v-if="can('change_student_status')" @click="() => goToStudentActions(student)" class="flex items-center gap-2">
-                            <ClipboardCheck class="h-4 w-4" />
-                            View Student Actions
-                        </DropdownMenuItem>
-                        <DropdownMenuItem @click="exportSummary" class="flex items-center gap-2">
-                            <Download class="h-4 w-4" />
-                            Export
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
-        </div>
+                <!-- Quick actions -->
+                <div class="flex shrink-0 items-center gap-2">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger as-child>
+                            <Button variant="outline" size="sm" class="flex items-center gap-2">
+                                Actions
+                                <ChevronDown class="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem class="flex items-center gap-2" @click="() => loginAsStudent(student as unknown as Student)">
+                                <LogIn class="h-4 w-4" />
+                                Login as student
+                            </DropdownMenuItem>
+                            <DropdownMenuItem class="flex items-center gap-2" @click="editStudent">
+                                <Edit class="h-4 w-4" />
+                                Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem v-if="can('change_student_status')" class="flex items-center gap-2" @click="goToStudentPlacementAndProgression">
+                                <RotateCw class="h-4 w-4" />
+                                EGC Placement &amp; Progression
+                            </DropdownMenuItem>
+                            <DropdownMenuItem v-if="can('view_student_action')" class="flex items-center gap-2" @click="goToStudentActions">
+                                <ClipboardCheck class="h-4 w-4" />
+                                View Student Actions
+                            </DropdownMenuItem>
+                            <DropdownMenuItem class="flex items-center gap-2" @click="exportSummary">
+                                <Download class="h-4 w-4" />
+                                Export
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </CardContent>
+        </Card>
 
-        <!-- Main Content -->
+        <!-- Tabs + active tab content -->
         <Card>
             <CardHeader class="pb-0">
-                <nav class="grid w-full grid-cols-6 gap-2">
+                <nav class="flex w-full flex-wrap gap-2">
                     <Link
-                        v-for="tab in tabs"
+                        v-for="tab in visibleTabs"
                         :key="tab.key"
                         :href="route(tab.route, student.id)"
                         :class="[
-                            'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                            currentTab === tab.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                            'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors',
+                            currentTab === tab.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                         ]"
                     >
                         <component :is="tab.icon" class="h-4 w-4" />
@@ -153,17 +179,3 @@ const tabs = [
         </Card>
     </div>
 </template>
-
-<style scoped>
-/* Custom styles for better mobile responsiveness */
-@media (max-width: 640px) {
-    .grid-cols-8 {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    .grid-cols-8 > :nth-child(n + 4) {
-        grid-column: span 1;
-        margin-top: 0.5rem;
-    }
-}
-</style>

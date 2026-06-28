@@ -49,12 +49,71 @@ class StudentAcademicSummaryController extends Controller
     }
 
     /**
+     * Build the persistent Hub context-bar payload shared by every tab.
+     *
+     * Keeps the context bar (photo, identity, status, intake, program /
+     * specialization) consistent on all tabs without each method duplicating
+     * the field list.
+     *
+     * @return array<string, mixed>
+     */
+    private function hubStudentContext(Student $student): array
+    {
+        $student->loadMissing([
+            'campus:id,name,code',
+            'program:id,name,code',
+            'specialization:id,name,code',
+        ]);
+
+        return [
+            'id' => $student->id,
+            'student_id' => $student->student_id,
+            'full_name' => $student->full_name,
+            'status' => $student->status,
+            'email' => $student->email,
+            'intake' => $student->intake,
+            'avatar_url' => $student->avatar_url,
+            'campus' => $student->campus ? [
+                'id' => $student->campus->id,
+                'name' => $student->campus->name,
+                'code' => $student->campus->code,
+            ] : null,
+            'program' => $student->program ? [
+                'id' => $student->program->id,
+                'name' => $student->program->name,
+                'code' => $student->program->code,
+            ] : null,
+            'specialization' => $student->specialization ? [
+                'id' => $student->specialization->id,
+                'name' => $student->specialization->name,
+                'code' => $student->specialization->code,
+            ] : null,
+        ];
+    }
+
+    /**
+     * Whether the current viewer is an act-capable academic officer.
+     *
+     * Drives full-vs-reduced Hub data and act-control visibility (ADR-0007).
+     */
+    private function canActOnStudent(Request $request): bool
+    {
+        $user = $request->user();
+
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->can('change_student_status') || $user->can('view_student_action');
+    }
+
+    /**
      * Display the overview tab for academic summary
      *
      * @param  Student  $student  The student to display overview for
      * @return Response Inertia response with overview data
      */
-    public function overview(Student $student): Response
+    public function overview(Student $student, Request $request): Response
     {
 
         // Load necessary relationships
@@ -71,11 +130,16 @@ class StudentAcademicSummaryController extends Controller
             'parentProfiles.user:id,name,email',
         ]);
 
-        $overviewData = $this->academicSummaryService->getOverviewData($student);
+        // Act-capable (Cán Bộ Đào tạo) staff see the full Hub; view-only roles
+        // get a reduced read-only field set (ADR-0007).
+        $canAct = $this->canActOnStudent($request);
+
+        $overviewData = $this->academicSummaryService->getOverviewData($student, $canAct);
 
         return Inertia::render('students/AcademicSummary/Overview', [
-            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email', 'intake']),
+            'student' => $this->hubStudentContext($student),
             'overview' => $overviewData,
+            'can_act' => $canAct,
         ]);
     }
 
@@ -94,7 +158,7 @@ class StudentAcademicSummaryController extends Controller
         $registrationsData = $action->execute($student, $validated);
 
         return Inertia::render('students/AcademicSummary/Registrations', [
-            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email', 'intake']),
+            'student' => $this->hubStudentContext($student),
             'registrations' => $registrationsData,
             'filters' => [
                 'academic_year' => $validated['academic_year'] ?? null,
@@ -121,7 +185,7 @@ class StudentAcademicSummaryController extends Controller
         $scoresData = $this->academicSummaryService->getScoresData($student);
 
         return Inertia::render('students/AcademicSummary/Scores', [
-            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email', 'intake']),
+            'student' => $this->hubStudentContext($student),
             'scores' => $scoresData,
         ]);
     }
@@ -137,7 +201,7 @@ class StudentAcademicSummaryController extends Controller
         $attendanceData = $query->execute($student);
 
         return Inertia::render('students/AcademicSummary/Attendance', [
-            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email', 'intake']),
+            'student' => $this->hubStudentContext($student),
             'attendance' => $attendanceData,
         ]);
     }
@@ -154,7 +218,7 @@ class StudentAcademicSummaryController extends Controller
         $gpaData = $this->academicSummaryService->getGpaData($student);
 
         return Inertia::render('students/AcademicSummary/Gpa', [
-            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email', 'intake']),
+            'student' => $this->hubStudentContext($student),
             'gpa' => $gpaData,
         ]);
     }
@@ -171,7 +235,7 @@ class StudentAcademicSummaryController extends Controller
         $graduationData = $this->academicSummaryService->getGraduationData($student);
 
         return Inertia::render('students/AcademicSummary/Graduation', [
-            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email', 'intake']),
+            'student' => $this->hubStudentContext($student),
             'graduation' => $graduationData,
         ]);
     }
@@ -199,7 +263,7 @@ class StudentAcademicSummaryController extends Controller
         $transactionStatsData = $transactionStats->getData(true);
 
         return Inertia::render('students/AcademicSummary/Gold', [
-            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email', 'intake']),
+            'student' => $this->hubStudentContext($student),
             'gold' => [
                 'summary' => $walletData['data'] ?? $walletData,
                 'recent_transactions' => $recentTransactionsData['data'] ?? $recentTransactionsData,
@@ -219,7 +283,7 @@ class StudentAcademicSummaryController extends Controller
         $feeSummary = $query->execute($student);
 
         return Inertia::render('students/AcademicSummary/Fee', [
-            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'student' => $this->hubStudentContext($student),
             'feeSummary' => $feeSummary,
         ]);
     }

@@ -494,12 +494,45 @@ export interface StudentOverview {
         phone?: string;
         relationship?: string;
     };
-    additional_info: {
+    additional_info?: {
         high_school_name?: string;
-        high_school_graduation_year?: string;
-        entrance_exam_score?: string;
+        high_school_graduation_year?: string | number;
+        entrance_exam_score?: string | number;
         admission_notes?: string;
     };
+    recent_registrations?: StudentRecentRegistration[];
+}
+
+/**
+ * A single recent course registration row shown on the Hub Overview tab
+ * (folded in from the retired Show page).
+ */
+export interface StudentRecentRegistration {
+    id: number;
+    course_offering_id: number | null;
+    unit_name: string | null;
+    unit_code: string | null;
+    credit_points: number | string | null;
+    semester: string | null;
+    registration_status: string;
+    registration_date: string | null;
+}
+
+/**
+ * The persistent Student Hub context-bar payload, passed to StudentLayout on
+ * every tab (photo, identity, status, intake, program / specialization).
+ */
+export interface StudentHubContext {
+    id: number;
+    student_id: string;
+    full_name: string;
+    status: string;
+    email?: string;
+    intake?: number | string | null;
+    avatar_url?: string | null;
+    campus?: { id: number; name: string; code: string } | null;
+    program?: { id: number; name: string; code: string } | null;
+    specialization?: { id: number; name: string; code: string } | null;
 }
 
 // Course Registration interfaces for Academic Summary

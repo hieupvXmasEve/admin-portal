@@ -1,24 +1,25 @@
 <script setup lang="ts">
 import StudentLayout from '@/layouts/StudentLayout.vue';
-import type { Student, StudentOverview } from '@/types/models';
+import type { StudentHubContext, StudentOverview } from '@/types/models';
 import { Head } from '@inertiajs/vue3';
 import OverviewTab from '../AcademicSummary/OverviewTab.vue';
 
 interface Props {
-    student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status' | 'email' | 'intake'>;
+    student: StudentHubContext;
     overview: StudentOverview;
+    can_act?: boolean;
 }
 
-defineProps<Props>();
-
+withDefaults(defineProps<Props>(), {
+    can_act: true,
+});
 </script>
 
 <template>
     <div>
-
-        <Head :title="`Academic Summary - Overview - ${student.full_name}`" />
+        <Head :title="`Student Hub - Overview - ${student.full_name}`" />
         <StudentLayout :student="student" current-tab="overview">
-            <OverviewTab :overview="overview" :loading="false" />
+            <OverviewTab :overview="overview" :can-act="can_act" :loading="false" />
         </StudentLayout>
     </div>
 </template>
