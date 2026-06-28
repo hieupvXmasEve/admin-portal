@@ -53,28 +53,85 @@ class StaffCopilotAnswer
             if (in_array($status, ['completed', 'partial'], true)) {
                 $count = (int) ($payload['result_count'] ?? 0);
 
-                return "Found {$count} entity candidate(s) from {$sourceReport}.";
+                return 'Found **'.$count.'** matching candidate(s) in approved '.self::sourceLabel($sourceReport).' data.';
             }
 
-            return 'This entity lookup could not be answered safely from the allowlisted entity catalog.';
+            return 'This entity lookup could not be answered safely from approved directory data.';
         }
 
         if ($result instanceof EntityProfileResult) {
             return in_array($status, ['completed', 'partial'], true)
-                ? "Profile sections returned from {$sourceReport}."
-                : 'This student profile could not be answered safely from the allowlisted profile section catalog.';
+                ? 'Retrieved approved profile sections from '.self::sourceLabel($sourceReport).'.'
+                : 'This student profile could not be answered safely from approved profile data.';
         }
 
         return in_array($status, ['completed', 'partial'], true)
-            ? "Answer generated from {$sourceReport}."
-            : 'This question could not be answered safely from the allowlisted metric catalog.';
+            ? self::metricAnswerContent($payload, $sourceReport)
+            : 'This question could not be answered safely from approved metric data.';
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private static function metricAnswerContent(array $payload, string $sourceReport): string
+    {
+        $lines = [
+            'Answer prepared from approved '.self::sourceLabel($sourceReport).' data.',
+        ];
+
+        $summary = is_array($payload['summary'] ?? null) ? $payload['summary'] : [];
+
+        foreach (array_slice($summary, 0, 6, true) as $key => $value) {
+            if (! is_scalar($value) && $value !== null) {
+                continue;
+            }
+
+            $lines[] = '- '.self::label((string) $key).': **'.self::stringValue($value).'**';
+        }
+
+        $groups = is_array($payload['groups'] ?? null) ? $payload['groups'] : [];
+
+        if ($groups !== []) {
+            $lines[] = '- Grouped results: **'.count($groups).'** group(s)';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    private static function label(string $value): string
+    {
+        return str($value)
+            ->replace('_', ' ')
+            ->headline()
+            ->toString();
+    }
+
+    private static function sourceLabel(string $sourceReport): string
+    {
+        return str($sourceReport)
+            ->replace(['.', '-'], ' ')
+            ->headline()
+            ->toString();
+    }
+
+    private static function stringValue(mixed $value): string
+    {
+        if (is_float($value)) {
+            return (string) round($value, 2);
+        }
+
+        if ($value === null || $value === '') {
+            return '-';
+        }
+
+        return (string) $value;
     }
 
     public static function unsupported(): self
     {
         return new self(
             status: 'failed',
-            content: 'This question is outside the staff copilot MVP metric catalog.',
+            content: 'I cannot answer that in Staff Copilot yet. It only supports query-only questions over approved Swinx data.',
             payload: [
                 'status' => 'failed',
                 'safe_error_code' => 'unsupported_staff_question',

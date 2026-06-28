@@ -182,7 +182,8 @@ it('streams normalized run events and completes the queued run through allowlist
 
     expect($run->status)->toBe(AiChatRun::STATUS_COMPLETED)
         ->and($run->last_event_id)->not->toBeNull()
-        ->and($assistantMessage->redacted_content)->toBe('Answer generated from finance.reporting.collection-progress.')
+        ->and($assistantMessage->redacted_content)->toContain('Answer prepared from approved Finance Reporting Collection Progress data.')
+        ->and($assistantMessage->redacted_content)->toContain('- Outstanding Total: **300**')
         ->and($assistantMessage->final_answer_id)->not->toBeNull()
         ->and($toolCall->tool_name)->toBe('query_metrics')
         ->and($toolCall->status)->toBe('completed')
@@ -398,7 +399,7 @@ it('cancels a queued run without executing provider or tool work', function () {
 
     expect($run->status)->toBe(AiChatRun::STATUS_CANCELLED)
         ->and($run->cancellation_requested_at)->not->toBeNull()
-        ->and($assistantMessage->redacted_content)->toBe('This run was cancelled before completion.')
+        ->and($assistantMessage->redacted_content)->toBe('This run was cancelled before a complete answer was produced.')
         ->and($response->streamedContent())->toContain('event: run.cancelled')
         ->and(AiToolCall::query()->count())->toBe(0);
 });

@@ -27,6 +27,14 @@ interface SuggestedPrompt {
 
 interface AnswerPayload {
     status: string;
+    content_markdown: string;
+    terminal_state: {
+        kind: 'completed' | 'partial' | 'unsupported' | 'cancelled' | 'denied' | 'failed';
+        title: string;
+        message: string;
+        safe_error_code: string | null;
+        is_retryable: boolean;
+    };
     summary: Record<string, unknown> | null;
     groups: Array<{
         key: string;
@@ -67,7 +75,11 @@ interface AnswerPayload {
     profile_catalog_version: string | null;
     profile_entity_type: string | null;
     result_limit: number | null;
+    campus_scope_snapshot: Record<string, unknown>;
+    freshness: Record<string, unknown>;
     warnings: string[];
+    hidden_sections: string[];
+    hidden_section_notice: string | null;
     confidence: {
         level: string;
         basis: string;
@@ -132,6 +144,8 @@ const props = defineProps<{
 }>();
 
 type RuntimePayload = Record<string, unknown>;
+type MarkdownInline = { text: string; strong: boolean };
+type MarkdownBlock = { type: 'heading'; text: string } | { type: 'paragraph'; text: string } | { type: 'unordered-list'; items: string[] } | { type: 'ordered-list'; items: string[] } | { type: 'table'; rows: string[][] };
 
 const form = useForm({
     conversation_id: props.conversation?.id ?? null,
@@ -522,6 +536,135 @@ const formatValue = (value: unknown): string => {
     return String(value);
 };
 
+const sourceDisplayLabel = (sourceReport: string): string => formatLabel(sourceReport.replace(/[.-]/g, '_'));
+
+const freshnessLabel = (freshness: Record<string, unknown>): string | null => {
+    const rule = typeof freshness.rule === 'string' ? freshness.rule : null;
+
+    if (rule === 'computed_at_request_time') {
+        return 'Fresh at request time';
+    }
+
+    return rule ? formatLabel(rule) : null;
+};
+
+const parseInlineMarkdown = (text: string): MarkdownInline[] => {
+    const segments: MarkdownInline[] = [];
+    const pattern = /\*\*([^*]+)\*\*/g;
+    let cursor = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = pattern.exec(text)) !== null) {
+        if (match.index > cursor) {
+            segments.push({ text: text.slice(cursor, match.index), strong: false });
+        }
+
+        segments.push({ text: match[1], strong: true });
+        cursor = match.index + match[0].length;
+    }
+
+    if (cursor < text.length) {
+        segments.push({ text: text.slice(cursor), strong: false });
+    }
+
+    return segments.length > 0 ? segments : [{ text, strong: false }];
+};
+
+const isTableSeparator = (line: string): boolean => /^[\s|:-]+$/.test(line) && line.includes('-');
+
+const parseTableRow = (line: string): string[] =>
+    line
+        .split('|')
+        .map((cell) => cell.trim())
+        .filter((cell, index, cells) => cell !== '' || (index > 0 && index < cells.length - 1));
+
+const isMarkdownBlockStart = (line: string): boolean => /^(#{1,3})\s+/.test(line) || /^[-*]\s+/.test(line) || /^\d+\.\s+/.test(line) || line.includes('|');
+
+const safeMarkdownBlocks = (content: string): MarkdownBlock[] => {
+    const lines = content.split('\n');
+    const blocks: MarkdownBlock[] = [];
+    let index = 0;
+
+    while (index < lines.length) {
+        const line = lines[index].trim();
+
+        if (line === '') {
+            index += 1;
+            continue;
+        }
+
+        const heading = /^(#{1,3})\s+(.*)$/.exec(line);
+
+        if (heading) {
+            blocks.push({ type: 'heading', text: heading[2].trim() });
+            index += 1;
+            continue;
+        }
+
+        if (/^[-*]\s+/.test(line)) {
+            const items: string[] = [];
+
+            while (index < lines.length && /^[-*]\s+/.test(lines[index].trim())) {
+                items.push(lines[index].trim().replace(/^[-*]\s+/, ''));
+                index += 1;
+            }
+
+            blocks.push({ type: 'unordered-list', items });
+            continue;
+        }
+
+        if (/^\d+\.\s+/.test(line)) {
+            const items: string[] = [];
+
+            while (index < lines.length && /^\d+\.\s+/.test(lines[index].trim())) {
+                items.push(lines[index].trim().replace(/^\d+\.\s+/, ''));
+                index += 1;
+            }
+
+            blocks.push({ type: 'ordered-list', items });
+            continue;
+        }
+
+        if (line.includes('|')) {
+            const rows: string[][] = [];
+
+            while (index < lines.length && lines[index].trim().includes('|')) {
+                const row = lines[index].trim();
+
+                if (!isTableSeparator(row)) {
+                    rows.push(parseTableRow(row));
+                }
+
+                index += 1;
+            }
+
+            if (rows.length > 0) {
+                blocks.push({ type: 'table', rows });
+            }
+
+            continue;
+        }
+
+        const paragraphLines = [line];
+        index += 1;
+
+        while (index < lines.length) {
+            const nextLine = lines[index].trim();
+
+            if (nextLine === '' || isMarkdownBlockStart(nextLine)) {
+                break;
+            }
+
+            paragraphLines.push(nextLine);
+            index += 1;
+        }
+
+        blocks.push({ type: 'paragraph', text: paragraphLines.join(' ') });
+    }
+
+    return blocks;
+};
+
 const formatProfileValue = (value: unknown): string => {
     if (Array.isArray(value)) {
         return `${value.length} item${value.length === 1 ? '' : 's'}`;
@@ -582,13 +725,13 @@ defineOptions({
             <div class="space-y-1">
                 <p class="text-muted-foreground text-xs font-semibold tracking-widest uppercase">AI Operations</p>
                 <h1 class="text-2xl font-semibold tracking-tight">Staff Copilot</h1>
-                <p class="text-muted-foreground max-w-3xl text-sm">Metric answers from allowlisted Academic and Finance reports.</p>
+                <p class="text-muted-foreground max-w-3xl text-sm">Safe answers from approved Academic and Finance data.</p>
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
                 <Badge variant="outline">
                     <Database class="h-3.5 w-3.5" />
-                    {{ capabilities.catalog_version }}
+                    Approved data
                 </Badge>
                 <Badge :variant="capabilities.sdk_installed ? 'success' : 'warning'">
                     <Sparkles class="h-3.5 w-3.5" />
@@ -596,11 +739,11 @@ defineOptions({
                 </Badge>
                 <Badge :variant="capabilities.live_provider_enabled ? 'success' : 'outline'">
                     <ShieldCheck class="h-3.5 w-3.5" />
-                    {{ capabilities.runtime_mode === 'live_provider' ? 'Live provider' : 'Deterministic' }}
+                    {{ capabilities.live_provider_enabled ? 'Connected' : 'Fallback' }}
                 </Badge>
                 <Badge :variant="isStreaming ? 'warning' : 'outline'">
                     <Wifi class="h-3.5 w-3.5" />
-                    {{ activeRunProgressLabel ?? displayStatusLabel(activeRunStatus) ?? capabilities.stream_transport }}
+                    {{ activeRunProgressLabel ?? displayStatusLabel(activeRunStatus) ?? (capabilities.streaming_enabled ? 'Live' : 'Paused') }}
                 </Badge>
             </div>
         </div>
@@ -611,7 +754,7 @@ defineOptions({
                     <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                         <div>
                             <CardTitle>{{ conversation?.title ?? 'New staff chat' }}</CardTitle>
-                            <CardDescription>{{ latestAssistantMessage?.answer?.source_references?.[0]?.source_report ?? capabilities.tool_names.join(', ') }}</CardDescription>
+                            <CardDescription>{{ latestAssistantMessage?.answer?.terminal_state.title ?? 'Conversation history and current run state' }}</CardDescription>
                         </div>
                         <Badge v-if="latestAssistantMessage?.answer" :variant="statusVariant(latestAssistantMessage.answer.status)">
                             {{ displayStatusLabel(latestAssistantMessage.answer.status) ?? latestAssistantMessage.answer.status }}
@@ -640,7 +783,7 @@ defineOptions({
                             <div class="max-w-[88%] space-y-3 rounded-md border p-4" :class="message.role === 'user' ? 'border-primary/30 bg-primary/5' : 'bg-background'">
                                 <div class="flex items-start gap-2">
                                     <UserRound v-if="message.role === 'user'" class="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
-                                    <p class="text-sm leading-6 whitespace-pre-wrap">{{ message.content }}</p>
+                                    <p v-if="message.role === 'user' || !message.answer" class="text-sm leading-6 whitespace-pre-wrap">{{ message.content }}</p>
                                 </div>
 
                                 <div v-if="message.role === 'assistant' && message.run_status && !message.answer" class="flex flex-wrap items-center gap-2 border-t pt-3">
@@ -653,13 +796,76 @@ defineOptions({
 
                                 <div v-if="message.answer" class="space-y-3 border-t pt-3">
                                     <div class="flex flex-wrap items-center gap-2">
-                                        <Badge :variant="statusVariant(message.answer.status)">{{ displayStatusLabel(message.answer.status) ?? message.answer.status }}</Badge>
+                                        <Badge :variant="statusVariant(message.answer.status)">{{ message.answer.terminal_state.title }}</Badge>
                                         <Badge variant="outline">{{ message.answer.confidence.level }}</Badge>
-                                        <Badge v-if="message.answer.safe_error_code" variant="destructive">{{ message.answer.safe_error_code }}</Badge>
-                                        <Button v-if="message.run_id && message.answer.status === 'failed'" type="button" size="sm" variant="outline" @click="retryRun(message.run_id)">
+                                        <Badge v-if="freshnessLabel(message.answer.freshness)" variant="outline">{{ freshnessLabel(message.answer.freshness) }}</Badge>
+                                        <Button v-if="message.run_id && message.answer.terminal_state.is_retryable" type="button" size="sm" variant="outline" @click="retryRun(message.run_id)">
                                             <RefreshCw class="h-3.5 w-3.5" />
                                             Retry
                                         </Button>
+                                    </div>
+
+                                    <div class="bg-muted/25 space-y-3 rounded-md border p-3">
+                                        <template v-for="(block, blockIndex) in safeMarkdownBlocks(message.answer.content_markdown)" :key="`${message.id}-md-${blockIndex}`">
+                                            <h3 v-if="block.type === 'heading'" class="text-base font-semibold">
+                                                <template v-for="(segment, segmentIndex) in parseInlineMarkdown(block.text)" :key="segmentIndex">
+                                                    <strong v-if="segment.strong">{{ segment.text }}</strong>
+                                                    <span v-else>{{ segment.text }}</span>
+                                                </template>
+                                            </h3>
+
+                                            <p v-else-if="block.type === 'paragraph'" class="text-sm leading-6">
+                                                <template v-for="(segment, segmentIndex) in parseInlineMarkdown(block.text)" :key="segmentIndex">
+                                                    <strong v-if="segment.strong">{{ segment.text }}</strong>
+                                                    <span v-else>{{ segment.text }}</span>
+                                                </template>
+                                            </p>
+
+                                            <ul v-else-if="block.type === 'unordered-list'" class="ml-5 list-disc space-y-1 text-sm leading-6">
+                                                <li v-for="(item, itemIndex) in block.items" :key="itemIndex">
+                                                    <template v-for="(segment, segmentIndex) in parseInlineMarkdown(item)" :key="segmentIndex">
+                                                        <strong v-if="segment.strong">{{ segment.text }}</strong>
+                                                        <span v-else>{{ segment.text }}</span>
+                                                    </template>
+                                                </li>
+                                            </ul>
+
+                                            <ol v-else-if="block.type === 'ordered-list'" class="ml-5 list-decimal space-y-1 text-sm leading-6">
+                                                <li v-for="(item, itemIndex) in block.items" :key="itemIndex">
+                                                    <template v-for="(segment, segmentIndex) in parseInlineMarkdown(item)" :key="segmentIndex">
+                                                        <strong v-if="segment.strong">{{ segment.text }}</strong>
+                                                        <span v-else>{{ segment.text }}</span>
+                                                    </template>
+                                                </li>
+                                            </ol>
+
+                                            <div v-else class="overflow-x-auto">
+                                                <table class="w-full min-w-[360px] border-collapse text-sm">
+                                                    <tbody>
+                                                        <tr v-for="(row, rowIndex) in block.rows" :key="rowIndex" class="border-b last:border-b-0">
+                                                            <td v-for="(cell, cellIndex) in row" :key="cellIndex" class="px-2 py-1.5 align-top" :class="rowIndex === 0 ? 'font-medium' : ''">
+                                                                <template v-for="(segment, segmentIndex) in parseInlineMarkdown(cell)" :key="segmentIndex">
+                                                                    <strong v-if="segment.strong">{{ segment.text }}</strong>
+                                                                    <span v-else>{{ segment.text }}</span>
+                                                                </template>
+                                                            </td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </template>
+                                    </div>
+
+                                    <div v-if="message.answer.hidden_section_notice" class="bg-muted/30 flex gap-2 rounded-md border p-3 text-sm">
+                                        <AlertTriangle class="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+                                        <p>{{ message.answer.hidden_section_notice }}</p>
+                                    </div>
+
+                                    <div v-if="message.answer.warnings.length > 0" class="bg-muted/30 space-y-1 rounded-md border p-3 text-sm">
+                                        <p class="font-medium">Notes</p>
+                                        <ul class="ml-4 list-disc">
+                                            <li v-for="warning in message.answer.warnings" :key="warning">{{ formatLabel(warning) }}</li>
+                                        </ul>
                                     </div>
 
                                     <div v-if="message.answer.summary" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -670,12 +876,12 @@ defineOptions({
                                     </div>
 
                                     <div v-if="message.answer.groups.length > 0" class="space-y-2">
-                                        <p class="text-muted-foreground text-xs font-semibold tracking-widest uppercase">Groups</p>
+                                        <p class="text-muted-foreground text-xs font-semibold tracking-widest uppercase">Breakdown</p>
                                         <div class="grid gap-2 lg:grid-cols-2">
                                             <div v-for="group in message.answer.groups" :key="`${group.key}-${group.value}`" class="rounded-md border p-3">
                                                 <div class="mb-2 flex items-center justify-between gap-2">
                                                     <p class="text-sm font-medium">{{ group.label }}</p>
-                                                    <Badge variant="outline">{{ group.key }}</Badge>
+                                                    <Badge variant="outline">{{ formatLabel(group.key) }}</Badge>
                                                 </div>
                                                 <div class="grid gap-1 text-xs">
                                                     <div v-for="[metric, value] in metricsEntries(group.metrics)" :key="metric" class="flex items-center justify-between gap-3">
@@ -696,7 +902,7 @@ defineOptions({
                                                         <p class="truncate text-sm font-medium">{{ candidate.label }}</p>
                                                         <p class="text-muted-foreground text-xs">{{ candidate.match_reason }}</p>
                                                     </div>
-                                                    <Badge variant="outline">{{ candidate.entity_type }}</Badge>
+                                                    <Badge variant="outline">{{ formatLabel(candidate.entity_type) }}</Badge>
                                                 </div>
                                                 <div class="grid gap-1 text-xs">
                                                     <div v-for="[key, value] in safeIdentifierEntries(candidate.safe_identifiers)" :key="key" class="flex items-center justify-between gap-3">
@@ -714,7 +920,7 @@ defineOptions({
                                             <div v-for="[section, value] in profileSectionEntries(message.answer.profile_sections)" :key="section" class="rounded-md border p-3">
                                                 <div class="mb-2 flex items-center justify-between gap-2">
                                                     <p class="text-sm font-medium">{{ formatLabel(section) }}</p>
-                                                    <Badge variant="outline">{{ message.answer.profile_entity_type ?? 'student' }}</Badge>
+                                                    <Badge variant="outline">{{ formatLabel(message.answer.profile_entity_type ?? 'student') }}</Badge>
                                                 </div>
                                                 <div class="grid gap-1 text-xs">
                                                     <div v-for="[key, entryValue] in profileValueEntries(value)" :key="key" class="flex items-center justify-between gap-3">
@@ -727,15 +933,15 @@ defineOptions({
                                     </div>
 
                                     <div v-if="message.answer.source_references.length > 0" class="space-y-2">
-                                        <p class="text-muted-foreground text-xs font-semibold tracking-widest uppercase">Sources</p>
+                                        <p class="text-muted-foreground text-xs font-semibold tracking-widest uppercase">Evidence</p>
                                         <div
                                             v-for="source in message.answer.source_references"
                                             :key="`${source.source_report}-${source.metric ?? source.section ?? source.entity_type ?? 'source'}`"
                                             class="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-xs"
                                         >
                                             <FileText class="text-muted-foreground h-3.5 w-3.5" />
-                                            <span class="font-medium">{{ source.source_report }}</span>
-                                            <span class="text-muted-foreground">{{ source.source_reference_policy }}</span>
+                                            <span class="font-medium">{{ sourceDisplayLabel(source.source_report) }}</span>
+                                            <span class="text-muted-foreground">summary evidence</span>
                                         </div>
                                     </div>
                                 </div>
@@ -779,14 +985,14 @@ defineOptions({
                 <Card>
                     <CardHeader>
                         <CardTitle>Prompts</CardTitle>
-                        <CardDescription>{{ suggested_prompts.length }} catalog cases</CardDescription>
+                        <CardDescription>{{ suggested_prompts.length }} examples</CardDescription>
                     </CardHeader>
                     <CardContent class="space-y-3">
                         <button v-for="prompt in suggested_prompts" :key="prompt.key" type="button" class="hover:border-primary/50 hover:bg-muted/50 w-full rounded-md border p-3 text-left transition" @click="usePrompt(prompt)">
                             <span class="block text-sm font-medium">{{ prompt.question }}</span>
                             <span class="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-xs">
-                                <span>{{ prompt.metric }}</span>
-                                <span v-if="prompt.group_by.length">by {{ prompt.group_by.join(', ') }}</span>
+                                <span>{{ sourceDisplayLabel(prompt.source_report) }}</span>
+                                <span v-if="prompt.group_by.length">by {{ prompt.group_by.map(formatLabel).join(', ') }}</span>
                             </span>
                         </button>
                     </CardContent>
@@ -794,21 +1000,21 @@ defineOptions({
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Capability</CardTitle>
-                        <CardDescription>{{ capabilities.tool_schema_version }}</CardDescription>
+                        <CardTitle>Run Setup</CardTitle>
+                        <CardDescription>Query-only staff answers</CardDescription>
                     </CardHeader>
                     <CardContent class="space-y-3 text-sm">
                         <div class="flex items-center justify-between gap-3">
-                            <span class="text-muted-foreground">Tool</span>
-                            <Badge variant="outline">{{ capabilities.tool_names.join(', ') }}</Badge>
+                            <span class="text-muted-foreground">Data</span>
+                            <Badge variant="outline">Academic and Finance</Badge>
                         </div>
                         <div class="flex items-center justify-between gap-3">
                             <span class="text-muted-foreground">Provider</span>
-                            <Badge :variant="capabilities.live_provider_enabled ? 'success' : 'outline'">{{ capabilities.runtime_mode }}</Badge>
+                            <Badge :variant="capabilities.live_provider_enabled ? 'success' : 'outline'">{{ capabilities.live_provider_enabled ? 'Connected' : 'Fallback' }}</Badge>
                         </div>
                         <div class="flex items-center justify-between gap-3">
-                            <span class="text-muted-foreground">Stream</span>
-                            <Badge :variant="capabilities.streaming_enabled ? 'success' : 'outline'">{{ capabilities.stream_transport }}</Badge>
+                            <span class="text-muted-foreground">Updates</span>
+                            <Badge :variant="capabilities.streaming_enabled ? 'success' : 'outline'">{{ capabilities.streaming_enabled ? 'Live' : 'Paused' }}</Badge>
                         </div>
                         <div class="flex items-center justify-between gap-3">
                             <span class="text-muted-foreground">Evidence</span>

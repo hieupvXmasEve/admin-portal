@@ -14,6 +14,7 @@ use App\Modules\AI\Models\AiProviderSetting;
 use App\Modules\AI\Models\AiToolCall;
 use App\Modules\AI\Support\EntityCatalog;
 use App\Modules\AI\Support\MetricCatalog;
+use App\Modules\AI\Support\StaffCopilotAnswerPresenter;
 use App\Modules\AI\Support\StaffMetricQuestionDataset;
 use App\Modules\AI\Support\StudentProfileSectionCatalog;
 use App\Modules\AI\Support\Tools\ToolRegistry;
@@ -27,6 +28,7 @@ class StaffCopilotPageQuery
         private readonly StudentProfileSectionCatalog $studentProfileSectionCatalog,
         private readonly StaffMetricQuestionDataset $dataset,
         private readonly ToolRegistry $toolRegistry,
+        private readonly StaffCopilotAnswerPresenter $answerPresenter,
     ) {}
 
     /**
@@ -138,7 +140,7 @@ class StaffCopilotPageQuery
                     'run_id' => $run?->id,
                     'run_status' => $run?->status,
                     'answer' => $message->role === 'assistant'
-                        ? $this->answerPayload($traces->get((string) $message->final_answer_id))
+                        ? $this->answerPayload($traces->get((string) $message->final_answer_id), $message, $run)
                         : null,
                 ];
             })
@@ -215,7 +217,7 @@ class StaffCopilotPageQuery
     /**
      * @return array<string, mixed>|null
      */
-    private function answerPayload(?AiAgentTrace $trace): ?array
+    private function answerPayload(?AiAgentTrace $trace, AiMessage $message, ?AiChatRun $run): ?array
     {
         if (! $trace) {
             return null;
@@ -223,10 +225,17 @@ class StaffCopilotPageQuery
 
         /** @var AiToolCall|null $toolCall */
         $toolCall = $trace->toolCalls->sortByDesc('id')->first();
+        $status = $this->answerStatus($trace, $run);
+        $safeErrorCode = $trace->safe_error_code ?? $run?->safe_error_code;
+        $messageHiddenSections = $this->stringList($message->hidden_sections ?? []);
 
         if (! $toolCall) {
+            $hiddenSections = $messageHiddenSections;
+
             return [
-                'status' => $trace->status,
+                'status' => $status,
+                'content_markdown' => $this->answerPresenter->safeMarkdown($message->redacted_content),
+                'terminal_state' => $this->answerPresenter->terminalState($status, $safeErrorCode),
                 'summary' => null,
                 'groups' => [],
                 'source_references' => [],
@@ -244,17 +253,25 @@ class StaffCopilotPageQuery
                 'campus_scope_snapshot' => [],
                 'freshness' => [],
                 'warnings' => [],
-                'hidden_sections' => [],
+                'hidden_sections' => $hiddenSections,
+                'hidden_section_notice' => $this->answerPresenter->hiddenSectionNotice($hiddenSections),
                 'confidence' => ['level' => 'none', 'basis' => 'not_executed'],
-                'safe_error_code' => $trace->safe_error_code,
+                'safe_error_code' => $safeErrorCode,
                 'record_count' => 0,
             ];
         }
 
         $resultSummary = $toolCall->redacted_result_summary ?? [];
+        $safeErrorCode = $toolCall->safe_error_code ?? $safeErrorCode;
+        $hiddenSections = array_values(array_unique([
+            ...$this->stringList($toolCall->hidden_sections ?? []),
+            ...$messageHiddenSections,
+        ]));
 
         return [
-            'status' => $toolCall->status,
+            'status' => $status,
+            'content_markdown' => $this->answerPresenter->safeMarkdown($message->redacted_content),
+            'terminal_state' => $this->answerPresenter->terminalState($status, $safeErrorCode),
             'summary' => $resultSummary['summary'] ?? null,
             'groups' => $resultSummary['groups'] ?? [],
             'source_references' => $toolCall->source_references ?? [],
@@ -272,11 +289,36 @@ class StaffCopilotPageQuery
             'campus_scope_snapshot' => $toolCall->campus_scope_snapshot ?? [],
             'freshness' => $resultSummary['freshness'] ?? [],
             'warnings' => $resultSummary['warnings'] ?? [],
-            'hidden_sections' => $toolCall->hidden_sections ?? [],
+            'hidden_sections' => $hiddenSections,
+            'hidden_section_notice' => $this->answerPresenter->hiddenSectionNotice($hiddenSections),
             'confidence' => $resultSummary['confidence'] ?? ['level' => 'none', 'basis' => 'not_executed'],
-            'safe_error_code' => $toolCall->safe_error_code,
+            'safe_error_code' => $safeErrorCode,
             'record_count' => $toolCall->record_count,
         ];
+    }
+
+    private function answerStatus(AiAgentTrace $trace, ?AiChatRun $run): string
+    {
+        if (in_array($run?->status, [AiChatRun::STATUS_FAILED, AiChatRun::STATUS_CANCELLED], true)) {
+            return (string) $run->status;
+        }
+
+        return $trace->status;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function stringList(mixed $values): array
+    {
+        if (! is_array($values)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            fn (mixed $value): string => is_scalar($value) ? (string) $value : '',
+            $values,
+        )));
     }
 
     /**

@@ -24,6 +24,7 @@ class StaffCopilotSseRuntime
         private readonly AiRedactor $redactor,
         private readonly MetricCatalog $catalog,
         private readonly StaffCopilotAgentRunner $runner,
+        private readonly StaffCopilotAnswerPresenter $answerPresenter,
     ) {}
 
     public function queue(User $actor, ?Campus $campus, string $question, ?int $conversationId = null): AiChatRun
@@ -100,11 +101,14 @@ class StaffCopilotSseRuntime
             ])->save();
 
             $assistantMessage = $run->assistantMessage()->first();
+            $finalAnswerId = $this->terminalFinalAnswerId($run);
+            $content = $this->answerPresenter->terminalState(AiChatRun::STATUS_CANCELLED, 'run_cancelled')['message'];
 
             if ($assistantMessage instanceof AiMessage) {
                 $assistantMessage->forceFill([
-                    'redacted_content' => 'This run was cancelled before completion.',
-                    'content_hash' => hash('sha256', 'This run was cancelled before completion.'),
+                    'redacted_content' => $content,
+                    'content_hash' => hash('sha256', $content),
+                    'final_answer_id' => $finalAnswerId,
                     'hidden_sections' => ['run_cancelled'],
                 ])->save();
             }
@@ -115,6 +119,7 @@ class StaffCopilotSseRuntime
                 $trace->forceFill([
                     'status' => AiChatRun::STATUS_CANCELLED,
                     'safe_error_code' => 'run_cancelled',
+                    'final_answer_id' => $finalAnswerId,
                 ])->save();
             }
 
@@ -270,10 +275,13 @@ class StaffCopilotSseRuntime
 
             $durationMs = max(0, (int) round((microtime(true) - $started) * 1000));
             $safeErrorCode = $answer->safeErrorCode() ?? $run->trace->safe_error_code;
+            $safeContent = $answer->isSuccessful()
+                ? $this->answerPresenter->safeMarkdown($answer->content())
+                : $this->answerPresenter->terminalState($answer->status(), $safeErrorCode)['message'];
 
             $run->assistantMessage->forceFill([
-                'redacted_content' => $this->redactor->redactText($answer->content()),
-                'content_hash' => hash('sha256', $answer->content()),
+                'redacted_content' => $this->redactor->redactText($safeContent),
+                'content_hash' => hash('sha256', $safeContent),
                 'final_answer_id' => $finalAnswerId,
                 'hidden_sections' => $this->redactor->redact($answer->hiddenSections()),
             ])->save();
@@ -305,7 +313,7 @@ class StaffCopilotSseRuntime
 
             $this->recordEvent($run, 'message.delta', [
                 'message_id' => $run->assistant_message_id,
-                'delta' => $answer->content(),
+                'delta' => $safeContent,
             ], $run->assistantMessage);
 
             $this->recordEvent($run, 'message.completed', [
@@ -345,11 +353,14 @@ class StaffCopilotSseRuntime
             ])->save();
 
             $assistantMessage = $run->assistantMessage()->first();
+            $finalAnswerId = $this->terminalFinalAnswerId($run);
+            $content = $this->answerPresenter->terminalState(AiChatRun::STATUS_FAILED, $safeErrorCode)['message'];
 
             if ($assistantMessage instanceof AiMessage) {
                 $assistantMessage->forceFill([
-                    'redacted_content' => 'The AI copilot run could not complete safely.',
-                    'content_hash' => hash('sha256', 'The AI copilot run could not complete safely.'),
+                    'redacted_content' => $content,
+                    'content_hash' => hash('sha256', $content),
+                    'final_answer_id' => $finalAnswerId,
                     'hidden_sections' => [$safeErrorCode],
                 ])->save();
             }
@@ -360,6 +371,7 @@ class StaffCopilotSseRuntime
                 $trace->forceFill([
                     'status' => AiChatRun::STATUS_FAILED,
                     'safe_error_code' => $safeErrorCode,
+                    'final_answer_id' => $finalAnswerId,
                 ])->save();
             }
 
@@ -378,6 +390,11 @@ class StaffCopilotSseRuntime
         ])->save();
 
         return $sourceRun;
+    }
+
+    private function terminalFinalAnswerId(AiChatRun $run): string
+    {
+        return 'staff-copilot-terminal-'.$run->ai_agent_trace_id;
     }
 
     private function markStatus(AiChatRun $run, string $status, string $eventType, array $payload = []): void
