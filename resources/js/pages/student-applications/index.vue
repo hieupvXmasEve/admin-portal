@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Head, router } from '@inertiajs/vue3';
-import { CheckCircle2, Eye, FileText, MoreHorizontal, Pencil, Plus, XCircle } from 'lucide-vue-next';
+import { CheckCircle2, ExternalLink, Eye, FileText, MoreHorizontal, Pencil, Plus, XCircle } from 'lucide-vue-next';
 import { reactive, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
@@ -19,6 +19,13 @@ interface LinkedStudent {
     full_name: string;
 }
 
+interface DocRef {
+    id: number;
+    link: string;
+    original_name: string | null;
+    page_index: number;
+}
+
 interface ApplicationRow {
     id: number;
     full_name: string;
@@ -27,12 +34,16 @@ interface ApplicationRow {
     national_id: string | null;
     phone: string | null;
     intended_program: string | null;
-    campus_code: string;
     intake: string | null;
     status: 'pending' | 'enrolled' | 'rejected';
-    documents_count: number;
+    documents_by_type: Record<string, DocRef[]>;
     created_at: string;
     student?: LinkedStudent | null;
+}
+
+interface DocumentType {
+    code: string;
+    name: string;
 }
 
 interface Paginator<T> {
@@ -66,6 +77,7 @@ interface Props {
     applications: Paginator<ApplicationRow>;
     filters: Filters;
     currentCampus: Campus | null;
+    documentTypes: DocumentType[];
     intakes: string[];
     statusOptions: StatusOption[];
 }
@@ -109,6 +121,9 @@ const goCreate = () => router.visit(route('student-applications.create'));
 
 // Open the focused documents view in a new browser tab.
 const openDocuments = (id: number) => window.open(route('student-applications.documents', id), '_blank', 'noopener');
+
+// Documents of a given catalog type for a row (empty when none submitted).
+const docsForType = (row: ApplicationRow, code: string): DocRef[] => row.documents_by_type?.[code] ?? [];
 
 const formatDate = (value: string): string =>
     new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
@@ -222,9 +237,11 @@ const goToPage = (url: string | null) => {
                                 <th class="px-4 py-3 font-medium">Phone</th>
                                 <th class="px-4 py-3 font-medium">Program</th>
                                 <th class="px-4 py-3 font-medium">Intake</th>
-                                <th class="px-4 py-3 font-medium">Documents</th>
                                 <th class="px-4 py-3 font-medium">Status</th>
                                 <th class="px-4 py-3 font-medium">Created</th>
+                                <th v-for="type in documentTypes" :key="type.code" class="px-3 py-3 font-medium">
+                                    <span class="block max-w-[150px] truncate" :title="type.name">{{ type.name }}</span>
+                                </th>
                                 <th class="px-4 py-3 text-right font-medium">Actions</th>
                             </tr>
                         </thead>
@@ -240,21 +257,28 @@ const goToPage = (url: string | null) => {
                                 <td class="px-4 py-3">{{ row.intended_program ?? '—' }}</td>
                                 <td class="px-4 py-3">{{ row.intake ?? '—' }}</td>
                                 <td class="px-4 py-3">
-                                    <button
-                                        type="button"
-                                        class="text-primary inline-flex items-center gap-1 font-medium hover:underline disabled:text-muted-foreground disabled:no-underline"
-                                        :disabled="row.documents_count === 0"
-                                        :title="row.documents_count > 0 ? 'Open documents in a new tab' : 'No documents'"
-                                        @click="openDocuments(row.id)"
-                                    >
-                                        <FileText class="h-4 w-4" />
-                                        {{ row.documents_count }}
-                                    </button>
-                                </td>
-                                <td class="px-4 py-3">
                                     <span class="rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize" :class="statusBadgeClass(row.status)">{{ row.status }}</span>
                                 </td>
                                 <td class="text-muted-foreground px-4 py-3 whitespace-nowrap">{{ formatDate(row.created_at) }}</td>
+                                <td v-for="type in documentTypes" :key="type.code" class="px-3 py-3 align-top">
+                                    <template v-if="docsForType(row, type.code).length > 0">
+                                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                            <a
+                                                v-for="doc in docsForType(row, type.code)"
+                                                :key="doc.id"
+                                                :href="doc.link"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                :title="doc.original_name ?? 'Open document'"
+                                                class="text-primary inline-flex items-center gap-1 font-medium hover:underline"
+                                            >
+                                                <ExternalLink class="h-3.5 w-3.5" />
+                                                {{ docsForType(row, type.code).length > 1 ? `Trang ${doc.page_index + 1}` : 'Xem' }}
+                                            </a>
+                                        </div>
+                                    </template>
+                                    <span v-else class="text-muted-foreground text-xs">Không có</span>
+                                </td>
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex items-center justify-end gap-1">
                                         <Button
@@ -296,7 +320,9 @@ const goToPage = (url: string | null) => {
                                 </td>
                             </tr>
                             <tr v-if="applications.data.length === 0">
-                                <td colspan="10" class="text-muted-foreground px-4 py-10 text-center">No applications match these filters.</td>
+                                <td :colspan="9 + documentTypes.length" class="text-muted-foreground px-4 py-10 text-center">
+                                    No applications match these filters.
+                                </td>
                             </tr>
                         </tbody>
                     </table>

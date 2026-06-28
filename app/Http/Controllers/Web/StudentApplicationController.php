@@ -8,6 +8,7 @@ use App\Exports\StudentApplicationExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreStudentApplicationRequest;
 use App\Http\Requests\UpdateStudentApplicationRequest;
+use App\Models\ApplicationDocumentType;
 use App\Models\ApplicationGuardian;
 use App\Models\Campus;
 use App\Models\Program;
@@ -49,10 +50,14 @@ class StudentApplicationController extends Controller
         ];
 
         $query = StudentApplication::query()
-            ->withCount('documents')
-            ->with(['student' => function ($query) {
-                $query->select('id', 'student_id', 'full_name');
-            }]);
+            ->with([
+                'student' => function ($query) {
+                    $query->select('id', 'student_id', 'full_name');
+                },
+                'documents' => function ($query) {
+                    $query->orderBy('page_index')->orderBy('id');
+                },
+            ]);
 
         if ($currentCampus !== null) {
             $query->where('campus_code', $currentCampus->code);
@@ -80,7 +85,35 @@ class StudentApplicationController extends Controller
 
         $applications = $query
             ->paginate($filters['per_page'])
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn (StudentApplication $application) => [
+                'id' => $application->id,
+                'full_name' => $application->full_name,
+                'student_code' => $application->student_code,
+                'email' => $application->email,
+                'national_id' => $application->national_id,
+                'phone' => $application->phone,
+                'intended_program' => $application->intended_program,
+                'intake' => $application->intake,
+                'status' => $application->status,
+                'created_at' => $application->created_at,
+                'student' => $application->student,
+                // Documents grouped by catalog code, so the list can render one
+                // column per document type with the file links inline.
+                'documents_by_type' => $application->documents
+                    ->groupBy('file_type_code')
+                    ->map(fn ($documents) => $documents->map(fn ($document) => [
+                        'id' => $document->id,
+                        'link' => $document->link,
+                        'original_name' => $document->original_name,
+                        'page_index' => $document->page_index,
+                    ])->values()),
+            ]);
+
+        // The document-type catalog drives the per-type columns on the list.
+        $documentTypes = ApplicationDocumentType::query()
+            ->activeOrdered()
+            ->get(['code', 'name']);
 
         $intakes = StudentApplication::query()
             ->when($currentCampus !== null, fn ($q) => $q->where('campus_code', $currentCampus->code))
@@ -96,6 +129,7 @@ class StudentApplicationController extends Controller
             'currentCampus' => $currentCampus !== null
                 ? ['code' => $currentCampus->code, 'name' => $currentCampus->name]
                 : null,
+            'documentTypes' => $documentTypes,
             'intakes' => $intakes,
             'statusOptions' => $this->statusOptions(),
         ]);

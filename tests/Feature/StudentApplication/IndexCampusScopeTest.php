@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\ApplicationDocument;
+use App\Models\ApplicationDocumentType;
 use App\Models\Campus;
 use App\Models\StudentApplication;
 use App\Models\User;
@@ -54,14 +55,19 @@ it('lists only applications for the current campus', function () {
         );
 });
 
-it('exposes a documents_count on each listed application', function () {
+it('exposes documents grouped by type and the document-type columns', function () {
+    ApplicationDocumentType::factory()->create(['code' => 'transcript', 'name' => 'Transcript', 'order' => 1]);
+
     $application = scopedApplication($this->campus);
-    ApplicationDocument::factory()->count(3)->forApplication($application)->create();
+    ApplicationDocument::factory()->count(3)->forApplication($application)->create([
+        'file_type_code' => 'transcript',
+    ]);
 
     $this->actingAs($this->staff)
         ->get(route('student-applications.index'))
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('applications.data.0.documents_count', 3)
+            ->where('documentTypes.0.code', 'transcript')
+            ->has('applications.data.0.documents_by_type.transcript', 3)
         );
 });
 
