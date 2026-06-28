@@ -1,8 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Exports;
 
+use App\Models\ApplicationDocumentType;
+use App\Models\StudentApplication;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -12,42 +17,68 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
+/**
+ * Read-only export of Applications for the admissions CRM to complete.
+ *
+ * One row per Application: CRM matching keys first, then identity / contact /
+ * intent / English-test, the lifecycle status, the primary Guardian, then one
+ * column per active document type, then timestamps. **Missing values are left
+ * blank** (not "N/A") so the CRM can see exactly which fields and documents are
+ * absent and supply them — there is no in-app update path for frozen records.
+ */
 class StudentApplicationExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapping, WithStyles
 {
-    protected Builder $query;
+    /**
+     * Active document types (catalog order). Drives one column per type, so a
+     * blank cell unambiguously means "this document type is missing".
+     *
+     * @var Collection<int, ApplicationDocumentType>
+     */
+    protected Collection $documentTypes;
 
-    protected array $filters;
-
-    public function __construct(Builder $query, array $filters = [])
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function __construct(protected Builder $query, protected array $filters = [])
     {
-        $this->query = $query;
-        $this->filters = $filters;
+        $this->documentTypes = ApplicationDocumentType::query()->activeOrdered()->get();
     }
 
     public function query()
     {
-        return $this->query->with(['student' => function ($query) {
-            $query->select('id', 'student_id', 'full_name');
-        }]);
+        return $this->query->with([
+            'student:id,student_id,full_name',
+            'guardians',
+            'documents',
+        ]);
     }
 
+    /**
+     * @return list<string>
+     */
     public function headings(): array
     {
         return [
-            'ID',
+            // CRM matching keys first.
+            'Student Code',
+            'CRM Admission ID',
+            // Identity
             'Full Name',
             'Gender',
             'Ethnicity',
             'Date of Birth',
             'National ID',
+            // Contact
             'Phone',
             'Email',
             'Address',
             'Health Information',
+            // Admission intent
             'Campus',
             'Intended Program',
             'Intended Specialization',
             'Intake',
+            // English test
             'Exam Date',
             'English Test Type',
             'Listening',
@@ -60,54 +91,76 @@ class StudentApplicationExport implements FromQuery, ShouldAutoSize, WithHeading
             'SUT ID',
             'International Applicant',
             'Exception Units',
+            // Lifecycle
             'Application Status',
-            'Student ID',
-            'Student Name',
+            'Linked Student Code',
+            'Linked Student Name',
+            // Primary guardian
+            'Primary Guardian Name',
+            'Primary Guardian Relationship',
+            'Primary Guardian Phone',
+            'Primary Guardian Email',
+            // One column per active document type (blank = missing).
+            ...$this->documentTypes->map(fn (ApplicationDocumentType $type): string => $type->name)->all(),
+            // Timestamps
             'Created Date',
             'Updated Date',
         ];
     }
 
+    /**
+     * @param  StudentApplication  $application
+     * @return list<string>
+     */
     public function map($application): array
     {
+        $guardian = $application->guardians->firstWhere('is_primary', true);
+
         return [
-            $application->id,
-            $application->full_name,
-            $application->gender ?? 'N/A',
-            $application->ethnicity ?? 'N/A',
+            $this->blank($application->student_code),
+            $this->blank($application->crm_admission_id),
+            $this->blank($application->full_name),
+            $this->blank($application->gender),
+            $this->blank($application->ethnicity),
             $this->formatBirthDate($application),
-            $application->national_id ?? 'N/A',
-            $application->phone ?? 'N/A',
-            $application->email ?? 'N/A',
-            $application->address ?? 'N/A',
-            $application->health_information ?? 'N/A',
-            $application->campus_code ?? 'N/A',
-            $application->intended_program ?? 'N/A',
-            $application->intended_specialization ?? 'N/A',
-            $application->intake ?? 'N/A',
-            $application->exam_date ? date('Y-m-d', strtotime($application->exam_date)) : 'N/A',
-            $application->english_test_type ?? 'N/A',
-            $application->listening ?? 'N/A',
-            $application->reading ?? 'N/A',
-            $application->writing ?? 'N/A',
-            $application->speaking ?? 'N/A',
-            $application->overall ?? 'N/A',
-            $application->study_link_status ?? 'N/A',
-            $application->english_qualifications ?? 'N/A',
-            $application->sut_id ?? 'N/A',
+            $this->blank($application->national_id),
+            $this->blank($application->phone),
+            $this->blank($application->email),
+            $this->blank($application->address),
+            $this->blank($application->health_information),
+            $this->blank($application->campus_code),
+            $this->blank($application->intended_program),
+            $this->blank($application->intended_specialization),
+            $this->blank($application->intake),
+            $application->exam_date ? $application->exam_date->format('Y-m-d') : '',
+            $this->blank($application->english_test_type),
+            $this->blank($application->listening),
+            $this->blank($application->reading),
+            $this->blank($application->writing),
+            $this->blank($application->speaking),
+            $this->blank($application->overall),
+            $this->blank($application->study_link_status),
+            $this->blank($application->english_qualifications),
+            $this->blank($application->sut_id),
             $application->is_international_applicant ? 'Yes' : 'No',
-            $application->exception_units ?? 'N/A',
-            ucfirst($application->status),
-            $application->student ? $application->student->student_id : 'Not Converted',
-            $application->student ? $application->student->full_name : 'N/A',
-            $application->created_at ? date('Y-m-d H:i:s', strtotime($application->created_at)) : 'N/A',
-            $application->updated_at ? date('Y-m-d H:i:s', strtotime($application->updated_at)) : 'N/A',
+            $this->blank($application->exception_units),
+            ucfirst((string) $application->status),
+            $this->blank($application->student?->student_id),
+            $this->blank($application->student?->full_name),
+            $this->blank($guardian?->full_name),
+            $this->blank($guardian?->relationship),
+            $this->blank($guardian?->phone),
+            $this->blank($guardian?->email),
+            ...$this->documentTypes->map(
+                fn (ApplicationDocumentType $type): string => $this->documentsFor($application, $type->code)
+            )->all(),
+            $application->created_at ? $application->created_at->format('Y-m-d H:i:s') : '',
+            $application->updated_at ? $application->updated_at->format('Y-m-d H:i:s') : '',
         ];
     }
 
     public function styles(Worksheet $sheet)
     {
-        // Style the header row
         $sheet->getStyle('A1:'.$sheet->getHighestColumn().'1')->applyFromArray([
             'font' => [
                 'bold' => true,
@@ -123,16 +176,42 @@ class StudentApplicationExport implements FromQuery, ShouldAutoSize, WithHeading
             ],
         ]);
 
-        // Freeze the header row
         $sheet->freezePane('A2');
 
         return [];
     }
 
-    private function formatBirthDate($application): string
+    /**
+     * Normalize a value to a string, mapping null/empty to a blank cell so the
+     * CRM sees the gap rather than a placeholder.
+     */
+    private function blank(mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * The file link(s) for one document type on an Application, newest page
+     * first; blank when no document of that type has been submitted.
+     */
+    private function documentsFor(StudentApplication $application, string $code): string
+    {
+        return $application->documents
+            ->where('file_type_code', $code)
+            ->sortBy('page_index')
+            ->map(fn ($document): string => (string) ($document->link ?: $document->original_name))
+            ->filter()
+            ->implode("\n");
+    }
+
+    private function formatBirthDate(StudentApplication $application): string
     {
         if (! $application->birth_day || ! $application->birth_month || ! $application->birth_year) {
-            return 'N/A';
+            return '';
         }
 
         return sprintf(

@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useDataTable } from '@/composables/useDataTable';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { CheckCircle2, ExternalLink, Eye, FileText, MoreHorizontal, Pencil, Plus, XCircle } from 'lucide-vue-next';
+import { CheckCircle2, Download, ExternalLink, Eye, FileText, MoreHorizontal, Pencil, Plus, XCircle } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
@@ -168,6 +168,21 @@ const goShow = (id: number) => router.visit(route('student-applications.show', i
 const goEdit = (id: number) => router.visit(route('student-applications.edit', id));
 const goCreate = () => router.visit(route('student-applications.create'));
 
+// Export the current (campus-scoped) view to Excel for the CRM to complete:
+// missing fields come out blank. `scope=filtered` honours the active filters,
+// so with no filters set it is effectively the whole campus.
+const exportExcel = () => {
+    window.location.href = route('student-applications.export', {
+        format: 'xlsx',
+        scope: 'filtered',
+        search: filters.search || undefined,
+        status: filters.status,
+        intake: filters.intake,
+        sort: filters.sort ?? undefined,
+        direction: filters.direction ?? undefined,
+    });
+};
+
 // Open the focused documents view in a new browser tab.
 const openDocuments = (id: number) => window.open(route('student-applications.documents', id), '_blank', 'noopener');
 
@@ -237,10 +252,16 @@ const submitReject = () => {
                     <span v-if="currentCampus" class="text-foreground font-medium">· {{ currentCampus.name }}</span>
                 </p>
             </div>
-            <Button @click="goCreate">
-                <Plus class="mr-2 h-4 w-4" />
-                New application
-            </Button>
+            <div class="flex items-center gap-2">
+                <Button variant="outline" @click="exportExcel">
+                    <Download class="mr-2 h-4 w-4" />
+                    Export Excel
+                </Button>
+                <Button @click="goCreate">
+                    <Plus class="mr-2 h-4 w-4" />
+                    New application
+                </Button>
+            </div>
         </div>
 
         <!-- Filters -->
