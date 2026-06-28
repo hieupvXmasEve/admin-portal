@@ -122,15 +122,19 @@ it('flags a requires-decision transition with no decision and clears the flag on
         ->and($rows['action-'.$neverRequires->id]['missing_decision'])->toBeFalse();
 });
 
-it('flags a requires-decision progression transition that lacks a decision', function () {
+it('never flags an EGC progression transition as missing a decision (placement / stage change need none)', function () {
+    $placement = lifecycleEvent($this->student, $this->user, $this->semester, AcademicProgressionEventType::PLACEMENT_INITIALIZED, '2026-02-01 09:00:00');
     $stage = lifecycleEvent($this->student, $this->user, $this->semester, AcademicProgressionEventType::COURSE_STAGE_CHANGED, '2026-03-01 09:00:00');
 
     $rows = collect((new GetStudentLifecycleTimelineQuery)->handle($this->student)['timeline'])
         ->keyBy('id');
 
-    expect($rows['progression-'.$stage->id]['requires_decision'])->toBeTrue()
-        ->and($rows['progression-'.$stage->id]['missing_decision'])->toBeTrue()
-        ->and($rows['progression-'.$stage->id]['source'])->toBe('progression')
+    // Both still appear in the main timeline (they are status-changing), but
+    // neither requires a decision, so neither is flagged "Decision missing".
+    expect($rows['progression-'.$stage->id]['requires_decision'])->toBeFalse()
+        ->and($rows['progression-'.$stage->id]['missing_decision'])->toBeFalse()
+        ->and($rows['progression-'.$placement->id]['requires_decision'])->toBeFalse()
+        ->and($rows['progression-'.$placement->id]['missing_decision'])->toBeFalse()
         ->and($rows['progression-'.$stage->id]['label'])->toBe(AcademicProgressionEventType::COURSE_STAGE_CHANGED->labelEn());
 });
 

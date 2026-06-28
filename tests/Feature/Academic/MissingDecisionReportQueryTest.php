@@ -82,17 +82,16 @@ it('lists requires-decision status actions that lack a decision', function () {
         ->all());
 });
 
-it('lists requires-decision progression transitions that lack a decision', function () {
+it('never lists progression transitions (placement / stage change no longer require a decision)', function () {
     $student = missingDecisionStudent($this->campus, $this->program, $this->semester, 'SE700002');
 
-    $placement = missingDecisionEvent($student, $this->user, $this->semester, AcademicProgressionEventType::PLACEMENT_INITIALIZED);
-    $stage = missingDecisionEvent($student, $this->user, $this->semester, AcademicProgressionEventType::COURSE_STAGE_CHANGED);
+    // ADR-0008 (revised): EGC progression events do not require a Decision, so
+    // none of them — including placement and the move into intake_course —
+    // appear in the missing-decision report.
+    missingDecisionEvent($student, $this->user, $this->semester, AcademicProgressionEventType::PLACEMENT_INITIALIZED);
+    missingDecisionEvent($student, $this->user, $this->semester, AcademicProgressionEventType::COURSE_STAGE_CHANGED);
 
-    $result = (new GetMissingDecisionReportQuery)->handle([], $this->campus->id);
-
-    $keys = collect($result->items())->pluck('id')->sort()->values()->all();
-
-    expect($keys)->toBe(['progression-'.$placement->id, 'progression-'.$stage->id]);
+    expect((new GetMissingDecisionReportQuery)->handle([], $this->campus->id)->total())->toBe(0);
 });
 
 it('never lists admission deferral or pure progression records', function () {
@@ -120,12 +119,12 @@ it('drops a transition from the report once a decision is attached', function ()
     ]);
 
     $action = missingDecisionAction($student, $this->user, StudentActionType::ACADEMIC_DROPOUT);
-    $event = missingDecisionEvent($student, $this->user, $this->semester, AcademicProgressionEventType::COURSE_STAGE_CHANGED);
+    // A progression event sits alongside but is never counted (it needs no decision).
+    missingDecisionEvent($student, $this->user, $this->semester, AcademicProgressionEventType::COURSE_STAGE_CHANGED);
 
-    expect((new GetMissingDecisionReportQuery)->handle([], $this->campus->id)->total())->toBe(2);
+    expect((new GetMissingDecisionReportQuery)->handle([], $this->campus->id)->total())->toBe(1);
 
     $action->update(['decision_id' => $decision->id]);
-    $event->update(['decision_id' => $decision->id]);
 
     expect((new GetMissingDecisionReportQuery)->handle([], $this->campus->id)->total())->toBe(0);
 });

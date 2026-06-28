@@ -64,7 +64,7 @@ it('backfills a decision onto an action log and adds the student to the decision
         ->and((new GetMissingDecisionReportQuery)->handle([], $this->campus->id)->total())->toBe(0);
 });
 
-it('backfills a decision onto a progression event', function () {
+it('attaches a decision onto a progression event (optional — progression needs no decision)', function () {
     $event = AcademicProgressionEvent::create([
         'student_id' => $this->student->id,
         'event_type' => AcademicProgressionEventType::COURSE_STAGE_CHANGED->value,
@@ -74,7 +74,10 @@ it('backfills a decision onto a progression event', function () {
         'created_by_user_id' => $this->user->id,
     ]);
 
-    expect((new GetMissingDecisionReportQuery)->handle([], $this->campus->id)->total())->toBe(1);
+    // A progression event never requires a decision (ADR-0008, revised), so it
+    // never appears in the missing-decision report — but a decision may still be
+    // attached for the record, and that covers the student on the roster.
+    expect((new GetMissingDecisionReportQuery)->handle([], $this->campus->id)->total())->toBe(0);
 
     AttachDecisionToTransitionAction::run([
         'student_id' => $this->student->id,
@@ -84,8 +87,7 @@ it('backfills a decision onto a progression event', function () {
     ]);
 
     expect($event->fresh()->decision_id)->toBe($this->decision->id)
-        ->and($this->decision->students()->whereKey($this->student->id)->exists())->toBeTrue()
-        ->and((new GetMissingDecisionReportQuery)->handle([], $this->campus->id)->total())->toBe(0);
+        ->and($this->decision->students()->whereKey($this->student->id)->exists())->toBeTrue();
 });
 
 it('rejects attaching a transition that does not belong to the given student', function () {
