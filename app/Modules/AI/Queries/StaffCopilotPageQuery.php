@@ -172,6 +172,16 @@ class StaffCopilotPageQuery
             'last_event_id' => $run->last_event_id,
             'stream_url' => route('ai.copilot.runs.events', $run, false),
             'can_cancel' => true,
+            'provider' => $run->provider,
+            'model' => $run->model,
+            'runtime_mode' => $run->runtime_mode,
+            'stream_transport' => $run->stream_transport,
+            'stream_mode' => $run->stream_mode,
+            'streaming_enabled' => true,
+            'websocket_required' => false,
+            'prompt_version' => $run->prompt_version,
+            'catalog_version' => $run->catalog_version,
+            'tool_schema_version' => $run->tool_schema_version,
         ];
     }
 

@@ -74,8 +74,19 @@ it('queues a durable staff copilot run with placeholder state before provider ex
     $assistantMessage = AiMessage::query()->where('role', 'assistant')->firstOrFail();
 
     expect($run->status)->toBe(AiChatRun::STATUS_QUEUED)
+        ->and(AiChatRun::query()->count())->toBe(1)
+        ->and(AiMessage::query()->where('role', 'user')->count())->toBe(1)
+        ->and(AiMessage::query()->where('role', 'assistant')->count())->toBe(1)
+        ->and($run->user_id)->toBe($this->authorizedUser->id)
+        ->and($run->campus_id)->toBe($this->campus->id)
+        ->and($run->provider)->toBe('deterministic')
+        ->and($run->model)->toBe('staff-copilot-mvp')
+        ->and($run->runtime_mode)->toBe('deterministic')
         ->and($run->stream_transport)->toBe('sse')
         ->and($run->stream_mode)->toBe('fallback_snapshot')
+        ->and($run->prompt_version)->toBe('staff-copilot-mvp:v1')
+        ->and($run->catalog_version)->toBe('metric-catalog:v1')
+        ->and($run->tool_schema_version)->toBe('query_metrics:v1')
         ->and($run->ai_conversation_id)->toBe($conversation->id)
         ->and($run->user_message_id)->toBe($userMessage->id)
         ->and($run->assistant_message_id)->toBe($assistantMessage->id)
@@ -93,8 +104,19 @@ it('queues a durable staff copilot run with placeholder state before provider ex
             ->where('active_run.id', $run->id)
             ->where('active_run.status', AiChatRun::STATUS_QUEUED)
             ->where('active_run.assistant_message_id', $assistantMessage->id)
+            ->where('active_run.last_event_id', $run->last_event_id)
             ->where('active_run.can_cancel', true)
             ->where('active_run.stream_url', route('ai.copilot.runs.events', $run, false))
+            ->where('active_run.provider', 'deterministic')
+            ->where('active_run.model', 'staff-copilot-mvp')
+            ->where('active_run.runtime_mode', 'deterministic')
+            ->where('active_run.stream_transport', 'sse')
+            ->where('active_run.stream_mode', 'fallback_snapshot')
+            ->where('active_run.streaming_enabled', true)
+            ->where('active_run.websocket_required', false)
+            ->where('active_run.prompt_version', 'staff-copilot-mvp:v1')
+            ->where('active_run.catalog_version', 'metric-catalog:v1')
+            ->where('active_run.tool_schema_version', 'query_metrics:v1')
             ->where('capabilities.stream_transport', 'sse')
             ->where('capabilities.streaming_enabled', true)
             ->where('capabilities.websocket_required', false));
@@ -178,12 +200,65 @@ it('denies run stream and cancellation access to another authorized staff user',
     $run = AiChatRun::query()->firstOrFail();
 
     $this->actingAs($this->authorizedPeer)
+        ->get(route('ai.copilot.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('conversation', null)
+            ->where('active_run', null)
+            ->has('messages', 0));
+
+    $this->actingAs($this->authorizedPeer)
         ->get(route('ai.copilot.runs.events', $run))
         ->assertForbidden();
 
     $this->actingAs($this->authorizedPeer)
         ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
         ->post(route('ai.copilot.runs.cancel', $run))
+        ->assertForbidden();
+});
+
+it('does not recover a staff copilot active run from the wrong campus scope', function () {
+    $otherCampus = Campus::factory()->create(['code' => 'DNG']);
+
+    $this->actingAs($this->authorizedUser)
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->from(route('ai.copilot.index'))
+        ->post(route('ai.copilot.messages.store'), [
+            'question' => 'Current semester outstanding tuition by program là bao nhiêu?',
+        ]);
+
+    $run = AiChatRun::query()->firstOrFail();
+
+    $permissionService = Mockery::mock(PermissionService::class);
+    $permissionService->shouldReceive('getUserPermissions')
+        ->andReturnUsing(function (User $user, ?int $campusId = null) use ($otherCampus): array {
+            if (
+                $user->id === $this->authorizedUser->id
+                && in_array($campusId, [$this->campus->id, $otherCampus->id], true)
+            ) {
+                return ['view_ai_metrics'];
+            }
+
+            return [];
+        });
+
+    app()->forgetInstance(PermissionService::class);
+    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->forgetInstance('campus');
+    app()->singleton('campus', fn () => $otherCampus);
+
+    $this->actingAs($this->authorizedUser)
+        ->withSession(['current_campus_id' => $otherCampus->id])
+        ->get(route('ai.copilot.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('conversation', null)
+            ->where('active_run', null)
+            ->has('messages', 0));
+
+    $this->actingAs($this->authorizedUser)
+        ->withSession(['current_campus_id' => $otherCampus->id])
+        ->get(route('ai.copilot.runs.events', $run))
         ->assertForbidden();
 });
 

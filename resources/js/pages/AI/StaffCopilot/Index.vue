@@ -94,6 +94,16 @@ interface ActiveRun {
     last_event_id: number | null;
     stream_url: string;
     can_cancel: boolean;
+    provider: string | null;
+    model: string | null;
+    runtime_mode: 'deterministic' | 'live_provider' | 'fallback';
+    stream_transport: 'sse';
+    stream_mode: string;
+    streaming_enabled: boolean;
+    websocket_required: boolean;
+    prompt_version: string | null;
+    catalog_version: string | null;
+    tool_schema_version: string | null;
 }
 
 const props = defineProps<{

@@ -29,6 +29,7 @@ class StaffCopilotSseRuntime
     public function queue(User $actor, ?Campus $campus, string $question, ?int $conversationId = null): AiChatRun
     {
         return DB::transaction(function () use ($actor, $campus, $question, $conversationId): AiChatRun {
+            $runContract = $this->defaultRunContract();
             $conversation = $this->conversationFor($actor, $campus, $question, $conversationId);
             $userMessage = $this->auditRecorder->recordMessage($conversation, 'user', $question, [
                 'content_classification' => 'staff_copilot_question',
@@ -37,11 +38,11 @@ class StaffCopilotSseRuntime
                 'content_classification' => 'staff_copilot_answer',
             ]);
             $trace = $this->auditRecorder->startTrace($conversation, $userMessage, [
-                'provider' => 'deterministic',
-                'model' => 'staff-copilot-mvp',
-                'prompt_version' => StaffCopilotAgentRunner::PROMPT_VERSION,
-                'catalog_version' => $this->catalog->version(),
-                'tool_schema_version' => $this->catalog->toolSchemaVersion(),
+                'provider' => $runContract['provider'],
+                'model' => $runContract['model'],
+                'prompt_version' => $runContract['prompt_version'],
+                'catalog_version' => $runContract['catalog_version'],
+                'tool_schema_version' => $runContract['tool_schema_version'],
             ]);
 
             $run = AiChatRun::query()->create([
@@ -51,19 +52,21 @@ class StaffCopilotSseRuntime
                 'ai_agent_trace_id' => $trace->id,
                 'user_id' => $actor->id,
                 'campus_id' => $campus?->id,
-                'provider' => 'deterministic',
-                'model' => 'staff-copilot-mvp',
-                'runtime_mode' => 'deterministic',
-                'stream_transport' => 'sse',
-                'stream_mode' => 'fallback_snapshot',
+                ...$runContract,
                 'status' => AiChatRun::STATUS_QUEUED,
                 'idempotency_key' => (string) Str::uuid(),
             ]);
 
             $this->recordEvent($run, 'run.queued', [
                 'status' => AiChatRun::STATUS_QUEUED,
-                'stream_transport' => 'sse',
-                'stream_mode' => 'fallback_snapshot',
+                'provider' => $run->provider,
+                'model' => $run->model,
+                'runtime_mode' => $run->runtime_mode,
+                'stream_transport' => $run->stream_transport,
+                'stream_mode' => $run->stream_mode,
+                'prompt_version' => $run->prompt_version,
+                'catalog_version' => $run->catalog_version,
+                'tool_schema_version' => $run->tool_schema_version,
             ]);
             $this->recordEvent($run, 'message.created', [
                 'message_id' => $userMessage->id,
@@ -128,6 +131,7 @@ class StaffCopilotSseRuntime
     public function retry(AiChatRun $sourceRun): AiChatRun
     {
         return DB::transaction(function () use ($sourceRun): AiChatRun {
+            $runContract = $this->defaultRunContract();
             $sourceRun->loadMissing(['conversation', 'userMessage', 'user', 'campus']);
 
             $conversation = $sourceRun->conversation;
@@ -142,11 +146,11 @@ class StaffCopilotSseRuntime
                 'content_classification' => 'staff_copilot_answer',
             ]);
             $trace = $this->auditRecorder->startTrace($conversation, $userMessage, [
-                'provider' => 'deterministic',
-                'model' => 'staff-copilot-mvp',
-                'prompt_version' => StaffCopilotAgentRunner::PROMPT_VERSION,
-                'catalog_version' => $this->catalog->version(),
-                'tool_schema_version' => $this->catalog->toolSchemaVersion(),
+                'provider' => $runContract['provider'],
+                'model' => $runContract['model'],
+                'prompt_version' => $runContract['prompt_version'],
+                'catalog_version' => $runContract['catalog_version'],
+                'tool_schema_version' => $runContract['tool_schema_version'],
             ]);
 
             $run = AiChatRun::query()->create([
@@ -156,11 +160,7 @@ class StaffCopilotSseRuntime
                 'ai_agent_trace_id' => $trace->id,
                 'user_id' => $actor->id,
                 'campus_id' => $sourceRun->campus_id,
-                'provider' => 'deterministic',
-                'model' => 'staff-copilot-mvp',
-                'runtime_mode' => 'deterministic',
-                'stream_transport' => 'sse',
-                'stream_mode' => 'fallback_snapshot',
+                ...$runContract,
                 'status' => AiChatRun::STATUS_QUEUED,
                 'idempotency_key' => (string) Str::uuid(),
             ]);
@@ -168,8 +168,14 @@ class StaffCopilotSseRuntime
             $this->recordEvent($run, 'run.queued', [
                 'status' => AiChatRun::STATUS_QUEUED,
                 'retry_of_run_id' => $sourceRun->id,
-                'stream_transport' => 'sse',
-                'stream_mode' => 'fallback_snapshot',
+                'provider' => $run->provider,
+                'model' => $run->model,
+                'runtime_mode' => $run->runtime_mode,
+                'stream_transport' => $run->stream_transport,
+                'stream_mode' => $run->stream_mode,
+                'prompt_version' => $run->prompt_version,
+                'catalog_version' => $run->catalog_version,
+                'tool_schema_version' => $run->tool_schema_version,
             ]);
             $this->recordEvent($run, 'message.created', [
                 'message_id' => $assistantMessage->id,
@@ -286,6 +292,9 @@ class StaffCopilotSseRuntime
             $run->forceFill([
                 'provider' => $run->trace->provider,
                 'model' => $run->trace->model,
+                'prompt_version' => $run->trace->prompt_version,
+                'catalog_version' => $run->trace->catalog_version,
+                'tool_schema_version' => $run->trace->tool_schema_version,
                 'runtime_mode' => $run->trace->provider === 'deterministic' ? 'deterministic' : 'live_provider',
                 'status' => AiChatRun::STATUS_STREAMING,
                 'duration_ms' => $durationMs,
@@ -386,6 +395,23 @@ class StaffCopilotSseRuntime
 
         $run->forceFill($attributes)->save();
         $this->recordEvent($run, $eventType, $payload);
+    }
+
+    /**
+     * @return array{provider: string, model: string, prompt_version: string, catalog_version: string, tool_schema_version: string, runtime_mode: string, stream_transport: string, stream_mode: string}
+     */
+    private function defaultRunContract(): array
+    {
+        return [
+            'provider' => 'deterministic',
+            'model' => 'staff-copilot-mvp',
+            'prompt_version' => StaffCopilotAgentRunner::PROMPT_VERSION,
+            'catalog_version' => $this->catalog->version(),
+            'tool_schema_version' => $this->catalog->toolSchemaVersion(),
+            'runtime_mode' => 'deterministic',
+            'stream_transport' => 'sse',
+            'stream_mode' => 'fallback_snapshot',
+        ];
     }
 
     private function recordToolEvents(AiChatRun $run): void
