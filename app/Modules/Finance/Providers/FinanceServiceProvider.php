@@ -18,8 +18,10 @@ use App\Modules\Finance\Services\PaymentService;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\AiFinanceMetricReader as ModuleAiFinanceMetricReader;
 use App\Modules\Finance\Support\AiFinanceStudentProfileReader as ModuleAiFinanceStudentProfileReader;
+use App\Modules\Finance\Support\HubStudentFinanceSummaryReader as ModuleHubStudentFinanceSummaryReader;
 use App\Shared\Contracts\Finance\AiFinanceMetricReader;
 use App\Shared\Contracts\Finance\AiFinanceStudentProfileReader;
+use App\Shared\Contracts\Finance\HubStudentFinanceSummaryReader;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -32,6 +34,7 @@ class FinanceServiceProvider extends ServiceProvider
     {
         $this->app->bind(AiFinanceMetricReader::class, ModuleAiFinanceMetricReader::class);
         $this->app->bind(AiFinanceStudentProfileReader::class, ModuleAiFinanceStudentProfileReader::class);
+        $this->app->bind(HubStudentFinanceSummaryReader::class, ModuleHubStudentFinanceSummaryReader::class);
 
         // Register services as singletons
         $this->app->singleton(FinanceChargeService::class);

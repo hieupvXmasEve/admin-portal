@@ -188,6 +188,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:view_student_summary')
             ->name('students.academic-summary.fees');
 
+        // Read-only Finance tab: fees + gold + scholarships summary via the
+        // Finance read contract, deep-linking to the Finance Office (ADR-0007).
+        Route::get('/finance', [StudentAcademicSummaryController::class, 'finance'])
+            ->middleware('can:view_student_summary')
+            ->name('students.academic-summary.finance');
+
         Route::get('/attendance-details', [StudentAcademicSummaryController::class, 'getAttendanceDetails'])
             ->middleware('can:view_student_summary')
             ->name(StudentRoutes::ACADEMIC_SUMMARY_ATTENDANCE_DETAILS);

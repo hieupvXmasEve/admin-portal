@@ -19,6 +19,7 @@ use App\Modules\Academic\Queries\GetStudentLifecycleTimelineQuery;
 use App\Modules\Academic\Support\LifecycleFormOptions;
 use App\Services\ExcelExportService;
 use App\Services\StudentAcademicSummaryService;
+use App\Shared\Contracts\Finance\HubStudentFinanceSummaryReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -52,6 +53,7 @@ class StudentAcademicSummaryController extends Controller
             'graduation',
             'lifecycle',
             'gold',
+            'finance',
             'export',
         ]);
 
@@ -365,6 +367,28 @@ class StudentAcademicSummaryController extends Controller
         return Inertia::render('students/AcademicSummary/Fee', [
             'student' => $this->hubStudentContext($student),
             'feeSummary' => $feeSummary,
+        ]);
+    }
+
+    /**
+     * Display the read-only Finance tab for the Hub.
+     *
+     * The Hub is finance-aware but not finance-owning (ADR-0007): fees, gold,
+     * and scholarships are read through the Finance module's cross-module read
+     * contract — never by joining into Finance tables — and surfaced as a
+     * summary only. Any money operation deep-links out to the Finance Office,
+     * which owns mutation. No mutation path exists on this tab.
+     *
+     * @param  Student  $student  The student to display the finance summary for
+     * @return Response Inertia response with the read-only summary and deep link
+     */
+    public function finance(Student $student, HubStudentFinanceSummaryReader $reader): Response
+    {
+        return Inertia::render('students/AcademicSummary/Finance', [
+            'student' => $this->hubStudentContext($student),
+            'finance' => $reader->summary($student->id),
+            // Deep link into the Finance Office surface that owns money operations.
+            'financeOfficeUrl' => route('finance.students.overview', $student->id),
         ]);
     }
 
