@@ -127,7 +127,7 @@ const overallProgress = computed(() => {
 });
 
 // Get requirement display info
-const getRequirementDisplayInfo = (key: string, requirement: RequirementStatus) => {
+const getRequirementDisplayInfo = (key: string) => {
     const info: Record<string, { title: string; description: string }> = {
         core_credits: {
             title: 'Core Credits',
@@ -326,9 +326,9 @@ const getRequirementDisplayInfo = (key: string, requirement: RequirementStatus) 
                                             class="h-5 w-5 flex-shrink-0"
                                         />
                                         <div>
-                                            <h4 class="font-medium">{{ getRequirementDisplayInfo(key, requirement).title }}</h4>
+                                            <h4 class="font-medium">{{ getRequirementDisplayInfo(key).title }}</h4>
                                             <p class="text-sm text-muted-foreground">
-                                                {{ getRequirementDisplayInfo(key, requirement).description }}
+                                                {{ getRequirementDisplayInfo(key).description }}
                                             </p>
                                         </div>
                                     </div>

@@ -10,14 +10,17 @@ use App\Http\Controllers\Api\StudentWalletController;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Student\GetRegistrationsRequest;
 use App\Models\Student;
+use App\Modules\Academic\Exports\StudentAcademicSummaryExport;
 use App\Modules\Academic\Queries\GetStudentAttendanceDetailsQuery;
 use App\Modules\Academic\Queries\GetStudentAttendanceQuery;
 use App\Modules\Academic\Queries\GetStudentFeeSummaryQuery;
+use App\Services\ExcelExportService;
 use App\Services\StudentAcademicSummaryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * Controller for handling Student Academic Summary functionality
@@ -44,6 +47,7 @@ class StudentAcademicSummaryController extends Controller
             'attendance',
             'graduation',
             'gold',
+            'export',
         ]);
     }
 
@@ -220,6 +224,33 @@ class StudentAcademicSummaryController extends Controller
             'student' => $this->hubStudentContext($student),
             'graduation' => $graduationData,
         ]);
+    }
+
+    /**
+     * Download a single-student academic-summary workbook.
+     *
+     * Composes the academic summary the Hub shows — identity, cumulative GPA
+     * and standing, graduation progress, and a transcript of finalized
+     * academic records — into a downloadable Excel file. This replaces the
+     * Hub context-bar's former "coming soon" Export placeholder.
+     *
+     * @param  Student  $student  The student to export the academic summary for
+     * @return BinaryFileResponse The downloadable xlsx response
+     */
+    public function export(Student $student, ExcelExportService $excelService): BinaryFileResponse
+    {
+        $data = $this->academicSummaryService->getAcademicSummaryExportData($student);
+
+        $export = new StudentAcademicSummaryExport(
+            student: $data['student'],
+            graduation: $data['graduation'],
+            cumulative: $data['cumulative'],
+            courses: $data['courses'],
+        );
+
+        $filename = 'academic_summary_'.$student->student_id.'_'.now()->format('Y-m-d_H-i-s');
+
+        return $excelService->download($export, $filename);
     }
 
     /**

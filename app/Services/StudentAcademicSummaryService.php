@@ -1017,6 +1017,67 @@ class StudentAcademicSummaryService
     }
 
     /**
+     * Compose the single-student academic-summary export payload.
+     *
+     * Gathers the same academic picture the Hub shows — identity/context, the
+     * cumulative GPA snapshot, the graduation-progress contract, and a
+     * transcript of finalized academic records — already shaped for the
+     * StudentAcademicSummaryExport presenter, so the controller stays a thin
+     * orchestrator (mirrors the per-tab getXData read methods).
+     *
+     * @return array{
+     *     student: array<string, mixed>,
+     *     graduation: array<string, mixed>,
+     *     cumulative: array<string, mixed>|null,
+     *     courses: array<int, array<string, mixed>>
+     * }
+     */
+    public function getAcademicSummaryExportData(Student $student): array
+    {
+        $student->loadMissing([
+            'program:id,name',
+            'specialization:id,name',
+            'campus:id,name',
+        ]);
+
+        $cumulativeRaw = $this->getScoresData($student)['cumulative'] ?? null;
+        $cumulative = $cumulativeRaw === null ? null : [
+            'gpa' => $cumulativeRaw['gpa'] ?? 0,
+            'academic_standing' => $cumulativeRaw['academic_standing'] ?? null,
+            'credits_earned' => $cumulativeRaw['credit_points_earned'] ?? 0,
+        ];
+
+        $courses = $student->academicRecords()
+            ->with(['unit:id,code,name', 'semester:id,name'])
+            ->where('grade_status', 'final')
+            ->get()
+            ->map(fn ($record): array => [
+                'code' => $record->unit?->code ?? '',
+                'name' => $record->unit?->name ?? '',
+                'semester' => $record->semester?->name ?? '',
+                'credits' => $record->credit_points_earned,
+                'percentage' => $record->final_percentage,
+                'grade' => $record->final_letter_grade,
+            ])
+            ->all();
+
+        return [
+            'student' => [
+                'student_id' => $student->student_id,
+                'full_name' => $student->full_name,
+                'program' => $student->program?->name,
+                'specialization' => $student->specialization?->name,
+                'campus' => $student->campus?->name,
+                'status' => $student->status,
+                'intake' => $student->intake,
+            ],
+            'graduation' => $this->getGraduationData($student),
+            'cumulative' => $cumulative,
+            'courses' => $courses,
+        ];
+    }
+
+    /**
      * Get detailed scores for a specific course offering (for lazy loading)
      *
      * @param  Student  $student  The student model
@@ -1190,10 +1251,12 @@ class StudentAcademicSummaryService
             ? $student->curriculumVersion->curriculumUnits()->with('unit')->get()
             : collect();
 
-        // Get completed academic records
+        // Get completed, passed academic records (earned credit). "Earned" mirrors
+        // getCreditPointSnapshots: a passed record (is_passed), not a non-existent
+        // grade_status='passing' enum value that would silently match nothing.
         $completedRecords = $student->academicRecords()
             ->where('completion_status', 'completed')
-            ->where('grade_status', 'passing')
+            ->where('is_passed', true)
             ->with('unit')
             ->get();
 

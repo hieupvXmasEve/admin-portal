@@ -12,7 +12,6 @@ import { studentRoutes } from '@/utils/routes';
 import { Link, router } from '@inertiajs/vue3';
 import { ArrowLeft, ChevronDown, ClipboardCheck, Download, Edit, GraduationCap, LogIn, RotateCw } from 'lucide-vue-next';
 import { computed } from 'vue';
-import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
 
 interface Props {
@@ -51,8 +50,9 @@ const goBack = () => {
 };
 
 const exportSummary = () => {
-    // Real export lands in issue 04; placeholder until then.
-    toast.warning('The feature is coming soon!');
+    // Trigger a binary file download (Content-Disposition: attachment); a plain
+    // browser navigation, not an Inertia visit, so the xlsx downloads in place.
+    window.location.href = route('students.academic-summary.export', props.student.id);
 };
 
 const editStudent = () => {

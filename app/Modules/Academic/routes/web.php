@@ -166,6 +166,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:view_student_summary')
             ->name('students.academic-summary.graduation');
 
+        Route::get('/export', [StudentAcademicSummaryController::class, 'export'])
+            ->middleware('can:view_student_summary')
+            ->name('students.academic-summary.export');
+
         Route::get('/gold', [StudentAcademicSummaryController::class, 'gold'])
             ->middleware('can:view_student_summary')
             ->name('students.academic-summary.gold');

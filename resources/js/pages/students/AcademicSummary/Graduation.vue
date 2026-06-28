@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import StudentLayout from '@/layouts/StudentLayout.vue';
-import type { GraduationData, Student } from '@/types/models';
+import type { GraduationData, StudentHubContext } from '@/types/models';
 import { Head } from '@inertiajs/vue3';
 import GraduationTab from '../AcademicSummary/GraduationTab.vue';
 
 interface Props {
-    student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status'>;
+    student: StudentHubContext;
     graduation: GraduationData;
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 </script>
 
 <template>
