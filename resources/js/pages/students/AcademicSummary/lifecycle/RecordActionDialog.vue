@@ -31,6 +31,8 @@ interface StudentSummary {
 
 interface ActionOptions {
     actionTypes: ActionTypeOption[];
+    /** Action types selectable for the student's current status (backend source of truth). */
+    allowedActionTypes?: string[];
     semesters: Semester[];
     activeSemesterId?: number | null;
     campuses: Campus[];
@@ -89,6 +91,21 @@ const form = useForm<StoreStudentActionForm>({
 });
 
 const isEgcStudent = computed(() => props.student.status === 'intake_pre_uni_gc');
+
+// Only the actions valid for the student's current status (per the backend
+// StudentStatusTransitionPolicy) are offered, so illogical picks like
+// resume-from-course never appear. When the payload omits the list (e.g. a
+// status this surface does not act on) the dropdown is empty and recording is
+// disabled — the backend still enforces the rule regardless.
+const selectableActionTypes = computed<ActionTypeOption[]>(() => {
+    const allowed = actionOptions.value.allowedActionTypes;
+    if (!allowed) {
+        return actionOptions.value.actionTypes;
+    }
+    return actionOptions.value.actionTypes.filter((opt) => allowed.includes(opt.value));
+});
+
+const hasSelectableActions = computed(() => selectableActionTypes.value.length > 0);
 
 const selectedActionType = computed<StudentActionType | null>(() => (form.action_type ? (form.action_type as StudentActionType) : null));
 
@@ -232,7 +249,7 @@ const handleSubmit = (): void => {
 <template>
     <Dialog v-model:open="isDialogOpen">
         <DialogTrigger as-child>
-            <Button>
+            <Button :disabled="!hasSelectableActions" :title="hasSelectableActions ? undefined : 'No status actions are available for the current status'">
                 <Plus class="mr-2 h-4 w-4" />
                 Record action
             </Button>
@@ -252,7 +269,7 @@ const handleSubmit = (): void => {
                             <SelectValue placeholder="Select action type" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem v-for="opt in actionOptions.actionTypes" :key="opt.value" :value="opt.value">
+                            <SelectItem v-for="opt in selectableActionTypes" :key="opt.value" :value="opt.value">
                                 {{ opt.label }}
                             </SelectItem>
                         </SelectContent>

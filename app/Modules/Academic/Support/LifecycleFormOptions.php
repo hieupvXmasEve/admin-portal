@@ -64,6 +64,11 @@ class LifecycleFormOptions
         if ($student) {
             $activeSemesterId = $activeSemester?->id;
 
+            // The next actions a staff member may select for this student's
+            // current status (single source of truth — the dropdown filters to
+            // these so illogical picks like resume-from-course never appear).
+            $options['allowedActionTypes'] = StudentStatusTransitionPolicy::selectableActionValues((string) $student->status);
+
             $options['courseRegistrations'] = $student->courseRegistrations()
                 ->with(['courseOffering.unit', 'courseOffering.semester'])
                 ->whereHas('courseOffering', function ($query) {

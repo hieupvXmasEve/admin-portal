@@ -10,8 +10,10 @@ use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
 use App\Models\User;
+use App\Modules\Academic\Actions\RecordStudentActionAction;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia;
 
 use function Pest\Laravel\actingAs;
@@ -70,6 +72,42 @@ it('renders the Lifecycle tab with the merged timeline and egc sub-panel', funct
             ->has('options.placement')
             ->has('options.decisions')
         );
+});
+
+it('exposes only the status-appropriate selectable action types to the record dialog', function () {
+    actingAs($this->user)
+        ->get(route('students.academic-summary.lifecycle', $this->student->id))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('options.action.allowedActionTypes', [
+                StudentActionType::WAITING_COURSE_OPENING->value,
+                StudentActionType::ACADEMIC_DEFER->value,
+                StudentActionType::ACADEMIC_DROPOUT->value,
+                StudentActionType::CAMPUS_TRANSFER->value,
+            ])
+        );
+});
+
+it('rejects recording an illogical transition (resume while intake_course) at the backend', function () {
+    $courseStudent = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->create([
+            'student_id' => 'SE820002',
+            'status' => 'intake_course',
+            'intake' => 1,
+            'intake_semester_id' => $this->semester->id,
+        ]);
+
+    expect(fn () => RecordStudentActionAction::run([
+        'student_id' => $courseStudent->id,
+        'action_type' => StudentActionType::ACADEMIC_RESUME->value,
+        'reason' => 'Should be rejected',
+        'changed_by_user_id' => $this->user->id,
+        'return_semester_id' => $this->semester->id,
+    ]))->toThrow(ValidationException::class);
+
+    expect($courseStudent->fresh()->status)->toBe('intake_course');
 });
 
 it('redirects the retired standalone actions and placement pages into the Lifecycle tab', function () {
