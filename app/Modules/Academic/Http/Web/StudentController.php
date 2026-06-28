@@ -168,42 +168,6 @@ class StudentController extends Controller
         }
     }
 
-    public function show(Student $student, Request $request): Response|StudentResource
-    {
-        $student->load([
-            'campus',
-            'program',
-            'specialization',
-            'curriculumVersion',
-            'courseRegistrations.courseOffering.unit',
-            'academicHolds' => function ($query) {
-                $query->orderBy('placed_date', 'desc');
-            },
-        ]);
-
-        // Return JSON response for API requests
-        if ($request->expectsJson()) {
-            return new StudentResource($student);
-        }
-
-        // Get academic statistics for web view
-        $academicStats = [
-            'total_registrations' => $student->courseRegistrations()->count(),
-            'completed_courses' => $student->courseRegistrations()->where('registration_status', 'completed')->count(),
-            'active_registrations' => $student->courseRegistrations()->active()->count(),
-            'total_credits_earned' => $student->courseRegistrations()
-                ->where('registration_status', 'completed')
-                ->passing()
-                ->sum('credit_hours'),
-            'active_holds' => $student->academicHolds()->active()->count(),
-        ];
-
-        return Inertia::render('students/Show', [
-            'student' => $student,
-            'academicStats' => $academicStats,
-        ]);
-    }
-
     public function edit(Student $student): Response
     {
         $student->load(['campus', 'program', 'specialization', 'parentProfiles.user']);
