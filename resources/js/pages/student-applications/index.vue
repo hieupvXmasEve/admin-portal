@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Head, router } from '@inertiajs/vue3';
-import { CheckCircle2, Eye, MoreHorizontal, Pencil, Plus, XCircle } from 'lucide-vue-next';
+import { CheckCircle2, Eye, FileText, MoreHorizontal, Pencil, Plus, XCircle } from 'lucide-vue-next';
 import { reactive, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
@@ -24,9 +24,13 @@ interface ApplicationRow {
     full_name: string;
     student_code: string;
     email: string;
+    national_id: string | null;
+    phone: string | null;
+    intended_program: string | null;
     campus_code: string;
     intake: string | null;
     status: 'pending' | 'enrolled' | 'rejected';
+    documents_count: number;
     created_at: string;
     student?: LinkedStudent | null;
 }
@@ -55,14 +59,13 @@ interface StatusOption {
 interface Filters {
     search: string | null;
     status: string | null;
-    campus_code: string | null;
     intake: string | null;
 }
 
 interface Props {
     applications: Paginator<ApplicationRow>;
     filters: Filters;
-    campuses: Campus[];
+    currentCampus: Campus | null;
     intakes: string[];
     statusOptions: StatusOption[];
 }
@@ -72,7 +75,6 @@ const props = defineProps<Props>();
 const filters = reactive({
     search: props.filters.search ?? '',
     status: props.filters.status ?? 'all',
-    campus_code: props.filters.campus_code ?? 'all',
     intake: props.filters.intake ?? 'all',
 });
 
@@ -104,6 +106,12 @@ const statusBadgeClass = (status: ApplicationRow['status']): string => {
 const goShow = (id: number) => router.visit(route('student-applications.show', id));
 const goEdit = (id: number) => router.visit(route('student-applications.edit', id));
 const goCreate = () => router.visit(route('student-applications.create'));
+
+// Open the focused documents view in a new browser tab.
+const openDocuments = (id: number) => window.open(route('student-applications.documents', id), '_blank', 'noopener');
+
+const formatDate = (value: string): string =>
+    new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 
 const approve = (row: ApplicationRow) => {
     router.post(
@@ -167,7 +175,10 @@ const goToPage = (url: string | null) => {
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div>
                 <h1 class="text-3xl font-bold tracking-tight">Student Applications</h1>
-                <p class="text-muted-foreground mt-1 text-sm">Review applications, then approve to enroll or reject with a reason.</p>
+                <p class="text-muted-foreground mt-1 text-sm">
+                    Review applications, then approve to enroll or reject with a reason.
+                    <span v-if="currentCampus" class="text-foreground font-medium">· {{ currentCampus.name }}</span>
+                </p>
             </div>
             <Button @click="goCreate">
                 <Plus class="mr-2 h-4 w-4" />
@@ -177,7 +188,7 @@ const goToPage = (url: string | null) => {
 
         <!-- Filters -->
         <Card>
-            <CardContent class="grid grid-cols-1 gap-3 py-4 md:grid-cols-4">
+            <CardContent class="grid grid-cols-1 gap-3 py-4 md:grid-cols-3">
                 <DebouncedInput :model-value="filters.search" placeholder="Search name, email, code…" @update:model-value="(v: string) => onSearch(v)" />
 
                 <Select :model-value="filters.status" @update:model-value="(v) => applyFilters({ status: v as string })">
@@ -185,14 +196,6 @@ const goToPage = (url: string | null) => {
                     <SelectContent>
                         <SelectItem value="all">All statuses</SelectItem>
                         <SelectItem v-for="option in statusOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
-                    </SelectContent>
-                </Select>
-
-                <Select :model-value="filters.campus_code" @update:model-value="(v) => applyFilters({ campus_code: v as string })">
-                    <SelectTrigger><SelectValue placeholder="Campus" /></SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All campuses</SelectItem>
-                        <SelectItem v-for="campus in campuses" :key="campus.code" :value="campus.code">{{ campus.name }}</SelectItem>
                     </SelectContent>
                 </Select>
 
@@ -215,9 +218,13 @@ const goToPage = (url: string | null) => {
                             <tr class="text-muted-foreground">
                                 <th class="px-4 py-3 font-medium">Applicant</th>
                                 <th class="px-4 py-3 font-medium">Code</th>
-                                <th class="px-4 py-3 font-medium">Campus</th>
+                                <th class="px-4 py-3 font-medium">National ID</th>
+                                <th class="px-4 py-3 font-medium">Phone</th>
+                                <th class="px-4 py-3 font-medium">Program</th>
                                 <th class="px-4 py-3 font-medium">Intake</th>
+                                <th class="px-4 py-3 font-medium">Documents</th>
                                 <th class="px-4 py-3 font-medium">Status</th>
+                                <th class="px-4 py-3 font-medium">Created</th>
                                 <th class="px-4 py-3 text-right font-medium">Actions</th>
                             </tr>
                         </thead>
@@ -228,11 +235,26 @@ const goToPage = (url: string | null) => {
                                     <p class="text-muted-foreground text-xs">{{ row.email }}</p>
                                 </td>
                                 <td class="px-4 py-3">{{ row.student_code }}</td>
-                                <td class="px-4 py-3">{{ row.campus_code }}</td>
+                                <td class="px-4 py-3">{{ row.national_id ?? '—' }}</td>
+                                <td class="px-4 py-3">{{ row.phone ?? '—' }}</td>
+                                <td class="px-4 py-3">{{ row.intended_program ?? '—' }}</td>
                                 <td class="px-4 py-3">{{ row.intake ?? '—' }}</td>
+                                <td class="px-4 py-3">
+                                    <button
+                                        type="button"
+                                        class="text-primary inline-flex items-center gap-1 font-medium hover:underline disabled:text-muted-foreground disabled:no-underline"
+                                        :disabled="row.documents_count === 0"
+                                        :title="row.documents_count > 0 ? 'Open documents in a new tab' : 'No documents'"
+                                        @click="openDocuments(row.id)"
+                                    >
+                                        <FileText class="h-4 w-4" />
+                                        {{ row.documents_count }}
+                                    </button>
+                                </td>
                                 <td class="px-4 py-3">
                                     <span class="rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize" :class="statusBadgeClass(row.status)">{{ row.status }}</span>
                                 </td>
+                                <td class="text-muted-foreground px-4 py-3 whitespace-nowrap">{{ formatDate(row.created_at) }}</td>
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex items-center justify-end gap-1">
                                         <Button
@@ -257,6 +279,10 @@ const goToPage = (url: string | null) => {
                                                     <Eye class="mr-2 h-4 w-4" />
                                                     View
                                                 </DropdownMenuItem>
+                                                <DropdownMenuItem @click="openDocuments(row.id)">
+                                                    <FileText class="mr-2 h-4 w-4" />
+                                                    Documents (new tab)
+                                                </DropdownMenuItem>
                                                 <template v-if="row.status === 'pending'">
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem @click="goEdit(row.id)">
@@ -270,7 +296,7 @@ const goToPage = (url: string | null) => {
                                 </td>
                             </tr>
                             <tr v-if="applications.data.length === 0">
-                                <td colspan="6" class="text-muted-foreground px-4 py-10 text-center">No applications match these filters.</td>
+                                <td colspan="10" class="text-muted-foreground px-4 py-10 text-center">No applications match these filters.</td>
                             </tr>
                         </tbody>
                     </table>

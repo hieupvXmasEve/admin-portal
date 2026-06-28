@@ -156,76 +156,26 @@ Before final response:
 - [ ] Docs updated when routes, contracts, auth, or architecture changed
 - [ ] Final answer summarizes changed files, validation result, and unresolved questions
 
-<!-- RETIRED-WORKFLOWS:START -->
-## Retired Workflows
+## Agent skills
 
-Harness Experimental is the sole operational workflow for this repository.
+Skills are installed under `.agents/skills/`. When a user invokes a named skill,
+read that skill's `SKILL.md` before acting.
 
-Do not use Khuym, claudekit, ClaudeKit command packs, `.claude/`, `.agents/`,
-or `.khuym/` as workflow inputs. Do not run `node .codex/khuym_status.mjs` or
-invoke `khuym:*` / `ck:*` skills for this repo.
+### Issue tracker
 
-Historical files under `history/` may still be read as product context when a
-Harness story needs the old investigation notes, but they are not a live task
-system.
-<!-- RETIRED-WORKFLOWS:END -->
+Issues and PRDs live as local markdown under `.scratch/<feature-slug>/`. See `docs/agents/issue-tracker.md`.
 
-<!-- HARNESS:BEGIN -->
-## Harness — sole operational system
+### Triage labels
 
-Harness CLI (`./scripts/harness`, Rust binary at `scripts/bin/harness-cli`, DB at `harness.db`) is the only workflow system in this repo. Before work, read:
+Default vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), recorded as a `Status:` line in each issue file. See `docs/agents/triage-labels.md`.
 
-- `docs/HARNESS.md` — mental model + spec lifecycle
-- `docs/FEATURE_INTAKE.md` — intake gate, risk lanes, classification
-- `docs/ARCHITECTURE.md` — discovery-before-shape + boundary rules
-- `docs/templates/` — story + decision + validation templates
-- Current state: `./scripts/harness query matrix`, `./scripts/harness query backlog`, `./scripts/harness query decisions`
+### Domain docs
 
-### Operator loop (all agents run this for every user requirement)
+Single-context: one root `CONTEXT.md` (domain glossary) + `docs/adr/` (architectural decisions). See `docs/agents/domain.md`.
 
-1. **Intake**: classify per `docs/FEATURE_INTAKE.md` (tiny/normal/high-risk + risk flags). Record:
-   ```
-   ./scripts/harness intake --type <new_spec|spec_slice|change_request|new_initiative|maintenance|harness_improvement> --summary "..." --lane <tiny|normal|high_risk> --flags "auth,data-model,..." --docs "docs/..."
-   ```
-2. **Story**: for normal/high-risk, create story file from `docs/templates/story.md` (or `docs/templates/high-risk-story/` for high-risk) at `docs/stories/<epic>/<story-id>.md`, then register:
-   ```
-   ./scripts/harness story add --id <id> --title "..." --lane <normal|high_risk> --contract docs/stories/<epic>/<id>.md
-   ```
-   Include `Portal impact: none | student | lecturer | both` in the story before
-   implementation.
-3. **Planning + confirm**: present approach (affected files, validation shape, risks) to user. Wait for explicit approval before implementation.
-4. **Execute**: implement minimum vertical slice. Update story status:
-   ```
-   ./scripts/harness story update --id <id> --status in_progress
-   ```
-5. **Trace**: at end of substantial actions, record:
-   ```
-   ./scripts/harness trace --summary "..." --story <id> --actions "..." --changed "..." --outcome <completed|partial|failed|blocked> --friction "..."
-   ```
-6. **Decision**: when architecture/behavior choice is made, add ADR to `docs/decisions/NNNN-<slug>.md` + register:
-   ```
-   ./scripts/harness decision add --id <NNNN> --title "..." --status accepted --doc docs/decisions/NNNN-<slug>.md
-   ```
-7. **Backlog**: when friction is found but not fixed:
-   ```
-   ./scripts/harness backlog add --title "..." --while "<story-id>" --risk <tiny|normal|high_risk>
-   ```
+### Documentation boundaries
 
-### Lanes (from FEATURE_INTAKE.md)
-
-- **Tiny** (0-1 flags, no hard gate): patch directly + intake record. No story file required.
-- **Normal** (2-3 flags): story file + matrix row + validation expectations.
-- **High-risk** (4+ flags OR any hard gate — auth, authz, data loss, audit/security, external provider, validation weakening): full `docs/templates/high-risk-story/` folder (overview.md + design.md + validation.md + execplan.md) + user confirmation before implementation.
-
-### Hard rules
-
-- Never claim a validation command passes until it exists and was run.
-- Use `./scripts/harness query matrix` to verify story status; do not edit `harness.db` by hand.
-- ADR files in `docs/decisions/` are the human-readable surface; harness DB is the queryable index.
-- One direction only: file → DB via CLI. Never DB → file.
-<!-- HARNESS:END -->
-
-===
+Knowledge is kept small by discipline + file boundaries, not automation. Each knowledge type has one home: `CONTEXT.md` = stable glossary only, `docs/adr/` = decisions, `docs/prd/` = large specs, `.scratch/<feature>/` = tasks/status, commits/PRs = code history, `/handoff` = temporary. Never duplicate; reference by path. See `docs/agents/documentation-rules.md`.
 
 <laravel-boost-guidelines>
 === foundation rules ===

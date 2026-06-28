@@ -35,10 +35,13 @@ class StudentApplicationController extends Controller
      */
     public function index(Request $request)
     {
+        // Campus boundary: staff only see Applications for the campus they are
+        // currently working in (the session campus bound by SetCampus).
+        $currentCampus = $this->currentCampus();
+
         $filters = [
             'search' => $request->get('search'),
             'status' => $request->get('status'),
-            'campus_code' => $request->get('campus_code'),
             'intake' => $request->get('intake'),
             'per_page' => min((int) $request->get('per_page', 15), 200),
             'sort' => $request->get('sort', 'created_at'),
@@ -46,9 +49,14 @@ class StudentApplicationController extends Controller
         ];
 
         $query = StudentApplication::query()
+            ->withCount('documents')
             ->with(['student' => function ($query) {
                 $query->select('id', 'student_id', 'full_name');
             }]);
+
+        if ($currentCampus !== null) {
+            $query->where('campus_code', $currentCampus->code);
+        }
 
         if ($filters['search']) {
             $query->where(function ($q) use ($filters) {
@@ -64,10 +72,6 @@ class StudentApplicationController extends Controller
             $query->where('status', $filters['status']);
         }
 
-        if ($filters['campus_code'] !== null && $filters['campus_code'] !== 'all') {
-            $query->where('campus_code', $filters['campus_code']);
-        }
-
         if ($filters['intake'] !== null && $filters['intake'] !== '' && $filters['intake'] !== 'all') {
             $query->where('intake', $filters['intake']);
         }
@@ -78,8 +82,8 @@ class StudentApplicationController extends Controller
             ->paginate($filters['per_page'])
             ->withQueryString();
 
-        $campuses = Campus::select('code', 'name')->get();
         $intakes = StudentApplication::query()
+            ->when($currentCampus !== null, fn ($q) => $q->where('campus_code', $currentCampus->code))
             ->whereNotNull('intake')
             ->where('intake', '!=', '')
             ->distinct()
@@ -89,9 +93,43 @@ class StudentApplicationController extends Controller
         return Inertia::render('student-applications/index', [
             'applications' => $applications,
             'filters' => $filters,
-            'campuses' => $campuses,
+            'currentCampus' => $currentCampus !== null
+                ? ['code' => $currentCampus->code, 'name' => $currentCampus->name]
+                : null,
             'intakes' => $intakes,
             'statusOptions' => $this->statusOptions(),
+        ]);
+    }
+
+    /**
+     * The campus the user is currently working in (bound by SetCampus from the
+     * session), or null when none is selected.
+     */
+    private function currentCampus(): ?Campus
+    {
+        return app()->bound('campus') ? app('campus') : null;
+    }
+
+    /**
+     * A focused, new-tab view of a single Application's documents grouped by type
+     * (external links to the admissions catalog), with missing-required surfaced.
+     */
+    public function documents(StudentApplication $studentApplication, ApplicationDocumentService $documentService)
+    {
+        $studentApplication->load(['documents' => function ($query) {
+            $query->orderBy('file_type_code')->orderBy('page_index')->orderBy('id');
+        }]);
+
+        return Inertia::render('student-applications/documents', [
+            'application' => [
+                'id' => $studentApplication->id,
+                'full_name' => $studentApplication->full_name,
+                'student_code' => $studentApplication->student_code,
+                'campus_code' => $studentApplication->campus_code,
+                'status' => $studentApplication->status,
+                'is_international_applicant' => $studentApplication->is_international_applicant,
+            ],
+            'documentChecklist' => $documentService->checklist($studentApplication),
         ]);
     }
 
@@ -328,6 +366,12 @@ class StudentApplicationController extends Controller
             ];
 
             $query = StudentApplication::query();
+
+            // Never export beyond the user's current campus boundary.
+            $currentCampus = $this->currentCampus();
+            if ($currentCampus !== null) {
+                $query->where('campus_code', $currentCampus->code);
+            }
 
             if ($request->scope === 'filtered') {
                 if ($filters['search']) {

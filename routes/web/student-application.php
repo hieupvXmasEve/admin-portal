@@ -29,6 +29,10 @@ Route::middleware('auth')->prefix('student-applications')->name('student-applica
     Route::get('/{studentApplication}', [StudentApplicationController::class, 'show'])
         ->middleware('can:view_student_application')
         ->name('show');
+    // Focused per-student documents view (opened in a new tab from the list).
+    Route::get('/{studentApplication}/documents', [StudentApplicationController::class, 'documents'])
+        ->middleware('can:view_student_application')
+        ->name('documents');
     Route::get('/{studentApplication}/edit', [StudentApplicationController::class, 'edit'])
         ->middleware('can:edit_student_application')
         ->name('edit');
