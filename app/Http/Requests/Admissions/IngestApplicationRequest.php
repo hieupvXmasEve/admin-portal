@@ -57,11 +57,13 @@ class IngestApplicationRequest extends FormRequest
             'address' => 'nullable|string',
             'health_information' => 'nullable|string',
 
-            // Admission intent.
-            'campus_code' => 'nullable|string|max:50',
-            'intended_program' => 'nullable|string|max:255',
-            'intended_specialization' => 'nullable|string|max:255',
-            'intake' => 'nullable|string|max:100',
+            // Admission intent. Campus / program / intake are canonical codes that
+            // must already exist in Swinx so conversion resolves unambiguously
+            // (ADR-0005); specialization is validated only when supplied (deferred).
+            'campus_code' => 'required|string|max:50|exists:campuses,code',
+            'intended_program' => 'required|string|max:255|exists:programs,code',
+            'intended_specialization' => 'nullable|string|max:255|exists:specializations,code',
+            'intake' => 'required|string|max:100|exists:semesters,code',
             'is_international_applicant' => 'nullable|boolean',
             'exception_units' => 'nullable|string',
             'sut_id' => 'nullable|string|max:100',

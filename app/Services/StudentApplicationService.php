@@ -7,7 +7,6 @@ namespace App\Services;
 use App\Models\ApplicationGuardian;
 use App\Models\Campus;
 use App\Models\CampusUserRole;
-use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Specialization;
 use App\Models\Student;
@@ -40,7 +39,7 @@ class StudentApplicationService
      * Any failure rolls the whole transaction back — never a half-created Student
      * (ADR-0001). Exceptions propagate so callers can surface a clean failure.
      *
-     * @param  array{admission_date?: string, expected_graduation_date?: string|null, specialization_id?: int|null}  $options
+     * @param  array{admission_date?: string, expected_graduation_date?: string|null}  $options
      *
      * @throws RuntimeException when the Application cannot be approved
      */
@@ -62,8 +61,10 @@ class StudentApplicationService
         }
 
         return DB::transaction(function () use ($application, $actor, $options, $mappingData): Student {
+            // specialization_id is left as $mappingData resolved it — from the
+            // Curriculum Version, the single source of truth (ADR-0005); callers
+            // do not override it.
             $conversionData = array_merge($mappingData, [
-                'specialization_id' => $options['specialization_id'] ?? $mappingData['specialization_id'] ?? null,
                 'admission_date' => $options['admission_date'] ?? now()->toDateString(),
                 'expected_graduation_date' => $options['expected_graduation_date'] ?? null,
             ]);
@@ -286,9 +287,12 @@ class StudentApplicationService
     }
 
     /**
-     * Resolve campus/program/curriculum IDs from the Application's CRM-style codes.
+     * Resolve campus/program/curriculum IDs from the Application's canonical codes
+     * (ADR-0005). `intake` is the Semester code; the curriculum is derived from
+     * program + semester (+ specialization) and carries a match count so the
+     * approve guard can fail closed on an ambiguous mapping.
      *
-     * @return array{campus_id: int|null, program_id: int|null, curriculum_version_id: int|null, specialization_id: int|null, intake_semester_id: int|null}
+     * @return array{campus_id: int|null, program_id: int|null, curriculum_version_id: int|null, curriculum_match_count: int, specialization_id: int|null, intake_semester_id: int|null}
      */
     private function resolveMappingData(StudentApplication $application): array
     {
@@ -296,22 +300,16 @@ class StudentApplicationService
             'campus_code' => $application->campus_code,
             'intended_program' => $application->intended_program,
             'intake' => $application->intake,
+            'intended_specialization' => $application->intended_specialization,
         ]);
-
-        $curriculumVersionId = $resolved['curriculum_version_id'] ?? null;
-
-        // Derive the intake semester from the resolved curriculum version rather
-        // than relying on the students table's baked-in default.
-        $intakeSemesterId = $curriculumVersionId
-            ? CurriculumVersion::whereKey($curriculumVersionId)->value('semester_id')
-            : null;
 
         return [
             'campus_id' => $resolved['campus_id'] ?? null,
             'program_id' => $resolved['program_id'] ?? null,
-            'curriculum_version_id' => $curriculumVersionId,
+            'curriculum_version_id' => $resolved['curriculum_version_id'] ?? null,
+            'curriculum_match_count' => $resolved['curriculum_match_count'] ?? 0,
             'specialization_id' => $resolved['specialization_id'] ?? null,
-            'intake_semester_id' => $intakeSemesterId,
+            'intake_semester_id' => $resolved['intake_semester_id'] ?? null,
         ];
     }
 
@@ -394,27 +392,23 @@ class StudentApplicationService
         }
 
         if (empty($data['program_id']) || ! Program::find($data['program_id'])) {
-            $errors[] = 'A valid program could not be resolved for this application.';
+            $errors[] = 'A valid program could not be resolved for this application. Check the program code.';
         }
 
-        if (! empty($data['curriculum_version_id']) && ! empty($data['program_id'])) {
-            $curriculumVersion = CurriculumVersion::where('id', $data['curriculum_version_id'])
-                ->where('program_id', $data['program_id'])
-                ->first();
-            if (! $curriculumVersion) {
-                $errors[] = 'A valid curriculum version could not be resolved for this application.';
-            }
-        } elseif (empty($data['curriculum_version_id'])) {
-            $errors[] = 'A valid curriculum version could not be resolved for this application.';
+        if (empty($data['intake_semester_id'])) {
+            $errors[] = 'A valid intake (semester) could not be resolved for this application. Check the intake code.';
         }
 
-        if (! empty($data['specialization_id']) && ! empty($data['program_id'])) {
-            $specialization = Specialization::where('id', $data['specialization_id'])
-                ->where('program_id', $data['program_id'])
-                ->first();
-            if (! $specialization) {
-                $errors[] = "Specialization with ID {$data['specialization_id']} not found for the resolved program.";
-            }
+        // The Curriculum Version must resolve to exactly one row (ADR-0005). Zero
+        // means no curriculum is set up for this program + intake yet; many means
+        // the program + intake splits by specialization and the choice is
+        // ambiguous — in both cases refuse rather than admit into the wrong one.
+        $curriculumMatchCount = $data['curriculum_match_count'] ?? (empty($data['curriculum_version_id']) ? 0 : 1);
+
+        if ($curriculumMatchCount === 0) {
+            $errors[] = 'No curriculum version exists for this program and intake. Set one up before approving.';
+        } elseif ($curriculumMatchCount > 1) {
+            $errors[] = 'The curriculum version could not be uniquely determined for this program and intake (multiple specializations match). Resolve the ambiguity before approving.';
         }
 
         return [

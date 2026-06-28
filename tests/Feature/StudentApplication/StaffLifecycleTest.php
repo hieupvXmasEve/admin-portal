@@ -65,22 +65,26 @@ function makeStaff(): User
 }
 
 /**
- * Set up the program/curriculum mapping fixtures so an application's CRM codes
- * (campus_code / intended_program / intake) resolve during approval.
+ * Set up the program/curriculum mapping fixtures so an application's canonical
+ * codes (campus_code / intended_program / intake) resolve during approval.
+ * `intake` is the Semester code (ADR-0005); the curriculum is the single version
+ * for that program + semester.
  *
- * @return array{program: Program, curriculum: CurriculumVersion}
+ * @return array{program: Program, semester: Semester, curriculum: CurriculumVersion}
  */
 function setupApprovalMapping(Campus $campus): array
 {
     $program = Program::factory()->create(['code' => 'IT']);
+    $semester = Semester::factory()->create(['code' => 'FA25']);
     $curriculum = CurriculumVersion::factory()->forProgram($program)->create([
-        'version_code' => 'FA25',
+        'semester_id' => $semester->id,
+        'version_code' => 'IT2025.v1',
     ]);
 
     // assignStudentRole() looks up the student role by code.
     Role::factory()->create(['code' => 'sinh_vien', 'name' => 'Sinh viên']);
 
-    return ['program' => $program, 'curriculum' => $curriculum];
+    return ['program' => $program, 'semester' => $semester, 'curriculum' => $curriculum];
 }
 
 function makePendingApplication(Campus $campus, array $overrides = []): StudentApplication
@@ -409,11 +413,15 @@ it('allows an application to be approved again after a revoke', function () {
 
 it('creates a manual application as pending with no auto-approve', function () {
     $staff = makeStaff();
+    $program = Program::factory()->create();
+    $semester = Semester::factory()->create();
 
     $payload = [
         'full_name' => 'Manual Applicant',
         'email' => 'manual@example.com',
         'campus_code' => $this->campus->code,
+        'intended_program' => $program->code,
+        'intake' => $semester->code,
         'student_code' => 'SMAN0001',
         'phone' => '0900000000',
     ];
@@ -428,6 +436,48 @@ it('creates a manual application as pending with no auto-approve', function () {
     expect($application->student_id)->toBeNull();
 
     $response->assertRedirect(route('student-applications.show', $application));
+});
+
+it('rejects a manual application with an unknown program code (ADR-0005 parity)', function () {
+    $staff = makeStaff();
+    $semester = Semester::factory()->create();
+
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->post(route('student-applications.store'), [
+            'full_name' => 'Bad Program',
+            'email' => 'badprogram@example.com',
+            'campus_code' => $this->campus->code,
+            'intended_program' => 'CS', // no Program with this code
+            'intake' => $semester->code,
+            'student_code' => 'SBAD0001',
+            'phone' => '0900000000',
+        ])
+        ->assertSessionHasErrors('intended_program');
+
+    expect(StudentApplication::where('email', 'badprogram@example.com')->exists())->toBeFalse();
+});
+
+it('blocks approve when the curriculum is ambiguous (multiple versions for program + intake)', function () {
+    $program = Program::factory()->create(['code' => 'IT']);
+    $semester = Semester::factory()->create(['code' => 'FA25']);
+    // Two curriculum versions for the same program + semester → ambiguous.
+    CurriculumVersion::factory()->forProgram($program)->create(['semester_id' => $semester->id, 'version_code' => 'IT2025.v1']);
+    CurriculumVersion::factory()->forProgram($program)->create(['semester_id' => $semester->id, 'version_code' => 'IT2025.v2']);
+    Role::factory()->create(['code' => 'sinh_vien', 'name' => 'Sinh viên']);
+
+    $staff = makeStaff();
+    $application = makePendingApplication($this->campus);
+
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->post(route('student-applications.approve', $application), [])
+        ->assertRedirect();
+
+    // No Student created; the application stays pending.
+    expect($application->fresh()->status)->toBe(StudentApplication::STATUS_PENDING)
+        ->and($application->fresh()->student_id)->toBeNull()
+        ->and(Student::count())->toBe(0);
 });
 
 it('lists applications filtered by status', function () {

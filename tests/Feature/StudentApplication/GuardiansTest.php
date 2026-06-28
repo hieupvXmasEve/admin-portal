@@ -8,6 +8,7 @@ use App\Models\CurriculumVersion;
 use App\Models\ParentProfile;
 use App\Models\Program;
 use App\Models\Role;
+use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentApplication;
 use App\Models\User;
@@ -67,7 +68,11 @@ function guardianApplication(Campus $campus, array $overrides = []): StudentAppl
 function guardianApprovalMapping(): void
 {
     $program = Program::factory()->create(['code' => 'IT']);
-    CurriculumVersion::factory()->forProgram($program)->create(['version_code' => 'FA25']);
+    $semester = Semester::factory()->create(['code' => 'FA25']);
+    CurriculumVersion::factory()->forProgram($program)->create([
+        'semester_id' => $semester->id,
+        'version_code' => 'IT2025.v1',
+    ]);
     Role::factory()->create(['code' => 'sinh_vien', 'name' => 'Sinh viên']);
 }
 

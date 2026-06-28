@@ -15,16 +15,10 @@ import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
 import * as z from 'zod';
 
-interface Campus {
+interface CodeOption {
     id: number;
     code: string;
     name: string;
-}
-
-interface Program {
-    id: number;
-    name: string;
-    code: string;
 }
 
 interface StudentApplication {
@@ -62,12 +56,12 @@ interface StudentApplication {
 
 interface Props {
     application: StudentApplication;
-    campuses: Campus[];
-    programs: Program[];
+    campuses: CodeOption[];
+    programs: CodeOption[];
+    semesters: CodeOption[];
 }
 
 const props = defineProps<Props>();
-console.log(props.application);
 // Validation schema matching Laravel UpdateStudentApplicationRequest
 const formSchema = toTypedSchema(
     z.object({
@@ -88,9 +82,9 @@ const formSchema = toTypedSchema(
         address: z.string().nullable(),
         health_information: z.string().nullable(),
         campus_code: z.string().min(1, 'Campus is required'),
-        intended_program: z.string().max(255).nullable(),
+        intended_program: z.string().min(1, 'Program is required'),
         intended_specialization: z.string().max(255).nullable(),
-        intake: z.string().max(50).nullable(),
+        intake: z.string().min(1, 'Intake is required'),
         exam_date: z.string().nullable(),
         english_test_type: z.string().max(50).nullable(),
         listening: z.number().min(0).max(10).nullable(),
@@ -402,9 +396,18 @@ const handleCancel = () => {
 
                         <FormField v-slot="{ componentField }" name="intended_program">
                             <FormItem>
-                                <FormLabel>Intended Program</FormLabel>
+                                <FormLabel>Intended Program *</FormLabel>
                                 <FormControl>
-                                    <Input v-bind="componentField" disabled placeholder="Enter program code" />
+                                    <Select v-bind="componentField">
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select program" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem v-for="program in programs" :key="program.code" :value="program.code">
+                                                {{ program.name }} ({{ program.code }})
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -424,9 +427,18 @@ const handleCancel = () => {
 
                         <FormField v-slot="{ componentField }" name="intake">
                             <FormItem>
-                                <FormLabel>Intake</FormLabel>
+                                <FormLabel>Intake *</FormLabel>
                                 <FormControl>
-                                    <Input v-bind="componentField" disabled placeholder="e.g., 2024-1" />
+                                    <Select v-bind="componentField">
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select intake" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem v-for="semester in semesters" :key="semester.code" :value="semester.code">
+                                                {{ semester.name }} ({{ semester.code }})
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>

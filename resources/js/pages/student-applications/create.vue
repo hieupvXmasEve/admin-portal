@@ -10,14 +10,16 @@ import { ArrowLeft } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
 
-interface Campus {
+interface CodeOption {
     id: number;
     code: string;
     name: string;
 }
 
 interface Props {
-    campuses: Campus[];
+    campuses: CodeOption[];
+    programs: CodeOption[];
+    semesters: CodeOption[];
 }
 
 defineProps<Props>();
@@ -145,12 +147,32 @@ const submit = () => {
                         <p v-if="form.errors.campus_code" class="text-destructive text-xs">{{ form.errors.campus_code }}</p>
                     </div>
                     <div class="space-y-1">
-                        <Label for="intended_program">Intended program</Label>
-                        <Input id="intended_program" v-model="form.intended_program" placeholder="e.g. IT" />
+                        <Label for="intended_program">Intended program *</Label>
+                        <Select v-model="form.intended_program">
+                            <SelectTrigger id="intended_program">
+                                <SelectValue placeholder="Select program" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="program in programs" :key="program.code" :value="program.code">
+                                    {{ program.name }} ({{ program.code }})
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p v-if="form.errors.intended_program" class="text-destructive text-xs">{{ form.errors.intended_program }}</p>
                     </div>
                     <div class="space-y-1">
-                        <Label for="intake">Intake</Label>
-                        <Input id="intake" v-model="form.intake" placeholder="e.g. FA25" />
+                        <Label for="intake">Intake *</Label>
+                        <Select v-model="form.intake">
+                            <SelectTrigger id="intake">
+                                <SelectValue placeholder="Select intake" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="semester in semesters" :key="semester.code" :value="semester.code">
+                                    {{ semester.name }} ({{ semester.code }})
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p v-if="form.errors.intake" class="text-destructive text-xs">{{ form.errors.intake }}</p>
                     </div>
                 </CardContent>
             </Card>

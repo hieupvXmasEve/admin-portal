@@ -8,219 +8,116 @@ use App\Models\Campus;
 use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Semester;
-use Illuminate\Support\Collection;
+use App\Models\Specialization;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
+/**
+ * Resolves an Application's admission-intent codes to the concrete academic
+ * records a Student is created under on Approve (ADR-0005).
+ *
+ * Inputs are canonical codes — `Campus.code`, `Program.code`, `Semester.code`
+ * (intake) — validated to exist at the write boundary. The Curriculum Version is
+ * derived from `(program, semester [, specialization])` and must match **exactly
+ * one** row: the returned `curriculum_match_count` lets the approve guard fail
+ * closed on 0 or many instead of silently picking one. There is no name→code
+ * translation; the code IS the key.
+ */
 class ProgramMappingService
 {
-    /**
-     * Mapping between intended_program codes and actual program codes
-     */
-    private const PROGRAM_CODE_MAPPING = [
-        'Công nghệ bán dẫn' => 'SEMI',           // Computer Science → Software Engineering and Mobile Intelligence
-        'Trí tuệ nhân tạo' => 'AI',  // AI Vietnamese name → AI code
-        'AI' => 'AI',             // AI → AI (direct match)
-        'Tài chính' => 'FIN',            // TC → Finance
-        'Quản trị kinh doanh' => 'BA',             // IT → Business Analytics,
-        'Hệ thống IoT Thông minh' => 'IOT',
-        'Công nghệ phần mềm' => 'SWT',
-        'IT' => 'IT'
-    ];
+    private const CACHE_TTL_SECONDS = 600;
 
     /**
-     * Map intended program code to actual program code
-     */
-    public function mapIntendedProgramToCode(string $intendedProgram): ?string
-    {
-        return self::PROGRAM_CODE_MAPPING[$intendedProgram] ?? null;
-    }
-
-    /**
-     * Get program ID from intended program code
-     */
-    public function getProgramIdFromIntendedCode(string $intendedProgram): ?int
-    {
-        $programCode = $this->mapIntendedProgramToCode($intendedProgram);
-
-        if (!$programCode) {
-            return null;
-        }
-
-        $program = Cache::remember(
-            "program_by_code_{$programCode}",
-            10, // 1 hour
-            fn() => Program::where('code', $programCode)->first()
-        );
-
-        return $program?->id;
-    }
-
-    /**
-     * Get campus ID from campus code
-     */
-    public function getCampusIdFromCode(string $campusCode): ?int
-    {
-        $campus = Cache::remember(
-            "campus_by_code_{$campusCode}",
-            10, // 1 hour
-            fn() => Campus::where('code', $campusCode)->first()
-        );
-
-        return $campus?->id;
-    }
-
-    /**
-     * Get curriculum version ID from intake code and program ID
-     */
-    public function getCurriculumVersionId(string $intakeCode, int $programId): ?int
-    {
-        // First try to find by version_code matching intake
-        $curriculumVersion = Cache::remember(
-            "curriculum_version_{$intakeCode}_{$programId}",
-            10, // 30 minutes
-            function () use ($intakeCode, $programId) {
-                return CurriculumVersion::where('version_code', $intakeCode)
-                    ->where('program_id', $programId)
-                    ->first();
-            }
-        );
-
-        if ($curriculumVersion) {
-            return $curriculumVersion->id;
-        }
-
-        // If not found by version_code, try to find by semester code
-        $semester = Cache::remember(
-            "semester_by_code_{$intakeCode}",
-            10, // 30 minutes
-            fn() => Semester::where('code', $intakeCode)->first()
-        );
-
-        if (!$semester) {
-            return null;
-        }
-
-        // Find curriculum version by semester and program
-        $curriculumVersion = Cache::remember(
-            "curriculum_version_semester_{$semester->id}_{$programId}",
-            10, // 30 minutes
-            function () use ($semester, $programId) {
-                return CurriculumVersion::where('semester_id', $semester->id)
-                    ->where('program_id', $programId)
-                    ->first();
-            }
-        );
-
-        return $curriculumVersion?->id;
-    }
-
-    /**
-     * Resolve all mapping data for a student application
+     * Resolve the campus / program / intake-semester / curriculum ids from an
+     * Application's codes.
+     *
+     * @param  array{campus_code?: ?string, intended_program?: ?string, intake?: ?string, intended_specialization?: ?string}  $applicationData
+     * @return array{campus_id: ?int, program_id: ?int, intake_semester_id: ?int, curriculum_version_id: ?int, curriculum_match_count: int, specialization_id: ?int}
      */
     public function resolveApplicationMappingData(array $applicationData): array
     {
-        Log::info('ProgramMappingService: Starting mapping resolution', [
-            'input_data' => $applicationData
-        ]);
+        $campusId = $this->idFromCode(Campus::class, 'campus_by_code', $applicationData['campus_code'] ?? null);
+        $programId = $this->idFromCode(Program::class, 'program_by_code', $applicationData['intended_program'] ?? null);
+        $semesterId = $this->idFromCode(Semester::class, 'semester_by_code', $applicationData['intake'] ?? null);
+        $specializationId = $this->specializationIdFromCode($applicationData['intended_specialization'] ?? null, $programId);
 
-        $resolvedData = [];
-
-        // Resolve campus_id
-        if (!empty($applicationData['campus_code'])) {
-            Log::info("Resolving campus ID for code: {$applicationData['campus_code']}");
-            $campusId = $this->getCampusIdFromCode($applicationData['campus_code']);
-            $resolvedData['campus_id'] = $campusId;
-            Log::info("Campus ID resolved: " . ($campusId ? $campusId : 'NULL'));
-        } else {
-            Log::warning('Campus code is empty, cannot resolve campus_id');
-        }
-
-        // Resolve program_id
-        if (!empty($applicationData['intended_program'])) {
-            Log::info("Resolving program ID for intended program: {$applicationData['intended_program']}");
-            $mappedCode = $this->mapIntendedProgramToCode($applicationData['intended_program']);
-            Log::info("Mapped program code: " . ($mappedCode ? $mappedCode : 'NULL'));
-
-            $programId = $this->getProgramIdFromIntendedCode($applicationData['intended_program']);
-            $resolvedData['program_id'] = $programId;
-            Log::info("Program ID resolved: " . ($programId ? $programId : 'NULL'));
-        } else {
-            Log::warning('Intended program is empty, cannot resolve program_id');
-        }
-
-        // Resolve curriculum_version_id
-        if (!empty($applicationData['intake']) && !empty($resolvedData['program_id'])) {
-            Log::info("Resolving curriculum version ID for intake: {$applicationData['intake']}, program_id: {$resolvedData['program_id']}");
-            $curriculumVersionId = $this->getCurriculumVersionId(
-                $applicationData['intake'],
-                $resolvedData['program_id']
-            );
-            $resolvedData['curriculum_version_id'] = $curriculumVersionId;
-            Log::info("Curriculum version ID resolved: " . ($curriculumVersionId ? $curriculumVersionId : 'NULL'));
-        } else {
-            if (empty($applicationData['intake'])) {
-                Log::warning('Intake is empty, cannot resolve curriculum_version_id');
-            }
-            if (empty($resolvedData['program_id'])) {
-                Log::warning('Program ID not resolved, cannot resolve curriculum_version_id');
-            }
-        }
-
-        Log::info('ProgramMappingService: Mapping resolution complete', [
-            'resolved_data' => $resolvedData
-        ]);
-
-        return $resolvedData;
-    }
-
-    /**
-     * Get all program mappings for reference
-     */
-    public function getAllProgramMappings(): array
-    {
-        return self::PROGRAM_CODE_MAPPING;
-    }
-
-    /**
-     * Validate mapping data completeness
-     */
-    public function validateMappingData(array $mappingData): array
-    {
-        $errors = [];
-
-        if (empty($mappingData['campus_id'])) {
-            $errors[] = 'Campus ID could not be resolved';
-        }
-
-        if (empty($mappingData['program_id'])) {
-            $errors[] = 'Program ID could not be resolved';
-        }
-
-        if (empty($mappingData['curriculum_version_id'])) {
-            $errors[] = 'Curriculum Version ID could not be resolved';
-        }
+        [$curriculumVersionId, $curriculumMatchCount, $resolvedSpecializationId] =
+            $this->resolveCurriculum($programId, $semesterId, $specializationId);
 
         return [
-            'valid' => empty($errors),
-            'errors' => $errors,
+            'campus_id' => $campusId,
+            'program_id' => $programId,
+            // The intake IS the starting Semester (ADR-0005).
+            'intake_semester_id' => $semesterId,
+            'curriculum_version_id' => $curriculumVersionId,
+            'curriculum_match_count' => $curriculumMatchCount,
+            // Specialization is taken from the resolved Curriculum Version, the
+            // single source of truth, not from the (deferred) intent field.
+            'specialization_id' => $resolvedSpecializationId,
         ];
     }
 
     /**
-     * Clear mapping cache
+     * Resolve the Curriculum Version for a program + semester, optionally narrowed
+     * by specialization. Returns `[id, matchCount, specializationId]`; the id and
+     * specialization are only set when exactly one version matches.
+     *
+     * @return array{0: ?int, 1: int, 2: ?int}
      */
-    public function clearMappingCache(): void
+    private function resolveCurriculum(?int $programId, ?int $semesterId, ?int $specializationId): array
     {
-        $patterns = [
-            'program_by_code_*',
-            'campus_by_code_*',
-            'curriculum_version_*',
-            'semester_by_code_*'
-        ];
-
-        foreach ($patterns as $pattern) {
-            Cache::forget($pattern);
+        if ($programId === null || $semesterId === null) {
+            return [null, 0, null];
         }
+
+        $versions = CurriculumVersion::query()
+            ->where('program_id', $programId)
+            ->where('semester_id', $semesterId)
+            ->when($specializationId !== null, fn ($query) => $query->where('specialization_id', $specializationId))
+            ->get(['id', 'specialization_id']);
+
+        if ($versions->count() === 1) {
+            $version = $versions->first();
+
+            return [$version->id, 1, $version->specialization_id];
+        }
+
+        return [null, $versions->count(), null];
+    }
+
+    /**
+     * Resolve a specialization id from its code (scoped to the program when known).
+     */
+    private function specializationIdFromCode(?string $code, ?int $programId): ?int
+    {
+        if ($code === null || $code === '') {
+            return null;
+        }
+
+        return Specialization::query()
+            ->where('code', $code)
+            ->when($programId !== null, fn ($query) => $query->where('program_id', $programId))
+            ->value('id');
+    }
+
+    /**
+     * Look up a row id by its `code`, cached briefly. Codes → ids are stable, so a
+     * short TTL keeps the hot approve/ingest paths cheap.
+     *
+     * @param  class-string<Model>  $model
+     */
+    private function idFromCode(string $model, string $cachePrefix, ?string $code): ?int
+    {
+        if ($code === null || $code === '') {
+            return null;
+        }
+
+        $id = Cache::remember(
+            "{$cachePrefix}_{$code}",
+            self::CACHE_TTL_SECONDS,
+            fn () => $model::query()->where('code', $code)->value('id'),
+        );
+
+        return $id !== null ? (int) $id : null;
     }
 }

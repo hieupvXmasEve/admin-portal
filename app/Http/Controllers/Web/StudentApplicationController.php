@@ -12,12 +12,14 @@ use App\Models\ApplicationDocumentType;
 use App\Models\ApplicationGuardian;
 use App\Models\Campus;
 use App\Models\Program;
+use App\Models\Semester;
 use App\Models\StudentApplication;
 use App\Services\ApplicationDocumentService;
 use App\Services\StudentApplicationService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Excel;
@@ -172,13 +174,7 @@ class StudentApplicationController extends Controller
      */
     public function create()
     {
-        $campuses = Campus::select('id', 'code', 'name')->get();
-        $programs = Program::select('id', 'name', 'code')->get();
-
-        return Inertia::render('student-applications/create', [
-            'campuses' => $campuses,
-            'programs' => $programs,
-        ]);
+        return Inertia::render('student-applications/create', $this->intentFormOptions());
     }
 
     /**
@@ -225,14 +221,25 @@ class StudentApplicationController extends Controller
      */
     public function edit(StudentApplication $studentApplication)
     {
-        $campuses = Campus::select('id', 'code', 'name')->get();
-        $programs = Program::select('id', 'name', 'code')->get();
-
         return Inertia::render('student-applications/edit', [
             'application' => $studentApplication,
-            'campuses' => $campuses,
-            'programs' => $programs,
+            ...$this->intentFormOptions(),
         ]);
+    }
+
+    /**
+     * Dropdown options for the manual create/edit form. Programs, campuses and
+     * intakes are the canonical code lists the form submits codes from (ADR-0005).
+     *
+     * @return array{campuses: Collection<int, Campus>, programs: Collection<int, Program>, semesters: Collection<int, Semester>}
+     */
+    private function intentFormOptions(): array
+    {
+        return [
+            'campuses' => Campus::select('id', 'code', 'name')->orderBy('name')->get(),
+            'programs' => Program::select('id', 'code', 'name')->orderBy('name')->get(),
+            'semesters' => Semester::select('id', 'code', 'name')->orderBy('code')->get(),
+        ];
     }
 
     /**

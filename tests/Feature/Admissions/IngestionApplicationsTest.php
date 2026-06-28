@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use App\Models\ApplicationDocument;
 use App\Models\ApplicationDocumentType;
+use App\Models\Campus;
+use App\Models\Program;
+use App\Models\Semester;
 use App\Models\StudentApplication;
 use App\Models\User;
 use App\Shared\Support\Admissions\AdmissionsIngestion;
@@ -18,6 +21,12 @@ beforeEach(function () {
     // The ingestion throttle uses the cache store; clear it so per-test hit
     // counts do not leak across tests.
     Cache::flush();
+
+    // Canonical codes the payload references must exist (ADR-0005: required+exists).
+    Campus::factory()->create(['code' => 'SAI']);
+    Program::factory()->create(['code' => 'IT']);
+    Program::factory()->create(['code' => 'BUS']);
+    Semester::factory()->create(['code' => 'Fall 2025']);
 
     $service = User::factory()->create(['type' => UserType::SERVICE]);
     Sanctum::actingAs($service, [AdmissionsIngestion::ABILITY]);
@@ -237,6 +246,22 @@ it('returns validation errors in the ApiResponse envelope', function () {
             ],
         ]);
 
+    expect(StudentApplication::count())->toBe(0);
+});
+
+it('rejects an unknown program code with 422 (ADR-0005)', function () {
+    $this->postJson(ingestUrl(), ingestionPayload(['intended_program' => 'CS']))
+        ->assertStatus(422)
+        ->assertJson(['success' => false, 'errors' => [['code' => 'VALIDATION_ERROR']]]);
+
+    expect(StudentApplication::count())->toBe(0);
+});
+
+it('rejects a missing campus / intake code with 422', function () {
+    $payload = ingestionPayload();
+    unset($payload['campus_code'], $payload['intake']);
+
+    $this->postJson(ingestUrl(), $payload)->assertStatus(422);
     expect(StudentApplication::count())->toBe(0);
 });
 

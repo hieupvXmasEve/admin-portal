@@ -3,7 +3,7 @@
 > Single-page orientation for humans and AI agents new to this repo.
 > For depth, jump to `docs/codebase-discovery-2026-05-12.md`. For all agent operating rules, see `AGENTS.md`.
 
-**Last updated:** 2026-05-31
+**Last updated:** 2026-06-28
 **Owner:** Platform Team
 **Status:** Active baseline
 
@@ -322,6 +322,17 @@ Seed terms (cross-cutting platform language; extend per domain as work lands):
 | **Action** | A write-path use case, named `VerbEntityAction` with `static run(array $data)`. |
 | **Query** | A read model, named `VerbEntityContextQuery` with `handle(...$args)`. |
 | **ApiResponse envelope** | The mandatory API response shape `{ success, timestamp, data?, meta?, message?, errors? }` produced via `ApiResponse::*`. |
+| **Staff Copilot** | A staff/admin web AI assistant in Swinx that helps authorized staff inspect and analyze allowlisted academic and finance data within the current campus. It is read-only unless a separate write-approval story accepts mutations. |
+| **Allowed AI data** | The subset of Swinx business data an AI capability may use after staff permission, campus scope, tool/catalog allowlists, redaction, and audit policy are applied. It is not a raw database dump or unrestricted transcript memory. |
+| **Report/metric Q&A** | A Staff Copilot flow where staff ask natural-language questions about allowlisted operational metrics, and Swinx answers through validated metric queries with source, filter, scope, freshness, and confidence evidence. |
+| **MVP metric seed** | The first Staff Copilot report/metric Q&A metric set for Academic and Finance: student status count, academic defer count, finance collection summary, finance fee monitor summary, and DNG lifecycle attention. |
+| **Structured AI answer** | A Staff Copilot response shaped for UI rendering and testing, with answer text plus metric summaries, groups, sources, filters, freshness, hidden sections, confidence, and safe error state when applicable. |
+| **Student-centric analysis** | A Staff Copilot analysis flow centered on one resolved Student, using only allowed AI data for that student to explain academic, finance, attendance, enrollment, and lifecycle context. |
+| **Query-only AI capability** | An AI capability that may retrieve and analyze allowed AI data but must not mutate records, create tasks, send messages, change workflow state, or trigger side effects. |
+| **Resolved Student** | The single Student accepted by Staff Copilot conversation context as the current subject for a follow-up analysis. If no Student or multiple Students are plausible, Staff Copilot must ask for clarification before querying student-specific data. |
+| **Staff Student Case Review Summary** | A query-only Staff Copilot output that summarizes one resolved Student's allowed AI data into evidence-backed observations and suggested follow-up questions for staff. It explains notable academic, finance, attendance, enrollment, and lifecycle context without taking action on the student's record. |
+| **Chat-initiated case review** | A Staff Copilot review flow started from the current chat after exactly one Student has been resolved in conversation context. It is not a separate button or entry point on the student detail page. |
+| **Case review section bundle** | The default allowed-data bundle for a Staff Student Case Review Summary: identity, academic summary, bounded recent enrollments, attendance summary, finance summary, and lifecycle actions. Missing section permissions produce hidden-section notices instead of failing the whole review. |
 | **Application** _(Admissions)_ | A prospective student's dossier, captured before they become a Student; created by the admissions CRM via API or entered manually by staff. |
 | **Applicant** _(Admissions)_ | The person an Application is about; becomes a Student only when approved, and is neither a User nor a Student until then. |
 | **Approve** _(Admissions)_ | The decision to admit an Applicant so they become a Student. Not "convert", "admit", or "enroll". |
@@ -330,6 +341,8 @@ Seed terms (cross-cutting platform language; extend per domain as work lands):
 | **Revoke** _(Admissions)_ | Undoing a mistaken approval while the new Student has no downstream activity: it returns the Application to pending. Distinct from Withdraw. |
 | **Withdraw** _(Admissions)_ | Removing a Student who has already studied, preserving all their academic/financial history. Distinct from Revoke. |
 | **Document type** _(Admissions)_ | A category of admission document (e.g. CCCD, transcript), defined by the admissions CRM's catalog and mirrored into Swinx. |
+| **Intended Program** _(Admissions)_ | The Program an Applicant requests on their Application, identified by the canonical `Program` code — the applicant's *intent*, distinct from the actual Program a Student is placed into on Approve. |
+| **Intake** _(Admissions)_ | The Semester an Applicant intends to start in, identified by the canonical `Semester` code. With the Intended Program it determines the Curriculum Version the Student is enrolled under. |
 
 ## Onward Pointers
 

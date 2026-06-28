@@ -9,6 +9,7 @@ use App\Models\Permission;
 use App\Models\Program;
 use App\Models\Role;
 use App\Models\RolePermission;
+use App\Models\Semester;
 use App\Models\StudentApplication;
 use App\Models\User;
 use App\Shared\Support\Enums\UserType;
@@ -78,7 +79,11 @@ function authzPendingApplication(Campus $campus, array $overrides = []): Student
 function authzApprovalMapping(): void
 {
     $program = Program::factory()->create(['code' => 'IT']);
-    CurriculumVersion::factory()->forProgram($program)->create(['version_code' => 'FA25']);
+    $semester = Semester::factory()->create(['code' => 'FA25']);
+    CurriculumVersion::factory()->forProgram($program)->create([
+        'semester_id' => $semester->id,
+        'version_code' => 'IT2025.v1',
+    ]);
     Role::factory()->create(['code' => 'sinh_vien', 'name' => 'Sinh viên']);
 }
 
