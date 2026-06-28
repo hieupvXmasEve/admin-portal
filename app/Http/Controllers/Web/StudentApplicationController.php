@@ -315,8 +315,10 @@ class StudentApplicationController extends Controller
                 ->with('error', 'Failed to approve the application. Please try again.');
         }
 
+        // Stay on the originating page (the list or the detail screen) and just
+        // refresh its data — the action does not navigate away.
         return redirect()
-            ->route('student-applications.show', $studentApplication)
+            ->back()
             ->with('success', 'Application approved. The student has been enrolled.');
     }
 
@@ -351,7 +353,7 @@ class StudentApplicationController extends Controller
         }
 
         return redirect()
-            ->route('student-applications.show', $studentApplication)
+            ->back()
             ->with('success', 'Application rejected.');
     }
 
@@ -384,7 +386,7 @@ class StudentApplicationController extends Controller
         }
 
         return redirect()
-            ->route('student-applications.show', $studentApplication)
+            ->back()
             ->with('success', 'Approval revoked. The application is pending again.');
     }
 

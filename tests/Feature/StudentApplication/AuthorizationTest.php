@@ -107,7 +107,7 @@ it('lets a staff member with the permission at the application campus approve it
             'admission_date' => now()->toDateString(),
         ]);
 
-    $response->assertRedirect(route('student-applications.show', $application));
+    $response->assertRedirect();
     expect($application->fresh()->status)->toBe(StudentApplication::STATUS_ENROLLED);
 });
 
@@ -144,7 +144,7 @@ it('lets a staff member with the permission at the application campus reject it'
             'rejected_reason' => 'Incomplete dossier.',
         ]);
 
-    $response->assertRedirect(route('student-applications.show', $application));
+    $response->assertRedirect();
     expect($application->fresh()->status)->toBe(StudentApplication::STATUS_REJECTED);
 });
 

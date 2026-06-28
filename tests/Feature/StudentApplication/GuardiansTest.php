@@ -245,7 +245,7 @@ it('maps the primary guardian to the student emergency contact and links it as t
         ->post(route('student-applications.approve', $application), [
             'admission_date' => now()->toDateString(),
         ])
-        ->assertRedirect(route('student-applications.show', $application));
+        ->assertRedirect();
 
     $application->refresh();
     $student = Student::find($application->student_id);

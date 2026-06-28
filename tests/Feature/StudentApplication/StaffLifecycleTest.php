@@ -111,7 +111,8 @@ it('approves a pending application, atomically creating user, student, role, and
             'admission_date' => now()->toDateString(),
         ]);
 
-    $response->assertRedirect(route('student-applications.show', $application));
+    // Approve redirects back to the originating page (it does not navigate away).
+    $response->assertRedirect();
 
     // Application moved to enrolled and records who approved it.
     $application->refresh();
@@ -197,7 +198,7 @@ it('rejects a pending application with a reason and creates no student', functio
             'rejected_reason' => 'Incomplete dossier.',
         ]);
 
-    $response->assertRedirect(route('student-applications.show', $application));
+    $response->assertRedirect();
 
     $application->refresh();
     expect($application->status)->toBe(StudentApplication::STATUS_REJECTED);
@@ -282,7 +283,7 @@ it('revokes an enrolled application within the safe window, tearing down student
         ->withHeader('X-CSRF-TOKEN', SA_CSRF)
         ->post(route('student-applications.revoke', $application));
 
-    $response->assertRedirect(route('student-applications.show', $application));
+    $response->assertRedirect();
 
     // Application returned to pending and records who revoked it.
     $application->refresh();
@@ -403,7 +404,7 @@ it('allows an application to be approved again after a revoke', function () {
         ->post(route('student-applications.approve', $application), [
             'admission_date' => now()->toDateString(),
         ])
-        ->assertRedirect(route('student-applications.show', $application));
+        ->assertRedirect();
 
     $application->refresh();
     expect($application->status)->toBe(StudentApplication::STATUS_ENROLLED);
