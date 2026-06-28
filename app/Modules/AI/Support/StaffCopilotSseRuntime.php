@@ -57,8 +57,7 @@ class StaffCopilotSseRuntime
                 'idempotency_key' => (string) Str::uuid(),
             ]);
 
-            $this->recordEvent($run, 'run.queued', [
-                'status' => AiChatRun::STATUS_QUEUED,
+            $this->recordEvent($run, 'run.queued', $this->progressPayload(AiChatRun::STATUS_QUEUED, [
                 'provider' => $run->provider,
                 'model' => $run->model,
                 'runtime_mode' => $run->runtime_mode,
@@ -67,7 +66,7 @@ class StaffCopilotSseRuntime
                 'prompt_version' => $run->prompt_version,
                 'catalog_version' => $run->catalog_version,
                 'tool_schema_version' => $run->tool_schema_version,
-            ]);
+            ]));
             $this->recordEvent($run, 'message.created', [
                 'message_id' => $userMessage->id,
                 'role' => 'user',
@@ -119,10 +118,9 @@ class StaffCopilotSseRuntime
                 ])->save();
             }
 
-            $this->recordEvent($run, 'run.cancelled', [
-                'status' => AiChatRun::STATUS_CANCELLED,
+            $this->recordEvent($run, 'run.cancelled', $this->progressPayload(AiChatRun::STATUS_CANCELLED, [
                 'safe_error_code' => 'run_cancelled',
-            ], $assistantMessage);
+            ]), $assistantMessage);
 
             return $run->refresh();
         });
@@ -165,8 +163,7 @@ class StaffCopilotSseRuntime
                 'idempotency_key' => (string) Str::uuid(),
             ]);
 
-            $this->recordEvent($run, 'run.queued', [
-                'status' => AiChatRun::STATUS_QUEUED,
+            $this->recordEvent($run, 'run.queued', $this->progressPayload(AiChatRun::STATUS_QUEUED, [
                 'retry_of_run_id' => $sourceRun->id,
                 'provider' => $run->provider,
                 'model' => $run->model,
@@ -176,7 +173,7 @@ class StaffCopilotSseRuntime
                 'prompt_version' => $run->prompt_version,
                 'catalog_version' => $run->catalog_version,
                 'tool_schema_version' => $run->tool_schema_version,
-            ]);
+            ]));
             $this->recordEvent($run, 'message.created', [
                 'message_id' => $assistantMessage->id,
                 'role' => 'assistant',
@@ -249,8 +246,8 @@ class StaffCopilotSseRuntime
         $finalAnswerId = 'staff-copilot-'.$run->trace->id;
 
         try {
-            $this->markStatus($run, AiChatRun::STATUS_RUNNING, 'run.started', ['status' => AiChatRun::STATUS_RUNNING]);
-            $this->markStatus($run, AiChatRun::STATUS_PLANNING, 'run.status', ['status' => AiChatRun::STATUS_PLANNING]);
+            $this->markStatus($run, AiChatRun::STATUS_RUNNING, 'run.started');
+            $this->markStatus($run, AiChatRun::STATUS_PLANNING, 'run.status');
 
             $answer = $this->runner->run($run->userMessage->redacted_content, $run->user, $run->campus, $run->trace);
             $run->trace->refresh();
@@ -260,13 +257,13 @@ class StaffCopilotSseRuntime
                     'safe_error_code' => 'provider_invocation_failed',
                     'provider' => $run->trace->provider,
                     'model' => $run->trace->model,
+                    'progress_label' => 'Provider unavailable',
+                    'progress_detail' => 'Swinx is falling back safely.',
                 ]);
             }
 
             if ($run->trace->toolCalls()->exists()) {
-                $this->markStatus($run, AiChatRun::STATUS_TOOL_RUNNING, 'run.status', [
-                    'status' => AiChatRun::STATUS_TOOL_RUNNING,
-                ]);
+                $this->markStatus($run, AiChatRun::STATUS_TOOL_RUNNING, 'run.status');
             }
 
             $this->recordToolEvents($run);
@@ -301,11 +298,10 @@ class StaffCopilotSseRuntime
                 'safe_error_code' => $safeErrorCode,
             ])->save();
 
-            $this->recordEvent($run, 'run.status', [
-                'status' => AiChatRun::STATUS_STREAMING,
+            $this->recordEvent($run, 'run.status', $this->progressPayload(AiChatRun::STATUS_STREAMING, [
                 'provider' => $run->provider,
                 'model' => $run->model,
-            ]);
+            ]));
 
             $this->recordEvent($run, 'message.delta', [
                 'message_id' => $run->assistant_message_id,
@@ -317,6 +313,7 @@ class StaffCopilotSseRuntime
                 'status' => $answer->status(),
                 'safe_error_code' => $safeErrorCode,
                 'source_references' => $answer->payload()['source_references'] ?? [],
+                'progress_label' => $answer->isSuccessful() ? 'Answer ready' : 'Could not complete',
             ], $run->assistantMessage);
 
             $terminalStatus = $answer->isSuccessful() ? AiChatRun::STATUS_COMPLETED : AiChatRun::STATUS_FAILED;
@@ -330,10 +327,9 @@ class StaffCopilotSseRuntime
                 'safe_error_code' => $safeErrorCode,
             ])->save();
 
-            $this->recordEvent($run, $terminalEvent, [
-                'status' => $terminalStatus,
+            $this->recordEvent($run, $terminalEvent, $this->progressPayload($terminalStatus, [
                 'safe_error_code' => $safeErrorCode,
-            ]);
+            ]));
         } catch (Throwable) {
             $this->failRun($run, 'runtime_execution_failed');
         }
@@ -367,10 +363,9 @@ class StaffCopilotSseRuntime
                 ])->save();
             }
 
-            $this->recordEvent($run, 'run.failed', [
-                'status' => AiChatRun::STATUS_FAILED,
+            $this->recordEvent($run, 'run.failed', $this->progressPayload(AiChatRun::STATUS_FAILED, [
                 'safe_error_code' => $safeErrorCode,
-            ], $assistantMessage);
+            ]), $assistantMessage);
         });
     }
 
@@ -385,7 +380,7 @@ class StaffCopilotSseRuntime
         return $sourceRun;
     }
 
-    private function markStatus(AiChatRun $run, string $status, string $eventType, array $payload): void
+    private function markStatus(AiChatRun $run, string $status, string $eventType, array $payload = []): void
     {
         $attributes = ['status' => $status];
 
@@ -394,7 +389,7 @@ class StaffCopilotSseRuntime
         }
 
         $run->forceFill($attributes)->save();
-        $this->recordEvent($run, $eventType, $payload);
+        $this->recordEvent($run, $eventType, $this->progressPayload($status, $payload));
     }
 
     /**
@@ -419,10 +414,7 @@ class StaffCopilotSseRuntime
         $toolCalls = $run->trace->toolCalls()->orderBy('id')->get();
 
         foreach ($toolCalls as $toolCall) {
-            $this->recordEvent($run, 'tool.started', [
-                'tool_name' => $toolCall->tool_name,
-                'tool_schema_version' => $toolCall->tool_schema_version,
-            ], null, $toolCall);
+            $this->recordEvent($run, 'tool.started', $this->toolProgressPayload($toolCall, 'started'), null, $toolCall);
 
             $eventType = match ($toolCall->status) {
                 'completed', 'partial' => 'tool.completed',
@@ -430,14 +422,115 @@ class StaffCopilotSseRuntime
                 default => 'tool.failed',
             };
 
-            $this->recordEvent($run, $eventType, [
-                'tool_name' => $toolCall->tool_name,
-                'tool_schema_version' => $toolCall->tool_schema_version,
+            $this->recordEvent($run, $eventType, $this->toolProgressPayload($toolCall, $toolCall->status, [
                 'status' => $toolCall->status,
                 'safe_error_code' => $toolCall->safe_error_code,
-                'source_references' => $toolCall->source_references ?? [],
-            ], null, $toolCall);
+            ]), null, $toolCall);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function progressPayload(string $status, array $payload = []): array
+    {
+        return array_replace([
+            'status' => $status,
+            'progress_label' => $this->statusLabel($status),
+            'progress_detail' => $this->statusDetail($status),
+        ], $payload);
+    }
+
+    private function statusLabel(string $status): string
+    {
+        return match ($status) {
+            AiChatRun::STATUS_QUEUED => 'Waiting to start',
+            AiChatRun::STATUS_RUNNING => 'Starting',
+            AiChatRun::STATUS_PLANNING => 'Reviewing question',
+            AiChatRun::STATUS_TOOL_RUNNING => 'Checking approved data',
+            AiChatRun::STATUS_STREAMING => 'Writing answer',
+            AiChatRun::STATUS_COMPLETED => 'Answer ready',
+            AiChatRun::STATUS_FAILED => 'Could not complete',
+            AiChatRun::STATUS_CANCELLED => 'Stopped',
+            default => 'Working',
+        };
+    }
+
+    private function statusDetail(string $status): string
+    {
+        return match ($status) {
+            AiChatRun::STATUS_QUEUED => 'Your question is queued.',
+            AiChatRun::STATUS_RUNNING => 'Swinx is preparing the run.',
+            AiChatRun::STATUS_PLANNING => 'Swinx is deciding what allowed data is needed.',
+            AiChatRun::STATUS_TOOL_RUNNING => 'Swinx is reading approved data for this campus.',
+            AiChatRun::STATUS_STREAMING => 'The answer is being prepared.',
+            AiChatRun::STATUS_COMPLETED => 'The run completed.',
+            AiChatRun::STATUS_FAILED => 'The run stopped safely.',
+            AiChatRun::STATUS_CANCELLED => 'The run was cancelled.',
+            default => 'The run is in progress.',
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function toolProgressPayload(AiToolCall $toolCall, string $status, array $payload = []): array
+    {
+        return array_replace([
+            'status' => $status,
+            'data_group' => $this->dataGroupLabel($toolCall),
+            'progress_label' => $this->toolStatusLabel($status),
+            'progress_detail' => $this->toolStatusDetail($toolCall, $status),
+        ], $payload);
+    }
+
+    private function toolStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'started' => 'Checking approved data',
+            'completed' => 'Data check complete',
+            'partial' => 'Partial data available',
+            'denied' => 'Data access blocked',
+            default => 'Data check stopped',
+        };
+    }
+
+    private function toolStatusDetail(AiToolCall $toolCall, string $status): string
+    {
+        $dataGroup = $this->dataGroupLabel($toolCall);
+
+        return match ($status) {
+            'started' => "Swinx is checking {$dataGroup}.",
+            'completed' => "{$dataGroup} is ready for the answer.",
+            'partial' => "{$dataGroup} returned partial results.",
+            'denied' => "You do not have access to {$dataGroup}.",
+            default => "Swinx could not use {$dataGroup}.",
+        };
+    }
+
+    private function dataGroupLabel(AiToolCall $toolCall): string
+    {
+        $sourceReport = (string) ($toolCall->source_references[0]['source_report'] ?? '');
+
+        if (str_starts_with($sourceReport, 'finance.')) {
+            return 'Finance data';
+        }
+
+        if (str_starts_with($sourceReport, 'academic.student-profile.')) {
+            return 'Student profile data';
+        }
+
+        if (str_starts_with($sourceReport, 'academic.entity-search.')) {
+            return 'Directory data';
+        }
+
+        if (str_starts_with($sourceReport, 'academic.')) {
+            return 'Academic data';
+        }
+
+        return 'approved data';
     }
 
     private function recordEvent(

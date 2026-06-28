@@ -246,7 +246,10 @@ Code baseline:
 - Staff copilot message submission now queues a durable assistant run, stores a
   placeholder assistant message, and streams normalized run/status/tool/message
   events through `/ai/copilot/runs/{run}/events` using SSE. Active runs are
-  recovered on page reload and can be cancelled through
+  recovered on page reload with both `last_event_id` and a `replay_cursor`.
+  Browser reconnects use the last applied event cursor so assistant deltas are
+  not duplicated. Invalid cursors return a stable `invalid_run_event_cursor`
+  error before provider/tool work can execute. Runs can be cancelled through
   `/ai/copilot/runs/{run}/cancel` or retried through
   `/ai/copilot/runs/{run}/retry` when owned by the current staff/campus scope.
 - Staff copilot can use an enabled, successfully tested staff-owned provider
@@ -268,7 +271,8 @@ Acceptance criteria:
 - AI evaluation and live-agent evidence can be recorded with deterministic/SDK
   fakes and without live provider credentials.
 - Staff copilot SSE events are persisted as redacted run events, replayable by
-  cursor, owner/campus checked, and do not require WebSocket/Reverb/Pusher.
+  cursor, owner/campus checked, staff-friendly in progress payloads, and do not
+  require WebSocket/Reverb/Pusher.
 - AI query plans are allowlisted, aggregate-only, campus-scoped, permission
   checked, and denied before execution when they contain SQL/table/column
   payloads, unsupported filters/groupings, cross-campus scope, or unbounded

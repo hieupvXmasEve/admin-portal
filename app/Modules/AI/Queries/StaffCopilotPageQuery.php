@@ -165,11 +165,15 @@ class StaffCopilotPageQuery
             return null;
         }
 
+        $assistantContent = (string) $run->assistantMessage()
+            ->value('redacted_content');
+
         return [
             'id' => $run->id,
             'status' => $run->status,
             'assistant_message_id' => $run->assistant_message_id,
             'last_event_id' => $run->last_event_id,
+            'replay_cursor' => $assistantContent === '' ? 0 : ($run->last_event_id ?? 0),
             'stream_url' => route('ai.copilot.runs.events', $run, false),
             'can_cancel' => true,
             'provider' => $run->provider,

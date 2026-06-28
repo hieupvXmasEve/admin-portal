@@ -84,6 +84,8 @@ interface CopilotMessage {
     hidden_sections: string[];
     run_id: number | null;
     run_status: string | null;
+    run_progress_label?: string | null;
+    run_progress_detail?: string | null;
     answer: AnswerPayload | null;
 }
 
@@ -92,6 +94,7 @@ interface ActiveRun {
     status: string;
     assistant_message_id: number;
     last_event_id: number | null;
+    replay_cursor: number;
     stream_url: string;
     can_cancel: boolean;
     provider: string | null;
@@ -137,11 +140,27 @@ const form = useForm({
 
 const localMessages = ref<CopilotMessage[]>(props.messages.map((message) => ({ ...message })));
 const activeRunStatus = ref<string | null>(props.active_run?.status ?? null);
-const lastEventId = ref<number>(props.active_run?.last_event_id ?? 0);
+const activeRunProgressLabel = ref<string | null>(null);
+const activeRunProgressDetail = ref<string | null>(null);
+const lastEventId = ref<number>(props.active_run?.replay_cursor ?? props.active_run?.last_event_id ?? 0);
 const isStreaming = ref(false);
 const eventSource = ref<EventSource | null>(null);
+const reconnectTimer = ref<ReturnType<typeof setTimeout> | null>(null);
+const appliedEventIds = ref<Set<number>>(new Set());
 
 const terminalStatuses = ['completed', 'failed', 'cancelled'];
+const statusLabels: Record<string, string> = {
+    queued: 'Waiting to start',
+    running: 'Starting',
+    planning: 'Reviewing question',
+    tool_running: 'Checking approved data',
+    streaming: 'Writing answer',
+    completed: 'Answer ready',
+    failed: 'Could not complete',
+    cancelled: 'Stopped',
+    partial: 'Partial answer',
+    denied: 'Access blocked',
+};
 
 const displayMessages = computed(() => localMessages.value);
 
@@ -228,29 +247,100 @@ const payloadNumber = (payload: RuntimePayload, key: string): number | null => (
 
 const payloadString = (payload: RuntimePayload, key: string): string | null => (typeof payload[key] === 'string' ? payload[key] : null);
 
-const updateLastEventId = (payload: RuntimePayload): void => {
+const displayStatusLabel = (status: string | null): string | null => (status ? (statusLabels[status] ?? status) : null);
+
+const consumeEventPayload = (payload: RuntimePayload): boolean => {
     const eventId = payloadNumber(payload, 'event_id');
 
-    if (eventId !== null) {
-        lastEventId.value = eventId;
+    if (eventId === null) {
+        return true;
     }
+
+    if (appliedEventIds.value.has(eventId)) {
+        return false;
+    }
+
+    appliedEventIds.value.add(eventId);
+    lastEventId.value = Math.max(lastEventId.value, eventId);
+
+    return true;
 };
 
 const assistantMessageFor = (messageId: number): CopilotMessage | undefined => localMessages.value.find((message) => message.id === messageId && message.role === 'assistant');
 
 const applyStatusPayload = (payload: RuntimePayload): void => {
-    updateLastEventId(payload);
+    if (!consumeEventPayload(payload)) {
+        return;
+    }
 
     const status = payloadString(payload, 'status');
+    const progressLabel = payloadString(payload, 'progress_label');
+    const progressDetail = payloadString(payload, 'progress_detail');
 
     if (status) {
         activeRunStatus.value = status;
     }
+
+    if (progressLabel) {
+        activeRunProgressLabel.value = progressLabel;
+    } else if (status) {
+        activeRunProgressLabel.value = displayStatusLabel(status);
+    }
+
+    if (progressDetail) {
+        activeRunProgressDetail.value = progressDetail;
+    }
+
+    const assistantMessageId = props.active_run?.assistant_message_id ?? null;
+
+    if (assistantMessageId !== null) {
+        const message = assistantMessageFor(assistantMessageId);
+
+        if (message) {
+            message.run_status = status ?? message.run_status;
+            message.run_progress_label = activeRunProgressLabel.value;
+            message.run_progress_detail = activeRunProgressDetail.value;
+        }
+    }
+};
+
+const applyMessageCreated = (event: MessageEvent<string>): void => {
+    const payload = parsePayload(event);
+
+    if (!consumeEventPayload(payload)) {
+        return;
+    }
+
+    const messageId = payloadNumber(payload, 'message_id');
+    const role = payloadString(payload, 'role');
+
+    if (messageId === null || role !== 'assistant' || assistantMessageFor(messageId)) {
+        return;
+    }
+
+    localMessages.value = [
+        ...localMessages.value,
+        {
+            id: messageId,
+            role: 'assistant',
+            content: '',
+            created_at: null,
+            hidden_sections: [],
+            run_id: payloadNumber(payload, 'run_id'),
+            run_status: payloadString(payload, 'status') ?? activeRunStatus.value,
+            run_progress_label: activeRunProgressLabel.value,
+            run_progress_detail: activeRunProgressDetail.value,
+            answer: null,
+        },
+    ];
 };
 
 const applyMessageDelta = (event: MessageEvent<string>): void => {
     const payload = parsePayload(event);
-    updateLastEventId(payload);
+
+    if (!consumeEventPayload(payload)) {
+        return;
+    }
 
     const messageId = payloadNumber(payload, 'message_id');
     const delta = payloadString(payload, 'delta');
@@ -267,15 +357,22 @@ const applyMessageDelta = (event: MessageEvent<string>): void => {
 
     message.content += delta;
     message.run_status = 'streaming';
+    message.run_progress_label = displayStatusLabel('streaming');
+    message.run_progress_detail = 'The answer is being prepared.';
     activeRunStatus.value = 'streaming';
+    activeRunProgressLabel.value = displayStatusLabel('streaming');
 };
 
 const applyMessageCompleted = (event: MessageEvent<string>): void => {
     const payload = parsePayload(event);
-    updateLastEventId(payload);
+
+    if (!consumeEventPayload(payload)) {
+        return;
+    }
 
     const messageId = payloadNumber(payload, 'message_id');
     const status = payloadString(payload, 'status');
+    const progressLabel = payloadString(payload, 'progress_label');
 
     if (messageId === null || status === null) {
         return;
@@ -285,12 +382,25 @@ const applyMessageCompleted = (event: MessageEvent<string>): void => {
 
     if (message) {
         message.run_status = status;
+        message.run_progress_label = progressLabel ?? displayStatusLabel(status);
     }
 };
 
-const disconnectStream = (): void => {
+const clearReconnectTimer = (): void => {
+    if (reconnectTimer.value !== null) {
+        clearTimeout(reconnectTimer.value);
+        reconnectTimer.value = null;
+    }
+};
+
+const closeEventSource = (): void => {
     eventSource.value?.close();
     eventSource.value = null;
+};
+
+const disconnectStream = (): void => {
+    clearReconnectTimer();
+    closeEventSource();
     isStreaming.value = false;
 };
 
@@ -310,15 +420,36 @@ const handleTerminalEvent =
         finishRun(status);
     };
 
-const connectToActiveRun = (): void => {
+const scheduleReconnect = (): void => {
+    if (!props.active_run || reconnectTimer.value !== null || activeRunStatus.value === null || terminalStatuses.includes(activeRunStatus.value)) {
+        return;
+    }
+
+    closeEventSource();
+    isStreaming.value = false;
+    reconnectTimer.value = setTimeout(() => {
+        reconnectTimer.value = null;
+        connectToActiveRun(lastEventId.value, false);
+    }, 750);
+};
+
+const connectToActiveRun = (cursor?: number, resetSeenEvents = true): void => {
     if (!props.active_run || terminalStatuses.includes(props.active_run.status) || typeof EventSource === 'undefined') {
         return;
     }
 
-    disconnectStream();
+    clearReconnectTimer();
+    closeEventSource();
 
     activeRunStatus.value = props.active_run.status;
-    lastEventId.value = props.active_run.last_event_id ?? 0;
+    activeRunProgressLabel.value = displayStatusLabel(props.active_run.status);
+    activeRunProgressDetail.value = null;
+
+    if (resetSeenEvents) {
+        appliedEventIds.value = new Set();
+    }
+
+    lastEventId.value = cursor ?? props.active_run.replay_cursor ?? props.active_run.last_event_id ?? 0;
 
     const separator = props.active_run.stream_url.includes('?') ? '&' : '?';
     const source = new EventSource(`${props.active_run.stream_url}${separator}cursor=${lastEventId.value}`);
@@ -329,6 +460,7 @@ const connectToActiveRun = (): void => {
         source.addEventListener(eventName, (event) => applyStatusPayload(parsePayload(event as MessageEvent<string>)));
     });
 
+    source.addEventListener('message.created', (event) => applyMessageCreated(event as MessageEvent<string>));
     source.addEventListener('message.delta', (event) => applyMessageDelta(event as MessageEvent<string>));
     source.addEventListener('message.completed', (event) => applyMessageCompleted(event as MessageEvent<string>));
     source.addEventListener('run.completed', handleTerminalEvent('completed'));
@@ -340,7 +472,7 @@ const connectToActiveRun = (): void => {
         }
     });
     source.onerror = () => {
-        isStreaming.value = false;
+        scheduleReconnect();
     };
 };
 
@@ -418,6 +550,8 @@ watch(
     () => props.active_run,
     (run) => {
         activeRunStatus.value = run?.status ?? null;
+        activeRunProgressLabel.value = run ? displayStatusLabel(run.status) : null;
+        activeRunProgressDetail.value = null;
 
         if (run) {
             connectToActiveRun();
@@ -466,7 +600,7 @@ defineOptions({
                 </Badge>
                 <Badge :variant="isStreaming ? 'warning' : 'outline'">
                     <Wifi class="h-3.5 w-3.5" />
-                    {{ activeRunStatus ?? capabilities.stream_transport }}
+                    {{ activeRunProgressLabel ?? displayStatusLabel(activeRunStatus) ?? capabilities.stream_transport }}
                 </Badge>
             </div>
         </div>
@@ -480,11 +614,11 @@ defineOptions({
                             <CardDescription>{{ latestAssistantMessage?.answer?.source_references?.[0]?.source_report ?? capabilities.tool_names.join(', ') }}</CardDescription>
                         </div>
                         <Badge v-if="latestAssistantMessage?.answer" :variant="statusVariant(latestAssistantMessage.answer.status)">
-                            {{ latestAssistantMessage.answer.status }}
+                            {{ displayStatusLabel(latestAssistantMessage.answer.status) ?? latestAssistantMessage.answer.status }}
                         </Badge>
                         <Badge v-else-if="activeRunStatus" :variant="statusVariant(activeRunStatus)">
                             <LoaderCircle v-if="isStreaming" class="h-3.5 w-3.5 animate-spin" />
-                            {{ activeRunStatus }}
+                            {{ activeRunProgressLabel ?? displayStatusLabel(activeRunStatus) }}
                         </Badge>
                     </div>
                 </CardHeader>
@@ -512,14 +646,14 @@ defineOptions({
                                 <div v-if="message.role === 'assistant' && message.run_status && !message.answer" class="flex flex-wrap items-center gap-2 border-t pt-3">
                                     <Badge :variant="statusVariant(message.run_status)">
                                         <LoaderCircle v-if="!terminalStatuses.includes(message.run_status)" class="h-3.5 w-3.5 animate-spin" />
-                                        {{ message.run_status }}
+                                        {{ message.run_progress_label ?? displayStatusLabel(message.run_status) }}
                                     </Badge>
-                                    <span class="text-muted-foreground text-xs">Run #{{ message.run_id }}</span>
+                                    <span class="text-muted-foreground text-xs">{{ message.run_progress_detail ?? `Run #${message.run_id}` }}</span>
                                 </div>
 
                                 <div v-if="message.answer" class="space-y-3 border-t pt-3">
                                     <div class="flex flex-wrap items-center gap-2">
-                                        <Badge :variant="statusVariant(message.answer.status)">{{ message.answer.status }}</Badge>
+                                        <Badge :variant="statusVariant(message.answer.status)">{{ displayStatusLabel(message.answer.status) ?? message.answer.status }}</Badge>
                                         <Badge variant="outline">{{ message.answer.confidence.level }}</Badge>
                                         <Badge v-if="message.answer.safe_error_code" variant="destructive">{{ message.answer.safe_error_code }}</Badge>
                                         <Button v-if="message.run_id && message.answer.status === 'failed'" type="button" size="sm" variant="outline" @click="retryRun(message.run_id)">

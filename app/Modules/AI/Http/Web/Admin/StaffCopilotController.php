@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\AI\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Responses\ApiResponse;
 use App\Models\Campus;
 use App\Models\User;
 use App\Modules\AI\Actions\RunStaffCopilotMessageAction;
@@ -12,6 +13,7 @@ use App\Modules\AI\Http\Requests\SubmitStaffCopilotMessageRequest;
 use App\Modules\AI\Models\AiChatRun;
 use App\Modules\AI\Queries\StaffCopilotPageQuery;
 use App\Modules\AI\Support\StaffCopilotSseRuntime;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -50,13 +52,21 @@ class StaffCopilotController extends Controller
         return redirect()->route('ai.copilot.index');
     }
 
-    public function events(Request $request, AiChatRun $run): StreamedResponse
+    public function events(Request $request, AiChatRun $run): StreamedResponse|JsonResponse
     {
         $this->authorizeRun($run, $request);
 
         $cursor = (int) $request->integer('cursor', 0);
 
-        abort_unless($this->runtime->validateCursor($run, $cursor), 422, 'Invalid run event cursor.');
+        if (! $this->runtime->validateCursor($run, $cursor)) {
+            return ApiResponse::error('Invalid run event cursor.', [
+                [
+                    'code' => 'invalid_run_event_cursor',
+                    'field' => 'cursor',
+                    'detail' => 'The cursor does not belong to this run event stream.',
+                ],
+            ], 422);
+        }
 
         return response()->eventStream(
             fn () => $this->runtime->stream($run, $cursor),

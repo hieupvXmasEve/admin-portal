@@ -45,13 +45,13 @@ enum AcademicProgressionEventType: string
      * Whether a progression transition of this type needs an authorizing
      * Decision (ADR-0008, revised).
      *
-     * No EGC progression event requires a Decision. Placement and the move into
-     * intake_course are enrolment milestones — they mirror the enrolment status
-     * actions (NE / major enrolment), which never required a Decision either, so
-     * flagging the progression side as "Decision missing" was an inconsistency.
-     * The Decision requirement lives solely on the status actions (defer, resume,
-     * dropout, campus transfer). English-level changes and IELTS records have
-     * never needed one. See the revision note in ADR-0008.
+     * No EGC progression event requires a Decision. The requirement for the
+     * enrolment transitions lives on the status actions instead — NE enrolment
+     * (→ `intake_pre_uni_gc`) and major enrolment (→ `intake_course`) carry it
+     * (see {@see StudentActionType::requiresDecision()}). Placement
+     * Initialized and Course Stage Changed are a secondary record of those same
+     * transitions, so flagging them too would double-count; English-level changes
+     * and IELTS records never needed one. See the revision note in ADR-0008.
      */
     public function requiresDecision(): bool
     {

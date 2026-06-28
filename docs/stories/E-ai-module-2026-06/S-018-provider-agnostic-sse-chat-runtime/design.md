@@ -123,11 +123,11 @@ Reload recovery:
 
 ```text
 GET /ai/copilot
-  -> returns conversation, messages, active_run, last_event_id, capabilities
+  -> returns conversation, messages, active_run, last_event_id, replay_cursor, capabilities
   -> UI renders persisted messages immediately
-  -> if active_run status is not terminal, UI reconnects to SSE using cursor
-  -> if SSE cannot reconnect, UI shows a safe reconnect/retry state or uses a
-     documented polling fallback
+  -> if active_run status is not terminal, UI reconnects to SSE using replay_cursor
+  -> after a dropped connection, UI reconnects with the latest applied event_id
+  -> replayed event ids are ignored so assistant deltas are not duplicated
 ```
 
 Cancellation:
@@ -171,7 +171,10 @@ stream:
 SSE endpoint:
 
 ```text
-GET /ai/copilot/runs/{run}/events
+GET /ai/copilot/runs/{run}/events?cursor={event_id}
+
+Invalid cursor:
+422 ApiResponse::error(... code=invalid_run_event_cursor ...)
 ```
 
 Optional cancellation endpoint:
@@ -184,24 +187,19 @@ Normalized SSE event examples:
 
 ```text
 event: run.started
-id: 1
-data: {"run_id":301,"status":"running"}
+data: {"run_id":301,"event_id":1,"sequence":4,"status":"running","progress_label":"Starting"}
 
 event: tool.started
-id: 2
-data: {"run_id":301,"tool_name":"query_metrics","tool_schema_version":"query_metrics:v1"}
+data: {"run_id":301,"event_id":2,"sequence":6,"status":"started","data_group":"Finance data","progress_label":"Checking approved data"}
 
 event: message.delta
-id: 3
-data: {"run_id":301,"message_id":502,"delta":"Outstanding tuition "}
+data: {"run_id":301,"event_id":3,"sequence":8,"message_id":502,"delta":"Outstanding tuition "}
 
 event: message.completed
-id: 4
-data: {"run_id":301,"message_id":502,"status":"completed","source_references":[...]}
+data: {"run_id":301,"event_id":4,"sequence":9,"message_id":502,"status":"completed","source_references":[...],"progress_label":"Answer ready"}
 
 event: run.completed
-id: 5
-data: {"run_id":301,"status":"completed"}
+data: {"run_id":301,"event_id":5,"sequence":10,"status":"completed","progress_label":"Answer ready"}
 ```
 
 Page props should include active run state:
@@ -213,6 +211,7 @@ Page props should include active run state:
         "status": "streaming",
         "assistant_message_id": 502,
         "last_event_id": 3,
+        "replay_cursor": 0,
         "stream_url": "/ai/copilot/runs/301/events",
         "can_cancel": true
     },

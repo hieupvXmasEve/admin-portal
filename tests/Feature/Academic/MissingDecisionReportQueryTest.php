@@ -94,11 +94,10 @@ it('never lists progression transitions (placement / stage change no longer requ
     expect((new GetMissingDecisionReportQuery)->handle([], $this->campus->id)->total())->toBe(0);
 });
 
-it('never lists admission deferral or pure progression records', function () {
+it('never lists admission deferral, waiting, or pure progression records', function () {
     $student = missingDecisionStudent($this->campus, $this->program, $this->semester, 'SE700003', 'intake_pre_uni_gc');
 
     missingDecisionAction($student, $this->user, StudentActionType::ADMISSION_DEFERRAL);
-    missingDecisionAction($student, $this->user, StudentActionType::STUDENT_ENROLLMENT_NE);
     missingDecisionAction($student, $this->user, StudentActionType::WAITING_COURSE_OPENING);
     missingDecisionEvent($student, $this->user, $this->semester, AcademicProgressionEventType::ENGLISH_LEVEL_CHANGED);
     missingDecisionEvent($student, $this->user, $this->semester, AcademicProgressionEventType::IELTS_RECORDED);
@@ -106,6 +105,19 @@ it('never lists admission deferral or pure progression records', function () {
     $result = (new GetMissingDecisionReportQuery)->handle([], $this->campus->id);
 
     expect($result->total())->toBe(0);
+});
+
+it('lists the enrolment transitions into the study stages when they lack a decision', function () {
+    $student = missingDecisionStudent($this->campus, $this->program, $this->semester, 'SE700010');
+
+    $ne = missingDecisionAction($student, $this->user, StudentActionType::STUDENT_ENROLLMENT_NE);
+    $major = missingDecisionAction($student, $this->user, StudentActionType::STUDENT_MAJOR_ENROLLMENT);
+
+    $result = (new GetMissingDecisionReportQuery)->handle([], $this->campus->id);
+
+    $keys = collect($result->items())->pluck('id')->sort()->values()->all();
+
+    expect($keys)->toBe(collect(['action-'.$ne->id, 'action-'.$major->id])->sort()->values()->all());
 });
 
 it('drops a transition from the report once a decision is attached', function () {

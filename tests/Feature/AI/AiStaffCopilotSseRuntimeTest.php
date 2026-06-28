@@ -105,6 +105,7 @@ it('queues a durable staff copilot run with placeholder state before provider ex
             ->where('active_run.status', AiChatRun::STATUS_QUEUED)
             ->where('active_run.assistant_message_id', $assistantMessage->id)
             ->where('active_run.last_event_id', $run->last_event_id)
+            ->where('active_run.replay_cursor', 0)
             ->where('active_run.can_cancel', true)
             ->where('active_run.stream_url', route('ai.copilot.runs.events', $run, false))
             ->where('active_run.provider', 'deterministic')
@@ -187,6 +188,108 @@ it('streams normalized run events and completes the queued run through allowlist
         ->and($toolCall->status)->toBe('completed')
         ->and($toolCall->source_references[0]['source_report'])->toBe('finance.reporting.collection-progress')
         ->and(AiRunEvent::query()->where('event_type', 'message.delta')->count())->toBeGreaterThan(0);
+
+    $events = AiRunEvent::query()
+        ->where('ai_chat_run_id', $run->id)
+        ->orderBy('sequence')
+        ->get();
+
+    expect($events->pluck('sequence')->all())->toBe(range(1, $events->count()))
+        ->and($events->pluck('redacted_payload.sequence')->all())->toBe(range(1, $events->count()));
+});
+
+it('replays persisted run events after a valid cursor without duplicating assistant deltas or executing tools again', function () {
+    $this->actingAs($this->authorizedUser)
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->from(route('ai.copilot.index'))
+        ->post(route('ai.copilot.messages.store'), [
+            'question' => 'Current semester outstanding tuition by program là bao nhiêu?',
+        ]);
+
+    $run = AiChatRun::query()->firstOrFail();
+
+    $this->mock(AiFinanceMetricReader::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('collectionProgress')
+            ->once()
+            ->andReturn([
+                'summary' => [
+                    'student_count' => 2,
+                    'billed_total' => 1000.0,
+                    'paid_total' => 700.0,
+                    'outstanding_total' => 300.0,
+                    'collection_rate' => 0.7,
+                ],
+                'breakdowns' => [
+                    'by_program' => [
+                        [
+                            'key' => 'IT',
+                            'label' => 'Information Technology',
+                            'student_count' => 2,
+                            'outstanding' => 300.0,
+                        ],
+                    ],
+                ],
+                'meta' => [],
+            ]);
+    });
+
+    $initialResponse = $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.runs.events', $run));
+
+    $initialContent = $initialResponse->streamedContent();
+    $initialEvents = staffCopilotSseEvents($initialContent);
+    $deltaEvent = collect($initialEvents)->firstWhere('event', 'message.delta');
+
+    expect($deltaEvent)->not->toBeNull();
+
+    $this->mock(AiFinanceMetricReader::class, function (MockInterface $mock): void {
+        $mock->shouldNotReceive('collectionProgress');
+        $mock->shouldNotReceive('feeMonitor');
+        $mock->shouldNotReceive('dngLifecycle');
+    });
+
+    $replayResponse = $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.runs.events', [$run, 'cursor' => $deltaEvent['data']['event_id']]));
+
+    $replayContent = $replayResponse->streamedContent();
+    $replayEvents = staffCopilotSseEvents($replayContent);
+
+    expect(collect($replayEvents)->pluck('data.event_id')->all())
+        ->not->toContain($deltaEvent['data']['event_id'])
+        ->and(collect($replayEvents)->pluck('event')->all())
+        ->toContain('message.completed')
+        ->toContain('run.completed')
+        ->and($replayContent)
+        ->not->toContain('event: message.delta');
+});
+
+it('rejects an invalid cursor with a stable safe error response before executing provider or tool work', function () {
+    $this->actingAs($this->authorizedUser)
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->from(route('ai.copilot.index'))
+        ->post(route('ai.copilot.messages.store'), [
+            'question' => 'Current semester outstanding tuition by program là bao nhiêu?',
+        ]);
+
+    $run = AiChatRun::query()->firstOrFail();
+
+    $this->mock(AiFinanceMetricReader::class, function (MockInterface $mock): void {
+        $mock->shouldNotReceive('collectionProgress');
+        $mock->shouldNotReceive('feeMonitor');
+        $mock->shouldNotReceive('dngLifecycle');
+    });
+
+    $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.runs.events', [$run, 'cursor' => 999999]))
+        ->assertUnprocessable()
+        ->assertJsonPath('success', false)
+        ->assertJsonPath('errors.0.code', 'invalid_run_event_cursor')
+        ->assertJsonPath('errors.0.field', 'cursor');
+
+    $run->refresh();
+
+    expect($run->status)->toBe(AiChatRun::STATUS_QUEUED)
+        ->and(AiToolCall::query()->count())->toBe(0);
 });
 
 it('denies run stream and cancellation access to another authorized staff user', function () {
@@ -338,3 +441,38 @@ it('retries a failed run without duplicating the original user message', functio
         ->and(AiMessage::query()->where('role', 'user')->count())->toBe(1)
         ->and(AiMessage::query()->where('role', 'assistant')->count())->toBe(2);
 });
+
+/**
+ * @return list<array{event: string, data: array<string, mixed>}>
+ */
+function staffCopilotSseEvents(string $content): array
+{
+    return collect(preg_split("/\n\n/", trim($content)) ?: [])
+        ->map(function (string $block): ?array {
+            $event = null;
+            $data = null;
+
+            foreach (explode("\n", $block) as $line) {
+                if (str_starts_with($line, 'event: ')) {
+                    $event = substr($line, 7);
+                }
+
+                if (str_starts_with($line, 'data: ')) {
+                    $decoded = json_decode(substr($line, 6), true);
+                    $data = is_array($decoded) ? $decoded : [];
+                }
+            }
+
+            if ($event === null) {
+                return null;
+            }
+
+            return [
+                'event' => $event,
+                'data' => $data ?? [],
+            ];
+        })
+        ->filter()
+        ->values()
+        ->all();
+}

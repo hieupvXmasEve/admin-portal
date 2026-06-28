@@ -13,14 +13,16 @@ implemented
 - `POST /ai/copilot/messages` queues a durable run and assistant placeholder
   before provider/tool execution.
 - `GET /ai/copilot/runs/{run}/events` uses Laravel SSE to replay events after a
-  cursor, execute queued runs, emit status/tool/message events, and close on a
-  terminal run state.
+  cursor, reject invalid cursors with a stable `invalid_run_event_cursor`
+  response before execution, emit staff-friendly status/tool/message progress
+  events, and close on a terminal run state.
 - `POST /ai/copilot/runs/{run}/cancel` cancels queued active runs with
   owner/campus authorization.
 - `POST /ai/copilot/runs/{run}/retry` retries failed runs without duplicating
   the original user message.
 - The Vue Staff Copilot page renders optimistic local messages, pending
-  assistant state, SSE deltas, terminal reload recovery, and a stop action.
+  assistant state, SSE deltas, terminal reload recovery, dropped-connection
+  reconnect from the latest applied event id, and a stop action.
 - Provider/tool execution still flows through AI-MOD-017
   `LiveStaffCopilotAgent`/`StaffCopilotAgentRunner` and `ToolDispatcher`; the
   first stream mode is `fallback_snapshot`, so upstream provider-native token

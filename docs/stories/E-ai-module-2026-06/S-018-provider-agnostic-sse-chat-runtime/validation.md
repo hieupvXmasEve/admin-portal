@@ -122,3 +122,23 @@ capture browser proof for:
   137, matching the known Swinx repo-wide frontend memory baseline; targeted
   ESLint/Prettier checks passed for the touched Staff Copilot page.
 - Browser E2E proof was not run in this slice.
+
+## Replay/Progress Hardening Evidence - 2026-06-29
+
+- `AiStaffCopilotSseRuntimeTest` now covers replay after a valid cursor,
+  invalid cursor rejection before provider/tool execution, active-run
+  `replay_cursor`, append-only sequence ordering, terminal stream behavior, and
+  stream safety exclusions.
+- AI Staff Copilot regression bundle passed:
+  `AiStaffCopilotChatTest`, `AiLiveStaffCopilotAgentTest`,
+  `AiStudentProfileSectionsTest`, `AiEntityCatalogSearchTest`, and
+  `AiStaffCopilotSseRuntimeTest` => 26 tests / 770 assertions.
+- `./scripts/dev.sh composer exec pint -- --dirty --format agent` passed.
+- `./scripts/dev.sh npm exec -- eslint resources/js/pages/AI/StaffCopilot/Index.vue`
+  passed.
+- `./scripts/dev.sh npm exec -- prettier --check resources/js/pages/AI/StaffCopilot/Index.vue`
+  passed.
+- `./scripts/dev.sh npm run type-check` was attempted again and was killed with
+  exit 137. A single-file `vue-tsc` attempt is not a valid project check here:
+  it does not resolve the repo's `@` aliases and reports an existing
+  `router.reload({ preserveScroll })` type mismatch on this page.

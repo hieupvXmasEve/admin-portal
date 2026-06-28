@@ -61,11 +61,14 @@ it('classifies which transitions require a decision', function () {
         ->and(StudentActionType::ACADEMIC_RESUME->requiresDecision())->toBeTrue()
         ->and(StudentActionType::ACADEMIC_DROPOUT->requiresDecision())->toBeTrue()
         ->and(StudentActionType::CAMPUS_TRANSFER->requiresDecision())->toBeTrue()
+        // The enrolment transitions into the study stages also require a Decision.
+        ->and(StudentActionType::STUDENT_ENROLLMENT_NE->requiresDecision())->toBeTrue()
+        ->and(StudentActionType::STUDENT_MAJOR_ENROLLMENT->requiresDecision())->toBeTrue()
         ->and(StudentActionType::ADMISSION_DEFERRAL->requiresDecision())->toBeFalse()
-        ->and(StudentActionType::STUDENT_ENROLLMENT_NE->requiresDecision())->toBeFalse()
+        ->and(StudentActionType::WAITING_COURSE_OPENING->requiresDecision())->toBeFalse()
         // EGC progression events never require a Decision (ADR-0008, revised):
-        // placement / stage change are enrolment milestones, like the enrolment
-        // actions, not governed transitions.
+        // they are a secondary record of the enrolment transitions, which carry
+        // the requirement on the action side instead.
         ->and(AcademicProgressionEventType::PLACEMENT_INITIALIZED->requiresDecision())->toBeFalse()
         ->and(AcademicProgressionEventType::COURSE_STAGE_CHANGED->requiresDecision())->toBeFalse()
         ->and(AcademicProgressionEventType::ENGLISH_LEVEL_CHANGED->requiresDecision())->toBeFalse()
@@ -76,6 +79,8 @@ it('classifies which transitions require a decision', function () {
             StudentActionType::ACADEMIC_RESUME->value,
             StudentActionType::ACADEMIC_DROPOUT->value,
             StudentActionType::CAMPUS_TRANSFER->value,
+            StudentActionType::STUDENT_ENROLLMENT_NE->value,
+            StudentActionType::STUDENT_MAJOR_ENROLLMENT->value,
         ]);
 });
 
