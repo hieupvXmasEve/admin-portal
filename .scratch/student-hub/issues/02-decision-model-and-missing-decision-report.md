@@ -1,6 +1,6 @@
 # Decision model: many-students roster, authorize both streams, missing-decision report
 
-Status: ready-for-agent
+Status: ready-for-human
 
 ## Parent
 
