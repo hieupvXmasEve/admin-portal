@@ -41,6 +41,21 @@ beforeEach(function () {
     $permissionService->shouldReceive('getUserPermissions')
         ->andReturnUsing(function (User $user, ?int $campusId = null): array {
             if ($user->id === $this->authorizedUser->id && $campusId === $this->campus->id) {
+                return ['view_ai_metrics', 'view_finance_reporting', 'view_academic_report'];
+            }
+
+            return [];
+        });
+
+    app()->forgetInstance(PermissionService::class);
+    app()->singleton(PermissionService::class, fn () => $permissionService);
+});
+
+it('denies provider planned metric reads when the staff user lacks the domain permission', function () {
+    $permissionService = Mockery::mock(PermissionService::class);
+    $permissionService->shouldReceive('getUserPermissions')
+        ->andReturnUsing(function (User $user, ?int $campusId = null): array {
+            if ($user->id === $this->authorizedUser->id && $campusId === $this->campus->id) {
                 return ['view_ai_metrics'];
             }
 
@@ -49,6 +64,99 @@ beforeEach(function () {
 
     app()->forgetInstance(PermissionService::class);
     app()->singleton(PermissionService::class, fn () => $permissionService);
+
+    AiProviderSetting::query()->create([
+        'user_id' => $this->authorizedUser->id,
+        'provider' => 'openai',
+        'default_model' => 'gpt-4o-mini',
+        'encrypted_api_key' => 'sk-live-provider-test',
+        'enabled' => true,
+        'tested_at' => now(),
+        'last_test_status' => 'success',
+        'created_by_user_id' => $this->authorizedUser->id,
+        'updated_by_user_id' => $this->authorizedUser->id,
+    ]);
+
+    LiveStaffCopilotPlannerAgent::fake([
+        [
+            'action' => 'tool_calls',
+            'tool_calls' => [
+                [
+                    'tool_name' => 'query_metrics',
+                    'arguments' => [
+                        'metric' => 'finance_collection_summary',
+                        'filters' => ['semester' => 'current'],
+                        'group_by' => ['program'],
+                        'options' => [
+                            'include_rows' => false,
+                            'limit' => 500,
+                        ],
+                    ],
+                    'reason' => 'The provider can suggest the finance metric, but Swinx still checks permissions.',
+                ],
+            ],
+            'answer_intent' => 'finance_collection_summary',
+            'question' => null,
+            'safe_error_code' => null,
+            'reason' => null,
+        ],
+    ])->preventStrayPrompts();
+
+    LiveStaffCopilotFinalAnswerAgent::fake([
+        [
+            'status' => 'denied',
+            'answer' => 'I cannot answer that finance request because you do not have access to that approved data group.',
+            'referenced_tool_call_ids' => [],
+            'source_references' => [],
+            'confidence' => [
+                'level' => 'none',
+                'basis' => 'domain_permission_denied',
+            ],
+            'limitations' => ['Finance reporting permission is required for this metric.'],
+            'clarification_question' => null,
+            'safe_error_code' => 'forbidden_by_domain_permission',
+        ],
+    ])->preventStrayPrompts();
+
+    $this->mock(AiFinanceMetricReader::class, function (MockInterface $mock): void {
+        $mock->shouldNotReceive('collectionProgress');
+        $mock->shouldNotReceive('feeMonitor');
+        $mock->shouldNotReceive('dngLifecycle');
+    });
+
+    $this->actingAs($this->authorizedUser)
+        ->withHeader('X-CSRF-TOKEN', 'ai-live-copilot-test-token')
+        ->from(route('ai.copilot.index'))
+        ->post(route('ai.copilot.messages.store'), [
+            'question' => 'Can you show outstanding tuition by program for this term?',
+        ])
+        ->assertRedirect(route('ai.copilot.index'))
+        ->assertInertiaFlash('success', 'AI copilot run queued.');
+
+    $run = AiChatRun::query()->firstOrFail();
+
+    $response = $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.runs.events', $run));
+
+    $response->assertStreamed();
+
+    expect($response->streamedContent())->toContain('event: run.failed');
+
+    $toolCall = AiToolCall::query()->firstOrFail();
+    $assistantMessage = AiMessage::query()->where('role', 'assistant')->firstOrFail();
+
+    expect($toolCall->tool_name)->toBe('query_metrics')
+        ->and($toolCall->status)->toBe('denied')
+        ->and($toolCall->permission_result)->toBe('denied')
+        ->and($toolCall->safe_error_code)->toBe('forbidden_by_domain_permission')
+        ->and($toolCall->redacted_arguments)->toMatchArray([
+            'metric' => 'finance_collection_summary',
+            'filters' => ['semester' => 'current'],
+            'group_by' => ['program'],
+        ])
+        ->and($toolCall->redacted_result_summary['safe_error_code'])->toBe('forbidden_by_domain_permission')
+        ->and($assistantMessage->redacted_content)->toContain('do not have access')
+        ->and(AiProviderUsage::query()->pluck('status')->all())->toBe(['succeeded', 'succeeded']);
 });
 
 it('plans with a live provider, executes allowlisted tools, and synthesizes an audited answer', function () {
@@ -199,6 +307,71 @@ it('plans with a live provider, executes allowlisted tools, and synthesizes an a
     expect(AiProviderUsage::query()->count())->toBe(2)
         ->and(AiProviderUsage::query()->pluck('status')->all())->toBe(['succeeded', 'succeeded'])
         ->and(AiProviderSetting::query()->firstOrFail()->last_used_at)->not->toBeNull();
+});
+
+it('asks for clarification from live provider planning without executing business data tools', function () {
+    AiProviderSetting::query()->create([
+        'user_id' => $this->authorizedUser->id,
+        'provider' => 'openai',
+        'default_model' => 'gpt-4o-mini',
+        'encrypted_api_key' => 'sk-live-provider-test',
+        'enabled' => true,
+        'tested_at' => now(),
+        'last_test_status' => 'success',
+        'created_by_user_id' => $this->authorizedUser->id,
+        'updated_by_user_id' => $this->authorizedUser->id,
+    ]);
+
+    LiveStaffCopilotPlannerAgent::fake([
+        [
+            'action' => 'ask_clarification',
+            'tool_calls' => null,
+            'answer_intent' => null,
+            'question' => 'Which metric should I inspect: tuition collection, fee monitor, DNG lifecycle, or academic status?',
+            'missing_fields' => ['metric'],
+            'safe_error_code' => null,
+            'reason' => 'The prompt did not identify a bounded metric.',
+        ],
+    ])->preventStrayPrompts();
+    LiveStaffCopilotFinalAnswerAgent::fake()->preventStrayPrompts();
+
+    $this->mock(AiFinanceMetricReader::class, function (MockInterface $mock): void {
+        $mock->shouldNotReceive('collectionProgress');
+        $mock->shouldNotReceive('feeMonitor');
+        $mock->shouldNotReceive('dngLifecycle');
+    });
+
+    $this->actingAs($this->authorizedUser)
+        ->withHeader('X-CSRF-TOKEN', 'ai-live-copilot-test-token')
+        ->from(route('ai.copilot.index'))
+        ->post(route('ai.copilot.messages.store'), [
+            'question' => 'Can you check this term?',
+        ])
+        ->assertRedirect(route('ai.copilot.index'))
+        ->assertInertiaFlash('success', 'AI copilot run queued.');
+
+    $run = AiChatRun::query()->firstOrFail();
+
+    $response = $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.runs.events', $run));
+
+    $response->assertStreamed();
+
+    expect($response->streamedContent())
+        ->toContain('event: run.completed')
+        ->toContain('Which metric should I inspect')
+        ->not->toContain('event: tool.started');
+
+    LiveStaffCopilotFinalAnswerAgent::assertNeverPrompted();
+
+    $trace = AiAgentTrace::query()->firstOrFail();
+    $assistantMessage = AiMessage::query()->where('role', 'assistant')->firstOrFail();
+
+    expect($trace->status)->toBe('completed')
+        ->and($trace->step_count)->toBe(0)
+        ->and(AiToolCall::query()->count())->toBe(0)
+        ->and($assistantMessage->redacted_content)->toBe('Which metric should I inspect: tuition collection, fee monitor, DNG lifecycle, or academic status?')
+        ->and(AiProviderUsage::query()->count())->toBe(1);
 });
 
 it('denies unsafe model proposed tools before source execution and without leaking raw SQL', function () {

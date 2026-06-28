@@ -101,7 +101,10 @@ class StaffMetricQuestionDataset
                 'campus' => 'current',
             ],
             'permission_context' => [
-                'permissions' => [(string) ($definition['required_permission'] ?? 'view_ai_metrics')],
+                'permissions' => array_values(array_unique(array_filter([
+                    (string) ($definition['required_permission'] ?? 'view_ai_metrics'),
+                    isset($definition['required_domain_permission']) ? (string) $definition['required_domain_permission'] : null,
+                ]))),
                 'campus_scope' => 'current_campus_only',
             ],
             'expected_tool_calls' => [

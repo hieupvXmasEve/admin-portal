@@ -1,6 +1,6 @@
 # Project Overview and PDR
 
-Last updated: 2026-06-24
+Last updated: 2026-06-29
 Owner: Platform Team
 Status: Current-state baseline (evidence-first)
 Source of truth: code in `app/`, `routes/`, `resources/` + scout reports in `plans/reports/`
@@ -234,8 +234,9 @@ Code baseline:
   audit/evaluation persistence.
 - AI metric catalog/query-plan foundation defines aggregate-only metric
   contracts, business glossary mappings, query-plan validation, campus scope,
-  `view_ai_metrics` permission checks, source report identity, and deterministic
-  staff metric evaluation cases before any tool execution.
+  `view_ai_metrics` entry permission checks, per-metric domain permission
+  checks, source report identity, and deterministic staff metric evaluation
+  cases before any tool execution.
 - AI entity catalog/search foundation defines EntityCatalog v1 for `student`,
   `program`, `semester`, and `course_offering`, with `class` as the
   course-offering alias, entity-specific permission checks, campus scope for

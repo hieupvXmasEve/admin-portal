@@ -42,7 +42,7 @@ beforeEach(function () {
                 in_array($user->id, [$this->authorizedUser->id, $this->authorizedPeer->id], true)
                 && $campusId === $this->campus->id
             ) {
-                return ['view_ai_metrics'];
+                return ['view_ai_metrics', 'view_finance_reporting', 'view_academic_report'];
             }
 
             return [];
@@ -339,7 +339,7 @@ it('does not recover a staff copilot active run from the wrong campus scope', fu
                 $user->id === $this->authorizedUser->id
                 && in_array($campusId, [$this->campus->id, $otherCampus->id], true)
             ) {
-                return ['view_ai_metrics'];
+                return ['view_ai_metrics', 'view_finance_reporting', 'view_academic_report'];
             }
 
             return [];

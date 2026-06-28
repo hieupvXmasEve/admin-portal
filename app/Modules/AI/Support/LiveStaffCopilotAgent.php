@@ -362,6 +362,8 @@ class LiveStaffCopilotAgent
                     'source_report',
                     'source_reference_policy',
                     'max_record_limit',
+                    'required_permission',
+                    'required_domain_permission',
                 ]))
                 ->values()
                 ->all(),

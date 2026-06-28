@@ -36,7 +36,7 @@ beforeEach(function () {
     $permissionService->shouldReceive('getUserPermissions')
         ->andReturnUsing(function (User $user, ?int $campusId = null): array {
             if ($user->id === $this->authorizedUser->id && $campusId === $this->campus->id) {
-                return ['view_ai_metrics'];
+                return ['view_ai_metrics', 'view_finance_reporting', 'view_academic_report'];
             }
 
             return [];
@@ -216,6 +216,60 @@ it('denies invalid plans before source execution and audits the safe error', fun
         ->and($toolCall->permission_result)->toBe('not_evaluated')
         ->and($toolCall->record_count)->toBe(0)
         ->and($toolCall->safe_error_code)->toBe('invalid_query_plan_schema');
+});
+
+it('denies metric reads without the required domain permission before source execution', function () {
+    $permissionService = Mockery::mock(PermissionService::class);
+    $permissionService->shouldReceive('getUserPermissions')
+        ->andReturnUsing(function (User $user, ?int $campusId = null): array {
+            if ($user->id === $this->authorizedUser->id && $campusId === $this->campus->id) {
+                return ['view_ai_metrics'];
+            }
+
+            return [];
+        });
+
+    app()->forgetInstance(PermissionService::class);
+    app()->singleton(PermissionService::class, fn () => $permissionService);
+
+    $this->mock(AiFinanceMetricReader::class, function (MockInterface $mock): void {
+        $mock->shouldNotReceive('collectionProgress');
+        $mock->shouldNotReceive('feeMonitor');
+        $mock->shouldNotReceive('dngLifecycle');
+    });
+
+    $audit = app(AiAuditRecorder::class);
+    $conversation = $audit->startConversation($this->authorizedUser, $this->campus);
+    $trace = $audit->startTrace($conversation, null);
+
+    $result = app(ToolDispatcher::class)->dispatch(
+        toolName: 'query_metrics',
+        arguments: [
+            'metric' => 'finance_collection_summary',
+            'filters' => ['semester' => 'current'],
+            'group_by' => [],
+        ],
+        actor: $this->authorizedUser,
+        campus: $this->campus,
+        trace: $trace,
+    );
+
+    expect($result->toArray())->toMatchArray([
+        'allowed' => false,
+        'tool' => 'query_metrics',
+        'metric' => 'finance_collection_summary',
+        'summary' => null,
+        'record_count' => 0,
+        'safe_error_code' => 'forbidden_by_domain_permission',
+        'status' => 'denied',
+    ]);
+
+    $toolCall = AiToolCall::query()->where('tool_name', 'query_metrics')->firstOrFail();
+
+    expect($toolCall->status)->toBe('denied')
+        ->and($toolCall->permission_result)->toBe('denied')
+        ->and($toolCall->record_count)->toBe(0)
+        ->and($toolCall->safe_error_code)->toBe('forbidden_by_domain_permission');
 });
 
 it('aggregates academic status rows without leaking student identifiers', function () {

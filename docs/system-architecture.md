@@ -1,6 +1,6 @@
 # System Architecture
 
-Last updated: 2026-06-24
+Last updated: 2026-06-29
 Owner: Platform Team
 Status: Current-state architecture map
 Source of truth: route files, middleware, module providers, runtime entrypoints
@@ -256,7 +256,7 @@ Phase 1 guardrails:
 - AI: `app/Modules/AI` (provider settings, audit/evaluation foundation, metric catalog/query-plan validation, query metrics/entity search/student profile-section tool execution, staff copilot chat/SSE runtime)
     - Provider settings: `ai_provider_settings` stores one encrypted staff-owned provider setting per user with provider/model allowlists, key masking, cost limits, and provider test metadata.
     - Audit/evaluation/runtime foundation: `ai_conversations`, `ai_messages`, `ai_agent_traces`, `ai_tool_calls`, `ai_provider_usages`, `ai_feedback`, `ai_evaluation_cases`, `ai_evaluation_runs`, `ai_evaluation_results`, `ai_chat_runs`, and `ai_run_events`.
-    - Metric catalog/query-plan foundation: code-defined aggregate MetricCatalog v1, business glossary subset, query-plan DTO/validator, `view_ai_metrics` permission, and deterministic staff metric evaluation cases.
+    - Metric catalog/query-plan foundation: code-defined aggregate MetricCatalog v1, business glossary subset, query-plan DTO/validator, `view_ai_metrics` entry permission, per-metric domain permission checks, and deterministic staff metric evaluation cases.
     - Query metrics tool MVP: internal `ToolRegistry`/`ToolDispatcher`, read-only `query_metrics` execution, bounded aggregate `QueryMetricsResult`, and MetricCatalog v1 resolvers for Academic status/defer, Finance collection, Fee Monitor, and DNG lifecycle metrics.
     - Entity catalog/search MVP: code-defined EntityCatalog v1, `search_entities:v1`, `SearchEntitiesTool`, bounded `EntitySearchResult`, scoped opaque entity references, and first accepted entity types `student`, `program`, `semester`, and `course_offering` with `class` as the user-facing course-offering alias.
     - Student profile-section MVP: code-defined StudentProfileSectionCatalog v1, `get_entity_profile:v1`, `EntityReferenceResolver`, `GetEntityProfileTool`, bounded `EntityProfileResult`, current-campus opaque `entity_ref` validation, and accepted student sections `identity`, `academic_summary`, `enrollments`, `attendance_summary`, `finance_summary`, and `lifecycle_actions` with section-level hidden-section reporting.

@@ -31,7 +31,7 @@ beforeEach(function () {
     $permissionService->shouldReceive('getUserPermissions')
         ->andReturnUsing(function (User $user, ?int $campusId = null): array {
             if ($user->id === $this->authorizedUser->id && $campusId === $this->campus->id) {
-                return ['view_ai_metrics'];
+                return ['view_ai_metrics', 'view_finance_reporting', 'view_academic_report'];
             }
 
             return [];
@@ -62,9 +62,11 @@ it('exposes aggregate metric catalog and glossary without executable database de
         ->and($collectionMetric['source_query'])->toBe(ListCollectionProgressQuery::class)
         ->and($collectionMetric['output_shape'])->toBe('aggregate_summary')
         ->and($collectionMetric['required_permission'])->toBe('view_ai_metrics')
+        ->and($collectionMetric['required_domain_permission'])->toBe('view_finance_reporting')
         ->and($collectionMetric['allowed_filters'])->toHaveKeys(['semester', 'program_id', 'fee_type', 'balance_state'])
         ->and($collectionMetric['allowed_group_by'])->toContain('program', 'fee_type', 'balance_state', 'aging_bucket')
         ->and($statusMetric['source_query'])->toBe(GetStudentStatusBySemesterQuery::class)
+        ->and($statusMetric['required_domain_permission'])->toBe('view_academic_report')
         ->and($statusMetric['allowed_group_by'])->toContain('status', 'program', 'intake_semester');
 
     $encodedMetric = json_encode($collectionMetric, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);

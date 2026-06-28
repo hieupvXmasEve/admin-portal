@@ -49,6 +49,7 @@ class ToolRegistry
                     'unsupported_group_by',
                     'unsupported_query_plan_option',
                     'forbidden_by_permission',
+                    'forbidden_by_domain_permission',
                     'forbidden_by_campus_scope',
                     'max_record_limit_exceeded',
                     'metric_resolver_missing',

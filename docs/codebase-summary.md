@@ -1,6 +1,6 @@
 # Codebase Summary
 
-Last updated: 2026-06-24
+Last updated: 2026-06-29
 Owner: Platform Team
 Status: Current-state snapshot
 Primary source: `repomix-output.xml` (generated 2026-03-02 / updated for runtime code through commit 8651e0f4)
@@ -52,7 +52,7 @@ Current counts:
     - Provider settings table: `ai_provider_settings`
     - Audit/evaluation/runtime tables: `ai_conversations`, `ai_messages`, `ai_agent_traces`, `ai_tool_calls`, `ai_provider_usages`, `ai_feedback`, `ai_evaluation_cases`, `ai_evaluation_runs`, `ai_evaluation_results`, `ai_chat_runs`, `ai_run_events`
     - Support services: `AiRedactor`, `AiAuditRecorder`, `AiProviderUsageRecorder`, `AiEvaluationRunner`, `BusinessGlossary`, `MetricCatalog`, `EntityCatalog`, `StudentProfileSectionCatalog`, `EntityReferenceResolver`, `QueryPlanValidator`, `ToolRegistry`, `ToolDispatcher`, `QueryMetricsTool`, `SearchEntitiesTool`, `GetEntityProfileTool`, MetricCatalog v1 resolvers, and entity/profile result helpers.
-    - Metric catalog/query-plan foundation: aggregate-only `metric-catalog:v1`, `query_metrics:v1` schema identity, `view_ai_metrics` permission, deterministic staff metric evaluation cases, and validated QueryPlan contracts.
+    - Metric catalog/query-plan foundation: aggregate-only `metric-catalog:v1`, `query_metrics:v1` schema identity, `view_ai_metrics` entry permission plus per-metric domain permission checks, deterministic staff metric evaluation cases, and validated QueryPlan contracts.
     - Query metrics tool MVP: internal read-only `query_metrics` execution returns bounded aggregate output with normalized filters, grouped summaries, source references, warnings/confidence, and AI tool-call audit for completed, denied, failed, or partial results.
     - Entity catalog/search MVP: `entity-catalog:v1` and `search_entities:v1` support `student`, `program`, `semester`, and `course_offering` (`class` alias) with entity-specific permissions, campus scoping for students/course offerings, opaque scoped `entity_ref` values, safe identifiers, source references, warnings/confidence, and AI tool-call audit.
     - Student profile-section MVP: `student-profile-sections:v1` and `get_entity_profile:v1` support selected `student` entities via opaque `entity_ref`, current-campus validation, section permissions (`identity`, `academic_summary`, `enrollments`, `attendance_summary`, `finance_summary`, `lifecycle_actions`), hidden-section reporting, source references, and completed/partial/denied/failed AI tool-call audit.

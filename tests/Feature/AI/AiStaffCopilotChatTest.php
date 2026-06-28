@@ -39,7 +39,7 @@ beforeEach(function () {
     $permissionService->shouldReceive('getUserPermissions')
         ->andReturnUsing(function (User $user, ?int $campusId = null): array {
             if ($user->id === $this->authorizedUser->id && $campusId === $this->campus->id) {
-                return ['view_ai_metrics'];
+                return ['view_ai_metrics', 'view_finance_reporting', 'view_academic_report'];
             }
 
             return [];

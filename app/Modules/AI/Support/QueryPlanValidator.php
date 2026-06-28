@@ -40,11 +40,27 @@ class QueryPlanValidator
             return $this->deny($plan, 'not_evaluated', $campusScopeSnapshot, 'unsupported_metric');
         }
 
-        $permission = (string) $metric['required_permission'];
+        $permission = (string) ($metric['required_permission'] ?? 'view_ai_metrics');
+        $domainPermission = isset($metric['required_domain_permission'])
+            ? (string) $metric['required_domain_permission']
+            : null;
         $permissions = $this->permissionService->getUserPermissions($actor, $campusId);
 
         if (! in_array($permission, $permissions, true)) {
-            return $this->deny($plan, 'denied', $campusScopeSnapshot, 'forbidden_by_permission', $metric);
+            return $this->deny($plan, 'denied', $campusScopeSnapshot, 'forbidden_by_permission', $metric, [
+                "missing_permission:{$permission}",
+            ]);
+        }
+
+        if (
+            $domainPermission !== null
+            && $domainPermission !== ''
+            && $domainPermission !== $permission
+            && ! in_array($domainPermission, $permissions, true)
+        ) {
+            return $this->deny($plan, 'denied', $campusScopeSnapshot, 'forbidden_by_domain_permission', $metric, [
+                "missing_permission:{$domainPermission}",
+            ]);
         }
 
         $campusFilter = $plan->filters()['campus_id'] ?? null;
