@@ -1,6 +1,6 @@
 # Reports management area + one-way links into the Hub + nav consolidation
 
-Status: ready-for-agent
+Status: ready-for-human
 
 ## Parent
 
