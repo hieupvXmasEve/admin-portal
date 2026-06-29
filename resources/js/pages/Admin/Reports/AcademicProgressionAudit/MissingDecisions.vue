@@ -54,8 +54,10 @@ const { filters, clearFilters, handlePaginationNavigate, handlePageSizeChange, u
     ['transitions', 'filters'],
 );
 
-const goToDecisions = () => {
-    router.visit(studentRoutes.studentDecisionsIndex());
+// One-way deep link into the student's Hub Lifecycle tab, where the authorizing
+// Decision is backfilled onto the transition (ADR-0007, ADR-0008).
+const goToStudentLifecycle = (studentId: number) => {
+    router.visit(studentRoutes.hub.lifecycle(studentId));
 };
 
 const formatDate = (value: string | null): string => {
@@ -156,10 +158,10 @@ const sourceLabel = (source: MissingDecisionRow['source']): string => (source ==
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="row in transitions.data" :key="row.id" class="hover:bg-muted/50 border-b">
+                            <tr v-for="row in transitions.data" :key="row.id" class="hover:bg-muted/50 cursor-pointer border-b" @click="goToStudentLifecycle(row.student.id)">
                                 <td class="px-4 py-3">
                                     <div>
-                                        <p class="font-medium">{{ row.student.full_name }}</p>
+                                        <p class="font-medium text-blue-600 hover:underline">{{ row.student.full_name }}</p>
                                         <p class="text-muted-foreground text-xs">{{ row.student.student_id }}</p>
                                     </div>
                                 </td>
@@ -170,7 +172,7 @@ const sourceLabel = (source: MissingDecisionRow['source']): string => (source ==
                                 </td>
                                 <td class="px-4 py-3">{{ formatDate(row.occurred_at) }}</td>
                                 <td class="px-4 py-3">
-                                    <Button size="sm" variant="outline" @click="goToDecisions">
+                                    <Button size="sm" variant="outline" @click.stop="goToStudentLifecycle(row.student.id)">
                                         <FileSignature class="mr-1 h-4 w-4" />
                                         Attach decision
                                     </Button>

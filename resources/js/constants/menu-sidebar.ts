@@ -41,7 +41,6 @@ import {
     Ticket,
     TrendingUp,
     Trophy,
-    User,
     UserPlus,
     Users,
 } from 'lucide-vue-next';
@@ -197,76 +196,58 @@ export const mainNavGroups: NavGroup[] = [
                         requiredPermissions: ['view_grade'],
                     },
                     {
-                        title: 'Performance Dashboard',
-                        href: academicSummaryRoutes.performanceDashboard(),
-                        icon: BarChart3,
-                        requiredPermissions: ['view_grade'],
-                    },
-                    {
                         title: 'Warning Center',
                         href: academicSummaryRoutes.warningCenter(),
                         icon: AlertCircle,
                         requiredPermissions: ['view_attendance', 'view_grade'],
                     },
-                    {
-                        title: 'Academic Report',
-                        href: academicSummaryRoutes.academicReport(),
-                        icon: FileText,
-                        requiredPermissions: ['view_grade'],
-                    },
-                    {
-                        title: 'Course Ranking',
-                        href: academicSummaryRoutes.courseRanking(),
-                        icon: Trophy,
-                        requiredPermissions: ['view_grade'],
-                    },
+                    // Aggregate analytics (Performance Dashboard, Academic Report, Course Ranking)
+                    // live in the management "Reports & Audits" group (ADR-0007, issue 07).
                 ],
             },
         ],
     },
     {
+        // Per-student work (ADR-0007): reached through the single "Student" entry,
+        // which opens the student list and from there the per-student Student Hub.
+        // The aggregate audits/reports that used to be scattered here now live in the
+        // separate management "Reports & Audits" group below (issue 07).
         label: 'Student Services',
         items: [
             {
-                // Single entry point into the per-student Student Hub (ADR-0007).
-                // Full nav consolidation of the items below is tracked in issue 07.
                 title: 'Students',
                 href: studentRoutes.list(),
                 icon: Users,
                 requiredPermissions: ['view_student'],
             },
             {
-                title: 'Student Records',
-                href: '#',
-                icon: User,
-                children: [
-                    {
-                        title: 'Student List',
-                        href: studentRoutes.list(),
-                        icon: Users,
-                        requiredPermissions: ['view_student'],
-                    },
-                    {
-                        title: 'Enrollments & Holds',
-                        href: studentRoutes.enrollments(),
-                        icon: ClipboardList,
-                        requiredPermissions: ['view_student'],
-                    },
-                    {
-                        title: 'Student Applications',
-                        href: '/student-applications',
-                        icon: ClipboardCheck,
-                        requiredPermissions: ['view_student_application'],
-                    },
-                ],
+                title: 'Enrollments & Holds',
+                href: studentRoutes.enrollments(),
+                icon: ClipboardList,
+                requiredPermissions: ['view_student'],
             },
             {
-                title: 'Status & Decisions',
+                title: 'Student Applications',
+                href: '/student-applications',
+                icon: ClipboardCheck,
+                requiredPermissions: ['view_student_application'],
+            },
+        ],
+    },
+    {
+        // Management oversight area for Directors/Heads (ADR-0007): the aggregate
+        // audits/reports, kept separate from the per-student Hub. Each report row
+        // deep-links one-way into the relevant student's Hub tab; there is no
+        // Hub → report back-link (issue 07).
+        label: 'Reports & Audits',
+        items: [
+            {
+                title: 'Lifecycle & Decisions',
                 href: '#',
                 icon: ClipboardList,
                 children: [
                     {
-                        title: 'Student Actions',
+                        title: 'Student Actions Audit',
                         href: studentRoutes.studentStatusAction(),
                         icon: ClipboardCheck,
                         requiredPermissions: ['view_student_action'],
@@ -278,19 +259,6 @@ export const mainNavGroups: NavGroup[] = [
                         requiredPermissions: ['view_student_action'],
                     },
                     {
-                        title: 'Student Decisions',
-                        href: studentRoutes.studentDecisionsIndex(),
-                        icon: FileText,
-                        requiredPermissions: ['view_student_action'],
-                    },
-                ],
-            },
-            {
-                title: 'Progression Audit',
-                href: '#',
-                icon: AlertCircle,
-                children: [
-                    {
                         title: 'Academic Progression',
                         href: studentRoutes.academicProgressionAudit(),
                         icon: TrendingUp,
@@ -301,6 +269,43 @@ export const mainNavGroups: NavGroup[] = [
                         href: studentRoutes.academicProgressionMissingDocuments(),
                         icon: ClipboardCheck,
                         requiredPermissions: ['view_student_action'],
+                    },
+                    {
+                        title: 'Missing Decisions',
+                        href: studentRoutes.academicProgressionMissingDecisions(),
+                        icon: FileWarning,
+                        requiredPermissions: ['view_student_action'],
+                    },
+                    {
+                        title: 'Student Decisions',
+                        href: studentRoutes.studentDecisionsIndex(),
+                        icon: FileText,
+                        requiredPermissions: ['view_student_action'],
+                    },
+                ],
+            },
+            {
+                title: 'Academic Performance',
+                href: '#',
+                icon: BarChart3,
+                children: [
+                    {
+                        title: 'Performance Dashboard',
+                        href: academicSummaryRoutes.performanceDashboard(),
+                        icon: BarChart3,
+                        requiredPermissions: ['view_grade'],
+                    },
+                    {
+                        title: 'Course Ranking',
+                        href: academicSummaryRoutes.courseRanking(),
+                        icon: Trophy,
+                        requiredPermissions: ['view_grade'],
+                    },
+                    {
+                        title: 'Academic Report',
+                        href: academicSummaryRoutes.academicReport(),
+                        icon: FileText,
+                        requiredPermissions: ['view_grade'],
                     },
                 ],
             },

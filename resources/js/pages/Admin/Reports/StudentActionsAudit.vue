@@ -128,7 +128,7 @@ const columns: ColumnDef<StudentActionLog>[] = [
             h(
                 Link,
                 {
-                    href: route('students.actions.index', { student: row.original.student_id }),
+                    href: studentRoutes.hub.lifecycle(row.original.student_id),
                     class: 'text-blue-600 hover:underline font-medium',
                 },
                 () => row.original.student?.student_id ?? '-',

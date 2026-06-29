@@ -52,10 +52,6 @@ class CourseRankingController extends Controller
 
     /**
      * Get course rankings for a given semester and campus.
-     *
-     * @param int $semesterId
-     * @param int $campusId
-     * @return array
      */
     private function getCourseRankings(int $semesterId, int $campusId): array
     {
@@ -84,6 +80,7 @@ class CourseRankingController extends Controller
                 ->get()
                 ->map(function ($record) {
                     return [
+                        'id' => $record->student->id,
                         'student_id' => $record->student->student_id,
                         'full_name' => $record->student->full_name,
                         'final_percentage' => (float) $record->final_percentage,

@@ -205,6 +205,18 @@ export const studentRoutes = {
     // Student Academic Summary Routes
     studentAcademicSummary: (id: number) => route('students.academic-summary.overview', { student: id }),
 
+    // Student Hub tab deep links (one-way targets from the management Reports area, ADR-0007).
+    // The Hub is the academic-summary surface; reports drill into the relevant tab for a student.
+    hub: {
+        overview: (id: number) => route('students.academic-summary.overview', { student: id }),
+        registrations: (id: number) => route('students.academic-summary.registrations', { student: id }),
+        scores: (id: number) => route('students.academic-summary.scores', { student: id }),
+        attendance: (id: number) => route('students.academic-summary.attendance', { student: id }),
+        lifecycle: (id: number) => route('students.academic-summary.lifecycle', { student: id }),
+        graduation: (id: number) => route('students.academic-summary.graduation', { student: id }),
+        finance: (id: number) => route('students.academic-summary.finance', { student: id }),
+    },
+
     studentStatusActionIndex: (id: number) => route('students.actions.index', { student: id }),
     studentStatusAction: () => route('reports.student-actions.index'),
     studentStatusActionImport: () => route('reports.student-actions.import'),

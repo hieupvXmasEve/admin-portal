@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { studentRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import {
     ArcElement,
@@ -262,7 +263,7 @@ const trendOptions = {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            <TableRow v-for="student in stats.top_students" :key="student.id">
+                            <TableRow v-for="student in stats.top_students" :key="student.id" class="cursor-pointer" @click="router.visit(studentRoutes.hub.scores(student.id))">
                                 <TableCell>
                                     <div class="font-medium">{{ student.name }}</div>
                                     <div class="text-muted-foreground text-xs">{{ student.student_id }}</div>
@@ -290,7 +291,7 @@ const trendOptions = {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            <TableRow v-for="student in stats.at_risk_list" :key="student.id">
+                            <TableRow v-for="student in stats.at_risk_list" :key="student.id" class="cursor-pointer" @click="router.visit(studentRoutes.hub.scores(student.id))">
                                 <TableCell>
                                     <div class="font-medium">{{ student.name }}</div>
                                     <div class="text-muted-foreground text-xs">{{ student.student_id }}</div>

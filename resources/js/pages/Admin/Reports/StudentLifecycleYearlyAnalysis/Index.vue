@@ -9,7 +9,7 @@ import { useTableFilters } from '@/composables/useFilters';
 import type { PaginatedResponse } from '@/types';
 import { getStudentStatusBadgeClass, getStudentStatusLabel } from '@/types/student';
 import { studentRoutes } from '@/utils/routes';
-import { Head } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 interface AnalysisRow {
@@ -32,6 +32,7 @@ interface AnalysisRow {
 }
 
 interface StatusRow {
+    id: number;
     student_id: string;
     full_name: string;
     program_name: string | null;
@@ -300,8 +301,8 @@ const handleExport = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="row in statusTable.data" :key="`${row.student_id}-${row.intake_semester}`" class="border-b">
-                                    <td class="px-3 py-2 font-medium">{{ row.student_id }}</td>
+                                <tr v-for="row in statusTable.data" :key="`${row.student_id}-${row.intake_semester}`" class="hover:bg-muted/50 cursor-pointer border-b" @click="router.visit(studentRoutes.hub.lifecycle(row.id))">
+                                    <td class="px-3 py-2 font-medium text-blue-600 hover:underline">{{ row.student_id }}</td>
                                     <td class="px-3 py-2">{{ row.full_name }}</td>
                                     <td class="px-3 py-2">{{ row.program_name ?? '-' }}</td>
                                     <td class="px-3 py-2">{{ row.intake_semester ?? '-' }}</td>

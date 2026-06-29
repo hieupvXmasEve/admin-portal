@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
+import { studentRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import { FileSpreadsheet, FileText, Filter, Search } from 'lucide-vue-next';
 import { computed } from 'vue';
@@ -310,7 +311,7 @@ const barPlugins = [barLabelPlugin];
                         </TableHeader>
                         <TableBody>
                             <TableRow v-for="student in reportData" :key="student.student_id" class="group border-b border-slate-100 transition-all hover:bg-slate-50/80">
-                                <TableCell class="sticky left-0 z-9 border-r border-slate-100 bg-white font-semibold whitespace-nowrap text-slate-700 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]"> {{ student.full_name }}</TableCell>
+                                <TableCell class="sticky left-0 z-9 cursor-pointer border-r border-slate-100 bg-white font-semibold whitespace-nowrap text-blue-600 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)] hover:underline" @click="router.visit(studentRoutes.hub.scores(student.id))"> {{ student.full_name }}</TableCell>
                                 <TableCell class="sticky left-[200px] z-9 border-r border-slate-100 bg-white whitespace-nowrap text-slate-600 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]">{{ student.student_id }} </TableCell>
                                 <template v-for="unit in units" :key="unit.id">
                                     <TableCell class="border-r border-slate-100 px-2 py-4 text-center transition-colors">

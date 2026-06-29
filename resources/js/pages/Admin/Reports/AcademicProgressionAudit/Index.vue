@@ -136,8 +136,9 @@ const getEventTypeBadgeVariant = (eventType: string) => {
     }
 };
 
-const goToStudentPlacement = (studentId: number) => {
-    router.visit(studentRoutes.studentPlacement(studentId));
+// One-way deep link into the student's Hub Lifecycle tab (ADR-0007).
+const goToStudentLifecycle = (studentId: number) => {
+    router.visit(studentRoutes.hub.lifecycle(studentId));
 };
 </script>
 
@@ -359,7 +360,7 @@ const goToStudentPlacement = (studentId: number) => {
                         <tbody>
                             <tr v-for="event in progressionEvents.data" :key="event.id"
                                 class="hover:bg-muted/50 cursor-pointer border-b"
-                                @click="goToStudentPlacement(event.student.id)">
+                                @click="goToStudentLifecycle(event.student.id)">
                                 <td class="px-4 py-3">
                                     <div>
                                         <p class="font-medium">{{ event.student.full_name }}</p>

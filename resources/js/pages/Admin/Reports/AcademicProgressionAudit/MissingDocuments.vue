@@ -52,7 +52,6 @@ const props = defineProps<Props>();
 
 const {
     filters,
-    applyFilters,
     clearFilters,
     handlePaginationNavigate,
     handlePageSizeChange,
@@ -63,8 +62,10 @@ const {
     ['certificates', 'filters']
 );
 
-const goToStudentPlacement = (studentId: number) => {
-    router.visit(studentRoutes.studentPlacement(studentId));
+// One-way deep link into the student's Hub Lifecycle tab, where EGC placement /
+// IELTS documents are now managed (ADR-0007; placement page retired into the Hub).
+const goToStudentLifecycle = (studentId: number) => {
+    router.visit(studentRoutes.hub.lifecycle(studentId));
 };
 </script>
 
@@ -153,7 +154,7 @@ const goToStudentPlacement = (studentId: number) => {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="cert in certificates.data" :key="cert.id" class="hover:bg-muted/50 cursor-pointer border-b" @click="goToStudentPlacement(cert.student.id)">
+                            <tr v-for="cert in certificates.data" :key="cert.id" class="hover:bg-muted/50 cursor-pointer border-b" @click="goToStudentLifecycle(cert.student.id)">
                                 <td class="px-4 py-3">
                                     <div>
                                         <p class="font-medium">{{ cert.student.full_name }}</p>
@@ -168,9 +169,9 @@ const goToStudentPlacement = (studentId: number) => {
                                 <td class="px-4 py-3">{{ cert.issue_date ?? '-' }}</td>
                                 <td class="max-w-xs truncate px-4 py-3">{{ cert.notes ?? '-' }}</td>
                                 <td class="px-4 py-3">
-                                    <Button size="sm" variant="outline" @click.stop="goToStudentPlacement(cert.student.id)">
+                                    <Button size="sm" variant="outline" @click.stop="goToStudentLifecycle(cert.student.id)">
                                         <Upload class="mr-1 h-4 w-4" />
-                                        Upload
+                                        Open Hub
                                     </Button>
                                 </td>
                             </tr>

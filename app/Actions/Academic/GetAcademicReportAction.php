@@ -6,22 +6,16 @@ namespace App\Actions\Academic;
 
 use App\Models\AcademicRecord;
 use App\Models\CurriculumUnit;
-use App\Models\GpaCalculation;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
-use Illuminate\Pagination\LengthAwarePaginator;
 
 class GetAcademicReportAction
 {
     /**
      * Execute the academic report logic.
-     *
-     * @param array $filters
-     * @return array
      */
     public function execute(array $filters): array
     {
@@ -36,10 +30,10 @@ class GetAcademicReportAction
             ->where('status', 'intake_course');
 
         // Apply filters
-        if (!empty($filters['program_id'])) {
+        if (! empty($filters['program_id'])) {
             $studentsQuery->where('program_id', $filters['program_id']);
         }
-        if (!empty($filters['keyword'])) {
+        if (! empty($filters['keyword'])) {
             $keyword = $filters['keyword'];
             $studentsQuery->where(function ($q) use ($keyword) {
                 $q->where('full_name', 'like', "%{$keyword}%")
@@ -131,6 +125,7 @@ class GetAcademicReportAction
 
         $reportData = $items->map(function (Student $student) use ($units, $curriculumUnitsByVersion) {
             $row = [
+                'id' => $student->id,
                 'full_name' => $student->full_name,
                 'student_id' => $student->student_id,
                 'course_results' => [],
@@ -175,13 +170,13 @@ class GetAcademicReportAction
         if ($isExport) {
             // Build filter context for export
             $semester = Semester::find($semesterId);
-            $program = !empty($filters['program_id']) ? Program::find($filters['program_id']) : null;
+            $program = ! empty($filters['program_id']) ? Program::find($filters['program_id']) : null;
 
             $filterContext = [
                 'semester' => $semester?->name ?? 'N/A',
                 'program' => $program?->name ?? 'All Programs',
                 'status' => 'In Course',
-                'keyword' => !empty($filters['keyword']) ? $filters['keyword'] : null,
+                'keyword' => ! empty($filters['keyword']) ? $filters['keyword'] : null,
             ];
 
             return [

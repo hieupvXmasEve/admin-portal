@@ -8,8 +8,8 @@ use App\Enums\StudentActionType;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentActionLog;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -154,6 +154,7 @@ class GetStudentStatusBySemesterQuery
             })?->dropoutSemester?->code;
 
             return [
+                'id' => $student->id,
                 'student_id' => $student->student_id,
                 'full_name' => $student->full_name,
                 'program_name' => $student->program?->name,

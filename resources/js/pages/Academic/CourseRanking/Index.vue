@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import {
-    Card, CardHeader, CardTitle, CardDescription, CardContent
+    Card, CardHeader, CardTitle, CardContent
 } from '@/components/ui/card';
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -13,9 +13,10 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Filter, Trophy, Award, TrendingUp } from 'lucide-vue-next';
-import { academicSummaryRoutes } from '@/utils/routes';
+import { studentRoutes } from '@/utils/routes';
 
 interface StudentRanking {
+    id: number;
     student_id: string;
     full_name: string;
     final_percentage: number;
@@ -154,7 +155,8 @@ const getAttendanceColor = (attendance: number | null) => {
                         </TableHeader>
                         <TableBody>
                             <TableRow v-for="(student, index) in course.students" :key="student.student_id"
-                                class="hover:bg-slate-50/50 transition-colors">
+                                class="hover:bg-slate-50/50 transition-colors cursor-pointer"
+                                @click="router.visit(studentRoutes.hub.scores(student.id))">
                                 <TableCell class="text-center">
                                     <div class="flex items-center justify-center">
                                         <Badge :variant="getRankBadgeVariant(index + 1)" class="font-bold">
