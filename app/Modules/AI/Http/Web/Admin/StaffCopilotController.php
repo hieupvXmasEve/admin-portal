@@ -80,6 +80,8 @@ class StaffCopilotController extends Controller
     public function cancel(Request $request, AiChatRun $run): RedirectResponse
     {
         $this->authorizeRun($run, $request);
+        abort_unless($run->isCancellable(), 409, 'Only active runs can be cancelled.');
+
         $this->runtime->cancel($run);
 
         Inertia::flash('info', 'AI copilot run cancelled.');

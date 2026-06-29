@@ -87,7 +87,7 @@ class StaffCopilotSseRuntime
         return DB::transaction(function () use ($run): AiChatRun {
             $run = $run->newQuery()->lockForUpdate()->find($run->id) ?? $run;
 
-            if ($run->isTerminal()) {
+            if (! $run->isCancellable()) {
                 return $run;
             }
 
@@ -257,6 +257,10 @@ class StaffCopilotSseRuntime
             $answer = $this->runner->run($run->userMessage->redacted_content, $run->user, $run->campus, $run->trace);
             $run->trace->refresh();
 
+            if ($this->stopIfCancellationRequested($run)) {
+                return;
+            }
+
             if ($run->trace->safe_error_code === 'provider_invocation_failed') {
                 $this->recordEvent($run, 'provider.failed', [
                     'safe_error_code' => 'provider_invocation_failed',
@@ -379,6 +383,27 @@ class StaffCopilotSseRuntime
                 'safe_error_code' => $safeErrorCode,
             ]), $assistantMessage);
         });
+    }
+
+    private function stopIfCancellationRequested(AiChatRun $run): bool
+    {
+        $freshRun = $run->newQuery()->find($run->id);
+
+        if (! $freshRun instanceof AiChatRun) {
+            return false;
+        }
+
+        if ($freshRun->status === AiChatRun::STATUS_CANCELLED) {
+            return true;
+        }
+
+        if ($freshRun->cancellation_requested_at !== null) {
+            $this->cancel($freshRun);
+
+            return true;
+        }
+
+        return false;
     }
 
     private function queueMissingRetry(AiChatRun $sourceRun): AiChatRun

@@ -5,11 +5,13 @@ declare(strict_types=1);
 use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\User;
+use App\Modules\AI\Models\AiAgentTrace;
 use App\Modules\AI\Models\AiChatRun;
 use App\Modules\AI\Models\AiConversation;
 use App\Modules\AI\Models\AiMessage;
 use App\Modules\AI\Models\AiRunEvent;
 use App\Modules\AI\Models\AiToolCall;
+use App\Modules\AI\Support\StaffCopilotSseRuntime;
 use App\Services\PermissionService;
 use App\Shared\Contracts\Finance\AiFinanceMetricReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -319,6 +321,11 @@ it('denies run stream and cancellation access to another authorized staff user',
         ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
         ->post(route('ai.copilot.runs.cancel', $run))
         ->assertForbidden();
+
+    $this->actingAs($this->unauthorizedUser)
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->post(route('ai.copilot.runs.cancel', $run))
+        ->assertForbidden();
 });
 
 it('does not recover a staff copilot active run from the wrong campus scope', function () {
@@ -364,6 +371,12 @@ it('does not recover a staff copilot active run from the wrong campus scope', fu
         ->withSession(['current_campus_id' => $otherCampus->id])
         ->get(route('ai.copilot.runs.events', $run))
         ->assertForbidden();
+
+    $this->actingAs($this->authorizedUser)
+        ->withSession(['current_campus_id' => $otherCampus->id])
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->post(route('ai.copilot.runs.cancel', $run))
+        ->assertForbidden();
 });
 
 it('cancels a queued run without executing provider or tool work', function () {
@@ -396,12 +409,139 @@ it('cancels a queued run without executing provider or tool work', function () {
 
     $run->refresh();
     $assistantMessage = AiMessage::query()->where('role', 'assistant')->firstOrFail();
+    $trace = AiAgentTrace::query()->firstOrFail();
+    $cancelEvent = AiRunEvent::query()
+        ->where('ai_chat_run_id', $run->id)
+        ->where('event_type', 'run.cancelled')
+        ->firstOrFail();
 
     expect($run->status)->toBe(AiChatRun::STATUS_CANCELLED)
         ->and($run->cancellation_requested_at)->not->toBeNull()
+        ->and($run->completed_at)->not->toBeNull()
+        ->and($run->safe_error_code)->toBe('run_cancelled')
+        ->and($run->last_event_id)->toBe($cancelEvent->id)
         ->and($assistantMessage->redacted_content)->toBe('This run was cancelled before a complete answer was produced.')
+        ->and($assistantMessage->final_answer_id)->toBe('staff-copilot-terminal-'.$run->ai_agent_trace_id)
+        ->and($assistantMessage->hidden_sections)->toBe(['run_cancelled'])
+        ->and($trace->status)->toBe(AiChatRun::STATUS_CANCELLED)
+        ->and($trace->safe_error_code)->toBe('run_cancelled')
+        ->and($trace->final_answer_id)->toBe('staff-copilot-terminal-'.$run->ai_agent_trace_id)
+        ->and($cancelEvent->redacted_payload['status'])->toBe(AiChatRun::STATUS_CANCELLED)
+        ->and($cancelEvent->redacted_payload['safe_error_code'])->toBe('run_cancelled')
         ->and($response->streamedContent())->toContain('event: run.cancelled')
         ->and(AiToolCall::query()->count())->toBe(0);
+
+    $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('active_run', null)
+            ->where('messages.1.run_status', AiChatRun::STATUS_CANCELLED)
+            ->where('messages.1.answer.terminal_state.kind', 'cancelled')
+            ->where('messages.1.answer.safe_error_code', 'run_cancelled'));
+});
+
+it('denies cancelling terminal runs without changing completed history', function () {
+    $this->actingAs($this->authorizedUser)
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->from(route('ai.copilot.index'))
+        ->post(route('ai.copilot.messages.store'), [
+            'question' => 'Current semester outstanding tuition by program là bao nhiêu?',
+        ]);
+
+    $run = AiChatRun::query()->firstOrFail();
+
+    $this->mock(AiFinanceMetricReader::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('collectionProgress')
+            ->once()
+            ->andReturn([
+                'summary' => [
+                    'student_count' => 2,
+                    'billed_total' => 1000.0,
+                    'paid_total' => 700.0,
+                    'outstanding_total' => 300.0,
+                    'collection_rate' => 0.7,
+                ],
+                'breakdowns' => [],
+                'meta' => [],
+            ]);
+    });
+
+    $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.runs.events', $run))
+        ->streamedContent();
+
+    $run->refresh();
+    $assistantMessage = AiMessage::query()->where('role', 'assistant')->firstOrFail();
+    $completedContent = $assistantMessage->redacted_content;
+    $completedAt = $run->completed_at;
+    $lastEventId = $run->last_event_id;
+
+    $this->actingAs($this->authorizedUser)
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->post(route('ai.copilot.runs.cancel', $run))
+        ->assertStatus(409);
+
+    $run->refresh();
+    $assistantMessage->refresh();
+
+    expect($run->status)->toBe(AiChatRun::STATUS_COMPLETED)
+        ->and($run->cancellation_requested_at)->toBeNull()
+        ->and($run->safe_error_code)->toBeNull()
+        ->and($run->completed_at?->toISOString())->toBe($completedAt?->toISOString())
+        ->and($run->last_event_id)->toBe($lastEventId)
+        ->and($assistantMessage->redacted_content)->toBe($completedContent)
+        ->and(AiRunEvent::query()->where('event_type', 'run.cancelled')->exists())->toBeFalse();
+});
+
+it('preserves cancelled state when cancellation is requested after execution has started', function () {
+    $this->actingAs($this->authorizedUser)
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->from(route('ai.copilot.index'))
+        ->post(route('ai.copilot.messages.store'), [
+            'question' => 'Current semester outstanding tuition by program là bao nhiêu?',
+        ]);
+
+    $run = AiChatRun::query()->firstOrFail();
+
+    $this->mock(AiFinanceMetricReader::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('collectionProgress')
+            ->once()
+            ->andReturnUsing(function (): array {
+                app(StaffCopilotSseRuntime::class)->cancel(AiChatRun::query()->firstOrFail());
+
+                return [
+                    'summary' => [
+                        'student_count' => 2,
+                        'billed_total' => 1000.0,
+                        'paid_total' => 700.0,
+                        'outstanding_total' => 300.0,
+                        'collection_rate' => 0.7,
+                    ],
+                    'breakdowns' => [],
+                    'meta' => [],
+                ];
+            });
+    });
+
+    $response = $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.runs.events', $run));
+
+    $response->assertStreamed();
+
+    $content = $response->streamedContent();
+    $run->refresh();
+    $assistantMessage = AiMessage::query()->where('role', 'assistant')->firstOrFail();
+
+    expect($content)
+        ->toContain('event: run.started')
+        ->toContain('event: run.cancelled')
+        ->not->toContain('event: message.delta')
+        ->not->toContain('event: run.completed')
+        ->and($run->status)->toBe(AiChatRun::STATUS_CANCELLED)
+        ->and($run->safe_error_code)->toBe('run_cancelled')
+        ->and($assistantMessage->redacted_content)->toBe('This run was cancelled before a complete answer was produced.')
+        ->and(AiToolCall::query()->count())->toBe(1);
 });
 
 it('retries a failed run without duplicating the original user message', function () {

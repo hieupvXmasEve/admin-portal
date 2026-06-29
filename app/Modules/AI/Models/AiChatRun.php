@@ -109,4 +109,9 @@ class AiChatRun extends Model
             self::STATUS_CANCELLED,
         ], true);
     }
+
+    public function isCancellable(): bool
+    {
+        return ! $this->isTerminal();
+    }
 }
