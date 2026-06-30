@@ -132,6 +132,10 @@ class RoleAndPermissionSeeder extends Seeder
                 'approve_student_application',
                 'reject_student_application',
                 'revoke_student_application',
+                // Controlled MCP server (ADR-0010): org-wide leadership may span every
+                // campus when querying AI metrics. Domain data stays gated per-domain.
+                'view_ai_metrics',
+                'view_ai_all_campus',
             ],
             'truong_phong' => [
                 'view_user',

@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Mcp\Support\ActiveUserMcpActorResolver;
+use App\Mcp\Support\McpActorResolver;
+use App\Mcp\Support\McpCampusResolver;
+use App\Mcp\Support\PermissionMcpCampusResolver;
 use App\Models\CourseOffering;
 use App\Models\Department;
 use App\Models\Lecture;
@@ -30,7 +34,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Controlled MCP server identity layer (ADR-0010): the tools resolve the actor and
+        // campus through these contracts, so the concrete resolvers bind here.
+        $this->app->bind(
+            McpActorResolver::class,
+            ActiveUserMcpActorResolver::class,
+        );
+        $this->app->bind(
+            McpCampusResolver::class,
+            PermissionMcpCampusResolver::class,
+        );
     }
 
     /**

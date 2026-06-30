@@ -29,7 +29,7 @@ class QueryMetricsTool
     {
         $started = microtime(true);
         $plan = QueryPlan::fromArray($arguments);
-        $validation = $this->validator->validate($plan, $context->actor, $context->campus);
+        $validation = $this->validator->validate($plan, $context->actor, $context->campus, $context->campusScope);
         $validationData = $validation->toArray();
 
         if (! $validation->allowed()) {

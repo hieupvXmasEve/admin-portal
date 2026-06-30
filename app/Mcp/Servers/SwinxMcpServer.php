@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mcp\Servers;
 
 use App\Mcp\Tools\PingTool;
+use App\Mcp\Tools\QueryMetricsMcpTool;
 use Laravel\Mcp\Server;
 
 /**
@@ -26,9 +27,14 @@ class SwinxMcpServer extends Server
 
     /**
      * @var array<class-string>
+     *
+     * Issue 04 maps the first real tool (`query_metrics`); `search_entities` and
+     * `get_entity_profile` arrive in the next slice. `ping` stays as the transport
+     * tracer until all three real tools are registered.
      */
     protected array $tools = [
         PingTool::class,
+        QueryMetricsMcpTool::class,
     ];
 
     /**

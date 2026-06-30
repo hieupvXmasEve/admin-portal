@@ -16,13 +16,20 @@ class QueryPlanValidator
         private readonly PermissionService $permissionService,
     ) {}
 
-    public function validate(QueryPlan $plan, User $actor, ?Campus $campus = null): QueryPlanValidationResult
-    {
+    public function validate(
+        QueryPlan $plan,
+        User $actor,
+        ?Campus $campus = null,
+        ?CampusScopeSnapshot $campusScope = null,
+    ): QueryPlanValidationResult {
         // Campus may be supplied explicitly by the caller; web-chat continues to rely on
         // the container-bound `campus` resolved by SetCampus middleware when none is passed.
         $campus ??= app()->bound('campus') ? app('campus') : null;
         $campusId = $campus?->id;
-        $campusScopeSnapshot = CampusScopeSnapshot::single($campusId)->toArray();
+        // A pre-resolved MCP scope (possibly multi-campus) wins; otherwise fall back to the
+        // single-campus snapshot derived from the resolved campus (web-chat shape unchanged).
+        $scope = $campusScope ?? CampusScopeSnapshot::single($campusId);
+        $campusScopeSnapshot = $scope->toArray();
 
         if ($plan->hasSchemaViolations()) {
             return $this->deny(
@@ -65,7 +72,9 @@ class QueryPlanValidator
 
         $campusFilter = $plan->filters()['campus_id'] ?? null;
 
-        if ($campusFilter !== null && (int) $campusFilter !== (int) $campusId) {
+        // A campus filter must fall within the resolved scope: the single resolved campus for
+        // web-chat, or any campus in the permitted span for an MCP all-campus holder.
+        if ($campusFilter !== null && ! in_array((int) $campusFilter, $scope->campusIds(), true)) {
             return $this->deny($plan, 'allowed', $campusScopeSnapshot, 'forbidden_by_campus_scope', $metric);
         }
 

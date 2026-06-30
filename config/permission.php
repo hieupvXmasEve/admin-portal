@@ -246,6 +246,11 @@ return [
         // AI Governance
         'ai_metrics' => [
             'view_ai_metrics' => 'view_ai_metrics',
+            // All-campus AI scope (ADR-0010): a dedicated AI-wide permission that lets a
+            // holder span every campus over the Controlled MCP server. Distinct from the
+            // finance all-campus permission (wrong domain); per-domain data stays gated by
+            // its own domain permission — this only governs campus span.
+            'view_ai_all_campus' => 'view_ai_all_campus',
         ],
         'ai_provider_settings' => [
             'view_ai_provider_settings' => 'view_ai_provider_settings',
