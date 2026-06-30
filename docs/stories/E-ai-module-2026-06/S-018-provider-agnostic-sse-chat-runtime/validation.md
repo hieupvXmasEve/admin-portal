@@ -142,3 +142,23 @@ capture browser proof for:
   exit 137. A single-file `vue-tsc` attempt is not a valid project check here:
   it does not resolve the repo's `@` aliases and reports an existing
   `router.reload({ preserveScroll })` type mismatch on this page.
+
+## Operational Audit Evidence Hardening - 2026-06-30
+
+- Terminal `ai_run_events` now include redacted `audit_evidence` for completed,
+  failed, cancelled, and retried Staff Copilot runs.
+- The evidence snapshot records actor/campus scope, `view_ai_metrics` entry
+  layer, connected-provider usage, provider/model/runtime metadata,
+  prompt/catalog/tool schema versions, tool permission outcomes, source
+  references, warnings, hidden-section markers, confidence, duration, final
+  answer linkage, cancellation metadata, and retry linkage.
+- Evidence payloads are normalized run-event metadata only. They do not expose
+  provider API keys, raw provider request/response bodies, SQL, raw rows,
+  hidden-section data, internal exception traces, portal behavior, WebSocket
+  transport, or write/action mode.
+- `AiStaffCopilotSseRuntimeTest` and `AiStaffCopilotChatTest` were extended to
+  assert terminal evidence through persisted SSE/run-event behavior for
+  completed, provider-failed, permission-denied, unsupported, cancelled, failed,
+  and retried runs.
+- Validation in this environment was blocked before execution because
+  `./scripts/dev.sh` cannot find Docker and the host does not provide `php`.

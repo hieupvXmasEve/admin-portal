@@ -199,6 +199,46 @@ it('streams normalized run events and completes the queued run through allowlist
 
     expect($events->pluck('sequence')->all())->toBe(range(1, $events->count()))
         ->and($events->pluck('redacted_payload.sequence')->all())->toBe(range(1, $events->count()));
+
+    $completedEvent = $events->firstWhere('event_type', 'run.completed');
+    $completedEvidence = $completedEvent?->redacted_payload['audit_evidence'] ?? [];
+    $completedEvidenceJson = json_encode($completedEvidence, JSON_THROW_ON_ERROR);
+
+    expect($completedEvidence['actor'])->toMatchArray([
+        'user_id' => $this->authorizedUser->id,
+        'role' => 'staff',
+    ])
+        ->and($completedEvidence['campus_scope'])->toMatchArray([
+            'campus_id' => $this->campus->id,
+            'campus_ids' => [$this->campus->id],
+        ])
+        ->and($completedEvidence['access_layers']['entry_permission'])->toBe('view_ai_metrics')
+        ->and($completedEvidence['access_layers']['connected_provider_used'])->toBeFalse()
+        ->and($completedEvidence['run_contract'])->toMatchArray([
+            'provider' => 'deterministic',
+            'model' => 'staff-copilot-mvp',
+            'runtime_mode' => 'deterministic',
+            'stream_transport' => 'sse',
+            'stream_mode' => 'fallback_snapshot',
+            'prompt_version' => 'staff-copilot-mvp:v1',
+            'catalog_version' => 'metric-catalog:v1',
+            'tool_schema_version' => 'query_metrics:v1',
+        ])
+        ->and($completedEvidence['terminal']['status'])->toBe(AiChatRun::STATUS_COMPLETED)
+        ->and($completedEvidence['terminal']['duration_ms'])->toBeInt()
+        ->and($completedEvidence['answer']['assistant_message_id'])->toBe($assistantMessage->id)
+        ->and($completedEvidence['answer']['final_answer_id'])->toBe($assistantMessage->final_answer_id)
+        ->and($completedEvidence['tools'][0]['tool_name'])->toBe('query_metrics')
+        ->and($completedEvidence['tools'][0]['permission_result'])->toBe('allowed')
+        ->and($completedEvidence['tools'][0]['source_references'][0]['source_report'])->toBe('finance.reporting.collection-progress')
+        ->and($completedEvidence['source_references'][0]['source_report'])->toBe('finance.reporting.collection-progress')
+        ->and($completedEvidence['confidence']['level'])->toBe('high')
+        ->and($completedEvidence['warnings'])->toBe([])
+        ->and($completedEvidence['hidden_sections'])->toBe([])
+        ->and($completedEvidenceJson)->not->toContain('raw_provider_request')
+        ->and($completedEvidenceJson)->not->toContain('raw_provider_response')
+        ->and($completedEvidenceJson)->not->toContain('raw_sql')
+        ->and($completedEvidenceJson)->not->toContain('raw_rows');
 });
 
 it('replays persisted run events after a valid cursor without duplicating assistant deltas or executing tools again', function () {
@@ -293,6 +333,67 @@ it('rejects an invalid cursor with a stable safe error response before executing
 
     expect($run->status)->toBe(AiChatRun::STATUS_QUEUED)
         ->and(AiToolCall::query()->count())->toBe(0);
+});
+
+it('records permission-denied terminal evidence without executing source reads', function () {
+    $permissionService = Mockery::mock(PermissionService::class);
+    $permissionService->shouldReceive('getUserPermissions')
+        ->andReturnUsing(function (User $user, ?int $campusId = null): array {
+            if ($user->id === $this->authorizedUser->id && $campusId === $this->campus->id) {
+                return ['view_ai_metrics'];
+            }
+
+            return [];
+        });
+
+    app()->forgetInstance(PermissionService::class);
+    app()->singleton(PermissionService::class, fn () => $permissionService);
+
+    $this->actingAs($this->authorizedUser)
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->from(route('ai.copilot.index'))
+        ->post(route('ai.copilot.messages.store'), [
+            'question' => 'Current semester outstanding tuition by program là bao nhiêu?',
+        ]);
+
+    $run = AiChatRun::query()->firstOrFail();
+
+    $this->mock(AiFinanceMetricReader::class, function (MockInterface $mock): void {
+        $mock->shouldNotReceive('collectionProgress');
+        $mock->shouldNotReceive('feeMonitor');
+        $mock->shouldNotReceive('dngLifecycle');
+    });
+
+    $response = $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.runs.events', $run))
+        ->assertStreamed();
+
+    $content = $response->streamedContent();
+    $run->refresh();
+
+    $failedEvent = AiRunEvent::query()
+        ->where('ai_chat_run_id', $run->id)
+        ->where('event_type', 'run.failed')
+        ->firstOrFail();
+    $failedEvidence = $failedEvent->redacted_payload['audit_evidence'] ?? [];
+    $failedEvidenceJson = json_encode($failedEvidence, JSON_THROW_ON_ERROR);
+
+    expect($content)
+        ->toContain('event: tool.denied')
+        ->toContain('event: run.failed')
+        ->not->toContain('raw_provider_request')
+        ->not->toContain('raw_provider_response')
+        ->not->toContain('raw_sql')
+        ->and($run->safe_error_code)->toBe('forbidden_by_domain_permission')
+        ->and($failedEvidence['terminal']['safe_error_code'])->toBe('forbidden_by_domain_permission')
+        ->and($failedEvidence['terminal']['reason'])->toBe('permission_denied')
+        ->and($failedEvidence['tools'][0]['status'])->toBe('denied')
+        ->and($failedEvidence['tools'][0]['permission_result'])->toBe('denied')
+        ->and($failedEvidence['tools'][0]['safe_error_code'])->toBe('forbidden_by_domain_permission')
+        ->and($failedEvidence['tools'][0]['source_references'])->toBe([])
+        ->and($failedEvidence['confidence'])->toMatchArray(['level' => 'none', 'basis' => 'not_executed'])
+        ->and($failedEvidenceJson)->not->toContain('raw_rows')
+        ->and($failedEvidenceJson)->not->toContain('Current semester outstanding tuition');
 });
 
 it('denies run stream and cancellation access to another authorized staff user', function () {
@@ -428,6 +529,10 @@ it('cancels a queued run without executing provider or tool work', function () {
         ->and($trace->final_answer_id)->toBe('staff-copilot-terminal-'.$run->ai_agent_trace_id)
         ->and($cancelEvent->redacted_payload['status'])->toBe(AiChatRun::STATUS_CANCELLED)
         ->and($cancelEvent->redacted_payload['safe_error_code'])->toBe('run_cancelled')
+        ->and($cancelEvent->redacted_payload['audit_evidence']['terminal']['reason'])->toBe('cancelled_by_owner')
+        ->and($cancelEvent->redacted_payload['audit_evidence']['terminal']['safe_error_code'])->toBe('run_cancelled')
+        ->and($cancelEvent->redacted_payload['audit_evidence']['answer']['final_answer_id'])->toBe('staff-copilot-terminal-'.$run->ai_agent_trace_id)
+        ->and($cancelEvent->redacted_payload['audit_evidence']['hidden_sections'])->toBe(['run_cancelled'])
         ->and($response->streamedContent())->toContain('event: run.cancelled')
         ->and(AiToolCall::query()->count())->toBe(0);
 
@@ -567,8 +672,16 @@ it('retries a failed run without duplicating the original user message', functio
     $response->streamedContent();
 
     $failedRun->refresh();
+    $failedEvent = AiRunEvent::query()
+        ->where('ai_chat_run_id', $failedRun->id)
+        ->where('event_type', 'run.failed')
+        ->firstOrFail();
 
     expect($failedRun->status)->toBe(AiChatRun::STATUS_FAILED)
+        ->and($failedEvent->redacted_payload['audit_evidence']['terminal']['safe_error_code'])->toBe('source_query_failed')
+        ->and($failedEvent->redacted_payload['audit_evidence']['terminal']['reason'])->toBe('runtime_or_source_failure')
+        ->and($failedEvent->redacted_payload['audit_evidence']['tools'][0]['status'])->toBe('failed')
+        ->and($failedEvent->redacted_payload['audit_evidence']['tools'][0]['permission_result'])->toBe('allowed')
         ->and(AiMessage::query()->where('role', 'user')->count())->toBe(1)
         ->and(AiMessage::query()->where('role', 'assistant')->count())->toBe(1);
 
@@ -663,6 +776,8 @@ it('retries a failed run without duplicating the original user message', functio
         ->not->toContain('raw_provider_request')
         ->not->toContain('raw_provider_response')
         ->and($retryRun->status)->toBe(AiChatRun::STATUS_COMPLETED)
+        ->and($retryEvents->firstWhere('event_type', 'run.completed')?->redacted_payload['audit_evidence']['retry']['retry_of_run_id'])->toBe($failedRun->id)
+        ->and($retryEvents->firstWhere('event_type', 'run.completed')?->redacted_payload['audit_evidence']['retry']['source_safe_error_code'])->toBe('source_query_failed')
         ->and(AiMessage::query()->where('role', 'user')->count())->toBe(1)
         ->and(AiMessage::query()->where('role', 'assistant')->count())->toBe(2)
         ->and($retryEvents->pluck('sequence')->all())->toBe(range(1, $retryEvents->count()))
@@ -685,9 +800,16 @@ it('rejects retry for unsupported prompts even though they end as failed runs', 
         ->streamedContent();
 
     $run->refresh();
+    $failedEvent = AiRunEvent::query()
+        ->where('ai_chat_run_id', $run->id)
+        ->where('event_type', 'run.failed')
+        ->firstOrFail();
 
     expect($run->status)->toBe(AiChatRun::STATUS_FAILED)
-        ->and($run->safe_error_code)->toBe('unsupported_staff_question');
+        ->and($run->safe_error_code)->toBe('unsupported_staff_question')
+        ->and($failedEvent->redacted_payload['audit_evidence']['terminal']['safe_error_code'])->toBe('unsupported_staff_question')
+        ->and($failedEvent->redacted_payload['audit_evidence']['terminal']['reason'])->toBe('unsupported_prompt')
+        ->and($failedEvent->redacted_payload['audit_evidence']['tools'])->toBe([]);
 
     $this->actingAs($this->authorizedUser)
         ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')

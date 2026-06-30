@@ -12,6 +12,7 @@ use App\Modules\AI\Models\AiChatRun;
 use App\Modules\AI\Models\AiConversation;
 use App\Modules\AI\Models\AiMessage;
 use App\Modules\AI\Models\AiProviderSetting;
+use App\Modules\AI\Models\AiRunEvent;
 use App\Modules\AI\Models\AiToolCall;
 use App\Services\PermissionService;
 use App\Shared\Contracts\Academic\AiAcademicMetricReader;
@@ -482,10 +483,18 @@ it('renders a failed live final answer as terminal copy while preserving complet
 
     $assistantMessage = AiMessage::query()->where('role', 'assistant')->firstOrFail();
     $toolCall = AiToolCall::query()->firstOrFail();
+    $failedEvent = AiRunEvent::query()
+        ->where('ai_chat_run_id', $run->id)
+        ->where('event_type', 'run.failed')
+        ->firstOrFail();
 
     expect($assistantMessage->redacted_content)
         ->toBe('The connected AI provider was unavailable, so the run stopped safely.')
-        ->and($toolCall->status)->toBe('completed');
+        ->and($toolCall->status)->toBe('completed')
+        ->and($failedEvent->redacted_payload['audit_evidence']['terminal']['safe_error_code'])->toBe('provider_invocation_failed')
+        ->and($failedEvent->redacted_payload['audit_evidence']['terminal']['reason'])->toBe('provider_failure')
+        ->and($failedEvent->redacted_payload['audit_evidence']['access_layers']['connected_provider_used'])->toBeTrue()
+        ->and($failedEvent->redacted_payload['audit_evidence']['source_references'][0]['source_report'])->toBe('finance.reporting.collection-progress');
 
     $this->actingAs($this->authorizedUser)
         ->get(route('ai.copilot.index'))

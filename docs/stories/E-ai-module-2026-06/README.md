@@ -63,7 +63,11 @@ Implemented slice: Staff Copilot now queues `ai_chat_runs` with assistant
 placeholders, persists normalized `ai_run_events`, exposes
 `/ai/copilot/runs/{run}/events` via Laravel SSE, supports owner/campus-checked
 run cancellation/retry, and keeps AI-MOD-017 provider/tool execution behind the
-backend with fallback snapshot deltas.
+backend with fallback snapshot deltas. Terminal run events retain redacted
+operator evidence for actor/campus scope, AI access layers, provider/model and
+runtime metadata, tool/source evidence, safe error reason, duration, final
+answer linkage, cancellation, and retry linkage without exposing provider keys,
+raw provider payloads, SQL, raw rows, hidden-section data, or exception traces.
 
 Implemented profile slice: Staff Copilot can execute `get_entity_profile:v1`
 for student entities selected through opaque `search_entities` `entity_ref`

@@ -124,8 +124,11 @@ class StaffCopilotSseRuntime
                 ])->save();
             }
 
+            $run->refresh();
+
             $this->recordEvent($run, 'run.cancelled', $this->progressPayload(AiChatRun::STATUS_CANCELLED, [
                 'safe_error_code' => 'run_cancelled',
+                'audit_evidence' => $this->terminalEvidencePayload($run),
             ]), $assistantMessage);
 
             return $run->refresh();
@@ -348,8 +351,11 @@ class StaffCopilotSseRuntime
                 'safe_error_code' => $safeErrorCode,
             ])->save();
 
+            $run->refresh();
+
             $this->recordEvent($run, $terminalEvent, $this->progressPayload($terminalStatus, [
                 'safe_error_code' => $safeErrorCode,
+                'audit_evidence' => $this->terminalEvidencePayload($run, $answer),
             ]));
         } catch (Throwable) {
             $this->failRun($run, 'runtime_execution_failed');
@@ -388,8 +394,11 @@ class StaffCopilotSseRuntime
                 ])->save();
             }
 
+            $run->refresh();
+
             $this->recordEvent($run, 'run.failed', $this->progressPayload(AiChatRun::STATUS_FAILED, [
                 'safe_error_code' => $safeErrorCode,
+                'audit_evidence' => $this->terminalEvidencePayload($run),
             ]), $assistantMessage);
         });
     }
@@ -582,6 +591,318 @@ class StaffCopilotSseRuntime
         }
 
         return 'approved data';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function terminalEvidencePayload(AiChatRun $run, ?StaffCopilotAnswer $answer = null): array
+    {
+        $run->refresh();
+
+        $trace = $run->trace()->with(['toolCalls', 'providerUsages'])->first();
+        $assistantMessage = $run->assistantMessage()->first();
+        $toolCalls = $trace?->toolCalls?->sortBy('id')->values() ?? collect();
+        $answerPayload = $answer?->payload() ?? [];
+        $sourceReferences = $this->sourceReferenceEvidence($answerPayload, $toolCalls);
+        $hiddenSections = $this->hiddenSectionEvidence($answerPayload, $toolCalls, $assistantMessage);
+        $safeErrorCode = $run->safe_error_code ?? $trace?->safe_error_code ?? (isset($answerPayload['safe_error_code']) ? (string) $answerPayload['safe_error_code'] : null);
+
+        return [
+            'actor' => [
+                'user_id' => $run->user_id,
+                'role' => 'staff',
+            ],
+            'campus_scope' => [
+                'campus_id' => $run->campus_id,
+                'campus_ids' => $run->campus_id === null ? [] : [$run->campus_id],
+            ],
+            'access_layers' => [
+                'entry_permission' => 'view_ai_metrics',
+                'connected_provider_used' => $run->provider !== null && $run->provider !== 'deterministic',
+                'tool_permission_results' => $toolCalls
+                    ->map(fn (AiToolCall $toolCall): array => [
+                        'tool_call_id' => $toolCall->id,
+                        'tool_name' => $toolCall->tool_name,
+                        'permission_result' => $toolCall->permission_result,
+                        'safe_error_code' => $toolCall->safe_error_code,
+                    ])
+                    ->all(),
+            ],
+            'run_contract' => [
+                'provider' => $run->provider,
+                'model' => $run->model,
+                'runtime_mode' => $run->runtime_mode,
+                'stream_transport' => $run->stream_transport,
+                'stream_mode' => $run->stream_mode,
+                'prompt_version' => $run->prompt_version,
+                'catalog_version' => $run->catalog_version,
+                'tool_schema_version' => $run->tool_schema_version,
+            ],
+            'terminal' => [
+                'status' => $run->status,
+                'safe_error_code' => $safeErrorCode,
+                'reason' => $this->terminalReason($run, $safeErrorCode),
+                'started_at' => $run->started_at?->toISOString(),
+                'completed_at' => $run->completed_at?->toISOString(),
+                'failed_at' => $run->failed_at?->toISOString(),
+                'cancellation_requested_at' => $run->cancellation_requested_at?->toISOString(),
+                'duration_ms' => $run->duration_ms,
+            ],
+            'answer' => [
+                'assistant_message_id' => $run->assistant_message_id,
+                'final_answer_id' => $assistantMessage?->final_answer_id ?? $trace?->final_answer_id,
+                'hidden_sections' => $this->stringList($assistantMessage?->hidden_sections ?? []),
+            ],
+            'retry' => $this->retryEvidence($run),
+            'tools' => $toolCalls
+                ->map(fn (AiToolCall $toolCall): array => $this->toolEvidence($toolCall))
+                ->all(),
+            'source_references' => $sourceReferences,
+            'warnings' => $this->warningEvidence($answerPayload, $toolCalls),
+            'hidden_sections' => $hiddenSections,
+            'confidence' => $this->confidenceEvidence($answerPayload, $toolCalls),
+        ];
+    }
+
+    private function terminalReason(AiChatRun $run, ?string $safeErrorCode): string
+    {
+        if ($run->status === AiChatRun::STATUS_CANCELLED || $safeErrorCode === 'run_cancelled') {
+            return 'cancelled_by_owner';
+        }
+
+        if ($run->status === AiChatRun::STATUS_COMPLETED && $safeErrorCode === null) {
+            return 'completed';
+        }
+
+        return match ($safeErrorCode) {
+            'unsupported_staff_question' => 'unsupported_prompt',
+            'provider_invocation_failed' => 'provider_failure',
+            'forbidden_by_domain_permission',
+            'forbidden_by_permission' => 'permission_denied',
+            'forbidden_by_campus_scope' => 'campus_scope_denied',
+            'invalid_run_event_cursor' => 'invalid_cursor',
+            'run_context_missing',
+            'run_retry_context_missing' => 'missing_context',
+            'runtime_execution_failed',
+            'source_query_failed',
+            'metric_resolver_missing' => 'runtime_or_source_failure',
+            default => $run->status === AiChatRun::STATUS_COMPLETED ? 'completed_with_safe_warning' : 'safe_failure',
+        };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function retryEvidence(AiChatRun $run): array
+    {
+        $queuedEvent = AiRunEvent::query()
+            ->where('ai_chat_run_id', $run->id)
+            ->where('event_type', 'run.queued')
+            ->orderBy('sequence')
+            ->first();
+        $queuedPayload = $queuedEvent?->redacted_payload ?? [];
+        $retryOfRunId = is_array($queuedPayload) ? ($queuedPayload['retry_of_run_id'] ?? null) : null;
+
+        if ($retryOfRunId === null) {
+            return [
+                'retry_of_run_id' => null,
+                'source_status' => null,
+                'source_safe_error_code' => null,
+                'reused_user_message_id' => null,
+            ];
+        }
+
+        $sourceRun = AiChatRun::query()->find((int) $retryOfRunId);
+
+        return [
+            'retry_of_run_id' => (int) $retryOfRunId,
+            'source_status' => $sourceRun?->status,
+            'source_safe_error_code' => $sourceRun?->safe_error_code,
+            'reused_user_message_id' => $run->user_message_id,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function toolEvidence(AiToolCall $toolCall): array
+    {
+        $resultSummary = is_array($toolCall->redacted_result_summary) ? $toolCall->redacted_result_summary : [];
+
+        return [
+            'tool_call_id' => $toolCall->id,
+            'tool_name' => $toolCall->tool_name,
+            'tool_schema_version' => $toolCall->tool_schema_version,
+            'status' => $toolCall->status,
+            'permission_result' => $toolCall->permission_result,
+            'campus_scope_snapshot' => $toolCall->campus_scope_snapshot ?? [],
+            'record_count' => $toolCall->record_count,
+            'source_references' => $toolCall->source_references ?? [],
+            'warnings' => $this->stringList($resultSummary['warnings'] ?? []),
+            'hidden_sections' => $this->stringList($toolCall->hidden_sections ?? []),
+            'confidence' => $this->confidenceArray($resultSummary['confidence'] ?? null),
+            'safe_error_code' => $toolCall->safe_error_code,
+            'duration_ms' => $toolCall->duration_ms,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $answerPayload
+     * @param  iterable<AiToolCall>  $toolCalls
+     * @return list<array<string, mixed>>
+     */
+    private function sourceReferenceEvidence(array $answerPayload, iterable $toolCalls): array
+    {
+        $references = [];
+
+        foreach ($this->arrayList($answerPayload['source_references'] ?? []) as $reference) {
+            $references[] = $reference;
+        }
+
+        foreach ($toolCalls as $toolCall) {
+            foreach ($this->arrayList($toolCall->source_references ?? []) as $reference) {
+                $references[] = $reference;
+            }
+        }
+
+        return $this->uniqueArrayList($references);
+    }
+
+    /**
+     * @param  array<string, mixed>  $answerPayload
+     * @param  iterable<AiToolCall>  $toolCalls
+     * @return list<string>
+     */
+    private function warningEvidence(array $answerPayload, iterable $toolCalls): array
+    {
+        $warnings = $this->stringList($answerPayload['warnings'] ?? []);
+
+        foreach ($toolCalls as $toolCall) {
+            $resultSummary = is_array($toolCall->redacted_result_summary) ? $toolCall->redacted_result_summary : [];
+            $warnings = [
+                ...$warnings,
+                ...$this->stringList($resultSummary['warnings'] ?? []),
+            ];
+        }
+
+        return array_values(array_unique($warnings));
+    }
+
+    /**
+     * @param  array<string, mixed>  $answerPayload
+     * @param  iterable<AiToolCall>  $toolCalls
+     * @return list<string>
+     */
+    private function hiddenSectionEvidence(array $answerPayload, iterable $toolCalls, ?AiMessage $assistantMessage): array
+    {
+        $hiddenSections = [
+            ...$this->stringList($answerPayload['hidden_sections'] ?? []),
+            ...$this->stringList($assistantMessage?->hidden_sections ?? []),
+        ];
+
+        foreach ($toolCalls as $toolCall) {
+            $hiddenSections = [
+                ...$hiddenSections,
+                ...$this->stringList($toolCall->hidden_sections ?? []),
+            ];
+        }
+
+        return array_values(array_unique($hiddenSections));
+    }
+
+    /**
+     * @param  array<string, mixed>  $answerPayload
+     * @param  iterable<AiToolCall>  $toolCalls
+     * @return array{level: string, basis: string}
+     */
+    private function confidenceEvidence(array $answerPayload, iterable $toolCalls): array
+    {
+        $confidence = $this->confidenceArray($answerPayload['confidence'] ?? null);
+
+        if ($confidence['level'] !== 'none' || $confidence['basis'] !== 'not_executed') {
+            return $confidence;
+        }
+
+        foreach ($toolCalls as $toolCall) {
+            $resultSummary = is_array($toolCall->redacted_result_summary) ? $toolCall->redacted_result_summary : [];
+            $toolConfidence = $this->confidenceArray($resultSummary['confidence'] ?? null);
+
+            if ($toolConfidence['level'] !== 'none' || $toolConfidence['basis'] !== 'not_executed') {
+                return $toolConfidence;
+            }
+        }
+
+        return $confidence;
+    }
+
+    /**
+     * @return array{level: string, basis: string}
+     */
+    private function confidenceArray(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return ['level' => 'none', 'basis' => 'not_executed'];
+        }
+
+        return [
+            'level' => is_scalar($value['level'] ?? null) ? (string) $value['level'] : 'none',
+            'basis' => is_scalar($value['basis'] ?? null) ? (string) $value['basis'] : 'not_executed',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function stringList(mixed $values): array
+    {
+        if (! is_array($values)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            fn (mixed $value): string => is_scalar($value) ? (string) $value : '',
+            $values,
+        )));
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function arrayList(mixed $values): array
+    {
+        if (! is_array($values)) {
+            return [];
+        }
+
+        return array_values(array_filter($values, fn (mixed $value): bool => is_array($value)));
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $values
+     * @return list<array<string, mixed>>
+     */
+    private function uniqueArrayList(array $values): array
+    {
+        $seen = [];
+        $unique = [];
+
+        foreach ($values as $value) {
+            $key = json_encode($value, JSON_UNESCAPED_SLASHES);
+
+            if (! is_string($key)) {
+                $key = serialize($value);
+            }
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $unique[] = $value;
+        }
+
+        return $unique;
     }
 
     private function recordEvent(

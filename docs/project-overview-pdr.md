@@ -253,6 +253,10 @@ Code baseline:
   error before provider/tool work can execute. Runs can be cancelled through
   `/ai/copilot/runs/{run}/cancel` or retried through
   `/ai/copilot/runs/{run}/retry` when owned by the current staff/campus scope.
+  Terminal run events retain redacted `audit_evidence` for actor/campus scope,
+  AI access layers, provider/model/runtime metadata, tool/source evidence,
+  final answer linkage, safe error code, duration, cancellation, and retry
+  linkage.
 - Staff copilot can use an enabled, successfully tested staff-owned provider
   setting for live structured planning and final answer synthesis. The live
   model can only propose `query_metrics`, `search_entities`, and
@@ -273,7 +277,9 @@ Acceptance criteria:
   fakes and without live provider credentials.
 - Staff copilot SSE events are persisted as redacted run events, replayable by
   cursor, owner/campus checked, staff-friendly in progress payloads, and do not
-  require WebSocket/Reverb/Pusher.
+  require WebSocket/Reverb/Pusher. Terminal event payloads include redacted
+  audit evidence and exclude provider API keys, raw provider payloads, SQL, raw
+  rows, hidden-section data, and internal exception traces.
 - AI query plans are allowlisted, aggregate-only, campus-scoped, permission
   checked, and denied before execution when they contain SQL/table/column
   payloads, unsupported filters/groupings, cross-campus scope, or unbounded
@@ -284,8 +290,8 @@ Acceptance criteria:
 - Staff copilot entity candidate lists return only bounded safe labels,
   allowlisted identifiers, match reasons, source references, campus scope,
   hidden sections, warnings, confidence, and opaque entity refs.
-- No MCP exposure, write/action mode, source-row dumps, profile-section reads,
-  or student/lecturer portal behavior is exposed by the current Staff Copilot
+- No MCP exposure, write/action mode, source-row dumps, raw profile exports, or
+  student/lecturer portal behavior is exposed by the current Staff Copilot
   runtime.
 
 ## 4) Non-Functional Requirements
