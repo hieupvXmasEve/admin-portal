@@ -11,6 +11,7 @@ use App\Modules\AI\Models\AiConversation;
 use App\Modules\AI\Models\AiMessage;
 use App\Modules\AI\Models\AiRunEvent;
 use App\Modules\AI\Models\AiToolCall;
+use DomainException;
 use Generator;
 use Illuminate\Http\StreamedEvent;
 use Illuminate\Support\Facades\DB;
@@ -135,6 +136,14 @@ class StaffCopilotSseRuntime
     {
         return DB::transaction(function () use ($sourceRun): AiChatRun {
             $runContract = $this->defaultRunContract();
+            $sourceRun = AiChatRun::query()
+                ->lockForUpdate()
+                ->findOrFail($sourceRun->id);
+
+            if (! $sourceRun->isRetryable()) {
+                throw new DomainException('Only retryable failed runs can be retried.');
+            }
+
             $sourceRun->loadMissing(['conversation', 'userMessage', 'user', 'campus']);
 
             $conversation = $sourceRun->conversation;

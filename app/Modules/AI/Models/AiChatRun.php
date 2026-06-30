@@ -12,6 +12,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AiChatRun extends Model
 {
+    private const NON_RETRYABLE_SAFE_ERROR_CODES = [
+        'unsupported_staff_question',
+    ];
+
     public const STATUS_QUEUED = 'queued';
 
     public const STATUS_RUNNING = 'running';
@@ -113,5 +117,18 @@ class AiChatRun extends Model
     public function isCancellable(): bool
     {
         return ! $this->isTerminal();
+    }
+
+    public function isRetryable(): bool
+    {
+        if ($this->status !== self::STATUS_FAILED) {
+            return false;
+        }
+
+        if ($this->safe_error_code === null) {
+            return true;
+        }
+
+        return ! in_array($this->safe_error_code, self::NON_RETRYABLE_SAFE_ERROR_CODES, true);
     }
 }

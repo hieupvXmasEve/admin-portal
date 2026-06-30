@@ -549,10 +549,16 @@ it('retries a failed run without duplicating the original user message', functio
         ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
         ->from(route('ai.copilot.index'))
         ->post(route('ai.copilot.messages.store'), [
-            'question' => 'Write an email to all students',
+            'question' => 'Current semester outstanding tuition by program là bao nhiêu?',
         ]);
 
     $failedRun = AiChatRun::query()->firstOrFail();
+
+    $this->mock(AiFinanceMetricReader::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('collectionProgress')
+            ->once()
+            ->andThrow(new RuntimeException('source unavailable'));
+    });
 
     $response = $this->actingAs($this->authorizedUser)
         ->get(route('ai.copilot.runs.events', $failedRun))
@@ -574,13 +580,231 @@ it('retries a failed run without duplicating the original user message', functio
         ->assertInertiaFlash('success', 'AI copilot run retried.');
 
     $retryRun = AiChatRun::query()->latest('id')->firstOrFail();
+    $retryQueuedEvent = AiRunEvent::query()
+        ->where('ai_chat_run_id', $retryRun->id)
+        ->where('event_type', 'run.queued')
+        ->firstOrFail();
+    $retryAssistantEvent = AiRunEvent::query()
+        ->where('ai_chat_run_id', $retryRun->id)
+        ->where('event_type', 'message.created')
+        ->firstOrFail();
+    $retryMetadata = json_encode([
+        $retryQueuedEvent->redacted_payload,
+        $retryAssistantEvent->redacted_payload,
+    ], JSON_THROW_ON_ERROR);
 
     expect($retryRun->id)->not->toBe($failedRun->id)
         ->and($retryRun->status)->toBe(AiChatRun::STATUS_QUEUED)
         ->and($retryRun->user_message_id)->toBe($failedRun->user_message_id)
         ->and($retryRun->assistant_message_id)->not->toBe($failedRun->assistant_message_id)
+        ->and($retryRun->ai_agent_trace_id)->not->toBe($failedRun->ai_agent_trace_id)
+        ->and($retryRun->idempotency_key)->not->toBe($failedRun->idempotency_key)
+        ->and($retryQueuedEvent->redacted_payload['retry_of_run_id'])->toBe($failedRun->id)
+        ->and($retryAssistantEvent->redacted_payload['retry_of_run_id'])->toBe($failedRun->id)
+        ->and($retryMetadata)->not->toContain('Current semester outstanding tuition')
+        ->and($retryMetadata)->not->toContain('raw_provider_request')
+        ->and($retryMetadata)->not->toContain('raw_provider_response')
+        ->and($retryMetadata)->not->toContain('raw_sql')
         ->and(AiMessage::query()->where('role', 'user')->count())->toBe(1)
         ->and(AiMessage::query()->where('role', 'assistant')->count())->toBe(2);
+
+    $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('active_run.id', $retryRun->id)
+            ->has('messages', 3)
+            ->where('messages.0.role', 'user')
+            ->where('messages.1.role', 'assistant')
+            ->where('messages.1.run_status', AiChatRun::STATUS_FAILED)
+            ->where('messages.2.role', 'assistant')
+            ->where('messages.2.run_status', AiChatRun::STATUS_QUEUED));
+
+    $this->mock(AiFinanceMetricReader::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('collectionProgress')
+            ->once()
+            ->andReturn([
+                'summary' => [
+                    'student_count' => 2,
+                    'billed_total' => 1000.0,
+                    'paid_total' => 700.0,
+                    'outstanding_total' => 300.0,
+                    'collection_rate' => 0.7,
+                ],
+                'breakdowns' => [
+                    'by_program' => [
+                        [
+                            'key' => 'IT',
+                            'label' => 'Information Technology',
+                            'student_count' => 2,
+                            'outstanding' => 300.0,
+                        ],
+                    ],
+                ],
+                'meta' => [],
+            ]);
+    });
+
+    $retryResponse = $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.runs.events', $retryRun))
+        ->assertStreamed();
+
+    $retryContent = $retryResponse->streamedContent();
+    $retryRun->refresh();
+
+    $retryEvents = AiRunEvent::query()
+        ->where('ai_chat_run_id', $retryRun->id)
+        ->orderBy('sequence')
+        ->get();
+
+    expect($retryContent)
+        ->toContain('event: run.completed')
+        ->toContain('event: message.delta')
+        ->not->toContain('raw_provider_request')
+        ->not->toContain('raw_provider_response')
+        ->and($retryRun->status)->toBe(AiChatRun::STATUS_COMPLETED)
+        ->and(AiMessage::query()->where('role', 'user')->count())->toBe(1)
+        ->and(AiMessage::query()->where('role', 'assistant')->count())->toBe(2)
+        ->and($retryEvents->pluck('sequence')->all())->toBe(range(1, $retryEvents->count()))
+        ->and($retryEvents->pluck('redacted_payload.sequence')->all())->toBe(range(1, $retryEvents->count()));
+});
+
+it('rejects retry for unsupported prompts even though they end as failed runs', function () {
+    $this->actingAs($this->authorizedUser)
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->from(route('ai.copilot.index'))
+        ->post(route('ai.copilot.messages.store'), [
+            'question' => 'Write an email to all students',
+        ]);
+
+    $run = AiChatRun::query()->firstOrFail();
+
+    $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.runs.events', $run))
+        ->assertStreamed()
+        ->streamedContent();
+
+    $run->refresh();
+
+    expect($run->status)->toBe(AiChatRun::STATUS_FAILED)
+        ->and($run->safe_error_code)->toBe('unsupported_staff_question');
+
+    $this->actingAs($this->authorizedUser)
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->from(route('ai.copilot.index'))
+        ->post(route('ai.copilot.runs.retry', $run))
+        ->assertStatus(409);
+
+    expect(AiChatRun::query()->count())->toBe(1)
+        ->and(AiMessage::query()->where('role', 'user')->count())->toBe(1)
+        ->and(AiMessage::query()->where('role', 'assistant')->count())->toBe(1);
+});
+
+it('rejects retry for non-failed run statuses without creating a new attempt', function (string $status) {
+    $this->actingAs($this->authorizedUser)
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->from(route('ai.copilot.index'))
+        ->post(route('ai.copilot.messages.store'), [
+            'question' => 'Current semester outstanding tuition by program là bao nhiêu?',
+        ]);
+
+    $run = AiChatRun::query()->firstOrFail();
+    $completedAt = in_array($status, [
+        AiChatRun::STATUS_COMPLETED,
+        AiChatRun::STATUS_CANCELLED,
+    ], true) ? now() : null;
+
+    $run->forceFill([
+        'status' => $status,
+        'completed_at' => $completedAt,
+        'failed_at' => null,
+        'safe_error_code' => $status === AiChatRun::STATUS_CANCELLED ? 'run_cancelled' : null,
+    ])->save();
+
+    $this->actingAs($this->authorizedUser)
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->from(route('ai.copilot.index'))
+        ->post(route('ai.copilot.runs.retry', $run))
+        ->assertStatus(409);
+
+    expect(AiChatRun::query()->count())->toBe(1)
+        ->and(AiMessage::query()->where('role', 'user')->count())->toBe(1)
+        ->and(AiMessage::query()->where('role', 'assistant')->count())->toBe(1)
+        ->and(AiRunEvent::query()->where('event_type', 'run.queued')->count())->toBe(1);
+})->with([
+    'queued' => AiChatRun::STATUS_QUEUED,
+    'running' => AiChatRun::STATUS_RUNNING,
+    'planning' => AiChatRun::STATUS_PLANNING,
+    'tool running' => AiChatRun::STATUS_TOOL_RUNNING,
+    'streaming' => AiChatRun::STATUS_STREAMING,
+    'completed' => AiChatRun::STATUS_COMPLETED,
+    'cancelled' => AiChatRun::STATUS_CANCELLED,
+]);
+
+it('denies retry to another staff user, wrong-campus session, and staff without entry permission', function () {
+    $otherCampus = Campus::factory()->create(['code' => 'DNG']);
+
+    $this->actingAs($this->authorizedUser)
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->from(route('ai.copilot.index'))
+        ->post(route('ai.copilot.messages.store'), [
+            'question' => 'Current semester outstanding tuition by program là bao nhiêu?',
+        ]);
+
+    $run = AiChatRun::query()->firstOrFail();
+
+    $this->mock(AiFinanceMetricReader::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('collectionProgress')
+            ->once()
+            ->andThrow(new RuntimeException('source unavailable'));
+    });
+
+    $this->actingAs($this->authorizedUser)
+        ->get(route('ai.copilot.runs.events', $run))
+        ->assertStreamed()
+        ->streamedContent();
+
+    $run->refresh();
+
+    expect($run->status)->toBe(AiChatRun::STATUS_FAILED);
+
+    $this->actingAs($this->authorizedPeer)
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->post(route('ai.copilot.runs.retry', $run))
+        ->assertForbidden();
+
+    $this->actingAs($this->unauthorizedUser)
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->post(route('ai.copilot.runs.retry', $run))
+        ->assertForbidden();
+
+    $permissionService = Mockery::mock(PermissionService::class);
+    $permissionService->shouldReceive('getUserPermissions')
+        ->andReturnUsing(function (User $user, ?int $campusId = null) use ($otherCampus): array {
+            if (
+                $user->id === $this->authorizedUser->id
+                && in_array($campusId, [$this->campus->id, $otherCampus->id], true)
+            ) {
+                return ['view_ai_metrics', 'view_finance_reporting', 'view_academic_report'];
+            }
+
+            return [];
+        });
+
+    app()->forgetInstance(PermissionService::class);
+    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->forgetInstance('campus');
+    app()->singleton('campus', fn () => $otherCampus);
+
+    $this->actingAs($this->authorizedUser)
+        ->withSession(['current_campus_id' => $otherCampus->id])
+        ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
+        ->post(route('ai.copilot.runs.retry', $run))
+        ->assertForbidden();
+
+    expect(AiChatRun::query()->count())->toBe(1)
+        ->and(AiMessage::query()->where('role', 'user')->count())->toBe(1)
+        ->and(AiMessage::query()->where('role', 'assistant')->count())->toBe(1);
 });
 
 /**

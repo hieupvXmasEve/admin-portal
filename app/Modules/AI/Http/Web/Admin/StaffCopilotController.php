@@ -8,11 +8,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\Campus;
 use App\Models\User;
+use App\Modules\AI\Actions\RetryStaffCopilotRunAction;
 use App\Modules\AI\Actions\RunStaffCopilotMessageAction;
 use App\Modules\AI\Http\Requests\SubmitStaffCopilotMessageRequest;
 use App\Modules\AI\Models\AiChatRun;
 use App\Modules\AI\Queries\StaffCopilotPageQuery;
 use App\Modules\AI\Support\StaffCopilotSseRuntime;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -93,9 +95,11 @@ class StaffCopilotController extends Controller
     {
         $this->authorizeRun($run, $request);
 
-        abort_unless($run->status === AiChatRun::STATUS_FAILED, 409, 'Only failed runs can be retried.');
-
-        $this->runtime->retry($run);
+        try {
+            RetryStaffCopilotRunAction::run($run);
+        } catch (DomainException $exception) {
+            abort(409, $exception->getMessage());
+        }
 
         Inertia::flash('success', 'AI copilot run retried.');
 
