@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -45,6 +46,14 @@ return new class extends Migration
 
     public function down(): void
     {
+        // Standalone MCP-channel rows carry null conversation/trace links; they must be
+        // removed before the columns are re-tightened to NOT NULL, or MariaDB rejects the
+        // change. This is an intentional, controlled data loss on rollback of the spike.
+        DB::table('ai_tool_calls')
+            ->whereNull('ai_conversation_id')
+            ->orWhereNull('ai_agent_trace_id')
+            ->delete();
+
         Schema::table('ai_tool_calls', function (Blueprint $table): void {
             $table->dropForeign(['ai_conversation_id']);
             $table->dropForeign(['ai_agent_trace_id']);

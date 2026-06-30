@@ -91,6 +91,22 @@ exposure. Per the PRD this is the hard pass/fail; treat it as the remaining acce
 - `clarification_required` registered as a safe error code (a clarification, not a deny)
   across the three tool catalogs.
 
+## Security review (Issues 01–03) — dispositions
+
+- **Route path** — verified `POST /mcp/swinx` (NOT `/mcp/mcp/swinx`): v0.7's
+  `McpServiceProvider::loadAiRoutes()` uses `Route::group([], …)` with no prefix, so the
+  handle passed to `Mcp::web('mcp/swinx', …)` is the full path. Confirmed via `route:list`
+  and the unauthenticated-401 feature test. (A reviewer reading the *stale host* vendor
+  copy — which had `Route::prefix('mcp')` — would wrongly expect a double prefix.)
+- **Migration `down()`** — fixed: deletes null-FK (MCP) rows before re-tightening the
+  conversation/trace columns to NOT NULL, so rollback can't hit a CONSTRAINT error.
+- **Known gap — public OAuth/DCR endpoints are unthrottled.** `POST /oauth/register`,
+  `/oauth/*`, and `/mcp/swinx` have **no rate limiter yet**. This is **deferred to Step 5
+  (hardening)** by design — origin/Host validation, per-user tool throttle (~60/min),
+  per-IP OAuth (~10/min) + DCR (~5/hour), and the `laravel/mcp` version pin all land
+  together there. These endpoints must NOT be production-exposed until Step 5 ships (this
+  is already gated behind the live OAuth-round-trip human gate above).
+
 ## ChatGPT go/no-go
 
 Deferred to Step 6 (not in scope for Issues 01–03).
