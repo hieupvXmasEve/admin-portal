@@ -56,11 +56,11 @@ class GetStudentLifecycleTimelineQuery
     public function handle(Student $student): array
     {
         $actions = $student->actionLogs()
-            ->with(['decision', 'changedBy:id,name', 'fromCampus:id,name,code', 'toCampus:id,name,code'])
+            ->with(['decision.uploadRecord', 'changedBy:id,name', 'fromCampus:id,name,code', 'toCampus:id,name,code'])
             ->get();
 
         $events = $student->academicProgressionEvents()
-            ->with(['decision', 'createdBy:id,name', 'semester:id,name,code'])
+            ->with(['decision.uploadRecord', 'createdBy:id,name', 'semester:id,name,code'])
             ->get();
 
         $entries = [];
@@ -237,7 +237,7 @@ class GetStudentLifecycleTimelineQuery
     }
 
     /**
-     * @return array{id: int, decision_name: string|null, decision_number: string|null, decision_signer: string|null, issued_at: string|null}|null
+     * @return array{id: int, decision_name: string|null, decision_number: string|null, decision_signer: string|null, issued_at: string|null, upload_record: array{id: int, url: string, original_name: string}|null}|null
      */
     private function decisionPayload(?StudentDecision $decision): ?array
     {
@@ -251,6 +251,11 @@ class GetStudentLifecycleTimelineQuery
             'decision_number' => $decision->decision_number,
             'decision_signer' => $decision->decision_signer,
             'issued_at' => $this->iso($decision->issued_at),
+            'upload_record' => $decision->uploadRecord !== null ? [
+                'id' => $decision->uploadRecord->id,
+                'url' => $decision->uploadRecord->url,
+                'original_name' => $decision->uploadRecord->original_name,
+            ] : null,
         ];
     }
 

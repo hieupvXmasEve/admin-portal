@@ -544,6 +544,8 @@ export interface LifecycleDecision {
     decision_number: string | null;
     decision_signer: string | null;
     issued_at: string | null;
+    /** The uploaded Decision scan, when one is attached. Null when no document is attached. */
+    upload_record: { id: number; url: string; original_name: string } | null;
 }
 
 /** Source-specific detail fields carried by a timeline row. */

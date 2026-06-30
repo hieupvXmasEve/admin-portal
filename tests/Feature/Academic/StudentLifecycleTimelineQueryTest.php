@@ -160,6 +160,34 @@ it('flags a requires-decision transition with no decision and clears the flag on
         ->and($rows['action-'.$neverRequires->id]['missing_decision'])->toBeFalse();
 });
 
+it('exposes the attached Decision document (url + original_name) on the timeline entry it authorizes', function () {
+    $scan = UploadRecord::factory()->create([
+        'context' => 'general',
+        'original_name' => 'decision-qd-900.pdf',
+    ]);
+
+    $decision = StudentDecision::query()->create([
+        'decision_name' => 'Transition decision',
+        'decision_number' => 'QD-900-001',
+        'decision_signer' => 'Academic Office',
+        'issued_at' => '2026-05-01',
+        'upload_record_id' => $scan->id,
+        'changed_by_user_id' => $this->user->id,
+    ]);
+
+    $withDoc = lifecycleAction($this->student, $this->user, StudentActionType::CAMPUS_TRANSFER, '2026-04-01 09:00:00', $decision);
+    $noDecision = lifecycleAction($this->student, $this->user, StudentActionType::ADMISSION_DEFERRAL, '2026-02-01 09:00:00');
+
+    $rows = collect((new GetStudentLifecycleTimelineQuery)->handle($this->student)['timeline'])->keyBy('id');
+
+    expect($rows['action-'.$withDoc->id]['decision']['upload_record'])->not->toBeNull()
+        ->and($rows['action-'.$withDoc->id]['decision']['upload_record']['id'])->toBe($scan->id)
+        ->and($rows['action-'.$withDoc->id]['decision']['upload_record']['original_name'])->toBe('decision-qd-900.pdf')
+        ->and($rows['action-'.$withDoc->id]['decision']['upload_record']['url'])->toBeString()
+        ->and($rows['action-'.$withDoc->id]['decision']['upload_record']['url'])->not->toBe('')
+        ->and($rows['action-'.$noDecision->id]['decision'])->toBeNull();
+});
+
 it('never flags an EGC progression transition as missing a decision (placement / stage change need none)', function () {
     $placement = lifecycleEvent($this->student, $this->user, $this->semester, AcademicProgressionEventType::PLACEMENT_INITIALIZED, '2026-02-01 09:00:00');
     $stage = lifecycleEvent($this->student, $this->user, $this->semester, AcademicProgressionEventType::COURSE_STAGE_CHANGED, '2026-03-01 09:00:00');

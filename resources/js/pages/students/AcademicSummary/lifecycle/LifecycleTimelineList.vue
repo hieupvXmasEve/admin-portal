@@ -62,6 +62,16 @@ const sourceIcon = (row: LifecycleTimelineRow) => (row.source === 'progression' 
                             <AlertTriangle class="h-3 w-3" />
                             Decision missing
                         </Badge>
+                        <a
+                            v-if="row.decision?.upload_record"
+                            :href="row.decision.upload_record.url"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="text-primary inline-flex items-center gap-1 text-xs hover:underline"
+                        >
+                            <FileText class="h-3 w-3" />
+                            View document
+                        </a>
                     </div>
                 </div>
 
