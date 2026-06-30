@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Contracts\Auth\Guard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Passport\Client;
 
 uses(RefreshDatabase::class);
 
@@ -74,6 +75,36 @@ it('lets an authenticated actor call the read-only ping tool over the MCP server
         ->tool(PingTool::class)
         ->assertOk()
         ->assertSee('pong');
+});
+
+it('renders the branded consent at /oauth/authorize without forcing campus selection', function () {
+    // Regression: the campus-selection web middleware must not bounce the OAuth consent
+    // route, even when the signed-in staff member has no campus selected in session.
+    $user = User::factory()->create();
+
+    $client = (new Client)->forceFill([
+        'name' => 'Inspector',
+        'secret' => null,
+        'redirect_uris' => ['http://localhost:6274/oauth/callback'],
+        'grant_types' => ['authorization_code'],
+        'revoked' => false,
+    ]);
+    $client->save();
+
+    $response = $this->actingAs($user)->get('/oauth/authorize?'.http_build_query([
+        'client_id' => $client->getKey(),
+        'redirect_uri' => 'http://localhost:6274/oauth/callback',
+        'response_type' => 'code',
+        'scope' => 'mcp:use',
+        'code_challenge' => str_repeat('a', 43),
+        'code_challenge_method' => 'S256',
+        'state' => 'xyz',
+    ]));
+
+    $response->assertOk()
+        ->assertSee('Authorize connection')
+        ->assertSee('Third-party application')
+        ->assertSee('Inspector');
 });
 
 it('refuses an unauthenticated MCP tool request', function () {

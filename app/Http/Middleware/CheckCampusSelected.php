@@ -11,12 +11,19 @@ class CheckCampusSelected
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
         // 1. Skip for guests - let auth middleware handle them
-        if (!auth()->check()) {
+        if (! auth()->check()) {
+            return $next($request);
+        }
+
+        // 1b. OAuth authorization endpoints render Passport's own consent screen for the
+        // Controlled MCP server (ADR-0010) and are not part of the campus-scoped app shell.
+        // They must never be bounced to campus selection, or the consent flow breaks.
+        if ($request->is('oauth/*')) {
             return $next($request);
         }
 
@@ -24,11 +31,11 @@ class CheckCampusSelected
         $isSelectCampusRoute = $request->routeIs([
             'select-campus.index',
             'select-campus.set-current',
-            'select-campus.change'
+            'select-campus.change',
         ]);
 
         // 2. If already has campus, and trying to go to selection page, go to dashboard
-        if ($campusId && $isSelectCampusRoute && !$request->routeIs('select-campus.change')) {
+        if ($campusId && $isSelectCampusRoute && ! $request->routeIs('select-campus.change')) {
             return redirect()->route('dashboard');
         }
 
@@ -44,7 +51,7 @@ class CheckCampusSelected
         }
 
         // 4. If no campus selected, redirect to selection page
-        if (!$campusId) {
+        if (! $campusId) {
             return redirect()->route('select-campus.index');
         }
 
