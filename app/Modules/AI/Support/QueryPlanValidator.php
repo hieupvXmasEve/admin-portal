@@ -18,11 +18,11 @@ class QueryPlanValidator
 
     public function validate(QueryPlan $plan, User $actor, ?Campus $campus = null): QueryPlanValidationResult
     {
+        // Campus may be supplied explicitly by the caller; web-chat continues to rely on
+        // the container-bound `campus` resolved by SetCampus middleware when none is passed.
         $campus ??= app()->bound('campus') ? app('campus') : null;
         $campusId = $campus?->id;
-        $campusScopeSnapshot = [
-            'campus_ids' => $campusId ? [$campusId] : [],
-        ];
+        $campusScopeSnapshot = CampusScopeSnapshot::single($campusId)->toArray();
 
         if ($plan->hasSchemaViolations()) {
             return $this->deny(

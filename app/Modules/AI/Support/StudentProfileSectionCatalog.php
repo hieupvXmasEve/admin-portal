@@ -87,6 +87,8 @@ class StudentProfileSectionCatalog
             'expired_entity_reference',
             'forbidden_by_permission',
             'forbidden_by_campus_scope',
+            // A clarification result (ambiguous campus over MCP), NOT a deny.
+            'clarification_required',
             'entity_not_found',
             'profile_resolver_missing',
             'source_query_failed',

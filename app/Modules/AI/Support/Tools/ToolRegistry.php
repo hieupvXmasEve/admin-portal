@@ -51,6 +51,9 @@ class ToolRegistry
                     'forbidden_by_permission',
                     'forbidden_by_domain_permission',
                     'forbidden_by_campus_scope',
+                    // A clarification result (e.g. ambiguous campus over MCP), NOT a deny —
+                    // the caller is asked to disambiguate rather than being refused access.
+                    'clarification_required',
                     'max_record_limit_exceeded',
                     'metric_resolver_missing',
                     'source_query_failed',

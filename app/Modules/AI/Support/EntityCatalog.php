@@ -93,6 +93,8 @@ class EntityCatalog
             'result_limit_exceeded',
             'forbidden_by_permission',
             'forbidden_by_campus_scope',
+            // A clarification result (ambiguous campus over MCP), NOT a deny.
+            'clarification_required',
             'entity_resolver_missing',
             'entity_reference_encoding_failed',
             'source_query_failed',
