@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Mcp\Servers\SwinxMcpServer;
-use App\Mcp\Tools\PingTool;
 use App\Models\User;
 use Illuminate\Contracts\Auth\Guard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -58,25 +56,6 @@ it('returns a client id from the dynamic client registration endpoint (not a 419
     expect($response->json('client_id'))->not->toBeNull();
 });
 
-it('registers the ping tool under its canonical name and marks it read-only', function () {
-    $tool = new PingTool;
-
-    $array = $tool->toArray();
-
-    expect($tool->name())->toBe('ping')
-        ->and($array['name'])->toBe('ping')
-        ->and($array['annotations'])->toMatchArray(['readOnlyHint' => true]);
-});
-
-it('lets an authenticated actor call the read-only ping tool over the MCP server', function () {
-    $user = User::factory()->create();
-
-    SwinxMcpServer::actingAs($user)
-        ->tool(PingTool::class)
-        ->assertOk()
-        ->assertSee('pong');
-});
-
 it('renders the branded consent at /oauth/authorize without forcing campus selection', function () {
     // Regression: the campus-selection web middleware must not bounce the OAuth consent
     // route, even when the signed-in staff member has no campus selected in session.
@@ -113,6 +92,6 @@ it('refuses an unauthenticated MCP tool request', function () {
         'jsonrpc' => '2.0',
         'id' => 1,
         'method' => 'tools/call',
-        'params' => ['name' => 'ping', 'arguments' => []],
+        'params' => ['name' => 'query_metrics', 'arguments' => []],
     ])->assertUnauthorized();
 });
