@@ -209,5 +209,43 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinutes($decay, $max)->by(AdmissionsIngestion::RATE_LIMITER.':'.$key);
         });
+
+        $this->configureMcpRateLimiting();
+    }
+
+    /**
+     * Rate limiters for the public Controlled MCP server (ADR-0011).
+     *
+     * `throttle:mcp` caps tool calls per acting user — the abuse boundary is a person,
+     * and a per-client limit could be evaded by registering many clients. `throttle:mcp-oauth`
+     * caps the OAuth + dynamic-client-registration routes per IP, with the DCR endpoint
+     * (`oauth/register`) held to a far tighter hourly budget since open registration is the
+     * registration-spam target. Both are attached at route registration, never globally.
+     */
+    protected function configureMcpRateLimiting(): void
+    {
+        RateLimiter::for('mcp', function (Request $request) {
+            $max = (int) config('mcp.rate_limits.tool_calls_per_minute', 60);
+
+            // After auth:api runs, the default-guard user is the OAuth actor, so per-user
+            // keying is exact; the IP fallback only applies before authentication.
+            $key = $request->user()?->id ?: $request->ip();
+
+            return Limit::perMinute($max)->by('mcp-tool:'.$key);
+        });
+
+        RateLimiter::for('mcp-oauth', function (Request $request) {
+            $ip = (string) $request->ip();
+
+            if ($request->is('oauth/register')) {
+                $max = (int) config('mcp.rate_limits.registration_per_hour', 5);
+
+                return Limit::perHour($max)->by('mcp-dcr:'.$ip);
+            }
+
+            $max = (int) config('mcp.rate_limits.oauth_per_minute', 10);
+
+            return Limit::perMinute($max)->by('mcp-oauth:'.$ip);
+        });
     }
 }

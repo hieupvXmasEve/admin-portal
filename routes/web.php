@@ -11,7 +11,13 @@ use Laravel\Mcp\Facades\Mcp;
 // agent clients (Claude, ChatGPT) can self-register and discover the Passport
 // authorize/token endpoints with zero install. These routes are CSRF-exempt (see
 // bootstrap/app.php); the /mcp/swinx tool endpoint itself lives in routes/ai.php.
-Mcp::oauthRoutes();
+//
+// Wrapped in throttle:mcp-oauth (per-IP) so the public discovery + open registration
+// surface is rate-limited; the limiter holds oauth/register (DCR) to a far tighter
+// hourly budget than the discovery endpoints — registration-spam is the abuse target.
+Route::middleware('throttle:mcp-oauth')->group(function (): void {
+    Mcp::oauthRoutes();
+});
 
 Route::get('/', function () {
     return redirect()->route('dashboard');

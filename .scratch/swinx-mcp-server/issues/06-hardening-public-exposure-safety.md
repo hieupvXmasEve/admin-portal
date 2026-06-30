@@ -1,6 +1,6 @@
 # 06 — Hardening + public-exposure safety
 
-Status: ready-for-agent
+Status: ready-for-human
 
 ## Parent
 
