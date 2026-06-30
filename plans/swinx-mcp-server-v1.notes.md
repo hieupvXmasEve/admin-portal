@@ -70,7 +70,30 @@ solely by the `api` (Passport) guard.
 | Existing AI feature suite stays green | ✅ verified |
 | **Live external-client OAuth round-trip (`mcp:inspector` / Claude Desktop)** | ⏳ **HUMAN GATE** |
 
-### Why the live round-trip is not auto-completed here
+### Live round-trip — COMPLETED (2026-07-01)
+
+The MCP Inspector completed the full OAuth round-trip against `/mcp/swinx` and made
+authenticated calls (`POST /oauth/token → 200`, an access token persisted, `POST /mcp/swinx
+→ 200`). Getting there surfaced four real integration blockers that are now fixed:
+
+1. **Consent vs campus middleware** — `CheckCampusSelected` bounced `/oauth/authorize` to
+   `/select-campus`. Fixed: `oauth/*` skips the campus gate.
+2. **Passport key permissions** — keys were `775`; `chmod 600` (see ops gotcha above).
+3. **Google login lost the intended URL** — `SocialAuthController::callback` hardcoded a
+   redirect to `select-campus`, dropping the OAuth `intended` URL, and the inner Google
+   OAuth threw `InvalidStateException` whenever the browser host differed (`localhost` vs
+   `127.0.0.1`) because the session cookie is host-scoped. Fixes: callback now
+   `redirect()->intended(...)`, AND the whole flow must use **one consistent host** that
+   matches `GOOGLE_REDIRECT_URI`/`APP_URL` (here `127.0.0.1:8000`) — point the inspector at
+   `http://127.0.0.1:8000/mcp/swinx`, not `localhost`.
+4. **CORS** — the inspector's browser-side OAuth callback (origin `http://localhost:6274`)
+   fetches the discovery metadata and POSTs `/oauth/token` cross-origin; the app returned no
+   `Access-Control-Allow-Origin`, so every fetch failed and the client fell back to a wrong
+   `/token` path. Fixed in `config/cors.php`: added `.well-known/*`, `oauth/*`, `mcp/*` to
+   `paths` and `http://localhost:6274` / `http://127.0.0.1:6274` to `allowed_origins`
+   (Step 5 hardening should tighten these origins for production).
+
+### Note on the earlier "human gate" framing
 
 `php artisan mcp:inspector swinx` launches the Node **MCP Inspector UI in a browser** (via
 `Symfony\Process` → `npx @modelcontextprotocol/inspector`) and requires a human to click

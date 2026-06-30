@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Modules\Identity\Actions\AuthenticateSocialUserAction;
 use App\Shared\DTO\SocialUserData;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
-use Illuminate\Support\Str;
 
 class SocialAuthController extends Controller
 {
@@ -39,7 +39,9 @@ class SocialAuthController extends Controller
 
             $request->session()->put('email', $user->email);
 
-            return redirect()->route('select-campus.index');
+            // Honor an intended URL (e.g. the Passport /oauth/authorize consent for the MCP
+            // server) just like password login does; fall back to campus selection otherwise.
+            return redirect()->intended(route('select-campus.index'));
         } catch (InvalidStateException $e) {
             return redirect()->route('login')->with('error', 'Authentication failed. Please try again.');
         } catch (\Exception $e) {
