@@ -15,6 +15,8 @@
         "inertiajs/inertia-laravel": "3.x-dev",
         "laravel/ai": "^0.7.2",
         "laravel/framework": "^13.0",
+        "laravel/mcp": "^0.7",
+        "laravel/passport": "^13.7",
         "laravel/sanctum": "^4.1",
         "laravel/socialite": "^5.20",
         "laravel/telescope": "^5.11",

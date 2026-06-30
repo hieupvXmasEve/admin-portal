@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Passport\Passport;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -43,6 +44,20 @@ class AppServiceProvider extends ServiceProvider
         $this->configureRateLimiting();
         $this->configureMorphMap();
         $this->shareThemeWithViews();
+        $this->configureMcpPassport();
+    }
+
+    /**
+     * Configure Passport for the Controlled MCP server (ADR-0010/0011): a branded
+     * consent screen and short-lived access tokens to shrink the orphaned-token
+     * window (the active-status gate is the primary offboarding control).
+     */
+    protected function configureMcpPassport(): void
+    {
+        Passport::authorizationView('mcp.authorize');
+        Passport::tokensExpireIn(now()->addHour());
+        Passport::refreshTokensExpireIn(now()->addDays(30));
+        Passport::personalAccessTokensExpireIn(now()->addHour());
     }
 
     protected function shareThemeWithViews(): void

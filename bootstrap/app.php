@@ -35,6 +35,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->validateCsrfTokens(except: [
             'api/webhooks/dng/*',
+            // Unauthenticated MCP discovery + dynamic client registration are called by
+            // external agent clients with no session, so they must bypass CSRF (a POST
+            // to oauth/register would otherwise 419). See ADR-0011 / routes/web.php.
+            'oauth/register',
+            '.well-known/*',
         ]);
 
         $middleware->web(append: [

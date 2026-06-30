@@ -4,6 +4,14 @@ use App\Http\Controllers\Api\ElectiveController;
 use App\Http\Controllers\Web\CurriculumVersionController;
 use App\Http\Controllers\Web\DashboardController;
 use Illuminate\Support\Facades\Route;
+use Laravel\Mcp\Facades\Mcp;
+
+// Controlled MCP server (ADR-0009/0011): OAuth discovery (.well-known/*) + dynamic
+// client registration (POST oauth/register) at the application root, so external
+// agent clients (Claude, ChatGPT) can self-register and discover the Passport
+// authorize/token endpoints with zero install. These routes are CSRF-exempt (see
+// bootstrap/app.php); the /mcp/swinx tool endpoint itself lives in routes/ai.php.
+Mcp::oauthRoutes();
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
