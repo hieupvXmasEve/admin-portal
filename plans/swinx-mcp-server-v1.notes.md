@@ -107,6 +107,19 @@ exposure. Per the PRD this is the hard pass/fail; treat it as the remaining acce
   together there. These endpoints must NOT be production-exposed until Step 5 ships (this
   is already gated behind the live OAuth-round-trip human gate above).
 
+## Ops gotcha — Passport key file permissions
+
+`passport:install` generated `storage/oauth-private.key` / `oauth-public.key` as `775`
+(the container's umask added exec bits). `league/oauth2-server` rejects keys that are not
+`600`/`660`, so token *validation* fails at the `/mcp/swinx` call with a 500
+("Key file … permissions are not correct …") even though consent + code→token succeeded.
+
+Fix: `chmod 600 storage/oauth-*.key` (do it inside the container:
+`./scripts/dev.sh shell` → `chmod 600 storage/oauth-*.key`). Re-apply after any
+`passport:install`/key regeneration. For production, prefer loading the keys from env
+(`Passport::loadKeysFrom` / `PASSPORT_PRIVATE_KEY`) to avoid the file-permission check
+entirely. The keys are gitignored (secrets) and must not be committed.
+
 ## ChatGPT go/no-go
 
 Deferred to Step 6 (not in scope for Issues 01–03).
