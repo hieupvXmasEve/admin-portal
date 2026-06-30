@@ -7,9 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import FileUpload from '@/components/FileUpload.vue';
+import type { UploadedFile } from '@/types/fileUpload';
+import type { EgcPanel } from '@/types/models';
 import { useForm } from '@inertiajs/vue3';
 import { ArrowRight, FileText, GraduationCap, Plus, TrendingUp } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
 
@@ -39,6 +42,7 @@ interface PlacementOptions {
 interface Props {
     student: StudentSummary;
     options: Record<string, unknown>;
+    egc: EgcPanel;
 }
 
 const props = defineProps<Props>();
@@ -46,6 +50,26 @@ const props = defineProps<Props>();
 // The orchestrator types `options` loosely as Record<string, unknown>; the actual
 // payload is built by LifecycleFormOptions::placementOptions(). Narrow it once here.
 const placementOptions = computed(() => props.options as unknown as PlacementOptions);
+
+// Picker options for the transition dialog, built from the EGC panel's IELTS list
+// that is already on the page — staff choose a certificate instead of typing its id.
+// Below-threshold certificates can never qualify, so they are disabled; scan-missing
+// ones stay selectable (the "allow missing documents" exception still applies).
+const ieltsCertificateOptions = computed(() =>
+    props.egc.ielts.map((cert) => {
+        const score = Number(cert.overall_score);
+        const belowThreshold = Number.isFinite(score) && score < placementOptions.value.ieltsScoreThreshold;
+        const scanMissing = cert.upload_record === null || cert.missing_documents;
+        const issued = cert.issue_date ? new Date(cert.issue_date).toLocaleDateString() : 'no issue date';
+        const flags = [belowThreshold ? 'below threshold' : null, scanMissing ? 'scan missing' : null].filter(Boolean).join(', ');
+
+        return {
+            value: String(cert.id),
+            label: `${cert.overall_score ?? '—'} — ${issued}${flags ? ` · ${flags}` : ''}`,
+            belowThreshold,
+        };
+    }),
+);
 
 const isPlacementDialogOpen = ref(false);
 const isIeltsDialogOpen = ref(false);
@@ -70,8 +94,19 @@ const ieltsForm = useForm({
     overall_score: '',
     semester_id: '',
     issue_date: '',
+    upload_record_id: null as number | null,
     missing_documents: false,
     notes: '',
+});
+
+// Scan attached at creation time: clears the missing-documents flag automatically.
+const ieltsUploadedFiles = ref<UploadedFile[]>([]);
+
+watch(ieltsUploadedFiles, (files) => {
+    ieltsForm.upload_record_id = files.length > 0 ? files[0].id : null;
+    if (files.length > 0) {
+        ieltsForm.missing_documents = false;
+    }
 });
 
 const levelForm = useForm({
@@ -117,6 +152,7 @@ const handleIeltsSubmit = (): void => {
             isIeltsDialogOpen.value = false;
             ieltsForm.reset();
             ieltsForm.student_id = props.student.id;
+            ieltsUploadedFiles.value = [];
         },
         onError: () => {
             toast.error('Failed to record IELTS certificate.');
@@ -308,8 +344,20 @@ const handleTransitionSubmit = (): void => {
                             <p v-if="ieltsForm.errors.issue_date" class="text-sm text-red-500">{{ ieltsForm.errors.issue_date }}</p>
                         </div>
 
+                        <div class="space-y-2">
+                            <Label>IELTS scan (Optional)</Label>
+                            <FileUpload
+                                v-model="ieltsUploadedFiles"
+                                context="ielts_certificate"
+                                :upload-immediately="true"
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                label="Drop the IELTS certificate scan here or click to upload"
+                            />
+                            <p class="text-muted-foreground text-xs">Attaching a scan clears the "missing file scan" flag automatically.</p>
+                        </div>
+
                         <div class="flex items-center space-x-2">
-                            <Switch id="ielts_missing_documents" v-model:model-value="ieltsForm.missing_documents" />
+                            <Switch id="ielts_missing_documents" v-model:model-value="ieltsForm.missing_documents" :disabled="!!ieltsForm.upload_record_id" />
                             <Label for="ielts_missing_documents">Missing file scan (exception)</Label>
                         </div>
 
@@ -415,8 +463,25 @@ const handleTransitionSubmit = (): void => {
                     </DialogHeader>
                     <form class="space-y-4" @submit.prevent="handleTransitionSubmit">
                         <div class="space-y-2">
-                            <Label for="transition_ielts_certificate_id">IELTS Certificate ID *</Label>
-                            <Input id="transition_ielts_certificate_id" v-model="transitionForm.ielts_certificate_id" type="number" min="0" placeholder="Qualifying IELTS certificate ID" />
+                            <Label for="transition_ielts_certificate_id">Qualifying IELTS certificate *</Label>
+                            <Select v-model="transitionForm.ielts_certificate_id">
+                                <SelectTrigger id="transition_ielts_certificate_id">
+                                    <SelectValue placeholder="Select qualifying IELTS certificate" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="option in ieltsCertificateOptions"
+                                        :key="option.value"
+                                        :value="option.value"
+                                        :disabled="option.belowThreshold"
+                                    >
+                                        {{ option.label }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p v-if="ieltsCertificateOptions.length === 0" class="text-muted-foreground text-xs">
+                                No IELTS certificates recorded yet — record one first.
+                            </p>
                             <p v-if="transitionForm.errors.ielts_certificate_id" class="text-sm text-red-500">{{ transitionForm.errors.ielts_certificate_id }}</p>
                         </div>
 

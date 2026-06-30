@@ -73,8 +73,8 @@ const openAttachDecision = (row: LifecycleTimelineRow) => {
             </Card>
 
             <div class="space-y-6">
-                <EgcControls v-if="isEgcStudent && canChangeStatus" :student="student" :options="options.placement" />
-                <EgcSubPanel :egc="egc" />
+                <EgcControls v-if="isEgcStudent && canChangeStatus" :student="student" :options="options.placement" :egc="egc" />
+                <EgcSubPanel :egc="egc" :can-change-status="canChangeStatus" />
             </div>
         </div>
 

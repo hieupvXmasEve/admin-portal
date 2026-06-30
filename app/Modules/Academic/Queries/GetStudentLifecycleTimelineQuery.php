@@ -210,6 +210,7 @@ class GetStudentLifecycleTimelineQuery
             ->all();
 
         $ielts = $student->ieltsCertificates()
+            ->with('uploadRecord')
             ->latestFirst()
             ->get()
             ->map(fn (IeltsCertificate $certificate): array => [
@@ -218,6 +219,11 @@ class GetStudentLifecycleTimelineQuery
                 'issue_date' => $this->iso($certificate->issue_date),
                 'missing_documents' => (bool) $certificate->missing_documents,
                 'upload_record_id' => $certificate->upload_record_id,
+                'upload_record' => $certificate->uploadRecord !== null ? [
+                    'id' => $certificate->uploadRecord->id,
+                    'url' => $certificate->uploadRecord->url,
+                    'original_name' => $certificate->uploadRecord->original_name,
+                ] : null,
                 'notes' => $certificate->notes,
             ])
             ->all();

@@ -596,6 +596,8 @@ export interface EgcIeltsRecord {
     issue_date: string | null;
     missing_documents: boolean;
     upload_record_id: number | null;
+    /** The uploaded IELTS scan, when one is attached. Null when the scan is missing. */
+    upload_record: { id: number; url: string; original_name: string } | null;
     notes: string | null;
 }
 

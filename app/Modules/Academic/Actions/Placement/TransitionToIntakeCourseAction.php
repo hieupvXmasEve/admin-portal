@@ -21,7 +21,7 @@ class TransitionToIntakeCourseAction
 {
     /**
      * Transition a student from intake_pre_uni_gc to intake_course.
-     * Requires IELTS >= 6.5 and (by default) complete documents.
+     * Requires IELTS >= SCORE_THRESHOLD_INTAKE_COURSE (5.5) and (by default) complete documents.
      *
      * @param  array  $data  {
      *                       student_id: int,

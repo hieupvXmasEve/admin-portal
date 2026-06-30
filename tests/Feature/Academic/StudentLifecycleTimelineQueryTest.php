@@ -7,11 +7,13 @@ use App\Enums\ProgressionTriggerSource;
 use App\Enums\StudentActionType;
 use App\Models\AcademicProgressionEvent;
 use App\Models\Campus;
+use App\Models\IeltsCertificate;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
+use App\Models\UploadRecord;
 use App\Models\User;
 use App\Modules\Academic\Actions\RecordStudentActionAction;
 use App\Modules\Academic\Queries\GetStudentLifecycleTimelineQuery;
@@ -94,6 +96,42 @@ it('keeps english-level changes and ielts records out of the main timeline and i
         ->and($levelHistoryIds)->toContain($ielts->id)
         ->and($result['egc']['current_level'])->toBe(2)
         ->and($result['egc']['starting_level'])->toBe(1);
+});
+
+it('exposes the IELTS scan file (url + original_name) in the egc panel, and null when the scan is missing', function () {
+    $upload = UploadRecord::factory()->create([
+        'context' => 'ielts_certificate',
+        'disk' => 'ielts-certificates',
+        'original_name' => 'ielts-trf.pdf',
+    ]);
+
+    $withScan = IeltsCertificate::create([
+        'student_id' => $this->student->id,
+        'overall_score' => 6.5,
+        'submitted_at' => '2026-02-10 09:00:00',
+        'issue_date' => '2026-02-10',
+        'upload_record_id' => $upload->id,
+        'missing_documents' => false,
+    ]);
+
+    $withoutScan = IeltsCertificate::create([
+        'student_id' => $this->student->id,
+        'overall_score' => 5.5,
+        'submitted_at' => '2026-01-05 09:00:00',
+        'issue_date' => '2026-01-05',
+        'upload_record_id' => null,
+        'missing_documents' => true,
+    ]);
+
+    $ielts = collect((new GetStudentLifecycleTimelineQuery)->handle($this->student)['egc']['ielts'])
+        ->keyBy('id');
+
+    expect($ielts[$withScan->id]['upload_record'])->not->toBeNull()
+        ->and($ielts[$withScan->id]['upload_record']['id'])->toBe($upload->id)
+        ->and($ielts[$withScan->id]['upload_record']['original_name'])->toBe('ielts-trf.pdf')
+        ->and($ielts[$withScan->id]['upload_record']['url'])->toBeString()
+        ->and($ielts[$withScan->id]['upload_record']['url'])->not->toBe('')
+        ->and($ielts[$withoutScan->id]['upload_record'])->toBeNull();
 });
 
 it('flags a requires-decision transition with no decision and clears the flag once attached', function () {
