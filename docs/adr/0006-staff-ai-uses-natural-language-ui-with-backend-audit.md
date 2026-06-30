@@ -1,0 +1,5 @@
+# Staff AI uses natural-language UI with backend audit
+
+Staff Copilot answers for the staff/admin web app should use natural, non-technical language instead of exposing tool names, source reports, filters, freshness fields, schema versions, confidence internals, or trace identifiers in the main chat UI. We chose this over a technical evidence-first UI because staff need to understand whether they can ask a question and what the result means, while Swinx still needs complete backend evidence for debugging, permission review, dashboard parity, provider usage, and audit.
+
+The backend must still persist redacted technical evidence for every AI run and tool call, including selected tool, arguments, permission result, campus scope, hidden sections, source references, safe errors, provider/model usage, and structured result payloads. AI provider/model calls may synthesize staff-friendly language from Swinx-approved query results, but they do not grant data access, decide permissions, or replace backend audit records.
