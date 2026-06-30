@@ -11,6 +11,7 @@ use App\Models\CourseOffering;
 use App\Models\Student;
 use App\Modules\Academic\Support\FailureReasonClassifier;
 use App\Modules\Finance\Actions\Egc\SyncEgcBlockResultsAction;
+use App\Services\AttendanceService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -194,13 +195,19 @@ final class RemediateEgcAttendanceFailuresAction
             );
         }
 
-        DB::transaction(function () use ($record, $absentAttendances, $projectedCounts, $gradeThreshold, $attendanceThreshold, $finalPercentage): void {
-            foreach ($absentAttendances as $attendance) {
-                $attendance->update([
-                    'status' => 'present',
-                    'check_in_time' => $attendance->check_in_time ?? now(),
-                ]);
-            }
+        $affectedSessionIds = $absentAttendances->pluck('class_session_id')->unique()->values();
+
+        DB::transaction(function () use ($record, $absentAttendances, $affectedSessionIds, $projectedCounts, $gradeThreshold, $attendanceThreshold, $finalPercentage): void {
+            Attendance::withoutEvents(function () use ($absentAttendances): void {
+                foreach ($absentAttendances as $attendance) {
+                    $attendance->update([
+                        'status' => 'present',
+                        'check_in_time' => $attendance->check_in_time ?? now(),
+                    ]);
+                }
+            });
+
+            self::refreshSessionAttendanceStatistics($affectedSessionIds);
 
             $eval = FailureReasonClassifier::classify(
                 $finalPercentage,
@@ -327,6 +334,23 @@ final class RemediateEgcAttendanceFailuresAction
         $requiredAttended = (int) ceil(($attendanceThreshold / 100) * $recorded);
 
         return max(0, min($requiredAttended - $attended, $absent));
+    }
+
+    /**
+     * @param  Collection<int, int>  $sessionIds
+     */
+    private static function refreshSessionAttendanceStatistics(Collection $sessionIds): void
+    {
+        if ($sessionIds->isEmpty()) {
+            return;
+        }
+
+        $attendanceService = app(AttendanceService::class);
+
+        ClassSession::query()
+            ->whereIn('id', $sessionIds->all())
+            ->get()
+            ->each(fn (ClassSession $session) => $attendanceService->updateAttendanceStatistics($session));
     }
 
     /**

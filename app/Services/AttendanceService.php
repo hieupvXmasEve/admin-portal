@@ -155,8 +155,12 @@ class AttendanceService
     {
         $activeStudentIds = $classSession->courseOffering->activeClassRosterStudentIds();
 
-        $attendanceStats = $classSession->attendances()
-            ->whereIn('student_id', $activeStudentIds)
+        $attendanceQuery = $classSession->attendances();
+        if ($activeStudentIds->isNotEmpty()) {
+            $attendanceQuery->whereIn('student_id', $activeStudentIds);
+        }
+
+        $attendanceStats = $attendanceQuery
             ->selectRaw('
                 COUNT(*) as total,
                 SUM(CASE WHEN status = "present" THEN 1 ELSE 0 END) as present,
@@ -166,17 +170,22 @@ class AttendanceService
             ')
             ->first();
 
-        $present = $attendanceStats->present ?? 0;
-        $late = $attendanceStats->late ?? 0;
+        $present = (int) ($attendanceStats->present ?? 0);
+        $late = (int) ($attendanceStats->late ?? 0);
 
         $actualAttendees = $present + $late;
         $expectedAttendees = $activeStudentIds->count();
+
+        if ($expectedAttendees === 0) {
+            $expectedAttendees = (int) $classSession->attendances()->distinct()->count('student_id');
+        }
+
         $attendancePercentage = $expectedAttendees > 0
             ? round(($actualAttendees / $expectedAttendees) * 100, 2)
-            : 0;
+            : null;
 
         $classSession->update([
-            'expected_attendees' => $expectedAttendees,
+            'expected_attendees' => $expectedAttendees > 0 ? $expectedAttendees : null,
             'actual_attendees' => $actualAttendees,
             'attendance_percentage' => $attendancePercentage,
         ]);

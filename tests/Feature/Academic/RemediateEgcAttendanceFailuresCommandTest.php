@@ -35,6 +35,7 @@ function seedEgcAttendanceFailureScenario(
     bool $activeSemester = true,
     float $finalPercentage = 75.0,
     ?string $unitCode = null,
+    string $studentStatus = 'intake_pre_uni_gc',
 ): array {
     $campus = Campus::factory()->create();
     $semester = Semester::factory()->active()->create([
@@ -49,7 +50,7 @@ function seedEgcAttendanceFailureScenario(
         'intake_semester_id' => $intakeSemester->id,
         'intake' => 1,
         'intake_mode' => 'sequential',
-        'status' => 'intake_pre_uni_gc',
+        'status' => $studentStatus,
     ]);
 
     $unit = Unit::factory()->state([
@@ -106,6 +107,7 @@ function seedEgcAttendanceFailureScenario(
             'session_date' => now()->subDays(20 - $sequence)->toDateString(),
             'start_time' => '09:00:00',
             'end_time' => '11:00:00',
+            'expected_attendees' => 1,
         ]);
     });
 
@@ -212,6 +214,24 @@ it('skips records that fail the grade threshold', function () {
 
     expect($scenario['record']->refresh()->is_passed)->toBeFalse()
         ->and(Attendance::query()->where('student_id', $scenario['student']->id)->where('status', 'absent')->count())->toBe(5);
+});
+
+it('remediates students who are inactive on the class roster without violating session constraints', function () {
+    $scenario = seedEgcAttendanceFailureScenario(studentStatus: 'deferred');
+    $session = ClassSession::query()
+        ->where('course_offering_id', $scenario['offering']->id)
+        ->first();
+
+    expect($session)->not->toBeNull()
+        ->and($session->expected_attendees)->toBeGreaterThan(0);
+
+    $this->artisan('academic:remediate-egc-attendance-failures')
+        ->assertSuccessful();
+
+    $session->refresh();
+
+    expect($scenario['record']->refresh()->is_passed)->toBeTrue()
+        ->and($session->expected_attendees)->toBeGreaterThan(0);
 });
 
 it('limits remediation to a single student when student-id is provided', function () {
