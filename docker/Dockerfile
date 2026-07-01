@@ -53,4 +53,5 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -fsS http://localhost/health || exit 1
 
-CMD ["/usr/local/bin/start-frankenphp"]
+# Use the bind-mounted repo script in dev so boot fixes (e.g. OAuth key perms) apply without rebuild.
+CMD ["sh", "/app/docker/start-frankenphp.sh"]
