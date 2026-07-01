@@ -50,5 +50,6 @@ php artisan event:cache
 
 chown -R www-data:www-data /app/storage /app/bootstrap/cache
 chmod -R 775 /app/storage /app/bootstrap/cache
+sh /app/scripts/fix-oauth-key-permissions.sh /app/storage
 
 exec frankenphp run --config /etc/caddy/Caddyfile

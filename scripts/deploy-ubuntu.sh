@@ -125,6 +125,9 @@ fi
 log "Rebuilding Laravel optimized caches"
 "$php_bin" artisan optimize
 
+log "Fixing Passport OAuth key permissions"
+bash scripts/fix-oauth-key-permissions.sh storage
+
 log "Restarting Laravel queue workers"
 "$php_bin" artisan queue:restart
 
