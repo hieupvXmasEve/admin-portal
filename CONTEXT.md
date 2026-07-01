@@ -3,7 +3,7 @@
 > Single-page orientation for humans and AI agents new to this repo.
 > For depth, jump to `docs/codebase-discovery-2026-05-12.md`. For all agent operating rules, see `AGENTS.md`.
 
-**Last updated:** 2026-06-30
+**Last updated:** 2026-07-01
 **Owner:** Platform Team
 **Status:** Active baseline
 
@@ -334,7 +334,7 @@ Seed terms (cross-cutting platform language; extend per domain as work lands):
 | **Safe AI markdown** | A limited Staff Copilot answer format allowing headings, paragraphs, emphasis, lists, blockquotes, and markdown tables. Raw HTML, images, external links, code blocks, and copy actions are not part of the MVP answer surface. |
 | **Natural-language answer synthesis** | The use of an approved AI provider/model to turn redacted, structured Swinx query results into staff-friendly language. It does not grant data access, run queries, decide permissions, or replace backend audit evidence. |
 | **BOD AI Operations Analyst** | A read-only Staff Copilot mode for leadership that summarizes Academic and Finance operations through aggregate metrics and controlled drilldown. It is governed by a dedicated BOD AI access permission, separate from operational staff and super-admin permissions. |
-| **Controlled MCP server** | A Swinx-owned, OAuth-protected MCP server that authorized staff connect to from external agent clients (Claude, ChatGPT, Codex). "Controlled" means access-controlled — per-user identity, Swinx permission, campus scope, redaction, and audit gate every call — **not** network-private; it is publicly reachable so cloud clients can connect inbound. It exposes only read-only tools, and the client's own model performs natural-language synthesis. |
+| **Controlled MCP server** | A Swinx-owned, OAuth-protected MCP server that authorized staff connect to from external agent clients. Claude is the v1 client; other clients (ChatGPT, Codex) are prospective. "Controlled" means access-controlled — per-user identity, Swinx permission, campus scope, redaction, and audit gate every call — **not** network-private; it is publicly reachable so cloud clients can connect inbound. It exposes only read-only tools, and the client's own model performs natural-language synthesis. |
 | **MCP client authorization** | A per-user OAuth grant that lets one external agent client act for one staff member against the Controlled MCP server. The client inherits that staff member's **full** Swinx permissions (no per-client capability narrowing) and is revocable and auditable independently per client. Replaces the earlier "scoped service token" model, which assumed per-agent service accounts. |
 | **Connected AI provider** | A staff-owned AI provider configuration that is enabled, has a saved API key, and has passed Swinx's provider test. Staff Copilot is unavailable until the staff member connects an AI provider. |
 | **AI access layers** | The separate gates for Staff Copilot: a connected AI provider enables the assistant experience, `view_ai_metrics` allows entry to AI metric Q&A, and domain data permissions decide which Academic or Finance metrics may be queried. Having an AI provider or AI entry permission never grants data access by itself. |
