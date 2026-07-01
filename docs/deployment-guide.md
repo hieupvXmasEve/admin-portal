@@ -666,6 +666,14 @@ cd /www/wwwroot/x.metropolia.edu.vn/asia-admin-portal
 DEPLOY_ENVIRONMENT=production DEPLOY_RUN_MIGRATIONS=false bash scripts/deploy-ubuntu.sh
 ```
 
+## 16) MCP Server (ChatGPT / Claude connector)
+
+The staff MCP endpoint is `POST /mcp/swinx` with OAuth discovery at `/.well-known/oauth-authorization-server`.
+
+New clones on aaPanel/nginx + Cloudflare often need **server-side** fixes (nginx `.well-known` routing, Passport keys, Cloudflare WAF) that are not part of `git pull`. See the dedicated runbook:
+
+- [MCP Server Deployment & Troubleshooting](mcp-server-deployment.md)
+
 ## Unresolved Questions
 
 - Should production database stay containerized in all environments, or move to managed DB outside Compose?
