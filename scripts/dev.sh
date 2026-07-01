@@ -59,8 +59,18 @@ case "${1:-}" in
     npm) shift; dc exec app pnpm "$@" ;;
     pnpm) shift; dc exec app pnpm "$@" ;;
     test) shift; dc exec app php artisan test "$@" ;;
+    tunnel)
+        # Share via Cloudflare Tunnel: built assets only (avoids Cloudflare 429 on Vite dev requests).
+        ensure_env
+        dc exec app pnpm run build
+        rm -f public/hot
+        dc stop vite 2>/dev/null || true
+        echo "Tunnel mode: built assets served from public/build/"
+        echo "App: https://$(env_value APP_URL https://mcp.asia-vn.edu.vn | sed -E 's#^https?://##')"
+        echo "Local HMR again: ./scripts/dev.sh start  (restarts vite + hot file)"
+        ;;
     *)
-        echo "Usage: $0 {start|stop|restart|rebuild|logs|status|shell|mysql|artisan|composer|npm|pnpm|test}"
+        echo "Usage: $0 {start|stop|restart|rebuild|logs|status|shell|mysql|artisan|composer|npm|pnpm|test|tunnel}"
         exit 1
         ;;
 esac
