@@ -23,7 +23,11 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [env('VITE_APP_URL_FE', 'http://localhost:3000'), env('VITE_APP_URL_FE_LECTURE', 'http://localhost:3001'), 'http://localhost:3000', 'http://localhost:6274', 'http://127.0.0.1:6274'],
+    // `https://chatgpt.com` (and the legacy `https://chat.openai.com`) are added because
+    // ChatGPT's "add custom connector" modal probes the MCP server + OAuth discovery
+    // endpoints from the browser (chatgpt.com origin); without an Access-Control-Allow-Origin
+    // match the browser blocks the read and ChatGPT reports "does not implement OAuth".
+    'allowed_origins' => [env('VITE_APP_URL_FE', 'http://localhost:3000'), env('VITE_APP_URL_FE_LECTURE', 'http://localhost:3001'), 'http://localhost:3000', 'http://localhost:6274', 'http://127.0.0.1:6274', 'https://chatgpt.com', 'https://chat.openai.com'],
 
     'allowed_origins_patterns' => ['#^https?://.*\.asia-vn\.edu\.vn$#', '#^https?://.*\.metropolia\.edu\.vn$#', '#^http://localhost:3000$#', '#^http://127.0.0.1:3000$#'],
 
