@@ -9,6 +9,7 @@
 /vendor
 .env
 .env.backup
+.env.backup.*
 .env.docker.dev
 .env.docker.production
 

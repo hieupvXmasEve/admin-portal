@@ -46,6 +46,7 @@ case "${1:-}" in
     start) start ;;
     stop) dc down ;;
     restart) dc down && dc up -d --build ;;
+    restart-no-build) dc down && dc up -d --no-build ;;
     rebuild) dc down && dc build --no-cache && dc up -d ;;
     logs) shift; dc logs -f "$@" ;;
     status) dc ps ;;
@@ -59,7 +60,13 @@ case "${1:-}" in
     npm) shift; dc exec app pnpm "$@" ;;
     pnpm) shift; dc exec app pnpm "$@" ;;
     test) shift; dc exec app php artisan test "$@" ;;
-    tunnel)
+    localhost)
+        ./scripts/dev-env.sh localhost
+        ;;
+    tunnel|tunnel-domain)
+        ./scripts/dev-env.sh tunnel
+        ;;
+    tunnel-assets)
         # Share via Cloudflare Tunnel: built assets only (avoids Cloudflare 429 on Vite dev requests).
         ensure_env
         dc exec app pnpm run build
@@ -67,10 +74,10 @@ case "${1:-}" in
         dc stop vite 2>/dev/null || true
         echo "Tunnel mode: built assets served from public/build/"
         echo "App: https://$(env_value APP_URL https://mcp.asia-vn.edu.vn | sed -E 's#^https?://##')"
-        echo "Local HMR again: ./scripts/dev.sh start  (restarts vite + hot file)"
+        echo "Local HMR again: ./scripts/dev-env.sh localhost"
         ;;
     *)
-        echo "Usage: $0 {start|stop|restart|rebuild|logs|status|shell|mysql|artisan|composer|npm|pnpm|test|tunnel}"
+        echo "Usage: $0 {start|stop|restart|restart-no-build|rebuild|logs|status|shell|mysql|artisan|composer|npm|pnpm|test|localhost|tunnel|tunnel-domain|tunnel-assets}"
         exit 1
         ;;
 esac
