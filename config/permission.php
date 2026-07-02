@@ -114,6 +114,7 @@ return [
             'view_course_offering' => 'view_course_offering',
             'create_course_offering' => 'create_course_offering',
             'edit_course_offering' => 'edit_course_offering',
+            'complete_course_offering' => 'complete_course_offering',
             'delete_course_offering' => 'delete_course_offering',
             'add_student_registration' => 'add_student_registration',
             'delete_student_registration' => 'delete_student_registration',

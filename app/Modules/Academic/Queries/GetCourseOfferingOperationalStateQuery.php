@@ -1,0 +1,203 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Academic\Queries;
+
+use App\Models\ClassSession;
+use App\Models\CourseOffering;
+use App\Models\User;
+use Illuminate\Support\Collection;
+
+/**
+ * Operational-state read model for the Course Offering Cockpit (ADR 0013).
+ *
+ * Derives the offering's lifecycle stage, readiness blockers, and available
+ * actions from existing data (course_status, sessions, attendance, Canvas
+ * mapping). Nothing is persisted; the frontend renders this contract instead
+ * of inferring state. Blocker rules mirror MarkCourseOfferingCompletedAction
+ * so the UI never promises a completion the backend would reject.
+ */
+class GetCourseOfferingOperationalStateQuery
+{
+    public const BLOCKER_SESSIONS_MISSING_ATTENDANCE = 'sessions_missing_attendance';
+
+    public const BLOCKER_SESSIONS_AUTO_ATTENDANCE_ONLY = 'sessions_auto_attendance_only';
+
+    public const BLOCKER_CANVAS_UNSYNCED = 'canvas_unsynced';
+
+    public const ACTION_FINALIZE = 'finalize';
+
+    private const TERMINAL_STAGES = ['completed', 'cancelled'];
+
+    /**
+     * @return array{
+     *   lifecycle_stage: string,
+     *   session_progress: array{total: int, completed: int},
+     *   readiness_blockers: array<int, array{code: string, message: string, references: array<int, array{type: string, id: int, label: string}>}>,
+     *   available_actions: array<int, array{action: string, label: string, allowed: bool, blocked_by: array<int, string>}>
+     * }
+     */
+    public static function handle(CourseOffering $courseOffering, User $user): array
+    {
+        $sessions = $courseOffering->classSessions()
+            ->where('status', '!=', 'cancelled')
+            ->with(['attendances' => function ($query) {
+                $query->select('id', 'class_session_id', 'recording_method');
+            }])
+            ->orderBy('session_date')
+            ->orderBy('start_time')
+            ->get(['id', 'course_offering_id', 'session_title', 'session_date', 'start_time', 'status']);
+
+        $lifecycleStage = self::deriveLifecycleStage($courseOffering, $sessions);
+
+        $readinessBlockers = in_array($lifecycleStage, self::TERMINAL_STAGES, true)
+            ? []
+            : self::deriveReadinessBlockers($courseOffering, $sessions);
+
+        return [
+            'lifecycle_stage' => $lifecycleStage,
+            'session_progress' => [
+                'total' => $sessions->count(),
+                'completed' => $sessions->where('status', 'completed')->count(),
+            ],
+            'readiness_blockers' => $readinessBlockers,
+            'available_actions' => self::deriveAvailableActions($user, $lifecycleStage, $readinessBlockers),
+        ];
+    }
+
+    /**
+     * Lifecycle is derived, never persisted: setup → registration → teaching
+     * → grading → completed / cancelled. Cancelled sessions are ignored.
+     *
+     * @param  Collection<int, ClassSession>  $sessions
+     */
+    private static function deriveLifecycleStage(CourseOffering $courseOffering, Collection $sessions): string
+    {
+        if ($courseOffering->course_status === 'cancelled') {
+            return 'cancelled';
+        }
+
+        if ($courseOffering->course_status === 'completed') {
+            return 'completed';
+        }
+
+        if ($sessions->isNotEmpty() && $sessions->every(fn (ClassSession $session): bool => $session->status === 'completed')) {
+            return 'grading';
+        }
+
+        $hasStarted = $sessions->contains(
+            fn (ClassSession $session): bool => in_array($session->status, ['in_progress', 'completed'], true)
+        );
+        if ($hasStarted) {
+            return 'teaching';
+        }
+
+        if ($sessions->isNotEmpty() || $courseOffering->current_enrollment > 0) {
+            return 'registration';
+        }
+
+        return 'setup';
+    }
+
+    /**
+     * @param  Collection<int, ClassSession>  $sessions
+     * @return array<int, array{code: string, message: string, references: array<int, array{type: string, id: int, label: string}>}>
+     */
+    private static function deriveReadinessBlockers(CourseOffering $courseOffering, Collection $sessions): array
+    {
+        $blockers = [];
+
+        $missingAttendance = $sessions->filter(
+            fn (ClassSession $session): bool => $session->attendances->isEmpty()
+        );
+        if ($missingAttendance->isNotEmpty()) {
+            $blockers[] = [
+                'code' => self::BLOCKER_SESSIONS_MISSING_ATTENDANCE,
+                'message' => $missingAttendance->count().' session(s) without recorded attendance',
+                'references' => self::sessionReferences($missingAttendance),
+            ];
+        }
+
+        // auto_system-only attendance means attendance has not been manually finalized yet.
+        $autoSystemOnly = $sessions->filter(
+            fn (ClassSession $session): bool => $session->attendances->isNotEmpty()
+                && $session->attendances->every(
+                    fn ($attendance): bool => $attendance->recording_method === 'auto_system'
+                )
+        );
+        if ($autoSystemOnly->isNotEmpty()) {
+            $blockers[] = [
+                'code' => self::BLOCKER_SESSIONS_AUTO_ATTENDANCE_ONLY,
+                'message' => $autoSystemOnly->count().' session(s) have only auto-system attendance and need manual confirmation',
+                'references' => self::sessionReferences($autoSystemOnly),
+            ];
+        }
+
+        // Canvas rule (ADR 0013): a mapped-but-unsynced offering blocks
+        // completion. pending / ignored mappings and unmapped offerings don't.
+        if (! $courseOffering->is_canvas_synced) {
+            $mappedMapping = $courseOffering->canvasCourseMappings()
+                ->where('sync_status', 'mapped')
+                ->first(['id', 'course_offering_id', 'canvas_course_name', 'canvas_course_id']);
+
+            if ($mappedMapping !== null) {
+                $blockers[] = [
+                    'code' => self::BLOCKER_CANVAS_UNSYNCED,
+                    'message' => 'Canvas-mapped but not synced — sync grades from Canvas before finalizing',
+                    'references' => [[
+                        'type' => 'canvas_course_mapping',
+                        'id' => $mappedMapping->id,
+                        'label' => $mappedMapping->canvas_course_name ?? $mappedMapping->canvas_course_id,
+                    ]],
+                ];
+            }
+        }
+
+        return $blockers;
+    }
+
+    /**
+     * Actions blocked by state are sent with blocked_by codes so the UI can
+     * disable and explain; actions the user lacks permission for are omitted
+     * entirely. Finalize only applies to offerings that are not yet terminal.
+     *
+     * @param  array<int, array{code: string, message: string, references: array<int, array{type: string, id: int, label: string}>}>  $readinessBlockers
+     * @return array<int, array{action: string, label: string, allowed: bool, blocked_by: array<int, string>}>
+     */
+    private static function deriveAvailableActions(User $user, string $lifecycleStage, array $readinessBlockers): array
+    {
+        if (in_array($lifecycleStage, self::TERMINAL_STAGES, true)) {
+            return [];
+        }
+
+        if (! $user->can('complete_course_offering')) {
+            return [];
+        }
+
+        $blockerCodes = array_values(array_column($readinessBlockers, 'code'));
+
+        return [[
+            'action' => self::ACTION_FINALIZE,
+            'label' => 'Finalize course',
+            'allowed' => $blockerCodes === [],
+            'blocked_by' => $blockerCodes,
+        ]];
+    }
+
+    /**
+     * @param  Collection<int, ClassSession>  $sessions
+     * @return array<int, array{type: string, id: int, label: string}>
+     */
+    private static function sessionReferences(Collection $sessions): array
+    {
+        return $sessions
+            ->map(fn (ClassSession $session): array => [
+                'type' => 'class_session',
+                'id' => $session->id,
+                'label' => "{$session->session_title} ({$session->formatted_date})",
+            ])
+            ->values()
+            ->all();
+    }
+}

@@ -24,6 +24,7 @@ use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Modules\Academic\Actions\MoveStudentToSectionAction;
 use App\Modules\Academic\Http\Requests\MoveStudentRequest;
+use App\Modules\Academic\Queries\GetCourseOfferingOperationalStateQuery;
 use App\Modules\Academic\Queries\GetCourseOfferingScoresQuery;
 use App\Modules\Academic\Queries\GetCourseOfferingSurveyQuery;
 use App\Services\CourseSurveyService;
@@ -482,6 +483,10 @@ class CourseOfferingController extends Controller
         return Inertia::render('course-offerings/Show', [
             // Eager — needed by Overview, Sessions, Students tabs
             'courseOffering' => $courseOffering,
+
+            // Eager — single operational-state contract for the cockpit
+            // (ADR 0013); re-derived on every visit and partial reload.
+            'operational_state' => GetCourseOfferingOperationalStateQuery::handle($courseOffering, Auth::user()),
 
             // Once — rarely change during page session, skip on partial reloads
             'availableRooms' => Inertia::once(fn () => $availableRooms),

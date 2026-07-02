@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\RolePermission;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Log;
 
@@ -28,6 +29,9 @@ class UpdatePermissionsSeeder extends Seeder
 
         // Assign all available permissions to the Super Admin role.
         $this->assignAllPermissionsToSuperAdmin();
+
+        // Companion grants that follow another permission by default.
+        $this->grantCompleteCourseOfferingToEditorRoles();
 
         $this->command->info('✅ Permissions synced successfully!');
     }
@@ -98,6 +102,32 @@ class UpdatePermissionsSeeder extends Seeder
         }
 
         $this->command->info("🗑️  Deleted {$deletedCount} orphaned permissions.");
+    }
+
+    /**
+     * ADR 0013: routine course finalization stays broad — any role that can
+     * edit course offerings also gets complete_course_offering by default.
+     * Idempotent, so re-running the sync never duplicates grants.
+     */
+    private function grantCompleteCourseOfferingToEditorRoles(): void
+    {
+        $edit = Permission::where('code', 'edit_course_offering')->first();
+        $complete = Permission::where('code', 'complete_course_offering')->first();
+
+        if (! $edit || ! $complete) {
+            return;
+        }
+
+        $editorRoleIds = RolePermission::where('permission_id', $edit->id)->pluck('role_id');
+
+        foreach ($editorRoleIds as $roleId) {
+            RolePermission::firstOrCreate([
+                'role_id' => $roleId,
+                'permission_id' => $complete->id,
+            ]);
+        }
+
+        $this->command->info('🔗 Granted complete_course_offering to '.$editorRoleIds->count().' role(s) holding edit_course_offering');
     }
 
     /**

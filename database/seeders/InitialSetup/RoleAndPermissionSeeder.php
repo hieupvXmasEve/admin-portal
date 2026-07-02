@@ -86,6 +86,34 @@ class RoleAndPermissionSeeder extends Seeder
 
         // Other roles get specific permissions
         $this->assignPermissionsToOtherRoles();
+
+        // Companion grants that follow another permission by default
+        $this->grantCompleteCourseOfferingToEditorRoles();
+    }
+
+    /**
+     * ADR 0013: routine course finalization stays broad — any role that can
+     * edit course offerings also gets complete_course_offering by default.
+     */
+    private function grantCompleteCourseOfferingToEditorRoles(): void
+    {
+        $edit = Permission::where('code', 'edit_course_offering')->first();
+        $complete = Permission::where('code', 'complete_course_offering')->first();
+
+        if (! $edit || ! $complete) {
+            return;
+        }
+
+        $editorRoleIds = RolePermission::where('permission_id', $edit->id)->pluck('role_id');
+
+        foreach ($editorRoleIds as $roleId) {
+            RolePermission::firstOrCreate([
+                'role_id' => $roleId,
+                'permission_id' => $complete->id,
+            ]);
+        }
+
+        $this->command->info('🔗 Granted complete_course_offering to '.$editorRoleIds->count().' role(s) holding edit_course_offering');
     }
 
     private function assignAllPermissionsToSuperAdmin(): void

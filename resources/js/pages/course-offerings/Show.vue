@@ -13,7 +13,7 @@ import StudentsTab from '@/pages/course-offerings/components/tabs/StudentsTab.vu
 import type { SurveyData } from '@/pages/course-offerings/components/tabs/SurveyTab.vue';
 import SurveyTab from '@/pages/course-offerings/components/tabs/SurveyTab.vue';
 import type { AcademicRecord, ClassSession, CourseOffering, CourseRegistration, Room } from '@/types/models';
-import { courseRoutes } from '@/utils/routes';
+import type { OperationalState } from '@/types/operational-state';
 import { Deferred, Head, Link, router } from '@inertiajs/vue3';
 import { ArrowLeft, Edit, Users } from 'lucide-vue-next';
 import { onMounted, onUnmounted, ref } from 'vue';
@@ -25,6 +25,7 @@ interface Props {
         class_sessions?: ClassSession[];
         academic_records?: AcademicRecord[];
     };
+    operational_state: OperationalState;
     availableRooms: Room[];
     siblingOfferings: CourseOffering[];
     scoresData?: ScoresData;
@@ -146,8 +147,8 @@ const goBack = () => window.history.back();
         </div>
     </div>
 
-    <!-- Lifecycle Header -->
-    <CourseLifecycleHeader :course-offering="courseOffering" />
+    <!-- Lifecycle Header (backend-derived operational state, ADR 0013) -->
+    <CourseLifecycleHeader :operational-state="operational_state" />
 
     <!-- Tabs -->
     <Tabs :model-value="currentTab" class="mt-2 w-full" @update:model-value="handleTabChange">

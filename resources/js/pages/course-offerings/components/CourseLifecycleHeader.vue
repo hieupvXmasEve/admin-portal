@@ -1,41 +1,21 @@
 <script setup lang="ts">
 /**
- * CourseLifecycleHeader — displays lifecycle progress bar (5 stages) and warnings bar.
- * Lifecycle stage is computed purely from frontend data — no extra API calls.
+ * CourseLifecycleHeader — renders the backend-derived operational state for
+ * the Course Offering Cockpit (ADR 0013): lifecycle stage, readiness
+ * blockers, and permission-gated actions. The frontend never infers
+ * operational state; it only renders the `operational_state` contract.
  */
 import { Badge } from '@/components/ui/badge';
-import type { ClassSession, CourseOffering } from '@/types/models';
-import { AlertTriangle } from 'lucide-vue-next';
+import { Button } from '@/components/ui/button';
+import type { LifecycleStage, OperationalState } from '@/types/operational-state';
+import { AlertTriangle, CheckCircle2 } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface Props {
-    courseOffering: CourseOffering & {
-        class_sessions?: ClassSession[];
-    };
+    operationalState: OperationalState;
 }
 
 const props = defineProps<Props>();
-
-// ---- Lifecycle stage computation ----
-type LifecycleStage = 'setup' | 'registration' | 'teaching' | 'grading' | 'completed' | 'cancelled';
-
-const lifecycleStage = computed<LifecycleStage>(() => {
-    const status = props.courseOffering.course_status;
-    if (status === 'cancelled') return 'cancelled';
-    if (status === 'completed') return 'completed';
-
-    const sessions = props.courseOffering.class_sessions || [];
-    const allCompleted = sessions.length > 0 && sessions.every((s) => s.status === 'completed');
-    if (allCompleted) return 'grading';
-
-    const hasStarted = sessions.some((s) => s.status === 'in_progress' || s.status === 'completed');
-    if (hasStarted) return 'teaching';
-
-    // Has sessions scheduled but not started, or enrollment > 0
-    if (sessions.length > 0 || props.courseOffering.current_enrollment > 0) return 'registration';
-
-    return 'setup';
-});
 
 const stages: { key: LifecycleStage; label: string }[] = [
     { key: 'setup', label: 'Setup' },
@@ -54,6 +34,8 @@ const stageOrder: Record<LifecycleStage, number> = {
     cancelled: -1,
 };
 
+const lifecycleStage = computed<LifecycleStage>(() => props.operationalState.lifecycle_stage);
+
 const currentStageIndex = computed(() => stageOrder[lifecycleStage.value] ?? 0);
 
 const getStageState = (stageKey: LifecycleStage): 'completed' | 'active' | 'pending' => {
@@ -66,54 +48,26 @@ const getStageState = (stageKey: LifecycleStage): 'completed' | 'active' | 'pend
 };
 
 const sessionProgressText = computed(() => {
-    const sessions = props.courseOffering.class_sessions || [];
-    if (sessions.length === 0) return null;
-    const completedCount = sessions.filter((s) => s.status === 'completed').length;
+    const { total, completed } = props.operationalState.session_progress;
+    if (total === 0) return null;
     if (lifecycleStage.value === 'teaching' || lifecycleStage.value === 'grading') {
-        return `${completedCount}/${sessions.length} sessions completed`;
+        return `${completed}/${total} sessions completed`;
     }
     return null;
 });
 
-// ---- Warnings computation ----
-interface Warning {
-    id: string;
-    message: string;
-}
+const blockers = computed(() => props.operationalState.readiness_blockers);
 
-const warnings = computed<Warning[]>(() => {
-    const result: Warning[] = [];
-    const sessions = props.courseOffering.class_sessions || [];
+// Backend omits actions the user lacks permission for, so a missing
+// finalize action means the button must not render at all.
+const finalizeAction = computed(() => props.operationalState.available_actions.find((action) => action.action === 'finalize'));
 
-    // Sessions without attendance
-    const sessionsWithoutAttendance = sessions.filter((s) => s.status === 'completed' && (s.attendance_percentage === null || s.attendance_percentage === 0));
-    if (sessionsWithoutAttendance.length > 0) {
-        result.push({
-            id: 'missing-attendance',
-            message: `${sessionsWithoutAttendance.length} session(s) completed without attendance records`,
-        });
-    }
-
-    // Survey not created (only warn during/after teaching)
-    const hasStartedTeaching = sessions.some((s) => s.status === 'in_progress' || s.status === 'completed');
-    const hasSurvey = props.courseOffering.form_targets && props.courseOffering.form_targets.length > 0;
-    if (hasStartedTeaching && !hasSurvey) {
-        result.push({
-            id: 'no-survey',
-            message: 'Course survey not yet created',
-        });
-    }
-
-    // All sessions completed but course not finalized
-    const allCompleted = sessions.length > 0 && sessions.every((s) => s.status === 'completed');
-    if (allCompleted && props.courseOffering.course_status !== 'completed') {
-        result.push({
-            id: 'not-finalized',
-            message: 'All sessions completed — ready to mark course as completed',
-        });
-    }
-
-    return result;
+const finalizeBlockedExplanation = computed(() => {
+    if (!finalizeAction.value || finalizeAction.value.allowed) return null;
+    const messages = blockers.value
+        .filter((blocker) => finalizeAction.value!.blocked_by.includes(blocker.code))
+        .map((blocker) => blocker.message);
+    return messages.join(' · ');
 });
 </script>
 
@@ -181,14 +135,51 @@ const warnings = computed<Warning[]>(() => {
             </div>
         </div>
 
-        <!-- Warnings Bar (hidden when no warnings) -->
-        <div v-if="warnings.length > 0" class="rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-900/20">
-            <div class="flex flex-col gap-2">
-                <div v-for="warning in warnings" :key="warning.id" class="flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
-                    <AlertTriangle class="h-4 w-4 shrink-0 text-yellow-600" />
-                    <span>{{ warning.message }}</span>
+        <!-- Readiness Blockers + Finalize (blocked) -->
+        <div v-if="blockers.length > 0" class="rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-900/20">
+            <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div class="flex min-w-0 flex-col gap-2.5">
+                    <div v-for="blocker in blockers" :key="blocker.code" class="text-sm text-yellow-800 dark:text-yellow-200">
+                        <div class="flex items-center gap-2">
+                            <AlertTriangle class="h-4 w-4 shrink-0 text-yellow-600" />
+                            <span>{{ blocker.message }}</span>
+                        </div>
+                        <div v-if="blocker.references.length > 0" class="mt-1.5 ml-6 flex flex-wrap gap-1.5">
+                            <Badge
+                                v-for="reference in blocker.references"
+                                :key="`${reference.type}-${reference.id}`"
+                                variant="outline"
+                                class="border-yellow-300 bg-yellow-100/60 text-xs font-normal text-yellow-800 dark:border-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-200"
+                            >
+                                {{ reference.label }}
+                            </Badge>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="finalizeAction" class="flex shrink-0 flex-col items-start gap-1 md:items-end">
+                    <Button size="sm" :disabled="!finalizeAction.allowed" :title="finalizeBlockedExplanation ?? undefined">
+                        {{ finalizeAction.label }}
+                    </Button>
+                    <p v-if="!finalizeAction.allowed" class="max-w-60 text-right text-xs text-yellow-700 dark:text-yellow-300">
+                        Resolve the readiness blockers to finalize this course.
+                    </p>
                 </div>
             </div>
+        </div>
+
+        <!-- Ready to finalize -->
+        <div
+            v-else-if="finalizeAction"
+            class="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20"
+        >
+            <div class="flex items-center gap-2 text-sm text-green-800 dark:text-green-200">
+                <CheckCircle2 class="h-4 w-4 shrink-0 text-green-600" />
+                <span>No readiness blockers — this course can be finalized.</span>
+            </div>
+            <Button size="sm" :disabled="!finalizeAction.allowed">
+                {{ finalizeAction.label }}
+            </Button>
         </div>
     </div>
 </template>
