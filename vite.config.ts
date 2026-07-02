@@ -22,16 +22,20 @@ export default defineConfig(({ mode }) => {
         corsOrigins.push(appUrl);
     }
 
-    let hmr: { host: string; protocol?: 'ws' | 'wss'; clientPort?: number } = {
+    // Local http://localhost:8000 — page via Caddy, HMR websocket direct on VITE_PORT.
+    // HTTPS tunnel (APP_URL=https://…) — single origin through Caddy on 443 (wss + proxied assets).
+    let hmr: { host: string; port?: number; protocol?: 'ws' | 'wss'; clientPort?: number } = {
         host: 'localhost',
+        port: vitePort,
+        clientPort: vitePort,
     };
 
-    if (appUrl) {
-        const { hostname, port } = new URL(appUrl);
+    if (appUrl && isHttpsApp) {
+        const { hostname } = new URL(appUrl);
         hmr = {
             host: hostname,
-            protocol: isHttpsApp ? 'wss' : 'ws',
-            clientPort: isHttpsApp ? 443 : port ? Number(port) : 80,
+            protocol: 'wss',
+            clientPort: 443,
         };
     }
 
@@ -56,7 +60,8 @@ export default defineConfig(({ mode }) => {
             host: '0.0.0.0',
             port: vitePort,
             strictPort: true,
-            ...(appUrl ? { origin: appUrl } : {}),
+            // origin only for HTTPS tunnel — avoids /vendor/* 404 on localhost:8000
+            ...(appUrl && isHttpsApp ? { origin: appUrl } : {}),
             hmr,
             cors: {
                 origin: corsOrigins,

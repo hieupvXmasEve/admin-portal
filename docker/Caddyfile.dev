@@ -29,9 +29,16 @@
 	# Proxy Vite dev server through the app port so HMR works via Cloudflare Tunnel
 	# (single origin — no separate vite subdomain or CORS issues).
 	@vite {
-		path /@vite/* /@fs/* /@id/* /resources/* /node_modules/* /__vite_ping
+		path /@vite/* /@fs/* /@id/* /resources/* /node_modules/* /vendor/* /__vite_ping
 	}
 	reverse_proxy @vite http://vite:{$VITE_PORT:5173}
+
+	# Vite HMR websocket (tunnel / single-origin mode hits port 443 or 8000)
+	@hmr {
+		header Connection *Upgrade*
+		header Upgrade websocket
+	}
+	reverse_proxy @hmr http://vite:{$VITE_PORT:5173}
 
 	# Set document root to Laravel's public directory
 	root * /app/public

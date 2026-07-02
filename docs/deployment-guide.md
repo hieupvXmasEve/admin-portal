@@ -666,11 +666,36 @@ cd /www/wwwroot/x.metropolia.edu.vn/asia-admin-portal
 DEPLOY_ENVIRONMENT=production DEPLOY_RUN_MIGRATIONS=false bash scripts/deploy-ubuntu.sh
 ```
 
-## 16) MCP Server (ChatGPT / Claude connector)
+## 16) Host Docker Deploy (recommended for aaPanel / Cloudflare)
+
+For the simplest server setup — **one exposed port, domain points at Docker** — use the host compose stack instead of bare PHP on aaPanel:
+
+```bash
+cp .env.example .env
+# APP_ENV=production, APP_DEBUG=false, APP_URL=https://your-domain.com, TRUSTED_PROXIES=*
+
+./scripts/host.sh deploy
+```
+
+Compose: [`docker/docker-compose.host.yml`](/Users/hunt2412/hieupvdev/project/swinx/docker/docker-compose.host.yml)
+
+Proxy snippet: [`docker/nginx-proxy-snippet.conf`](/Users/hunt2412/hieupvdev/project/swinx/docker/nginx-proxy-snippet.conf)
+
+| Step | Action |
+| --- | --- |
+| 1 | `./scripts/host.sh deploy` — builds app, db, redis, queue, scheduler |
+| 2 | aaPanel nginx `proxy_pass http://127.0.0.1:8080` (or set `HOST_APP_PORT`) |
+| 3 | Cloudflare orange cloud → server IP; fix WAF if subdomain returns 403 |
+
+FrankenPHP inside the container handles Laravel routes including `/.well-known/*` (MCP OAuth) — no aaPanel `.well-known` `try_files` patch needed.
+
+Commands: `./scripts/host.sh {deploy|start|stop|restart|logs|status|artisan|backup|health}`
+
+## 17) MCP Server (ChatGPT / Claude connector)
 
 The staff MCP endpoint is `POST /mcp/swinx` with OAuth discovery at `/.well-known/oauth-authorization-server`.
 
-New clones on aaPanel/nginx + Cloudflare often need **server-side** fixes (nginx `.well-known` routing, Passport keys, Cloudflare WAF) that are not part of `git pull`. See the dedicated runbook:
+New clones on **bare aaPanel PHP** often need manual nginx/Passport fixes. **Host Docker mode avoids most of them.** See:
 
 - [MCP Server Deployment & Troubleshooting](mcp-server-deployment.md)
 

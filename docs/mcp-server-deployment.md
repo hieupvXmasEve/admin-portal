@@ -6,7 +6,9 @@ Status: Operational runbook
 
 ## 1) Scope
 
-This guide documents how to enable and verify the **Controlled MCP server** (`POST /mcp/swinx`) when cloning or deploying Swinx to a new Ubuntu host (aaPanel/nginx + PHP 8.4) behind Cloudflare.
+This guide documents how to enable and verify the **Controlled MCP server** (`POST /mcp/swinx`) when cloning or deploying Swinx to a new Ubuntu host behind Cloudflare.
+
+**Recommended:** use **host Docker mode** (`./scripts/host.sh deploy`) so FrankenPHP handles `/.well-known/*` inside the container — see [Deployment Guide §16](deployment-guide.md). The sections below on aaPanel nginx `try_files` apply only to **bare PHP** deployments without Docker.
 
 It covers server-side fixes only. The MCP OAuth surface is implemented in application code (`routes/web.php`, `routes/ai.php`, Passport, `config/cors.php`). Most production failures are **infrastructure configuration**, not missing application features.
 
@@ -28,9 +30,24 @@ Known deployments (same server `157.10.186.103`):
 
 ---
 
-## 2) First-time checklist (new clone)
+## 2) Host Docker checklist (preferred)
 
-Run from the deployed app root (not Docker on these hosts — use host `php84`):
+```bash
+cp .env.example .env
+# APP_ENV=production, APP_DEBUG=false, APP_URL=https://<domain>, TRUSTED_PROXIES=*
+
+./scripts/host.sh deploy
+```
+
+Point aaPanel nginx at `http://127.0.0.1:8080` using `docker/nginx-proxy-snippet.conf`. Passport keys and OAuth table migrations run automatically on container start.
+
+Skip to §4 for verification. If Cloudflare returns 403, see §6.
+
+---
+
+## 3) First-time checklist (bare PHP / aaPanel, no Docker)
+
+Run from the deployed app root (use host `php84`):
 
 ```bash
 cd /www/wwwroot/<domain>/<app-path>
@@ -59,11 +76,11 @@ php84 artisan optimize:clear
 
 ---
 
-## 3) Verification commands
+## 4) Verification commands
 
 Replace `<domain>` with your hostname. All checks should pass before testing ChatGPT.
 
-### 3.1 External (through Cloudflare)
+### 4.1 External (through Cloudflare)
 
 ```bash
 # OAuth discovery — must be HTTP 200 + application/json (NOT 403 HTML, NOT 404)
@@ -100,7 +117,7 @@ Expected:
 | `POST /oauth/register` | `201` + `client_id` |
 | CORS with `Origin: https://chatgpt.com` | `access-control-allow-origin: https://chatgpt.com` |
 
-### 3.2 Origin-only (bypass Cloudflare — SSH on server)
+### 4.2 Origin-only (bypass Cloudflare — SSH on server)
 
 Use this to tell **server vs Cloudflare** failures apart:
 
@@ -115,7 +132,7 @@ curl -skI "https://127.0.0.1/.well-known/oauth-authorization-server" \
 
 ---
 
-## 4) nginx (aaPanel): `.well-known` returns 404 with JSON body
+## 5) nginx (aaPanel bare PHP): `.well-known` returns 404 with JSON body
 
 ### Symptom
 
@@ -165,7 +182,7 @@ Re-run §3.1 — discovery must return **200**.
 
 ---
 
-## 5) Cloudflare: entire subdomain returns 403
+## 6) Cloudflare: entire subdomain returns 403
 
 ### Symptom
 
@@ -200,7 +217,7 @@ curl -sI "https://<domain>/.well-known/oauth-authorization-server" | head -3
 
 ---
 
-## 6) ChatGPT-specific errors
+## 7) ChatGPT-specific errors
 
 | User-visible error | Typical root cause | Fix section |
 | --- | --- | --- |
@@ -214,7 +231,7 @@ curl -sI "https://<domain>/.well-known/oauth-authorization-server" | head -3
 
 ---
 
-## 7) Google OAuth (staff login before MCP consent)
+## 8) Google OAuth (staff login before MCP consent)
 
 MCP OAuth consent requires an authenticated staff session (often via Google SSO).
 
@@ -235,7 +252,7 @@ Use one consistent hostname end-to-end (no mixing `localhost` vs `127.0.0.1` in 
 
 ---
 
-## 8) Quick diagnosis flow
+## 9) Quick diagnosis flow
 
 ```text
 ChatGPT connector fails
@@ -258,7 +275,7 @@ curl /.well-known/oauth-authorization-server (external)
 
 ---
 
-## 9) Reference: automated tests in repo
+## 10) Reference: automated tests in repo
 
 Feature tests lock the ChatGPT connector contract:
 
@@ -274,7 +291,7 @@ Run in Docker dev:
 
 ---
 
-## 10) Related docs
+## 11) Related docs
 
 - [Deployment Guide](deployment-guide.md) — CI/CD paths and branch → server mapping
 - [plans/swinx-mcp-server-v1.notes.md](../plans/swinx-mcp-server-v1.notes.md) — spike findings and integration blockers

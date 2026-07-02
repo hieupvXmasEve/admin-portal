@@ -4,9 +4,12 @@ set -eu
 
 echo "Starting FrankenPHP production container..."
 
-if [ -z "${SERVER_NAME:-}" ]; then
-    echo "SERVER_NAME must be set."
-    exit 1
+# ACME/TLS Caddyfile.prod uses {env.SERVER_NAME}; Caddyfile.proxy listens on :80 only.
+if grep -q '{env.SERVER_NAME}' /etc/caddy/Caddyfile 2>/dev/null; then
+    if [ -z "${SERVER_NAME:-}" ]; then
+        echo "SERVER_NAME must be set for TLS Caddyfile."
+        exit 1
+    fi
 fi
 
 if [ -n "${DB_HOST:-}" ]; then
@@ -35,6 +38,11 @@ php artisan package:discover --ansi
 
 if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
     php artisan migrate --force
+fi
+
+if [ ! -f storage/oauth-private.key ] || [ ! -f storage/oauth-public.key ]; then
+    echo "Generating Passport OAuth keys..."
+    php artisan passport:keys --force
 fi
 
 php artisan ziggy:generate || true
