@@ -17,6 +17,7 @@ use App\Services\PermissionService;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 
 use function Pest\Laravel\actingAs;
 
@@ -110,7 +111,7 @@ function mapOperationalCanvasCourse(CourseOffering $courseOffering, string $sync
     ]);
 }
 
-function getOperationalState(object $context, CourseOffering $courseOffering)
+function getOperationalState(object $context, CourseOffering $courseOffering): TestResponse
 {
     return actingAs($context->user)
         ->withSession(['current_campus_id' => $context->campus->id])

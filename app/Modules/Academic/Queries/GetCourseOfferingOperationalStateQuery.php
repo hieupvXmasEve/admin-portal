@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Queries;
 
+use App\Models\Attendance;
+use App\Models\CanvasCourseMapping;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\User;
@@ -123,7 +125,7 @@ class GetCourseOfferingOperationalStateQuery
         $autoSystemOnly = $sessions->filter(
             fn (ClassSession $session): bool => $session->attendances->isNotEmpty()
                 && $session->attendances->every(
-                    fn ($attendance): bool => $attendance->recording_method === 'auto_system'
+                    fn (Attendance $attendance): bool => $attendance->recording_method === 'auto_system'
                 )
         );
         if ($autoSystemOnly->isNotEmpty()) {
@@ -137,19 +139,22 @@ class GetCourseOfferingOperationalStateQuery
         // Canvas rule (ADR 0013): a mapped-but-unsynced offering blocks
         // completion. pending / ignored mappings and unmapped offerings don't.
         if (! $courseOffering->is_canvas_synced) {
-            $mappedMapping = $courseOffering->canvasCourseMappings()
+            $mappedMappings = $courseOffering->canvasCourseMappings()
                 ->where('sync_status', 'mapped')
-                ->first(['id', 'course_offering_id', 'canvas_course_name', 'canvas_course_id']);
+                ->get(['id', 'course_offering_id', 'canvas_course_name', 'canvas_course_id']);
 
-            if ($mappedMapping !== null) {
+            if ($mappedMappings->isNotEmpty()) {
                 $blockers[] = [
                     'code' => self::BLOCKER_CANVAS_UNSYNCED,
                     'message' => 'Canvas-mapped but not synced — sync grades from Canvas before finalizing',
-                    'references' => [[
-                        'type' => 'canvas_course_mapping',
-                        'id' => $mappedMapping->id,
-                        'label' => $mappedMapping->canvas_course_name ?? $mappedMapping->canvas_course_id,
-                    ]],
+                    'references' => $mappedMappings
+                        ->map(fn (CanvasCourseMapping $mapping): array => [
+                            'type' => 'canvas_course_mapping',
+                            'id' => $mapping->id,
+                            'label' => $mapping->canvas_course_name ?? $mapping->canvas_course_id,
+                        ])
+                        ->values()
+                        ->all(),
                 ];
             }
         }
