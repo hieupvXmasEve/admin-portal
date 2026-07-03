@@ -61,6 +61,11 @@ class CourseOfferingRoutes
     // Class sessions / room management
     public const API_CHANGE_ROOM = 'api.course-offerings.change-room';
 
+    // Canvas grade sync (issue 10) — preview (dry-run) and apply
+    public const API_SYNC_GRADES_PREVIEW = 'api.course-offerings.sync-grades.preview';
+
+    public const API_SYNC_GRADES_APPLY = 'api.course-offerings.sync-grades';
+
     // Route Prefixes
     public const WEB_PREFIX = 'course-offerings.';
 

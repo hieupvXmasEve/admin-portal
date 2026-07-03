@@ -2,6 +2,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -9,10 +10,12 @@ import HeadlessToastWithProps from '@/components/ui/sonner/HeadlessToastWithProp
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApi } from '@/composables/useApiRequest';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
+import CanvasSyncPreviewDialog from '@/pages/course-offerings/components/CanvasSyncPreviewDialog.vue';
 import type { CourseOffering } from '@/types/models';
+import type { OperationalState } from '@/types/operational-state';
 import { formatSubmissionTypes } from '@/utils/canvasGradeFormatter';
 import { Link, router } from '@inertiajs/vue3';
-import { BarChart3, BookOpen, Calculator, Calendar, User, Users } from 'lucide-vue-next';
+import { BarChart3, BookOpen, Calculator, Calendar, RefreshCw, User, Users } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
@@ -100,6 +103,7 @@ export interface ScoresData {
 interface Props {
     courseOffering: CourseOffering;
     scoresData?: ScoresData;
+    operationalState?: OperationalState;
 }
 
 const props = defineProps<Props>();
@@ -108,6 +112,35 @@ const { showConfirmDialog } = useGlobalConfirmDialog();
 const isRecalculating = ref(false);
 
 const statusFilter = ref<string>('all');
+
+// ---- Sync from Canvas (issue 10) ----
+// operational_state.available_actions is the backend contract (ADR 0013) —
+// the tab never infers "mapped + not completed + permission" itself.
+const canSyncGrades = computed(() => (props.operationalState?.available_actions ?? []).some((action) => action.action === 'sync_grades'));
+const selectedStudentIds = ref<number[]>([]);
+const isSyncDialogOpen = ref(false);
+
+const isAllSelected = computed(() => filteredScoresGrid.value.length > 0 && selectedStudentIds.value.length === filteredScoresGrid.value.length);
+const isSomeSelected = computed(() => selectedStudentIds.value.length > 0 && !isAllSelected.value);
+
+const toggleSelectAll = (checked: boolean | 'indeterminate') => {
+    selectedStudentIds.value = checked === true ? filteredScoresGrid.value.map((s) => s.id) : [];
+};
+
+const toggleStudentSelection = (studentId: number, checked: boolean) => {
+    selectedStudentIds.value = checked ? [...selectedStudentIds.value, studentId] : selectedStudentIds.value.filter((id) => id !== studentId);
+};
+
+const openSyncDialog = () => {
+    if (selectedStudentIds.value.length === 0) return;
+    isSyncDialogOpen.value = true;
+};
+
+const onSynced = () => {
+    toast.success('Canvas grades synced successfully');
+    selectedStudentIds.value = [];
+    router.reload({ only: ['scoresData'] });
+};
 
 const filteredScoresGrid = computed(() => {
     if (!props.scoresData) return [];
@@ -262,6 +295,14 @@ const recalculateCourseResult = () => {
                 </Button>
             </div>
 
+            <!-- Sync from Canvas (non-completed, Canvas-mapped offerings — ADR 0014) -->
+            <div v-if="canSyncGrades" class="flex justify-end">
+                <Button variant="outline" :disabled="selectedStudentIds.length === 0" @click="openSyncDialog">
+                    <RefreshCw class="mr-2 h-4 w-4" />
+                    Sync from Canvas{{ selectedStudentIds.length > 0 ? ` (${selectedStudentIds.length})` : '' }}
+                </Button>
+            </div>
+
             <!-- Statistics Cards -->
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-5">
                 <Card>
@@ -401,7 +442,10 @@ const recalculateCourseResult = () => {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead class="sticky left-0 z-10 min-w-[100px] bg-white dark:bg-gray-950">Student</TableHead>
+                                    <TableHead v-if="canSyncGrades" class="sticky left-0 z-10 w-10 bg-white dark:bg-gray-950">
+                                        <Checkbox :model-value="isAllSelected" :indeterminate="isSomeSelected" @update:model-value="toggleSelectAll" />
+                                    </TableHead>
+                                    <TableHead class="sticky z-10 min-w-[100px] bg-white dark:bg-gray-950" :class="canSyncGrades ? 'left-10' : 'left-0'">Student</TableHead>
                                     <template v-for="component in scoresData.assessment_components" :key="`component-${component.id}`">
                                         <template v-if="component.type !== 'attendance'">
                                             <TableHead v-for="detail in detailsByComponent[component.id] || []" :key="detail.id" class="min-w-[140px] text-center">
@@ -433,7 +477,13 @@ const recalculateCourseResult = () => {
                             </TableHeader>
                             <TableBody>
                                 <TableRow v-for="student in filteredScoresGrid" :key="student.student_id">
-                                    <TableCell class="sticky left-0 z-10 bg-white dark:bg-gray-950">
+                                    <TableCell v-if="canSyncGrades" class="sticky left-0 z-10 bg-white dark:bg-gray-950">
+                                        <Checkbox
+                                            :model-value="selectedStudentIds.includes(student.id)"
+                                            @update:model-value="(checked) => toggleStudentSelection(student.id, checked === true)"
+                                        />
+                                    </TableCell>
+                                    <TableCell class="sticky z-10 bg-white dark:bg-gray-950" :class="canSyncGrades ? 'left-10' : 'left-0'">
                                         <div class="space-y-1">
                                             <div class="font-medium">
                                                 <Link :href="route('students.academic-summary.scores', { student: student.id })" class="text-primary hover:underline">
@@ -507,5 +557,13 @@ const recalculateCourseResult = () => {
                 </CardContent>
             </Card>
         </template>
+
+        <CanvasSyncPreviewDialog
+            v-if="canSyncGrades"
+            v-model:open="isSyncDialogOpen"
+            :course-offering-id="courseOffering.id"
+            :student-ids="selectedStudentIds"
+            @synced="onSynced"
+        />
     </div>
 </template>

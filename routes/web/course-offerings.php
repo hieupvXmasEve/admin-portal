@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Constants\CourseOfferingRoutes;
 use App\Http\Controllers\Api\ClassSessionController;
 use App\Http\Controllers\Web\CourseOfferingController;
+use App\Modules\Academic\Http\Web\Canvas\PreviewCanvasGradeSyncController;
+use App\Modules\Academic\Http\Web\Canvas\SyncCanvasGradeController;
 use App\Modules\Academic\Http\Web\FinalizeCourseOfferingController;
 use App\Modules\Academic\Http\Web\RecalculateCourseOfferingController;
 use App\Modules\Academic\Http\Web\RecordClassSessionAttendanceController;
@@ -139,6 +141,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{courseOffering}/change-room', [CourseOfferingController::class, 'changeRoom'])
             ->middleware('can:edit_course_offering')
             ->name(CourseOfferingRoutes::API_CHANGE_ROOM);
+
+        // ============================================
+        // Canvas Grade Sync (cockpit Scores tab, issue 10)
+        // ============================================
+        Route::post('/{courseOffering}/sync-grades/preview', PreviewCanvasGradeSyncController::class)
+            ->middleware('can:sync_course_grades')
+            ->name(CourseOfferingRoutes::API_SYNC_GRADES_PREVIEW);
+
+        Route::post('/{courseOffering}/sync-grades', SyncCanvasGradeController::class)
+            ->middleware('can:sync_course_grades')
+            ->name(CourseOfferingRoutes::API_SYNC_GRADES_APPLY);
 
         // ============================================
         // Class Session Management

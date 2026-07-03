@@ -116,6 +116,9 @@ return [
             'edit_course_offering' => 'edit_course_offering',
             'complete_course_offering' => 'complete_course_offering',
             'recalculate_course_offering' => 'recalculate_course_offering',
+            // Cockpit Scores tab "Sync from Canvas" (preview + apply). Distinct from
+            // 'sync_canvas_courses' (Canvas-integration admin bulk sync).
+            'sync_course_grades' => 'sync_course_grades',
             'delete_course_offering' => 'delete_course_offering',
             'add_student_registration' => 'add_student_registration',
             'delete_student_registration' => 'delete_student_registration',

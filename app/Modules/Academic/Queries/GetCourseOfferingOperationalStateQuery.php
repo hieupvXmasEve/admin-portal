@@ -32,6 +32,8 @@ class GetCourseOfferingOperationalStateQuery
 
     public const ACTION_RECALCULATE = 'recalculate';
 
+    public const ACTION_SYNC_GRADES = 'sync_grades';
+
     public const ATTENDANCE_STATUS_RECORDED = 'recorded';
 
     public const ATTENDANCE_STATUS_NOT_RECORDED = 'not_recorded';
@@ -77,7 +79,7 @@ class GetCourseOfferingOperationalStateQuery
                 'completed' => $sessions->where('status', 'completed')->count(),
             ],
             'readiness_blockers' => $readinessBlockers,
-            'available_actions' => self::deriveAvailableActions($user, $lifecycleStage, $readinessBlockers),
+            'available_actions' => self::deriveAvailableActions($user, $lifecycleStage, $readinessBlockers, self::hasMappedCanvasCourse($courseOffering)),
             'session_attendance_status' => self::deriveSessionAttendanceStatus($sessions),
         ];
     }
@@ -195,13 +197,15 @@ class GetCourseOfferingOperationalStateQuery
      * disable and explain; actions the user lacks permission for are omitted
      * entirely. Finalize applies to non-terminal offerings (gated by
      * complete_course_offering); Recalculate applies to already-completed
-     * offerings (gated by the stricter recalculate_course_offering).
+     * offerings (gated by the stricter recalculate_course_offering). Sync
+     * grades (ADR 0014) applies only to non-terminal, Canvas-mapped
+     * offerings — post-completion, grades flow only through Recalculate.
      * Cancelled offerings never expose an action.
      *
      * @param  array<int, array{code: string, message: string, references: array<int, array{type: string, id: int, label: string}>}>  $readinessBlockers
      * @return array<int, array{action: string, label: string, allowed: bool, blocked_by: array<int, string>}>
      */
-    private static function deriveAvailableActions(User $user, string $lifecycleStage, array $readinessBlockers): array
+    private static function deriveAvailableActions(User $user, string $lifecycleStage, array $readinessBlockers, bool $hasMappedCanvasCourse): array
     {
         if ($lifecycleStage === 'cancelled') {
             return [];
@@ -222,16 +226,34 @@ class GetCourseOfferingOperationalStateQuery
             ]];
         }
 
-        if (! $user->can('complete_course_offering')) {
-            return [];
+        $actions = [];
+
+        if ($user->can('complete_course_offering')) {
+            $actions[] = [
+                'action' => self::ACTION_FINALIZE,
+                'label' => 'Finalize course',
+                'allowed' => $blockerCodes === [],
+                'blocked_by' => $blockerCodes,
+            ];
         }
 
-        return [[
-            'action' => self::ACTION_FINALIZE,
-            'label' => 'Finalize course',
-            'allowed' => $blockerCodes === [],
-            'blocked_by' => $blockerCodes,
-        ]];
+        if ($hasMappedCanvasCourse && $user->can('sync_course_grades')) {
+            $actions[] = [
+                'action' => self::ACTION_SYNC_GRADES,
+                'label' => 'Sync from Canvas',
+                'allowed' => true,
+                'blocked_by' => [],
+            ];
+        }
+
+        return $actions;
+    }
+
+    private static function hasMappedCanvasCourse(CourseOffering $courseOffering): bool
+    {
+        return $courseOffering->canvasCourseMappings()
+            ->where('sync_status', 'mapped')
+            ->exists();
     }
 
     /**

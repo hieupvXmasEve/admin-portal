@@ -184,7 +184,7 @@ const goBack = () => window.history.back();
                     </div>
                 </template>
                 <template #default="{ reloading }">
-                    <ScoresTab :course-offering="courseOffering" :scores-data="scoresData" :class="{ 'opacity-50': reloading }" />
+                    <ScoresTab :course-offering="courseOffering" :scores-data="scoresData" :operational-state="operational_state" :class="{ 'opacity-50': reloading }" />
                 </template>
             </Deferred>
         </TabsContent>

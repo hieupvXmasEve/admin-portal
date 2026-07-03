@@ -10,10 +10,12 @@ use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CanvasCourseMapping;
+use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\CurriculumUnit;
 use App\Models\Student;
 use App\Models\Unit;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -24,194 +26,72 @@ class CanvasGradeSyncService
     ) {}
 
     /**
-     * Sync grades for all students in a course offering
-     * Only syncs students that match between local and Canvas (by SIS User ID or SIS Login ID)
+     * Sync grades for all (or a selected subset of) students in a course offering.
+     * Only syncs students that match between local and Canvas (by SIS User ID or SIS Login ID).
+     *
+     * @param  array<int>|null  $studentIds  Restrict the write to these local student IDs; null syncs the whole roster.
      */
-    public function syncCourseGrades(CanvasCourseMapping $mapping): array
+    public function syncCourseGrades(CanvasCourseMapping $mapping, ?array $studentIds = null): array
     {
-        // Increase execution time for bulk operations
         $originalLimit = ini_get('max_execution_time');
         set_time_limit(300); // 5 minutes for bulk grade sync
 
         try {
-            return $this->performSync($mapping);
+            return $this->performSync($mapping, $studentIds);
         } finally {
-            // Restore original limit
             set_time_limit((int) $originalLimit);
         }
     }
 
-    private function performSync(CanvasCourseMapping $mapping): array
+    /**
+     * Dry-run preview of what syncCourseGrades() would change for the selected students.
+     * Never writes to the database and never fires model events.
+     *
+     * @param  array<int>  $studentIds
+     */
+    public function previewCourseGrades(CanvasCourseMapping $mapping, array $studentIds): array
     {
-        return DB::transaction(function () use ($mapping) {
-            // Load courseOffering with unit for credit_hours
-            $courseOffering = $mapping->courseOffering()->with('unit')->first();
+        $originalLimit = ini_get('max_execution_time');
+        set_time_limit(300);
 
-            Log::info('========== GRADE SYNC DEBUG START ==========');
-            Log::info('Canvas Course Mapping', [
-                'mapping_id' => $mapping->id,
-                'canvas_course_id' => $mapping->canvas_course_id,
-                'canvas_course_name' => $mapping->canvas_course_name,
-                'course_offering_id' => $courseOffering?->id,
-            ]);
+        try {
+            return $this->performPreview($mapping, $studentIds);
+        } finally {
+            set_time_limit((int) $originalLimit);
+        }
+    }
 
-            if (! $courseOffering || ! $courseOffering->syllabusTemplate) {
-                throw new \Exception('Course offering or syllabus not found');
+    /**
+     * @param  array<int>|null  $studentIds
+     * @return array{success: bool, students_synced: int, students_skipped: int, total_students: int, students_processed: array<int, array<string, mixed>>, errors: array<int, array<string, mixed>>}
+     */
+    private function performSync(CanvasCourseMapping $mapping, ?array $studentIds): array
+    {
+        return DB::transaction(function () use ($mapping, $studentIds) {
+            $context = $this->buildSyncContext($mapping, $studentIds);
+            if (isset($context['early_return'])) {
+                return $context['early_return'];
             }
 
-            // Get local enrolled students (registered, confirmed, or completed)
-            $enrollments = CourseRegistration::where('course_offering_id', $courseOffering->id)
-                ->whereIn('registration_status', ['registered', 'confirmed', 'completed'])
-                ->with('student')
-                ->get();
-
-            if ($enrollments->isEmpty()) {
-                return [
-                    'success' => true,
-                    'message' => 'No enrolled students found',
-                    'students_synced' => 0,
-                ];
-            }
-
-            // Get Canvas students
-            $canvasStudents = $this->apiService->getCourseStudents(
-                $mapping->canvasIntegration,
-                $mapping->canvas_course_id
-            );
-
-            Log::info('Fetched Canvas students for grade sync', [
-                'canvas_course_id' => $mapping->canvas_course_id,
-                'canvas_students_count' => count($canvasStudents),
-                'local_enrollments_count' => $enrollments->count(),
-                'sample_canvas_student' => $canvasStudents[0] ?? null,
-            ]);
-
-            // Build Canvas student lookup by SIS User ID and SIS Login ID
-            $canvasStudentMap = [];
-            foreach ($canvasStudents as $canvasStudent) {
-                $sisUserId = $canvasStudent['sis_user_id'] ?? null;
-                $sisLoginId = $canvasStudent['login_id'] ?? null;
-
-                if ($sisUserId) {
-                    $canvasStudentMap[strtoupper(trim((string) $sisUserId))] = $canvasStudent;
-                }
-                if ($sisLoginId && ! isset($canvasStudentMap[$sisLoginId])) {
-                    $canvasStudentMap[strtoupper(trim((string) $sisLoginId))] = $canvasStudent;
-                }
-            }
-
-            Log::info('Built Canvas student map', [
-                'map_size' => count($canvasStudentMap),
-                'map_keys_sample' => array_slice(array_keys($canvasStudentMap), 0, 5),
-                'first_canvas_student_sample' => $canvasStudents[0] ?? null,
-            ]);
-
-            Log::info('Local students fetched for grade sync', [
-                'total_enrollments' => $enrollments->count(),
-            ]);
-
-            // Get all Canvas-synced assignments to build filter list
-            $syllabusTemplate = $courseOffering->syllabusTemplate;
-            $canvasComponents = AssessmentComponent::where('syllabus_template_id', $syllabusTemplate->id)
-                ->where('is_canvas_synced', true)
-                ->get();
-
-            if ($canvasComponents->isEmpty()) {
-                throw new \Exception('No Canvas components found. Please sync assignments first.');
-            }
-
-            // Collect all Canvas assignment IDs
-            $assignmentIds = [];
-            foreach ($canvasComponents as $component) {
-                $details = AssessmentComponentDetail::where('assessment_component_id', $component->id)
-                    ->whereNotNull('canvas_assignment_id')
-                    ->pluck('canvas_assignment_id')
-                    ->toArray();
-                $assignmentIds = array_merge($assignmentIds, $details);
-            }
-
-            Log::info('Canvas components and assignments', [
-                'components_count' => $canvasComponents->count(),
-                'total_assignment_ids' => count($assignmentIds),
-                'assignment_ids' => $assignmentIds,
-                'components_details' => $canvasComponents->map(fn ($c) => [
-                    'id' => $c->id,
-                    'name' => $c->component_name,
-                    'canvas_group_id' => $c->canvas_assignment_group_id,
-                ])->toArray(),
-            ]);
-
-            // Fetch submissions ONLY for our assignments (much faster!)
-            Log::info('Starting bulk submissions fetch...', [
-                'canvas_course_id' => $mapping->canvas_course_id,
-                'expected_students' => $enrollments->count(),
-                'assignment_ids_count' => count($assignmentIds),
-                'assignment_ids' => $assignmentIds,
-            ]);
-
-            $startTime = microtime(true);
-            $allSubmissions = $this->apiService->getAllStudentSubmissions(
-                $mapping->canvasIntegration,
-                $mapping->canvas_course_id,
-                $assignmentIds // ← FILTER BY ASSIGNMENT IDs!
-            );
-            $fetchTime = microtime(true) - $startTime;
-
-            Log::info('Bulk submissions fetched', [
-                'total_submissions' => count($allSubmissions),
-                'fetch_time_seconds' => round($fetchTime, 2),
-            ]);
-
-            // Build submission lookup: [user_id][assignment_id] => submission
-            Log::info('Building submission map...');
-            $mapStartTime = microtime(true);
-
-            $submissionMap = [];
-            foreach ($allSubmissions as $submission) {
-                $userId = (string) $submission['user_id'];
-                $assignmentId = (string) $submission['assignment_id'];
-                $submissionMap[$userId][$assignmentId] = $submission;
-            }
-
-            $mapTime = microtime(true) - $mapStartTime;
-            Log::info('Submission map built', [
-                'unique_students' => count($submissionMap),
-                'map_time_seconds' => round($mapTime, 2),
-            ]);
+            [
+                'course_offering' => $courseOffering,
+                'enrollments' => $enrollments,
+                'canvas_student_map' => $canvasStudentMap,
+                'canvas_components' => $canvasComponents,
+                'submission_map' => $submissionMap,
+            ] = $context;
 
             $synced = 0;
             $skipped = 0;
             $errors = [];
             $studentsProcessed = [];
 
-            Log::info('Starting student processing...', [
-                'total_students_to_process' => $enrollments->count(),
-            ]);
-            $processStartTime = microtime(true);
-
-            foreach ($enrollments as $index => $enrollment) {
-                if ($index % 10 === 0) {
-                    $elapsed = microtime(true) - $processStartTime;
-                    $currentMemory = memory_get_usage(true);
-                    Log::info('Processing progress', [
-                        'processed' => $index,
-                        'total' => $enrollments->count(),
-                        'elapsed_seconds' => round($elapsed, 2),
-                        'memory_mb' => round($currentMemory / 1024 / 1024, 2),
-                    ]);
-                }
+            foreach ($enrollments as $enrollment) {
                 $student = $enrollment->student;
-                // Use student_id column (e.g., "AUS15189") to match with Canvas SIS User ID
                 $studentId = strtoupper(trim((string) $student->student_id));
 
-                // Try to find Canvas student by matching student_id with SIS User ID or SIS Login ID
                 $canvasStudent = $canvasStudentMap[$studentId] ?? null;
                 if (! $canvasStudent) {
-                    Log::warning('Student not found in Canvas', [
-                        'student_id' => $student->id,
-                        'student_code' => $studentId,
-                        'available_canvas_keys' => array_keys($canvasStudentMap),
-                    ]);
                     $skipped++;
                     $studentsProcessed[] = [
                         'student_id' => $student->id,
@@ -227,14 +107,6 @@ class CanvasGradeSyncService
 
                 $canvasUserId = (string) $canvasStudent['id'];
 
-                Log::info('Matched student - syncing grades', [
-                    'local_student_id' => $student->id,
-                    'student_code' => $studentId,
-                    'canvas_user_id' => $canvasUserId,
-                    'has_submissions' => isset($submissionMap[$canvasUserId]),
-                    'submission_count' => isset($submissionMap[$canvasUserId]) ? count($submissionMap[$canvasUserId]) : 0,
-                ]);
-
                 try {
                     $result = $this->syncStudentGradesFromBulk($student, $canvasUserId, $submissionMap, $mapping, $canvasComponents);
                     $synced++;
@@ -249,7 +121,6 @@ class CanvasGradeSyncService
                         'grades_updated' => $result['updated'],
                     ];
 
-                    // Free memory: unset processed submissions for this student
                     unset($submissionMap[$canvasUserId]);
                 } catch (\Exception $e) {
                     $errors[] = [
@@ -271,19 +142,16 @@ class CanvasGradeSyncService
                 }
             }
 
-            // Free all remaining memory from bulk data
-            unset($submissionMap, $allSubmissions, $canvasStudentMap, $canvasStudents);
+            unset($submissionMap, $canvasStudentMap);
             gc_collect_cycles();
 
             Log::info('Grade sync completed', [
                 'course_offering_id' => $courseOffering->id,
+                'student_ids_filter' => $studentIds,
                 'synced' => $synced,
                 'skipped' => $skipped,
                 'errors_count' => count($errors),
-                'final_memory_mb' => round(memory_get_usage(true) / 1024 / 1024, 2),
             ]);
-
-            Log::info('========== GRADE SYNC DEBUG END ==========');
 
             return [
                 'success' => true,
@@ -297,14 +165,190 @@ class CanvasGradeSyncService
     }
 
     /**
+     * @param  array<int>  $studentIds
+     * @return array{success: bool, summary: array{total_changes: int, students_changed: int, students_unchanged: int, students_unmatched: int}, changes: array<int, array<string, mixed>>, course_totals: array<int, array<string, mixed>>, unmatched: array<int, array{student_id: int, student_code: string, student_name: string, reason: string}>}
+     */
+    private function performPreview(CanvasCourseMapping $mapping, array $studentIds): array
+    {
+        $context = $this->buildSyncContext($mapping, $studentIds);
+        if (isset($context['early_return'])) {
+            return $this->emptyPreviewResult($context['early_return']);
+        }
+
+        [
+            'course_offering' => $courseOffering,
+            'enrollments' => $enrollments,
+            'canvas_student_map' => $canvasStudentMap,
+            'canvas_components' => $canvasComponents,
+            'submission_map' => $submissionMap,
+        ] = $context;
+
+        $changes = [];
+        $courseTotals = [];
+        $unmatched = [];
+        $studentsWithChanges = [];
+        $studentsUnchanged = 0;
+
+        foreach ($enrollments as $enrollment) {
+            $student = $enrollment->student;
+            $studentCode = strtoupper(trim((string) $student->student_id));
+
+            $canvasStudent = $canvasStudentMap[$studentCode] ?? null;
+            if (! $canvasStudent) {
+                $unmatched[] = [
+                    'student_id' => $student->id,
+                    'student_code' => $studentCode,
+                    'student_name' => $student->full_name ?? $student->id,
+                    'reason' => 'Not found in Canvas course (SIS ID/login mismatch)',
+                ];
+
+                continue;
+            }
+
+            $canvasUserId = (string) $canvasStudent['id'];
+            $studentDiff = $this->diffStudentGradesFromBulk($student, $canvasUserId, $submissionMap, $mapping, $courseOffering, $canvasComponents);
+
+            if (! empty($studentDiff['cell_changes'])) {
+                array_push($changes, ...$studentDiff['cell_changes']);
+                $studentsWithChanges[$student->id] = true;
+            }
+
+            if ($studentDiff['course_total'] !== null) {
+                $courseTotals[] = $studentDiff['course_total'];
+                $studentsWithChanges[$student->id] = true;
+            }
+
+            if (empty($studentDiff['cell_changes']) && $studentDiff['course_total'] === null) {
+                $studentsUnchanged++;
+            }
+        }
+
+        return [
+            'success' => true,
+            'summary' => [
+                'total_changes' => count($changes) + count($courseTotals),
+                'students_changed' => count($studentsWithChanges),
+                'students_unchanged' => $studentsUnchanged,
+                'students_unmatched' => count($unmatched),
+            ],
+            'changes' => $changes,
+            'course_totals' => $courseTotals,
+            'unmatched' => $unmatched,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $earlyReturn
+     * @return array<string, mixed>
+     */
+    private function emptyPreviewResult(array $earlyReturn): array
+    {
+        return array_merge($earlyReturn, [
+            'summary' => ['total_changes' => 0, 'students_changed' => 0, 'students_unchanged' => 0, 'students_unmatched' => 0],
+            'changes' => [],
+            'course_totals' => [],
+            'unmatched' => [],
+        ]);
+    }
+
+    /**
+     * Shared setup for sync and preview: resolves the course offering, the
+     * (optionally student-filtered) roster, the Canvas student/submission
+     * lookups, and the Canvas-synced assessment components. Read-only.
+     *
+     * @param  array<int>|null  $studentIds
+     * @return array{early_return: array<string, mixed>}|array{course_offering: CourseOffering, enrollments: Collection<int, CourseRegistration>, canvas_student_map: array<string, array<string, mixed>>, canvas_components: Collection<int, AssessmentComponent>, submission_map: array<string, array<string, array<string, mixed>>>}
+     */
+    private function buildSyncContext(CanvasCourseMapping $mapping, ?array $studentIds): array
+    {
+        $courseOffering = $mapping->courseOffering()->with('unit')->first();
+
+        if (! $courseOffering || ! $courseOffering->syllabusTemplate) {
+            throw new \Exception('Course offering or syllabus not found');
+        }
+
+        $enrollments = CourseRegistration::where('course_offering_id', $courseOffering->id)
+            ->whereIn('registration_status', ['registered', 'confirmed', 'completed'])
+            ->when($studentIds !== null, fn ($q) => $q->whereIn('student_id', $studentIds))
+            ->with('student')
+            ->get();
+
+        if ($enrollments->isEmpty()) {
+            return ['early_return' => [
+                'success' => true,
+                'message' => 'No enrolled students found',
+                'students_synced' => 0,
+            ]];
+        }
+
+        $canvasStudents = $this->apiService->getCourseStudents(
+            $mapping->canvasIntegration,
+            $mapping->canvas_course_id
+        );
+
+        $canvasStudentMap = [];
+        foreach ($canvasStudents as $canvasStudent) {
+            $sisUserId = $canvasStudent['sis_user_id'] ?? null;
+            $sisLoginId = $canvasStudent['login_id'] ?? null;
+
+            if ($sisUserId) {
+                $canvasStudentMap[strtoupper(trim((string) $sisUserId))] = $canvasStudent;
+            }
+            if ($sisLoginId && ! isset($canvasStudentMap[$sisLoginId])) {
+                $canvasStudentMap[strtoupper(trim((string) $sisLoginId))] = $canvasStudent;
+            }
+        }
+
+        $syllabusTemplate = $courseOffering->syllabusTemplate;
+        $canvasComponents = AssessmentComponent::where('syllabus_template_id', $syllabusTemplate->id)
+            ->where('is_canvas_synced', true)
+            ->get();
+
+        if ($canvasComponents->isEmpty()) {
+            throw new \Exception('No Canvas components found. Please sync assignments first.');
+        }
+
+        $assignmentIds = [];
+        foreach ($canvasComponents as $component) {
+            $details = AssessmentComponentDetail::where('assessment_component_id', $component->id)
+                ->whereNotNull('canvas_assignment_id')
+                ->pluck('canvas_assignment_id')
+                ->toArray();
+            $assignmentIds = array_merge($assignmentIds, $details);
+        }
+
+        $allSubmissions = $this->apiService->getAllStudentSubmissions(
+            $mapping->canvasIntegration,
+            $mapping->canvas_course_id,
+            $assignmentIds
+        );
+
+        $submissionMap = [];
+        foreach ($allSubmissions as $submission) {
+            $userId = (string) $submission['user_id'];
+            $assignmentId = (string) $submission['assignment_id'];
+            $submissionMap[$userId][$assignmentId] = $submission;
+        }
+
+        return [
+            'course_offering' => $courseOffering,
+            'enrollments' => $enrollments,
+            'canvas_student_map' => $canvasStudentMap,
+            'canvas_components' => $canvasComponents,
+            'submission_map' => $submissionMap,
+        ];
+    }
+
+    /**
      * Sync grades for a specific student from bulk submission data
      *
      * @param  Student  $student  Local student record
      * @param  string  $canvasUserId  Canvas user ID
-     * @param  array  $submissionMap  Bulk submissions indexed by [user_id][assignment_id]
-     * @param  $canvasComponents  Canvas components
+     * @param  array<string, array<string, array<string, mixed>>>  $submissionMap  Bulk submissions indexed by [user_id][assignment_id]
+     * @param  Collection<int, AssessmentComponent>  $canvasComponents
+     * @return array{success: bool, synced: int, created: int, updated: int}
      */
-    private function syncStudentGradesFromBulk(Student $student, string $canvasUserId, array $submissionMap, CanvasCourseMapping $mapping, $canvasComponents): array
+    private function syncStudentGradesFromBulk(Student $student, string $canvasUserId, array $submissionMap, CanvasCourseMapping $mapping, Collection $canvasComponents): array
     {
         $courseOffering = $mapping->courseOffering;
 
@@ -315,58 +359,25 @@ class CanvasGradeSyncService
         $studentSubmissions = $submissionMap[$canvasUserId] ?? [];
 
         foreach ($canvasComponents as $component) {
-            // Get all assignment details for this component
             $assignmentDetails = AssessmentComponentDetail::where('assessment_component_id', $component->id)
                 ->whereNotNull('canvas_assignment_id')
                 ->get();
 
             foreach ($assignmentDetails as $detail) {
-                // Get submission from bulk data
                 $submission = $studentSubmissions[$detail->canvas_assignment_id] ?? null;
 
                 if (! $submission) {
-                    Log::debug('No submission for assignment', [
-                        'student_id' => $student->id,
-                        'canvas_assignment_id' => $detail->canvas_assignment_id,
-                        'detail_id' => $detail->id,
-                    ]);
-
                     continue;
                 }
 
-                // Calculate percentage
-                $score = $submission['score'] ?? null;
-                $percentageScore = null;
+                $data = $this->buildScoreData($detail, $submission, $student->id, $courseOffering->id);
 
-                if ($score !== null && $detail->max_points > 0) {
-                    $percentageScore = ($score / $detail->max_points) * 100;
-                }
-
-                // Determine score status based on grading state
-                $scoreStatus = 'draft';
-                if (isset($submission['grade']) && $submission['grade'] !== null) {
-                    $scoreStatus = 'final';
-                }
-
-                $data = [
-                    'assessment_component_detail_id' => $detail->id,
-                    'student_id' => $student->id,
-                    'course_offering_id' => $courseOffering->id,
-                    'points_earned' => $score ?? 0,
-                    'percentage_score' => $percentageScore ?? 0,
-                    'submitted_at' => isset($submission['submitted_at'])
-                        ? date('Y-m-d H:i:s', strtotime($submission['submitted_at']))
-                        : null,
-                    'graded_at' => isset($submission['graded_at'])
-                        ? date('Y-m-d H:i:s', strtotime($submission['graded_at']))
-                        : null,
-                    'status' => $this->mapCanvasStatus($submission['workflow_state'] ?? 'unsubmitted'),
-                    'score_status' => $scoreStatus,
-                ];
-
-                // Check if score already exists
+                // Match the table's unique key (assessment_component_detail_id,
+                // student_id, course_offering_id, submission_attempt) so a
+                // score in another offering (e.g. a retake) can't be picked up.
                 $existing = AssessmentComponentDetailScore::where('assessment_component_detail_id', $detail->id)
                     ->where('student_id', $student->id)
+                    ->where('course_offering_id', $courseOffering->id)
                     ->first();
 
                 if ($existing) {
@@ -381,130 +392,7 @@ class CanvasGradeSyncService
             }
         }
 
-        // Sync Canvas total grade to academic record
-        try {
-            $enrollment = $this->apiService->getStudentEnrollment(
-                $mapping->canvasIntegration,
-                $mapping->canvas_course_id,
-                $canvasUserId
-            );
-
-            // Use current_score (posted) or fallback to unposted_current_score
-            $grades = $enrollment['grades'] ?? null;
-            $canvasTotal = 0;
-
-            if ($grades) {
-                if (isset($grades['current_score']) && $grades['current_score'] !== null) {
-                    $canvasTotal = (float) $grades['current_score'];
-                } elseif (isset($grades['unposted_current_score']) && $grades['unposted_current_score'] !== null) {
-                    $canvasTotal = (float) $grades['unposted_current_score'];
-                }
-            }
-
-            if ($canvasTotal !== null) {
-                // Check if academic record already exists
-                $existingRecord = AcademicRecord::where('student_id', $student->id)
-                    ->where('course_offering_id', $courseOffering->id)
-                    ->first();
-
-                if ($existingRecord) {
-                    // When the syllabus has a custom grading engine, Canvas total must NOT
-                    // overwrite the rule-engine result — the local calculator is authoritative.
-                    $gradingScheme = $courseOffering->syllabusTemplate?->grading_scheme;
-                    $hasCustomEngine = $gradingScheme !== null
-                        && isset($gradingScheme['engine'])
-                        && $gradingScheme['engine'] !== 'default_weighted_percentage';
-
-                    if ($hasCustomEngine) {
-                        Log::info('Skipped Canvas total overwrite: custom grading engine is authoritative', [
-                            'student_id' => $student->id,
-                            'course_offering_id' => $courseOffering->id,
-                            'engine' => $gradingScheme['engine'],
-                            'canvas_total' => $canvasTotal,
-                        ]);
-                    } else {
-                        // Update existing record
-                        $finalPercentage = round($canvasTotal, 2);
-                        $existingRecord->update([
-                            'final_percentage' => $finalPercentage,
-                            'final_letter_grade' => AcademicRecord::calculateLetterGrade($finalPercentage),
-                        ]);
-
-                        Log::info('Updated Canvas total grade in existing academic record', [
-                            'student_id' => $student->id,
-                            'academic_record_id' => $existingRecord->id,
-                            'canvas_total' => $canvasTotal,
-                            'final_percentage' => $finalPercentage,
-                            'final_letter_grade' => $existingRecord->final_letter_grade,
-                        ]);
-                    }
-                } else {
-                    // Try to create new record with all required fields
-                    $finalPercentage = round($canvasTotal, 2);
-                    $academicRecordData = [
-                        'student_id' => $student->id,
-                        'course_offering_id' => $courseOffering->id,
-                        'final_percentage' => $finalPercentage,
-                        'final_letter_grade' => AcademicRecord::calculateLetterGrade($finalPercentage),
-                        'enrollment_date' => now()->toDateString(),
-                    ];
-
-                    // Add required fields from course offering
-                    foreach (['semester_id', 'unit_id', 'campus_id'] as $field) {
-                        if ($courseOffering->$field) {
-                            $academicRecordData[$field] = $courseOffering->$field;
-                        }
-                    }
-
-                    // Get credit_points from unit - this is REQUIRED
-                    $creditHours = $courseOffering->unit->credit_points ?? null;
-                    if ($creditHours === null) {
-                        $unit = Unit::find($courseOffering->unit_id);
-                        $creditHours = $unit->credit_points ?? null;
-                    }
-
-                    if ($creditHours !== null && $creditHours >= 0) {
-                        $academicRecordData['credit_hours'] = $creditHours;
-                        $academicRecordData['credit_points'] = $creditHours;
-
-                        // Get program_id
-                        $programId = $student->program_id ?? null;
-                        if (! $programId && $courseOffering->unit_id) {
-                            $curriculumUnit = CurriculumUnit::where('unit_id', $courseOffering->unit_id)
-                                ->with('curriculumVersion')
-                                ->first();
-                            $programId = $curriculumUnit->curriculumVersion->program_id ?? null;
-                        }
-
-                        if ($programId) {
-                            $academicRecordData['program_id'] = $programId;
-
-                            // Check all required fields
-                            $required = ['semester_id', 'unit_id', 'campus_id', 'credit_hours', 'enrollment_date'];
-                            $missing = array_filter($required, fn ($f) => empty($academicRecordData[$f]));
-
-                            if (empty($missing)) {
-                                $newRecord = AcademicRecord::create($academicRecordData);
-                                Log::info('Created new academic record with Canvas total grade', [
-                                    'student_id' => $student->id,
-                                    'academic_record_id' => $newRecord->id,
-                                    'canvas_total' => $canvasTotal,
-                                ]);
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (CanvasConnectionException $e) {
-            // Re-throw connection exceptions to stop the entire sync
-            throw $e;
-        } catch (\Exception $e) {
-            Log::warning('Failed to sync Canvas total grade', [
-                'student_id' => $student->id,
-                'canvas_user_id' => $canvasUserId,
-                'error' => $e->getMessage(),
-            ]);
-        }
+        $this->syncCanvasCourseTotal($student, $canvasUserId, $mapping, $courseOffering);
 
         return [
             'success' => true,
@@ -515,121 +403,287 @@ class CanvasGradeSyncService
     }
 
     /**
-     * Sync grades for a specific student (OLD - using individual API calls)
-     * Kept for backward compatibility or fallback
+     * Read-only counterpart to syncStudentGradesFromBulk(): computes the same
+     * score data Canvas would produce but only reports the cells that would
+     * change, without writing anything or fetching from Canvas twice.
      *
-     * @param  Student  $student  Local student record
-     * @param  array  $canvasStudent  Canvas student data with 'id' (Canvas user ID)
+     * @param  array<string, array<string, array<string, mixed>>>  $submissionMap  Bulk submissions indexed by [user_id][assignment_id]
+     * @param  Collection<int, AssessmentComponent>  $canvasComponents
+     * @return array{
+     *   cell_changes: array<int, array{student_id: int, student_code: string, student_name: string, component_id: int, component_name: string, detail_id: int, detail_name: string, old_points: float|null, new_points: float, old_percentage: float|null, new_percentage: float, is_disputed: bool}>,
+     *   course_total: array{student_id: int, student_code: string, student_name: string, old_percentage: float|null, new_percentage: float}|null
+     * }
      */
-    public function syncStudentGrades(Student $student, array $canvasStudent, CanvasCourseMapping $mapping): array
+    private function diffStudentGradesFromBulk(Student $student, string $canvasUserId, array $submissionMap, CanvasCourseMapping $mapping, CourseOffering $courseOffering, Collection $canvasComponents): array
     {
-        $courseOffering = $mapping->courseOffering;
-        $syllabusTemplate = $courseOffering->syllabusTemplate;
-
-        $canvasUserId = (string) $canvasStudent['id'];
-
-        // Get all Canvas-synced components (Assignment Groups)
-        $canvasComponents = AssessmentComponent::where('syllabus_template_id', $syllabusTemplate->id)
-            ->where('is_canvas_synced', true)
-            ->get();
-
-        if ($canvasComponents->isEmpty()) {
-            throw new \Exception('No Canvas components found. Please sync assignments first.');
-        }
-
-        $synced = 0;
-        $created = 0;
-        $updated = 0;
+        $studentSubmissions = $submissionMap[$canvasUserId] ?? [];
+        $cellChanges = [];
 
         foreach ($canvasComponents as $component) {
-            // Get all assignment details for this component
             $assignmentDetails = AssessmentComponentDetail::where('assessment_component_id', $component->id)
                 ->whereNotNull('canvas_assignment_id')
                 ->get();
 
             foreach ($assignmentDetails as $detail) {
-                // Fetch submission from Canvas for this specific student and assignment
-                $submission = $this->apiService->getSubmission(
-                    $mapping->canvasIntegration,
-                    $mapping->canvas_course_id,
-                    $detail->canvas_assignment_id,
-                    $canvasUserId
-                );
-
+                $submission = $studentSubmissions[$detail->canvas_assignment_id] ?? null;
                 if (! $submission) {
-                    Log::debug('No submission found', [
-                        'student_id' => $student->id,
-                        'canvas_user_id' => $canvasUserId,
-                        'assignment_id' => $detail->canvas_assignment_id,
-                    ]);
-
                     continue;
                 }
 
-                // Calculate percentage
-                $score = $submission['score'] ?? null;
-                $percentageScore = null;
+                $newData = $this->buildScoreData($detail, $submission, $student->id, $courseOffering->id);
 
-                if ($score !== null && $detail->max_points > 0) {
-                    $percentageScore = ($score / $detail->max_points) * 100;
-                }
-
-                // Determine score status based on grading state
-                $scoreStatus = 'draft'; // default
-                if (isset($submission['grade']) && $submission['grade'] !== null) {
-                    $scoreStatus = 'final';
-                } elseif (isset($submission['submitted_at'])) {
-                    $scoreStatus = 'draft';
-                }
-
-                $data = [
-                    'assessment_component_detail_id' => $detail->id,
-                    'student_id' => $student->id,
-                    'course_offering_id' => $courseOffering->id,
-                    'points_earned' => $score ?? 0,
-                    'percentage_score' => $percentageScore ?? 0,
-                    'submitted_at' => isset($submission['submitted_at'])
-                        ? date('Y-m-d H:i:s', strtotime($submission['submitted_at']))
-                        : null,
-                    'graded_at' => isset($submission['graded_at'])
-                        ? date('Y-m-d H:i:s', strtotime($submission['graded_at']))
-                        : null,
-                    'status' => $this->mapCanvasStatus($submission['workflow_state'] ?? 'unsubmitted'),
-                    'score_status' => $scoreStatus,
-                ];
-
-                // Check if score already exists
                 $existing = AssessmentComponentDetailScore::where('assessment_component_detail_id', $detail->id)
                     ->where('student_id', $student->id)
+                    ->where('course_offering_id', $courseOffering->id)
                     ->first();
 
-                if ($existing) {
-                    $existing->update($data);
-                    $updated++;
-                } else {
-                    AssessmentComponentDetailScore::create($data);
-                    $created++;
+                $oldPoints = $existing?->points_earned;
+                $newPoints = $newData['points_earned'];
+                $oldPercentage = $existing !== null ? (float) $existing->percentage_score : null;
+                $newPercentage = $newData['percentage_score'];
+
+                $changed = $existing === null
+                    || abs((float) $oldPoints - (float) $newPoints) > 0.001
+                    || abs((float) $oldPercentage - (float) $newPercentage) > 0.01;
+
+                if (! $changed) {
+                    continue;
                 }
 
-                $synced++;
+                $cellChanges[] = [
+                    'student_id' => $student->id,
+                    'student_code' => strtoupper(trim((string) $student->student_id)),
+                    'student_name' => $student->full_name ?? $student->id,
+                    'component_id' => $component->id,
+                    'component_name' => $component->name,
+                    'detail_id' => $detail->id,
+                    'detail_name' => $detail->name,
+                    'old_points' => $oldPoints !== null ? (float) $oldPoints : null,
+                    'new_points' => (float) $newPoints,
+                    'old_percentage' => $oldPercentage,
+                    'new_percentage' => (float) $newPercentage,
+                    'is_disputed' => $existing?->score_status === 'disputed',
+                ];
             }
         }
 
-        Log::info('Student grades synced from Canvas', [
-            'student_id' => $student->id,
-            'canvas_user_id' => $canvasUserId,
-            'course_offering_id' => $courseOffering->id,
-            'synced' => $synced,
-            'created' => $created,
-            'updated' => $updated,
-        ]);
+        $courseTotal = $this->diffCanvasCourseTotal($student, $canvasUserId, $mapping, $courseOffering);
+
+        return ['cell_changes' => $cellChanges, 'course_total' => $courseTotal];
+    }
+
+    /**
+     * Build the AssessmentComponentDetailScore attributes Canvas submission
+     * data maps to. Shared by the write path and the preview diff so the two
+     * can never compute a different "new" value.
+     */
+    private function buildScoreData(AssessmentComponentDetail $detail, array $submission, int $studentId, int $courseOfferingId): array
+    {
+        $score = $submission['score'] ?? null;
+        $percentageScore = null;
+
+        if ($score !== null && $detail->max_points > 0) {
+            $percentageScore = ($score / $detail->max_points) * 100;
+        }
+
+        $scoreStatus = 'draft';
+        if (isset($submission['grade']) && $submission['grade'] !== null) {
+            $scoreStatus = 'final';
+        }
 
         return [
-            'success' => true,
-            'synced' => $synced,
-            'created' => $created,
-            'updated' => $updated,
+            'assessment_component_detail_id' => $detail->id,
+            'student_id' => $studentId,
+            'course_offering_id' => $courseOfferingId,
+            'points_earned' => $score ?? 0,
+            'percentage_score' => $percentageScore ?? 0,
+            'submitted_at' => isset($submission['submitted_at'])
+                ? date('Y-m-d H:i:s', strtotime($submission['submitted_at']))
+                : null,
+            'graded_at' => isset($submission['graded_at'])
+                ? date('Y-m-d H:i:s', strtotime($submission['graded_at']))
+                : null,
+            'status' => $this->mapCanvasStatus($submission['workflow_state'] ?? 'unsubmitted'),
+            'score_status' => $scoreStatus,
         ];
+    }
+
+    /**
+     * Fetch the student's Canvas course total and, unless a custom grading
+     * engine is authoritative, write it to the AcademicRecord.
+     */
+    private function syncCanvasCourseTotal(Student $student, string $canvasUserId, CanvasCourseMapping $mapping, CourseOffering $courseOffering): void
+    {
+        try {
+            $canvasTotal = $this->fetchCanvasCourseTotal($canvasUserId, $mapping);
+            if ($canvasTotal === null) {
+                return;
+            }
+
+            $existingRecord = AcademicRecord::where('student_id', $student->id)
+                ->where('course_offering_id', $courseOffering->id)
+                ->first();
+
+            if ($existingRecord) {
+                if ($this->hasCustomGradingEngine($courseOffering)) {
+                    Log::info('Skipped Canvas total overwrite: custom grading engine is authoritative', [
+                        'student_id' => $student->id,
+                        'course_offering_id' => $courseOffering->id,
+                    ]);
+
+                    return;
+                }
+
+                $finalPercentage = round($canvasTotal, 2);
+                $existingRecord->update([
+                    'final_percentage' => $finalPercentage,
+                    'final_letter_grade' => AcademicRecord::calculateLetterGrade($finalPercentage),
+                ]);
+
+                return;
+            }
+
+            $this->createAcademicRecordWithCanvasTotal($student, $courseOffering, $canvasTotal);
+        } catch (CanvasConnectionException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::warning('Failed to sync Canvas total grade', [
+                'student_id' => $student->id,
+                'canvas_user_id' => $canvasUserId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Read-only counterpart to syncCanvasCourseTotal(): returns the old/new
+     * final_percentage pair when it would change, or null when unchanged or
+     * when a custom grading engine makes the Canvas total non-authoritative.
+     */
+    private function diffCanvasCourseTotal(Student $student, string $canvasUserId, CanvasCourseMapping $mapping, CourseOffering $courseOffering): ?array
+    {
+        try {
+            $canvasTotal = $this->fetchCanvasCourseTotal($canvasUserId, $mapping);
+            if ($canvasTotal === null || $this->hasCustomGradingEngine($courseOffering)) {
+                return null;
+            }
+
+            $existingRecord = AcademicRecord::where('student_id', $student->id)
+                ->where('course_offering_id', $courseOffering->id)
+                ->first();
+
+            $newPercentage = round($canvasTotal, 2);
+            $oldPercentage = $existingRecord?->final_percentage !== null ? (float) $existingRecord->final_percentage : null;
+
+            if ($oldPercentage !== null && abs($oldPercentage - $newPercentage) < 0.01) {
+                return null;
+            }
+
+            return [
+                'student_id' => $student->id,
+                'student_code' => strtoupper(trim((string) $student->student_id)),
+                'student_name' => $student->full_name ?? $student->id,
+                'old_percentage' => $oldPercentage,
+                'new_percentage' => $newPercentage,
+            ];
+        } catch (\Exception $e) {
+            Log::warning('Failed to diff Canvas total grade', [
+                'student_id' => $student->id,
+                'canvas_user_id' => $canvasUserId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    private function fetchCanvasCourseTotal(string $canvasUserId, CanvasCourseMapping $mapping): ?float
+    {
+        $enrollment = $this->apiService->getStudentEnrollment(
+            $mapping->canvasIntegration,
+            $mapping->canvas_course_id,
+            $canvasUserId
+        );
+
+        $grades = $enrollment['grades'] ?? null;
+        if (! $grades) {
+            return null;
+        }
+
+        if (isset($grades['current_score']) && $grades['current_score'] !== null) {
+            return (float) $grades['current_score'];
+        }
+
+        if (isset($grades['unposted_current_score']) && $grades['unposted_current_score'] !== null) {
+            return (float) $grades['unposted_current_score'];
+        }
+
+        return null;
+    }
+
+    /**
+     * When the syllabus has a custom grading engine, Canvas total must NOT
+     * overwrite the rule-engine result — the local calculator is authoritative.
+     */
+    private function hasCustomGradingEngine(CourseOffering $courseOffering): bool
+    {
+        $gradingScheme = $courseOffering->syllabusTemplate?->grading_scheme;
+
+        return $gradingScheme !== null
+            && isset($gradingScheme['engine'])
+            && $gradingScheme['engine'] !== 'default_weighted_percentage';
+    }
+
+    private function createAcademicRecordWithCanvasTotal(Student $student, CourseOffering $courseOffering, float $canvasTotal): void
+    {
+        $finalPercentage = round($canvasTotal, 2);
+        $academicRecordData = [
+            'student_id' => $student->id,
+            'course_offering_id' => $courseOffering->id,
+            'final_percentage' => $finalPercentage,
+            'final_letter_grade' => AcademicRecord::calculateLetterGrade($finalPercentage),
+            'enrollment_date' => now()->toDateString(),
+        ];
+
+        foreach (['semester_id', 'unit_id', 'campus_id'] as $field) {
+            if ($courseOffering->$field) {
+                $academicRecordData[$field] = $courseOffering->$field;
+            }
+        }
+
+        $creditHours = $courseOffering->unit->credit_points ?? null;
+        if ($creditHours === null) {
+            $unit = Unit::find($courseOffering->unit_id);
+            $creditHours = $unit->credit_points ?? null;
+        }
+
+        if ($creditHours === null || $creditHours < 0) {
+            return;
+        }
+
+        $academicRecordData['credit_hours'] = $creditHours;
+        $academicRecordData['credit_points'] = $creditHours;
+
+        $programId = $student->program_id ?? null;
+        if (! $programId && $courseOffering->unit_id) {
+            $curriculumUnit = CurriculumUnit::where('unit_id', $courseOffering->unit_id)
+                ->with('curriculumVersion')
+                ->first();
+            $programId = $curriculumUnit->curriculumVersion->program_id ?? null;
+        }
+
+        if (! $programId) {
+            return;
+        }
+
+        $academicRecordData['program_id'] = $programId;
+
+        $required = ['semester_id', 'unit_id', 'campus_id', 'credit_hours', 'enrollment_date'];
+        $missing = array_filter($required, fn ($f) => empty($academicRecordData[$f]));
+
+        if (empty($missing)) {
+            AcademicRecord::create($academicRecordData);
+        }
     }
 
     /**
@@ -661,7 +715,6 @@ class CanvasGradeSyncService
 
         $syllabusTemplate = $courseOffering->syllabusTemplate;
 
-        // Find all Canvas components (Assignment Groups)
         $canvasComponents = AssessmentComponent::where('syllabus_template_id', $syllabusTemplate->id)
             ->where('is_canvas_synced', true)
             ->get();
@@ -673,7 +726,6 @@ class CanvasGradeSyncService
             ];
         }
 
-        // Count assignments across all Canvas components
         $assignmentsCount = AssessmentComponentDetail::whereIn('assessment_component_id', $canvasComponents->pluck('id'))
             ->whereNotNull('canvas_assignment_id')
             ->count();
@@ -685,12 +737,10 @@ class CanvasGradeSyncService
             ];
         }
 
-        // Count enrolled students (registered or confirmed)
         $studentsCount = CourseRegistration::where('course_offering_id', $courseOffering->id)
-            ->whereIn('registration_status', ['registered', 'confirmed'])
+            ->whereIn('registration_status', ['registered', 'confirmed', 'completed'])
             ->count();
 
-        // Count graded scores across all Canvas components
         $gradedScoresCount = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($q) use ($canvasComponents) {
             $q->whereIn('assessment_component_id', $canvasComponents->pluck('id'))
                 ->whereNotNull('canvas_assignment_id');
