@@ -303,6 +303,17 @@ export interface StudentFinancePaymentHistoryRow {
     };
 }
 
+export type StudentFinanceReviewSignalTarget = 'payment-history' | 'ledger' | 'installments';
+
+export interface StudentFinanceReviewSignal {
+    id: string;
+    type: 'surplus' | 'dng_paid_voided_fee' | 'installment_mismatch' | 'invoice_cache_drift';
+    title: string;
+    message: string;
+    target: StudentFinanceReviewSignalTarget;
+    target_label: string;
+}
+
 export interface LedgerEvent {
     at: string | null;
     type: string;

@@ -79,7 +79,7 @@ const formatLineAmount = (amount: number, isCredit: boolean): string => {
 </script>
 
 <template>
-    <Card class="overflow-hidden">
+    <Card id="ledger" data-review-target="ledger" class="overflow-hidden">
         <CardHeader class="bg-muted/30 border-b pb-3">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="flex items-start gap-2">

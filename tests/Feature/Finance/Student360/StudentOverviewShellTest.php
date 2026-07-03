@@ -265,6 +265,184 @@ it('shows staff-facing tuition KPIs and surplus source for a paid DNG released f
     }
 });
 
+it('surfaces in-page review signals for surplus, voided DNG fees, stale installments, and cache drift', function () {
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-05-10 09:00:00'));
+
+    try {
+        $user = grantFinanceOverview(['view_finance_student_overview']);
+        $student = makeOverviewStudent($this->campus, $this->program, $this->semester);
+        $summer = Semester::factory()->create(['code' => 'SUMMER2026', 'name' => 'Summer 2026']);
+
+        $paidCharge = FinanceCharge::create([
+            'student_id' => $student->id,
+            'semester_id' => $this->semester->id,
+            'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+            'amount' => 15_000_000,
+            'description' => 'Paid tuition with stale installment',
+            'effective_at' => now(),
+            'status' => FinanceCharge::STATUS_ACTIVE,
+        ]);
+        $paidInvoice = StudentInvoice::create([
+            'invoice_number' => 'INV-PAID-STILL-CACHED-OLD',
+            'student_id' => $student->id,
+            'semester_id' => $this->semester->id,
+            'status' => 'pending',
+            'due_date' => now()->addDays(7),
+        ]);
+        $paidLine = InvoiceLine::create([
+            'invoice_id' => $paidInvoice->id,
+            'charge_id' => $paidCharge->id,
+            'amount_snapshot' => 15_000_000,
+            'description_snapshot' => 'Paid tuition with stale installment',
+            'status' => 'active',
+        ]);
+        FinanceChargeInstallment::create([
+            'finance_charge_id' => $paidCharge->id,
+            'installment_no' => 1,
+            'amount' => 15_000_000,
+            'due_date' => now()->addDays(7),
+            'status' => FinanceChargeInstallment::STATUS_PENDING,
+        ]);
+
+        $paidInFull = Payment::create([
+            'student_id' => $student->id,
+            'amount' => 15_000_000,
+            'method' => Payment::METHOD_BANK_TRANSFER,
+            'source' => 'manual',
+            'external_ref' => 'PAID-IN-FULL',
+            'paid_at' => CarbonImmutable::parse('2026-04-20 10:30:00'),
+            'status' => Payment::STATUS_COMPLETED,
+            'received_by_user_id' => $user->id,
+        ]);
+        app(SettlementService::class)->createPaymentApplication($paidInFull, $paidLine, 15_000_000, 'application', $user->id);
+        $paidInvoice->forceFill([
+            'cached_total_amount' => 1_000,
+            'cached_paid_amount' => 0,
+        ])->save();
+
+        $voidedCharge = FinanceCharge::create([
+            'student_id' => $student->id,
+            'semester_id' => $summer->id,
+            'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+            'amount' => 30_000_000,
+            'description' => 'Voided EGC fee',
+            'effective_at' => now(),
+            'status' => FinanceCharge::STATUS_VOID,
+            'voided_at' => now(),
+            'voided_by_user_id' => $user->id,
+            'void_reason' => 'Voided after DNG payment',
+        ]);
+        $voidedInvoice = StudentInvoice::create([
+            'invoice_number' => 'INV-VOIDED-DNG',
+            'student_id' => $student->id,
+            'semester_id' => $summer->id,
+            'status' => 'cancelled',
+            'due_date' => now()->addDays(14),
+        ]);
+        $voidedLine = InvoiceLine::create([
+            'invoice_id' => $voidedInvoice->id,
+            'charge_id' => $voidedCharge->id,
+            'amount_snapshot' => 30_000_000,
+            'description_snapshot' => 'Voided EGC fee',
+            'status' => 'void',
+            'voided_at' => now(),
+            'void_reason' => 'Voided after DNG payment',
+        ]);
+
+        $dngPayment = Payment::create([
+            'student_id' => $student->id,
+            'amount' => 30_000_000,
+            'method' => Payment::METHOD_GATEWAY,
+            'source' => 'dng',
+            'external_ref' => 'DNGPAY-230',
+            'paid_at' => CarbonImmutable::parse('2026-05-02 08:00:00'),
+            'status' => Payment::STATUS_COMPLETED,
+            'received_by_user_id' => $user->id,
+        ]);
+        PaymentApplication::create([
+            'payment_id' => $dngPayment->id,
+            'invoice_line_id' => $voidedLine->id,
+            'amount' => 30_000_000,
+            'entry_type' => 'application',
+            'applied_at' => CarbonImmutable::parse('2026-05-02 08:05:00'),
+            'created_by' => $user->id,
+        ]);
+        PaymentApplication::create([
+            'payment_id' => $dngPayment->id,
+            'invoice_line_id' => $voidedLine->id,
+            'amount' => -30_000_000,
+            'entry_type' => 'reversal',
+            'applied_at' => CarbonImmutable::parse('2026-05-03 09:00:00'),
+            'created_by' => $user->id,
+            'source_ref_type' => 'finance_charge',
+            'source_ref_id' => $voidedCharge->id,
+        ]);
+        DngPaymentRequest::create([
+            'student_id' => $student->id,
+            'campus_code' => 'CAMPUS001',
+            'student_code' => $student->student_id,
+            'fee_type' => 'HP',
+            'description' => 'SUMMER2026 EGC',
+            'semester_id' => $summer->id,
+            'due_date' => CarbonImmutable::parse('2026-05-15'),
+            'item_id' => '230',
+            'amount' => 30_000_000,
+            'status' => DngPaymentRequest::STATUS_PAID_INVOICED,
+            'payment_id' => $dngPayment->id,
+            'paid_at' => CarbonImmutable::parse('2026-05-02 08:00:00'),
+        ]);
+
+        actingAs($user)->get("/finance/students/{$student->id}")
+            ->assertInertia(fn ($page) => $page
+                ->has('review_signals', 4)
+                ->where('review_signals.0.type', 'surplus')
+                ->where('review_signals.0.target', 'payment-history')
+                ->where('review_signals.0.target_label', 'Xem khoản đã nộp')
+                ->where('review_signals.1.type', 'dng_paid_voided_fee')
+                ->where('review_signals.1.target', 'ledger')
+                ->where('review_signals.1.target_label', 'Xem sổ cái')
+                ->where('review_signals.2.type', 'installment_mismatch')
+                ->where('review_signals.2.target', 'installments')
+                ->where('review_signals.2.target_label', 'Xem thẻ trả góp')
+                ->where('review_signals.3.type', 'invoice_cache_drift')
+                ->where('review_signals.3.target', 'ledger')
+                ->where('review_signals.3.target_label', 'Xem sổ cái'));
+    } finally {
+        CarbonImmutable::setTestNow();
+    }
+});
+
+it('does not show review signals when payment, installment, and invoice cache data is consistent', function () {
+    $user = grantFinanceOverview(['view_finance_student_overview']);
+    $student = makeOverviewStudent($this->campus, $this->program, $this->semester);
+    $fixture = makeOverviewCharge($student, $this->semester);
+
+    FinanceChargeInstallment::create([
+        'finance_charge_id' => $fixture['charge']->id,
+        'installment_no' => 1,
+        'amount' => 10_000_000,
+        'due_date' => now()->subDay(),
+        'status' => FinanceChargeInstallment::STATUS_PAID,
+        'paid_at' => now()->subDay(),
+    ]);
+
+    $payment = Payment::create([
+        'student_id' => $student->id,
+        'amount' => 10_000_000,
+        'method' => Payment::METHOD_BANK_TRANSFER,
+        'source' => 'manual',
+        'external_ref' => 'CONSISTENT-PAID',
+        'paid_at' => now()->subDay(),
+        'status' => Payment::STATUS_COMPLETED,
+        'received_by_user_id' => $user->id,
+    ]);
+    app(SettlementService::class)->createPaymentApplication($payment, $fixture['line'], 10_000_000, 'application', $user->id);
+    app(SettlementService::class)->recalculateInvoiceSnapshot($fixture['invoice']);
+
+    actingAs($user)->get("/finance/students/{$student->id}")
+        ->assertInertia(fn ($page) => $page->where('review_signals', []));
+});
+
 it('offers allocation from a surplus payment only when current fee obligations exist', function () {
     $user = grantFinanceOverview(['view_finance_student_overview']);
     $student = makeOverviewStudent($this->campus, $this->program, $this->semester);

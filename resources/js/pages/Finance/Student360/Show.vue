@@ -8,11 +8,22 @@ import StudentActionMenu from '@/components/finance/student360/StudentActionMenu
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import type { LedgerEvent, LedgerGroup, Student360Actions, Student360Balances, Student360Identity, Student360StatusCards, StudentFinanceOverviewKpi, StudentFinancePaymentHistoryRow, StudentFinanceTuitionOverview } from '@/types/finance';
+import type {
+    LedgerEvent,
+    LedgerGroup,
+    Student360Actions,
+    Student360Balances,
+    Student360Identity,
+    Student360StatusCards,
+    StudentFinanceOverviewKpi,
+    StudentFinancePaymentHistoryRow,
+    StudentFinanceReviewSignal,
+    StudentFinanceTuitionOverview,
+} from '@/types/finance';
 import { formatCurrency, formatDate } from '@/utils/format';
 import { financeRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { CheckCircle2, CircleAlert, ExternalLink, Receipt } from 'lucide-vue-next';
+import { AlertTriangle, CheckCircle2, CircleAlert, ExternalLink, Receipt } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, ref } from 'vue';
 
 const props = defineProps<{
@@ -20,6 +31,7 @@ const props = defineProps<{
     balances: Student360Balances;
     tuition_overview: StudentFinanceTuitionOverview;
     payment_history: StudentFinancePaymentHistoryRow[];
+    review_signals: StudentFinanceReviewSignal[];
     status_cards: Student360StatusCards;
     actions: Student360Actions;
     focus: { type: string; id: number } | null;
@@ -74,6 +86,12 @@ const openCancel = (id: number): void => {
 
 const pushInstallment = (payload: { chargeId: number; installmentId: number }): void => {
     router.post(financeRoutes.student360.retryInstallmentPush(payload.chargeId, payload.installmentId), {}, { preserveScroll: true });
+};
+
+const scrollToReviewTarget = async (target: string): Promise<void> => {
+    await nextTick();
+
+    document.querySelector(`[data-review-target="${target}"], [data-focus-section="${target}"], #${target}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 };
 
 const scrollToFocus = async (): Promise<void> => {
@@ -143,7 +161,34 @@ onMounted(() => {
             {{ props.tuition_overview.surplus_message }}
         </p>
 
-        <Card id="payment-history" class="overflow-hidden">
+        <Card v-if="props.review_signals.length" class="border-amber-200 bg-amber-50/50 shadow-none dark:border-amber-900/70 dark:bg-amber-950/20">
+            <CardHeader class="pb-2">
+                <div class="flex items-start gap-2">
+                    <div class="mt-0.5 rounded-md bg-amber-100 p-2 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
+                        <AlertTriangle class="size-4" />
+                    </div>
+                    <div>
+                        <CardTitle class="text-sm text-amber-950 dark:text-amber-100">Cần kiểm tra</CardTitle>
+                        <CardDescription class="mt-0.5 text-amber-800 dark:text-amber-200">Tín hiệu rà soát dữ liệu, không phải số tiền cần thu thêm.</CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent class="pt-0">
+                <ul class="divide-y divide-amber-200/70 dark:divide-amber-900/70">
+                    <li v-for="signal in props.review_signals" :key="signal.id" class="flex flex-wrap items-start justify-between gap-2 py-2 first:pt-0 last:pb-0">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-medium text-amber-950 dark:text-amber-100">{{ signal.title }}</p>
+                            <p class="text-sm text-amber-800 dark:text-amber-200">{{ signal.message }}</p>
+                        </div>
+                        <Button size="sm" variant="ghost" class="h-8 shrink-0 text-amber-900 hover:bg-amber-100 hover:text-amber-950 dark:text-amber-100 dark:hover:bg-amber-950/60" @click="scrollToReviewTarget(signal.target)">
+                            {{ signal.target_label }}
+                        </Button>
+                    </li>
+                </ul>
+            </CardContent>
+        </Card>
+
+        <Card id="payment-history" data-review-target="payment-history" class="overflow-hidden">
             <CardHeader class="bg-muted/30 border-b pb-3">
                 <div class="flex items-start gap-2">
                     <div class="bg-primary/10 text-primary mt-0.5 rounded-md p-2">
