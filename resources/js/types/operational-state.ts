@@ -25,9 +25,17 @@ export interface AvailableAction {
     blocked_by: string[];
 }
 
+export type SessionAttendanceStatus = 'recorded' | 'not_recorded' | 'auto_system_only';
+
+export interface SessionAttendanceStatusEntry {
+    session_id: number;
+    status: SessionAttendanceStatus;
+}
+
 export interface OperationalState {
     lifecycle_stage: LifecycleStage;
     session_progress: { total: number; completed: number };
     readiness_blockers: ReadinessBlocker[];
     available_actions: AvailableAction[];
+    session_attendance_status: SessionAttendanceStatusEntry[];
 }

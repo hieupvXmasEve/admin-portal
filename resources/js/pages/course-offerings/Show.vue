@@ -165,7 +165,7 @@ const goBack = () => window.history.back();
 
         <!-- Sessions Tab -->
         <TabsContent value="sessions" class="space-y-6">
-            <SessionsTab :course-offering="courseOffering" :available-rooms="availableRooms" />
+            <SessionsTab :course-offering="courseOffering" :available-rooms="availableRooms" :operational-state="operational_state" />
         </TabsContent>
 
         <!-- Students Tab -->

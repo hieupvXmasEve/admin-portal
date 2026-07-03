@@ -32,12 +32,19 @@ class GetCourseOfferingOperationalStateQuery
 
     public const ACTION_RECALCULATE = 'recalculate';
 
+    public const ATTENDANCE_STATUS_RECORDED = 'recorded';
+
+    public const ATTENDANCE_STATUS_NOT_RECORDED = 'not_recorded';
+
+    public const ATTENDANCE_STATUS_AUTO_SYSTEM_ONLY = 'auto_system_only';
+
     /**
      * @return array{
      *   lifecycle_stage: string,
      *   session_progress: array{total: int, completed: int},
      *   readiness_blockers: array<int, array{code: string, message: string, references: array<int, array{type: string, id: int, label: string}>}>,
-     *   available_actions: array<int, array{action: string, label: string, allowed: bool, blocked_by: array<int, string>}>
+     *   available_actions: array<int, array{action: string, label: string, allowed: bool, blocked_by: array<int, string>}>,
+     *   session_attendance_status: array<int, array{session_id: int, status: string}>
      * }
      */
     public static function handle(CourseOffering $courseOffering, User $user): array
@@ -71,6 +78,7 @@ class GetCourseOfferingOperationalStateQuery
             ],
             'readiness_blockers' => $readinessBlockers,
             'available_actions' => self::deriveAvailableActions($user, $lifecycleStage, $readinessBlockers),
+            'session_attendance_status' => self::deriveSessionAttendanceStatus($sessions),
         ];
     }
 
@@ -117,7 +125,7 @@ class GetCourseOfferingOperationalStateQuery
         $blockers = [];
 
         $missingAttendance = $sessions->filter(
-            fn (ClassSession $session): bool => $session->attendances->isEmpty()
+            fn (ClassSession $session): bool => self::sessionAttendanceStatus($session) === self::ATTENDANCE_STATUS_NOT_RECORDED
         );
         if ($missingAttendance->isNotEmpty()) {
             $blockers[] = [
@@ -129,10 +137,7 @@ class GetCourseOfferingOperationalStateQuery
 
         // auto_system-only attendance means attendance has not been manually finalized yet.
         $autoSystemOnly = $sessions->filter(
-            fn (ClassSession $session): bool => $session->attendances->isNotEmpty()
-                && $session->attendances->every(
-                    fn (Attendance $attendance): bool => $attendance->recording_method === 'auto_system'
-                )
+            fn (ClassSession $session): bool => self::sessionAttendanceStatus($session) === self::ATTENDANCE_STATUS_AUTO_SYSTEM_ONLY
         );
         if ($autoSystemOnly->isNotEmpty()) {
             $blockers[] = [
@@ -227,6 +232,43 @@ class GetCourseOfferingOperationalStateQuery
             'allowed' => $blockerCodes === [],
             'blocked_by' => $blockerCodes,
         ]];
+    }
+
+    /**
+     * Per-session attendance status for the cockpit sessions view. Derived
+     * from the same session/attendance data as the readiness blockers above
+     * (via sessionAttendanceStatus()) so the two can never drift apart.
+     *
+     * @param  Collection<int, ClassSession>  $sessions
+     * @return array<int, array{session_id: int, status: string}>
+     */
+    private static function deriveSessionAttendanceStatus(Collection $sessions): array
+    {
+        return $sessions
+            ->map(fn (ClassSession $session): array => [
+                'session_id' => $session->id,
+                'status' => self::sessionAttendanceStatus($session),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Single source of truth for a session's attendance readiness: not yet
+     * recorded, recorded only via the auto_system method (needs manual
+     * confirmation), or recorded.
+     */
+    private static function sessionAttendanceStatus(ClassSession $session): string
+    {
+        if ($session->attendances->isEmpty()) {
+            return self::ATTENDANCE_STATUS_NOT_RECORDED;
+        }
+
+        if ($session->attendances->every(fn (Attendance $attendance): bool => $attendance->recording_method === 'auto_system')) {
+            return self::ATTENDANCE_STATUS_AUTO_SYSTEM_ONLY;
+        }
+
+        return self::ATTENDANCE_STATUS_RECORDED;
     }
 
     /**

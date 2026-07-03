@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import { createSelectionColumn } from '@/lib/table-utils';
 import type { ClassSession, CourseOffering, Room } from '@/types/models';
+import type { OperationalState, SessionAttendanceStatus } from '@/types/operational-state';
 import { attendanceRoutes } from '@/utils/routes';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { ModalLink, visitModal } from '@inertiaui/modal-vue';
@@ -19,10 +20,46 @@ import { route } from 'ziggy-js';
 interface Props {
     courseOffering: CourseOffering;
     availableRooms: Room[];
+    operationalState: OperationalState;
 }
 
 const props = defineProps<Props>();
 const { showConfirmDialog } = useGlobalConfirmDialog();
+
+// Per-session attendance status is derived backend-side from the same data
+// as the operational_state readiness blockers (ADR 0013) — looked up by
+// session id here rather than recomputed, so it can never drift from them.
+const attendanceStatusBySessionId = computed(() => {
+    const map = new Map<number, SessionAttendanceStatus>();
+    props.operationalState.session_attendance_status.forEach((entry) => map.set(entry.session_id, entry.status));
+    return map;
+});
+
+const attendanceStatusLabel = (status?: SessionAttendanceStatus): string => {
+    switch (status) {
+        case 'recorded':
+            return 'Recorded';
+        case 'auto_system_only':
+            return 'Auto-system only';
+        case 'not_recorded':
+            return 'Not recorded';
+        default:
+            return '—';
+    }
+};
+
+const attendanceStatusVariant = (status?: SessionAttendanceStatus): 'default' | 'outline' | 'destructive' | 'secondary' => {
+    switch (status) {
+        case 'recorded':
+            return 'default';
+        case 'auto_system_only':
+            return 'secondary';
+        case 'not_recorded':
+            return 'destructive';
+        default:
+            return 'outline';
+    }
+};
 
 // Build the return URL pointing to this tab so Back from a child page lands here.
 // window.location is accessed as a getter (not inline in template) to avoid SSR errors.
@@ -215,6 +252,7 @@ const columns: ColumnDef<ClassSession>[] = [
         cell: ({ row }) => (row.original.lecture?.display_name ? h('span', { class: 'text-sm' }, row.original.lecture.display_name) : h('span', { class: 'text-muted-foreground text-sm' }, '—')),
     },
     { header: 'Status', id: 'status', enableSorting: false },
+    { header: 'Attendance Status', id: 'attendance_status', enableSorting: false },
     {
         header: 'Attendance',
         id: 'attendance',
@@ -312,6 +350,13 @@ const columns: ColumnDef<ClassSession>[] = [
                 <template #cell-status="{ row }">
                     <Badge :variant="sessionStatusVariant(row.original.status)" class="capitalize">
                         {{ row.original.status.replace('_', ' ') }}
+                    </Badge>
+                </template>
+
+                <!-- Attendance status cell (backend-derived, ADR 0013) -->
+                <template #cell-attendance_status="{ row }">
+                    <Badge :variant="attendanceStatusVariant(attendanceStatusBySessionId.get(row.original.id))">
+                        {{ attendanceStatusLabel(attendanceStatusBySessionId.get(row.original.id)) }}
                     </Badge>
                 </template>
 

@@ -208,6 +208,29 @@ it('does not report a Canvas blocker for non-blocking mapping states', function 
     'no mapping' => [null, false],
 ]);
 
+it('exposes per-session attendance status matching the readiness blockers', function () {
+    $offering = makeOperationalOffering($this);
+    // Explicit sequence_number avoids a unique-constraint collision on the
+    // factory's random default when several sessions share one course
+    // offering; ordering below relies on the distinct session_date values.
+    $notRecorded = makeOperationalSession($offering, ['session_title' => 'Not recorded', 'session_date' => '2026-01-10', 'sequence_number' => 1]);
+    $autoOnly = makeOperationalSession($offering, ['session_title' => 'Auto only', 'session_date' => '2026-01-15', 'sequence_number' => 2]);
+    recordOperationalAttendance($this, $autoOnly, 'auto_system');
+    $recorded = makeOperationalSession($offering, ['session_title' => 'Recorded', 'session_date' => '2026-01-20', 'sequence_number' => 3]);
+    recordOperationalAttendance($this, $recorded, 'manual');
+
+    getOperationalState($this, $offering)
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('operational_state.session_attendance_status', 3)
+            ->where('operational_state.session_attendance_status.0.session_id', $notRecorded->id)
+            ->where('operational_state.session_attendance_status.0.status', 'not_recorded')
+            ->where('operational_state.session_attendance_status.1.session_id', $autoOnly->id)
+            ->where('operational_state.session_attendance_status.1.status', 'auto_system_only')
+            ->where('operational_state.session_attendance_status.2.session_id', $recorded->id)
+            ->where('operational_state.session_attendance_status.2.status', 'recorded'));
+});
+
 it('returns no blockers and an allowed finalize for a fully ready offering', function () {
     $offering = makeOperationalOffering($this, ['is_canvas_synced' => true]);
     mapOperationalCanvasCourse($offering, 'mapped');

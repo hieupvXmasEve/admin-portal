@@ -1,6 +1,6 @@
 # Per-session attendance status visible in cockpit sessions view
 
-Status: ready-for-agent
+Status: ready-for-human (implemented 2026-07-03)
 
 ## Parent
 
@@ -14,11 +14,11 @@ This slice is read-only: it makes attendance readiness visible per session but d
 
 ## Acceptance criteria
 
-- [ ] Each session row/card in the cockpit sessions view shows one of: recorded, not recorded, auto-system only.
-- [ ] The per-session status is derived from the same attendance data source as the readiness blockers in the `operational_state` prop (no duplicate computation logic).
-- [ ] Status updates correctly across the scenarios already covered by the operational-state tests (no attendance, auto-system-only, fully recorded).
-- [ ] No new write path is introduced in this slice.
-- [ ] Pest HTTP feature test asserts the cockpit page response includes the correct per-session attendance status for each scenario.
+- [x] Each session row/card in the cockpit sessions view shows one of: recorded, not recorded, auto-system only.
+- [x] The per-session status is derived from the same attendance data source as the readiness blockers in the `operational_state` prop (no duplicate computation logic).
+- [x] Status updates correctly across the scenarios already covered by the operational-state tests (no attendance, auto-system-only, fully recorded).
+- [x] No new write path is introduced in this slice.
+- [x] Pest HTTP feature test asserts the cockpit page response includes the correct per-session attendance status for each scenario.
 
 ## Blocked by
 
