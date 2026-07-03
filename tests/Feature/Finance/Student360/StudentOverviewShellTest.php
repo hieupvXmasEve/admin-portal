@@ -272,6 +272,143 @@ it('offers allocation from a surplus payment only when current fee obligations e
             ->where('payment_history.0.action.message', null));
 });
 
+it('keeps voided invoice lines in grouped ledger without counting them as collectible', function () {
+    $user = grantFinanceOverview(['view_finance_student_overview']);
+    $student = makeOverviewStudent($this->campus, $this->program, $this->semester);
+    $student->forceFill(['student_id' => 'AUS121787'])->save();
+
+    $spring = Semester::factory()->create(['code' => 'SPRING2026', 'name' => 'Spring 2026']);
+    $summer = Semester::factory()->create(['code' => 'SUMMER2026', 'name' => 'Summer 2026']);
+
+    $springActiveCharge = FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $spring->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => 5_000_000,
+        'description' => 'SPRING active tuition',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    $springVoidedCharge = FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $spring->id,
+        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'amount' => 10_000_000,
+        'description' => 'SPRING voided EGC add-on',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_VOID,
+        'voided_at' => now(),
+        'voided_by_user_id' => $user->id,
+        'void_reason' => 'Wrong EGC level',
+    ]);
+    $springInvoice = StudentInvoice::create([
+        'invoice_number' => 'INV-SPRING-LEDGER',
+        'student_id' => $student->id,
+        'semester_id' => $spring->id,
+        'status' => 'pending',
+        'due_date' => now()->addDays(7),
+    ]);
+    InvoiceLine::create([
+        'invoice_id' => $springInvoice->id,
+        'charge_id' => $springActiveCharge->id,
+        'amount_snapshot' => 5_000_000,
+        'description_snapshot' => 'SPRING active tuition',
+        'status' => 'active',
+    ]);
+    InvoiceLine::create([
+        'invoice_id' => $springInvoice->id,
+        'charge_id' => $springVoidedCharge->id,
+        'amount_snapshot' => 10_000_000,
+        'description_snapshot' => 'SPRING voided EGC add-on',
+        'status' => 'void',
+        'voided_at' => now(),
+        'void_reason' => 'Wrong EGC level',
+    ]);
+
+    $summerInvoice = StudentInvoice::create([
+        'invoice_number' => 'INV-SUMMER-AUS121787',
+        'student_id' => $student->id,
+        'semester_id' => $summer->id,
+        'status' => 'cancelled',
+        'due_date' => now()->addDays(14),
+    ]);
+    $dngPayment = Payment::create([
+        'student_id' => $student->id,
+        'amount' => 30_000_000,
+        'method' => Payment::METHOD_GATEWAY,
+        'source' => 'dng',
+        'external_ref' => 'DNGPAY-230',
+        'paid_at' => now()->subDay(),
+        'status' => Payment::STATUS_COMPLETED,
+        'received_by_user_id' => $user->id,
+    ]);
+
+    foreach ([1, 2] as $block) {
+        $charge = FinanceCharge::create([
+            'student_id' => $student->id,
+            'semester_id' => $summer->id,
+            'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+            'amount' => 15_000_000,
+            'description' => "SUMMER2026 EGC Block {$block}",
+            'effective_at' => now(),
+            'status' => FinanceCharge::STATUS_VOID,
+            'voided_at' => now(),
+            'voided_by_user_id' => $user->id,
+            'void_reason' => 'SUMMER2026 fees voided after DNG payment',
+        ]);
+        $line = InvoiceLine::create([
+            'invoice_id' => $summerInvoice->id,
+            'charge_id' => $charge->id,
+            'amount_snapshot' => 15_000_000,
+            'description_snapshot' => "SUMMER2026 EGC Block {$block}",
+            'status' => 'void',
+            'voided_at' => now(),
+            'void_reason' => 'SUMMER2026 fees voided after DNG payment',
+        ]);
+
+        PaymentApplication::create([
+            'payment_id' => $dngPayment->id,
+            'invoice_line_id' => $line->id,
+            'amount' => 15_000_000,
+            'entry_type' => 'application',
+            'applied_at' => now()->subDay(),
+            'created_by' => $user->id,
+        ]);
+        PaymentApplication::create([
+            'payment_id' => $dngPayment->id,
+            'invoice_line_id' => $line->id,
+            'amount' => -15_000_000,
+            'entry_type' => 'reversal',
+            'applied_at' => now(),
+            'created_by' => $user->id,
+            'source_ref_type' => 'finance_charge',
+            'source_ref_id' => $charge->id,
+        ]);
+    }
+
+    actingAs($user)->get("/finance/students/{$student->id}")
+        ->assertInertia(fn ($page) => $page
+            ->loadDeferredProps('default', fn ($reload) => $reload
+                ->where('ledger_groups.0.semester.code', 'SUMMER2026')
+                ->where('ledger_groups.0.collectible_remaining', 0)
+                ->where('ledger_groups.0.state_label', 'Không còn phải thu')
+                ->has('ledger_groups.0.invoices.0.lines', 2)
+                ->where('ledger_groups.0.invoices.0.lines.0.status', 'void')
+                ->where('ledger_groups.0.invoices.0.lines.0.status_label', 'Đã hủy')
+                ->where('ledger_groups.0.invoices.0.lines.0.outstanding', 0)
+                ->where('ledger_groups.0.invoices.0.lines.0.payment_applied', 15_000_000)
+                ->where('ledger_groups.0.invoices.0.lines.0.payment_reversed', 15_000_000)
+                ->where('ledger_groups.1.semester.code', 'SPRING2026')
+                ->where('ledger_groups.1.collectible_remaining', 5_000_000)
+                ->has('ledger_groups.1.invoices.0.lines', 2)
+                ->where('ledger_groups.1.invoices.0.lines.0.status', 'active')
+                ->where('ledger_groups.1.invoices.0.lines.0.outstanding', 5_000_000)
+                ->where('ledger_groups.1.invoices.0.lines.1.status', 'void')
+                ->where('ledger_groups.1.invoices.0.lines.1.status_label', 'Đã hủy')
+                ->where('ledger_groups.1.invoices.0.lines.1.outstanding', 0)
+                ->where('ledger_groups.1.invoices.0.remaining', 5_000_000)));
+});
+
 it('echoes a valid focus target', function () {
     $user = grantFinanceOverview(['view_finance_student_overview']);
     $student = makeOverviewStudent($this->campus, $this->program, $this->semester);

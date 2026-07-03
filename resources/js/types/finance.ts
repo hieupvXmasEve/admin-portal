@@ -373,6 +373,12 @@ export interface LedgerInvoiceLine {
     paid: number;
     outstanding: number;
     is_credit: boolean;
+    status: 'active' | 'void';
+    status_label: string;
+    voided_at: string | null;
+    void_reason: string | null;
+    payment_applied: number;
+    payment_reversed: number;
 }
 
 export interface LedgerInvoice {
@@ -391,6 +397,10 @@ export interface LedgerInvoice {
 
 export interface LedgerGroup {
     semester: { id: number | null; code: string | null; name: string };
+    collectible_total: number;
+    collectible_paid: number;
+    collectible_remaining: number;
+    state_label: string;
     invoices: LedgerInvoice[];
 }
 

@@ -4,27 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import type { LedgerEvent, LedgerGroup, LedgerInvoice } from '@/types/finance';
-import {
-    getChargeTypeBadgeClass,
-    getChargeTypeLabel,
-    getInvoiceStatusBadgeClass,
-    getInvoiceStatusLabel,
-} from '@/types/finance';
+import type { LedgerEvent, LedgerGroup } from '@/types/finance';
+import { getChargeTypeBadgeClass, getChargeTypeLabel, getInvoiceStatusBadgeClass, getInvoiceStatusLabel } from '@/types/finance';
 import { formatCurrency, formatDate } from '@/utils/format';
 import { financeRoutes } from '@/utils/routes';
 import { Deferred, Link } from '@inertiajs/vue3';
-import {
-    ArrowDownLeft,
-    ArrowUpRight,
-    BookOpen,
-    Calendar,
-    CheckCircle2,
-    Clock,
-    ExternalLink,
-    Minus,
-    Receipt,
-} from 'lucide-vue-next';
+import { ArrowDownLeft, ArrowUpRight, BookOpen, Calendar, CheckCircle2, Clock, ExternalLink, Minus, Receipt } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 const props = defineProps<{ timeline?: LedgerEvent[]; groups?: LedgerGroup[] }>();
@@ -72,20 +57,18 @@ const invoiceBorderClass = (status: string): string => {
     return map[status] ?? 'border-l-slate-300';
 };
 
-const semesterSummary = (invoices: LedgerInvoice[]) => {
-    const remaining = invoices.reduce((sum, invoice) => sum + invoice.remaining, 0);
-    const net = invoices.reduce((sum, invoice) => sum + invoice.net, 0);
-
-    return { count: invoices.length, remaining, net };
+const semesterSummary = (group: LedgerGroup) => {
+    return {
+        count: group.invoices.length,
+        remaining: group.collectible_remaining,
+        net: group.collectible_total,
+    };
 };
 
 const totalOutstanding = computed(() => {
     if (!props.groups?.length) return 0;
 
-    return props.groups.reduce(
-        (sum, group) => sum + group.invoices.reduce((groupSum, invoice) => groupSum + invoice.remaining, 0),
-        0,
-    );
+    return props.groups.reduce((sum, group) => sum + group.collectible_remaining, 0);
 });
 
 const formatLineAmount = (amount: number, isCredit: boolean): string => {
@@ -97,7 +80,7 @@ const formatLineAmount = (amount: number, isCredit: boolean): string => {
 
 <template>
     <Card class="overflow-hidden">
-        <CardHeader class="border-b bg-muted/30 pb-3">
+        <CardHeader class="bg-muted/30 border-b pb-3">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="flex items-start gap-2">
                     <div class="bg-primary/10 text-primary mt-0.5 rounded-md p-2">
@@ -109,11 +92,8 @@ const formatLineAmount = (amount: number, isCredit: boolean): string => {
                     </div>
                 </div>
                 <div v-if="groups?.length" class="text-right">
-                    <p class="text-muted-foreground text-xs">Tổng còn nợ</p>
-                    <p
-                        class="text-lg font-semibold tabular-nums"
-                        :class="totalOutstanding > 0 ? 'text-orange-700 dark:text-orange-300' : 'text-emerald-700 dark:text-emerald-300'"
-                    >
+                    <p class="text-muted-foreground text-xs">Tổng còn phải thu</p>
+                    <p class="text-lg font-semibold tabular-nums" :class="totalOutstanding > 0 ? 'text-orange-700 dark:text-orange-300' : 'text-emerald-700 dark:text-emerald-300'">
                         {{ formatCurrency(totalOutstanding) }}
                     </p>
                 </div>
@@ -144,11 +124,7 @@ const formatLineAmount = (amount: number, isCredit: boolean): string => {
                         </template>
 
                         <div v-if="groups && groups.length" class="space-y-5">
-                            <section
-                                v-for="group in groups"
-                                :key="group.semester.id ?? 'none'"
-                                class="overflow-hidden rounded-lg border"
-                            >
+                            <section v-for="group in groups" :key="group.semester.id ?? 'none'" class="overflow-hidden rounded-lg border">
                                 <div class="bg-muted/50 flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
                                     <div>
                                         <h3 class="text-sm font-semibold tracking-tight">
@@ -159,50 +135,27 @@ const formatLineAmount = (amount: number, isCredit: boolean): string => {
                                         </p>
                                     </div>
                                     <div class="flex flex-wrap items-center gap-2 text-xs">
-                                        <Badge variant="outline" class="tabular-nums">
-                                            {{ semesterSummary(group.invoices).count }} hóa đơn
-                                        </Badge>
-                                        <Badge
-                                            variant="outline"
-                                            class="tabular-nums"
-                                            :class="
-                                                semesterSummary(group.invoices).remaining > 0
-                                                    ? 'border-orange-200 bg-orange-50 text-orange-800'
-                                                    : 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                                            "
-                                        >
-                                            Còn nợ {{ formatCurrency(semesterSummary(group.invoices).remaining) }}
+                                        <Badge variant="outline" class="tabular-nums"> {{ semesterSummary(group).count }} hóa đơn </Badge>
+                                        <Badge variant="outline" class="tabular-nums" :class="semesterSummary(group).remaining > 0 ? 'border-orange-200 bg-orange-50 text-orange-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'">
+                                            <template v-if="semesterSummary(group).remaining > 0">Còn phải thu {{ formatCurrency(semesterSummary(group).remaining) }}</template>
+                                            <template v-else>{{ group.state_label }}</template>
                                         </Badge>
                                     </div>
                                 </div>
 
                                 <div class="divide-y">
-                                    <article
-                                        v-for="invoice in group.invoices"
-                                        :key="invoice.id"
-                                        class="border-l-4 bg-card px-4 py-3"
-                                        :class="invoiceBorderClass(invoice.status)"
-                                    >
+                                    <article v-for="invoice in group.invoices" :key="invoice.id" class="bg-card border-l-4 px-4 py-3" :class="invoiceBorderClass(invoice.status)">
                                         <div class="flex flex-wrap items-start justify-between gap-3">
                                             <div class="min-w-0 space-y-1">
                                                 <div class="flex flex-wrap items-center gap-2">
-                                                    <Link
-                                                        :href="financeRoutes.lookup.invoiceDetail(invoice.id)"
-                                                        class="hover:text-primary truncate font-medium tabular-nums transition-colors"
-                                                    >
+                                                    <Link :href="financeRoutes.lookup.invoiceDetail(invoice.id)" class="hover:text-primary truncate font-medium tabular-nums transition-colors">
                                                         {{ invoice.invoice_number }}
                                                     </Link>
-                                                    <Badge
-                                                        variant="outline"
-                                                        :class="cn('text-[11px] font-medium', getInvoiceStatusBadgeClass(invoice.status))"
-                                                    >
+                                                    <Badge variant="outline" :class="cn('text-[11px] font-medium', getInvoiceStatusBadgeClass(invoice.status))">
                                                         <CheckCircle2 v-if="invoice.status === 'paid'" class="mr-1 size-3" />
                                                         {{ getInvoiceStatusLabel(invoice.status) }}
                                                     </Badge>
-                                                    <Link
-                                                        :href="financeRoutes.lookup.invoiceDetail(invoice.id)"
-                                                        class="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-xs"
-                                                    >
+                                                    <Link :href="financeRoutes.lookup.invoiceDetail(invoice.id)" class="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-xs">
                                                         Chi tiết
                                                         <ExternalLink class="size-3" />
                                                     </Link>
@@ -227,33 +180,26 @@ const formatLineAmount = (amount: number, isCredit: boolean): string => {
                                                 </div>
                                                 <div>
                                                     <p class="text-muted-foreground">Giảm giá</p>
-                                                    <p class="font-medium tabular-nums text-violet-700 dark:text-violet-300">
+                                                    <p class="font-medium text-violet-700 tabular-nums dark:text-violet-300">
                                                         {{ invoice.discount > 0 ? `−${formatCurrency(invoice.discount)}` : '—' }}
                                                     </p>
                                                 </div>
                                                 <div>
                                                     <p class="text-muted-foreground">Đã thu</p>
-                                                    <p class="font-medium tabular-nums text-emerald-700 dark:text-emerald-300">
+                                                    <p class="font-medium text-emerald-700 tabular-nums dark:text-emerald-300">
                                                         {{ formatCurrency(invoice.paid) }}
                                                     </p>
                                                 </div>
                                                 <div>
-                                                    <p class="text-muted-foreground">Còn nợ</p>
-                                                    <p
-                                                        class="font-semibold tabular-nums"
-                                                        :class="
-                                                            invoice.remaining > 0
-                                                                ? 'text-orange-700 dark:text-orange-300'
-                                                                : 'text-emerald-700 dark:text-emerald-300'
-                                                        "
-                                                    >
+                                                    <p class="text-muted-foreground">Còn phải thu</p>
+                                                    <p class="font-semibold tabular-nums" :class="invoice.remaining > 0 ? 'text-orange-700 dark:text-orange-300' : 'text-emerald-700 dark:text-emerald-300'">
                                                         {{ formatCurrency(invoice.remaining) }}
                                                     </p>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div v-if="invoice.lines.length" class="mt-3 overflow-x-auto rounded-md border bg-muted/20">
+                                        <div v-if="invoice.lines.length" class="bg-muted/20 mt-3 overflow-x-auto rounded-md border">
                                             <table class="w-full min-w-[520px] text-xs">
                                                 <thead>
                                                     <tr class="text-muted-foreground border-b text-left">
@@ -261,39 +207,46 @@ const formatLineAmount = (amount: number, isCredit: boolean): string => {
                                                         <th class="px-3 py-2 font-medium">Mô tả</th>
                                                         <th class="px-3 py-2 text-right font-medium">Phải thu</th>
                                                         <th class="px-3 py-2 text-right font-medium">Đã thu</th>
-                                                        <th class="px-3 py-2 text-right font-medium">Còn nợ</th>
+                                                        <th class="px-3 py-2 text-right font-medium">Còn phải thu</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody class="divide-y">
-                                                    <tr v-for="line in invoice.lines" :key="line.id">
+                                                    <tr v-for="line in invoice.lines" :key="line.id" :class="line.status === 'void' ? 'bg-muted/30 text-muted-foreground' : ''">
                                                         <td class="px-3 py-2 align-top">
                                                             <Badge
                                                                 variant="outline"
-                                                                :class="cn('whitespace-nowrap text-[10px]', getChargeTypeBadgeClass(line.charge_type ?? line.label))"
+                                                                :class="cn('text-[10px] whitespace-nowrap', line.status === 'void' ? 'border-gray-200 bg-gray-100 text-gray-600' : getChargeTypeBadgeClass(line.charge_type ?? line.label))"
                                                             >
                                                                 {{ getChargeTypeLabel(line.charge_type ?? line.label) }}
                                                             </Badge>
+                                                            <Badge v-if="line.status === 'void'" variant="outline" class="mt-1 block w-fit border-gray-200 bg-gray-100 text-[10px] text-gray-600">
+                                                                {{ line.status_label }}
+                                                            </Badge>
                                                         </td>
-                                                        <td class="text-muted-foreground max-w-[200px] truncate px-3 py-2 align-top">
-                                                            {{ line.description || '—' }}
+                                                        <td class="max-w-[220px] px-3 py-2 align-top">
+                                                            <p class="truncate" :class="line.status === 'void' ? 'text-muted-foreground' : ''">
+                                                                {{ line.description || '—' }}
+                                                            </p>
+                                                            <p v-if="line.status === 'void' && line.void_reason" class="text-muted-foreground mt-1 truncate text-[11px]">
+                                                                {{ line.void_reason }}
+                                                            </p>
                                                         </td>
                                                         <td
                                                             class="px-3 py-2 text-right align-top tabular-nums"
-                                                            :class="line.is_credit ? 'text-emerald-700 dark:text-emerald-300' : ''"
+                                                            :class="[line.is_credit ? 'text-emerald-700 dark:text-emerald-300' : '', line.status === 'void' ? 'text-muted-foreground line-through' : '']"
                                                         >
                                                             {{ formatLineAmount(line.amount, line.is_credit) }}
                                                         </td>
-                                                        <td class="px-3 py-2 text-right align-top tabular-nums text-emerald-700 dark:text-emerald-300">
-                                                            {{ line.paid > 0 ? formatCurrency(line.paid) : '—' }}
+                                                        <td class="px-3 py-2 text-right align-top tabular-nums">
+                                                            <p :class="line.paid > 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'">
+                                                                {{ line.paid > 0 ? formatCurrency(line.paid) : '—' }}
+                                                            </p>
+                                                            <div v-if="line.payment_applied > 0 || line.payment_reversed > 0" class="text-muted-foreground mt-1 space-y-0.5 text-[11px]">
+                                                                <p v-if="line.payment_applied > 0">Đã áp dụng {{ formatCurrency(line.payment_applied) }}</p>
+                                                                <p v-if="line.payment_reversed > 0">Đã đảo {{ formatCurrency(line.payment_reversed) }}</p>
+                                                            </div>
                                                         </td>
-                                                        <td
-                                                            class="px-3 py-2 text-right align-top font-medium tabular-nums"
-                                                            :class="
-                                                                line.outstanding > 0
-                                                                    ? 'text-orange-700 dark:text-orange-300'
-                                                                    : 'text-muted-foreground'
-                                                            "
-                                                        >
+                                                        <td class="px-3 py-2 text-right align-top font-medium tabular-nums" :class="line.outstanding > 0 ? 'text-orange-700 dark:text-orange-300' : 'text-muted-foreground'">
                                                             {{ formatCurrency(line.outstanding) }}
                                                         </td>
                                                     </tr>
@@ -319,11 +272,7 @@ const formatLineAmount = (amount: number, isCredit: boolean): string => {
                         </template>
 
                         <div v-if="timeline && timeline.length" class="divide-y rounded-lg border">
-                            <div
-                                v-for="(event, idx) in timeline"
-                                :key="idx"
-                                class="flex items-center justify-between gap-3 px-4 py-3"
-                            >
+                            <div v-for="(event, idx) in timeline" :key="idx" class="flex items-center justify-between gap-3 px-4 py-3">
                                 <div class="flex min-w-0 items-center gap-3">
                                     <div :class="cn('rounded-full p-2', timelineEventMeta(event).bg)">
                                         <component :is="timelineEventMeta(event).icon" :class="cn('size-3.5', timelineEventMeta(event).tone)" />
@@ -335,14 +284,7 @@ const formatLineAmount = (amount: number, isCredit: boolean): string => {
                                         </p>
                                     </div>
                                 </div>
-                                <span
-                                    class="shrink-0 text-sm font-semibold tabular-nums"
-                                    :class="
-                                        event.signed_amount < 0
-                                            ? 'text-emerald-700 dark:text-emerald-300'
-                                            : 'text-orange-700 dark:text-orange-300'
-                                    "
-                                >
+                                <span class="shrink-0 text-sm font-semibold tabular-nums" :class="event.signed_amount < 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-orange-700 dark:text-orange-300'">
                                     {{ event.signed_amount < 0 ? '' : '+' }}{{ formatCurrency(event.signed_amount) }}
                                 </span>
                             </div>
