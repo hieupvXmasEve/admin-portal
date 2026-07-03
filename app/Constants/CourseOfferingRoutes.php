@@ -28,6 +28,8 @@ class CourseOfferingRoutes
     // Course Offering Management Routes
     public const TOGGLE_STATUS = 'course-offerings.toggle-status';
 
+    public const FINALIZE = 'course-offerings.finalize';
+
     // public const UPDATE_COURSE_STATUS = 'course-offerings.update-course-status';
 
     public const SPLIT_SHOW = 'course-offerings.split.show';

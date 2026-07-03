@@ -109,24 +109,17 @@ const goBack = () => window.history.back();
                         <span class="text-muted-foreground font-normal">—</span>
                         {{ courseOffering.course_title }}
                     </h1>
-                    <Badge v-if="courseOffering.section_code" variant="secondary" class="shrink-0">
-                        Section {{ courseOffering.section_code }}
-                    </Badge>
+                    <Badge v-if="courseOffering.section_code" variant="secondary" class="shrink-0"> Section {{ courseOffering.section_code }} </Badge>
                     <Badge :variant="courseStatusVariant(courseOffering.course_status)" class="shrink-0 capitalize">
                         {{ courseOffering.course_status }}
                     </Badge>
                 </div>
-                <p class="text-muted-foreground mt-1 text-sm">
-                    {{ courseOffering.semester?.name }} · {{ courseOffering.current_enrollment }}/{{ courseOffering.max_capacity }} students
-                </p>
+                <p class="text-muted-foreground mt-1 text-sm">{{ courseOffering.semester?.name }} · {{ courseOffering.current_enrollment }}/{{ courseOffering.max_capacity }} students</p>
             </div>
 
             <!-- Actions -->
             <div class="flex shrink-0 items-center gap-2">
-                <Link
-                    v-if="!courseOffering.section_code && courseOffering.current_enrollment > 0 && !courseOffering.class_sessions?.length"
-                    :href="route('course-offerings.split.show', courseOffering.id)"
-                >
+                <Link v-if="!courseOffering.section_code && courseOffering.current_enrollment > 0 && !courseOffering.class_sessions?.length" :href="route('course-offerings.split.show', courseOffering.id)">
                     <Button variant="outline" size="sm">
                         <Users class="mr-1.5 h-3.5 w-3.5" />
                         Split into Sections
@@ -148,7 +141,7 @@ const goBack = () => window.history.back();
     </div>
 
     <!-- Lifecycle Header (backend-derived operational state, ADR 0013) -->
-    <CourseLifecycleHeader :operational-state="operational_state" />
+    <CourseLifecycleHeader :course-offering-id="courseOffering.id" :operational-state="operational_state" />
 
     <!-- Tabs -->
     <Tabs :model-value="currentTab" class="mt-2 w-full" @update:model-value="handleTabChange">
@@ -206,12 +199,7 @@ const goBack = () => window.history.back();
                     </div>
                 </template>
                 <template #default="{ reloading }">
-                    <SurveyTab
-                        :course-offering="courseOffering"
-                        :survey-data="surveyData"
-                        :survey-forms="surveyForms"
-                        :class="{ 'opacity-50': reloading }"
-                    />
+                    <SurveyTab :course-offering="courseOffering" :survey-data="surveyData" :survey-forms="surveyForms" :class="{ 'opacity-50': reloading }" />
                 </template>
             </Deferred>
         </TabsContent>

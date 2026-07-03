@@ -7,11 +7,15 @@
  */
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useCockpitAction } from '@/composables/useCockpitAction';
+import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import type { LifecycleStage, OperationalState } from '@/types/operational-state';
 import { AlertTriangle, CheckCircle2 } from 'lucide-vue-next';
 import { computed } from 'vue';
+import { route } from 'ziggy-js';
 
 interface Props {
+    courseOfferingId: number;
     operationalState: OperationalState;
 }
 
@@ -64,11 +68,29 @@ const finalizeAction = computed(() => props.operationalState.available_actions.f
 
 const finalizeBlockedExplanation = computed(() => {
     if (!finalizeAction.value || finalizeAction.value.allowed) return null;
-    const messages = blockers.value
-        .filter((blocker) => finalizeAction.value!.blocked_by.includes(blocker.code))
-        .map((blocker) => blocker.message);
+    const messages = blockers.value.filter((blocker) => finalizeAction.value!.blocked_by.includes(blocker.code)).map((blocker) => blocker.message);
     return messages.join(' · ');
 });
+
+const { isPending: isFinalizing, submit: submitCockpitAction } = useCockpitAction();
+const { showConfirmDialog } = useGlobalConfirmDialog();
+
+// courseOffering is refreshed alongside operational_state so the header's
+// course_status badge doesn't go stale after completion.
+const finalize = () => {
+    showConfirmDialog(
+        {
+            title: 'Finalize course',
+            message: 'Finalizing completes this course offering, locks in final grades, and cannot be undone. Continue?',
+            confirmText: 'Finalize course',
+        },
+        {
+            onConfirm: () => {
+                submitCockpitAction(route('course-offerings.finalize', props.courseOfferingId), ['operational_state', 'courseOffering']);
+            },
+        },
+    );
+};
 </script>
 
 <template>
@@ -158,27 +180,22 @@ const finalizeBlockedExplanation = computed(() => {
                 </div>
 
                 <div v-if="finalizeAction" class="flex shrink-0 flex-col items-start gap-1 md:items-end">
-                    <Button size="sm" :disabled="!finalizeAction.allowed" :title="finalizeBlockedExplanation ?? undefined">
-                        {{ finalizeAction.label }}
+                    <Button size="sm" :disabled="!finalizeAction.allowed || isFinalizing" :title="finalizeBlockedExplanation ?? undefined" @click="finalize">
+                        {{ isFinalizing ? 'Finalizing…' : finalizeAction.label }}
                     </Button>
-                    <p v-if="!finalizeAction.allowed" class="max-w-60 text-right text-xs text-yellow-700 dark:text-yellow-300">
-                        Resolve the readiness blockers to finalize this course.
-                    </p>
+                    <p v-if="!finalizeAction.allowed" class="max-w-60 text-right text-xs text-yellow-700 dark:text-yellow-300">Resolve the readiness blockers to finalize this course.</p>
                 </div>
             </div>
         </div>
 
         <!-- Ready to finalize -->
-        <div
-            v-else-if="finalizeAction"
-            class="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20"
-        >
+        <div v-else-if="finalizeAction" class="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20">
             <div class="flex items-center gap-2 text-sm text-green-800 dark:text-green-200">
                 <CheckCircle2 class="h-4 w-4 shrink-0 text-green-600" />
                 <span>No readiness blockers — this course can be finalized.</span>
             </div>
-            <Button size="sm" :disabled="!finalizeAction.allowed">
-                {{ finalizeAction.label }}
+            <Button size="sm" :disabled="!finalizeAction.allowed || isFinalizing" @click="finalize">
+                {{ isFinalizing ? 'Finalizing…' : finalizeAction.label }}
             </Button>
         </div>
     </div>

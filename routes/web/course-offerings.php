@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Constants\CourseOfferingRoutes;
 use App\Http\Controllers\Api\ClassSessionController;
 use App\Http\Controllers\Web\CourseOfferingController;
+use App\Modules\Academic\Http\Web\FinalizeCourseOfferingController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -43,6 +44,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/{courseOffering}/toggle-status', [CourseOfferingController::class, 'toggleStatus'])
             ->middleware('can:edit_course_offering')
             ->name(CourseOfferingRoutes::TOGGLE_STATUS);
+
+        Route::post('/{courseOffering}/finalize', FinalizeCourseOfferingController::class)
+            ->middleware('can:complete_course_offering')
+            ->name(CourseOfferingRoutes::FINALIZE);
 
         /*
         Route::patch('/{courseOffering}/update-course-status', [CourseOfferingController::class, 'updateCourseStatus'])

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Academic\Actions;
 
 use App\Models\CourseOffering;
@@ -61,11 +63,22 @@ class MarkCourseOfferingCompletedAction
         }
 
         if (! empty($unmarkedSessions)) {
-            throw new RuntimeException('Cannot complete course. Attendance has not been taken for the following sessions: ' . implode(', ', $unmarkedSessions));
+            throw new RuntimeException('Cannot complete course. Attendance has not been taken for the following sessions: '.implode(', ', $unmarkedSessions));
         }
 
         if (! empty($autoSystemOnlySessions)) {
-            throw new RuntimeException('Cannot complete course. The following sessions only have auto_system attendance and still require manual attendance confirmation: ' . implode(', ', $autoSystemOnlySessions));
+            throw new RuntimeException('Cannot complete course. The following sessions only have auto_system attendance and still require manual attendance confirmation: '.implode(', ', $autoSystemOnlySessions));
+        }
+
+        // Canvas completion rule (ADR 0013): a mapped-but-unsynced offering can
+        // no longer fall back to manually entered grades — grades must be synced
+        // from Canvas first. pending/ignored mappings and unmapped offerings are
+        // unaffected. Forward-only: guarded by course_status so already-completed
+        // offerings (recalculate) are never retroactively blocked.
+        if ($courseOffering->course_status !== 'completed'
+            && ! $courseOffering->is_canvas_synced
+            && $courseOffering->canvasCourseMappings()->where('sync_status', 'mapped')->exists()) {
+            throw new RuntimeException('Cannot complete course. This offering is mapped to Canvas but grades have not been synced. Sync grades from Canvas before finalizing.');
         }
 
         try {
@@ -92,12 +105,12 @@ class MarkCourseOfferingCompletedAction
                 return $result;
             });
         } catch (\Exception $e) {
-            Log::error('Failed to complete course: ' . $e->getMessage(), [
+            Log::error('Failed to complete course: '.$e->getMessage(), [
                 'course_offering_id' => $courseOffering->id,
                 'course_code' => $courseOffering->course_code,
             ]);
 
-            throw new RuntimeException('Failed to complete course: ' . $e->getMessage());
+            throw new RuntimeException('Failed to complete course: '.$e->getMessage());
         }
     }
 }
