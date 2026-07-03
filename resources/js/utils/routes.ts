@@ -356,15 +356,10 @@ export const attendanceRoutes = {
         update: (id: number) => route('class-sessions.update', { classSession: id }),
         destroy: (id: number) => route('class-sessions.destroy', { classSession: id }),
     },
+    // Cross-offering reporting only (ADR 0013 phase B) — recording routes
+    // live on the Course Offering Cockpit instead.
     attendance: {
         index: () => route('attendance.index'),
-        create: () => route('attendance.create'),
-        edit: (id: number) => route('attendance.edit', { attendance: id }),
-        show: (id: number) => route('attendance.show', { attendance: id }),
-        store: () => route('attendance.store'),
-        update: (id: number) => route('attendance.update', { attendance: id }),
-        destroy: (id: number) => route('attendance.destroy', { attendance: id }),
-        bulkUpdate: () => route('attendance.api.bulk-update'),
     },
 } as const;
 

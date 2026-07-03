@@ -14,11 +14,11 @@ The lecturer attendance API remains untouched — this issue only affects the st
 
 ## Acceptance criteria
 
-- [ ] The standalone Attendance pages no longer expose a way to create/edit attendance records for a session (that action only exists in the cockpit now).
-- [ ] Attendance Index (or equivalent) remains available as a cross-offering reporting view.
-- [ ] Where a staff member would previously have jumped from Attendance to record something, the reporting view now deep-links to the relevant course offering's cockpit instead.
-- [ ] Any routes/controller actions that only existed to support per-offering recording on the standalone pages are removed or redirected, not left as dead/duplicate code paths.
-- [ ] Pest HTTP feature tests confirm the removed recording routes are gone (404/removed) or redirect appropriately, and that the reporting views still function.
+- [x] The standalone Attendance pages no longer expose a way to create/edit attendance records for a session (that action only exists in the cockpit now).
+- [x] Attendance Index (or equivalent) remains available as a cross-offering reporting view.
+- [x] Where a staff member would previously have jumped from Attendance to record something, the reporting view now deep-links to the relevant course offering's cockpit instead.
+- [x] Any routes/controller actions that only existed to support per-offering recording on the standalone pages are removed or redirected, not left as dead/duplicate code paths.
+- [x] Pest HTTP feature tests confirm the removed recording routes are gone (404/removed) or redirect appropriately, and that the reporting views still function.
 
 ## Blocked by
 

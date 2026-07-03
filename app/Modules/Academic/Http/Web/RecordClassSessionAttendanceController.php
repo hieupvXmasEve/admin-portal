@@ -15,12 +15,11 @@ use Inertia\Inertia;
 
 /**
  * Cockpit "record attendance" action (ADR 0013 phase B): records a batch of
- * per-student attendance for one session from the cockpit sessions view,
- * instead of the standalone staff Attendance pages. Reuses
- * RecordAttendanceAction so the recording logic never drifts from
- * AttendanceController::store. The frontend follows the redirect with an
- * Inertia partial reload of `operational_state` (and `courseOffering`) so the
- * per-session attendance status and readiness blockers both refresh.
+ * per-student attendance for one session from the cockpit sessions view. The
+ * standalone staff Attendance pages are reporting-only and no longer record
+ * attendance. The frontend follows the redirect with an Inertia partial
+ * reload of `operational_state` (and `courseOffering`) so the per-session
+ * attendance status and readiness blockers both refresh.
  *
  * Campus/parent-child scoping is enforced by the FormRequest's authorize()
  * (mirrors FinalizeCourseOfferingController's pattern of keeping that check

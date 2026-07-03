@@ -7,13 +7,16 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\ClassSession;
-use App\Models\Student;
-use App\Modules\Academic\Actions\Attendance\RecordAttendanceAction;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 
+/**
+ * Cross-offering attendance reporting (ADR 0013 phase B). Per-offering
+ * recording lives in the Course Offering Cockpit
+ * (RecordClassSessionAttendanceController); this controller no longer
+ * exposes create/edit/delete entry points.
+ */
 class AttendanceController extends Controller
 {
     /**
@@ -143,209 +146,6 @@ class AttendanceController extends Controller
                 'absent' => $absentCount,
                 'excused' => $excusedCount,
             ],
-        ]);
-    }
-
-    /**
-     * Show the form for creating a new attendance record
-     */
-    public function create(Request $request): Response
-    {
-        $sessionId = $request->get('session_id');
-
-        $classSessions = ClassSession::with('courseOffering.unit')
-            ->orderBy('session_date', 'desc')
-            ->get();
-
-        $students = Student::get();
-
-        return Inertia::render('attendance/Create', [
-            'classSessions' => $classSessions,
-            'students' => $students,
-            'preselectedSessionId' => $sessionId,
-        ]);
-    }
-
-    /**
-     * Store a newly created attendance record
-     */
-    public function store(Request $request)
-    {
-        $validated = $request->validate(RecordAttendanceAction::validationRules());
-
-        // Staff act as a User here, not a Lecture — recorded_by_lecture_id is
-        // FK-constrained to `lectures` and stays null for staff-recorded rows.
-        $attendance = RecordAttendanceAction::run($validated);
-
-        // Update attendance statistics for the class session
-        $classSession = $attendance->classSession;
-        if ($classSession) {
-            $classSession->updateAttendanceStatistics();
-        }
-
-        if ($request->expectsJson()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Attendance record created successfully',
-                'data' => $attendance->load(['classSession', 'student']),
-            ]);
-        }
-
-        return redirect()->route('attendance.index')
-            ->with('success', 'Attendance record created successfully');
-    }
-
-    /**
-     * Display the specified attendance record
-     */
-    public function show(Attendance $attendance): Response
-    {
-        $attendance->load([
-            'classSession.courseOffering.unit',
-            'classSession.lecture',
-            'student',
-            'recordedBy',
-            'verifiedBy',
-        ]);
-
-        return Inertia::render('attendance/Show', [
-            'attendance' => $attendance,
-        ]);
-    }
-
-    /**
-     * Show the form for editing the specified attendance record
-     */
-    public function edit(Attendance $attendance): Response
-    {
-        $attendance->load(['classSession.courseOffering.unit', 'student']);
-
-        $classSessions = ClassSession::with('courseOffering.unit')
-            ->orderBy('session_date', 'desc')
-            ->get();
-
-        $students = Student::get();
-
-        return Inertia::render('attendance/Edit', [
-            'attendance' => $attendance,
-            'classSessions' => $classSessions,
-            'students' => $students,
-        ]);
-    }
-
-    /**
-     * Update the specified attendance record
-     */
-    public function update(Request $request, Attendance $attendance)
-    {
-        $validated = $request->validate([
-            'class_session_id' => 'required|exists:class_sessions,id',
-            'student_id' => 'required|exists:students,id',
-            'status' => 'required|in:present,late,absent,excused',
-            'check_in_time' => 'nullable|date',
-            'check_out_time' => 'nullable|date|after:check_in_time',
-            'minutes_late' => 'nullable|integer|min:0',
-            'minutes_present' => 'nullable|integer|min:0',
-            'recording_method' => 'required|in:manual,qr_code,rfid,geolocation,biometric,mobile_app',
-            'participation_level' => 'nullable|in:excellent,good,average,poor',
-            'participation_score' => 'nullable|numeric|min:0|max:100',
-            'participation_notes' => 'nullable|string',
-            'notes' => 'nullable|string',
-            'excuse_reason' => 'nullable|string',
-            'is_verified' => 'boolean',
-        ]);
-
-        if ($validated['is_verified'] ?? false) {
-            $validated['verified_by_user_id'] = Auth::user()->id;
-            $validated['verified_at'] = now();
-        }
-
-        $attendance->update($validated);
-
-        // Update attendance statistics for the class session
-        $classSession = $attendance->classSession;
-        if ($classSession) {
-            $classSession->updateAttendanceStatistics();
-        }
-
-        if ($request->expectsJson()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Attendance record updated successfully',
-                'data' => $attendance->load(['classSession', 'student']),
-            ]);
-        }
-
-        return back()->with('success', 'Attendance record updated successfully');
-    }
-
-    /**
-     * Remove the specified attendance record
-     */
-    public function destroy(Request $request, Attendance $attendance)
-    {
-        $classSession = $attendance->classSession;
-        $attendance->delete();
-
-        // Update attendance statistics for the class session
-        if ($classSession) {
-            $classSession->updateAttendanceStatistics();
-        }
-
-        if ($request->expectsJson()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Attendance record deleted successfully',
-            ]);
-        }
-
-        return redirect()->route('attendance.index')
-            ->with('success', 'Attendance record deleted successfully');
-    }
-
-    /**
-     * Bulk update attendance records
-     */
-    public function bulkUpdate(Request $request)
-    {
-        $validated = $request->validate([
-            'attendance_ids' => 'required|array',
-            'attendance_ids.*' => 'exists:attendances,id',
-            'status' => 'required|in:present,late,absent,excused',
-            'recording_method' => 'nullable|in:manual,qr_code,rfid,geolocation,biometric,mobile_app',
-            'is_verified' => 'boolean',
-        ]);
-
-        $updateData = ['status' => $validated['status']];
-
-        if (isset($validated['recording_method'])) {
-            $updateData['recording_method'] = $validated['recording_method'];
-        }
-
-        if ($validated['is_verified'] ?? false) {
-            $updateData['is_verified'] = true;
-            $updateData['verified_by_user_id'] = Auth::user()->id;
-            $updateData['verified_at'] = now();
-        }
-
-        $updated = Attendance::whereIn('id', $validated['attendance_ids'])
-            ->update($updateData);
-
-        // Update attendance statistics for affected class sessions
-        $classSessionIds = Attendance::whereIn('id', $validated['attendance_ids'])
-            ->distinct()
-            ->pluck('class_session_id');
-
-        foreach ($classSessionIds as $classSessionId) {
-            $classSession = ClassSession::find($classSessionId);
-            if ($classSession) {
-                $classSession->updateAttendanceStatistics();
-            }
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => "Successfully updated {$updated} attendance records",
         ]);
     }
 }

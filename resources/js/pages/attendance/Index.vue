@@ -5,15 +5,13 @@ import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { PaginatedResponse } from '@/types';
 import type { Attendance } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ColumnDef } from '@tanstack/vue-table';
-import { Calendar, CheckCircle, Clock, Edit, Eye, FileText, MoreHorizontal, QrCode, Trash2, User, UserCheck, X, XCircle } from 'lucide-vue-next';
+import { Calendar, CheckCircle, Clock, Edit, FileText, QrCode, User, UserCheck, X, XCircle } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
-import { toast } from 'vue-sonner';
 
 interface Props {
     attendances: PaginatedResponse<Attendance>;
@@ -172,7 +170,7 @@ const columns: ColumnDef<Attendance>[] = [
     },
     {
         id: 'actions',
-        header: 'Actions',
+        header: 'Course Offering',
         enableHiding: false,
         enableSorting: false,
         cell: 'actions',
@@ -191,20 +189,6 @@ const handlePaginationNavigate = (url: string) => {
 const handlePageSizeChange = (pageSize: number) => {
     filters.value.per_page = pageSize;
     applyFilters(filters.value);
-};
-
-// Delete attendance record
-const deleteAttendance = (attendanceId: number) => {
-    if (!confirm('Are you sure you want to delete this attendance record?')) return;
-
-    router.delete(`/attendance/${attendanceId}`, {
-        onSuccess: () => {
-            toast.success('Attendance record deleted successfully');
-        },
-        onError: () => {
-            toast.error('Failed to delete attendance record');
-        },
-    });
 };
 
 // Navigate to sessions
@@ -399,33 +383,13 @@ const viewSessions = () => {
             </template>
 
             <template #cell-actions="{ row }">
-                <div class="flex items-center gap-2">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger as-child>
-                            <Button variant="ghost" size="sm">
-                                <MoreHorizontal class="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <Link :href="route('attendance.show', row.original.id)">
-                                <DropdownMenuItem>
-                                    <Eye class="mr-2 h-4 w-4" />
-                                    View Details
-                                </DropdownMenuItem>
-                            </Link>
-                            <Link :href="route('attendance.edit', row.original.id)">
-                                <DropdownMenuItem>
-                                    <Edit class="mr-2 h-4 w-4" />
-                                    Edit Record
-                                </DropdownMenuItem>
-                            </Link>
-                            <DropdownMenuItem class="text-destructive" @click="deleteAttendance(row.original.id)">
-                                <Trash2 class="mr-2 h-4 w-4" />
-                                Delete Record
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
+                <Link v-if="row.original.class_session?.course_offering_id" :href="route('course-offerings.show', row.original.class_session.course_offering_id) + '?tab=sessions'">
+                    <Button variant="outline" size="sm">
+                        <CheckCircle class="mr-2 h-4 w-4" />
+                        View in Course Offering
+                    </Button>
+                </Link>
+                <span v-else class="text-muted-foreground text-xs">—</span>
             </template>
         </DataTable>
 
