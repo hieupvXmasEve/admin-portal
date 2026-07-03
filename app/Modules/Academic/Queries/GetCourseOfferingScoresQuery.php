@@ -10,10 +10,10 @@ use App\Services\CourseStatisticsService;
 /**
  * Extract assessment scores data for a course offering.
  *
- * Delegates to CourseStatisticsService::getAssessmentScoresGrid() to keep
- * logic in one place while enabling reuse from both:
- *   - CourseStatisticsController@assessmentScores (existing standalone page)
- *   - CourseOfferingController@show (new deferred prop)
+ * Delegates to CourseStatisticsService::getAssessmentScoresGrid(). Backs the
+ * Course Offering Cockpit's scores tab (CourseOfferingController@show); the
+ * old standalone Course Statistics assessment-scores page that used to call
+ * this directly is retired (ADR 0013 phase C) and now only redirects there.
  */
 class GetCourseOfferingScoresQuery
 {

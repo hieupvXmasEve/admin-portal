@@ -227,7 +227,7 @@ const goToOfferingDetail = (id: number) => {
 };
 
 const goToAssessmentScoresPage = (courseOfferingId: number) => {
-    router.visit(`/course-statistics/${courseOfferingId}/assessment-scores`);
+    router.visit(route('course-offerings.show', courseOfferingId) + '?tab=scores');
 };
 
 const exportStatistics = (courseOfferingId: number) => {

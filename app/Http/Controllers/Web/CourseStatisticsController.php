@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
+use App\Constants\CourseOfferingRoutes;
 use App\Exports\AttendanceGridExport;
 use App\Exports\CourseOfferingStatisticsExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CourseStatisticsRequest;
-use App\Http\Resources\CourseStatisticsResource;
-use App\Models\CourseOffering;
 use App\Http\Resources\UnitStatisticsResource;
+use App\Models\CourseOffering;
 use App\Models\Semester;
-use App\Modules\Academic\Queries\GetCourseOfferingScoresQuery;
 use App\Services\CourseStatisticsService;
 use App\Services\ExcelExportService;
+use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -97,11 +97,17 @@ class CourseStatisticsController extends Controller
         return $this->excelService->download($export, $filename);
     }
 
-    public function assessmentScores(CourseOffering $courseOffering): Response
+    /**
+     * The per-offering assessment-scores page is retired (ADR 0013 phase C);
+     * this route only exists so old links/bookmarks land on the Course
+     * Offering Cockpit's scores tab, which renders the same scores grid.
+     */
+    public function assessmentScores(CourseOffering $courseOffering): RedirectResponse
     {
-        $data = GetCourseOfferingScoresQuery::handle($courseOffering);
-
-        return Inertia::render('CourseStatistics/AssessmentScores', $data);
+        return redirect()->route(CourseOfferingRoutes::SHOW, [
+            'courseOffering' => $courseOffering,
+            'tab' => 'scores',
+        ]);
     }
 
     public function exportCombined(CourseOffering $courseOffering): BinaryFileResponse

@@ -22,6 +22,7 @@ import { ColumnDef } from '@tanstack/vue-table';
 import { AlertCircle, Award, BarChart3, Check, CheckCircle2, ChevronsUpDown, Clock, ExternalLink, EyeOff, Link2, Link2Off, ListChecks, MoreHorizontal, RefreshCw, Search, X } from 'lucide-vue-next';
 import { computed, h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
+import { route } from 'ziggy-js';
 
 interface CanvasCourseMapping {
     id: number;
@@ -690,7 +691,7 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
             if (!mapping.course_offering || !mapping.course_offering.id || !mapping.is_mapped) {
                 return h('span', { class: 'text-muted-foreground text-sm' }, '—');
             }
-            const statisticsUrl = `/course-statistics/${mapping.course_offering.id}/assessment-scores`;
+            const statisticsUrl = route('course-offerings.show', mapping.course_offering.id) + '?tab=scores';
 
             return h(
                 Link,

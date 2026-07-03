@@ -146,7 +146,7 @@ const getStatusLabel = (status: string) => {
                         View in Course Offering
                     </Button>
                 </Link>
-                <Link :href="`/course-statistics/${course_offering.id}/assessment-scores`">
+                <Link :href="route('course-offerings.show', course_offering.id) + '?tab=scores'">
                     <Button variant="outline" size="sm">
                         <BarChart3 class="mr-2 h-4 w-4" />
                         Assessment Scores
