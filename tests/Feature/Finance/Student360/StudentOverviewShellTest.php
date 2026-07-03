@@ -199,10 +199,77 @@ it('shows staff-facing tuition KPIs and surplus source for a paid DNG released f
                 ->where('tuition_overview.kpis.collected.amount', 15_000_000)
                 ->where('tuition_overview.kpis.surplus.label', 'Còn dư')
                 ->where('tuition_overview.kpis.surplus.amount', 30_000_000)
-                ->where('tuition_overview.surplus_message', 'Còn dư 30.000.000 từ DNG #230, đã nộp ngày 02/05/2026'));
+                ->where('tuition_overview.surplus_message', 'Còn dư 30.000.000 từ DNG #230, đã nộp ngày 02/05/2026')
+                ->has('payment_history', 2)
+                ->where('payment_history.0.id', $dngPayment->id)
+                ->where('payment_history.0.source_label', 'DNG')
+                ->where('payment_history.0.reference', 'DNG #230')
+                ->where('payment_history.0.amount_paid', 30_000_000)
+                ->where('payment_history.0.collected_amount', 0)
+                ->where('payment_history.0.surplus_amount', 30_000_000)
+                ->where('payment_history.0.status_label', 'Còn dư')
+                ->where('payment_history.0.action.can_allocate', false)
+                ->where('payment_history.0.action.message', 'Chưa có học phí/khoản phí hiện tại để phân bổ.')
+                ->where('payment_history.1.id', $springPayment->id)
+                ->where('payment_history.1.source_label', 'Thủ công')
+                ->where('payment_history.1.reference', 'SPRING-PAID')
+                ->where('payment_history.1.amount_paid', 15_000_000)
+                ->where('payment_history.1.collected_amount', 15_000_000)
+                ->where('payment_history.1.surplus_amount', 0)
+                ->where('payment_history.1.status_label', 'Đã thu hết')
+                ->where('payment_history.1.action.can_allocate', false));
     } finally {
         CarbonImmutable::setTestNow();
     }
+});
+
+it('offers allocation from a surplus payment only when current fee obligations exist', function () {
+    $user = grantFinanceOverview(['view_finance_student_overview']);
+    $student = makeOverviewStudent($this->campus, $this->program, $this->semester);
+
+    $charge = FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $this->semester->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => 5_000_000,
+        'description' => 'Current tuition',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    $invoice = StudentInvoice::create([
+        'invoice_number' => 'INV-CURRENT-'.$student->id,
+        'student_id' => $student->id,
+        'semester_id' => $this->semester->id,
+        'status' => 'pending',
+        'due_date' => now()->addDays(7),
+    ]);
+    InvoiceLine::create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $charge->id,
+        'amount_snapshot' => 5_000_000,
+        'description_snapshot' => 'Current tuition',
+        'status' => 'active',
+    ]);
+
+    $payment = Payment::create([
+        'student_id' => $student->id,
+        'amount' => 2_000_000,
+        'method' => Payment::METHOD_IMPORT,
+        'source' => 'import',
+        'external_ref' => 'IMPORT-2026-001',
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+        'received_by_user_id' => $user->id,
+    ]);
+
+    actingAs($user)->get("/finance/students/{$student->id}")
+        ->assertInertia(fn ($page) => $page
+            ->has('payment_history', 1)
+            ->where('payment_history.0.id', $payment->id)
+            ->where('payment_history.0.source_label', 'Import')
+            ->where('payment_history.0.status_label', 'Còn dư')
+            ->where('payment_history.0.action.can_allocate', true)
+            ->where('payment_history.0.action.message', null));
 });
 
 it('echoes a valid focus target', function () {

@@ -7,18 +7,19 @@ import StatusCards from '@/components/finance/student360/StatusCards.vue';
 import StudentActionMenu from '@/components/finance/student360/StudentActionMenu.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { LedgerEvent, LedgerGroup, Student360Actions, Student360Balances, Student360Identity, Student360StatusCards, StudentFinanceOverviewKpi, StudentFinanceTuitionOverview } from '@/types/finance';
-import { formatCurrency } from '@/utils/format';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import type { LedgerEvent, LedgerGroup, Student360Actions, Student360Balances, Student360Identity, Student360StatusCards, StudentFinanceOverviewKpi, StudentFinancePaymentHistoryRow, StudentFinanceTuitionOverview } from '@/types/finance';
+import { formatCurrency, formatDate } from '@/utils/format';
 import { financeRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ExternalLink } from 'lucide-vue-next';
+import { CheckCircle2, CircleAlert, ExternalLink, Receipt } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, ref } from 'vue';
 
 const props = defineProps<{
     student: Student360Identity;
     balances: Student360Balances;
     tuition_overview: StudentFinanceTuitionOverview;
+    payment_history: StudentFinancePaymentHistoryRow[];
     status_cards: Student360StatusCards;
     actions: Student360Actions;
     focus: { type: string; id: number } | null;
@@ -58,6 +59,11 @@ const tuitionKpis = computed<Array<StudentFinanceOverviewKpi & { key: string; to
 const openAllocate = (): void => {
     allocatePaymentId.value = props.status_cards.balance.unapplied_payment_id;
     if (allocatePaymentId.value == null) return;
+    allocateOpen.value = true;
+};
+
+const openAllocatePayment = (paymentId: number): void => {
+    allocatePaymentId.value = paymentId;
     allocateOpen.value = true;
 };
 
@@ -136,6 +142,94 @@ onMounted(() => {
         <p v-if="props.tuition_overview.surplus_message" class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-200">
             {{ props.tuition_overview.surplus_message }}
         </p>
+
+        <Card id="payment-history" class="overflow-hidden">
+            <CardHeader class="bg-muted/30 border-b pb-3">
+                <div class="flex items-start gap-2">
+                    <div class="bg-primary/10 text-primary mt-0.5 rounded-md p-2">
+                        <Receipt class="size-4" />
+                    </div>
+                    <div>
+                        <CardTitle class="text-base">Các khoản đã nộp</CardTitle>
+                        <CardDescription class="mt-0.5">Lịch sử tiền đã nộp, phần đã thu và phần còn dư</CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent class="p-0">
+                <div v-if="props.payment_history.length" class="overflow-x-auto">
+                    <table class="w-full min-w-[860px] text-sm">
+                        <thead>
+                            <tr class="text-muted-foreground bg-muted/20 border-b text-left text-xs">
+                                <th class="px-4 py-2.5 font-medium">Ngày nộp</th>
+                                <th class="px-4 py-2.5 font-medium">Nguồn</th>
+                                <th class="px-4 py-2.5 font-medium">Tham chiếu</th>
+                                <th class="px-4 py-2.5 text-right font-medium">Tổng nộp</th>
+                                <th class="px-4 py-2.5 text-right font-medium">Đã thu</th>
+                                <th class="px-4 py-2.5 text-right font-medium">Còn dư</th>
+                                <th class="px-4 py-2.5 font-medium">Trạng thái</th>
+                                <th class="px-4 py-2.5 text-right font-medium">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            <tr v-for="row in props.payment_history" :key="row.id" class="bg-card align-top">
+                                <td class="px-4 py-3 whitespace-nowrap tabular-nums">
+                                    {{ formatDate(row.paid_at) }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    <Badge variant="outline" class="whitespace-nowrap">
+                                        {{ row.source_label }}
+                                    </Badge>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <Link :href="financeRoutes.collect.paymentDetail(row.id)" class="hover:text-primary inline-flex max-w-[220px] items-center gap-1 truncate font-medium transition-colors">
+                                        <span class="truncate">{{ row.reference }}</span>
+                                        <ExternalLink class="size-3 shrink-0" />
+                                    </Link>
+                                    <p v-if="row.dng_request_reference && row.dng_request_reference !== row.reference" class="text-muted-foreground mt-1 text-xs">
+                                        {{ row.dng_request_reference }}
+                                    </p>
+                                </td>
+                                <td class="px-4 py-3 text-right font-medium whitespace-nowrap tabular-nums">
+                                    {{ formatCurrency(row.amount_paid) }}
+                                </td>
+                                <td class="px-4 py-3 text-right whitespace-nowrap text-emerald-700 tabular-nums dark:text-emerald-300">
+                                    {{ formatCurrency(row.collected_amount) }}
+                                </td>
+                                <td class="px-4 py-3 text-right font-medium whitespace-nowrap tabular-nums" :class="row.surplus_amount > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'">
+                                    {{ formatCurrency(row.surplus_amount) }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    <Badge
+                                        variant="outline"
+                                        class="whitespace-nowrap"
+                                        :class="
+                                            row.status === 'surplus'
+                                                ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-200'
+                                                : 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-200'
+                                        "
+                                    >
+                                        <CircleAlert v-if="row.status === 'surplus'" class="mr-1 size-3" />
+                                        <CheckCircle2 v-else class="mr-1 size-3" />
+                                        {{ row.status_label }}
+                                    </Badge>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <Button v-if="row.action.can_allocate && props.actions.can_allocate" size="sm" variant="outline" @click="openAllocatePayment(row.id)"> Phân bổ </Button>
+                                    <p v-else-if="row.action.message" class="text-muted-foreground ml-auto max-w-[220px] text-xs">
+                                        {{ row.action.message }}
+                                    </p>
+                                    <span v-else class="text-muted-foreground text-xs">—</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div v-else class="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
+                    <Receipt class="text-muted-foreground size-8 opacity-40" />
+                    <p class="text-muted-foreground text-sm">Chưa có khoản đã nộp.</p>
+                </div>
+            </CardContent>
+        </Card>
 
         <StatusCards :cards="props.status_cards" :actions="props.actions" :focus="props.focus" @allocate="openAllocate" @cancel-dng="openCancel" @push-installment="pushInstallment" @review="openCancel" />
 

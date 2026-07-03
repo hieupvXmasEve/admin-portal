@@ -284,6 +284,25 @@ export interface StudentFinanceTuitionOverview {
     surplus_message: string | null;
 }
 
+export interface StudentFinancePaymentHistoryRow {
+    id: number;
+    paid_at: string | null;
+    source: string;
+    source_label: string;
+    reference: string;
+    dng_request_id: number | null;
+    dng_request_reference: string | null;
+    amount_paid: number;
+    collected_amount: number;
+    surplus_amount: number;
+    status: 'settled' | 'surplus';
+    status_label: string;
+    action: {
+        can_allocate: boolean;
+        message: string | null;
+    };
+}
+
 export interface LedgerEvent {
     at: string | null;
     type: string;
