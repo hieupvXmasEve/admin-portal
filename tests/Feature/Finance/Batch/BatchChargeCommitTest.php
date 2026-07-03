@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
+use App\Models\EgcBlock;
 use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\User;
@@ -137,6 +138,46 @@ it('allows an EGC-only operator to commit an unchanged EGC preview token', funct
         ]))
         ->assertSessionHasNoErrors()
         ->assertRedirect(route('finance.batch-studio.charges'));
+});
+
+it('rejects a stale EGC create token after same-semester blocks become reissue candidates', function () {
+    grantFinance($this->user, ['generate_egc_finance_charges', 'view_finance_all_campus'], $this->campus);
+
+    $student = makeBatchEgcStudent($this->campus, $this->semester, 'EGC'.random_int(100000000, 999999999));
+
+    $preview = $this->actingAs($this->user)
+        ->withHeaders(['X-CSRF-TOKEN' => BATCH_STUDIO_CSRF])
+        ->postJson(route('finance.batch-studio.charges.preview'), [
+            'fee_category' => 'egc',
+            'semester_id' => $this->semester->id,
+            'scope' => ['filters' => ['search' => $student->student_id]],
+        ])
+        ->assertOk();
+
+    $key = (string) $preview->json('data.lines.0.key');
+
+    seedBatchEgcBlockCharge($student, $this->semester, 1, 1, FinanceCharge::STATUS_VOID, 'void');
+    seedBatchEgcBlockCharge($student, $this->semester, 2, 2, FinanceCharge::STATUS_VOID, 'void');
+
+    $this->actingAs($this->user)
+        ->withSession(financeWebSession($this->campus))
+        ->from(route('finance.batch-studio.charges'))
+        ->post(route('finance.batch-studio.charges.commit'), financePostPayload([
+            'preview_token' => $preview->json('data.preview_token'),
+            'selected_keys' => [$key],
+        ]))
+        ->assertSessionHasErrors('preview_token');
+
+    expect(EgcBlock::query()
+        ->where('student_id', $student->id)
+        ->where('semester_id', $this->semester->id)
+        ->count())->toBe(2)
+        ->and(FinanceCharge::query()
+            ->where('student_id', $student->id)
+            ->where('semester_id', $this->semester->id)
+            ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->count())->toBe(0);
 });
 
 it('commits major charges for intake-major students', function () {

@@ -68,15 +68,19 @@ class AssembleBatchChargePreviewQuery
         $warningCodes = isset($row['warning']) && $row['warning'] !== null ? [(string) $row['warning']] : [];
         $reason = match ($bucket) {
             'warning' => (string) ($row['warning'] ?? ''),
+            'update' => (string) ($row['update_reason'] ?? $row['eligibility_reason'] ?? ''),
             'skip' => ($row['has_existing_charge'] ?? false) ? 'already_charged' : ((string) ($row['skip_reason'] ?? 'ineligible')),
             default => null,
         };
+        $chargeableLevels = collect($row['chargeable_levels'] ?? []);
 
         $hashPayload = [
             'student_id' => (int) $row['id'],
             'semester_id' => $semesterId,
             'fee_category' => $feeCategory,
             'charge_type' => (string) ($row['charge_type'] ?? $feeCategory),
+            'generation_mode' => (string) ($row['generation_mode'] ?? 'normal'),
+            'eligibility_reason' => $row['eligibility_reason'] ?? $row['skip_reason'] ?? null,
             'source_type' => $row['source_type'] ?? null,
             'source_id' => isset($row['source_id']) ? (int) $row['source_id'] : null,
             'fee_config_fingerprint' => BatchPreviewLineHasher::feeConfigFingerprint(
@@ -91,9 +95,24 @@ class AssembleBatchChargePreviewQuery
             'discount' => (float) ($row['discount_amount'] ?? 0),
             'net' => (float) ($row['estimated_amount'] ?? 0),
             'warning_codes' => $warningCodes,
+            'max_chargeable_blocks' => isset($row['max_chargeable_blocks']) ? (int) $row['max_chargeable_blocks'] : null,
+            'chargeable_levels' => $chargeableLevels
+                ->map(fn (mixed $level): ?int => is_array($level) && isset($level['level_number']) ? (int) $level['level_number'] : null)
+                ->filter(fn (?int $level): bool => $level !== null)
+                ->values()
+                ->all(),
+            'egc_block_signature' => collect($row['existing_egc_blocks'] ?? [])
+                ->map(fn (mixed $block): ?array => is_array($block) ? [
+                    'block_number' => (int) ($block['block_number'] ?? 0),
+                    'level_number' => (int) ($block['level_number'] ?? 0),
+                    'finance_charge_id' => isset($block['finance_charge_id']) ? (int) $block['finance_charge_id'] : null,
+                ] : null)
+                ->filter(fn (?array $block): bool => $block !== null)
+                ->values()
+                ->all(),
         ];
 
-        $blockAmounts = collect($row['chargeable_levels'] ?? [])
+        $blockAmounts = $chargeableLevels
             ->map(fn (mixed $level): float => is_array($level) ? (float) ($level['amount'] ?? 0) : 0.0)
             ->filter(fn (float $amount): bool => $amount > 0)
             ->values()
@@ -149,7 +168,8 @@ class AssembleBatchChargePreviewQuery
         $lines = [];
 
         foreach ($this->collection($result['eligible_students'] ?? []) as $row) {
-            $lines[] = self::mapChargeRow($row, 'egc', $semesterId, 'create');
+            $bucket = ($row['generation_mode'] ?? null) === 'reissue' ? 'update' : 'create';
+            $lines[] = self::mapChargeRow($row, 'egc', $semesterId, $bucket);
         }
         foreach (($result['warning_students'] ?? []) as $row) {
             $lines[] = self::mapChargeRow($row, 'egc', $semesterId, 'warning');

@@ -3,15 +3,21 @@
 declare(strict_types=1);
 
 use App\Models\AcademicRecord;
+use App\Models\CourseOffering;
+use App\Models\CourseRegistration;
 use App\Models\CurriculumVersion;
 use App\Models\EgcBlock;
 use App\Models\FinanceCharge;
 use App\Models\InvoiceDiscount;
+use App\Models\InvoiceLine;
+use App\Models\Payment;
+use App\Models\PaymentApplication;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentInvoice;
 use App\Models\Unit;
 use App\Modules\Finance\Actions\Egc\GenerateEgcChargesAction;
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Queries\Egc\PreviewEgcChargeGenerationQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +36,31 @@ function makeEgcChargeStudent(array $state = []): Student
         'intake_mode' => 'sequential',
         'gc_total_levels' => 6,
     ], $state))->create();
+}
+
+/**
+ * @return int[]
+ */
+function voidGeneratedEgcChargeIds(Student $student, Semester $semester): array
+{
+    $chargeIds = EgcBlock::query()
+        ->where('student_id', $student->id)
+        ->where('semester_id', $semester->id)
+        ->orderBy('block_number')
+        ->pluck('finance_charge_id')
+        ->filter()
+        ->map(fn (mixed $id): int => (int) $id)
+        ->values()
+        ->all();
+
+    FinanceCharge::query()
+        ->whereIn('id', $chargeIds)
+        ->update(['status' => FinanceCharge::STATUS_VOID, 'voided_at' => now(), 'void_reason' => 'Regression setup']);
+    DB::table('invoice_lines')
+        ->whereIn('charge_id', $chargeIds)
+        ->update(['status' => 'void', 'voided_at' => now(), 'void_reason' => 'Regression setup']);
+
+    return $chargeIds;
 }
 
 function makeInProgressAcademicRecord(Student $student, Semester $semester, int $level): AcademicRecord
@@ -353,6 +384,205 @@ it('skips duplicate blocks via unique constraint guard', function () {
 
     expect(EgcBlock::where('student_id', $student->id)->where('semester_id', $semester->id)->count())->toBe(2);
     expect($results['skipped'])->toBeGreaterThan(0);
+});
+
+it('reissues voided same semester EGC block charges without creating later block numbers', function () {
+    $semester = Semester::factory()->create();
+    $student = makeEgcChargeStudent(['status' => 'intake_pre_uni_gc', 'gc_current_level' => 1]);
+
+    GenerateEgcChargesAction::run([
+        'semester_id' => $semester->id,
+        'due_date' => now()->addDays(30)->toDateString(),
+        'students' => [[
+            'student_id' => $student->id,
+            'block_count' => 2,
+            'current_level' => 1,
+        ]],
+    ]);
+
+    $originalBlocks = EgcBlock::query()
+        ->where('student_id', $student->id)
+        ->where('semester_id', $semester->id)
+        ->orderBy('block_number')
+        ->get();
+    $originalChargeIds = $originalBlocks->pluck('finance_charge_id')->all();
+
+    voidGeneratedEgcChargeIds($student, $semester);
+
+    $results = GenerateEgcChargesAction::run([
+        'semester_id' => $semester->id,
+        'due_date' => now()->addDays(30)->toDateString(),
+        'students' => [[
+            'student_id' => $student->id,
+            'block_count' => 2,
+            'current_level' => 1,
+        ]],
+    ]);
+
+    $blocks = EgcBlock::query()
+        ->where('student_id', $student->id)
+        ->where('semester_id', $semester->id)
+        ->orderBy('block_number')
+        ->get();
+
+    expect($results['created'])->toBe(2)
+        ->and($blocks)->toHaveCount(2)
+        ->and($blocks->pluck('id')->all())->toBe($originalBlocks->pluck('id')->all())
+        ->and($blocks->pluck('block_number')->all())->toBe([1, 2])
+        ->and($blocks->pluck('finance_charge_id')->intersect($originalChargeIds)->all())->toBe([]);
+
+    expect(FinanceCharge::query()
+        ->whereIn('id', $blocks->pluck('finance_charge_id'))
+        ->where('status', FinanceCharge::STATUS_ACTIVE)
+        ->count())->toBe(2);
+});
+
+it('blocks reissue when a live DNG request is linked to a voided EGC block charge', function () {
+    $semester = Semester::factory()->create();
+    $student = makeEgcChargeStudent(['status' => 'intake_pre_uni_gc', 'gc_current_level' => 1]);
+
+    GenerateEgcChargesAction::run([
+        'semester_id' => $semester->id,
+        'due_date' => now()->addDays(30)->toDateString(),
+        'students' => [[
+            'student_id' => $student->id,
+            'block_count' => 2,
+            'current_level' => 1,
+        ]],
+    ]);
+
+    $chargeIds = voidGeneratedEgcChargeIds($student, $semester);
+
+    DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => (string) DB::table('campuses')->where('id', $student->campus_id)->value('code'),
+        'student_code' => $student->student_id,
+        'fee_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'description' => 'EGC live DNG guard',
+        'semester_id' => $semester->id,
+        'due_date' => now()->addDays(7)->toDateString(),
+        'item_id' => 'EGC-LIVE-'.$student->id.'-'.$chargeIds[0],
+        'amount' => 15_000_000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+        'finance_charge_id' => $chargeIds[0],
+    ]);
+
+    $results = GenerateEgcChargesAction::run([
+        'semester_id' => $semester->id,
+        'due_date' => now()->addDays(30)->toDateString(),
+        'students' => [[
+            'student_id' => $student->id,
+            'block_count' => 2,
+            'current_level' => 1,
+        ]],
+    ]);
+
+    expect($results['created'])->toBe(0)
+        ->and($results['skipped'])->toBe(2)
+        ->and($results['errors'][0]['error'])->toBe('live_dng_review_required')
+        ->and(EgcBlock::query()
+            ->where('student_id', $student->id)
+            ->where('semester_id', $semester->id)
+            ->count())->toBe(2)
+        ->and(FinanceCharge::query()
+            ->where('student_id', $student->id)
+            ->where('semester_id', $semester->id)
+            ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->count())->toBe(0);
+});
+
+it('blocks reissue when a bridged payment is linked to a voided EGC block charge', function () {
+    $semester = Semester::factory()->create();
+    $student = makeEgcChargeStudent(['status' => 'intake_pre_uni_gc', 'gc_current_level' => 1]);
+
+    GenerateEgcChargesAction::run([
+        'semester_id' => $semester->id,
+        'due_date' => now()->addDays(30)->toDateString(),
+        'students' => [[
+            'student_id' => $student->id,
+            'block_count' => 2,
+            'current_level' => 1,
+        ]],
+    ]);
+
+    $chargeIds = voidGeneratedEgcChargeIds($student, $semester);
+    $invoiceLineId = (int) InvoiceLine::query()
+        ->where('charge_id', $chargeIds[0])
+        ->value('id');
+    $payment = Payment::create([
+        'student_id' => $student->id,
+        'amount' => 15_000_000,
+        'method' => Payment::METHOD_GATEWAY,
+        'source' => 'test',
+        'external_ref' => 'EGC-PAY-'.$student->id,
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+    ]);
+    PaymentApplication::create([
+        'payment_id' => $payment->id,
+        'invoice_line_id' => $invoiceLineId,
+        'amount' => 15_000_000,
+        'entry_type' => 'application',
+        'applied_at' => now(),
+    ]);
+
+    $results = GenerateEgcChargesAction::run([
+        'semester_id' => $semester->id,
+        'due_date' => now()->addDays(30)->toDateString(),
+        'students' => [[
+            'student_id' => $student->id,
+            'block_count' => 2,
+            'current_level' => 1,
+        ]],
+    ]);
+
+    expect($results['created'])->toBe(0)
+        ->and($results['skipped'])->toBe(2)
+        ->and($results['errors'][0]['error'])->toBe('paid_dng_or_payment_review_required')
+        ->and(FinanceCharge::query()
+            ->where('student_id', $student->id)
+            ->where('semester_id', $semester->id)
+            ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->count())->toBe(0);
+});
+
+it('blocks EGC generation when defer logic marks the selected semester non-billable', function () {
+    $semester = Semester::factory()->create();
+    $student = makeEgcChargeStudent(['status' => 'intake_pre_uni_gc', 'gc_current_level' => 1]);
+    $offering = CourseOffering::factory()->state([
+        'semester_id' => $semester->id,
+        'campus_id' => $student->campus_id,
+    ])->create();
+
+    CourseRegistration::create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $semester->id,
+        'registration_status' => 'defer',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+    ]);
+
+    $results = GenerateEgcChargesAction::run([
+        'semester_id' => $semester->id,
+        'due_date' => now()->addDays(30)->toDateString(),
+        'students' => [[
+            'student_id' => $student->id,
+            'block_count' => 2,
+            'current_level' => 1,
+        ]],
+    ]);
+
+    expect($results['created'])->toBe(0)
+        ->and($results['skipped'])->toBe(2)
+        ->and($results['errors'][0]['error'])->toBe('deferred_non_billable')
+        ->and(EgcBlock::query()
+            ->where('student_id', $student->id)
+            ->where('semester_id', $semester->id)
+            ->count())->toBe(0);
 });
 
 it('filters preview by name student id email and paginates eligible rows', function () {

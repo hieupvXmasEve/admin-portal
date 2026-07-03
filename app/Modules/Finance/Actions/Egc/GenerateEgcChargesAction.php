@@ -9,8 +9,11 @@ use App\Models\FinanceCharge;
 use App\Models\InvoiceLine;
 use App\Models\Student;
 use App\Models\StudentInvoice;
+use App\Modules\Finance\Support\EgcBlockGenerationClassifier;
+use App\Modules\Finance\Support\EgcBlockGenerationState;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -25,12 +28,12 @@ class GenerateEgcChargesAction
     /**
      * Generate EGC charges for a list of students in a semester.
      *
-     * @param  array{semester_id: int, due_date: string, students: array<array{student_id: int, block_count: int}>}  $data
+     * @param  array{semester_id: int, due_date?: string, students: array<array{student_id: int, block_count: int}>}  $data
      */
     public static function run(array $data): array
     {
         $semesterId = (int) $data['semester_id'];
-        $dueDate = $data['due_date'];
+        $dueDate = (string) ($data['due_date'] ?? now()->addDays(30)->toDateString());
         $createdByUserId = auth()->id();
         $results = ['created' => 0, 'skipped' => 0, 'errors' => []];
 
@@ -54,6 +57,38 @@ class GenerateEgcChargesAction
 
             if ($totalLevels <= 0 || $effectiveStartLevel >= $totalLevels) {
                 $results['skipped'] += $blockCount;
+
+                continue;
+            }
+
+            $blockState = app(EgcBlockGenerationClassifier::class)->classify($student, $semesterId);
+
+            if ($blockState->isBlocked()) {
+                $results['skipped'] += $blockCount;
+                $results['errors'][] = ['student_id' => $studentId, 'error' => $blockState->reason];
+
+                continue;
+            }
+
+            if ($blockState->isAlreadyGenerated()) {
+                $results['skipped'] += $blockCount;
+
+                continue;
+            }
+
+            if ($blockState->shouldReissue()) {
+                try {
+                    DB::transaction(function () use ($studentId, $semesterId, $dueDate, $blockCount, $totalLevels, $createdByUserId, $blockState, &$results) {
+                        self::reissueExistingBlocks($studentId, $semesterId, $dueDate, $blockCount, $totalLevels, $createdByUserId, $blockState, $results);
+                    });
+                } catch (\Exception $e) {
+                    Log::error('GenerateEgcChargesAction reissue failed', [
+                        'student_id' => $studentId,
+                        'semester_id' => $semesterId,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $results['errors'][] = ['student_id' => $studentId, 'error' => $e->getMessage()];
+                }
 
                 continue;
             }
@@ -85,6 +120,41 @@ class GenerateEgcChargesAction
         }
 
         return $results;
+    }
+
+    private static function reissueExistingBlocks(
+        int $studentId,
+        int $semesterId,
+        string $dueDate,
+        int $blockCount,
+        int $totalLevels,
+        ?int $createdByUserId,
+        EgcBlockGenerationState $blockState,
+        array &$results,
+    ): void {
+        $created = 0;
+
+        /** @var Collection<int, EgcBlock> $blocks */
+        $blocks = $blockState->reissueBlocks->take($blockCount);
+
+        foreach ($blocks as $block) {
+            if ($block->level_number >= $totalLevels) {
+                $results['skipped']++;
+
+                continue;
+            }
+
+            $charge = self::createCharge($studentId, $semesterId, $dueDate, (int) $block->level_number, $createdByUserId);
+            $block->update([
+                'finance_charge_id' => $charge->id,
+                'result' => EgcBlock::RESULT_PENDING,
+            ]);
+
+            $created++;
+            $results['created']++;
+        }
+
+        $results['skipped'] += max(0, $blockCount - $created);
     }
 
     private static function generateForStudent(
@@ -227,24 +297,38 @@ class GenerateEgcChargesAction
             'created_by_user_id' => $createdByUserId,
         ]);
 
-        // Assign charge to invoice (find draft or create new), always sync due_date
-        $invoice = StudentInvoice::firstOrCreate(
-            ['student_id' => $studentId, 'semester_id' => $semesterId, 'billing_cycle_id' => null],
-            [
+        // Assign charge to a reusable invoice, always syncing due_date. Cancelled
+        // or paid invoices remain historical evidence and must not receive new lines.
+        $invoice = StudentInvoice::query()
+            ->where('student_id', $studentId)
+            ->where('semester_id', $semesterId)
+            ->whereNull('billing_cycle_id')
+            ->reusableForChargeGeneration()
+            ->latest('id')
+            ->first();
+
+        if (! $invoice) {
+            $invoice = StudentInvoice::create([
+                'student_id' => $studentId,
+                'semester_id' => $semesterId,
+                'billing_cycle_id' => null,
                 'invoice_number' => 'EGC-'.$studentId.'-'.$semesterId.'-'.now()->format('mdHis').rand(100, 999),
                 'status' => 'draft',
                 'due_date' => $dueDate,
-            ]
-        );
-
-        // Keep due_date in sync even if invoice already existed
-        if (! $invoice->wasRecentlyCreated) {
+            ]);
+        } else {
             $invoice->update(['due_date' => $dueDate]);
         }
 
         InvoiceLine::updateOrCreate(
             ['invoice_id' => $invoice->id, 'charge_id' => $charge->id],
-            ['amount_snapshot' => $charge->amount, 'description_snapshot' => $charge->description]
+            [
+                'amount_snapshot' => $charge->amount,
+                'description_snapshot' => $charge->description,
+                'status' => 'active',
+                'voided_at' => null,
+                'void_reason' => null,
+            ]
         );
 
         $invoice->recalculateTotals();

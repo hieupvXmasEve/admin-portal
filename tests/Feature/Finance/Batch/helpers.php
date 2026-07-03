@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\CurriculumVersion;
+use App\Models\EgcBlock;
 use App\Models\FinanceCharge;
+use App\Models\InvoiceLine;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Models\StudentInvoice;
 use App\Models\TuitionPlan;
 use App\Models\TuitionPlanTerm;
 use App\Models\User;
@@ -109,6 +112,83 @@ function makeBatchHpStudent(Campus $campus, Semester $targetSemester, string $st
     ]);
 
     return $student;
+}
+
+function makeBatchEgcStudent(Campus $campus, Semester $targetSemester, string $studentCode, array $state = []): Student
+{
+    $program = Program::factory()->create();
+    $intakeSemester = Semester::factory()->create([
+        'start_date' => $targetSemester->start_date->copy()->subMonths(4),
+        'end_date' => $targetSemester->start_date->copy()->subMonth(),
+    ]);
+    $curriculumVersion = CurriculumVersion::factory()
+        ->forProgram($program)
+        ->withEffectiveSemester($intakeSemester)
+        ->create();
+
+    return Student::factory()
+        ->forCampus($campus)
+        ->forProgram($program)
+        ->create(array_merge([
+            'student_id' => $studentCode,
+            'status' => 'intake_pre_uni_gc',
+            'curriculum_version_id' => $curriculumVersion->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+            'intake_semester_id' => $intakeSemester->id,
+            'gc_current_level' => 1,
+            'gc_total_levels' => 6,
+        ], $state));
+}
+
+function seedBatchEgcBlockCharge(
+    Student $student,
+    Semester $semester,
+    int $blockNumber,
+    int $levelNumber,
+    string $chargeStatus = FinanceCharge::STATUS_ACTIVE,
+    string $lineStatus = 'active',
+    string $invoiceStatus = 'draft',
+): EgcBlock {
+    $charge = FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'amount' => 15_000_000,
+        'description' => "EGC Level {$levelNumber} Fee",
+        'effective_at' => now(),
+        'status' => $chargeStatus,
+        'voided_at' => $chargeStatus === FinanceCharge::STATUS_VOID ? now() : null,
+        'void_reason' => $chargeStatus === FinanceCharge::STATUS_VOID ? 'Batch EGC regression setup' : null,
+    ]);
+
+    $invoice = StudentInvoice::create([
+        'invoice_number' => 'BATCH-EGC-'.$student->id.'-'.$semester->id.'-'.$blockNumber.'-'.random_int(1000, 9999),
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'billing_cycle_id' => null,
+        'status' => $invoiceStatus,
+        'due_date' => now()->addDays(30),
+    ]);
+
+    InvoiceLine::create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $charge->id,
+        'amount_snapshot' => $charge->amount,
+        'description_snapshot' => $charge->description,
+        'status' => $lineStatus,
+        'voided_at' => $lineStatus === 'void' ? now() : null,
+        'void_reason' => $lineStatus === 'void' ? 'Batch EGC regression setup' : null,
+    ]);
+
+    return EgcBlock::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'block_number' => $blockNumber,
+        'level_number' => $levelNumber,
+        'result' => EgcBlock::RESULT_PENDING,
+        'finance_charge_id' => $charge->id,
+    ])->create();
 }
 
 function seedBatchActiveCharge(Student $student, Semester $semester, string $chargeType): FinanceCharge

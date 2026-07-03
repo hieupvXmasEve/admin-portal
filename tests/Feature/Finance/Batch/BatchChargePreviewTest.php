@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
+use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\User;
 
@@ -88,6 +89,31 @@ it('allows an EGC-only operator to preview EGC charges', function () {
         ])
         ->assertOk()
         ->assertJsonStructure(['data' => ['preview_token', 'lines', 'summary']]);
+});
+
+it('classifies voided same-semester EGC blocks as reissue updates in preview', function () {
+    grantFinance($this->user, ['generate_egc_finance_charges', 'view_finance_all_campus'], $this->campus);
+
+    $student = makeBatchEgcStudent($this->campus, $this->semester, 'EGC'.random_int(100000000, 999999999));
+    seedBatchEgcBlockCharge($student, $this->semester, 1, 1, FinanceCharge::STATUS_VOID, 'void');
+    seedBatchEgcBlockCharge($student, $this->semester, 2, 2, FinanceCharge::STATUS_VOID, 'void');
+
+    $response = $this->actingAs($this->user)
+        ->withHeaders(['X-CSRF-TOKEN' => BATCH_STUDIO_CSRF])
+        ->postJson(route('finance.batch-studio.charges.preview'), [
+            'fee_category' => 'egc',
+            'semester_id' => $this->semester->id,
+            'scope' => ['filters' => ['search' => $student->student_id]],
+        ])
+        ->assertOk();
+
+    $line = $response->json('data.lines.0');
+
+    expect($line['display']['student_id'])->toBe($student->student_id)
+        ->and($line['display']['diff'])->toBe('update')
+        ->and($line['display']['reason'])->toBe('egc_block_charge_voided')
+        ->and($line['display']['block_count'])->toBe(2)
+        ->and($response->json('data.summary.eligible_count'))->toBe(1);
 });
 
 it('forbids a major preview for an EGC-only operator', function () {
