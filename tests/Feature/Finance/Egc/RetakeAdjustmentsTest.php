@@ -6,6 +6,7 @@ use App\Models\CurriculumVersion;
 use App\Models\EgcBlock;
 use App\Models\EgcRetakeDiscountLink;
 use App\Models\FinanceCharge;
+use App\Models\InvoiceDiscount;
 use App\Models\InvoiceLine;
 use App\Models\Semester;
 use App\Models\Student;
@@ -129,14 +130,77 @@ it('lists only later block charges as retake targets', function () {
     expect(collect($eligibleBlock['available_targets'])->pluck('id')->all())->toBe([$retakeCharge->id]);
 });
 
-it('applies retake discount to next-semester charge', function () {
-    $semester1 = Semester::factory()->create();
-    $semester2 = Semester::factory()->create();
+it('does not list consumed target blocks as available retake targets', function () {
+    $semester = Semester::factory()->create();
+    $student = makeRetakeStudent(['status' => 'intake_pre_uni_gc']);
+
+    $sourceCharge = makeChargeWithInvoice($student, $semester, 3);
+    $sourceBlock = attachChargeToBlock(makeEligibleBlock($student, $semester, 3), $sourceCharge);
+
+    $completedTargetCharge = makeChargeWithInvoice($student, $semester, 3);
+    attachChargeToBlock(EgcBlock::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'block_number' => 2,
+        'level_number' => 3,
+        'result' => EgcBlock::RESULT_PASS,
+        'is_retake' => true,
+    ])->create(), $completedTargetCharge);
+
+    $adjustments = app(ListEgcRetakeAdjustmentsQuery::class)->handle($semester->id);
+
+    expect(collect($adjustments['eligible_with_targets'])->pluck('id')->all())->not->toContain($sourceBlock->id);
+
+    $waitingBlock = collect($adjustments['eligible_no_targets'])->firstWhere('id', $sourceBlock->id);
+
+    expect($waitingBlock)->not->toBeNull()
+        ->and($waitingBlock['available_targets'])->toBe([]);
+
+    expect(fn () => ApplyEgcRetakeDiscountAction::run($sourceBlock->id, $completedTargetCharge->id))
+        ->toThrow(ValidationException::class);
+});
+
+it('rejects using next-semester block one as the retake target for a block one failure', function () {
+    $semester1 = Semester::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-04-30', 'is_archived' => false]);
+    $semester2 = Semester::factory()->create(['start_date' => '2026-05-01', 'end_date' => '2026-08-31', 'is_archived' => false]);
     $student = makeRetakeStudent(['status' => 'intake_pre_uni_gc']);
 
     $sourceCharge = makeChargeWithInvoice($student, $semester1, 1);
     $block = attachChargeToBlock(makeEligibleBlock($student, $semester1, 1), $sourceCharge); // failed in sem1
     $nextSemCharge = makeChargeWithInvoice($student, $semester2, 1); // retaking in sem2
+    attachChargeToBlock(EgcBlock::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $semester2->id,
+        'block_number' => 1,
+        'level_number' => 1,
+        'result' => EgcBlock::RESULT_PENDING,
+        'is_retake' => true,
+    ])->create(), $nextSemCharge);
+
+    $adjustments = app(ListEgcRetakeAdjustmentsQuery::class)->handle($semester1->id);
+
+    expect(collect($adjustments['eligible_with_targets'])->pluck('id')->all())->not->toContain($block->id);
+    expect(fn () => ApplyEgcRetakeDiscountAction::run($block->id, $nextSemCharge->id))
+        ->toThrow(ValidationException::class);
+});
+
+it('applies retake discount to next-semester block one for a block two failure', function () {
+    $semester1 = Semester::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-04-30', 'is_archived' => false]);
+    $semester2 = Semester::factory()->create(['start_date' => '2026-05-01', 'end_date' => '2026-08-31', 'is_archived' => false]);
+    $student = makeRetakeStudent(['status' => 'intake_pre_uni_gc']);
+
+    $sourceCharge = makeChargeWithInvoice($student, $semester1, 1);
+    $block = attachChargeToBlock(EgcBlock::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $semester1->id,
+        'block_number' => 2,
+        'level_number' => 1,
+        'result' => EgcBlock::RESULT_FAIL,
+        'attendance_rate' => 85.0,
+        'retake_discount_id' => null,
+    ])->create(), $sourceCharge);
+
+    $nextSemCharge = makeChargeWithInvoice($student, $semester2, 1);
     attachChargeToBlock(EgcBlock::factory()->state([
         'student_id' => $student->id,
         'semester_id' => $semester2->id,
@@ -205,29 +269,34 @@ it('prevents double discount on same target charge', function () {
 
     $sourceCharge1 = makeChargeWithInvoice($student, $semester, 1);
     $block1 = attachChargeToBlock(makeEligibleBlock($student, $semester, 1), $sourceCharge1);
-    $block2 = EgcBlock::factory()->state([
-        'student_id' => $student->id,
-        'semester_id' => $semester->id,
-        'level_number' => 2,
-        'block_number' => 2,
-        'result' => EgcBlock::RESULT_FAIL,
-        'attendance_rate' => 85.0,
-        'retake_discount_id' => null,
-    ])->create();
 
     $targetCharge = makeChargeWithInvoice($student, $semester, 1);
     attachChargeToBlock(EgcBlock::factory()->state([
         'student_id' => $student->id,
         'semester_id' => $semester->id,
-        'block_number' => 3,
+        'block_number' => 2,
         'level_number' => 1,
         'result' => EgcBlock::RESULT_PENDING,
         'is_retake' => true,
     ])->create(), $targetCharge);
 
-    ApplyEgcRetakeDiscountAction::run($block1->id, $targetCharge->id);
+    $invoiceLine = InvoiceLine::where('charge_id', $targetCharge->id)->firstOrFail();
+    $existingDiscount = InvoiceDiscount::create([
+        'invoice_id' => $invoiceLine->invoice_id,
+        'discount_type' => ApplyEgcRetakeDiscountAction::DISCOUNT_TYPE,
+        'discount_source' => EgcBlock::class,
+        'description' => 'Existing EGC retake discount',
+        'amount' => ApplyEgcRetakeDiscountAction::DISCOUNT_AMOUNT,
+        'status' => 'active',
+        'reference_id' => null,
+    ]);
+    EgcRetakeDiscountLink::create([
+        'invoice_discount_id' => $existingDiscount->id,
+        'source_egc_block_id' => $block1->id,
+        'target_finance_charge_id' => $targetCharge->id,
+    ]);
 
-    expect(fn () => ApplyEgcRetakeDiscountAction::run($block2->id, $targetCharge->id))
+    expect(fn () => ApplyEgcRetakeDiscountAction::run($block1->id, $targetCharge->id))
         ->toThrow(ValidationException::class);
 });
 

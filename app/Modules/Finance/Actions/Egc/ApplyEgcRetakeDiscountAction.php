@@ -12,6 +12,7 @@ use App\Models\InvoiceDiscount;
 use App\Models\InvoiceLine;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\EgcRetakeTargetResolver;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -28,7 +29,7 @@ class ApplyEgcRetakeDiscountAction
     public static function run(int $egcBlockId, int $targetChargeId): InvoiceDiscount
     {
         return DB::transaction(function () use ($egcBlockId, $targetChargeId) {
-            $block = EgcBlock::findOrFail($egcBlockId);
+            $block = EgcBlock::with('student:id,status')->findOrFail($egcBlockId);
 
             // Guard: block must be eligible
             if ($block->retake_discount_id !== null) {
@@ -43,6 +44,12 @@ class ApplyEgcRetakeDiscountAction
                 ]);
             }
 
+            if ($block->student?->status !== 'intake_pre_uni_gc') {
+                throw ValidationException::withMessages([
+                    'egc_block_id' => ['Retake discounts are only available while the student is in EGC stage.'],
+                ]);
+            }
+
             if ((float) ($block->attendance_rate ?? 0) < 80) {
                 throw ValidationException::withMessages([
                     'egc_block_id' => ['Attendance must be at least 80% to qualify for retake discount.'],
@@ -54,13 +61,22 @@ class ApplyEgcRetakeDiscountAction
                 ->where('status', FinanceCharge::STATUS_ACTIVE)
                 ->firstOrFail();
 
+            if ($targetCharge->charge_type !== FinanceCharge::TYPE_EGC_LEVEL_FEE) {
+                throw ValidationException::withMessages([
+                    'target_charge_id' => ['Retake discount target must be an EGC charge.'],
+                ]);
+            }
+
             if (! self::isValidTargetCharge($block, $targetCharge)) {
                 throw ValidationException::withMessages([
                     'target_charge_id' => ['Target charge must belong to a later retake block for the same student and level.'],
                 ]);
             }
 
-            $invoiceLine = InvoiceLine::where('charge_id', $targetCharge->id)->first();
+            $invoiceLine = InvoiceLine::where('charge_id', $targetCharge->id)
+                ->where('status', 'active')
+                ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', ['cancelled', 'void']))
+                ->first();
 
             if (! $invoiceLine) {
                 throw ValidationException::withMessages([
@@ -123,20 +139,9 @@ class ApplyEgcRetakeDiscountAction
 
     private static function isValidTargetCharge(EgcBlock $sourceBlock, FinanceCharge $targetCharge): bool
     {
-        $explicitTargetExists = EgcBlock::query()
-            ->where('student_id', $sourceBlock->student_id)
-            ->where('level_number', $sourceBlock->level_number)
-            ->where('finance_charge_id', $targetCharge->id)
-            ->whereKeyNot($sourceBlock->id)
-            ->where(function ($query) use ($sourceBlock) {
-                $query->where('semester_id', '>', $sourceBlock->semester_id)
-                    ->orWhere(function ($sameSemesterQuery) use ($sourceBlock) {
-                        $sameSemesterQuery->where('semester_id', $sourceBlock->semester_id)
-                            ->where('block_number', '>', $sourceBlock->block_number);
-                    });
-            })
-            ->exists();
-
-        return $explicitTargetExists;
+        return EgcRetakeTargetResolver::targetBlocksFor($sourceBlock)
+            ->contains(fn (EgcBlock $targetBlock): bool => (int) $targetBlock->finance_charge_id === (int) $targetCharge->id
+                && (int) $targetBlock->level_number === (int) $sourceBlock->level_number
+                && (bool) $targetBlock->is_retake);
     }
 }

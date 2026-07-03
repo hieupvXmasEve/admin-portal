@@ -27,6 +27,7 @@ class SyncEgcBlockResultsAction
             ->get();
 
         $synced = 0;
+        $skipped = [];
 
         foreach ($blocks->groupBy('student_id') as $studentId => $studentBlocks) {
             $resolvedByBlock = self::resolveResultsForStudent((int) $studentId, $semesterId, $studentBlocks);
@@ -35,6 +36,15 @@ class SyncEgcBlockResultsAction
                 $resolved = $resolvedByBlock[$block->id] ?? null;
 
                 if ($resolved === null) {
+                    continue;
+                }
+
+                if (
+                    $resolved['result'] === EgcBlock::RESULT_FAIL
+                    && self::hasLaterEgcProgressionEvidence((int) $studentId, (int) $block->level_number)
+                ) {
+                    $skipped[] = self::skippedRow($block, 'failed_result_conflicts_with_later_egc_progression');
+
                     continue;
                 }
 
@@ -51,6 +61,7 @@ class SyncEgcBlockResultsAction
         return [
             'synced' => $synced,
             'total' => $blocks->count(),
+            'skipped' => $skipped,
             'reconciliation' => ReconcileEgcChargesAfterSyncAction::run($semesterId),
         ];
     }
@@ -154,6 +165,57 @@ class SyncEgcBlockResultsAction
         return [
             'result' => $latest->is_passed ? EgcBlock::RESULT_PASS : EgcBlock::RESULT_FAIL,
             'attendance_rate' => $latest->attendance_percentage,
+        ];
+    }
+
+    private static function hasLaterEgcProgressionEvidence(int $studentId, int $levelNumber): bool
+    {
+        $currentLevel = DB::table('students')
+            ->where('id', $studentId)
+            ->value('gc_current_level');
+
+        if ($currentLevel !== null && (int) $currentLevel > $levelNumber) {
+            return true;
+        }
+
+        if (
+            AcademicRecord::query()
+                ->where('student_id', $studentId)
+                ->whereIn('completion_status', ['enrolled', 'in_progress', 'completed'])
+                ->whereHas('unit', fn ($query) => $query->where('unit_type', 'egc')->where('level', '>', $levelNumber))
+                ->exists()
+        ) {
+            return true;
+        }
+
+        if (
+            DB::table('course_registrations')
+                ->join('course_offerings', 'course_registrations.course_offering_id', '=', 'course_offerings.id')
+                ->join('units', 'course_offerings.unit_id', '=', 'units.id')
+                ->where('course_registrations.student_id', $studentId)
+                ->whereIn('course_registrations.registration_status', ['registered', 'confirmed', 'completed'])
+                ->where('units.unit_type', 'egc')
+                ->where('units.level', '>', $levelNumber)
+                ->exists()
+        ) {
+            return true;
+        }
+
+        return DB::table('academic_progression_events')
+            ->where('student_id', $studentId)
+            ->where('event_type', 'ENGLISH_LEVEL_CHANGED')
+            ->where('to_english_level', '>', $levelNumber)
+            ->exists();
+    }
+
+    private static function skippedRow(EgcBlock $block, string $reason): array
+    {
+        return [
+            'student_id' => (int) $block->student_id,
+            'source_egc_block_id' => (int) $block->id,
+            'block_number' => (int) $block->block_number,
+            'level_number' => (int) $block->level_number,
+            'reason' => $reason,
         ];
     }
 }

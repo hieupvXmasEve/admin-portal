@@ -6,6 +6,8 @@ namespace App\Modules\Finance\Queries\Egc;
 
 use App\Models\EgcBlock;
 use App\Models\EgcRetakeDiscountLink;
+use App\Models\FinanceCharge;
+use App\Modules\Finance\Support\EgcRetakeTargetResolver;
 use Illuminate\Support\Collection;
 
 class ListEgcRetakeAdjustmentsQuery
@@ -25,7 +27,7 @@ class ListEgcRetakeAdjustmentsQuery
             ->where('result', EgcBlock::RESULT_FAIL)
             ->whereNotNull('finance_charge_id') // deferred blocks have no charge yet — skip
             ->when($campusId !== null, fn ($query) => $query->whereHas('student', fn ($studentQuery) => $studentQuery->where('campus_id', $campusId)))
-            ->with(['student:id,full_name,student_id', 'retakeDiscount'])
+            ->with(['student:id,full_name,student_id,status', 'retakeDiscount'])
             ->get();
 
         $groups = [
@@ -65,43 +67,46 @@ class ListEgcRetakeAdjustmentsQuery
 
     private function findAvailableTargetCharges(EgcBlock $sourceBlock): Collection
     {
+        if ($sourceBlock->student?->status !== 'intake_pre_uni_gc') {
+            return collect();
+        }
+
         $usedChargeIds = EgcRetakeDiscountLink::pluck('target_finance_charge_id')->toArray();
 
-        $explicitTargets = EgcBlock::query()
-            ->where('student_id', $sourceBlock->student_id)
-            ->where('level_number', $sourceBlock->level_number)
-            ->whereNotNull('finance_charge_id')
-            ->whereKeyNot($sourceBlock->id)
-            ->where(function ($query) use ($sourceBlock) {
-                $query->where('semester_id', '>', $sourceBlock->semester_id)
-                    ->orWhere(function ($sameSemesterQuery) use ($sourceBlock) {
-                        $sameSemesterQuery->where('semester_id', $sourceBlock->semester_id)
-                            ->where('block_number', '>', $sourceBlock->block_number);
-                    });
-            })
-            ->whereHas('financeCharge', function ($query) use ($usedChargeIds) {
-                $query->where('status', 'active')
-                    ->whereNotIn('id', $usedChargeIds)
-                    ->whereHas('invoiceLines.invoice');
-            })
-            ->with([
+        $explicitTargets = EgcRetakeTargetResolver::targetBlocksFor($sourceBlock)
+            ->filter(fn (EgcBlock $targetBlock): bool => (int) $targetBlock->level_number === (int) $sourceBlock->level_number
+                && (bool) $targetBlock->is_retake)
+            ->load([
                 'semester:id,name',
                 'financeCharge.invoiceLines.invoice:id,invoice_number,semester_id,status',
             ])
-            ->orderBy('semester_id')
-            ->orderBy('block_number')
-            ->get()
-            ->map(fn (EgcBlock $targetBlock) => [
-                'id' => $targetBlock->financeCharge?->id,
-                'description' => $targetBlock->financeCharge?->description,
-                'amount' => $targetBlock->financeCharge?->amount,
-                'semester_id' => $targetBlock->semester_id,
-                'semester_name' => $targetBlock->semester?->name,
-                'invoice_id' => $targetBlock->financeCharge?->invoiceLines->first()?->invoice?->id,
-                'invoice_number' => $targetBlock->financeCharge?->invoiceLines->first()?->invoice?->invoice_number,
-                'target_block_number' => $targetBlock->block_number,
-                'target_level_number' => $targetBlock->level_number,
-            ]);
+            ->filter(function (EgcBlock $targetBlock) use ($usedChargeIds): bool {
+                $charge = $targetBlock->financeCharge;
+
+                return $charge instanceof FinanceCharge
+                    && $charge->status === FinanceCharge::STATUS_ACTIVE
+                    && $charge->charge_type === FinanceCharge::TYPE_EGC_LEVEL_FEE
+                    && ! in_array($charge->id, $usedChargeIds, true)
+                    && $charge->invoiceLines->contains(fn ($line): bool => ($line->status ?? 'active') === 'active'
+                        && ! in_array($line->invoice?->status, ['cancelled', 'void'], true));
+            })
+            ->map(function (EgcBlock $targetBlock) {
+                $invoiceLine = $targetBlock->financeCharge?->invoiceLines
+                    ->first(fn ($line) => ($line->status ?? 'active') === 'active'
+                        && ! in_array($line->invoice?->status, ['cancelled', 'void'], true));
+
+                return [
+                    'id' => $targetBlock->financeCharge?->id,
+                    'description' => $targetBlock->financeCharge?->description,
+                    'amount' => $targetBlock->financeCharge?->amount,
+                    'semester_id' => $targetBlock->semester_id,
+                    'semester_name' => $targetBlock->semester?->name,
+                    'invoice_id' => $invoiceLine?->invoice?->id,
+                    'invoice_number' => $invoiceLine?->invoice?->invoice_number,
+                    'target_block_number' => $targetBlock->block_number,
+                    'target_level_number' => $targetBlock->level_number,
+                ];
+            });
 
         return $explicitTargets;
     }

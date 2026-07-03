@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 use App\Models\AcademicRecord;
 use App\Models\Campus;
-use App\Models\CourseRegistration;
 use App\Models\CourseOffering;
+use App\Models\CourseRegistration;
 use App\Models\CurriculumVersion;
 use App\Models\EgcBlock;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
-use App\Modules\Finance\Queries\Egc\ListEgcBlockResultsQuery;
 use App\Modules\Finance\Actions\Egc\SyncEgcBlockResultsAction;
+use App\Modules\Finance\Queries\Egc\ListEgcBlockResultsQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -165,6 +165,51 @@ it('re-sync overwrites previous result', function () {
     SyncEgcBlockResultsAction::run($semester->id);
 
     expect($block->fresh()->result)->toBe(EgcBlock::RESULT_FAIL);
+});
+
+it('does not overwrite a block to fail when the student has later egc progression evidence', function () {
+    $semester = Semester::factory()->create();
+    $student = makeSyncStudent();
+    $student->update(['gc_current_level' => 5]);
+
+    $failedLevel = makeEgcUnit(4);
+    $laterLevel = makeEgcUnit(5);
+
+    $block = EgcBlock::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'block_number' => 2,
+        'level_number' => 4,
+        'result' => EgcBlock::RESULT_PASS,
+        'attendance_rate' => 82.86,
+    ])->create();
+
+    makeEgcAcademicRecord($student, $semester, $failedLevel, [
+        'completion_status' => 'completed',
+        'is_passed' => false,
+        'override_pass' => false,
+        'attendance_percentage' => 82.86,
+    ]);
+
+    $laterOffering = makeSyncCourseOffering($semester->id, $laterLevel->id);
+    AcademicRecord::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'unit_id' => $laterLevel->id,
+        'course_offering_id' => $laterOffering->id,
+        'completion_status' => 'in_progress',
+        'is_passed' => null,
+    ])->create();
+
+    $summary = SyncEgcBlockResultsAction::run($semester->id);
+
+    $block->refresh();
+
+    expect($summary['synced'])->toBe(0)
+        ->and($summary['skipped'])->toHaveCount(1)
+        ->and($summary['skipped'][0]['reason'])->toBe('failed_result_conflicts_with_later_egc_progression')
+        ->and($block->result)->toBe(EgcBlock::RESULT_PASS)
+        ->and($block->synced_at)->toBeNull();
 });
 
 it('matches duplicate same-level blocks by registration order and keeps in-progress attempts pending', function () {

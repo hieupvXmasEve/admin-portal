@@ -140,9 +140,9 @@ function grantEgcReconcilePermissions(array $codes): User
     return $user;
 }
 
-it('relevels future pending blocks and auto-applies retake discount after a failed source block', function () {
-    $sourceSemester = Semester::factory()->create();
-    $targetSemester = Semester::factory()->create();
+it('relevels only the immediate next-semester block and auto-applies retake discount after a block two failure', function () {
+    $sourceSemester = Semester::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-04-30', 'is_archived' => false]);
+    $targetSemester = Semester::factory()->create(['start_date' => '2026-05-01', 'end_date' => '2026-08-31', 'is_archived' => false]);
     $student = makeReconcileStudent();
 
     makeReconcileEgcUnit(3, 15_000_000);
@@ -151,7 +151,7 @@ it('relevels future pending blocks and auto-applies retake discount after a fail
 
     [$sourceCharge] = makeReconcileChargeWithInvoice($student, $sourceSemester, 3, 15_000_000);
     $sourceBlock = attachReconcileCharge(
-        makeReconcileBlock($student, $sourceSemester, 1, 3, EgcBlock::RESULT_FAIL, 97.14),
+        makeReconcileBlock($student, $sourceSemester, 2, 3, EgcBlock::RESULT_FAIL, 97.14),
         $sourceCharge,
     );
 
@@ -172,24 +172,24 @@ it('relevels future pending blocks and auto-applies retake discount after a fail
     $summary = ReconcileEgcChargesAfterSyncAction::run($sourceSemester->id);
 
     expect($summary['students_reconciled'])->toBe(1)
-        ->and($summary['releveled_blocks'])->toBe(2)
+        ->and($summary['releveled_blocks'])->toBe(1)
         ->and($summary['discounts_applied'])->toBe(1)
         ->and($summary['needs_manual_repair'])->toBe([]);
 
     expect($firstTargetBlock->fresh()->level_number)->toBe(3)
         ->and($firstTargetBlock->fresh()->is_retake)->toBeTrue()
-        ->and($secondTargetBlock->fresh()->level_number)->toBe(4)
+        ->and($secondTargetBlock->fresh()->level_number)->toBe(5)
         ->and($secondTargetBlock->fresh()->is_retake)->toBeFalse();
 
     expect((float) $firstTargetCharge->fresh()->amount)->toBe(15_000_000.0)
         ->and($firstTargetCharge->fresh()->description)->toBe('EGC Level 3 Fee')
-        ->and((float) $secondTargetCharge->fresh()->amount)->toBe(17_000_000.0)
-        ->and($secondTargetCharge->fresh()->description)->toBe('EGC Level 4 Fee');
+        ->and((float) $secondTargetCharge->fresh()->amount)->toBe(19_000_000.0)
+        ->and($secondTargetCharge->fresh()->description)->toBe('EGC Level 5 Fee');
 
     expect((float) $firstTargetLine->fresh()->amount_snapshot)->toBe(15_000_000.0)
         ->and($firstTargetLine->fresh()->description_snapshot)->toBe('EGC Level 3 Fee')
-        ->and((float) $secondTargetLine->fresh()->amount_snapshot)->toBe(17_000_000.0)
-        ->and($secondTargetLine->fresh()->description_snapshot)->toBe('EGC Level 4 Fee');
+        ->and((float) $secondTargetLine->fresh()->amount_snapshot)->toBe(19_000_000.0)
+        ->and($secondTargetLine->fresh()->description_snapshot)->toBe('EGC Level 5 Fee');
 
     expect($sourceBlock->fresh()->retake_discount_id)->not->toBeNull()
         ->and(EgcRetakeDiscountLink::query()->where('target_finance_charge_id', $firstTargetCharge->id)->exists())->toBeTrue()
@@ -204,7 +204,6 @@ it('relevels future pending blocks and auto-applies retake discount after a fail
 
 it('runs reconciliation automatically from block result sync', function () {
     $sourceSemester = Semester::factory()->create();
-    $targetSemester = Semester::factory()->create();
     $student = makeReconcileStudent();
 
     $levelThree = makeReconcileEgcUnit(3, 15_000_000);
@@ -216,9 +215,9 @@ it('runs reconciliation automatically from block result sync', function () {
         $sourceCharge,
     );
 
-    [$targetCharge] = makeReconcileChargeWithInvoice($student, $targetSemester, 4, 17_000_000);
+    [$targetCharge] = makeReconcileChargeWithInvoice($student, $sourceSemester, 4, 17_000_000);
     $targetBlock = attachReconcileCharge(
-        makeReconcileBlock($student, $targetSemester, 1, 4, EgcBlock::RESULT_PENDING),
+        makeReconcileBlock($student, $sourceSemester, 2, 4, EgcBlock::RESULT_PENDING),
         $targetCharge,
     );
 
@@ -248,7 +247,6 @@ it('runs reconciliation automatically from block result sync', function () {
 
 it('is idempotent after an automatic discount is applied', function () {
     $sourceSemester = Semester::factory()->create();
-    $targetSemester = Semester::factory()->create();
     $student = makeReconcileStudent();
 
     makeReconcileEgcUnit(3, 15_000_000);
@@ -259,9 +257,9 @@ it('is idempotent after an automatic discount is applied', function () {
         $sourceCharge,
     );
 
-    [$targetCharge] = makeReconcileChargeWithInvoice($student, $targetSemester, 4, 15_000_000);
+    [$targetCharge] = makeReconcileChargeWithInvoice($student, $sourceSemester, 4, 15_000_000);
     attachReconcileCharge(
-        makeReconcileBlock($student, $targetSemester, 1, 4, EgcBlock::RESULT_PENDING),
+        makeReconcileBlock($student, $sourceSemester, 2, 4, EgcBlock::RESULT_PENDING),
         $targetCharge,
     );
 
@@ -277,7 +275,6 @@ it('is idempotent after an automatic discount is applied', function () {
 
 it('relevels below-attendance failures without applying retake discount', function () {
     $sourceSemester = Semester::factory()->create();
-    $targetSemester = Semester::factory()->create();
     $student = makeReconcileStudent();
 
     makeReconcileEgcUnit(4, 15_000_000);
@@ -288,9 +285,9 @@ it('relevels below-attendance failures without applying retake discount', functi
         $sourceCharge,
     );
 
-    [$targetCharge] = makeReconcileChargeWithInvoice($student, $targetSemester, 5, 15_000_000);
+    [$targetCharge] = makeReconcileChargeWithInvoice($student, $sourceSemester, 5, 15_000_000);
     $targetBlock = attachReconcileCharge(
-        makeReconcileBlock($student, $targetSemester, 1, 5, EgcBlock::RESULT_PENDING),
+        makeReconcileBlock($student, $sourceSemester, 2, 5, EgcBlock::RESULT_PENDING),
         $targetCharge,
     );
 
@@ -302,6 +299,67 @@ it('relevels below-attendance failures without applying retake discount', functi
         ->and($targetBlock->fresh()->level_number)->toBe(4)
         ->and($targetBlock->fresh()->is_retake)->toBeTrue()
         ->and($sourceBlock->fresh()->retake_discount_id)->toBeNull()
+        ->and(EgcRetakeDiscountLink::query()->count())->toBe(0);
+});
+
+it('does not use next-semester block one as the retake target for a block one failure', function () {
+    $sourceSemester = Semester::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-04-30', 'is_archived' => false]);
+    $targetSemester = Semester::factory()->create(['start_date' => '2026-05-01', 'end_date' => '2026-08-31', 'is_archived' => false]);
+    $student = makeReconcileStudent();
+
+    makeReconcileEgcUnit(3, 15_000_000);
+    makeReconcileEgcUnit(4, 17_000_000);
+
+    [$sourceCharge] = makeReconcileChargeWithInvoice($student, $sourceSemester, 3, 15_000_000);
+    $sourceBlock = attachReconcileCharge(
+        makeReconcileBlock($student, $sourceSemester, 1, 3, EgcBlock::RESULT_FAIL, 97.14),
+        $sourceCharge,
+    );
+
+    [$targetCharge] = makeReconcileChargeWithInvoice($student, $targetSemester, 4, 17_000_000);
+    $targetBlock = attachReconcileCharge(
+        makeReconcileBlock($student, $targetSemester, 1, 4, EgcBlock::RESULT_PENDING),
+        $targetCharge,
+    );
+
+    $summary = ReconcileEgcChargesAfterSyncAction::run($sourceSemester->id);
+
+    expect($summary['students_reconciled'])->toBe(0)
+        ->and($summary['releveled_blocks'])->toBe(0)
+        ->and($summary['discounts_applied'])->toBe(0)
+        ->and($summary['skipped'][0]['reason'])->toBe('no_pending_target_blocks')
+        ->and($sourceBlock->fresh()->retake_discount_id)->toBeNull()
+        ->and($targetBlock->fresh()->level_number)->toBe(4)
+        ->and($targetBlock->fresh()->is_retake)->toBeFalse();
+});
+
+it('does not relevel or discount when the student is no longer in egc stage', function () {
+    $sourceSemester = Semester::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-04-30', 'is_archived' => false]);
+    $targetSemester = Semester::factory()->create(['start_date' => '2026-05-01', 'end_date' => '2026-08-31', 'is_archived' => false]);
+    $student = makeReconcileStudent(['status' => 'intake_course']);
+
+    makeReconcileEgcUnit(4, 15_000_000);
+    makeReconcileEgcUnit(5, 15_000_000);
+
+    [$sourceCharge] = makeReconcileChargeWithInvoice($student, $sourceSemester, 4, 15_000_000);
+    $sourceBlock = attachReconcileCharge(
+        makeReconcileBlock($student, $sourceSemester, 2, 4, EgcBlock::RESULT_FAIL, 97.14),
+        $sourceCharge,
+    );
+
+    [$targetCharge] = makeReconcileChargeWithInvoice($student, $targetSemester, 5, 15_000_000);
+    $targetBlock = attachReconcileCharge(
+        makeReconcileBlock($student, $targetSemester, 1, 5, EgcBlock::RESULT_PENDING),
+        $targetCharge,
+    );
+
+    $summary = ReconcileEgcChargesAfterSyncAction::run($sourceSemester->id);
+
+    expect($summary['students_reconciled'])->toBe(0)
+        ->and($summary['needs_manual_repair'][0]['reason'])->toBe('student_not_in_egc_stage')
+        ->and($sourceBlock->fresh()->retake_discount_id)->toBeNull()
+        ->and($targetBlock->fresh()->level_number)->toBe(5)
+        ->and($targetBlock->fresh()->is_retake)->toBeFalse()
         ->and(EgcRetakeDiscountLink::query()->count())->toBe(0);
 });
 
@@ -318,4 +376,42 @@ it('redirects the old retake adjustments index to the combined block results sur
             'semester_id' => $semester->id,
             'section' => 'retake-adjustments',
         ]));
+});
+
+it('rejects block result sync for a non-active semester', function () {
+    $campus = Campus::factory()->create();
+    $activeSemester = Semester::factory()->active()->create();
+    $inactiveSemester = Semester::factory()->create(['is_active' => false]);
+    $student = makeReconcileStudent();
+    $levelThree = makeReconcileEgcUnit(3, 15_000_000);
+    $user = grantEgcReconcilePermissions(['sync_egc_block_results']);
+
+    $sourceBlock = makeReconcileBlock($student, $inactiveSemester, 1, 3, EgcBlock::RESULT_PENDING);
+    session(['current_campus_id' => $campus->id]);
+    app()->singleton('campus', fn () => $campus);
+
+    AcademicRecord::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $inactiveSemester->id,
+        'unit_id' => $levelThree->id,
+        'course_offering_id' => makeReconcileCourseOffering($inactiveSemester, $levelThree)->id,
+        'completion_status' => 'completed',
+        'is_passed' => false,
+        'override_pass' => false,
+        'attendance_percentage' => 97.14,
+    ])->create();
+
+    actingAs($user)
+        ->withSession(['_token' => 'test-csrf-token'])
+        ->from(route('finance.egc.block-results.index'))
+        ->post(route('finance.egc.block-results.sync'), [
+            '_token' => 'test-csrf-token',
+            'semester_id' => $inactiveSemester->id,
+        ])
+        ->assertRedirect(route('finance.egc.block-results.index'))
+        ->assertSessionHasErrors('semester_id');
+
+    expect($activeSemester->is_active)->toBeTrue()
+        ->and($sourceBlock->fresh()->result)->toBe(EgcBlock::RESULT_PENDING)
+        ->and($sourceBlock->fresh()->synced_at)->toBeNull();
 });

@@ -27,6 +27,7 @@ interface EgcBlock {
 interface Semester {
     id: number;
     name: string;
+    is_active?: boolean;
 }
 
 interface EgcBlockPagination {
@@ -91,6 +92,7 @@ const props = defineProps<{
     adjustments: EgcAdjustments;
     semesters: Semester[];
     currentSemester: Semester | null;
+    canSyncResults: boolean;
     filters: { semester_id: string | null; search: string; result: string; per_page?: number; page?: number };
 }>();
 
@@ -110,7 +112,7 @@ const { filters, setFilter, handleSearch, handlePaginationNavigate, handlePageSi
         per_page: 50,
         page: 1,
     },
-    only: ['blocks', 'adjustments', 'filters', 'currentSemester'],
+    only: ['blocks', 'adjustments', 'filters', 'currentSemester', 'canSyncResults'],
     immediateFields: ['result', 'per_page'],
 });
 
@@ -202,7 +204,7 @@ function formatTargetLabel(target: TargetOption): string {
                 <h1 class="text-2xl font-bold">EGC · Kết quả & học lại</h1>
                 <p class="text-muted-foreground text-sm">Sync block results, reconcile generated charges, and handle retake discounts in one workflow · {{ selectedLabel }}</p>
             </div>
-            <Button :disabled="!selectedId || syncForm.processing" variant="outline" @click="syncResults">
+            <Button v-if="canSyncResults" :disabled="syncForm.processing" variant="outline" @click="syncResults">
                 <RefreshCw :class="['mr-2 h-4 w-4', syncForm.processing && 'animate-spin']" />
                 {{ syncForm.processing ? 'Syncing...' : 'Sync Results' }}
             </Button>

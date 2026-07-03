@@ -12,6 +12,7 @@ use App\Models\InvoiceLine;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
+use App\Modules\Finance\Support\EgcRetakeTargetResolver;
 use Illuminate\Support\Facades\DB;
 
 class ReconcileEgcChargesAfterSyncAction
@@ -39,7 +40,7 @@ class ReconcileEgcChargesAfterSyncAction
             ->whereNotNull('finance_charge_id')
             ->whereNull('retake_discount_id')
             ->when($studentIds !== null, fn ($query) => $query->whereIn('student_id', $studentIds))
-            ->with('student:id,gc_total_levels,student_id')
+            ->with('student:id,gc_total_levels,student_id,status')
             ->orderBy('student_id')
             ->orderBy('block_number')
             ->get();
@@ -57,8 +58,8 @@ class ReconcileEgcChargesAfterSyncAction
             }
 
             $expectedLevels = [];
-            foreach ($targets->values() as $index => $targetBlock) {
-                $expectedLevels[(int) $targetBlock->id] = (int) $sourceBlock->level_number + $index;
+            foreach ($targets->values() as $targetBlock) {
+                $expectedLevels[(int) $targetBlock->id] = (int) $sourceBlock->level_number;
             }
 
             $stopReason = self::firstStopReason($sourceBlock, $targets, $expectedLevels);
@@ -153,6 +154,10 @@ class ReconcileEgcChargesAfterSyncAction
     {
         $studentTotalLevels = (int) ($sourceBlock->student?->gc_total_levels ?? 0);
 
+        if ($sourceBlock->student?->status !== 'intake_pre_uni_gc') {
+            return 'student_not_in_egc_stage';
+        }
+
         foreach ($targets as $targetBlock) {
             $expectedLevel = $expectedLevels[(int) $targetBlock->id];
             if ($studentTotalLevels > 0 && $expectedLevel > $studentTotalLevels) {
@@ -166,6 +171,10 @@ class ReconcileEgcChargesAfterSyncAction
             $charge = $targetBlock->financeCharge;
             if (! $charge instanceof FinanceCharge || $charge->status !== FinanceCharge::STATUS_ACTIVE) {
                 return 'target_charge_not_active';
+            }
+
+            if ($charge->charge_type !== FinanceCharge::TYPE_EGC_LEVEL_FEE) {
+                return 'target_charge_not_egc';
             }
 
             $activeLines = self::activeInvoiceLinesFor($charge);
@@ -192,21 +201,8 @@ class ReconcileEgcChargesAfterSyncAction
 
     private static function targetBlocksFor(EgcBlock $sourceBlock)
     {
-        return EgcBlock::query()
-            ->where('student_id', $sourceBlock->student_id)
-            ->where('result', EgcBlock::RESULT_PENDING)
-            ->whereNotNull('finance_charge_id')
-            ->where(function ($query) use ($sourceBlock): void {
-                $query->where('semester_id', '>', $sourceBlock->semester_id)
-                    ->orWhere(function ($sameSemesterQuery) use ($sourceBlock): void {
-                        $sameSemesterQuery->where('semester_id', $sourceBlock->semester_id)
-                            ->where('block_number', '>', $sourceBlock->block_number);
-                    });
-            })
-            ->with(['financeCharge.invoiceLines.invoice'])
-            ->orderBy('semester_id')
-            ->orderBy('block_number')
-            ->get();
+        return EgcRetakeTargetResolver::targetBlocksFor($sourceBlock)
+            ->load(['financeCharge.invoiceLines.invoice']);
     }
 
     private static function activeInvoiceLineFor(FinanceCharge $charge): InvoiceLine

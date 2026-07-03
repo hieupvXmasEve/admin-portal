@@ -31,6 +31,8 @@ class EgcBlockResultsController extends Controller
 
         $currentCampusId = session('current_campus_id') ? (int) session('current_campus_id') : null;
         $semesterId = FinanceSemesterContextResolver::selectedId();
+        $activeSemesterId = Semester::query()->where('is_active', true)->value('id');
+        $currentSemester = $semesterId ? Semester::find($semesterId) : null;
 
         $blocks = $semesterId ? $query->handle($semesterId, $validated, $currentCampusId) : collect();
         $adjustments = $semesterId ? $adjustmentsQuery->handle($semesterId, $currentCampusId) : [
@@ -45,7 +47,10 @@ class EgcBlockResultsController extends Controller
             'blocks' => $blocks,
             'adjustments' => $adjustments,
             'semesters' => $semesters,
-            'currentSemester' => $semesterId ? Semester::find($semesterId) : null,
+            'currentSemester' => $currentSemester,
+            'canSyncResults' => $semesterId !== null
+                && $activeSemesterId !== null
+                && (int) $semesterId === (int) $activeSemesterId,
             'filters' => [
                 'search' => $validated['search'] ?? '',
                 'result' => $validated['result'] ?? 'all',
@@ -61,12 +66,25 @@ class EgcBlockResultsController extends Controller
             'semester_id' => 'required|integer|exists:semesters,id',
         ]);
 
-        $result = SyncEgcBlockResultsAction::run((int) $validated['semester_id']);
+        $semesterId = (int) $validated['semester_id'];
+        $activeSemesterId = Semester::query()->where('is_active', true)->value('id');
+
+        if ($activeSemesterId === null || $semesterId !== (int) $activeSemesterId) {
+            return redirect()
+                ->route('finance.egc.block-results.index')
+                ->withErrors(['semester_id' => 'Sync Results chỉ được chạy cho kỳ hiện tại đang active.']);
+        }
+
+        $result = SyncEgcBlockResultsAction::run($semesterId);
         $reconciliation = $result['reconciliation'];
         $message = "Synced {$result['synced']} of {$result['total']} blocks. "
             ."Reconciled {$reconciliation['students_reconciled']} students "
             ."({$reconciliation['releveled_blocks']} blocks releveled, "
             ."{$reconciliation['discounts_applied']} auto discounts).";
+
+        if (count($result['skipped'] ?? []) > 0) {
+            $message .= ' '.count($result['skipped']).' blocks need manual academic review.';
+        }
 
         Inertia::flash('success', $message);
         Inertia::flash('egc_reconciliation', $reconciliation);
