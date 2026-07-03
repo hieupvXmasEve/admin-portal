@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\AcademicRecord;
 use App\Models\CourseOffering;
+use App\Models\Student;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
@@ -227,7 +229,7 @@ class CourseStatisticsService
             'course_name' => $courseOffering->unit->name,
             'section_code' => $courseOffering->section_code,
             'semester' => $courseOffering->semester->name,
-            'instructor_name' => $courseOffering->lecture ? trim($courseOffering->lecture->first_name . ' ' . $courseOffering->lecture->last_name) : null,
+            'instructor_name' => $courseOffering->lecture ? trim($courseOffering->lecture->first_name.' '.$courseOffering->lecture->last_name) : null,
             'total_students' => $students->count(),
             'total_sessions' => $totalSessions,
             'allowed_absences' => $allowedAbsences,
@@ -254,10 +256,6 @@ class CourseStatisticsService
     public function getAssessmentScoresGrid(int $courseOfferingId): array
     {
         $courseOffering = CourseOffering::with([
-            'semester',
-            'unit',
-            'lecture',
-            'campus',
             'syllabusTemplate.assessmentComponents' => function ($query) {
                 $query->orderBy('sort_order')->orderBy('id');
             },
@@ -374,7 +372,7 @@ class CourseStatisticsService
                 $componentScores = $studentScores->whereIn('assessment_component_detail_id', $detailIds);
 
                 // Check if details have weights defined
-                $detailsHaveWeights = $validDetails->filter(fn($d) => $d->weight !== null && $d->weight > 0)->count() > 0;
+                $detailsHaveWeights = $validDetails->filter(fn ($d) => $d->weight !== null && $d->weight > 0)->count() > 0;
 
                 // Calculate weighted sum based on detail weights
                 $totalWeightedScore = 0;
@@ -449,16 +447,11 @@ class CourseStatisticsService
         // Calculate average from academic records
         $averageScore = $academicRecords->where('final_percentage', '!=', null)->avg('final_percentage');
 
-        // Calculate statistics
+        // Calculate statistics. Only average_score is kept here — course
+        // code/name/section, semester, instructor, and student/component
+        // counts already render elsewhere on the cockpit page (header,
+        // roster, syllabus), so the scores tab doesn't duplicate them.
         $statistics = [
-            'course_code' => $courseOffering->unit->code,
-            'course_name' => $courseOffering->unit->name,
-            'section_code' => $courseOffering->section_code,
-            'semester' => $courseOffering->semester->name,
-            'instructor_name' => $courseOffering->lecture ? trim($courseOffering->lecture->first_name . ' ' . $courseOffering->lecture->last_name) : null,
-            'total_students' => $students->count(),
-            'total_components' => $assessmentComponents->count(),
-            'total_details' => count($assessmentDetails),
             'average_score' => $averageScore ? round($averageScore, 2) : 0,
         ];
 
@@ -467,7 +460,7 @@ class CourseStatisticsService
                 'id' => $courseOffering->id,
                 'unit_id' => $courseOffering->unit_id,
                 'semester_id' => $courseOffering->semester_id,
-                'min_grade_threshold' => (float)($courseOffering->syllabusTemplate?->min_grade_threshold ?? 60.00)
+                'min_grade_threshold' => (float) ($courseOffering->syllabusTemplate?->min_grade_threshold ?? 60.00),
             ],
             'statistics' => $statistics,
             'assessment_components' => $assessmentComponents->map(function ($component) {
@@ -498,12 +491,12 @@ class CourseStatisticsService
         // Enhance attendance_grid with academic record attributes
         $attendanceGrid = $attendanceData['attendance_grid'];
 
-        $academicRecords = \App\Models\AcademicRecord::where('course_offering_id', $courseOfferingId)
+        $academicRecords = AcademicRecord::where('course_offering_id', $courseOfferingId)
             ->get()
             ->keyBy('student_id');
 
         // Get student mappings to link student_id (string) to record student_id (int)
-        $students = \App\Models\Student::whereIn('student_id', collect($attendanceGrid)->pluck('student_id'))
+        $students = Student::whereIn('student_id', collect($attendanceGrid)->pluck('student_id'))
             ->get()
             ->keyBy('student_id');
 
@@ -517,8 +510,8 @@ class CourseStatisticsService
 
                 // Use model static methods for calculation as requested
                 $percentage = (float) $record->final_percentage;
-                $studentData['grade_points'] = \App\Models\AcademicRecord::calculateGradePoints($percentage);
-                $studentData['letter_grade'] = \App\Models\AcademicRecord::calculateLetterGrade($percentage);
+                $studentData['grade_points'] = AcademicRecord::calculateGradePoints($percentage);
+                $studentData['letter_grade'] = AcademicRecord::calculateLetterGrade($percentage);
                 $studentData['grade_status'] = $record->grade_status;
                 $studentData['is_passed'] = $record->is_passed;
                 $studentData['override_pass'] = $record->override_pass;

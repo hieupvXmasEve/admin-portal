@@ -171,9 +171,37 @@ it('previews a Canvas grade sync without writing anything', function () {
     $response->assertJsonPath('data.changes.0.new_points', 80);
     $response->assertJsonPath('data.changes.0.old_points', null);
     $response->assertJsonPath('data.course_totals.0.new_percentage', 85);
+    $response->assertJsonPath('data.course_totals.0.changed', true);
 
     expect(AssessmentComponentDetailScore::count())->toBe(0);
     expect(AcademicRecord::where('student_id', $student->id)->count())->toBe(0);
+});
+
+it('still reports the Canvas course total when it matches the current record, flagged unchanged', function () {
+    ['offering' => $offering, 'mapping' => $mapping, 'student' => $student] = makeSyncableOffering($this);
+    mockCanvasApi(score: 80, courseTotal: 85);
+
+    AcademicRecord::factory()->create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $this->semester->id,
+        'unit_id' => $offering->unit_id,
+        'campus_id' => $this->campus->id,
+        'final_percentage' => 85,
+    ]);
+
+    $response = actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->postJson(route(CourseOfferingRoutes::API_SYNC_GRADES_PREVIEW, $offering), [
+            'student_ids' => [$student->id],
+        ]);
+
+    $response->assertOk();
+    $response->assertJsonPath('data.course_totals.0.old_percentage', 85);
+    $response->assertJsonPath('data.course_totals.0.new_percentage', 85);
+    $response->assertJsonPath('data.course_totals.0.changed', false);
+    // The course total didn't move, but the cell still did — student counts as changed.
+    $response->assertJsonPath('data.summary.students_changed', 1);
 });
 
 it('badges a changed cell whose current score_status is disputed but still includes it', function () {

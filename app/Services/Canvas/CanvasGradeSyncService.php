@@ -207,26 +207,36 @@ class CanvasGradeSyncService
 
             $canvasUserId = (string) $canvasStudent['id'];
             $studentDiff = $this->diffStudentGradesFromBulk($student, $canvasUserId, $submissionMap, $mapping, $courseOffering, $canvasComponents);
+            $courseTotal = $studentDiff['course_total'];
+            $totalChanged = $courseTotal !== null && $courseTotal['changed'];
 
             if (! empty($studentDiff['cell_changes'])) {
                 array_push($changes, ...$studentDiff['cell_changes']);
                 $studentsWithChanges[$student->id] = true;
             }
 
-            if ($studentDiff['course_total'] !== null) {
-                $courseTotals[] = $studentDiff['course_total'];
+            // Always surfaced when Canvas has a grade for this student (even
+            // unchanged) so staff can confirm what apply would pull in —
+            // `changed` drives the count/highlight, not inclusion.
+            if ($courseTotal !== null) {
+                $courseTotals[] = $courseTotal;
+            }
+
+            if ($totalChanged) {
                 $studentsWithChanges[$student->id] = true;
             }
 
-            if (empty($studentDiff['cell_changes']) && $studentDiff['course_total'] === null) {
+            if (empty($studentDiff['cell_changes']) && ! $totalChanged) {
                 $studentsUnchanged++;
             }
         }
 
+        $changedTotalsCount = count(array_filter($courseTotals, fn (array $total) => $total['changed']));
+
         return [
             'success' => true,
             'summary' => [
-                'total_changes' => count($changes) + count($courseTotals),
+                'total_changes' => count($changes) + $changedTotalsCount,
                 'students_changed' => count($studentsWithChanges),
                 'students_unchanged' => $studentsUnchanged,
                 'students_unmatched' => count($unmatched),
@@ -411,7 +421,7 @@ class CanvasGradeSyncService
      * @param  Collection<int, AssessmentComponent>  $canvasComponents
      * @return array{
      *   cell_changes: array<int, array{student_id: int, student_code: string, student_name: string, component_id: int, component_name: string, detail_id: int, detail_name: string, old_points: float|null, new_points: float, old_percentage: float|null, new_percentage: float, is_disputed: bool}>,
-     *   course_total: array{student_id: int, student_code: string, student_name: string, old_percentage: float|null, new_percentage: float}|null
+     *   course_total: array{student_id: int, student_code: string, student_name: string, old_percentage: float|null, new_percentage: float, changed: bool}|null
      * }
      */
     private function diffStudentGradesFromBulk(Student $student, string $canvasUserId, array $submissionMap, CanvasCourseMapping $mapping, CourseOffering $courseOffering, Collection $canvasComponents): array
@@ -556,9 +566,14 @@ class CanvasGradeSyncService
     }
 
     /**
-     * Read-only counterpart to syncCanvasCourseTotal(): returns the old/new
-     * final_percentage pair when it would change, or null when unchanged or
-     * when a custom grading engine makes the Canvas total non-authoritative.
+     * Read-only counterpart to syncCanvasCourseTotal(): always reports the
+     * Canvas total for a matched student (so staff can see what apply would
+     * pull in even when it matches the current record), flagged `changed`.
+     * Returns null only when Canvas has no grade yet or a custom grading
+     * engine makes the Canvas total non-authoritative (the total is never
+     * shown, changed or not, since apply would never touch it either).
+     *
+     * @return array{student_id: int, student_code: string, student_name: string, old_percentage: float|null, new_percentage: float, changed: bool}|null
      */
     private function diffCanvasCourseTotal(Student $student, string $canvasUserId, CanvasCourseMapping $mapping, CourseOffering $courseOffering): ?array
     {
@@ -574,10 +589,7 @@ class CanvasGradeSyncService
 
             $newPercentage = round($canvasTotal, 2);
             $oldPercentage = $existingRecord?->final_percentage !== null ? (float) $existingRecord->final_percentage : null;
-
-            if ($oldPercentage !== null && abs($oldPercentage - $newPercentage) < 0.01) {
-                return null;
-            }
+            $changed = $oldPercentage === null || abs($oldPercentage - $newPercentage) >= 0.01;
 
             return [
                 'student_id' => $student->id,
@@ -585,6 +597,7 @@ class CanvasGradeSyncService
                 'student_name' => $student->full_name ?? $student->id,
                 'old_percentage' => $oldPercentage,
                 'new_percentage' => $newPercentage,
+                'changed' => $changed,
             ];
         } catch (\Exception $e) {
             Log::warning('Failed to diff Canvas total grade', [

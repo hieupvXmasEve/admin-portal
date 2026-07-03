@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Passport\Passport;
+use RuntimeException;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -58,6 +59,57 @@ class AppServiceProvider extends ServiceProvider
         $this->configureMorphMap();
         $this->shareThemeWithViews();
         $this->configureMcpPassport();
+        $this->guardDestructiveDatabaseCommands();
+    }
+
+    /**
+     * `artisan migrate:fresh/migrate:reset/db:wipe --env=testing` does NOT
+     * switch databases here — there is no `.env.testing` counterpart file,
+     * and Docker Compose injects DB_CONNECTION/DB_DATABASE as real container
+     * env vars that Dotenv's immutable loader won't override, so `--env`
+     * silently falls straight through to the primary dev database. That
+     * wiped it twice already (2026-06-24, 2026-07-03) with no point-in-time
+     * recovery (binlog is off).
+     *
+     * Checked against raw argv rather than the `CommandStarting` event:
+     * `--env=testing` makes `Application::runningUnitTests()` return true
+     * (it only checks `app()->environment() === 'testing'`, not that PHPUnit
+     * is actually running), which makes the console Kernel skip wiring
+     * Symfony's command event to Laravel's — so `CommandStarting` silently
+     * never fires for a real `--env=testing` invocation. This runs in
+     * `boot()` instead, which always executes regardless of `--env`.
+     */
+    private function guardDestructiveDatabaseCommands(): void
+    {
+        if (! $this->app->runningInConsole()) {
+            return;
+        }
+
+        $argv = $_SERVER['argv'] ?? [];
+        $command = $argv[1] ?? null;
+
+        $destructive = ['migrate:fresh', 'migrate:reset', 'db:wipe'];
+        if (! in_array($command, $destructive, true)) {
+            return;
+        }
+
+        $connectionName = config('database.default');
+        foreach ($argv as $arg) {
+            if (str_starts_with((string) $arg, '--database=')) {
+                $connectionName = substr((string) $arg, strlen('--database='));
+                break;
+            }
+        }
+
+        $database = (string) config("database.connections.{$connectionName}.database");
+        $protected = (string) env('DB_DATABASE');
+
+        if ($protected !== '' && $database === $protected) {
+            throw new RuntimeException(
+                "Refusing to run '{$command}' against the protected database '{$database}'. ".
+                'Pass --database=testing to target the test database instead (see memory: swinx-env-testing-targets-dev-db).'
+            );
+        }
     }
 
     /**

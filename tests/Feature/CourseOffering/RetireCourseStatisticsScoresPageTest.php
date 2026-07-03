@@ -129,7 +129,6 @@ it('renders the same scores grid in the cockpit scores tab that the retired page
         ])
         ->assertOk()
         ->assertJsonPath('component', 'course-offerings/Show')
-        ->assertJsonPath('props.scoresData.statistics.total_students', 1)
         ->assertJsonPath('props.scoresData.assessment_details.0.detail_name', 'Final Exam')
         ->assertJsonPath('props.scoresData.scores_grid.0.student_id', $this->student->student_id)
         ->assertJsonPath('props.scoresData.scores_grid.0.scores.0.percentage_score', '82.50')

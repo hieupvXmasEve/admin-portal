@@ -22,7 +22,7 @@ class GetCourseOfferingScoresQuery
      *
      * @return array{
      *   course_offering: array{id: int, unit_id: int, semester_id: int, min_grade_threshold: float},
-     *   statistics: array{course_code: string, course_name: string, section_code: string|null, semester: string, instructor_name: string|null, total_students: int, total_components: int, total_details: int, average_score: float},
+     *   statistics: array{average_score: float},
      *   assessment_components: array<int, array{id: int, name: string, type: string, weight: float, details: array}>,
      *   assessment_details: array<int, array>,
      *   scores_grid: array<int, array>,

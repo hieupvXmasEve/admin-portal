@@ -15,7 +15,7 @@ import type { CourseOffering } from '@/types/models';
 import type { OperationalState } from '@/types/operational-state';
 import { formatSubmissionTypes } from '@/utils/canvasGradeFormatter';
 import { Link, router } from '@inertiajs/vue3';
-import { BarChart3, BookOpen, Calculator, Calendar, RefreshCw, User, Users } from 'lucide-vue-next';
+import { BarChart3, BookOpen, Calculator, RefreshCw } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
@@ -76,14 +76,6 @@ interface AssessmentComponent {
 }
 
 interface Statistics {
-    course_code: string;
-    course_name: string;
-    section_code: string;
-    semester: string;
-    instructor_name: string | null;
-    total_students: number;
-    total_components: number;
-    total_details: number;
     average_score: number;
 }
 
@@ -287,101 +279,30 @@ const recalculateCourseResult = () => {
 
         <!-- Scores content -->
         <template v-else>
-            <!-- Recalculate button (completed courses only) -->
-            <div v-if="courseOffering.course_status === 'completed'" class="flex justify-end">
-                <Button variant="outline" :disabled="isRecalculating" @click="recalculateCourseResult">
-                    <Calculator class="mr-2 h-4 w-4" />
-                    {{ isRecalculating ? 'Recalculating...' : 'Recalculate Course Result' }}
-                </Button>
-            </div>
+            <!-- Header row: average score (the one stat not shown elsewhere on the cockpit page) + actions -->
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <BarChart3 class="text-muted-foreground h-4 w-4" />
+                    <span class="text-muted-foreground text-sm">Average score:</span>
+                    <span
+                        class="text-lg font-bold"
+                        :class="[scoresData.statistics.average_score >= 80 ? 'text-green-600' : scoresData.statistics.average_score >= 60 ? 'text-yellow-600' : 'text-red-600']"
+                    >
+                        {{ scoresData.statistics.average_score.toFixed(1) }}%
+                    </span>
+                </div>
 
-            <!-- Sync from Canvas (non-completed, Canvas-mapped offerings — ADR 0014) -->
-            <div v-if="canSyncGrades" class="flex justify-end">
-                <Button variant="outline" :disabled="selectedStudentIds.length === 0" @click="openSyncDialog">
-                    <RefreshCw class="mr-2 h-4 w-4" />
-                    Sync from Canvas{{ selectedStudentIds.length > 0 ? ` (${selectedStudentIds.length})` : '' }}
-                </Button>
-            </div>
+                <div class="flex items-center gap-2">
+                    <Button v-if="courseOffering.course_status === 'completed'" variant="outline" :disabled="isRecalculating" @click="recalculateCourseResult">
+                        <Calculator class="mr-2 h-4 w-4" />
+                        {{ isRecalculating ? 'Recalculating...' : 'Recalculate Course Result' }}
+                    </Button>
 
-            <!-- Statistics Cards -->
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-5">
-                <Card>
-                    <CardContent class="p-4">
-                        <div class="flex items-start gap-3">
-                            <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
-                                <Calendar class="h-5 w-5 text-blue-600" />
-                            </div>
-                            <div class="min-w-0">
-                                <p class="text-muted-foreground text-xs font-medium uppercase tracking-wide">Semester</p>
-                                <p class="mt-0.5 truncate font-bold">{{ scoresData.statistics.semester }}</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent class="p-4">
-                        <div class="flex items-start gap-3">
-                            <div class="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
-                                <User class="h-5 w-5 text-purple-600" />
-                            </div>
-                            <div class="min-w-0">
-                                <p class="text-muted-foreground text-xs font-medium uppercase tracking-wide">Instructor</p>
-                                <p class="mt-0.5 truncate font-bold">{{ scoresData.statistics.instructor_name || 'N/A' }}</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent class="p-4">
-                        <div class="flex items-start gap-3">
-                            <div class="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
-                                <Users class="h-5 w-5 text-green-600" />
-                            </div>
-                            <div>
-                                <p class="text-muted-foreground text-xs font-medium uppercase tracking-wide">Students</p>
-                                <p class="mt-0.5 text-xl font-bold">{{ scoresData.statistics.total_students }}</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent class="p-4">
-                        <div class="flex items-start gap-3">
-                            <div class="rounded-lg bg-orange-100 p-2 dark:bg-orange-900/30">
-                                <BookOpen class="h-5 w-5 text-orange-600" />
-                            </div>
-                            <div>
-                                <p class="text-muted-foreground text-xs font-medium uppercase tracking-wide">Components</p>
-                                <p class="mt-0.5 text-xl font-bold">{{ scoresData.statistics.total_components }}</p>
-                                <p class="text-muted-foreground text-xs">{{ scoresData.statistics.total_details }} details</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent class="p-4">
-                        <div class="flex items-start gap-3">
-                            <div class="rounded-lg bg-indigo-100 p-2 dark:bg-indigo-900/30">
-                                <BarChart3 class="h-5 w-5 text-indigo-600" />
-                            </div>
-                            <div>
-                                <p class="text-muted-foreground text-xs font-medium uppercase tracking-wide">Average</p>
-                                <p
-                                    class="mt-0.5 text-xl font-bold"
-                                    :class="[
-                                        scoresData.statistics.average_score >= 80
-                                            ? 'text-green-600'
-                                            : scoresData.statistics.average_score >= 60
-                                              ? 'text-yellow-600'
-                                              : 'text-red-600',
-                                    ]"
-                                >
-                                    {{ scoresData.statistics.average_score.toFixed(1) }}%
-                                </p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                    <Button v-if="canSyncGrades" variant="outline" :disabled="selectedStudentIds.length === 0" @click="openSyncDialog">
+                        <RefreshCw class="mr-2 h-4 w-4" />
+                        Sync from Canvas{{ selectedStudentIds.length > 0 ? ` (${selectedStudentIds.length})` : '' }}
+                    </Button>
+                </div>
             </div>
 
             <!-- Legend -->
