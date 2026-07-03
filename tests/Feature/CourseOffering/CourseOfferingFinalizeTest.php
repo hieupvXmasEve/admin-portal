@@ -251,12 +251,23 @@ it('does not re-finalize an already completed offering', function () {
     expect($offering->fresh()->course_status)->toBe('completed');
 });
 
-it('does not retroactively apply the Canvas rule when recalculating a completed offering', function () {
+it('applies the Canvas rule to recalculate the same as finalize', function () {
     $offering = makeReadyFinalizeOffering($this, ['course_status' => 'completed']);
     mapFinalizeCanvasCourse($offering, 'mapped');
 
-    // Recalculation of an already-completed offering must not hit the new
-    // Canvas block (forward-only rule, no backfill).
+    // The Canvas rule is forward-only in the sense that it never backfills
+    // or reprocesses historical offerings on its own — but an explicit
+    // Recalculate action is not backfill, so it is blocked exactly like
+    // Finalize (Course Offering Cockpit PRD, issue 04).
+    expect(fn () => MarkCourseOfferingCompletedAction::run($offering, recalculate: true))
+        ->toThrow(RuntimeException::class, 'Canvas');
+
+    expect($offering->fresh()->course_status)->toBe('completed');
+});
+
+it('recalculates normally for non-blocking Canvas states on an already-completed offering', function () {
+    $offering = makeReadyFinalizeOffering($this, ['course_status' => 'completed']);
+
     $result = MarkCourseOfferingCompletedAction::run($offering, recalculate: true);
 
     expect($result['success'])->toBeTrue()

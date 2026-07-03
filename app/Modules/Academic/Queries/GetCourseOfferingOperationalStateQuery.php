@@ -30,7 +30,7 @@ class GetCourseOfferingOperationalStateQuery
 
     public const ACTION_FINALIZE = 'finalize';
 
-    private const TERMINAL_STAGES = ['completed', 'cancelled'];
+    public const ACTION_RECALCULATE = 'recalculate';
 
     /**
      * @return array{
@@ -53,9 +53,15 @@ class GetCourseOfferingOperationalStateQuery
 
         $lifecycleStage = self::deriveLifecycleStage($courseOffering, $sessions);
 
-        $readinessBlockers = in_array($lifecycleStage, self::TERMINAL_STAGES, true)
-            ? []
-            : self::deriveReadinessBlockers($courseOffering, $sessions);
+        // Finalize (non-terminal stages) is blocked by the full readiness set
+        // (attendance + Canvas). Recalculate (completed stage) only re-checks
+        // the Canvas rule — attendance was already satisfied at the original
+        // finalize. Cancelled offerings never expose blockers or actions.
+        $readinessBlockers = match (true) {
+            $lifecycleStage === 'cancelled' => [],
+            $lifecycleStage === 'completed' => array_values(array_filter([self::deriveCanvasBlocker($courseOffering)])),
+            default => self::deriveReadinessBlockers($courseOffering, $sessions),
+        };
 
         return [
             'lifecycle_stage' => $lifecycleStage,
@@ -136,51 +142,84 @@ class GetCourseOfferingOperationalStateQuery
             ];
         }
 
-        // Canvas rule (ADR 0013): a mapped-but-unsynced offering blocks
-        // completion. pending / ignored mappings and unmapped offerings don't.
-        if (! $courseOffering->is_canvas_synced) {
-            $mappedMappings = $courseOffering->canvasCourseMappings()
-                ->where('sync_status', 'mapped')
-                ->get(['id', 'course_offering_id', 'canvas_course_name', 'canvas_course_id']);
-
-            if ($mappedMappings->isNotEmpty()) {
-                $blockers[] = [
-                    'code' => self::BLOCKER_CANVAS_UNSYNCED,
-                    'message' => 'Canvas-mapped but not synced — sync grades from Canvas before finalizing',
-                    'references' => $mappedMappings
-                        ->map(fn (CanvasCourseMapping $mapping): array => [
-                            'type' => 'canvas_course_mapping',
-                            'id' => $mapping->id,
-                            'label' => $mapping->canvas_course_name ?? $mapping->canvas_course_id,
-                        ])
-                        ->values()
-                        ->all(),
-                ];
-            }
+        $canvasBlocker = self::deriveCanvasBlocker($courseOffering);
+        if ($canvasBlocker !== null) {
+            $blockers[] = $canvasBlocker;
         }
 
         return $blockers;
     }
 
     /**
+     * Canvas rule (ADR 0013): a mapped-but-unsynced offering blocks
+     * completion — Finalize and Recalculate alike. pending / ignored
+     * mappings and unmapped offerings don't.
+     *
+     * @return array{code: string, message: string, references: array<int, array{type: string, id: int, label: string}>}|null
+     */
+    private static function deriveCanvasBlocker(CourseOffering $courseOffering): ?array
+    {
+        if ($courseOffering->is_canvas_synced) {
+            return null;
+        }
+
+        $mappedMappings = $courseOffering->canvasCourseMappings()
+            ->where('sync_status', 'mapped')
+            ->get(['id', 'course_offering_id', 'canvas_course_name', 'canvas_course_id']);
+
+        if ($mappedMappings->isEmpty()) {
+            return null;
+        }
+
+        return [
+            'code' => self::BLOCKER_CANVAS_UNSYNCED,
+            'message' => 'Canvas-mapped but not synced — sync grades from Canvas before finalizing',
+            'references' => $mappedMappings
+                ->map(fn (CanvasCourseMapping $mapping): array => [
+                    'type' => 'canvas_course_mapping',
+                    'id' => $mapping->id,
+                    'label' => $mapping->canvas_course_name ?? $mapping->canvas_course_id,
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
      * Actions blocked by state are sent with blocked_by codes so the UI can
      * disable and explain; actions the user lacks permission for are omitted
-     * entirely. Finalize only applies to offerings that are not yet terminal.
+     * entirely. Finalize applies to non-terminal offerings (gated by
+     * complete_course_offering); Recalculate applies to already-completed
+     * offerings (gated by the stricter recalculate_course_offering).
+     * Cancelled offerings never expose an action.
      *
      * @param  array<int, array{code: string, message: string, references: array<int, array{type: string, id: int, label: string}>}>  $readinessBlockers
      * @return array<int, array{action: string, label: string, allowed: bool, blocked_by: array<int, string>}>
      */
     private static function deriveAvailableActions(User $user, string $lifecycleStage, array $readinessBlockers): array
     {
-        if (in_array($lifecycleStage, self::TERMINAL_STAGES, true)) {
+        if ($lifecycleStage === 'cancelled') {
             return [];
+        }
+
+        $blockerCodes = array_values(array_column($readinessBlockers, 'code'));
+
+        if ($lifecycleStage === 'completed') {
+            if (! $user->can('recalculate_course_offering')) {
+                return [];
+            }
+
+            return [[
+                'action' => self::ACTION_RECALCULATE,
+                'label' => 'Recalculate course',
+                'allowed' => $blockerCodes === [],
+                'blocked_by' => $blockerCodes,
+            ]];
         }
 
         if (! $user->can('complete_course_offering')) {
             return [];
         }
-
-        $blockerCodes = array_values(array_column($readinessBlockers, 'code'));
 
         return [[
             'action' => self::ACTION_FINALIZE,

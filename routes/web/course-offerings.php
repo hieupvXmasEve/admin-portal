@@ -6,6 +6,7 @@ use App\Constants\CourseOfferingRoutes;
 use App\Http\Controllers\Api\ClassSessionController;
 use App\Http\Controllers\Web\CourseOfferingController;
 use App\Modules\Academic\Http\Web\FinalizeCourseOfferingController;
+use App\Modules\Academic\Http\Web\RecalculateCourseOfferingController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -48,6 +49,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{courseOffering}/finalize', FinalizeCourseOfferingController::class)
             ->middleware('can:complete_course_offering')
             ->name(CourseOfferingRoutes::FINALIZE);
+
+        Route::post('/{courseOffering}/recalculate', RecalculateCourseOfferingController::class)
+            ->middleware('can:recalculate_course_offering')
+            ->name(CourseOfferingRoutes::RECALCULATE);
 
         /*
         Route::patch('/{courseOffering}/update-course-status', [CourseOfferingController::class, 'updateCourseStatus'])

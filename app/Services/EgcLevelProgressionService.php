@@ -10,6 +10,7 @@ use App\Models\AcademicProgressionEvent;
 use App\Models\AcademicRecord;
 use App\Models\CourseOffering;
 use App\Models\Student;
+use App\Models\Unit;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use Carbon\CarbonImmutable;
@@ -203,26 +204,47 @@ class EgcLevelProgressionService
                     ]);
                 }
             } else {
-                // Student failed - keep level the same
+                // Student failed - keep level the same, unless this is a
+                // recalculate that flips a student the unit itself promoted
+                // back to failing (EGC recalculate progression audit, issue
+                // 03; fix, issue 09). Finalize-mode failures never had a
+                // prior promotion to undo within the same call.
                 $currentLevel = $student->gc_current_level ?? null;
+                $previousStatus = $recalculate ? ($previousStatusMap[$student->id] ?? null) : null;
+
+                $demotion = null;
+                if ($recalculate && $previousStatus === true && $currentLevel === $unitLevel + 1) {
+                    $demotion = $this->revertStudentLevel($student, $record, $unitLevel, $courseOffering);
+                    if ($demotion['reverted']) {
+                        $currentLevel = $demotion['to_level'];
+                    }
+                }
+
+                $wasReverted = $demotion['reverted'] ?? false;
+
                 $results['failed_students'][] = [
                     'student_id' => $student->student_id,
                     'student_name' => $student->full_name,
                     'grade' => $record->final_letter_grade,
                     'current_level' => $currentLevel,
-                    'action' => 'Level unchanged (failed course)',
+                    'action' => $wasReverted
+                        ? "Level reverted after grade correction: Level {$demotion['from_level']} → Level {$demotion['to_level']}"
+                        : 'Level unchanged (failed course)',
                 ];
 
                 // Send failure notification
                 // Only notify if status changed in recalculate mode
                 $shouldNotify = ! $recalculate;
                 if ($recalculate) {
-                    $previousStatus = $previousStatusMap[$student->id] ?? null;
                     // Notify if: new student (null) OR status changed from pass to fail
                     $shouldNotify = $previousStatus === null || $previousStatus !== false;
                 }
 
                 if ($shouldNotify) {
+                    $message = $wasReverted
+                        ? "Your grade was corrected and you no longer meet the requirements for this level. Your level was reverted from Level {$demotion['from_level']} to Level {$demotion['to_level']}."
+                        : 'You did not pass this course. Your level remains at Level '.($currentLevel ?? 'N/A');
+
                     $this->publishEgcCourseCompletedNotificationV2(
                         $student,
                         $courseOffering,
@@ -230,15 +252,16 @@ class EgcLevelProgressionService
                         false,
                         false,
                         (int) ($currentLevel ?? 0),
-                        'You did not pass this course. Your level remains at Level '.($currentLevel ?? 'N/A')
+                        $message
                     );
                 }
 
-                Log::info('EGC Course Failed - Level Unchanged', [
+                Log::info('EGC Course Failed', [
                     'student_id' => $student->student_id,
                     'unit_code' => $courseOffering->unit->code,
                     'grade' => $record->final_letter_grade,
                     'level' => $currentLevel,
+                    'demoted' => $wasReverted,
                 ]);
             }
         }
@@ -363,6 +386,79 @@ class EgcLevelProgressionService
                 ? "Student completed all {$totalLevels} EGC levels. Manual status transition required."
                 : "Student progressed from Level {$oldLevel} to Level {$newLevel}",
         ];
+    }
+
+    /**
+     * Revert a student's EGC level after a recalculate flips a previously
+     * passing grade to failing (EGC recalculate progression audit, issue
+     * 03; fix, issue 09).
+     *
+     * Conservative by design: only reverts when `gc_current_level` still
+     * matches exactly `$unitLevel + 1` — i.e. the student was promoted
+     * specifically by this unit's prior finalize and hasn't progressed
+     * further via another course since. Skips the revert when the student
+     * already has a newer academic record (enrolled, in progress, or
+     * completed) for the next-level unit — reverting them out from under
+     * coursework they're already doing at that level would be a worse
+     * inconsistency than leaving the level as-is.
+     *
+     * @return array{reverted: bool, from_level: int, to_level: ?int, reason: ?string}
+     */
+    private function revertStudentLevel(
+        Student $student,
+        AcademicRecord $record,
+        int $unitLevel,
+        CourseOffering $courseOffering
+    ): array {
+        $promotedLevel = $unitLevel + 1;
+
+        $nextLevelUnit = Unit::where('unit_type', 'egc')
+            ->where('level', $promotedLevel)
+            ->first();
+
+        if ($nextLevelUnit) {
+            $hasNewerRecord = AcademicRecord::where('student_id', $student->id)
+                ->where('unit_id', $nextLevelUnit->id)
+                ->whereIn('completion_status', ['enrolled', 'in_progress', 'completed'])
+                ->exists();
+
+            if ($hasNewerRecord) {
+                Log::warning('EGC Level Demotion Blocked - Newer Record Exists', [
+                    'student_id' => $student->student_id,
+                    'unit_code' => $courseOffering->unit->code,
+                    'promoted_level' => $promotedLevel,
+                    'message' => 'Student already has an academic record for the next-level unit; skipping automatic demotion.',
+                ]);
+
+                return ['reverted' => false, 'from_level' => $promotedLevel, 'to_level' => null, 'reason' => 'newer_level_record_exists'];
+            }
+        }
+
+        $student->update(['gc_current_level' => $unitLevel]);
+
+        AcademicProgressionEvent::create([
+            'student_id' => $student->id,
+            'event_type' => AcademicProgressionEventType::ENGLISH_LEVEL_CHANGED,
+            'semester_id' => $courseOffering->semester_id,
+            'effective_at' => now(),
+            'trigger_source' => ProgressionTriggerSource::SYSTEM,
+            'from_english_level' => $promotedLevel,
+            'to_english_level' => $unitLevel,
+            'notes' => sprintf(
+                'Recalculate reversal: grade correction for EGC unit %s flipped pass to fail; level reverted',
+                $record->unit->code
+            ),
+        ]);
+
+        Log::info('EGC Level Reverted (Recalculate Demotion)', [
+            'student_id' => $student->student_id,
+            'student_name' => $student->full_name,
+            'from_level' => $promotedLevel,
+            'to_level' => $unitLevel,
+            'unit_code' => $record->unit->code,
+        ]);
+
+        return ['reverted' => true, 'from_level' => $promotedLevel, 'to_level' => $unitLevel, 'reason' => null];
     }
 
     private function publishEgcCourseCompletedNotificationV2(

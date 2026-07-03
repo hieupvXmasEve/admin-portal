@@ -30,6 +30,8 @@ class CourseOfferingRoutes
 
     public const FINALIZE = 'course-offerings.finalize';
 
+    public const RECALCULATE = 'course-offerings.recalculate';
+
     // public const UPDATE_COURSE_STATUS = 'course-offerings.update-course-status';
 
     public const SPLIT_SHOW = 'course-offerings.split.show';

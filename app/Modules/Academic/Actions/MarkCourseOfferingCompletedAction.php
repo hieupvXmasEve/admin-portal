@@ -73,10 +73,14 @@ class MarkCourseOfferingCompletedAction
         // Canvas completion rule (ADR 0013): a mapped-but-unsynced offering can
         // no longer fall back to manually entered grades — grades must be synced
         // from Canvas first. pending/ignored mappings and unmapped offerings are
-        // unaffected. Forward-only: guarded by course_status so already-completed
-        // offerings (recalculate) are never retroactively blocked.
-        if ($courseOffering->course_status !== 'completed'
-            && ! $courseOffering->is_canvas_synced
+        // unaffected. Applies to both Finalize and Recalculate (PRD Course
+        // Offering Cockpit, issue 04): by the time execution reaches this check,
+        // the offering is either not yet completed (fresh finalize) or completed
+        // with $recalculate true (the "already completed && !recalculate" guard
+        // above already threw otherwise) — so this never runs as unattended
+        // backfill/reprocessing of historical offerings, only on an explicit
+        // Finalize or Recalculate action.
+        if (! $courseOffering->is_canvas_synced
             && $courseOffering->canvasCourseMappings()->where('sync_status', 'mapped')->exists()) {
             throw new RuntimeException('Cannot complete course. This offering is mapped to Canvas but grades have not been synced. Sync grades from Canvas before finalizing.');
         }
