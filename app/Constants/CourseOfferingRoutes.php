@@ -32,6 +32,8 @@ class CourseOfferingRoutes
 
     public const RECALCULATE = 'course-offerings.recalculate';
 
+    public const RECORD_SESSION_ATTENDANCE = 'course-offerings.sessions.record-attendance';
+
     // public const UPDATE_COURSE_STATUS = 'course-offerings.update-course-status';
 
     public const SPLIT_SHOW = 'course-offerings.split.show';

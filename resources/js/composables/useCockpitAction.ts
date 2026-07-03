@@ -1,3 +1,4 @@
+import type { RequestPayload } from '@inertiajs/core';
 import { router } from '@inertiajs/vue3';
 import { readonly, ref } from 'vue';
 
@@ -11,22 +12,18 @@ import { readonly, ref } from 'vue';
 export function useCockpitAction() {
     const isPending = ref(false);
 
-    const submit = (url: string, refreshProps: string[] = ['operational_state']) => {
-        router.post(
-            url,
-            {},
-            {
-                only: refreshProps,
-                preserveScroll: true,
-                preserveState: true,
-                onStart: () => {
-                    isPending.value = true;
-                },
-                onFinish: () => {
-                    isPending.value = false;
-                },
+    const submit = (url: string, data: RequestPayload = {}, refreshProps: string[] = ['operational_state']) => {
+        router.post(url, data, {
+            only: refreshProps,
+            preserveScroll: true,
+            preserveState: true,
+            onStart: () => {
+                isPending.value = true;
             },
-        );
+            onFinish: () => {
+                isPending.value = false;
+            },
+        });
     };
 
     return { isPending: readonly(isPending), submit };

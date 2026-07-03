@@ -12,10 +12,11 @@ import { Link, router, useForm } from '@inertiajs/vue3';
 import { ModalLink, visitModal } from '@inertiaui/modal-vue';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { format } from 'date-fns';
-import { BookOpen, Calendar, Clock, Edit2, Eye, Settings, Trash2 } from 'lucide-vue-next';
+import { BookOpen, Calendar, ClipboardCheck, Clock, Edit2, Eye, Settings, Trash2 } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
+import RecordAttendanceModal from '../RecordAttendanceModal.vue';
 
 interface Props {
     courseOffering: CourseOffering;
@@ -63,12 +64,19 @@ const attendanceStatusVariant = (status?: SessionAttendanceStatus): 'default' | 
 
 // Build the return URL pointing to this tab so Back from a child page lands here.
 // window.location is accessed as a getter (not inline in template) to avoid SSR errors.
-const getSessionsTabUrl = () =>
-    `${window.location.pathname}?tab=sessions`;
+const getSessionsTabUrl = () => `${window.location.pathname}?tab=sessions`;
 
 const classSessionsTable = ref();
 const isAllSessionsCompleted = computed(() => props.courseOffering.class_sessions?.every((s) => s.status === 'completed') ?? true);
 const selectedSessions = ref<ClassSession[]>([]);
+
+// ---- Record attendance modal (ADR 0013 phase B) ----
+const recordAttendanceModalOpen = ref(false);
+const sessionToRecordAttendance = ref<ClassSession | null>(null);
+const openRecordAttendanceModal = (session: ClassSession) => {
+    sessionToRecordAttendance.value = session;
+    recordAttendanceModalOpen.value = true;
+};
 
 // ---- Session limit ----
 const canAddSession = computed(() => {
@@ -374,6 +382,11 @@ const columns: ColumnDef<ClassSession>[] = [
                             <Settings class="h-4 w-4" />
                         </ModalLink>
 
+                        <!-- Record attendance — cockpit-native, no standalone Attendance page (ADR 0013) -->
+                        <Button v-if="row.original.status !== 'cancelled'" variant="ghost" size="sm" title="Record attendance" @click="openRecordAttendanceModal(row.original)">
+                            <ClipboardCheck class="h-4 w-4" />
+                        </Button>
+
                         <!-- View attendance detail — pass ?return= so Back lands on sessions tab -->
                         <Link :href="attendanceRoutes.classSessions.show(row.original.id) + '?return=' + encodeURIComponent(getSessionsTabUrl())">
                             <Button variant="ghost" size="sm" title="View attendance">
@@ -389,5 +402,7 @@ const columns: ColumnDef<ClassSession>[] = [
                 </template>
             </DataTable>
         </template>
+
+        <RecordAttendanceModal v-model:open="recordAttendanceModalOpen" :course-offering="courseOffering" :session="sessionToRecordAttendance" />
     </div>
 </template>

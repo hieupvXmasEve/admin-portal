@@ -93,7 +93,7 @@ const runActiveAction = () => {
             },
             {
                 onConfirm: () => {
-                    submitCockpitAction(route('course-offerings.recalculate', props.courseOfferingId), ['operational_state', 'courseOffering']);
+                    submitCockpitAction(route('course-offerings.recalculate', props.courseOfferingId), {}, ['operational_state', 'courseOffering']);
                 },
             },
         );
@@ -109,7 +109,7 @@ const runActiveAction = () => {
         },
         {
             onConfirm: () => {
-                submitCockpitAction(route('course-offerings.finalize', props.courseOfferingId), ['operational_state', 'courseOffering']);
+                submitCockpitAction(route('course-offerings.finalize', props.courseOfferingId), {}, ['operational_state', 'courseOffering']);
             },
         },
     );

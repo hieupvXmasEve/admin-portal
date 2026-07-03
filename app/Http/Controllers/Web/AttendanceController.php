@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\ClassSession;
 use App\Models\Student;
+use App\Modules\Academic\Actions\Attendance\RecordAttendanceAction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -170,25 +171,11 @@ class AttendanceController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'class_session_id' => 'required|exists:class_sessions,id',
-            'student_id' => 'required|exists:students,id',
-            'status' => 'required|in:present,late,absent,excused',
-            'check_in_time' => 'nullable|date',
-            'check_out_time' => 'nullable|date|after:check_in_time',
-            'minutes_late' => 'nullable|integer|min:0',
-            'minutes_present' => 'nullable|integer|min:0',
-            'recording_method' => 'required|in:manual,qr_code,rfid,geolocation,biometric,mobile_app',
-            'participation_level' => 'nullable|in:excellent,good,average,poor',
-            'participation_score' => 'nullable|numeric|min:0|max:100',
-            'participation_notes' => 'nullable|string',
-            'notes' => 'nullable|string',
-            'excuse_reason' => 'nullable|string',
-        ]);
+        $validated = $request->validate(RecordAttendanceAction::validationRules());
 
-        $validated['recorded_by_lecture_id'] = Auth::user()->id;
-
-        $attendance = Attendance::create($validated);
+        // Staff act as a User here, not a Lecture — recorded_by_lecture_id is
+        // FK-constrained to `lectures` and stays null for staff-recorded rows.
+        $attendance = RecordAttendanceAction::run($validated);
 
         // Update attendance statistics for the class session
         $classSession = $attendance->classSession;
@@ -288,6 +275,7 @@ class AttendanceController extends Controller
                 'data' => $attendance->load(['classSession', 'student']),
             ]);
         }
+
         return back()->with('success', 'Attendance record updated successfully');
     }
 
@@ -349,7 +337,7 @@ class AttendanceController extends Controller
             ->pluck('class_session_id');
 
         foreach ($classSessionIds as $classSessionId) {
-            $classSession = \App\Models\ClassSession::find($classSessionId);
+            $classSession = ClassSession::find($classSessionId);
             if ($classSession) {
                 $classSession->updateAttendanceStatistics();
             }

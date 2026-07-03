@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\ClassSessionController;
 use App\Http\Controllers\Web\CourseOfferingController;
 use App\Modules\Academic\Http\Web\FinalizeCourseOfferingController;
 use App\Modules\Academic\Http\Web\RecalculateCourseOfferingController;
+use App\Modules\Academic\Http\Web\RecordClassSessionAttendanceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -53,6 +54,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{courseOffering}/recalculate', RecalculateCourseOfferingController::class)
             ->middleware('can:recalculate_course_offering')
             ->name(CourseOfferingRoutes::RECALCULATE);
+
+        // Cockpit attendance recording (ADR 0013 phase B) — same permission
+        // as the standalone AttendanceController::store endpoint it replaces.
+        Route::post('/{courseOffering}/class-sessions/{classSession}/record-attendance', RecordClassSessionAttendanceController::class)
+            ->middleware('can:create_course_offering')
+            ->name(CourseOfferingRoutes::RECORD_SESSION_ATTENDANCE);
 
         /*
         Route::patch('/{courseOffering}/update-course-status', [CourseOfferingController::class, 'updateCourseStatus'])
