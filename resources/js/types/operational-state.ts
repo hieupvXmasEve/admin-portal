@@ -38,4 +38,5 @@ export interface OperationalState {
     readiness_blockers: ReadinessBlocker[];
     available_actions: AvailableAction[];
     session_attendance_status: SessionAttendanceStatusEntry[];
+    has_mapped_canvas_course: boolean;
 }

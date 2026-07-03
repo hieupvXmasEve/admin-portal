@@ -46,7 +46,8 @@ class GetCourseOfferingOperationalStateQuery
      *   session_progress: array{total: int, completed: int},
      *   readiness_blockers: array<int, array{code: string, message: string, references: array<int, array{type: string, id: int, label: string}>}>,
      *   available_actions: array<int, array{action: string, label: string, allowed: bool, blocked_by: array<int, string>}>,
-     *   session_attendance_status: array<int, array{session_id: int, status: string}>
+     *   session_attendance_status: array<int, array{session_id: int, status: string}>,
+     *   has_mapped_canvas_course: bool
      * }
      */
     public static function handle(CourseOffering $courseOffering, User $user): array
@@ -72,6 +73,8 @@ class GetCourseOfferingOperationalStateQuery
             default => self::deriveReadinessBlockers($courseOffering, $sessions),
         };
 
+        $hasMappedCanvasCourse = self::hasMappedCanvasCourse($courseOffering);
+
         return [
             'lifecycle_stage' => $lifecycleStage,
             'session_progress' => [
@@ -79,8 +82,13 @@ class GetCourseOfferingOperationalStateQuery
                 'completed' => $sessions->where('status', 'completed')->count(),
             ],
             'readiness_blockers' => $readinessBlockers,
-            'available_actions' => self::deriveAvailableActions($user, $lifecycleStage, $readinessBlockers, self::hasMappedCanvasCourse($courseOffering)),
+            'available_actions' => self::deriveAvailableActions($user, $lifecycleStage, $readinessBlockers, $hasMappedCanvasCourse),
             'session_attendance_status' => self::deriveSessionAttendanceStatus($sessions),
+            // Independent of the sync_course_grades permission — Recalculate's
+            // embedded Canvas pull (issue 11) is gated by recalculate_course_offering
+            // alone, so the frontend needs this signal without relying on the
+            // sync_grades action (which additionally requires sync_course_grades).
+            'has_mapped_canvas_course' => $hasMappedCanvasCourse,
         ];
     }
 

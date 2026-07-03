@@ -6,19 +6,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import HeadlessToastWithProps from '@/components/ui/sonner/HeadlessToastWithProps.vue';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useApi } from '@/composables/useApiRequest';
-import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import CanvasSyncPreviewDialog from '@/pages/course-offerings/components/CanvasSyncPreviewDialog.vue';
+import RecalculatePreviewDialog from '@/pages/course-offerings/components/RecalculatePreviewDialog.vue';
 import type { CourseOffering } from '@/types/models';
 import type { OperationalState } from '@/types/operational-state';
 import { formatSubmissionTypes } from '@/utils/canvasGradeFormatter';
 import { Link, router } from '@inertiajs/vue3';
 import { BarChart3, BookOpen, Calculator, RefreshCw } from 'lucide-vue-next';
-import { computed, h, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
-import { route } from 'ziggy-js';
 
 // ---- Type definitions (matches GetCourseOfferingScoresQuery output) ----
 interface AssessmentDetail {
@@ -99,9 +96,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-const api = useApi();
-const { showConfirmDialog } = useGlobalConfirmDialog();
-const isRecalculating = ref(false);
 
 const statusFilter = ref<string>('all');
 
@@ -111,6 +105,24 @@ const statusFilter = ref<string>('all');
 const canSyncGrades = computed(() => (props.operationalState?.available_actions ?? []).some((action) => action.action === 'sync_grades'));
 const selectedStudentIds = ref<number[]>([]);
 const isSyncDialogOpen = ref(false);
+
+// ---- Recalculate (issue 11) — preview-first, gated by the same backend
+// contract. has_mapped_canvas_course is independent of sync_course_grades
+// (unlike canSyncGrades above) so the embedded pull option doesn't
+// silently disappear for staff who only hold recalculate_course_offering.
+const canRecalculate = computed(() => (props.operationalState?.available_actions ?? []).some((action) => action.action === 'recalculate'));
+const hasMappedCanvasCourse = computed(() => props.operationalState?.has_mapped_canvas_course ?? false);
+const isRecalculateDialogOpen = ref(false);
+const rosterStudents = computed(() => (props.scoresData?.scores_grid ?? []).map((s) => ({ id: s.id, student_id: s.student_id, full_name: s.full_name })));
+
+const openRecalculateDialog = () => {
+    isRecalculateDialogOpen.value = true;
+};
+
+const onRecalculateApplied = () => {
+    toast.success('Course results recalculated successfully');
+    router.reload({ only: ['scoresData'] });
+};
 
 const isAllSelected = computed(() => filteredScoresGrid.value.length > 0 && selectedStudentIds.value.length === filteredScoresGrid.value.length);
 const isSomeSelected = computed(() => selectedStudentIds.value.length > 0 && !isAllSelected.value);
@@ -226,40 +238,6 @@ const getGradeStatusLabel = (status: string): string => {
     return labels[status] || status;
 };
 
-// ---- Recalculate action ----
-const recalculateCourseResult = () => {
-    showConfirmDialog(
-        {
-            title: 'Recalculate Course Results',
-            message: `Are you sure you want to recalculate results for "${props.courseOffering.course_code}"? This will update student grades and only send notifications to students whose pass/fail status has changed.`,
-            confirmText: 'Recalculate',
-        },
-        {
-            onConfirm: async () => {
-                isRecalculating.value = true;
-                try {
-                    const { data: apiData } = await api.post(`/api/course-offerings/${props.courseOffering.id}/recalculate`, {});
-                    if (apiData.value?.success) {
-                        const message = apiData.value.data?.message || 'Course results recalculated successfully';
-                        toast.success('Course results recalculated successfully', {
-                            description: h(HeadlessToastWithProps, { message }),
-                        });
-                        router.reload({ only: ['scoresData'] });
-                    } else {
-                        const errorMessage = apiData.value?.message || 'Failed to recalculate course results';
-                        toast.error('Failed to recalculate course results', {
-                            description: h(HeadlessToastWithProps, { message: errorMessage }),
-                        });
-                    }
-                } catch {
-                    toast.error('Failed to recalculate course results');
-                } finally {
-                    isRecalculating.value = false;
-                }
-            },
-        },
-    );
-};
 </script>
 
 <template>
@@ -293,9 +271,9 @@ const recalculateCourseResult = () => {
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <Button v-if="courseOffering.course_status === 'completed'" variant="outline" :disabled="isRecalculating" @click="recalculateCourseResult">
+                    <Button v-if="canRecalculate" variant="outline" @click="openRecalculateDialog">
                         <Calculator class="mr-2 h-4 w-4" />
-                        {{ isRecalculating ? 'Recalculating...' : 'Recalculate Course Result' }}
+                        Recalculate Course Result
                     </Button>
 
                     <Button v-if="canSyncGrades" variant="outline" :disabled="selectedStudentIds.length === 0" @click="openSyncDialog">
@@ -485,6 +463,15 @@ const recalculateCourseResult = () => {
             :course-offering-id="courseOffering.id"
             :student-ids="selectedStudentIds"
             @synced="onSynced"
+        />
+
+        <RecalculatePreviewDialog
+            v-if="canRecalculate"
+            v-model:open="isRecalculateDialogOpen"
+            :course-offering-id="courseOffering.id"
+            :has-mapped-canvas-course="hasMappedCanvasCourse"
+            :students="rosterStudents"
+            @applied="onRecalculateApplied"
         />
     </div>
 </template>

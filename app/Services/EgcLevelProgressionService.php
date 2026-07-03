@@ -14,6 +14,7 @@ use App\Models\Unit;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -27,12 +28,18 @@ class EgcLevelProgressionService
      * Process EGC level progression for completed course
      *
      * @param  bool  $recalculate  If true, only notify students whose status changed
-     * @param  array  $previousStatusMap  Map of student_id => previous pass status
+     * @param  array<int, bool>  $previousStatusMap  Map of student_id => previous pass status
+     * @param  array<int, float>  $previousScoreMap  Map of student_id => previous final_percentage (ADR 0014 light tier)
+     * @param  bool  $dryRun  If true, never persists or dispatches — only reports what would happen (issue 11 recalculate preview)
+     * @param  ?Collection<int, AcademicRecord>  $records  The just-finalized records to process; when omitted, falls back to re-querying (existing finalize callers)
      */
     public function processEgcProgression(
         CourseOffering $courseOffering,
         bool $recalculate = false,
-        array $previousStatusMap = []
+        array $previousStatusMap = [],
+        array $previousScoreMap = [],
+        bool $dryRun = false,
+        ?Collection $records = null
     ): array {
         // Check if this is an EGC course
         if ($courseOffering->unit->unit_type !== 'egc') {
@@ -56,12 +63,12 @@ class EgcLevelProgressionService
             ];
         }
 
-        // Get all students with academic records
-        // Note: Records were just finalized in CourseCompletionService, so we need fresh data
-        $completedRecords = AcademicRecord::where('course_offering_id', $courseOffering->id)
-            ->whereNotNull('final_letter_grade')
+        // Records were just finalized by CourseCompletionService::finalizeAcademicRecords()
+        // and passed in directly — never re-queried, so a dry run isn't computed off
+        // stale pre-recalculate data (that call already skipped saving when $dryRun).
+        $completedRecords = ($records ?? AcademicRecord::where('course_offering_id', $courseOffering->id)
             ->with(['student', 'unit'])
-            ->get();
+            ->get())->whereNotNull('final_letter_grade');
 
         // Determine passing threshold based on course type
         // EGC courses require 70%, other courses require 60%
@@ -77,6 +84,7 @@ class EgcLevelProgressionService
             'failed_students' => [],
             'warnings' => [],
             'errors' => [],
+            'notification_tiers' => [],
         ];
 
         foreach ($completedRecords as $record) {
@@ -139,7 +147,10 @@ class EgcLevelProgressionService
                     $shouldNotify = $previousStatus === null || $previousStatus !== true;
                 }
 
-                if ($shouldNotify) {
+                $tier = $this->tierFor($recalculate, $shouldNotify, $student, $record, $previousScoreMap);
+                $results['notification_tiers'][] = ['student_id' => $student->id, 'tier' => $tier];
+
+                if (! $dryRun && $tier === CourseCompletionService::TIER_STRONG) {
                     $this->publishEgcCourseCompletedNotificationV2(
                         $student,
                         $courseOffering,
@@ -149,6 +160,8 @@ class EgcLevelProgressionService
                         $studentLevel,
                         'You passed but level mismatch detected. Please contact academic office.'
                     );
+                } elseif (! $dryRun && $tier === CourseCompletionService::TIER_LIGHT) {
+                    $this->publishScoreUpdatedNotificationV2($student, $courseOffering, $previousScoreMap, $record);
                 }
 
                 continue;
@@ -157,7 +170,7 @@ class EgcLevelProgressionService
             if ($isPassing && $levelMatch) {
                 // Progress the student to next level
                 try {
-                    $progressResult = $this->progressStudentLevel($student, $record, $unitLevel, $courseOffering);
+                    $progressResult = $this->progressStudentLevel($student, $record, $unitLevel, $courseOffering, $dryRun);
                     $results['progressed'][] = $progressResult;
 
                     // Send success notification with level progression
@@ -169,7 +182,10 @@ class EgcLevelProgressionService
                         $shouldNotify = $previousStatus === null || $previousStatus !== true;
                     }
 
-                    if ($shouldNotify) {
+                    $tier = $this->tierFor($recalculate, $shouldNotify, $student, $record, $previousScoreMap);
+                    $results['notification_tiers'][] = ['student_id' => $student->id, 'tier' => $tier];
+
+                    if (! $dryRun && $tier === CourseCompletionService::TIER_STRONG) {
                         $this->publishEgcCourseCompletedNotificationV2(
                             $student,
                             $courseOffering,
@@ -190,6 +206,8 @@ class EgcLevelProgressionService
                                 (string) $student->status
                             );
                         }
+                    } elseif (! $dryRun && $tier === CourseCompletionService::TIER_LIGHT) {
+                        $this->publishScoreUpdatedNotificationV2($student, $courseOffering, $previousScoreMap, $record);
                     }
                 } catch (\Exception $e) {
                     $results['errors'][] = [
@@ -214,7 +232,7 @@ class EgcLevelProgressionService
 
                 $demotion = null;
                 if ($recalculate && $previousStatus === true && $currentLevel === $unitLevel + 1) {
-                    $demotion = $this->revertStudentLevel($student, $record, $unitLevel, $courseOffering);
+                    $demotion = $this->revertStudentLevel($student, $record, $unitLevel, $courseOffering, $dryRun);
                     if ($demotion['reverted']) {
                         $currentLevel = $demotion['to_level'];
                     }
@@ -240,7 +258,10 @@ class EgcLevelProgressionService
                     $shouldNotify = $previousStatus === null || $previousStatus !== false;
                 }
 
-                if ($shouldNotify) {
+                $tier = $this->tierFor($recalculate, $shouldNotify, $student, $record, $previousScoreMap);
+                $results['notification_tiers'][] = ['student_id' => $student->id, 'tier' => $tier];
+
+                if (! $dryRun && $tier === CourseCompletionService::TIER_STRONG) {
                     $message = $wasReverted
                         ? "Your grade was corrected and you no longer meet the requirements for this level. Your level was reverted from Level {$demotion['from_level']} to Level {$demotion['to_level']}."
                         : 'You did not pass this course. Your level remains at Level '.($currentLevel ?? 'N/A');
@@ -254,6 +275,8 @@ class EgcLevelProgressionService
                         (int) ($currentLevel ?? 0),
                         $message
                     );
+                } elseif (! $dryRun && $tier === CourseCompletionService::TIER_LIGHT) {
+                    $this->publishScoreUpdatedNotificationV2($student, $courseOffering, $previousScoreMap, $record);
                 }
 
                 Log::info('EGC Course Failed', [
@@ -276,7 +299,8 @@ class EgcLevelProgressionService
         Student $student,
         AcademicRecord $record,
         int $currentUnitLevel,
-        CourseOffering $courseOffering
+        CourseOffering $courseOffering,
+        bool $dryRun = false
     ): array {
         $oldLevel = $student->gc_current_level;
 
@@ -327,21 +351,25 @@ class EgcLevelProgressionService
             ]);
         }
 
-        $student->update($updateData);
+        $student->fill($updateData);
 
-        AcademicProgressionEvent::create([
-            'student_id' => $student->id,
-            'event_type' => AcademicProgressionEventType::ENGLISH_LEVEL_CHANGED,
-            'semester_id' => $courseOffering->semester_id,
-            'effective_at' => now(),
-            'trigger_source' => ProgressionTriggerSource::SYSTEM,
-            'from_english_level' => $oldLevel,
-            'to_english_level' => $newLevel,
-            'notes' => sprintf(
-                'Auto progression after passing EGC unit %s',
-                $record->unit->code
-            ),
-        ]);
+        if (! $dryRun) {
+            $student->save();
+
+            AcademicProgressionEvent::create([
+                'student_id' => $student->id,
+                'event_type' => AcademicProgressionEventType::ENGLISH_LEVEL_CHANGED,
+                'semester_id' => $courseOffering->semester_id,
+                'effective_at' => now(),
+                'trigger_source' => ProgressionTriggerSource::SYSTEM,
+                'from_english_level' => $oldLevel,
+                'to_english_level' => $newLevel,
+                'notes' => sprintf(
+                    'Auto progression after passing EGC unit %s',
+                    $record->unit->code
+                ),
+            ]);
+        }
 
         // Update academic record with progression note
         $progressionNote = "EGC Level Progression: Level {$oldLevel} → Level {$newLevel}";
@@ -359,10 +387,14 @@ class EgcLevelProgressionService
             'completed_program' => $completedProgram,
         ];
 
-        $record->update([
+        $record->fill([
             'grade_history' => $gradeHistory,
             'administrative_notes' => ($record->administrative_notes ? $record->administrative_notes."\n" : '').$progressionNote,
         ]);
+
+        if (! $dryRun) {
+            $record->save();
+        }
 
         Log::info('EGC Level Progressed', [
             'student_id' => $student->student_id,
@@ -408,7 +440,8 @@ class EgcLevelProgressionService
         Student $student,
         AcademicRecord $record,
         int $unitLevel,
-        CourseOffering $courseOffering
+        CourseOffering $courseOffering,
+        bool $dryRun = false
     ): array {
         $promotedLevel = $unitLevel + 1;
 
@@ -434,21 +467,25 @@ class EgcLevelProgressionService
             }
         }
 
-        $student->update(['gc_current_level' => $unitLevel]);
+        $student->fill(['gc_current_level' => $unitLevel]);
 
-        AcademicProgressionEvent::create([
-            'student_id' => $student->id,
-            'event_type' => AcademicProgressionEventType::ENGLISH_LEVEL_CHANGED,
-            'semester_id' => $courseOffering->semester_id,
-            'effective_at' => now(),
-            'trigger_source' => ProgressionTriggerSource::SYSTEM,
-            'from_english_level' => $promotedLevel,
-            'to_english_level' => $unitLevel,
-            'notes' => sprintf(
-                'Recalculate reversal: grade correction for EGC unit %s flipped pass to fail; level reverted',
-                $record->unit->code
-            ),
-        ]);
+        if (! $dryRun) {
+            $student->save();
+
+            AcademicProgressionEvent::create([
+                'student_id' => $student->id,
+                'event_type' => AcademicProgressionEventType::ENGLISH_LEVEL_CHANGED,
+                'semester_id' => $courseOffering->semester_id,
+                'effective_at' => now(),
+                'trigger_source' => ProgressionTriggerSource::SYSTEM,
+                'from_english_level' => $promotedLevel,
+                'to_english_level' => $unitLevel,
+                'notes' => sprintf(
+                    'Recalculate reversal: grade correction for EGC unit %s flipped pass to fail; level reverted',
+                    $record->unit->code
+                ),
+            ]);
+        }
 
         Log::info('EGC Level Reverted (Recalculate Demotion)', [
             'student_id' => $student->student_id,
@@ -459,6 +496,88 @@ class EgcLevelProgressionService
         ]);
 
         return ['reverted' => true, 'from_level' => $promotedLevel, 'to_level' => $unitLevel, 'reason' => null];
+    }
+
+    /**
+     * Two-tier notification decision (ADR 0014): strong when the branch
+     * already decided to notify (status/level changed), light when the
+     * status didn't change but the score did, none otherwise.
+     *
+     * @param  array<int, float>  $previousScoreMap
+     */
+    private function tierFor(bool $recalculate, bool $shouldNotifyStrong, Student $student, AcademicRecord $record, array $previousScoreMap): string
+    {
+        if ($shouldNotifyStrong) {
+            return CourseCompletionService::TIER_STRONG;
+        }
+
+        if (! $recalculate) {
+            return CourseCompletionService::TIER_NONE;
+        }
+
+        $previousScore = $previousScoreMap[$student->id] ?? null;
+        $currentScore = (float) ($record->final_percentage ?? 0);
+        $scoreChanged = $previousScore !== null && abs($previousScore - $currentScore) > CourseCompletionService::SCORE_CHANGE_EPSILON;
+
+        return $scoreChanged ? CourseCompletionService::TIER_LIGHT : CourseCompletionService::TIER_NONE;
+    }
+
+    /**
+     * Light-tier notification (ADR 0014) for EGC courses: score changed on
+     * recalculate but pass/fail status (and level) did not.
+     *
+     * @param  array<int, float>  $previousScoreMap
+     */
+    private function publishScoreUpdatedNotificationV2(Student $student, CourseOffering $courseOffering, array $previousScoreMap, AcademicRecord $record): void
+    {
+        if (! (bool) config('notification.v2_enabled', false)) {
+            return;
+        }
+
+        $writeMode = (string) config('notification.write_mode', 'off');
+        if (! in_array($writeMode, ['dual', 'v2', 'v2_only'], true)) {
+            return;
+        }
+
+        if (! $student->user_id) {
+            return;
+        }
+
+        $oldPercentage = (float) ($previousScoreMap[$student->id] ?? 0);
+        $newPercentage = (float) ($record->final_percentage ?? 0);
+
+        $envelope = new DomainEventEnvelope(
+            eventId: (string) Str::uuid(),
+            eventName: 'academic.course_score_updated',
+            eventVersion: 1,
+            occurredAt: CarbonImmutable::now(),
+            aggregateType: 'course_offering',
+            aggregateId: (string) $courseOffering->id,
+            campusId: (int) $student->campus_id,
+            actorUserId: null,
+            payload: [
+                'type_key' => 'course_score_updated',
+                'channels' => ['realtime'],
+                'recipient_targets' => [
+                    ['type' => 'student', 'id' => (int) $student->id],
+                ],
+                'data' => [
+                    'title' => "Score Updated: {$courseOffering->unit->code}",
+                    'body' => "Your score for {$courseOffering->unit->name} was updated from {$oldPercentage}% to {$newPercentage}% (grade {$record->final_letter_grade}).",
+                    'category' => 'academic',
+                    'is_important' => false,
+                    'action_url' => '',
+                    'action_text' => 'View Academic Records',
+                    'course_code' => $courseOffering->unit->code,
+                    'course_name' => $courseOffering->unit->name,
+                    'grade' => $record->final_letter_grade,
+                    'old_final_percentage' => $oldPercentage,
+                    'new_final_percentage' => $newPercentage,
+                ],
+            ],
+        );
+
+        $this->publishDomainEventAction->runAfterCommit($envelope);
     }
 
     private function publishEgcCourseCompletedNotificationV2(

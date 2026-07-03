@@ -15,11 +15,24 @@ use App\Modules\Academic\Support\Grading\GradingCalculatorResolver;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class CourseCompletionService
 {
+    /** Status/EGC level changed — existing notification (ADR 0013/0014). */
+    public const TIER_STRONG = 'strong';
+
+    /** Final score changed but status did not — new "score updated" notification (ADR 0014). */
+    public const TIER_LIGHT = 'light';
+
+    /** No change — no notification. */
+    public const TIER_NONE = 'none';
+
+    /** Minimum final_percentage delta (points) to count as a score change for the light tier. */
+    public const SCORE_CHANGE_EPSILON = 0.005;
+
     public function __construct(
         protected EgcLevelProgressionService $egcService,
         protected CourseSurveyService $courseSurveyService,
@@ -31,41 +44,64 @@ class CourseCompletionService
      * Finalize a course offering when marked as completed
      *
      * @param  bool  $recalculate  If true, allows recalculating already completed courses
+     * @param  bool  $dryRun  If true, computes the same result but never persists or dispatches
+     *                        anything (issue 11 recalculate preview). All writes are skipped by
+     *                        filling models in-memory without saving, and re-queries are replaced
+     *                        by the freshly-computed in-memory collection so a dry run never reads
+     *                        back stale pre-recalculate data.
+     * @param  array<int, float>  $finalPercentageOverrides  student_id => final_percentage to use
+     *                                                       instead of the stored value (issue 11 optional Canvas pull preview —
+     *                                                       the projected course total from CanvasGradeSyncService::previewCourseGrades()).
      */
-    public function finalizeCourse(CourseOffering $courseOffering, bool $recalculate = false): array
-    {
+    public function finalizeCourse(
+        CourseOffering $courseOffering,
+        bool $recalculate = false,
+        bool $dryRun = false,
+        array $finalPercentageOverrides = [],
+    ): array {
         // 1. Validate prerequisites
         $this->validateAcademicRecordsExist($courseOffering);
 
-        // 1.5 Aggregate manual grades if not Canvas synced
-        if (! $courseOffering->is_canvas_synced) {
-            $this->aggregateManualGrades($courseOffering);
-        }
-
-        $this->validateGradesExist($courseOffering);
-
-        // Store previous pass/fail status before finalizing (for recalculate mode)
+        // Store previous pass/fail status + score before finalizing (for recalculate mode /
+        // two-tier notifications, ADR 0014): status flips get the strong notification,
+        // score-only changes get the light one. Must run before aggregateManualGrades()
+        // — in a live (non-dry) run that already overwrites final_percentage, so reading
+        // it after would compare the new value against itself.
         $previousStatusMap = [];
+        $previousScoreMap = [];
         if ($recalculate) {
             $previousRecords = AcademicRecord::where('course_offering_id', $courseOffering->id)
                 ->whereNotNull('final_letter_grade')
                 ->get();
             foreach ($previousRecords as $record) {
                 $previousStatusMap[$record->student_id] = (bool) ($record->is_passed ?? false);
+                $previousScoreMap[$record->student_id] = (float) ($record->final_percentage ?? 0);
             }
         }
 
-        // 2. Finalize academic records
-        $this->finalizeAcademicRecords($courseOffering);
+        // 1.5 Aggregate manual grades if not Canvas synced
+        $aggregatedGrades = [];
+        if (! $courseOffering->is_canvas_synced) {
+            $aggregatedGrades = $this->aggregateManualGrades($courseOffering, $dryRun);
+        }
+
+        $this->validateGradesExist($courseOffering);
+
+        // 2. Finalize academic records (in-memory only when $dryRun)
+        $finalizeResult = $this->finalizeAcademicRecords($courseOffering, $dryRun, $aggregatedGrades, $finalPercentageOverrides);
+        $records = $finalizeResult['records'];
+        $recordDiffs = $finalizeResult['diffs'];
 
         // 3. Update course registrations
-        $this->updateCourseRegistrations($courseOffering);
+        if (! $dryRun) {
+            $this->updateCourseRegistrations($courseOffering);
+        }
 
         // 4. Process EGC level progression if applicable
-        $egcResult = $this->egcService->processEgcProgression($courseOffering, $recalculate, $previousStatusMap);
+        $egcResult = $this->egcService->processEgcProgression($courseOffering, $recalculate, $previousStatusMap, $previousScoreMap, $dryRun, $records);
 
         // 5. Automatically attach survey to completed course (only if not already attached)
-        if (! $recalculate) {
+        if (! $recalculate && ! $dryRun) {
             $this->courseSurveyService->attachSurveyToCompletedCourse($courseOffering);
         }
 
@@ -73,7 +109,7 @@ class CourseCompletionService
         // (EGC courses send notifications in EgcLevelProgressionService)
         $nonEgcResult = null;
         if (! $egcResult['processed']) {
-            $nonEgcResult = $this->notifyStudentsNonEgcCompletion($courseOffering, $recalculate, $previousStatusMap);
+            $nonEgcResult = $this->notifyStudentsNonEgcCompletion($courseOffering, $recalculate, $previousStatusMap, $previousScoreMap, $dryRun, $records);
         }
 
         Log::info('Course Finalized', [
@@ -82,6 +118,7 @@ class CourseCompletionService
             'semester' => $courseOffering->semester?->code,
             'total_students' => $courseOffering->current_enrollment,
             'is_egc_course' => $egcResult['processed'],
+            'dry_run' => $dryRun,
         ]);
 
         return [
@@ -92,6 +129,8 @@ class CourseCompletionService
             'total_students' => $courseOffering->current_enrollment,
             'egc_progression' => $egcResult,
             'non_egc_result' => $nonEgcResult,
+            'record_changes' => $recordDiffs,
+            'dry_run' => $dryRun,
         ];
     }
 
@@ -101,9 +140,17 @@ class CourseCompletionService
      * Pass/fail and the explicit `failure_reason` are derived by
      * {@see FailureReasonClassifier} from grade AND attendance (ACAD-RET-001),
      * so failed students route to the correct remediation lane.
+     *
+     * @param  array<int, array{final_percentage: float, final_letter_grade: string, grade_breakdown: array}>  $aggregatedGrades  student_id => aggregateManualGrades() output, used instead of the stored value so a dry run reflects the just-computed aggregate rather than stale DB data.
+     * @param  array<int, float>  $finalPercentageOverrides  student_id => projected Canvas pull total (issue 11).
+     * @return array{records: Collection<int, AcademicRecord>, diffs: array<int, array<string, mixed>>}
      */
-    private function finalizeAcademicRecords(CourseOffering $courseOffering): void
-    {
+    private function finalizeAcademicRecords(
+        CourseOffering $courseOffering,
+        bool $dryRun = false,
+        array $aggregatedGrades = [],
+        array $finalPercentageOverrides = [],
+    ): array {
         // Load unit and syllabus template
         $courseOffering->load(['unit', 'syllabusTemplate']);
         $isEgcCourse = $courseOffering->unit->unit_type === 'egc';
@@ -124,23 +171,35 @@ class CourseCompletionService
             ->pluck('student_id')
             ->toArray();
 
-        // Update each record individually (only for registered students)
+        // Update each record individually (only for registered students).
+        // Eager loads student + unit — downstream EGC progression and
+        // notification steps consume this same collection instead of
+        // re-querying, so a dry run never reads back stale pre-recalculate data.
         $records = AcademicRecord::where('course_offering_id', $courseOffering->id)
             ->whereIn('student_id', $registeredStudentIds)
+            ->with(['student', 'unit'])
             ->get();
 
         $attendanceFailedCount = 0;
         $gradeFailedCount = 0;
         $passedCount = 0;
+        $diffs = [];
 
         foreach ($records as $record) {
-            // Cast to float to ensure type safety
-            $finalPercentage = (float) ($record->final_percentage ?? 0);
+            $oldFinalPercentage = (float) ($record->final_percentage ?? 0);
+            $oldLetterGrade = $record->final_letter_grade;
+            $oldIsPassed = (bool) ($record->is_passed ?? false);
+
+            // Aggregated/overridden value takes precedence over the stored one — the
+            // in-memory just-computed aggregate (manual grading) or the projected
+            // Canvas pull total (issue 11), never a stale DB read.
+            $agg = $aggregatedGrades[$record->student_id] ?? null;
+            $finalPercentage = (float) ($agg['final_percentage'] ?? $finalPercentageOverrides[$record->student_id] ?? $record->final_percentage ?? 0);
 
             // When a custom grading engine produced a breakdown, use its grade/points
             // directly rather than recomputing from final_percentage (which may be a
             // diagnostic proxy, not a real percentage for schemes like "pass_fail").
-            $breakdown = is_array($record->grade_breakdown) ? $record->grade_breakdown : null;
+            $breakdown = $agg['grade_breakdown'] ?? (is_array($record->grade_breakdown) ? $record->grade_breakdown : null);
             $isCustomEngine = $breakdown !== null
                 && isset($breakdown['engine'])
                 && $breakdown['engine'] !== 'default_weighted_percentage';
@@ -197,10 +256,11 @@ class CourseCompletionService
                 ? (float) $record->credit_points
                 : (float) $record->credit_hours;
 
-            $record->update([
+            $record->fill([
                 'grade_status' => 'final',
                 'grade_finalized_date' => now(),
                 'final_letter_grade' => $finalLetterGrade,
+                'final_percentage' => $finalPercentage,
                 'grade_points' => $gradePoints,
                 'completion_status' => 'completed',
                 'is_passed' => $finalPassed,
@@ -214,6 +274,20 @@ class CourseCompletionService
                 'failure_reason' => $eval['failure_reason'],
                 'failure_reason_snapshot' => $eval['snapshot'],
             ]);
+
+            if (! $dryRun) {
+                $record->save();
+            }
+
+            $diffs[] = [
+                'student_id' => $record->student_id,
+                'old_final_percentage' => $oldFinalPercentage,
+                'new_final_percentage' => $finalPercentage,
+                'old_letter_grade' => $oldLetterGrade,
+                'new_letter_grade' => $finalLetterGrade,
+                'old_is_passed' => $oldIsPassed,
+                'new_is_passed' => $finalPassed,
+            ];
         }
 
         Log::info('Academic records finalized', [
@@ -225,18 +299,24 @@ class CourseCompletionService
             'failed_attendance' => $attendanceFailedCount,
             'failed_grade' => $gradeFailedCount,
             'total_failed' => $attendanceFailedCount + $gradeFailedCount,
+            'dry_run' => $dryRun,
         ]);
+
+        return ['records' => $records, 'diffs' => $diffs];
     }
 
     /**
      * Aggregate and calculate scores for manually graded course offerings.
      * This sums up all assessment component scores to update AcademicRecords.
+     *
+     * @param  bool  $dryRun  If true, computes but never persists (issue 11 recalculate preview).
+     * @return array<int, array{final_percentage: float, final_letter_grade: string, grade_breakdown: array}> student_id => computed grade, always returned so callers (dry-run or not) can feed it straight into finalizeAcademicRecords() instead of re-reading the DB.
      */
-    public function aggregateManualGrades(CourseOffering $courseOffering): void
+    public function aggregateManualGrades(CourseOffering $courseOffering, bool $dryRun = false): array
     {
         $syllabus = $courseOffering->syllabusTemplate;
         if (! $syllabus) {
-            return;
+            return [];
         }
 
         $scheme = $syllabus->grading_scheme;
@@ -263,6 +343,8 @@ class CourseCompletionService
 
         // Identify which details have been graded for at least one student in this course
         $gradedDetailIds = $allScores->flatten()->pluck('assessment_component_detail_id')->unique()->toArray();
+
+        $computed = [];
 
         foreach ($registeredStudentIds as $studentId) {
             $studentScores = $allScores->get($studentId) ?? collect();
@@ -308,21 +390,29 @@ class CourseCompletionService
 
             $result = $calculator->calculate($componentAggregates, $scheme);
 
-            // Update academic record with calculator result
-            AcademicRecord::where('course_offering_id', $courseOffering->id)
-                ->where('student_id', $studentId)
-                ->update([
-                    'final_percentage' => $result->finalPercentage ?? $weightedAverage,
-                    'final_letter_grade' => $result->finalGrade,
-                    'grade_breakdown' => array_merge($result->gradeBreakdown, ['grade_points' => $result->gradePoints]),
-                ]);
+            $computed[$studentId] = [
+                'final_percentage' => $result->finalPercentage ?? $weightedAverage,
+                'final_letter_grade' => $result->finalGrade,
+                'grade_breakdown' => array_merge($result->gradeBreakdown, ['grade_points' => $result->gradePoints]),
+            ];
+        }
+
+        if (! $dryRun) {
+            foreach ($computed as $studentId => $data) {
+                AcademicRecord::where('course_offering_id', $courseOffering->id)
+                    ->where('student_id', $studentId)
+                    ->update($data);
+            }
         }
 
         Log::info('Aggregated manual grades for course offering', [
             'course_offering_id' => $courseOffering->id,
             'students_count' => count($registeredStudentIds),
             'engine' => $scheme['engine'] ?? 'default_weighted_percentage',
+            'dry_run' => $dryRun,
         ]);
+
+        return $computed;
     }
 
     /**
@@ -511,24 +601,28 @@ class CourseCompletionService
      * Returns array with pass/fail statistics
      *
      * @param  bool  $recalculate  If true, only notify students whose status changed
-     * @param  array  $previousStatusMap  Map of student_id => previous pass status
+     * @param  array<int, bool>  $previousStatusMap  Map of student_id => previous pass status
+     * @param  array<int, float>  $previousScoreMap  Map of student_id => previous final_percentage (ADR 0014 light tier)
+     * @param  bool  $dryRun  If true, never dispatches — only reports the tier each student would get
+     * @param  Collection<int, AcademicRecord>  $records  The just-finalized records (in-memory for a dry run, saved otherwise) — never re-queried, so a dry run isn't computed off stale data
      */
     private function notifyStudentsNonEgcCompletion(
         CourseOffering $courseOffering,
         bool $recalculate = false,
-        array $previousStatusMap = []
+        array $previousStatusMap = [],
+        array $previousScoreMap = [],
+        bool $dryRun = false,
+        ?Collection $records = null
     ): array {
         $courseOffering->load('unit');
 
-        $records = AcademicRecord::where('course_offering_id', $courseOffering->id)
-            ->whereNotNull('final_letter_grade')
-            ->with('student')
-            ->get();
+        $records = ($records ?? collect())->whereNotNull('final_letter_grade');
 
         $notifiedCount = 0;
         $passedCount = 0;
         $failedCount = 0;
         $skippedCount = 0;
+        $notificationTiers = [];
 
         foreach ($records as $record) {
             $student = $record->student;
@@ -546,27 +640,52 @@ class CourseCompletionService
                 $failedCount++;
             }
 
-            // In recalculate mode, only notify if status changed
+            $tier = self::TIER_STRONG;
+
+            // In recalculate mode, only strong-notify if status changed; a
+            // score-only change (status unchanged) gets the light tier instead
+            // of silence (ADR 0014).
             if ($recalculate) {
                 $previousStatus = $previousStatusMap[$student->id] ?? null;
+                $statusChanged = $previousStatus === null || $previousStatus !== $isPassing;
 
-                // Skip only if status hasn't changed (previous status exists and matches current)
-                // Note: If previousStatus is null (new student), we still notify
-                if ($previousStatus !== null && $previousStatus === $isPassing) {
-                    $skippedCount++;
+                if (! $statusChanged) {
+                    $previousScore = $previousScoreMap[$student->id] ?? null;
+                    $currentScore = (float) ($record->final_percentage ?? 0);
+                    $scoreChanged = $previousScore !== null && abs($previousScore - $currentScore) > self::SCORE_CHANGE_EPSILON;
 
-                    continue;
+                    $tier = $scoreChanged ? self::TIER_LIGHT : self::TIER_NONE;
                 }
             }
 
-            $this->publishCourseCompletedNotificationV2(
-                $student,
-                $courseOffering,
-                $record->final_letter_grade,
-                (float) ($record->final_percentage ?? 0),
-                (float) ($record->unit->credit_points ?? 0),
-                $isPassing
-            );
+            $notificationTiers[] = ['student_id' => $student->id, 'tier' => $tier];
+
+            if ($tier === self::TIER_NONE) {
+                $skippedCount++;
+
+                continue;
+            }
+
+            if (! $dryRun) {
+                if ($tier === self::TIER_STRONG) {
+                    $this->publishCourseCompletedNotificationV2(
+                        $student,
+                        $courseOffering,
+                        $record->final_letter_grade,
+                        (float) ($record->final_percentage ?? 0),
+                        (float) ($record->unit->credit_points ?? 0),
+                        $isPassing
+                    );
+                } else {
+                    $this->publishScoreUpdatedNotificationV2(
+                        $student,
+                        $courseOffering,
+                        (float) ($previousScoreMap[$student->id] ?? 0),
+                        (float) ($record->final_percentage ?? 0),
+                        $record->final_letter_grade,
+                    );
+                }
+            }
 
             $notifiedCount++;
         }
@@ -580,6 +699,7 @@ class CourseCompletionService
             'failed' => $failedCount,
             'recalculate_mode' => $recalculate,
             'skipped' => $skippedCount,
+            'dry_run' => $dryRun,
         ]);
 
         return [
@@ -587,6 +707,7 @@ class CourseCompletionService
             'passed' => $passedCount,
             'failed' => $failedCount,
             'skipped' => $skippedCount,
+            'notification_tiers' => $notificationTiers,
         ];
     }
 
@@ -645,6 +766,65 @@ class CourseCompletionService
                     'final_percentage' => $finalPercentage,
                     'credit_points' => $creditPoints,
                     'passed' => $passed,
+                ],
+            ],
+        );
+
+        $this->publishDomainEventAction->runAfterCommit($envelope);
+    }
+
+    /**
+     * Light-tier notification (ADR 0014): final score changed on recalculate
+     * but pass/fail status did not, so it doesn't warrant the strong
+     * completion notification — just a "your score was updated" note.
+     */
+    private function publishScoreUpdatedNotificationV2(
+        Student $student,
+        CourseOffering $courseOffering,
+        float $oldPercentage,
+        float $newPercentage,
+        string $grade,
+    ): void {
+        if (! (bool) config('notification.v2_enabled', false)) {
+            return;
+        }
+
+        $writeMode = (string) config('notification.write_mode', 'off');
+        if (! in_array($writeMode, ['dual', 'v2', 'v2_only'], true)) {
+            return;
+        }
+
+        if (! $student->user_id) {
+            return;
+        }
+
+        $envelope = new DomainEventEnvelope(
+            eventId: (string) Str::uuid(),
+            eventName: 'academic.course_score_updated',
+            eventVersion: 1,
+            occurredAt: CarbonImmutable::now(),
+            aggregateType: 'course_offering',
+            aggregateId: (string) $courseOffering->id,
+            campusId: (int) $student->campus_id,
+            actorUserId: null,
+            payload: [
+                'type_key' => 'course_score_updated',
+                'channels' => ['realtime'],
+                'recipient_targets' => [
+                    ['type' => 'student', 'id' => (int) $student->id],
+                ],
+                'data' => [
+                    'title' => "Score Updated: {$courseOffering->unit->code}",
+                    'body' => "Your score for {$courseOffering->unit->name} was updated from {$oldPercentage}% to {$newPercentage}% (grade {$grade}).",
+                    'category' => 'academic',
+                    'is_important' => false,
+                    'action_url' => '',
+                    'action_text' => 'View Academic Records',
+                    'course_code' => $courseOffering->unit->code,
+                    'course_name' => $courseOffering->unit->name,
+                    'grade' => $grade,
+                    'old_final_percentage' => $oldPercentage,
+                    'new_final_percentage' => $newPercentage,
                 ],
             ],
         );

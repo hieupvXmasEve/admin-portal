@@ -8,7 +8,9 @@ use App\Http\Controllers\Web\CourseOfferingController;
 use App\Modules\Academic\Http\Web\Canvas\PreviewCanvasGradeSyncController;
 use App\Modules\Academic\Http\Web\Canvas\SyncCanvasGradeController;
 use App\Modules\Academic\Http\Web\FinalizeCourseOfferingController;
+use App\Modules\Academic\Http\Web\RecalculateApplyController;
 use App\Modules\Academic\Http\Web\RecalculateCourseOfferingController;
+use App\Modules\Academic\Http\Web\RecalculatePreviewController;
 use App\Modules\Academic\Http\Web\RecordClassSessionAttendanceController;
 use Illuminate\Support\Facades\Route;
 
@@ -152,6 +154,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{courseOffering}/sync-grades', SyncCanvasGradeController::class)
             ->middleware('can:sync_course_grades')
             ->name(CourseOfferingRoutes::API_SYNC_GRADES_APPLY);
+
+        // ============================================
+        // Recalculate preview + apply (cockpit Scores tab, issue 11) — gated
+        // solely by recalculate_course_offering (ADR 0014); the embedded
+        // Canvas pull does not additionally require sync_course_grades.
+        // ============================================
+        Route::post('/{courseOffering}/recalculate/preview', RecalculatePreviewController::class)
+            ->middleware('can:recalculate_course_offering')
+            ->name(CourseOfferingRoutes::API_RECALCULATE_PREVIEW);
+
+        Route::post('/{courseOffering}/recalculate/apply', RecalculateApplyController::class)
+            ->middleware('can:recalculate_course_offering')
+            ->name(CourseOfferingRoutes::API_RECALCULATE_APPLY);
 
         // ============================================
         // Class Session Management

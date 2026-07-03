@@ -16,11 +16,17 @@ class MarkCourseOfferingCompletedAction
      * Mark a course offering as completed.
      *
      * @param  bool  $recalculate  If true, allows recalculating already completed courses
+     * @param  bool  $dryRun  If true, computes the recalculate preview (issue 11) without persisting or dispatching anything — the DB transaction is never committed to and every write inside the completion chain is skipped.
+     * @param  array<int, float>  $finalPercentageOverrides  student_id => projected Canvas pull total, used only in dry-run preview when a Canvas pull is being simulated.
      *
      * @throws RuntimeException
      */
-    public static function run(CourseOffering $courseOffering, bool $recalculate = false): array
-    {
+    public static function run(
+        CourseOffering $courseOffering,
+        bool $recalculate = false,
+        bool $dryRun = false,
+        array $finalPercentageOverrides = [],
+    ): array {
         // Ensure the course offering belongs to current campus
         // Note: In an API context, middleware usually handles campus scope,
         // but explicit check doesn't hurt.
@@ -86,15 +92,15 @@ class MarkCourseOfferingCompletedAction
         }
 
         try {
-            return DB::transaction(function () use ($courseOffering, $recalculate) {
+            return DB::transaction(function () use ($courseOffering, $recalculate, $dryRun, $finalPercentageOverrides) {
                 // Load necessary relationships
                 $courseOffering->load(['unit', 'semester']);
 
                 // Finalize course with all validations and EGC progression
-                $result = app(CourseCompletionService::class)->finalizeCourse($courseOffering, $recalculate);
+                $result = app(CourseCompletionService::class)->finalizeCourse($courseOffering, $recalculate, $dryRun, $finalPercentageOverrides);
 
-                // Update course offering status (only if not already completed)
-                if ($courseOffering->course_status !== 'completed') {
+                // Update course offering status (only if not already completed, never on a dry run)
+                if (! $dryRun && $courseOffering->course_status !== 'completed') {
                     $courseOffering->update(['course_status' => 'completed']);
                 }
 
@@ -104,6 +110,7 @@ class MarkCourseOfferingCompletedAction
                     'old_status' => $courseOffering->course_status,
                     'new_status' => 'completed',
                     'egc_result' => $result['egc_progression'] ?? null,
+                    'dry_run' => $dryRun,
                 ]);
 
                 return $result;
