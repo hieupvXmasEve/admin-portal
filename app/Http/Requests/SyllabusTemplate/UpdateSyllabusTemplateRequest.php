@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\SyllabusTemplate;
 
 use App\Http\Requests\SyllabusTemplate\Concerns\ValidatesGradingScheme;
+use App\Models\SyllabusTemplate;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -14,7 +15,13 @@ class UpdateSyllabusTemplateRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return true;
+        $template = $this->route('syllabusTemplate');
+
+        if (! $template instanceof SyllabusTemplate) {
+            return false;
+        }
+
+        return ! $template->isLockedForEditing();
     }
 
     public function rules(): array

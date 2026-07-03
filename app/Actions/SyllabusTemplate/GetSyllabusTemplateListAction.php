@@ -18,7 +18,15 @@ class GetSyllabusTemplateListAction
         $sort = $filters['sort'] ?? 'created_at';
         $direction = $filters['direction'] ?? 'desc';
 
-        $query = SyllabusTemplate::query()->with(['unit']);
+        $query = SyllabusTemplate::query()
+            ->with(['unit'])
+            ->withExists([
+                'courseOfferings as is_locked_for_editing' => function ($query) {
+                    $query->whereHas('classSessions', function ($sessionQuery) {
+                        $sessionQuery->where('status', 'completed');
+                    });
+                },
+            ]);
 
         if (! empty($filters['unit_id']) && $filters['unit_id'] !== 'all') {
             $query->where('unit_id', (int) $filters['unit_id']);

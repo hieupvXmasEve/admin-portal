@@ -26,6 +26,7 @@ interface TemplateRow {
     version: string | null;
     is_default: boolean;
     is_active: boolean;
+    is_locked_for_editing: boolean;
     delivery_mode: string | null;
     min_attendance_threshold: string | number;
     min_grade_threshold: string | number;
@@ -216,8 +217,12 @@ const columns = computed<ColumnDef<TemplateRow>[]>(() => [
                     <Button variant="ghost" size="sm" @click="router.visit(`/syllabus-templates/${row.original.id}`)">
                         <Eye class="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm"
-                        @click="router.visit(`/syllabus-templates/${row.original.id}/edit`)">
+                    <Button
+                        v-if="!row.original.is_locked_for_editing"
+                        variant="ghost"
+                        size="sm"
+                        @click="router.visit(`/syllabus-templates/${row.original.id}/edit`)"
+                    >
                         <Edit class="h-4 w-4" />
                     </Button>
                 </div>

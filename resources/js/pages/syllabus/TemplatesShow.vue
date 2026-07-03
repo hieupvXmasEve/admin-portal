@@ -1,11 +1,15 @@
 <script setup lang="ts">
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Badge from '@/components/ui/badge/Badge.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import type { GradingScheme } from '@/types/grading-scheme';
+import { formatCurrency } from '@/types/finance';
 import { Head, router } from '@inertiajs/vue3';
-import { ArrowLeft, BookOpen, Edit, FileText, Globe, MapPin, User, Users, Calendar, Clock } from 'lucide-vue-next';
+import { AlertTriangle, ArrowLeft, BookOpen, Calendar, CheckCircle2, Clock, Edit, Globe, Lock, MapPin, User, Users, XCircle } from 'lucide-vue-next';
+import { computed } from 'vue';
+import GradingSchemePreview from './components/GradingSchemePreview.vue';
 
 interface Unit {
     id: number;
@@ -56,6 +60,9 @@ interface SyllabusTemplate {
     description: string | null;
     total_hours: number;
     total_sessions: number;
+    min_attendance_threshold: number | string;
+    min_grade_threshold: number | string;
+    exam_resit_fee: number | string | null;
     learning_outcomes?: string[];
     grading_criteria?: Array<{ name: string; weight: number }>;
     required_materials?: string[];
@@ -77,7 +84,10 @@ interface SyllabusTemplate {
 const props = defineProps<{
     template: SyllabusTemplate;
     unit: Unit;
+    can_edit: boolean;
 }>();
+
+const gradingScheme = computed(() => (props.template.grading_scheme as GradingScheme | null) ?? null);
 
 const getDeliveryModeLabel = (mode: string | null) => {
     if (!mode) return 'Not specified';
@@ -91,27 +101,22 @@ const getDeliveryModeLabel = (mode: string | null) => {
         case 'blended':
             return 'Blended';
         default:
-            return mode.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+            return mode.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
     }
 };
 
+const assessmentTypeLabels: Record<string, string> = {
+    quiz: 'Quiz',
+    assignment: 'Assignment',
+    project: 'Project',
+    exam: 'Exam',
+    online_activity: 'Online Activity',
+    attendance: 'Attendance',
+    other: 'Other',
+};
+
 const getAssessmentTypeLabel = (type: string) => {
-    switch (type) {
-        case 'quiz':
-            return 'Quiz';
-        case 'assignment':
-            return 'Assignment';
-        case 'project':
-            return 'Project';
-        case 'exam':
-            return 'Exam';
-        case 'online_activity':
-            return 'Online Activity';
-        case 'other':
-            return 'Other';
-        default:
-            return type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-    }
+    return assessmentTypeLabels[type] ?? type.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
 };
 
 const getAssessmentTypeColor = (type: string) => {
@@ -126,6 +131,8 @@ const getAssessmentTypeColor = (type: string) => {
             return 'bg-red-100 text-red-800';
         case 'online_activity':
             return 'bg-yellow-100 text-yellow-800';
+        case 'attendance':
+            return 'bg-indigo-100 text-indigo-800';
         case 'other':
             return 'bg-gray-100 text-gray-800';
         default:
@@ -135,6 +142,16 @@ const getAssessmentTypeColor = (type: string) => {
 
 const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
+};
+
+const formatThreshold = (value: number | string) => Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+const formatExamResitFee = (fee: number | string | null) => {
+    const amount = Number(fee ?? 0);
+    if (!amount || amount <= 0) {
+        return '—';
+    }
+    return formatCurrency(amount);
 };
 
 const totalAssessmentWeight = props.template.assessment_components?.reduce((sum, component) => sum + Number(component.weight), 0) || 0;
@@ -156,22 +173,76 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
                 <ArrowLeft class="mr-2 h-4 w-4" />
                 Back to Templates
             </Button>
-            <Button @click="router.visit(`/syllabus-templates/${template.id}/edit`)">
+            <Button v-if="can_edit" @click="router.visit(`/syllabus-templates/${template.id}/edit`)">
                 <Edit class="mr-2 h-4 w-4" />
                 Edit Template
             </Button>
         </div>
     </div>
 
-    <div class="space-y-6">
-        <!-- Status and Basic Info -->
+    <Alert v-if="!can_edit" class="mt-6 border-amber-200 bg-amber-50 text-amber-900">
+        <Lock class="h-4 w-4" />
+        <AlertTitle>Template is read-only</AlertTitle>
+        <AlertDescription>
+            This syllabus template is assigned to a course offering that already has completed class sessions, so it cannot be edited.
+        </AlertDescription>
+    </Alert>
+
+    <div class="mt-6 space-y-6">
+        <!-- Grading scheme -->
+        <Card>
+            <CardHeader>
+                <CardTitle>Grading scheme</CardTitle>
+                <CardDescription>Rule-engine grading scheme applied to this template.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div v-if="!gradingScheme" class="text-muted-foreground text-sm">
+                    Default weighted percentage (no custom scheme configured).
+                </div>
+                <template v-else>
+                    <div class="grid gap-6 lg:grid-cols-2">
+                        <div class="space-y-3">
+                            <div class="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+                                <div>
+                                    <span class="text-muted-foreground">Engine</span>
+                                    <p class="font-medium">{{ gradingScheme.engine }}</p>
+                                </div>
+                                <div>
+                                    <span class="text-muted-foreground">Scale</span>
+                                    <p class="font-medium">{{ gradingScheme.scale }}</p>
+                                </div>
+                                <div v-if="gradingScheme.source_reference">
+                                    <span class="text-muted-foreground">Source</span>
+                                    <p class="font-medium">{{ gradingScheme.source_reference }}</p>
+                                </div>
+                            </div>
+                            <div v-if="gradingScheme.formula">
+                                <span class="text-sm text-muted-foreground">Formula</span>
+                                <p class="font-mono text-sm">{{ gradingScheme.formula }}</p>
+                            </div>
+                            <div v-if="gradingScheme.components?.length">
+                                <span class="text-sm text-muted-foreground">Components</span>
+                                <div class="mt-1 flex flex-wrap gap-2">
+                                    <Badge v-for="component in gradingScheme.components" :key="component.code" variant="secondary">
+                                        {{ component.label ?? component.code }}
+                                    </Badge>
+                                </div>
+                            </div>
+                        </div>
+                        <GradingSchemePreview :scheme="gradingScheme" />
+                    </div>
+                </template>
+            </CardContent>
+        </Card>
+
+        <!-- Basic Information -->
         <Card>
             <CardHeader>
                 <div class="flex items-center justify-between">
-                    <CardTitle class="flex items-center gap-2">
-                        <FileText class="h-5 w-5" />
-                        Template Overview
-                    </CardTitle>
+                    <div>
+                        <CardTitle>Basic Information</CardTitle>
+                        <CardDescription>General syllabus details and metadata</CardDescription>
+                    </div>
                     <div class="flex gap-2">
                         <Badge v-if="template.is_default" variant="default">Default</Badge>
                         <Badge :variant="template.is_active ? 'default' : 'secondary'">
@@ -181,64 +252,92 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
                 </div>
             </CardHeader>
             <CardContent class="space-y-4">
-                <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div class="space-y-2">
-                        <div class="text-sm font-medium text-gray-500">Unit Information</div>
+                        <div class="text-sm font-medium text-muted-foreground">Title</div>
+                        <p class="font-medium">{{ template.title }}</p>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="text-sm font-medium text-muted-foreground">Version</div>
+                        <p class="font-medium">{{ template.version }}</p>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="text-sm font-medium text-muted-foreground">Unit</div>
                         <div>
                             <div class="font-semibold">{{ unit.code }}</div>
-                            <div class="text-sm text-gray-600">{{ unit.name }}</div>
-                            <div v-if="unit.credit_points" class="text-xs text-gray-500">
+                            <div class="text-sm text-muted-foreground">{{ unit.name }}</div>
+                            <div v-if="unit.credit_points" class="text-xs text-muted-foreground">
                                 {{ unit.credit_points }} Credit Points
                             </div>
                         </div>
                     </div>
-
                     <div class="space-y-2">
-                        <div class="text-sm font-medium text-gray-500">Duration</div>
-                        <div>
-                            <div class="font-semibold">{{ template.total_hours }} Hours Total</div>
-                            <div class="text-sm text-gray-600">{{ template.total_sessions }} Sessions</div>
-                            <div v-if="template.total_hours && template.total_sessions" class="text-xs text-gray-500">
-                                ~{{ Math.round((template.total_hours / template.total_sessions) * 10) / 10 }} hours per session
-                            </div>
-                        </div>
+                        <div class="text-sm font-medium text-muted-foreground">Delivery Mode</div>
+                        <Badge :class="template.delivery_mode ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'">
+                            <Globe class="mr-1 h-3 w-3" />
+                            {{ getDeliveryModeLabel(template.delivery_mode) }}
+                        </Badge>
                     </div>
+                </div>
 
+                <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div class="space-y-2">
-                        <div class="text-sm font-medium text-gray-500">Delivery Mode</div>
-                        <div>
-                            <Badge :class="template.delivery_mode ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'">
-                                <Globe class="mr-1 h-3 w-3" />
-                                {{ getDeliveryModeLabel(template.delivery_mode) }}
-                            </Badge>
-                        </div>
+                        <div class="text-sm font-medium text-muted-foreground">Total Hours</div>
+                        <p class="font-medium">{{ template.total_hours }}</p>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="text-sm font-medium text-muted-foreground">Total Sessions</div>
+                        <p class="font-medium">{{ template.total_sessions }}</p>
+                        <p v-if="template.total_hours && template.total_sessions" class="text-xs text-muted-foreground">
+                            ~{{ Math.round((template.total_hours / template.total_sessions) * 10) / 10 }} hours per session
+                        </p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    <div class="space-y-2">
+                        <div class="text-sm font-medium text-muted-foreground">Min Attendance (%)</div>
+                        <p class="font-medium">{{ formatThreshold(template.min_attendance_threshold) }}%</p>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="text-sm font-medium text-muted-foreground">Min Pass Grade (out of 100)</div>
+                        <p class="font-medium">{{ formatThreshold(template.min_grade_threshold) }}</p>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="text-sm font-medium text-muted-foreground">Phí thi lại (VND)</div>
+                        <p class="font-medium">{{ formatExamResitFee(template.exam_resit_fee) }}</p>
                     </div>
                 </div>
 
                 <div v-if="template.description" class="space-y-2">
-                    <div class="text-sm font-medium text-gray-500">Description</div>
-                    <p class="text-sm text-gray-700 leading-relaxed">{{ template.description }}</p>
+                    <div class="text-sm font-medium text-muted-foreground">Description</div>
+                    <p class="text-sm leading-relaxed">{{ template.description }}</p>
+                </div>
+
+                <div class="flex items-center gap-2 text-sm">
+                    <component :is="template.is_active ? CheckCircle2 : XCircle" class="h-4 w-4" :class="template.is_active ? 'text-green-600' : 'text-muted-foreground'" />
+                    <span>{{ template.is_active ? 'Active syllabus' : 'Inactive syllabus' }}</span>
                 </div>
 
                 <!-- Applicable Program and Campus -->
                 <div v-if="template.applicable_program || template.applicable_campus" class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div v-if="template.applicable_program" class="space-y-2">
-                        <div class="text-sm font-medium text-gray-500">Applicable Program</div>
+                        <div class="text-sm font-medium text-muted-foreground">Applicable Program</div>
                         <div class="flex items-center gap-2">
-                            <Users class="h-4 w-4 text-gray-400" />
+                            <Users class="h-4 w-4 text-muted-foreground" />
                             <span class="font-medium">{{ template.applicable_program.name }}</span>
-                            <span v-if="template.applicable_program.code" class="text-sm text-gray-500">
+                            <span v-if="template.applicable_program.code" class="text-sm text-muted-foreground">
                                 ({{ template.applicable_program.code }})
                             </span>
                         </div>
                     </div>
 
                     <div v-if="template.applicable_campus" class="space-y-2">
-                        <div class="text-sm font-medium text-gray-500">Applicable Campus</div>
+                        <div class="text-sm font-medium text-muted-foreground">Applicable Campus</div>
                         <div class="flex items-center gap-2">
-                            <MapPin class="h-4 w-4 text-gray-400" />
+                            <MapPin class="h-4 w-4 text-muted-foreground" />
                             <span class="font-medium">{{ template.applicable_campus.name }}</span>
-                            <span v-if="template.applicable_campus.code" class="text-sm text-gray-500">
+                            <span v-if="template.applicable_campus.code" class="text-sm text-muted-foreground">
                                 ({{ template.applicable_campus.code }})
                             </span>
                         </div>
@@ -249,27 +348,27 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
                 <Separator />
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div v-if="template.creator" class="space-y-2">
-                        <div class="text-sm font-medium text-gray-500">Created By</div>
+                        <div class="text-sm font-medium text-muted-foreground">Created By</div>
                         <div class="flex items-center gap-2">
-                            <User class="h-4 w-4 text-gray-400" />
+                            <User class="h-4 w-4 text-muted-foreground" />
                             <span>{{ template.creator.first_name }} {{ template.creator.last_name }}</span>
-                            <span v-if="template.creator.email" class="text-sm text-gray-500">
+                            <span v-if="template.creator.email" class="text-sm text-muted-foreground">
                                 ({{ template.creator.email }})
                             </span>
                         </div>
                     </div>
 
                     <div class="space-y-2">
-                        <div class="text-sm font-medium text-gray-500">Dates</div>
+                        <div class="text-sm font-medium text-muted-foreground">Dates</div>
                         <div class="space-y-1">
                             <div class="flex items-center gap-2 text-sm">
-                                <Calendar class="h-3 w-3 text-gray-400" />
-                                <span class="text-gray-500">Created:</span>
+                                <Calendar class="h-3 w-3 text-muted-foreground" />
+                                <span class="text-muted-foreground">Created:</span>
                                 <span>{{ formatDate(template.created_at) }}</span>
                             </div>
                             <div class="flex items-center gap-2 text-sm">
-                                <Clock class="h-3 w-3 text-gray-400" />
-                                <span class="text-gray-500">Updated:</span>
+                                <Clock class="h-3 w-3 text-muted-foreground" />
+                                <span class="text-muted-foreground">Updated:</span>
                                 <span>{{ formatDate(template.updated_at) }}</span>
                             </div>
                         </div>
@@ -278,12 +377,12 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
 
                 <!-- Source Template -->
                 <div v-if="template.source_template" class="space-y-2">
-                    <div class="text-sm font-medium text-gray-500">Cloned From</div>
-                    <div class="rounded-lg border p-3 bg-gray-50">
+                    <div class="text-sm font-medium text-muted-foreground">Cloned From</div>
+                    <div class="rounded-lg border bg-muted/30 p-3">
                         <div class="flex items-center justify-between">
                             <div>
                                 <div class="font-medium">{{ template.source_template.title }}</div>
-                                <div class="text-sm text-gray-600">Version {{ template.source_template.version }}</div>
+                                <div class="text-sm text-muted-foreground">Version {{ template.source_template.version }}</div>
                             </div>
                             <Button
                                 variant="ghost"
@@ -299,14 +398,14 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
         </Card>
 
         <!-- Assessment Components -->
-        <Card v-if="template.assessment_components && template.assessment_components.length > 0">
+        <Card>
             <CardHeader>
                 <div class="flex items-center justify-between">
                     <div>
                         <CardTitle class="flex items-center gap-2">
                             <BookOpen class="h-5 w-5" />
                             Assessment Components
-                            <Badge :class="totalAssessmentWeight === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'">
+                            <Badge v-if="template.assessment_components?.length" :class="totalAssessmentWeight === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'">
                                 {{ totalAssessmentWeight }}%
                             </Badge>
                         </CardTitle>
@@ -315,14 +414,17 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
                 </div>
             </CardHeader>
             <CardContent>
-                <div class="space-y-4">
+                <div v-if="!template.assessment_components?.length" class="text-muted-foreground text-sm">
+                    No assessment components configured.
+                </div>
+                <div v-else class="space-y-4">
                     <div
                         v-for="component in template.assessment_components"
                         :key="component.id"
-                        class="rounded-lg border p-4 space-y-3"
+                        class="space-y-3 rounded-lg border p-4"
                     >
                         <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-3">
+                            <div class="flex flex-wrap items-center gap-3">
                                 <div class="font-medium">{{ component.name }}</div>
                                 <Badge v-if="component.code" variant="secondary" class="font-mono text-xs">
                                     {{ component.code }}
@@ -339,12 +441,12 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
 
                         <!-- Component Details -->
                         <div v-if="component.details && component.details.length > 0" class="ml-4">
-                            <div class="text-sm font-medium text-gray-500 mb-2">Sub-components</div>
+                            <div class="mb-2 text-sm font-medium text-muted-foreground">Sub-components</div>
                             <div class="space-y-2">
                                 <div
                                     v-for="detail in component.details"
                                     :key="detail.id"
-                                    class="flex items-center justify-between rounded border bg-gray-50 p-2"
+                                    class="flex items-center justify-between rounded border bg-muted/30 p-2"
                                 >
                                     <span class="text-sm">{{ detail.name }}</span>
                                     <span class="text-sm font-medium">
@@ -352,62 +454,28 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
                                     </span>
                                 </div>
                             </div>
-                            <div class="mt-2 text-xs text-gray-500">
+                            <div class="mt-2 text-xs text-muted-foreground">
                                 Subtotal: {{ component.details.reduce((sum, d) => sum + (d.weight || 0), 0) }}%
                             </div>
                         </div>
                     </div>
 
                     <!-- Total Weight Summary -->
-                    <div class="rounded-lg bg-gray-50 p-4">
+                    <div class="rounded-lg bg-muted/30 p-4">
                         <div class="flex items-center justify-between">
                             <span class="font-medium">Total Assessment Weight:</span>
                             <Badge :class="totalAssessmentWeight === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'">
                                 {{ totalAssessmentWeight }}% / 100%
                             </Badge>
                         </div>
-                        <p v-if="totalAssessmentWeight !== 100" class="mt-1 text-sm text-orange-600">
-                            ⚠️ Assessment components do not total 100%. This template may need adjustment.
+                        <p v-if="totalAssessmentWeight !== 100" class="mt-1 flex items-center gap-1 text-sm text-orange-600">
+                            <AlertTriangle class="h-4 w-4" />
+                            Assessment components do not total 100%. This template may need adjustment.
                         </p>
-                        <p v-else class="mt-1 text-sm text-green-600">
-                            ✓ Assessment structure is complete and valid.
+                        <p v-else class="mt-1 flex items-center gap-1 text-sm text-green-600">
+                            <CheckCircle2 class="h-4 w-4" />
+                            Assessment structure is complete and valid.
                         </p>
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-
-        <!-- Grading scheme (S-003) -->
-        <Card v-if="template.grading_scheme">
-            <CardHeader>
-                <CardTitle>Grading scheme</CardTitle>
-                <CardDescription>Rule-engine scheme applied to this template.</CardDescription>
-            </CardHeader>
-            <CardContent class="space-y-3">
-                <div class="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-                    <div>
-                        <span class="text-muted-foreground">Engine</span>
-                        <p class="font-medium">{{ template.grading_scheme.engine }}</p>
-                    </div>
-                    <div>
-                        <span class="text-muted-foreground">Scale</span>
-                        <p class="font-medium">{{ template.grading_scheme.scale }}</p>
-                    </div>
-                    <div v-if="template.grading_scheme.source_reference">
-                        <span class="text-muted-foreground">Source</span>
-                        <p class="font-medium">{{ template.grading_scheme.source_reference }}</p>
-                    </div>
-                </div>
-                <div v-if="template.grading_scheme.formula">
-                    <span class="text-sm text-muted-foreground">Formula</span>
-                    <p class="font-mono text-sm">{{ template.grading_scheme.formula }}</p>
-                </div>
-                <div v-if="template.grading_scheme.components?.length">
-                    <span class="text-sm text-muted-foreground">Components</span>
-                    <div class="mt-1 flex flex-wrap gap-2">
-                        <Badge v-for="component in template.grading_scheme.components" :key="component.code" variant="secondary">
-                            {{ component.label ?? component.code }}
-                        </Badge>
                     </div>
                 </div>
             </CardContent>
@@ -423,7 +491,7 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
                 <CardContent>
                     <ul class="space-y-2">
                         <li v-for="(outcome, index) in template.learning_outcomes" :key="index" class="flex gap-2">
-                            <span class="text-gray-400 mt-1">•</span>
+                            <span class="mt-1 text-muted-foreground">•</span>
                             <span class="text-sm">{{ outcome }}</span>
                         </li>
                     </ul>
@@ -438,7 +506,7 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
                 <CardContent>
                     <ul class="space-y-2">
                         <li v-for="(material, index) in template.required_materials" :key="index" class="flex gap-2">
-                            <span class="text-gray-400 mt-1">•</span>
+                            <span class="mt-1 text-muted-foreground">•</span>
                             <span class="text-sm">{{ material }}</span>
                         </li>
                     </ul>
@@ -470,13 +538,9 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
                     <CardTitle class="text-lg">Assessment Policy</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <p class="text-sm text-gray-700 leading-relaxed">{{ template.assessment_policy }}</p>
+                    <p class="text-sm leading-relaxed">{{ template.assessment_policy }}</p>
                 </CardContent>
             </Card>
         </div>
     </div>
 </template>
-
-<style scoped>
-/* Add any specific styles if needed */
-</style>

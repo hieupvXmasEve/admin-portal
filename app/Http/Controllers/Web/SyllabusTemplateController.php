@@ -65,8 +65,17 @@ class SyllabusTemplateController extends Controller
         ]);
     }
 
-    public function pageEdit(SyllabusTemplate $syllabusTemplate): Response
+    public function pageEdit(SyllabusTemplate $syllabusTemplate): Response|RedirectResponse
     {
+        if ($syllabusTemplate->isLockedForEditing()) {
+            Inertia::flash(
+                'error',
+                'This syllabus template cannot be edited because it is assigned to a course offering with completed class sessions.',
+            );
+
+            return redirect()->route('syllabus_templates.show', $syllabusTemplate);
+        }
+
         $units = Unit::query()->orderBy('code')->get(['id', 'code', 'name']);
 
         return Inertia::render('syllabus/TemplatesEdit', [
@@ -74,6 +83,7 @@ class SyllabusTemplateController extends Controller
             'syllabusTemplate' => $syllabusTemplate->load(['unit', 'applicableProgram', 'applicableCampus', 'creator', 'sourceTemplate', 'assessmentComponents.details']),
             'assessmentTypes' => AssessmentComponent::TYPES,
             'units' => $units,
+            'can_edit' => true,
         ]);
     }
 
@@ -82,6 +92,7 @@ class SyllabusTemplateController extends Controller
         return Inertia::render('syllabus/TemplatesShow', [
             'unit' => $syllabusTemplate->unit,
             'template' => $syllabusTemplate->load(['unit', 'applicableProgram', 'applicableCampus', 'creator', 'sourceTemplate', 'assessmentComponents.details']),
+            'can_edit' => ! $syllabusTemplate->isLockedForEditing(),
         ]);
     }
 
@@ -124,6 +135,7 @@ class SyllabusTemplateController extends Controller
         return Inertia::render('syllabus/TemplatesShow', [
             'unit' => $syllabusTemplate->unit,
             'template' => $syllabusTemplate,
+            'can_edit' => ! $syllabusTemplate->isLockedForEditing(),
         ]);
     }
 

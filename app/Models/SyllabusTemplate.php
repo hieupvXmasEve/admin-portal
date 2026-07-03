@@ -109,6 +109,19 @@ class SyllabusTemplate extends AuditableModel
         return $this->hasMany(CourseOffering::class);
     }
 
+    /**
+     * A template becomes read-only once it is assigned to a course offering
+     * that has at least one completed class session.
+     */
+    public function isLockedForEditing(): bool
+    {
+        return $this->courseOfferings()
+            ->whereHas('classSessions', function (Builder $query) {
+                $query->where('status', 'completed');
+            })
+            ->exists();
+    }
+
     public function scopeAssignableToCourseOffering(Builder $query, ?CourseOffering $courseOffering = null): Builder
     {
         $currentTemplateId = $courseOffering?->syllabus_template_id;
