@@ -3,11 +3,19 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
+use App\Models\FinanceCharge;
+use App\Models\InvoiceLine;
+use App\Models\Payment;
+use App\Models\PaymentApplication;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Models\StudentInvoice;
 use App\Models\User;
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Services\SettlementService;
 use App\Services\PermissionService;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -58,6 +66,143 @@ it('renders the 360 shell with identity and four balances for a visible student'
             ->has('balances.balance')
             ->has('balances.unapplied_credit')
             ->where('focus', null));
+});
+
+it('shows staff-facing tuition KPIs and surplus source for a paid DNG released from voided fees', function () {
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-05-10 09:00:00'));
+
+    try {
+        $user = grantFinanceOverview(['view_finance_student_overview']);
+        $student = makeOverviewStudent($this->campus, $this->program, $this->semester);
+        $student->forceFill(['student_id' => 'AUS121787'])->save();
+        $summer = Semester::factory()->create(['code' => 'SUMMER2026', 'name' => 'Summer 2026']);
+
+        $springCharge = FinanceCharge::create([
+            'student_id' => $student->id,
+            'semester_id' => $this->semester->id,
+            'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+            'amount' => 15_000_000,
+            'description' => 'SPRING tuition',
+            'effective_at' => now(),
+            'status' => FinanceCharge::STATUS_ACTIVE,
+        ]);
+        $springInvoice = StudentInvoice::create([
+            'invoice_number' => 'INV-SPRING-AUS121787',
+            'student_id' => $student->id,
+            'semester_id' => $this->semester->id,
+            'status' => 'pending',
+            'due_date' => now()->addDays(7),
+        ]);
+        $springLine = InvoiceLine::create([
+            'invoice_id' => $springInvoice->id,
+            'charge_id' => $springCharge->id,
+            'amount_snapshot' => 15_000_000,
+            'description_snapshot' => 'SPRING tuition',
+            'status' => 'active',
+        ]);
+
+        $springPayment = Payment::create([
+            'student_id' => $student->id,
+            'amount' => 15_000_000,
+            'method' => Payment::METHOD_BANK_TRANSFER,
+            'source' => 'manual',
+            'external_ref' => 'SPRING-PAID',
+            'paid_at' => CarbonImmutable::parse('2026-04-20 10:30:00'),
+            'status' => Payment::STATUS_COMPLETED,
+            'received_by_user_id' => $user->id,
+        ]);
+        app(SettlementService::class)->createPaymentApplication($springPayment, $springLine, 15_000_000, 'application', $user->id);
+
+        $summerCharge = FinanceCharge::create([
+            'student_id' => $student->id,
+            'semester_id' => $summer->id,
+            'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+            'amount' => 30_000_000,
+            'description' => 'SUMMER EGC fees',
+            'effective_at' => now(),
+            'status' => FinanceCharge::STATUS_VOID,
+            'voided_at' => now(),
+            'voided_by_user_id' => $user->id,
+            'void_reason' => 'SUMMER2026 fees voided after DNG payment',
+        ]);
+        $summerInvoice = StudentInvoice::create([
+            'invoice_number' => 'INV-SUMMER-AUS121787',
+            'student_id' => $student->id,
+            'semester_id' => $summer->id,
+            'status' => 'paid',
+            'due_date' => now()->addDays(14),
+        ]);
+        $summerLine = InvoiceLine::create([
+            'invoice_id' => $summerInvoice->id,
+            'charge_id' => $summerCharge->id,
+            'amount_snapshot' => 30_000_000,
+            'description_snapshot' => 'SUMMER EGC fees',
+            'status' => 'void',
+            'voided_at' => now(),
+            'void_reason' => 'SUMMER2026 fees voided after DNG payment',
+        ]);
+
+        $dngPayment = Payment::create([
+            'student_id' => $student->id,
+            'amount' => 30_000_000,
+            'method' => Payment::METHOD_GATEWAY,
+            'source' => 'dng',
+            'external_ref' => 'DNGPAY-230',
+            'paid_at' => CarbonImmutable::parse('2026-05-02 08:00:00'),
+            'status' => Payment::STATUS_COMPLETED,
+            'received_by_user_id' => $user->id,
+        ]);
+        PaymentApplication::create([
+            'payment_id' => $dngPayment->id,
+            'invoice_line_id' => $summerLine->id,
+            'amount' => 30_000_000,
+            'entry_type' => 'application',
+            'applied_at' => CarbonImmutable::parse('2026-05-02 08:05:00'),
+            'created_by' => $user->id,
+        ]);
+        PaymentApplication::create([
+            'payment_id' => $dngPayment->id,
+            'invoice_line_id' => $summerLine->id,
+            'amount' => -30_000_000,
+            'entry_type' => 'reversal',
+            'applied_at' => CarbonImmutable::parse('2026-05-03 09:00:00'),
+            'created_by' => $user->id,
+            'source_ref_type' => 'finance_charge',
+            'source_ref_id' => $summerCharge->id,
+        ]);
+        DngPaymentRequest::create([
+            'student_id' => $student->id,
+            'campus_code' => 'CAMPUS001',
+            'student_code' => 'AUS121787',
+            'fee_type' => 'HP',
+            'description' => 'SUMMER2026 EGC',
+            'semester_id' => $summer->id,
+            'due_date' => CarbonImmutable::parse('2026-05-15'),
+            'item_id' => '230',
+            'amount' => 30_000_000,
+            'status' => DngPaymentRequest::STATUS_PAID_INVOICED,
+            'dng_payment_id' => 'DNGPAY-230',
+            'payment_id' => $dngPayment->id,
+            'paid_at' => CarbonImmutable::parse('2026-05-02 08:00:00'),
+        ]);
+
+        actingAs($user)->get("/finance/students/{$student->id}")
+            ->assertInertia(fn ($page) => $page
+                ->component('Finance/Student360/Show')
+                ->where('tuition_overview.title', 'Học phí sinh viên')
+                ->where('tuition_overview.kpis.collectible_due.label', 'Còn phải thu')
+                ->where('tuition_overview.kpis.collectible_due.amount', 0)
+                ->where('tuition_overview.kpis.collectible_due.primary', true)
+                ->where('tuition_overview.kpis.total_paid.label', 'Tổng tiền đã nộp')
+                ->where('tuition_overview.kpis.total_paid.amount', 45_000_000)
+                ->where('tuition_overview.kpis.collected.label', 'Đã thu')
+                ->where('tuition_overview.kpis.collected.amount', 15_000_000)
+                ->where('tuition_overview.kpis.surplus.label', 'Còn dư')
+                ->where('tuition_overview.kpis.surplus.amount', 30_000_000)
+                ->where('tuition_overview.surplus_message', 'Còn dư 30.000.000 từ DNG #230, đã nộp ngày 02/05/2026'));
+    } finally {
+        CarbonImmutable::setTestNow();
+    }
 });
 
 it('echoes a valid focus target', function () {

@@ -8,23 +8,17 @@ import StudentActionMenu from '@/components/finance/student360/StudentActionMenu
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type {
-    LedgerEvent,
-    LedgerGroup,
-    Student360Actions,
-    Student360Balances,
-    Student360Identity,
-    Student360StatusCards,
-} from '@/types/finance';
+import type { LedgerEvent, LedgerGroup, Student360Actions, Student360Balances, Student360Identity, Student360StatusCards, StudentFinanceOverviewKpi, StudentFinanceTuitionOverview } from '@/types/finance';
 import { formatCurrency } from '@/utils/format';
 import { financeRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ExternalLink } from 'lucide-vue-next';
-import { nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 
 const props = defineProps<{
     student: Student360Identity;
     balances: Student360Balances;
+    tuition_overview: StudentFinanceTuitionOverview;
     status_cards: Student360StatusCards;
     actions: Student360Actions;
     focus: { type: string; id: number } | null;
@@ -38,12 +32,28 @@ const allocateOpen = ref(false);
 const cancelOpen = ref(false);
 const allocatePaymentId = ref<number | null>(null);
 const cancelDngId = ref<number | null>(null);
-const balanceCards = [
-    { key: 'net_charges', label: 'Phải thu', tone: 'text-foreground' },
-    { key: 'total_paid', label: 'Đã thu', tone: 'text-green-700 dark:text-green-300' },
-    { key: 'balance', label: 'Còn nợ', tone: 'text-orange-700 dark:text-orange-300' },
-    { key: 'unapplied_credit', label: 'Dư chưa khớp', tone: 'text-blue-700 dark:text-blue-300' },
-] as const;
+const tuitionKpis = computed<Array<StudentFinanceOverviewKpi & { key: string; tone: string }>>(() => [
+    {
+        ...props.tuition_overview.kpis.collectible_due,
+        key: 'collectible_due',
+        tone: props.tuition_overview.kpis.collectible_due.amount > 0 ? 'text-orange-700 dark:text-orange-300' : 'text-primary',
+    },
+    {
+        ...props.tuition_overview.kpis.total_paid,
+        key: 'total_paid',
+        tone: 'text-sky-700 dark:text-sky-300',
+    },
+    {
+        ...props.tuition_overview.kpis.collected,
+        key: 'collected',
+        tone: 'text-emerald-700 dark:text-emerald-300',
+    },
+    {
+        ...props.tuition_overview.kpis.surplus,
+        key: 'surplus',
+        tone: props.tuition_overview.kpis.surplus.amount > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground',
+    },
+]);
 
 const openAllocate = (): void => {
     allocatePaymentId.value = props.status_cards.balance.unapplied_payment_id;
@@ -57,11 +67,7 @@ const openCancel = (id: number): void => {
 };
 
 const pushInstallment = (payload: { chargeId: number; installmentId: number }): void => {
-    router.post(
-        financeRoutes.student360.retryInstallmentPush(payload.chargeId, payload.installmentId),
-        {},
-        { preserveScroll: true },
-    );
+    router.post(financeRoutes.student360.retryInstallmentPush(payload.chargeId, payload.installmentId), {}, { preserveScroll: true });
 };
 
 const scrollToFocus = async (): Promise<void> => {
@@ -87,25 +93,22 @@ onMounted(() => {
 </script>
 
 <template>
-    <Head :title="`Finance · ${props.student.full_name}`" />
+    <Head :title="`${props.tuition_overview.title} · ${props.student.full_name}`" />
 
     <div class="space-y-4">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-                <h1 class="text-xl font-semibold tracking-tight">{{ props.student.full_name }}</h1>
-                <p class="text-muted-foreground text-sm tabular-nums">{{ props.student.student_code }}</p>
+                <h1 class="text-xl font-semibold tracking-tight">{{ props.tuition_overview.title }}</h1>
+                <p class="text-muted-foreground text-sm">
+                    {{ props.student.full_name }} · <span class="tabular-nums">{{ props.student.student_code }}</span>
+                </p>
                 <div class="mt-2 flex flex-wrap gap-2">
                     <Badge variant="secondary">{{ props.student.academic_status ?? props.student.status }}</Badge>
                     <Badge variant="outline">{{ props.student.lifecycle_label }}</Badge>
                 </div>
             </div>
             <div class="flex items-center gap-2">
-                <StudentActionMenu
-                    :actions="props.actions"
-                    :has-unapplied="props.status_cards.balance.has_unapplied"
-                    @record-payment="recordOpen = true"
-                    @allocate="openAllocate"
-                />
+                <StudentActionMenu :actions="props.actions" :has-unapplied="props.status_cards.balance.has_unapplied" @record-payment="recordOpen = true" @allocate="openAllocate" />
                 <Button as-child variant="outline" size="sm">
                     <Link :href="props.links.audit">
                         <ExternalLink class="mr-1 size-4" />
@@ -116,36 +119,30 @@ onMounted(() => {
         </div>
 
         <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Card v-for="card in balanceCards" :key="card.key">
+            <Card v-for="card in tuitionKpis" :key="card.key" :class="card.primary ? 'border-primary/40 bg-primary/5 shadow-sm' : ''">
                 <CardHeader class="pb-1">
-                    <CardTitle class="text-muted-foreground text-xs font-medium">{{ card.label }}</CardTitle>
+                    <CardTitle class="text-xs font-medium" :class="card.primary ? 'text-primary' : 'text-muted-foreground'">
+                        {{ card.label }}
+                    </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <p class="text-lg font-semibold tabular-nums" :class="card.tone">
-                        {{ formatCurrency(props.balances[card.key]) }}
+                    <p class="font-semibold tabular-nums" :class="[card.primary ? 'text-2xl md:text-3xl' : 'text-lg', card.tone]">
+                        {{ formatCurrency(card.amount) }}
                     </p>
                 </CardContent>
             </Card>
         </div>
 
-        <StatusCards
-            :cards="props.status_cards"
-            :actions="props.actions"
-            :focus="props.focus"
-            @allocate="openAllocate"
-            @cancel-dng="openCancel"
-            @push-installment="pushInstallment"
-            @review="openCancel"
-        />
+        <p v-if="props.tuition_overview.surplus_message" class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-200">
+            {{ props.tuition_overview.surplus_message }}
+        </p>
+
+        <StatusCards :cards="props.status_cards" :actions="props.actions" :focus="props.focus" @allocate="openAllocate" @cancel-dng="openCancel" @push-installment="pushInstallment" @review="openCancel" />
 
         <LedgerLens :timeline="props.ledger" :groups="props.ledger_groups" />
 
         <RecordPaymentDrawer v-model:open="recordOpen" :student-id="props.student.id" />
         <AllocatePreviewDrawer v-model:open="allocateOpen" :payment-id="allocatePaymentId" />
-        <CancelDngDrawer
-            v-model:open="cancelOpen"
-            :dng-id="cancelDngId"
-            :can-void-charges="props.actions.can_void_charges"
-        />
+        <CancelDngDrawer v-model:open="cancelOpen" :dng-id="cancelDngId" :can-void-charges="props.actions.can_void_charges" />
     </div>
 </template>

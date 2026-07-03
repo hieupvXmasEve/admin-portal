@@ -267,6 +267,23 @@ export interface Student360Balances {
     status: string;
 }
 
+export interface StudentFinanceOverviewKpi {
+    label: string;
+    amount: number;
+    primary: boolean;
+}
+
+export interface StudentFinanceTuitionOverview {
+    title: string;
+    kpis: {
+        collectible_due: StudentFinanceOverviewKpi;
+        total_paid: StudentFinanceOverviewKpi;
+        collected: StudentFinanceOverviewKpi;
+        surplus: StudentFinanceOverviewKpi;
+    };
+    surplus_message: string | null;
+}
+
 export interface LedgerEvent {
     at: string | null;
     type: string;

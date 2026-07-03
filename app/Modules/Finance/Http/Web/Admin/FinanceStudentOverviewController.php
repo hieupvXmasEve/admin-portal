@@ -11,6 +11,7 @@ use App\Modules\Finance\Queries\Audit\GetFinanceAuditGraphQuery;
 use App\Modules\Finance\Queries\GetStudentBalanceQuery;
 use App\Modules\Finance\Queries\Student360\GetStudent360LedgerQuery;
 use App\Modules\Finance\Queries\Student360\GetStudent360StatusCardsQuery;
+use App\Modules\Finance\Queries\Student360\GetStudentFinanceOverviewKpisQuery;
 use App\Modules\Finance\Support\Audit\FinanceLedgerTimelineBuilder;
 use App\Modules\Finance\Support\LifecycleDueExceptionReasonResolver;
 use Inertia\Inertia;
@@ -32,6 +33,7 @@ class FinanceStudentOverviewController extends Controller
         FinanceLedgerTimelineBuilder $timelineBuilder,
         GetStudent360StatusCardsQuery $cardsQuery,
         GetStudent360LedgerQuery $ledgerQuery,
+        GetStudentFinanceOverviewKpisQuery $tuitionOverviewQuery,
     ): Response {
         if (! $this->visible($student, $request)) {
             abort(404);
@@ -58,6 +60,7 @@ class FinanceStudentOverviewController extends Controller
                 'unapplied_credit' => $balance['unapplied_credit'],
                 'status' => $balance['status'],
             ],
+            'tuition_overview' => $tuitionOverviewQuery->handle($studentId),
             'focus' => $request->focusTarget(),
             'links' => [
                 'audit' => route('finance.audit.index', ['target_type' => 'student', 'target_id' => $studentId]),
