@@ -167,13 +167,18 @@ it('re-sync overwrites previous result', function () {
     expect($block->fresh()->result)->toBe(EgcBlock::RESULT_FAIL);
 });
 
-it('does not overwrite a block to fail when the student has later egc progression evidence', function () {
-    $semester = Semester::factory()->create();
+it('does not overwrite a block to fail when the immediate next block has progressed to a higher level', function () {
+    $semester = Semester::factory()->state([
+        'start_date' => '2026-01-05',
+        'end_date' => '2026-04-30',
+    ])->create();
+    $nextSemester = Semester::factory()->state([
+        'start_date' => '2026-05-04',
+        'end_date' => '2026-08-31',
+    ])->create();
     $student = makeSyncStudent();
-    $student->update(['gc_current_level' => 5]);
 
     $failedLevel = makeEgcUnit(4);
-    $laterLevel = makeEgcUnit(5);
 
     $block = EgcBlock::factory()->state([
         'student_id' => $student->id,
@@ -184,22 +189,20 @@ it('does not overwrite a block to fail when the student has later egc progressio
         'attendance_rate' => 82.86,
     ])->create();
 
+    EgcBlock::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $nextSemester->id,
+        'block_number' => 1,
+        'level_number' => 5,
+        'result' => EgcBlock::RESULT_PENDING,
+    ])->create();
+
     makeEgcAcademicRecord($student, $semester, $failedLevel, [
         'completion_status' => 'completed',
         'is_passed' => false,
         'override_pass' => false,
         'attendance_percentage' => 82.86,
     ]);
-
-    $laterOffering = makeSyncCourseOffering($semester->id, $laterLevel->id);
-    AcademicRecord::factory()->state([
-        'student_id' => $student->id,
-        'semester_id' => $semester->id,
-        'unit_id' => $laterLevel->id,
-        'course_offering_id' => $laterOffering->id,
-        'completion_status' => 'in_progress',
-        'is_passed' => null,
-    ])->create();
 
     $summary = SyncEgcBlockResultsAction::run($semester->id);
 
@@ -210,6 +213,64 @@ it('does not overwrite a block to fail when the student has later egc progressio
         ->and($summary['skipped'][0]['reason'])->toBe('failed_result_conflicts_with_later_egc_progression')
         ->and($block->result)->toBe(EgcBlock::RESULT_PASS)
         ->and($block->synced_at)->toBeNull();
+});
+
+it('keeps a fail result when the immediate next block is the same-level retake', function () {
+    $semester = Semester::factory()->state([
+        'start_date' => '2026-01-05',
+        'end_date' => '2026-04-30',
+    ])->create();
+    $nextSemester = Semester::factory()->state([
+        'start_date' => '2026-05-04',
+        'end_date' => '2026-08-31',
+    ])->create();
+    $student = makeSyncStudent();
+    $student->update(['gc_current_level' => 4]);
+
+    $failedLevel = makeEgcUnit(3);
+
+    $sourceBlock = EgcBlock::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'block_number' => 2,
+        'level_number' => 3,
+        'result' => EgcBlock::RESULT_PASS,
+        'attendance_rate' => 91.43,
+    ])->create();
+
+    EgcBlock::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $nextSemester->id,
+        'block_number' => 1,
+        'level_number' => 3,
+        'result' => EgcBlock::RESULT_PENDING,
+        'is_retake' => true,
+    ])->create();
+
+    EgcBlock::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $nextSemester->id,
+        'block_number' => 2,
+        'level_number' => 4,
+        'result' => EgcBlock::RESULT_PENDING,
+    ])->create();
+
+    makeEgcAcademicRecord($student, $semester, $failedLevel, [
+        'completion_status' => 'completed',
+        'is_passed' => false,
+        'override_pass' => false,
+        'attendance_percentage' => 91.43,
+    ]);
+
+    $summary = SyncEgcBlockResultsAction::run($semester->id);
+
+    $sourceBlock->refresh();
+
+    expect($summary['synced'])->toBe(1)
+        ->and($summary['skipped'])->toBeEmpty()
+        ->and($sourceBlock->result)->toBe(EgcBlock::RESULT_FAIL)
+        ->and((float) $sourceBlock->attendance_rate)->toBe(91.43)
+        ->and($sourceBlock->synced_at)->not->toBeNull();
 });
 
 it('matches duplicate same-level blocks by registration order and keeps in-progress attempts pending', function () {

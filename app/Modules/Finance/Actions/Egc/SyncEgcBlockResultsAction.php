@@ -41,7 +41,7 @@ class SyncEgcBlockResultsAction
 
                 if (
                     $resolved['result'] === EgcBlock::RESULT_FAIL
-                    && self::hasLaterEgcProgressionEvidence((int) $studentId, (int) $block->level_number)
+                    && self::hasImmediateNextBlockProgressionEvidence($block)
                 ) {
                     $skipped[] = self::skippedRow($block, 'failed_result_conflicts_with_later_egc_progression');
 
@@ -168,44 +168,55 @@ class SyncEgcBlockResultsAction
         ];
     }
 
-    private static function hasLaterEgcProgressionEvidence(int $studentId, int $levelNumber): bool
+    private static function hasImmediateNextBlockProgressionEvidence(EgcBlock $block): bool
     {
-        $currentLevel = DB::table('students')
-            ->where('id', $studentId)
-            ->value('gc_current_level');
+        $nextBlock = self::immediateNextBlock($block);
 
-        if ($currentLevel !== null && (int) $currentLevel > $levelNumber) {
-            return true;
+        return $nextBlock instanceof EgcBlock
+            && (int) $nextBlock->level_number > (int) $block->level_number;
+    }
+
+    private static function immediateNextBlock(EgcBlock $block): ?EgcBlock
+    {
+        if ((int) $block->block_number === 1) {
+            return EgcBlock::query()
+                ->where('student_id', $block->student_id)
+                ->where('semester_id', $block->semester_id)
+                ->where('block_number', 2)
+                ->whereKeyNot($block->id)
+                ->first();
         }
 
-        if (
-            AcademicRecord::query()
-                ->where('student_id', $studentId)
-                ->whereIn('completion_status', ['enrolled', 'in_progress', 'completed'])
-                ->whereHas('unit', fn ($query) => $query->where('unit_type', 'egc')->where('level', '>', $levelNumber))
-                ->exists()
-        ) {
-            return true;
+        if ((int) $block->block_number !== 2) {
+            return null;
         }
 
-        if (
-            DB::table('course_registrations')
-                ->join('course_offerings', 'course_registrations.course_offering_id', '=', 'course_offerings.id')
-                ->join('units', 'course_offerings.unit_id', '=', 'units.id')
-                ->where('course_registrations.student_id', $studentId)
-                ->whereIn('course_registrations.registration_status', ['registered', 'confirmed', 'completed'])
-                ->where('units.unit_type', 'egc')
-                ->where('units.level', '>', $levelNumber)
-                ->exists()
-        ) {
-            return true;
+        $sourceStartDate = DB::table('semesters')
+            ->where('id', $block->semester_id)
+            ->value('start_date');
+
+        if ($sourceStartDate === null) {
+            return null;
         }
 
-        return DB::table('academic_progression_events')
-            ->where('student_id', $studentId)
-            ->where('event_type', 'ENGLISH_LEVEL_CHANGED')
-            ->where('to_english_level', '>', $levelNumber)
-            ->exists();
+        $nextSemesterId = DB::table('semesters')
+            ->where('id', '!=', $block->semester_id)
+            ->where('is_archived', false)
+            ->where('start_date', '>', $sourceStartDate)
+            ->orderBy('start_date')
+            ->orderBy('id')
+            ->value('id');
+
+        if ($nextSemesterId === null) {
+            return null;
+        }
+
+        return EgcBlock::query()
+            ->where('student_id', $block->student_id)
+            ->where('semester_id', $nextSemesterId)
+            ->where('block_number', 1)
+            ->whereKeyNot($block->id)
+            ->first();
     }
 
     private static function skippedRow(EgcBlock $block, string $reason): array

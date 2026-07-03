@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\AcademicRecord;
 use App\Models\Campus;
 use App\Models\CourseOffering;
+use App\Models\CourseRegistration;
 use App\Models\CurriculumVersion;
 use App\Models\DiscountAllocation;
 use App\Models\EgcBlock;
@@ -207,7 +208,6 @@ it('runs reconciliation automatically from block result sync', function () {
     $student = makeReconcileStudent();
 
     $levelThree = makeReconcileEgcUnit(3, 15_000_000);
-    makeReconcileEgcUnit(4, 17_000_000);
 
     [$sourceCharge] = makeReconcileChargeWithInvoice($student, $sourceSemester, 3, 15_000_000);
     $sourceBlock = attachReconcileCharge(
@@ -215,26 +215,64 @@ it('runs reconciliation automatically from block result sync', function () {
         $sourceCharge,
     );
 
-    [$targetCharge] = makeReconcileChargeWithInvoice($student, $sourceSemester, 4, 17_000_000);
+    [$targetCharge] = makeReconcileChargeWithInvoice($student, $sourceSemester, 3, 15_000_000);
     $targetBlock = attachReconcileCharge(
-        makeReconcileBlock($student, $sourceSemester, 2, 4, EgcBlock::RESULT_PENDING),
+        makeReconcileBlock($student, $sourceSemester, 2, 3, EgcBlock::RESULT_PENDING),
         $targetCharge,
     );
+
+    $sourceOffering = makeReconcileCourseOffering($sourceSemester, $levelThree);
+    $targetOffering = makeReconcileCourseOffering($sourceSemester, $levelThree);
+
+    CourseRegistration::create([
+        'student_id' => $student->id,
+        'course_offering_id' => $sourceOffering->id,
+        'semester_id' => $sourceSemester->id,
+        'registration_status' => 'completed',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 1,
+    ]);
+
+    CourseRegistration::create([
+        'student_id' => $student->id,
+        'course_offering_id' => $targetOffering->id,
+        'semester_id' => $sourceSemester->id,
+        'registration_status' => 'confirmed',
+        'registration_date' => now()->addMinute(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 2,
+        'is_retake' => true,
+    ]);
 
     AcademicRecord::factory()->state([
         'student_id' => $student->id,
         'semester_id' => $sourceSemester->id,
         'unit_id' => $levelThree->id,
-        'course_offering_id' => makeReconcileCourseOffering($sourceSemester, $levelThree)->id,
+        'course_offering_id' => $sourceOffering->id,
         'completion_status' => 'completed',
         'is_passed' => false,
         'override_pass' => false,
         'attendance_percentage' => 97.14,
     ])->create();
 
+    AcademicRecord::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $sourceSemester->id,
+        'unit_id' => $levelThree->id,
+        'course_offering_id' => $targetOffering->id,
+        'completion_status' => 'in_progress',
+        'is_passed' => null,
+        'override_pass' => false,
+    ])->create();
+
     $summary = SyncEgcBlockResultsAction::run($sourceSemester->id);
 
-    expect($summary['synced'])->toBe(1)
+    expect($summary['synced'])->toBe(2)
         ->and($summary['reconciliation']['students_reconciled'])->toBe(1)
         ->and($summary['reconciliation']['releveled_blocks'])->toBe(1)
         ->and($summary['reconciliation']['discounts_applied'])->toBe(1)
