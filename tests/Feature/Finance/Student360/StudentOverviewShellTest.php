@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\FinanceCharge;
+use App\Models\FinanceChargeInstallment;
 use App\Models\InvoiceLine;
 use App\Models\Payment;
 use App\Models\PaymentApplication;
@@ -49,6 +50,47 @@ function makeOverviewStudent(Campus $campus, Program $program, Semester $semeste
     return Student::factory()->forCampus($campus)->forProgram($program)
         ->state(['intake' => 1, 'intake_semester_id' => $semester->id])
         ->create();
+}
+
+/**
+ * @return array{charge: FinanceCharge, invoice: StudentInvoice, line: InvoiceLine}
+ */
+function makeOverviewCharge(
+    Student $student,
+    Semester $semester,
+    float $amount = 10_000_000,
+    string $chargeStatus = FinanceCharge::STATUS_ACTIVE,
+    string $lineStatus = 'active',
+): array {
+    $charge = FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => $amount,
+        'description' => 'Overview tuition',
+        'effective_at' => now(),
+        'status' => $chargeStatus,
+        'voided_at' => $chargeStatus === FinanceCharge::STATUS_VOID ? now() : null,
+        'void_reason' => $chargeStatus === FinanceCharge::STATUS_VOID ? 'Voided test charge' : null,
+    ]);
+    $invoice = StudentInvoice::create([
+        'invoice_number' => 'INV-OVERVIEW-'.$student->id.'-'.$charge->id,
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'status' => $lineStatus === 'void' ? 'cancelled' : 'pending',
+        'due_date' => now()->addDays(7),
+    ]);
+    $line = InvoiceLine::create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $charge->id,
+        'amount_snapshot' => $amount,
+        'description_snapshot' => 'Overview tuition',
+        'status' => $lineStatus,
+        'voided_at' => $lineStatus === 'void' ? now() : null,
+        'void_reason' => $lineStatus === 'void' ? 'Voided test line' : null,
+    ]);
+
+    return ['charge' => $charge, 'invoice' => $invoice, 'line' => $line];
 }
 
 it('renders the 360 shell with identity and four balances for a visible student', function () {
@@ -270,6 +312,152 @@ it('offers allocation from a surplus payment only when current fee obligations e
             ->where('payment_history.0.status_label', 'Còn dư')
             ->where('payment_history.0.action.can_allocate', true)
             ->where('payment_history.0.action.message', null));
+});
+
+it('does not make a paid DNG request actionable on the DNG card', function () {
+    $user = grantFinanceOverview(['view_finance_student_overview']);
+    $student = makeOverviewStudent($this->campus, $this->program, $this->semester);
+
+    $payment = Payment::create([
+        'student_id' => $student->id,
+        'amount' => 3_000_000,
+        'method' => Payment::METHOD_GATEWAY,
+        'source' => 'dng',
+        'external_ref' => 'DNGPAY-PAID-001',
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+        'received_by_user_id' => $user->id,
+    ]);
+    DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'CAMPUS001',
+        'student_code' => $student->student_id,
+        'fee_type' => 'HP',
+        'description' => 'Paid DNG',
+        'semester_id' => $this->semester->id,
+        'due_date' => now()->addDays(7),
+        'item_id' => 'PAID-001',
+        'amount' => 3_000_000,
+        'status' => DngPaymentRequest::STATUS_PAID_INVOICED,
+        'payment_id' => $payment->id,
+        'paid_at' => now(),
+    ]);
+
+    actingAs($user)->get("/finance/students/{$student->id}")
+        ->assertInertia(fn ($page) => $page
+            ->where('status_cards.dng.has_active', false)
+            ->where('status_cards.dng.request', null)
+            ->has('payment_history', 1)
+            ->where('payment_history.0.reference', 'DNG #PAID-001')
+            ->where('payment_history.0.status_label', 'Còn dư'));
+});
+
+it('surfaces live and failed DNG requests as actionable DNG work', function () {
+    $user = grantFinanceOverview(['view_finance_student_overview']);
+    $student = makeOverviewStudent($this->campus, $this->program, $this->semester);
+
+    $dng = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'CAMPUS001',
+        'student_code' => $student->student_id,
+        'fee_type' => 'HP',
+        'description' => 'Live DNG',
+        'semester_id' => $this->semester->id,
+        'due_date' => now()->addDays(7),
+        'item_id' => 'LIVE-001',
+        'amount' => 4_000_000,
+        'status' => DngPaymentRequest::STATUS_PENDING,
+    ]);
+
+    actingAs($user)->get("/finance/students/{$student->id}")
+        ->assertInertia(fn ($page) => $page
+            ->where('status_cards.dng.has_active', true)
+            ->where('status_cards.dng.request.id', $dng->id)
+            ->where('status_cards.dng.request.status', DngPaymentRequest::STATUS_PENDING));
+
+    $dng->update(['status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG]);
+
+    actingAs($user)->get("/finance/students/{$student->id}")
+        ->assertInertia(fn ($page) => $page
+            ->where('status_cards.dng.has_active', true)
+            ->where('status_cards.dng.request.id', $dng->id)
+            ->where('status_cards.dng.request.status', DngPaymentRequest::STATUS_PUSHED_TO_DNG));
+
+    $dng->update([
+        'status' => DngPaymentRequest::STATUS_FAILED,
+        'error_message' => 'DNG push failed',
+    ]);
+
+    actingAs($user)->get("/finance/students/{$student->id}")
+        ->assertInertia(fn ($page) => $page
+            ->where('status_cards.dng.has_active', true)
+            ->where('status_cards.dng.request.id', $dng->id)
+            ->where('status_cards.dng.request.status', DngPaymentRequest::STATUS_FAILED)
+            ->where('status_cards.dng.request.error_message', 'DNG push failed'));
+});
+
+it('hides pending installments once the invoice is fully paid', function () {
+    $user = grantFinanceOverview(['view_finance_student_overview']);
+    $student = makeOverviewStudent($this->campus, $this->program, $this->semester);
+    $fixture = makeOverviewCharge($student, $this->semester);
+
+    FinanceChargeInstallment::create([
+        'finance_charge_id' => $fixture['charge']->id,
+        'installment_no' => 1,
+        'amount' => 5_000_000,
+        'due_date' => now()->addDays(7),
+        'status' => FinanceChargeInstallment::STATUS_PENDING,
+    ]);
+
+    $payment = Payment::create([
+        'student_id' => $student->id,
+        'amount' => 10_000_000,
+        'method' => Payment::METHOD_BANK_TRANSFER,
+        'source' => 'manual',
+        'external_ref' => 'FULL-PAID',
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+        'received_by_user_id' => $user->id,
+    ]);
+    app(SettlementService::class)->createPaymentApplication($payment, $fixture['line'], 10_000_000, 'application', $user->id);
+
+    actingAs($user)->get("/finance/students/{$student->id}")
+        ->assertInertia(fn ($page) => $page
+            ->where('status_cards.installments.total', 0)
+            ->where('status_cards.installments.paid', 0)
+            ->where('status_cards.installments.next', null));
+});
+
+it('hides pending and cancelled installments on voided charges', function () {
+    $user = grantFinanceOverview(['view_finance_student_overview']);
+    $student = makeOverviewStudent($this->campus, $this->program, $this->semester);
+    $fixture = makeOverviewCharge(
+        student: $student,
+        semester: $this->semester,
+        chargeStatus: FinanceCharge::STATUS_VOID,
+        lineStatus: 'void',
+    );
+
+    FinanceChargeInstallment::create([
+        'finance_charge_id' => $fixture['charge']->id,
+        'installment_no' => 1,
+        'amount' => 5_000_000,
+        'due_date' => now()->addDays(7),
+        'status' => FinanceChargeInstallment::STATUS_PENDING,
+    ]);
+    FinanceChargeInstallment::create([
+        'finance_charge_id' => $fixture['charge']->id,
+        'installment_no' => 2,
+        'amount' => 5_000_000,
+        'due_date' => now()->addDays(14),
+        'status' => FinanceChargeInstallment::STATUS_CANCELLED,
+    ]);
+
+    actingAs($user)->get("/finance/students/{$student->id}")
+        ->assertInertia(fn ($page) => $page
+            ->where('status_cards.installments.total', 0)
+            ->where('status_cards.installments.paid', 0)
+            ->where('status_cards.installments.next', null));
 });
 
 it('keeps voided invoice lines in grouped ledger without counting them as collectible', function () {

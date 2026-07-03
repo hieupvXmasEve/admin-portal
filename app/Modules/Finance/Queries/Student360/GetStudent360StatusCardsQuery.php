@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Student360;
 
-use App\Models\FinanceCharge;
 use App\Models\FinanceChargeInstallment;
 use App\Models\Payment;
+use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Queries\GetStudentBalanceQuery;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\LifecycleDueExceptionRowMapper;
+use Illuminate\Support\Collection;
 
 /**
  * Read-only aggregate for the Student 360 status cards. Every figure is
@@ -18,6 +19,12 @@ use App\Modules\Finance\Support\LifecycleDueExceptionRowMapper;
  */
 class GetStudent360StatusCardsQuery
 {
+    private const ACTIONABLE_DNG_STATUSES = [
+        DngPaymentRequest::STATUS_PENDING,
+        DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+        DngPaymentRequest::STATUS_FAILED,
+    ];
+
     public function __construct(
         private GetStudentBalanceQuery $balanceQuery,
         private SettlementService $settlement,
@@ -64,6 +71,7 @@ class GetStudent360StatusCardsQuery
     {
         $latest = DngPaymentRequest::query()
             ->where('student_id', $studentId)
+            ->whereIn('status', self::ACTIONABLE_DNG_STATUSES)
             ->latest('id')
             ->first();
 
@@ -86,10 +94,19 @@ class GetStudent360StatusCardsQuery
     /** @return array<string,mixed> */
     private function installmentsCard(int $studentId): array
     {
-        $chargeIds = FinanceCharge::query()->where('student_id', $studentId)->pluck('id');
+        $chargeIds = $this->collectibleChargeIds($studentId);
+
+        if ($chargeIds->isEmpty()) {
+            return [
+                'total' => 0,
+                'paid' => 0,
+                'next' => null,
+            ];
+        }
 
         $installments = FinanceChargeInstallment::query()
             ->whereIn('finance_charge_id', $chargeIds)
+            ->where('status', '!=', FinanceChargeInstallment::STATUS_CANCELLED)
             ->orderBy('installment_no')
             ->get();
 
@@ -106,6 +123,16 @@ class GetStudent360StatusCardsQuery
                 'has_push_error' => $next->last_push_error !== null,
             ],
         ];
+    }
+
+    private function collectibleChargeIds(int $studentId): Collection
+    {
+        return $this->settlement
+            ->getOutstandingLinesForStudent($studentId, AutoAllocatePaymentsAction::DEFAULT_PRIORITY_ORDER)
+            ->pluck('charge_id')
+            ->filter()
+            ->unique()
+            ->values();
     }
 
     /** @return array<string,mixed> */
