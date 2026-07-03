@@ -21,14 +21,15 @@ use Inertia\Inertia;
  * AttendanceController::store. The frontend follows the redirect with an
  * Inertia partial reload of `operational_state` (and `courseOffering`) so the
  * per-session attendance status and readiness blockers both refresh.
+ *
+ * Campus/parent-child scoping is enforced by the FormRequest's authorize()
+ * (mirrors FinalizeCourseOfferingController's pattern of keeping that check
+ * out of the controller); this stays a thin validate → Action → redirect flow.
  */
 class RecordClassSessionAttendanceController extends Controller
 {
     public function __invoke(RecordClassSessionAttendanceRequest $request, CourseOffering $courseOffering, ClassSession $classSession): RedirectResponse
     {
-        abort_if($courseOffering->campus_id !== app('campus')->id, 404);
-        abort_if($classSession->course_offering_id !== $courseOffering->id, 404);
-
         $records = $request->validated('records');
 
         foreach ($records as $record) {

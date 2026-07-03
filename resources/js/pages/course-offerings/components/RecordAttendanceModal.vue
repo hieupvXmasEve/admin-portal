@@ -35,9 +35,13 @@ const statusOptions: { value: AttendanceStatus; label: string }[] = [
     { value: 'excused', label: 'Excused' },
 ];
 
-const activeRegistrationStatuses = ['registered', 'confirmed'];
+// Matches CourseRegistration::CLASS_ROSTER_REGISTRATION_STATUSES — the same
+// "active class roster" definition the backend validates student_id against
+// (CourseOffering::activeClassRosterRegistrations, also used by the lecturer
+// attendance flow), so a roster row shown here is never rejected server-side.
+const classRosterRegistrationStatuses = ['confirmed'];
 
-const activeRegistrations = computed<CourseRegistration[]>(() => (props.courseOffering.course_registrations ?? []).filter((registration) => activeRegistrationStatuses.includes(registration.registration_status)));
+const activeRegistrations = computed<CourseRegistration[]>(() => (props.courseOffering.course_registrations ?? []).filter((registration) => classRosterRegistrationStatuses.includes(registration.registration_status)));
 
 const drafts = reactive<Record<number, AttendanceStatus>>({});
 

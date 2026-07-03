@@ -7,6 +7,7 @@ use App\Models\Attendance;
 use App\Models\Campus;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
+use App\Models\CourseRegistration;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
@@ -76,14 +77,35 @@ function makeAttendanceSession(CourseOffering $courseOffering, array $overrides 
     ], $overrides));
 }
 
-function makeAttendanceStudent(object $context): Student
+/**
+ * Creates a student and confirms them on the offering's active class
+ * roster — the same roster relation (CourseOffering::activeClassRosterRegistrations)
+ * the endpoint validates student_id against.
+ */
+function makeAttendanceStudent(object $context, CourseOffering $courseOffering): Student
 {
-    return Student::factory()->forCampus($context->campus)->create([
+    $student = Student::factory()->forCampus($context->campus)->create([
         'status' => 'intake_course',
         'intake' => 1,
         'intake_mode' => 'sequential',
         'intake_semester_id' => $context->semester->id,
     ]);
+
+    CourseRegistration::query()->create([
+        'student_id' => $student->id,
+        'course_offering_id' => $courseOffering->id,
+        'semester_id' => $context->semester->id,
+        'registration_status' => 'confirmed',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'attempt_number' => 1,
+        'is_retake' => false,
+        'retake_fee' => 0,
+        'is_retake_paid' => 'no',
+    ]);
+
+    return $student;
 }
 
 function postRecordAttendance(object $context, CourseOffering $courseOffering, ClassSession $classSession, array $records): TestResponse
@@ -101,7 +123,7 @@ it('returns 403 when the user lacks create_course_offering', function () {
     ($this->grantPermissions)(['view_course_offering']);
     $offering = makeAttendanceOffering($this);
     $session = makeAttendanceSession($offering);
-    $student = makeAttendanceStudent($this);
+    $student = makeAttendanceStudent($this, $offering);
 
     postRecordAttendance($this, $offering, $session, [
         ['student_id' => $student->id, 'status' => 'present'],
@@ -122,18 +144,31 @@ it('404s when the class session does not belong to the course offering', functio
     $offering = makeAttendanceOffering($this);
     $otherOffering = makeAttendanceOffering($this);
     $session = makeAttendanceSession($otherOffering);
-    $student = makeAttendanceStudent($this);
+    $student = makeAttendanceStudent($this, $otherOffering);
 
     postRecordAttendance($this, $offering, $session, [
         ['student_id' => $student->id, 'status' => 'present'],
     ])->assertNotFound();
 });
 
+it('rejects a student who is not on this course offering\'s active roster', function () {
+    $offering = makeAttendanceOffering($this);
+    $session = makeAttendanceSession($offering);
+    $otherOffering = makeAttendanceOffering($this);
+    $unrelatedStudent = makeAttendanceStudent($this, $otherOffering);
+
+    postRecordAttendance($this, $offering, $session, [
+        ['student_id' => $unrelatedStudent->id, 'status' => 'present'],
+    ])->assertSessionHasErrors('records.0.student_id');
+
+    expect(Attendance::where('class_session_id', $session->id)->count())->toBe(0);
+});
+
 it('records manual attendance for a roster batch from the cockpit', function () {
     $offering = makeAttendanceOffering($this);
     $session = makeAttendanceSession($offering);
-    $present = makeAttendanceStudent($this);
-    $absent = makeAttendanceStudent($this);
+    $present = makeAttendanceStudent($this, $offering);
+    $absent = makeAttendanceStudent($this, $offering);
 
     postRecordAttendance($this, $offering, $session, [
         ['student_id' => $present->id, 'status' => 'present'],
@@ -158,7 +193,7 @@ it('records manual attendance for a roster batch from the cockpit', function () 
 it('confirms an auto-system attendance record manually instead of failing on the unique constraint', function () {
     $offering = makeAttendanceOffering($this);
     $session = makeAttendanceSession($offering);
-    $student = makeAttendanceStudent($this);
+    $student = makeAttendanceStudent($this, $offering);
 
     Attendance::create([
         'class_session_id' => $session->id,
@@ -185,7 +220,7 @@ it('clears the sessions_missing_attendance blocker once attendance is recorded f
     $offering = makeAttendanceOffering($this);
     $first = makeAttendanceSession($offering, ['session_title' => 'Week 1', 'sequence_number' => 1]);
     $second = makeAttendanceSession($offering, ['session_title' => 'Week 2', 'sequence_number' => 2]);
-    $student = makeAttendanceStudent($this);
+    $student = makeAttendanceStudent($this, $offering);
 
     postRecordAttendance($this, $offering, $first, [
         ['student_id' => $student->id, 'status' => 'present'],
