@@ -327,6 +327,15 @@ class CourseStatisticsService
         $schemeMeta = ! empty($gradingScheme) ? [
             'engine' => (string) ($gradingScheme['engine'] ?? 'metropolia_v1'),
             'scale' => $this->normalizeSchemeScale($gradingScheme['scale'] ?? null),
+            // Raw scheme definition (metropolia_v1: per-component gate/conversion;
+            // metropolia_v2: single formula string) so the tab can render *why* a
+            // student passed/failed instead of just the stored per-student result.
+            'components' => $gradingScheme['components'] ?? [],
+            'formula' => $gradingScheme['formula'] ?? null,
+            'pass_requirements' => $gradingScheme['pass_requirements'] ?? [],
+            'rounding_stage' => $gradingScheme['rounding_stage'] ?? null,
+            'clamp_min' => $gradingScheme['clamp_min'] ?? null,
+            'clamp_max' => $gradingScheme['clamp_max'] ?? null,
         ] : null;
         $presenter = new GradeDisplayPresenter;
 

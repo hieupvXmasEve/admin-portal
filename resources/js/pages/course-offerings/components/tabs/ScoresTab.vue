@@ -12,6 +12,7 @@ import RecalculatePreviewDialog from '@/pages/course-offerings/components/Recalc
 import type { CourseOffering } from '@/types/models';
 import type { OperationalState } from '@/types/operational-state';
 import { formatSubmissionTypes } from '@/utils/canvasGradeFormatter';
+import { describeMetropoliaScheme, type MetropoliaScheme } from '@/utils/metropoliaSchemeFormula';
 import { Link, router } from '@inertiajs/vue3';
 import { BarChart3, BookOpen, Calculator, RefreshCw } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -107,7 +108,7 @@ export interface ScoresData {
         unit_id: number;
         min_grade_threshold: number;
         semester_id: number;
-        scheme: { engine: string; scale: 'numeric_0_5' | 'pass_fail' | 'percentage' } | null;
+        scheme: MetropoliaScheme | null;
     };
 }
 
@@ -168,9 +169,24 @@ const onSynced = () => {
     router.reload({ only: ['scoresData'] });
 };
 
+// Metropolia's authoritative pass/fail is the stored, gate-aware
+// grade_display.pass_status — a gate failure can still map to a high raw
+// percentage, so it must never be compared against the flat min_grade_threshold
+// (see CourseCompletionService.php:216-222). Non-scheme/legacy offerings keep
+// the original flat-threshold behavior unchanged.
+const isMetropolia = computed(() => !!props.scoresData?.course_offering.scheme?.engine.startsWith('metropolia'));
+
 const filteredScoresGrid = computed(() => {
     if (!props.scoresData) return [];
     if (statusFilter.value === 'all') return props.scoresData.scores_grid;
+
+    if (isMetropolia.value) {
+        if (statusFilter.value === 'pass') return props.scoresData.scores_grid.filter((s) => s.grade_display?.pass_status === 'passed');
+        if (statusFilter.value === 'fail') return props.scoresData.scores_grid.filter((s) => s.grade_display?.pass_status === 'failed');
+        if (statusFilter.value === 'not_finalized') return props.scoresData.scores_grid.filter((s) => s.grade_display === null);
+        return props.scoresData.scores_grid;
+    }
+
     const threshold = props.scoresData.course_offering.min_grade_threshold;
     if (statusFilter.value === 'pass') return props.scoresData.scores_grid.filter((s) => s.total_percentage !== null && s.total_percentage >= threshold);
     if (statusFilter.value === 'fail') return props.scoresData.scores_grid.filter((s) => s.total_percentage !== null && s.total_percentage < threshold);
@@ -179,14 +195,21 @@ const filteredScoresGrid = computed(() => {
 
 const passCount = computed(() => {
     if (!props.scoresData) return 0;
+    if (isMetropolia.value) return props.scoresData.scores_grid.filter((s) => s.grade_display?.pass_status === 'passed').length;
     const threshold = props.scoresData.course_offering.min_grade_threshold;
     return props.scoresData.scores_grid.filter((s) => s.total_percentage !== null && s.total_percentage >= threshold).length;
 });
 
 const failCount = computed(() => {
     if (!props.scoresData) return 0;
+    if (isMetropolia.value) return props.scoresData.scores_grid.filter((s) => s.grade_display?.pass_status === 'failed').length;
     const threshold = props.scoresData.course_offering.min_grade_threshold;
     return props.scoresData.scores_grid.filter((s) => s.total_percentage !== null && s.total_percentage < threshold).length;
+});
+
+const notFinalizedCount = computed(() => {
+    if (!props.scoresData || !isMetropolia.value) return 0;
+    return props.scoresData.scores_grid.filter((s) => s.grade_display === null).length;
 });
 
 const detailsByComponent = computed(() => {
@@ -226,6 +249,10 @@ const getTotalBadgeVariant = (percentage: number | null): 'success' | 'destructi
 };
 
 const getComponentTotalBadgeVariant = (total: ComponentTotal): 'success' | 'destructive' | 'warning' | 'outline' => {
+    // Metropolia components pass/fail on their own gate (e.g. ≥40%), not the
+    // 60/80% coloring used for the default scheme — a neutral badge here avoids
+    // implying a result that the purple "Scheme Grade" cell already states.
+    if (isMetropolia.value) return 'outline';
     if (total.percentage_score === null) return 'outline';
     if (total.percentage_score >= 80) return 'success';
     if (total.percentage_score >= 60) return 'warning';
@@ -263,11 +290,26 @@ const getGradeStatusLabel = (status: string): string => {
 // ---- Scheme display (stored breakdown only — no live recomputation, ADR 0014) ----
 const hasScheme = computed(() => !!props.scoresData?.course_offering.scheme);
 
-// Sticky right-offset math: the "Total" column always stays at the far right
-// (right-0, 120px wide) so non-scheme offerings render byte-identical to
-// today. When a scheme is present, "Scheme Grade" (160px) sits just left of
-// it, pushing "Status" further left.
-const statusColRightPx = computed(() => (hasScheme.value ? 280 : 120));
+// The generic "Total" column is a flat percentage that's diagnostic-only for
+// metropolia (a gate failure can still carry a high percentage) — showing it
+// alongside the gate-aware "Scheme Grade" column is exactly the visual mixing
+// this fixes, so it's dropped entirely for metropolia offerings.
+const showTotalColumn = computed(() => !isMetropolia.value);
+
+// Sticky right-offset math: when Total is shown (non-metropolia), it always
+// stays at the far right (right-0, 120px wide) so non-scheme offerings render
+// byte-identical to today. "Scheme Grade" (160px) sits just left of it. For
+// metropolia, Total is hidden so Scheme Grade becomes the rightmost column.
+const schemeGradeRightPx = computed(() => (showTotalColumn.value ? 120 : 0));
+const statusColRightPx = computed(() => {
+    if (!hasScheme.value) return 120;
+    return showTotalColumn.value ? 280 : 160;
+});
+
+const metropoliaFormulaLines = computed(() => {
+    if (!isMetropolia.value || !props.scoresData?.course_offering.scheme) return [];
+    return describeMetropoliaScheme(props.scoresData.course_offering.scheme);
+});
 
 const schemeAwaitingFinalization = computed(() => hasScheme.value && !(props.scoresData?.scores_grid ?? []).some((s) => s.grade_display !== null));
 
@@ -279,7 +321,6 @@ const scaleLabel = (scale: GradeDisplay['scale']): string => {
 const findComponentDisplay = (student: StudentScore, code: string): GradeDisplayComponent | null => {
     return student.grade_display?.components.find((c) => c.code === code) ?? null;
 };
-
 </script>
 
 <template>
@@ -304,10 +345,7 @@ const findComponentDisplay = (student: StudentScore, code: string): GradeDisplay
                 <div class="flex items-center gap-2">
                     <BarChart3 class="text-muted-foreground h-4 w-4" />
                     <span class="text-muted-foreground text-sm">Average score:</span>
-                    <span
-                        class="text-lg font-bold"
-                        :class="[scoresData.statistics.average_score >= 80 ? 'text-green-600' : scoresData.statistics.average_score >= 60 ? 'text-yellow-600' : 'text-red-600']"
-                    >
+                    <span class="text-lg font-bold" :class="[scoresData.statistics.average_score >= 80 ? 'text-green-600' : scoresData.statistics.average_score >= 60 ? 'text-yellow-600' : 'text-red-600']">
                         {{ scoresData.statistics.average_score.toFixed(1) }}%
                     </span>
                     <Badge v-if="scoresData.course_offering.scheme" variant="outline" class="gap-1 border-purple-300 text-purple-700 dark:text-purple-400">
@@ -331,8 +369,11 @@ const findComponentDisplay = (student: StudentScore, code: string): GradeDisplay
             <!-- Scheme empty state: badge shown pre-finalization, grades appear after -->
             <p v-if="schemeAwaitingFinalization" class="text-muted-foreground text-sm">Scheme grades appear after finalization.</p>
 
-            <!-- Legend -->
-            <Card>
+            <!-- Legend: the generic percentage-color legend only applies to the
+            default scheme's letter-grade display. Metropolia pass/fail comes
+            from gates, not this coloring, so it's replaced by the actual
+            grading formula instead. -->
+            <Card v-if="!isMetropolia">
                 <CardHeader>
                     <CardTitle class="text-sm">Legend</CardTitle>
                 </CardHeader>
@@ -348,15 +389,27 @@ const findComponentDisplay = (student: StudentScore, code: string): GradeDisplay
                 </CardContent>
             </Card>
 
+            <Card v-else>
+                <CardHeader>
+                    <CardTitle class="text-sm">Grading Formula ({{ scoresData.course_offering.scheme?.engine }})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <ul class="list-disc space-y-1 pl-5 text-sm">
+                        <li v-for="(line, index) in metropoliaFormulaLines" :key="index">{{ line }}</li>
+                    </ul>
+                </CardContent>
+            </Card>
+
             <!-- Filters -->
             <Card>
                 <CardHeader><CardTitle>Filters</CardTitle></CardHeader>
                 <CardContent>
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
                         <div class="space-y-2">
-                            <Label
+                            <Label v-if="!isMetropolia"
                                 >Student Status — <span class="text-sm text-yellow-500">Min Grade Threshold: {{ scoresData.course_offering.min_grade_threshold }}</span></Label
                             >
+                            <Label v-else>Student Status</Label>
                             <Select v-model="statusFilter">
                                 <SelectTrigger>
                                     <SelectValue placeholder="All students" />
@@ -365,6 +418,7 @@ const findComponentDisplay = (student: StudentScore, code: string): GradeDisplay
                                     <SelectItem value="all">All Students ({{ scoresData.scores_grid.length }})</SelectItem>
                                     <SelectItem value="pass">Pass ({{ passCount }})</SelectItem>
                                     <SelectItem value="fail">Fail ({{ failCount }})</SelectItem>
+                                    <SelectItem v-if="isMetropolia" value="not_finalized">Not Finalized ({{ notFinalizedCount }})</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -424,20 +478,15 @@ const findComponentDisplay = (student: StudentScore, code: string): GradeDisplay
                                             </div>
                                         </TableHead>
                                     </template>
-                                    <TableHead class="sticky z-10 min-w-[100px] bg-white text-center dark:bg-gray-950" :style="{ right: statusColRightPx + 'px' }">
-                                        Status
-                                    </TableHead>
-                                    <TableHead v-if="hasScheme" class="sticky right-[120px] z-10 min-w-[160px] bg-white text-center dark:bg-gray-950">Scheme Grade</TableHead>
-                                    <TableHead class="sticky right-0 z-10 min-w-[120px] bg-white text-center dark:bg-gray-950">Total</TableHead>
+                                    <TableHead class="sticky z-10 min-w-[100px] bg-white text-center dark:bg-gray-950" :style="{ right: statusColRightPx + 'px' }"> Status </TableHead>
+                                    <TableHead v-if="hasScheme" class="sticky z-10 min-w-[160px] bg-white text-center dark:bg-gray-950" :style="{ right: schemeGradeRightPx + 'px' }"> Scheme Grade </TableHead>
+                                    <TableHead v-if="showTotalColumn" class="sticky right-0 z-10 min-w-[120px] bg-white text-center dark:bg-gray-950">Total</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 <TableRow v-for="student in filteredScoresGrid" :key="student.student_id">
                                     <TableCell v-if="canSyncGrades" class="sticky left-0 z-10 bg-white dark:bg-gray-950">
-                                        <Checkbox
-                                            :model-value="selectedStudentIds.includes(student.id)"
-                                            @update:model-value="(checked) => toggleStudentSelection(student.id, checked === true)"
-                                        />
+                                        <Checkbox :model-value="selectedStudentIds.includes(student.id)" @update:model-value="(checked) => toggleStudentSelection(student.id, checked === true)" />
                                     </TableCell>
                                     <TableCell class="sticky z-10 bg-white dark:bg-gray-950" :class="canSyncGrades ? 'left-10' : 'left-0'">
                                         <div class="space-y-1">
@@ -472,7 +521,9 @@ const findComponentDisplay = (student: StudentScore, code: string): GradeDisplay
                                         <TableCell v-if="hasScheme" class="bg-purple-50 text-center dark:bg-purple-950/20">
                                             <template v-for="(cd, cdIdx) in [findComponentDisplay(student, component.code)]" :key="cdIdx">
                                                 <div v-if="cd" class="space-y-1 text-xs">
-                                                    <div class="font-semibold">{{ cd.converted_grade ?? '-' }} <span class="text-muted-foreground font-normal">({{ cd.raw_percentage ?? '-' }}%)</span></div>
+                                                    <div class="font-semibold">
+                                                        {{ cd.converted_grade ?? '-' }} <span class="text-muted-foreground font-normal">({{ cd.raw_percentage ?? '-' }}%)</span>
+                                                    </div>
                                                     <Badge v-if="cd.requirement_status" :variant="cd.requirement_status === 'passed' ? 'success' : 'destructive'" class="text-[10px]">
                                                         {{ cd.requirement_status === 'passed' ? 'Met' : 'Not met' }}
                                                     </Badge>
@@ -484,7 +535,7 @@ const findComponentDisplay = (student: StudentScore, code: string): GradeDisplay
                                     <TableCell class="sticky z-10 bg-white text-center dark:bg-gray-950" :style="{ right: statusColRightPx + 'px' }">
                                         <Badge :variant="getGradeStatusVariant(student.grade_status)" class="text-xs">{{ getGradeStatusLabel(student.grade_status) }}</Badge>
                                     </TableCell>
-                                    <TableCell v-if="hasScheme" class="sticky right-[120px] z-10 bg-white text-center dark:bg-gray-950">
+                                    <TableCell v-if="hasScheme" class="sticky z-10 bg-white text-center dark:bg-gray-950" :style="{ right: schemeGradeRightPx + 'px' }">
                                         <div v-if="student.grade_display" class="space-y-1">
                                             <Badge :variant="student.grade_display.pass_status === 'passed' ? 'success' : 'destructive'" class="text-base font-bold">
                                                 {{ student.grade_display.final_label || student.grade_display.final_numeric }}
@@ -493,7 +544,7 @@ const findComponentDisplay = (student: StudentScore, code: string): GradeDisplay
                                         </div>
                                         <span v-else class="text-muted-foreground text-xs">Not finalized</span>
                                     </TableCell>
-                                    <TableCell class="sticky right-0 z-10 bg-white text-center dark:bg-gray-950">
+                                    <TableCell v-if="showTotalColumn" class="sticky right-0 z-10 bg-white text-center dark:bg-gray-950">
                                         <div class="space-y-1">
                                             <Badge v-if="student.total_percentage !== null" :variant="getTotalBadgeVariant(student.total_percentage)" class="text-base font-bold">
                                                 {{ Number(student.total_percentage).toFixed(1) }}
@@ -534,21 +585,8 @@ const findComponentDisplay = (student: StudentScore, code: string): GradeDisplay
             </Card>
         </template>
 
-        <CanvasSyncPreviewDialog
-            v-if="canSyncGrades"
-            v-model:open="isSyncDialogOpen"
-            :course-offering-id="courseOffering.id"
-            :student-ids="selectedStudentIds"
-            @synced="onSynced"
-        />
+        <CanvasSyncPreviewDialog v-if="canSyncGrades" v-model:open="isSyncDialogOpen" :course-offering-id="courseOffering.id" :student-ids="selectedStudentIds" @synced="onSynced" />
 
-        <RecalculatePreviewDialog
-            v-if="canRecalculate"
-            v-model:open="isRecalculateDialogOpen"
-            :course-offering-id="courseOffering.id"
-            :has-mapped-canvas-course="hasMappedCanvasCourse"
-            :students="rosterStudents"
-            @applied="onRecalculateApplied"
-        />
+        <RecalculatePreviewDialog v-if="canRecalculate" v-model:open="isRecalculateDialogOpen" :course-offering-id="courseOffering.id" :has-mapped-canvas-course="hasMappedCanvasCourse" :students="rosterStudents" @applied="onRecalculateApplied" />
     </div>
 </template>
