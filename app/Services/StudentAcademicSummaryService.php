@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\AcademicRecord;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\Attendance;
 use App\Models\CourseOffering;
@@ -11,6 +12,7 @@ use App\Models\GpaCalculation;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +26,10 @@ use Illuminate\Support\Facades\DB;
  */
 class StudentAcademicSummaryService
 {
+    public function __construct(
+        private readonly GradeDisplayPresenter $gradeDisplayPresenter,
+    ) {}
+
     /**
      * Get student overview information
      *
@@ -607,6 +613,7 @@ class StudentAcademicSummaryService
             ->with([
                 'courseOffering.unit:id,name,code',
                 'courseOffering.semester:id,name,code',
+                'courseOffering.syllabusTemplate:id,grading_scheme',
                 'assessmentComponentDetail.assessmentComponent:id,name,type,weight',
                 'assessmentComponentDetail:id,assessment_component_id,name,description,due_date,max_points',
             ])
@@ -620,6 +627,13 @@ class StudentAcademicSummaryService
                 $academicRecord = $student->academicRecords()
                     ->where('course_offering_id', $courseOfferingId)
                     ->first();
+
+                // Scheme metadata mirrors the cockpit Scores tab (issue 02):
+                // present pre- and post-finalization whenever the syllabus
+                // template carries a custom grading scheme. Per-student
+                // grade display only appears once a breakdown is stored at
+                // finalization/recalculation — no live recomputation (ADR 0014).
+                $schemeMeta = $this->schemeMeta($firstScore->courseOffering->syllabusTemplate?->grading_scheme);
 
                 // Map all scores for metadata calculation
                 $allScores = $courseScores->map(function ($score) {
@@ -656,6 +670,8 @@ class StudentAcademicSummaryService
                     'grade_status' => $academicRecord?->grade_status,
                     'total_assessments' => $courseScores->count(),
                     'completed_assessments' => $courseScores->where('status', 'graded')->count(),
+                    'scheme' => $schemeMeta,
+                    'grade_display' => $schemeMeta !== null ? $this->schemeGradeDisplay($academicRecord) : null,
                 ];
             })
             ->values();
@@ -733,6 +749,60 @@ class StudentAcademicSummaryService
                 'overall_average' => $scores->avg('course_average'),
             ],
         ];
+    }
+
+    /**
+     * Normalize a syllabus template's raw scheme metadata to the display
+     * badge shape, or null when the course has no custom grading scheme.
+     * Mirrors CourseStatisticsService's cockpit Scores tab treatment
+     * (metropolia-grading-display issue 02) so both surfaces agree.
+     *
+     * @param  array<string, mixed>|null  $gradingScheme
+     * @return array{engine: string, scale: string}|null
+     */
+    private function schemeMeta(?array $gradingScheme): ?array
+    {
+        if (empty($gradingScheme)) {
+            return null;
+        }
+
+        return [
+            'engine' => (string) ($gradingScheme['engine'] ?? 'metropolia_v1'),
+            'scale' => $this->normalizeSchemeScale($gradingScheme['scale'] ?? null),
+        ];
+    }
+
+    private function normalizeSchemeScale(mixed $scale): string
+    {
+        return match ((string) $scale) {
+            '0-5', 'numeric_0_5' => 'numeric_0_5',
+            'pass_fail' => 'pass_fail',
+            default => 'percentage',
+        };
+    }
+
+    /**
+     * Present the stored grade breakdown for a course, or null before
+     * finalization (no breakdown has been persisted yet). Never
+     * recalculates — reads only what finalization/recalculation stored
+     * (ADR 0014).
+     *
+     * @return array{
+     *   scheme_engine: string,
+     *   scale: string,
+     *   final_label: string,
+     *   final_numeric: int|float|null,
+     *   pass_status: string,
+     *   components: array<int, array{code: string, label: string, raw_percentage: mixed, converted_grade: mixed, requirement_status: string|null}>,
+     * }|null
+     */
+    private function schemeGradeDisplay(?AcademicRecord $academicRecord): ?array
+    {
+        if ($academicRecord === null || empty($academicRecord->grade_breakdown)) {
+            return null;
+        }
+
+        return $this->gradeDisplayPresenter->present($academicRecord);
     }
 
     /**

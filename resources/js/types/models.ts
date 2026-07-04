@@ -741,6 +741,25 @@ export interface AssessmentScore {
     status: 'pending' | 'submitted' | 'graded' | 'missing';
 }
 
+// Presenter-shaped output of GradeDisplayPresenter — stored-breakdown only,
+// never recomputed (ADR 0014). Null until the course is finalized.
+export interface GradeDisplayComponent {
+    code: string;
+    label: string;
+    raw_percentage: number | string | null;
+    converted_grade: number | string | null;
+    requirement_status: string | null;
+}
+
+export interface GradeDisplay {
+    scheme_engine: string;
+    scale: 'numeric_0_5' | 'pass_fail' | 'percentage';
+    final_label: string;
+    final_numeric: number | null;
+    pass_status: 'passed' | 'failed';
+    components: GradeDisplayComponent[];
+}
+
 export interface CourseScores {
     course_offering_id: number;
     course_name: string;
@@ -755,6 +774,8 @@ export interface CourseScores {
     grade_status?: string | null;
     total_assessments: number;
     completed_assessments: number;
+    scheme: { engine: string; scale: 'numeric_0_5' | 'pass_fail' | 'percentage' } | null;
+    grade_display: GradeDisplay | null;
 }
 
 export interface SubUnitScore {

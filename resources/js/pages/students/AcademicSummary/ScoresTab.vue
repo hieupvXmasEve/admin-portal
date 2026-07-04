@@ -148,6 +148,18 @@ const courseGroups = computed<SemesterGroup[]>(() => {
 
 const cumulative = computed(() => props.scores.cumulative ?? null);
 
+// ───────────────────────────── scheme display (stored breakdown only — no live recomputation, ADR 0014) ─────────────────────────────
+
+// Only add the column when at least one course in the transcript carries a
+// custom grading scheme, so students with no scheme-graded courses see the
+// table unchanged.
+const hasAnyScheme = computed(() => props.scores.standalone_units.data.some((c) => c.scheme !== null));
+
+const scaleLabel = (scale: 'numeric_0_5' | 'pass_fail' | 'percentage'): string => {
+    const labels: Record<'numeric_0_5' | 'pass_fail' | 'percentage', string> = { numeric_0_5: '0–5', pass_fail: 'Pass/Fail', percentage: 'Percentage' };
+    return labels[scale] || scale;
+};
+
 // GPA history: every finalized semester snapshot, independent of whether that
 // semester also has per-assessment score detail (the transcript view).
 const gpaHistory = computed<SemesterGpaSnapshot[]>(() => props.scores.semesters ?? []);
@@ -351,6 +363,7 @@ const openScoreDetails = (course: CourseScores): void => {
                                 <TableHead class="text-muted-foreground w-[120px] text-right text-[11px] tracking-wider uppercase">Final</TableHead>
                                 <TableHead class="text-muted-foreground w-[70px] text-right text-[11px] tracking-wider uppercase">Letter</TableHead>
                                 <TableHead class="text-muted-foreground w-[110px] text-right text-[11px] tracking-wider uppercase">Result</TableHead>
+                                <TableHead v-if="hasAnyScheme" class="text-muted-foreground w-[130px] text-right text-[11px] tracking-wider uppercase">Scheme grade</TableHead>
                                 <TableHead class="text-muted-foreground w-[110px] text-right text-[11px] tracking-wider uppercase">Action</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -384,6 +397,16 @@ const openScoreDetails = (course: CourseScores): void => {
                                         <span class="size-1.5 rounded-full bg-current"></span>
                                         {{ passFailBadge(course).label }}
                                     </span>
+                                </TableCell>
+                                <TableCell v-if="hasAnyScheme" class="text-right">
+                                    <div v-if="course.grade_display" class="inline-flex flex-col items-end gap-0.5">
+                                        <Badge :variant="course.grade_display.pass_status === 'passed' ? 'success' : 'destructive'" class="text-xs font-bold">
+                                            {{ course.grade_display.final_label || course.grade_display.final_numeric }}
+                                        </Badge>
+                                        <span class="text-muted-foreground text-[10px] capitalize">{{ course.grade_display.pass_status }}</span>
+                                    </div>
+                                    <span v-else-if="course.scheme" class="text-muted-foreground text-xs">Not finalized</span>
+                                    <span v-else class="text-muted-foreground text-sm">—</span>
                                 </TableCell>
                                 <TableCell class="text-right">
                                     <Button variant="ghost" size="sm" class="opacity-70 transition-opacity group-hover/row:opacity-100" @click="openScoreDetails(course)">
@@ -438,6 +461,53 @@ const openScoreDetails = (course: CourseScores): void => {
                                 {{ selectedScoreDetails.completed_assessments }}
                             </p>
                         </div>
+                    </div>
+
+                    <!-- Scheme breakdown: converted grade + requirement status per component
+                         (the gate-failure explainer, metropolia-grading-display issue 03) -->
+                    <div v-if="selectedScoreDetails.scheme" class="border-border overflow-hidden rounded-lg border border-purple-200 dark:border-purple-900/50">
+                        <header class="flex items-center justify-between gap-3 border-b border-purple-200 bg-purple-50 px-4 py-2.5 dark:border-purple-900/50 dark:bg-purple-950/20">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-semibold text-purple-700 dark:text-purple-400">Grading scheme</span>
+                                <Badge variant="outline" class="gap-1 border-purple-300 text-purple-700 dark:text-purple-400">
+                                    {{ selectedScoreDetails.scheme.engine }} · {{ scaleLabel(selectedScoreDetails.scheme.scale) }}
+                                </Badge>
+                            </div>
+                            <div v-if="selectedScoreDetails.grade_display" class="flex items-center gap-2">
+                                <Badge :variant="selectedScoreDetails.grade_display.pass_status === 'passed' ? 'success' : 'destructive'" class="text-sm font-bold">
+                                    {{ selectedScoreDetails.grade_display.final_label || selectedScoreDetails.grade_display.final_numeric }}
+                                </Badge>
+                                <span class="text-muted-foreground text-xs capitalize">{{ selectedScoreDetails.grade_display.pass_status }}</span>
+                            </div>
+                            <span v-else class="text-muted-foreground text-xs">Scheme grades appear after finalization.</span>
+                        </header>
+                        <Table v-if="selectedScoreDetails.grade_display">
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead class="text-muted-foreground text-[11px] tracking-wider uppercase">Component</TableHead>
+                                    <TableHead class="text-muted-foreground text-right text-[11px] tracking-wider uppercase">Raw %</TableHead>
+                                    <TableHead class="text-muted-foreground text-right text-[11px] tracking-wider uppercase">Converted</TableHead>
+                                    <TableHead class="text-muted-foreground text-right text-[11px] tracking-wider uppercase">Requirement</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow v-for="component in selectedScoreDetails.grade_display.components" :key="component.code">
+                                    <TableCell class="font-medium">{{ component.label }}</TableCell>
+                                    <TableCell class="text-muted-foreground text-right font-mono tabular-nums">{{ component.raw_percentage ?? '—' }}%</TableCell>
+                                    <TableCell class="text-right font-mono font-semibold tabular-nums">{{ component.converted_grade ?? '—' }}</TableCell>
+                                    <TableCell class="text-right">
+                                        <Badge
+                                            v-if="component.requirement_status"
+                                            :variant="component.requirement_status === 'passed' ? 'success' : 'destructive'"
+                                            class="text-[10px]"
+                                        >
+                                            {{ component.requirement_status === 'passed' ? 'Met' : 'Not met' }}
+                                        </Badge>
+                                        <span v-else class="text-muted-foreground text-xs">—</span>
+                                    </TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
                     </div>
 
                     <!-- Assessment table -->
