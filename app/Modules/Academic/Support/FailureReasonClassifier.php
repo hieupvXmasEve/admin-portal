@@ -39,6 +39,11 @@ final class FailureReasonClassifier
     public const EVIDENCE_NO_SESSIONS = 'no_sessions';
 
     /**
+     * @param  bool|null  $gradeFailedOverride  when a custom grading scheme has already
+     *                                          determined pass/fail (e.g. a gate requirement),
+     *                                          use that instead of the raw percentage-vs-threshold
+     *                                          check — a gate failure can produce a high diagnostic
+     *                                          percentage that would otherwise read as a pass.
      * @return array{is_passed: bool, failure_reason: ?string, snapshot: array<string, mixed>}
      */
     public static function classify(
@@ -53,6 +58,7 @@ final class FailureReasonClassifier
         bool $overridePass,
         bool $overrideIsPassed,
         ?\DateTimeInterface $evaluatedAt = null,
+        ?bool $gradeFailedOverride = null,
     ): array {
         $evaluatedAt ??= now();
         $recorded = $present + $late + $absent;
@@ -67,7 +73,7 @@ final class FailureReasonClassifier
             default => self::EVIDENCE_CLEAN,
         };
 
-        $gradeFailed = $finalPercentage < $gradeThreshold;
+        $gradeFailed = $gradeFailedOverride ?? ($finalPercentage < $gradeThreshold);
         $attendanceFailed = $attendanceEvaluable && $attendancePct < $attendanceThreshold;
 
         if ($overridePass) {

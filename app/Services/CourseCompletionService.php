@@ -213,6 +213,14 @@ class CourseCompletionService
                 $finalLetterGrade = AcademicRecord::calculateLetterGrade($finalPercentage);
             }
 
+            // A custom scheme's `passed` (stored on the breakdown) is gate-aware; the
+            // diagnostic final_percentage is not — a gate failure can still map to a
+            // high percentage, so it must never be compared against a flat threshold
+            // for these records.
+            $gradeFailedOverride = ($isCustomEngine && array_key_exists('passed', $breakdown))
+                ? ! $breakdown['passed']
+                : null;
+
             // ACAD-RET-001: derive pass/fail + explicit failure_reason from grade
             // AND attendance, so failed students route correctly (grade → resit,
             // attendance/both → retake). Attendance % excludes excused and
@@ -228,6 +236,7 @@ class CourseCompletionService
                 $attendanceThreshold,
                 (bool) $record->override_pass,
                 (bool) ($record->is_passed ?? false),
+                gradeFailedOverride: $gradeFailedOverride,
             );
 
             if ($eval['is_passed']) {
@@ -393,7 +402,15 @@ class CourseCompletionService
             $computed[$studentId] = [
                 'final_percentage' => $result->finalPercentage ?? $weightedAverage,
                 'final_letter_grade' => $result->finalGrade,
-                'grade_breakdown' => array_merge($result->gradeBreakdown, ['grade_points' => $result->gradePoints]),
+                // `passed` travels inside the stored breakdown (not a sibling AcademicRecord
+                // column) so finalizeAcademicRecords() — and any future recalculate that reads
+                // the breakdown back without a fresh $result — can honor the calculator's
+                // authoritative, gate-aware outcome instead of re-deriving pass/fail from the
+                // diagnostic final_percentage alone.
+                'grade_breakdown' => array_merge($result->gradeBreakdown, [
+                    'grade_points' => $result->gradePoints,
+                    'passed' => $result->passed,
+                ]),
             ];
         }
 
