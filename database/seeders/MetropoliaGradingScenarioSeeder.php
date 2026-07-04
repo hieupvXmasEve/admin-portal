@@ -13,6 +13,7 @@ use App\Models\Campus;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
+use App\Models\CurriculumUnit;
 use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Semester;
@@ -22,6 +23,7 @@ use App\Models\Unit;
 use App\Modules\Academic\Actions\MarkCourseOfferingCompletedAction;
 use App\Modules\Academic\Support\Grading\GradingCalculatorResolver;
 use App\Modules\Academic\Support\Grading\MetropoliaSchemeCatalog;
+use App\Services\V1\Student\GradeService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
@@ -142,6 +144,8 @@ class MetropoliaGradingScenarioSeeder extends Seeder
             ]
         );
 
+        $this->seedCurriculumUnit($unit);
+
         $template = SyllabusTemplate::firstOrCreate(
             ['title' => "Metropolia Seed: {$key}"],
             [
@@ -192,6 +196,8 @@ class MetropoliaGradingScenarioSeeder extends Seeder
             ['name' => 'Metropolia Seed - Default Weighted Control', 'credit_points' => 3]
         );
 
+        $this->seedCurriculumUnit($unit);
+
         $template = SyllabusTemplate::firstOrCreate(
             ['title' => 'Metropolia Seed: default_weighted_control'],
             [
@@ -239,6 +245,29 @@ class MetropoliaGradingScenarioSeeder extends Seeder
         if ($offering->fresh()->course_status !== 'completed') {
             MarkCourseOfferingCompletedAction::run($offering->fresh());
         }
+    }
+
+    /**
+     * Link the seeded unit into the seed curriculum version so
+     * {@see GradeService::getStudentGrades()} (which
+     * matches academic records against `curriculumVersion->curriculumUnits()`
+     * by `unit_id`) surfaces these offerings on the student portal's
+     * semester overview page, not just the per-course detail endpoint.
+     */
+    private function seedCurriculumUnit(Unit $unit): void
+    {
+        CurriculumUnit::firstOrCreate(
+            [
+                'curriculum_version_id' => $this->curriculumVersion->id,
+                'unit_id' => $unit->id,
+            ],
+            [
+                'semester_id' => $this->semester->id,
+                'unit_scope' => 'common',
+                'year_level' => 1,
+                'semester_number' => 1,
+            ]
+        );
     }
 
     private function seedOffering(Unit $unit, SyllabusTemplate $template): CourseOffering
