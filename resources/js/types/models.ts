@@ -74,6 +74,7 @@ export interface Unit {
     credit_points: number;
     level: number;
     unit_type: string;
+    modules?: Module[];
     created_at: string;
     updated_at: string;
 }

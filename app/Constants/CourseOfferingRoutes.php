@@ -25,16 +25,11 @@ class CourseOfferingRoutes
 
     public const DESTROY = 'course-offerings.destroy';
 
-    // Course Offering Management Routes
-    public const TOGGLE_STATUS = 'course-offerings.toggle-status';
-
     public const FINALIZE = 'course-offerings.finalize';
 
     public const RECALCULATE = 'course-offerings.recalculate';
 
     public const RECORD_SESSION_ATTENDANCE = 'course-offerings.sessions.record-attendance';
-
-    // public const UPDATE_COURSE_STATUS = 'course-offerings.update-course-status';
 
     public const SPLIT_SHOW = 'course-offerings.split.show';
 

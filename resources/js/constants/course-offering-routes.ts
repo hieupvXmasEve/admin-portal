@@ -13,8 +13,6 @@ export const COURSE_OFFERING_ROUTE_NAMES = {
     UPDATE: 'course-offerings.update',
     DESTROY: 'course-offerings.destroy',
 
-    // Management
-    TOGGLE_STATUS: 'course-offerings.toggle-status',
     SPLIT_SHOW: 'course-offerings.split.show',
     SPLIT_PERFORM: 'course-offerings.split.perform',
 
@@ -45,8 +43,6 @@ export const courseOfferingRoutes = {
     update: (id: number | string) => COURSE_OFFERING_ROUTE_NAMES.UPDATE.replace(':courseOffering', id.toString()),
     destroy: (id: number | string) => COURSE_OFFERING_ROUTE_NAMES.DESTROY.replace(':courseOffering', id.toString()),
 
-    // Management
-    toggleStatus: (id: number | string) => COURSE_OFFERING_ROUTE_NAMES.TOGGLE_STATUS.replace(':courseOffering', id.toString()),
     splitShow: (id: number | string) => COURSE_OFFERING_ROUTE_NAMES.SPLIT_SHOW.replace(':courseOffering', id.toString()),
     splitPerform: (id: number | string) => COURSE_OFFERING_ROUTE_NAMES.SPLIT_PERFORM.replace(':courseOffering', id.toString()),
 

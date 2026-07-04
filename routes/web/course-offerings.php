@@ -47,10 +47,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:delete_course_offering')
             ->name(CourseOfferingRoutes::DESTROY);
 
-        Route::patch('/{courseOffering}/toggle-status', [CourseOfferingController::class, 'toggleStatus'])
-            ->middleware('can:edit_course_offering')
-            ->name(CourseOfferingRoutes::TOGGLE_STATUS);
-
         Route::post('/{courseOffering}/finalize', FinalizeCourseOfferingController::class)
             ->middleware('can:complete_course_offering')
             ->name(CourseOfferingRoutes::FINALIZE);
@@ -64,12 +60,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{courseOffering}/class-sessions/{classSession}/record-attendance', RecordClassSessionAttendanceController::class)
             ->middleware('can:create_course_offering')
             ->name(CourseOfferingRoutes::RECORD_SESSION_ATTENDANCE);
-
-        /*
-        Route::patch('/{courseOffering}/update-course-status', [CourseOfferingController::class, 'updateCourseStatus'])
-            ->middleware('can:edit_course_offering')
-            ->name(CourseOfferingRoutes::UPDATE_COURSE_STATUS);
-        */
 
         Route::post('/{courseOffering}/survey', [CourseOfferingController::class, 'createSurvey'])
             ->middleware('can:edit_course_offering')

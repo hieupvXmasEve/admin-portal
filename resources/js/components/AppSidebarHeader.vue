@@ -19,8 +19,9 @@ withDefaults(
 );
 
 const { canAny } = usePermissions();
-const showFinanceShell = computed(() =>
-    canAny(['view_finance_student_overview', 'view_finance_audit_workspace', 'view_finance_operations_dashboard', 'view_finance_cockpit']),
+const showFinanceShell = computed(() => canAny(['view_finance_student_overview', 'view_finance_audit_workspace', 'view_finance_operations_dashboard', 'view_finance_cockpit']));
+const showSemesterSwitcher = computed(() =>
+    canAny(['view_finance_student_overview', 'view_finance_audit_workspace', 'view_finance_operations_dashboard', 'view_finance_cockpit', 'view_finance_batch_studio', 'view_finance_reporting', 'view_course_offering']),
 );
 </script>
 
@@ -37,10 +38,8 @@ const showFinanceShell = computed(() =>
                 <StudentSearchDropdown />
             </div>
             <div class="flex items-center gap-2">
-                <template v-if="showFinanceShell">
-                    <FinanceCommandPalette />
-                    <SemesterSwitcher />
-                </template>
+                <FinanceCommandPalette v-if="showFinanceShell" />
+                <SemesterSwitcher v-if="showSemesterSwitcher" />
                 <NotificationPopper />
             </div>
         </div>

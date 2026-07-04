@@ -27,12 +27,15 @@ use App\Modules\Academic\Http\Requests\MoveStudentRequest;
 use App\Modules\Academic\Queries\GetCourseOfferingOperationalStateQuery;
 use App\Modules\Academic\Queries\GetCourseOfferingScoresQuery;
 use App\Modules\Academic\Queries\GetCourseOfferingSurveyQuery;
+use App\Modules\Academic\Queries\ListCourseOfferingModuleOptionsQuery;
 use App\Services\CourseSurveyService;
 use App\Services\SystemConfigService;
 use App\Services\V1\Student\CurriculumService;
 use App\Services\V1\Student\PrerequisiteValidationService;
 use App\Support\CampusLogContext;
+use App\Support\SemesterContextResolver;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -55,12 +58,12 @@ class CourseOfferingController extends Controller
     /**
      * Display a listing of course offerings
      */
-    public function index(Request $request): Response
+    public function index(Request $request, ListCourseOfferingModuleOptionsQuery $moduleOptionsQuery): Response
     {
         // 1. Validate the request
         $validated = $request->validate([
             'search' => 'nullable|string|max:255',
-            'semester_id' => 'nullable|string', // 'all' or ID
+            'module_id' => 'nullable|string', // 'all' or ID
             'enrollment_status' => 'nullable|string|in:all,open,closed,waitlist_only,cancelled',
             'course_status' => 'nullable|string|in:all,not_started,in_progress,completed,cancelled',
             'delivery_mode' => 'nullable|string|in:all,in_person,online,hybrid,blended',
@@ -68,13 +71,25 @@ class CourseOfferingController extends Controller
             'unit_type' => 'nullable|string',
             'page' => 'nullable|integer|min:1',
             'per_page' => 'nullable|integer|min:5|max:100',
-            'sort' => 'nullable|string',
+            'sort' => ['nullable', 'string', Rule::in([
+                'unit_code',
+                'unit_name',
+                'unit_level',
+                'unit_type',
+                'delivery_mode',
+                'course_status',
+                'enrollment_status',
+                'current_enrollment',
+            ])],
             'direction' => 'nullable|string|in:asc,desc',
         ]);
 
-        $query = CourseOffering::with(['semester', 'lecture', 'unit', 'formTargets.form'])
+        $campusId = app('campus')->id;
+        $selectedSemesterId = SemesterContextResolver::selectedId();
+
+        $query = CourseOffering::with(['semester', 'lecture', 'unit.modules', 'formTargets.form'])
             ->join('units', 'course_offerings.unit_id', '=', 'units.id')
-            ->where('course_offerings.campus_id', app('campus')->id)
+            ->where('course_offerings.campus_id', $campusId)
             ->whereNotNull('units.id')
             ->select('course_offerings.*');
 
@@ -90,24 +105,24 @@ class CourseOfferingController extends Controller
             });
         }
 
-        // Semester
-        // Default to current semester if no semester filter is provided (null)
-        // If 'all' is explicitly provided, show all history
-        $semesterId = $validated['semester_id'] ?? null;
-        $defaultSemesterId = null;
+        if ($selectedSemesterId !== null) {
+            $query->where('course_offerings.semester_id', $selectedSemesterId);
+        }
 
-        if ($semesterId === 'all') {
-            // Show all - no filter
-        } elseif ($semesterId) {
-            // Specific semester selected
-            $query->where('course_offerings.semester_id', $semesterId);
-        } else {
-            // No filter provided - default to current active
-            $currentSemester = Semester::getActiveSemester();
-            if ($currentSemester) {
-                $defaultSemesterId = $currentSemester->id;
-                $query->where('course_offerings.semester_id', $currentSemester->id);
+        // Module
+        $moduleId = $validated['module_id'] ?? null;
+        if ($moduleId !== null && $moduleId !== '' && $moduleId !== 'all') {
+            if (! ctype_digit((string) $moduleId)) {
+                throw ValidationException::withMessages([
+                    'module_id' => 'Invalid module selected.',
+                ]);
             }
+
+            $query->whereHas('unit.modules', function ($moduleQuery) use ($campusId, $moduleId) {
+                $moduleQuery
+                    ->where('modules.id', (int) $moduleId)
+                    ->where('modules.campus_id', $campusId);
+            });
         }
 
         // Enrollment Status
@@ -136,23 +151,29 @@ class CourseOfferingController extends Controller
         }
 
         // Sorting
-        $sort = $validated['sort'] ?? 'units.code';
+        $sortMap = [
+            'unit_code' => 'units.code',
+            'unit_name' => 'units.name',
+            'unit_level' => 'units.level',
+            'unit_type' => 'units.unit_type',
+            'delivery_mode' => 'course_offerings.delivery_mode',
+            'course_status' => 'course_offerings.course_status',
+            'enrollment_status' => 'course_offerings.enrollment_status',
+            'current_enrollment' => 'course_offerings.current_enrollment',
+        ];
+
+        $sort = $validated['sort'] ?? 'unit_code';
         $direction = $validated['direction'] ?? 'asc';
 
-        // Handle specific sort columns if necessary, otherwise trust the column name (be careful with joins)
-        if ($sort === 'units.code') {
-            $query->orderBy('units.code', $direction);
-        } else {
-            $query->orderBy($sort, $direction);
-        }
+        $query
+            ->orderBy($sortMap[$sort], $direction)
+            ->orderBy('course_offerings.id');
 
         // Pagination
         $perPage = $validated['per_page'] ?? 15;
         $courseOfferings = $query->paginate($perPage)->withQueryString();
 
         // 3. Prepare options
-        $semesters = Semester::orderBy('start_date', 'desc')->get(['id', 'name', 'code']);
-
         $unitLevels = Unit::select('level')
             ->whereNotNull('level')
             ->distinct()
@@ -194,7 +215,7 @@ class CourseOfferingController extends Controller
             'courseOfferings' => $courseOfferings,
             'filters' => [
                 'search' => $validated['search'] ?? '',
-                'semester_id' => $defaultSemesterId ? (string) $defaultSemesterId : ($semesterId ?? ''),
+                'module_id' => $validated['module_id'] ?? 'all',
                 'enrollment_status' => $validated['enrollment_status'] ?? 'all',
                 'course_status' => $validated['course_status'] ?? 'all',
                 'delivery_mode' => $validated['delivery_mode'] ?? 'all',
@@ -202,10 +223,11 @@ class CourseOfferingController extends Controller
                 'unit_type' => $validated['unit_type'] ?? 'all',
                 'page' => $validated['page'] ?? 1,
                 'per_page' => $validated['per_page'] ?? 15,
-                'sort' => $validated['sort'] ?? null,
-                'direction' => $validated['direction'] ?? null,
+                'sort' => $sort,
+                'direction' => $direction,
             ],
-            'semesters' => $semesters,
+            'statistics' => $this->buildCourseOfferingStatistics($campusId, $selectedSemesterId),
+            'moduleOptions' => $moduleOptionsQuery->handle($campusId, $selectedSemesterId),
             'unitLevels' => $unitLevels,
             'unitTypes' => $unitTypes,
             'surveyForms' => $surveyForms,
@@ -748,23 +770,6 @@ class CourseOfferingController extends Controller
             return Redirect::back()
                 ->with('error', 'Failed to delete course offerings: '.$e->getMessage());
         }
-    }
-
-    /**
-     * Toggle course offering status
-     */
-    public function toggleStatus(CourseOffering $courseOffering): RedirectResponse
-    {
-        // Ensure the course offering belongs to current campus
-        if ($courseOffering->campus_id !== app('campus')->id) {
-            abort(404);
-        }
-
-        $newStatus = $courseOffering->enrollment_status === 'open' ? 'closed' : 'open';
-        $courseOffering->update(['enrollment_status' => $newStatus]);
-
-        return Redirect::back()
-            ->with('success', "Course offering status updated to {$newStatus}.");
     }
 
     /**
@@ -1616,18 +1621,35 @@ class CourseOfferingController extends Controller
     /**
      * Get course offering statistics
      */
-    public function statistics(Request $request)
+    public function statistics(Request $request): JsonResponse
     {
         $semesterId = $request->semester_id;
+        $selectedSemesterId = $semesterId && $semesterId !== 'all' ? (int) $semesterId : null;
 
-        $query = CourseOffering::query()->where('campus_id', app('campus')->id);
+        return ApiResponse::success($this->buildCourseOfferingStatistics(app('campus')->id, $selectedSemesterId));
+    }
 
-        if ($semesterId && $semesterId !== 'all') {
+    /**
+     * @return array{
+     *     total_offerings:int,
+     *     active_offerings:int,
+     *     full_offerings:int,
+     *     cancelled_offerings:int,
+     *     total_enrollment:int|float,
+     *     total_capacity:int|float,
+     *     enrollment_rate:float|int
+     * }
+     */
+    private function buildCourseOfferingStatistics(int $campusId, ?int $semesterId): array
+    {
+        $query = CourseOffering::query()->where('campus_id', $campusId);
+
+        if ($semesterId !== null) {
             $query->where('semester_id', $semesterId);
         }
 
         $stats = [
-            'total_offerings' => $query->count(),
+            'total_offerings' => (clone $query)->count(),
             'active_offerings' => (clone $query)->where('is_active', true)->where('enrollment_status', 'open')->count(),
             'full_offerings' => (clone $query)->whereRaw('current_enrollment >= max_capacity')->count(),
             'cancelled_offerings' => (clone $query)->where('enrollment_status', 'cancelled')->count(),
@@ -1639,7 +1661,7 @@ class CourseOfferingController extends Controller
             ? round(($stats['total_enrollment'] / $stats['total_capacity']) * 100, 2)
             : 0;
 
-        return ApiResponse::success($stats);
+        return $stats;
     }
 
     /**
@@ -2092,17 +2114,6 @@ class CourseOfferingController extends Controller
             return ApiResponse::error('Failed to update registration status: '.$e->getMessage(), [], 500);
         }
     }
-
-    /**
-     * Mark course as completed
-     */
-    /*
-    public function updateCourseStatus(Request $request, CourseOffering $courseOffering): RedirectResponse
-    {
-        // Moved to app/Modules/Academic/Http/Api/Admin/MarkCourseCompletedController.php
-        return Redirect::back()->with('error', 'This route is deprecated. Please use the API endpoint.');
-    }
-    */
 
     /**
      * Parse registration error to user-friendly message

@@ -6,6 +6,7 @@ use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\User;
 use App\Services\PermissionService;
+use App\Support\SemesterContextResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -30,7 +31,7 @@ beforeEach(function () {
     app()->singleton('campus', fn () => $this->campus);
 });
 
-it('shares a semester prop with options and selection to finance users', function () {
+it('shares a semester prop with options and selection to semester-aware users', function () {
     $active = Semester::factory()->create(['is_active' => true]);
     Semester::factory()->create(['is_active' => false]);
     $user = grantFinanceShell(['view_finance_student_overview']);
@@ -41,7 +42,17 @@ it('shares a semester prop with options and selection to finance users', functio
             ->has('semester.options'));
 });
 
-it('omits the semester prop for users without finance permissions', function () {
+it('shares the semester prop to course offering users', function () {
+    $active = Semester::factory()->create(['is_active' => true]);
+    $user = grantFinanceShell(['view_course_offering']);
+
+    actingAs($user)->get('/dashboard')
+        ->assertInertia(fn ($page) => $page
+            ->where('semester.selected_id', $active->id)
+            ->has('semester.options'));
+});
+
+it('omits the semester prop for users without semester-aware permissions', function () {
     Semester::factory()->create(['is_active' => true]);
     $user = grantFinanceShell([]);
 
@@ -59,4 +70,21 @@ it('persists a selected semester into the session', function () {
         ->assertRedirect();
 
     expect(session('current_semester_id'))->toBe($other->id);
+});
+
+it('persists all semesters as an explicit global selection', function () {
+    Semester::factory()->create(['is_active' => true]);
+    $user = grantFinanceShell(['view_course_offering']);
+
+    actingAs($user)
+        ->withSession(['_token' => 'test-token'])
+        ->post('/semester-context', ['_token' => 'test-token', 'semester_id' => null])
+        ->assertRedirect();
+
+    expect(session('current_semester_id'))->toBe(SemesterContextResolver::AllSemesters);
+
+    actingAs($user)->get('/dashboard')
+        ->assertInertia(fn ($page) => $page
+            ->where('semester.selected_id', null)
+            ->has('semester.options'));
 });

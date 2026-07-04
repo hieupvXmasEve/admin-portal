@@ -5,27 +5,23 @@ import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import LoadingSpinner from '@/components/ui/LoadingSpinner.vue';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import HeadlessToastWithProps from '@/components/ui/sonner/HeadlessToastWithProps.vue';
-import { useApi } from '@/composables/useApiRequest';
+import { useDataTable } from '@/composables/useDataTable';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
-import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import type { PaginatedResponse } from '@/types';
-import type { CourseOffering, Semester } from '@/types/models';
+import type { CourseOffering } from '@/types/models';
 import { courseRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ColumnDef } from '@tanstack/vue-table';
-import { BarChart3, CheckCircle, Copy, Edit, Eye, MoreHorizontal, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
-import { h, ref, watch } from 'vue';
+import type { ColumnDef } from '@tanstack/vue-table';
+import { Copy, Edit, Eye, MoreHorizontal, Plus, Trash2 } from 'lucide-vue-next';
+import { h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
 
 interface CourseOfferingFilters {
     search: string;
-    semester_id: string;
+    module_id: string;
     enrollment_status: string;
     course_status: string;
     delivery_mode: string;
@@ -37,15 +33,26 @@ interface CourseOfferingFilters {
     direction: 'asc' | 'desc' | null;
 }
 
+interface FilterOption {
+    value: string;
+    label: string;
+}
+
+interface CourseOfferingStatistics {
+    total_offerings: number;
+    active_offerings: number;
+}
+
 interface Props {
     courseOfferings: PaginatedResponse<CourseOffering>;
     filters: CourseOfferingFilters;
-    semesters: Semester[];
-    unitLevels: { value: string; label: string }[];
-    unitTypes: { value: string; label: string }[];
-    enrollmentStatusOptions: { value: string; label: string }[];
-    courseStatusOptions: { value: string; label: string }[];
-    deliveryModeOptions: { value: string; label: string }[];
+    statistics: CourseOfferingStatistics;
+    moduleOptions: FilterOption[];
+    unitLevels: FilterOption[];
+    unitTypes: FilterOption[];
+    enrollmentStatusOptions: FilterOption[];
+    courseStatusOptions: FilterOption[];
+    deliveryModeOptions: FilterOption[];
     flash?: {
         success?: string;
         error?: string;
@@ -55,16 +62,25 @@ interface Props {
 }
 const props = defineProps<Props>();
 
-const { filters, handleSearch, handlePaginationNavigate, handlePageSizeChange } = useInertiaFilters<CourseOfferingFilters>({
-    baseUrl: '/course-offerings',
+const { filters, setFilter, handleSearch, handlePaginationNavigate, handlePageSizeChange, handleSortChange, isLoading, currentSort, currentDirection } = useDataTable<CourseOfferingFilters>({
+    baseUrl: route('course-offerings.index'),
     initialFilters: {
-        ...props.filters,
         search: props.filters.search || '',
+        module_id: props.filters.module_id || 'all',
+        enrollment_status: props.filters.enrollment_status || 'all',
+        course_status: props.filters.course_status || 'all',
+        delivery_mode: props.filters.delivery_mode || 'all',
+        unit_level: props.filters.unit_level || 'all',
+        unit_type: props.filters.unit_type || 'all',
+        page: props.filters.page || 1,
+        per_page: props.filters.per_page || 15,
+        sort: props.filters.sort || 'unit_code',
+        direction: props.filters.direction || 'asc',
     },
-    only: ['courseOfferings', 'filters'],
+    only: ['courseOfferings', 'filters', 'statistics', 'moduleOptions'],
     defaultValues: {
         search: '',
-        semester_id: '',
+        module_id: 'all',
         enrollment_status: 'all',
         course_status: 'all',
         delivery_mode: 'all',
@@ -72,75 +88,21 @@ const { filters, handleSearch, handlePaginationNavigate, handlePageSizeChange } 
         unit_type: 'all',
         page: 1,
         per_page: 15,
-        sort: 'units.code',
+        sort: 'unit_code',
         direction: 'asc',
     },
     debounce: 300,
+    immediateFields: ['module_id', 'enrollment_status', 'course_status', 'delivery_mode', 'unit_level', 'unit_type', 'per_page', 'page'],
 });
 
 const selectedItems = ref<number[]>([]);
-const isLoading = ref(false);
-const statistics = ref<any>(null);
-const showStatusDialog = ref(false);
-const selectedCourse = ref<CourseOffering | null>(null);
+
+const handleSelectionChange = (selectedRows: CourseOffering[]) => {
+    selectedItems.value = selectedRows.map((row) => row.id);
+};
 
 // Initialize the confirm dialog composable
 const confirmDialog = useGlobalConfirmDialog();
-const api = useApi();
-
-// Load statistics
-const loadStatistics = async () => {
-    try {
-        const semesterId = filters.semester_id === 'all' ? '' : filters.semester_id;
-        const response = await fetch(`/api/course-offerings/statistics?semester_id=${semesterId}`);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        if (data.success) {
-            statistics.value = data.data;
-        } else {
-            console.error('API returned error:', data);
-        }
-    } catch (error) {
-        console.error('Failed to load statistics:', error);
-        // Set default statistics on error
-        statistics.value = {
-            total_offerings: 0,
-            active_offerings: 0,
-            total_enrollment: 0,
-            total_capacity: 0,
-            enrollment_rate: 0,
-        };
-    }
-};
-
-watch(
-    () => filters.semester_id,
-    () => {
-        loadStatistics();
-    },
-);
-
-// Load statistics on mount
-loadStatistics();
-
-// Old filter handlers removed in favor of useInertiaFilters
-
-const toggleStatus = (courseOffering: CourseOffering) => {
-    router.patch(
-        route('course-offerings.toggle-status', courseOffering.id),
-        {},
-        {
-            onSuccess: () => {
-                toast.success('Course offering status updated successfully');
-            },
-            onError: () => {
-                toast.error('Failed to update course offering status');
-            },
-        },
-    );
-};
 
 const deleteCourseOffering = (courseOffering: CourseOffering) => {
     const unitName = courseOffering.unit?.name || 'Unknown Unit';
@@ -205,39 +167,6 @@ const duplicateCourseOffering = (courseOffering: CourseOffering) => {
     );
 };
 
-const openStatusDialog = (courseOffering: CourseOffering) => {
-    selectedCourse.value = courseOffering;
-    showStatusDialog.value = true;
-};
-
-const closeStatusDialog = () => {
-    showStatusDialog.value = false;
-    selectedCourse.value = null;
-};
-
-const updateCourseStatus = async () => {
-    if (!selectedCourse.value) return;
-    isLoading.value = true;
-
-    const { data: apiData } = await api.post(`/api/course-offerings/${selectedCourse.value.id}/complete`, {});
-
-    isLoading.value = false;
-    if (apiData.value?.success) {
-        const message = apiData.value.data?.message || apiData.value.message || 'Course status updated successfully';
-        toast.success('Course status updated successfully', {
-            description: h(HeadlessToastWithProps, { message }),
-        });
-        closeStatusDialog();
-        router.reload();
-        loadStatistics();
-    } else {
-        const errorMessage = apiData.value?.message || apiData.value?.error || apiData.value?.data?.message || 'Failed to update course status';
-        toast.error('Failed to update course status', {
-            description: h(HeadlessToastWithProps, { message: errorMessage }),
-        });
-    }
-};
-
 const bulkDelete = () => {
     if (selectedItems.value.length === 0) {
         toast.error('Please select items to delete');
@@ -253,7 +182,7 @@ const bulkDelete = () => {
         {
             onConfirm: () => {
                 return new Promise((resolve, reject) => {
-                    router.delete('/api/course-offerings/bulk-delete', {
+                    router.delete(route('api.course-offerings.bulk-delete'), {
                         data: { ids: selectedItems.value },
                         onSuccess: (page) => {
                             // Check if there's a flash error message (indicates deletion failed)
@@ -317,20 +246,34 @@ const columns: ColumnDef<CourseOffering>[] = [
     {
         id: 'number',
         header: 'No.',
+        enableSorting: false,
         cell: ({ row }) => {
             return h('div', { class: 'text-center' }, row.index + 1 + (props.courseOfferings.current_page - 1) * props.courseOfferings.per_page);
         },
     },
     {
+        id: 'unit_code',
         accessorKey: 'unit.code',
         header: 'Unit',
         cell: ({ row }) => {
             const course = row.original;
             const unitCode = course.unit?.code || 'N/A';
-            return h('div', { class: 'space-y-1' }, [h('div', { class: 'font-medium' }, unitCode), course.section_code && h('div', { class: 'text-sm text-muted-foreground' }, `Section: ${course.section_code}`)]);
+            const modules = course.unit?.modules ?? [];
+
+            return h('div', { class: 'space-y-1' }, [
+                h('div', { class: 'font-medium' }, unitCode),
+                course.section_code && h('div', { class: 'text-sm text-muted-foreground' }, `Section: ${course.section_code}`),
+                modules.length > 0 &&
+                    h(
+                        'div',
+                        { class: 'flex flex-wrap gap-1' },
+                        modules.map((module) => h(Badge, { variant: 'secondary', class: 'text-xs font-normal' }, () => module.name)),
+                    ),
+            ]);
         },
     },
     {
+        id: 'unit_name',
         accessorKey: 'unit.name',
         header: 'Unit Name',
         cell: ({ row }) => {
@@ -341,6 +284,7 @@ const columns: ColumnDef<CourseOffering>[] = [
         },
     },
     {
+        id: 'unit_level',
         accessorKey: 'unit.level',
         header: 'Level',
         cell: ({ row }) => {
@@ -350,6 +294,7 @@ const columns: ColumnDef<CourseOffering>[] = [
         },
     },
     {
+        id: 'unit_type',
         accessorKey: 'unit.unit_type',
         header: 'Unit Type',
         cell: ({ row }) => {
@@ -374,13 +319,15 @@ const columns: ColumnDef<CourseOffering>[] = [
     {
         accessorKey: 'semester',
         header: 'Semester',
+        enableSorting: false,
         cell: ({ row }) => {
             const semester = row.original.semester;
             return semester ? h('div', {}, [h('div', { class: 'font-medium' }, semester.name), h('div', { class: 'text-sm text-muted-foreground' }, semester.code)]) : 'N/A';
         },
     },
     {
-        accessorKey: 'enrollment',
+        id: 'current_enrollment',
+        accessorKey: 'current_enrollment',
         header: 'Enrollment',
         cell: ({ row }) => {
             const course = row.original;
@@ -397,7 +344,8 @@ const columns: ColumnDef<CourseOffering>[] = [
         },
     },
     {
-        id: 'lifecycle',
+        id: 'course_status',
+        accessorKey: 'course_status',
         header: 'Lifecycle',
         cell: ({ row }) => {
             const badge = getLifecycleBadge(row.original);
@@ -407,6 +355,7 @@ const columns: ColumnDef<CourseOffering>[] = [
     {
         accessorKey: 'lecture',
         header: 'Lecture',
+        enableSorting: false,
         cell: ({ row }) => {
             const lecture = row.original.lecture;
 
@@ -417,6 +366,7 @@ const columns: ColumnDef<CourseOffering>[] = [
         id: 'actions',
         header: 'Actions',
         enablePinning: true,
+        enableSorting: false,
         cell: ({ row }) => {
             const course = row.original;
             const courseStatus = course.course_status || 'not_started';
@@ -430,11 +380,6 @@ const columns: ColumnDef<CourseOffering>[] = [
             if (canModify) {
                 menuItems.push(
                     h(DropdownMenuItem, { onClick: () => router.visit(route('course-offerings.edit', course.id)) }, () => [h(Edit, { class: 'mr-2 h-4 w-4' }), 'Edit']),
-                    h(DropdownMenuItem, { onClick: () => openStatusDialog(course) }, () => [h(CheckCircle, { class: 'mr-2 h-4 w-4 text-green-600' }), 'Mark as Completed']),
-                    h(DropdownMenuItem, { onClick: () => toggleStatus(course) }, () => [
-                        course.enrollment_status === 'open' ? h(ToggleLeft, { class: 'mr-2 h-4 w-4' }) : h(ToggleRight, { class: 'mr-2 h-4 w-4' }),
-                        course.enrollment_status === 'open' ? 'Close Registration' : 'Open Registration',
-                    ]),
                     h(DropdownMenuItem, { onClick: () => deleteCourseOffering(course), class: 'text-destructive' }, () => [h(Trash2, { class: 'mr-2 h-4 w-4' }), 'Delete']),
                 );
             }
@@ -477,10 +422,6 @@ const columns: ColumnDef<CourseOffering>[] = [
             <p class="text-muted-foreground">Manage course opening periods and registration settings</p>
         </div>
         <div class="flex items-center gap-2">
-            <Button variant="outline" size="sm" @click="loadStatistics">
-                <BarChart3 class="mr-2 h-4 w-4" />
-                Refresh Stats
-            </Button>
             <Link :href="courseRoutes.offerings.create()">
                 <Button>
                     <Plus class="mr-2 h-4 w-4" />
@@ -491,7 +432,7 @@ const columns: ColumnDef<CourseOffering>[] = [
     </div>
 
     <!-- Statistics -->
-    <div v-if="statistics" class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div class="grid gap-4 md:grid-cols-2">
         <Card>
             <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle class="text-sm font-medium">Total Offerings</CardTitle>
@@ -508,23 +449,6 @@ const columns: ColumnDef<CourseOffering>[] = [
                 <div class="text-2xl font-bold text-green-600">{{ statistics.active_offerings }}</div>
             </CardContent>
         </Card>
-        <Card>
-            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle class="text-sm font-medium">Total Enrollment</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div class="text-2xl font-bold">{{ statistics.total_enrollment }}</div>
-                <p class="text-muted-foreground text-xs">of {{ statistics.total_capacity }} capacity</p>
-            </CardContent>
-        </Card>
-        <Card>
-            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle class="text-sm font-medium">Enrollment Rate</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div class="text-2xl font-bold">{{ statistics.enrollment_rate }}%</div>
-            </CardContent>
-        </Card>
     </div>
 
     <!-- Filters -->
@@ -534,22 +458,22 @@ const columns: ColumnDef<CourseOffering>[] = [
             <CardDescription>Filter course offerings by various criteria</CardDescription>
         </CardHeader>
         <CardContent>
-            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Search</label>
                     <DebouncedInput v-model="filters.search" @update:model-value="handleSearch" placeholder="Search courses..." :debounce="300" />
                 </div>
 
                 <div class="space-y-2">
-                    <label class="text-sm font-medium">Semester</label>
-                    <Select v-model="filters.semester_id">
+                    <label class="text-sm font-medium">Module</label>
+                    <Select :model-value="filters.module_id" :disabled="isLoading" @update:model-value="(value) => setFilter('module_id', String(value))">
                         <SelectTrigger>
-                            <SelectValue placeholder="All Semesters" />
+                            <SelectValue placeholder="All Modules" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">All Semesters</SelectItem>
-                            <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
-                                {{ semester.name }}
+                            <SelectItem value="all">All Modules</SelectItem>
+                            <SelectItem v-for="module in moduleOptions" :key="module.value" :value="module.value">
+                                {{ module.label }}
                             </SelectItem>
                         </SelectContent>
                     </Select>
@@ -557,7 +481,7 @@ const columns: ColumnDef<CourseOffering>[] = [
 
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Level</label>
-                    <Select v-model="filters.unit_level">
+                    <Select :model-value="filters.unit_level" :disabled="isLoading" @update:model-value="(value) => setFilter('unit_level', String(value))">
                         <SelectTrigger>
                             <SelectValue placeholder="All Levels" />
                         </SelectTrigger>
@@ -572,7 +496,7 @@ const columns: ColumnDef<CourseOffering>[] = [
 
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Unit Type</label>
-                    <Select v-model="filters.unit_type">
+                    <Select :model-value="filters.unit_type" :disabled="isLoading" @update:model-value="(value) => setFilter('unit_type', String(value))">
                         <SelectTrigger>
                             <SelectValue placeholder="All Types" />
                         </SelectTrigger>
@@ -587,7 +511,7 @@ const columns: ColumnDef<CourseOffering>[] = [
 
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Course Status</label>
-                    <Select v-model="filters.course_status">
+                    <Select :model-value="filters.course_status" :disabled="isLoading" @update:model-value="(value) => setFilter('course_status', String(value))">
                         <SelectTrigger>
                             <SelectValue placeholder="All Statuses" />
                         </SelectTrigger>
@@ -602,7 +526,7 @@ const columns: ColumnDef<CourseOffering>[] = [
 
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Delivery Mode</label>
-                    <Select v-model="filters.delivery_mode">
+                    <Select :model-value="filters.delivery_mode" :disabled="isLoading" @update:model-value="(value) => setFilter('delivery_mode', String(value))">
                         <SelectTrigger>
                             <SelectValue placeholder="All Modes" />
                         </SelectTrigger>
@@ -634,52 +558,15 @@ const columns: ColumnDef<CourseOffering>[] = [
                 :data="courseOfferings.data"
                 :columns="columns"
                 :loading="isLoading"
-                v-model:selected="selectedItems"
-                row-key="id"
+                :initial-sort="currentSort ?? undefined"
+                :initial-direction="currentDirection ?? undefined"
+                :enable-row-selection="true"
+                @selection-change="handleSelectionChange"
+                @sort-change="handleSortChange"
             />
         </CardContent>
     </Card>
 
     <!-- Pagination -->
     <DataPagination :pagination-data="courseOfferings" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
-
-    <!-- Mark Completed Dialog -->
-    <Dialog v-model:open="showStatusDialog">
-        <DialogContent class="sm:max-w-md">
-            <DialogHeader>
-                <DialogTitle>Mark Course as Completed</DialogTitle>
-                <DialogDescription>
-                    <template v-if="selectedCourse">
-                        Are you sure you want to mark <strong>{{ selectedCourse.unit?.code }}</strong> <span v-if="selectedCourse.section_code"> - Section {{ selectedCourse.section_code }}</span> as completed?
-                    </template>
-                </DialogDescription>
-            </DialogHeader>
-            <div class="space-y-4 py-4">
-                <div class="space-y-3 rounded-md border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
-                    <div class="flex items-start gap-2">
-                        <svg class="mt-0.5 h-5 w-5 flex-shrink-0 text-yellow-800 dark:text-yellow-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        <div class="flex-1 space-y-2">
-                            <p class="text-sm font-semibold text-yellow-800 dark:text-yellow-200">Marking as Completed will:</p>
-                            <ul class="ml-1 space-y-1 text-sm text-yellow-800 dark:text-yellow-200">
-                                <li>• Finalize all student grades</li>
-                                <li>• Update course registrations to "completed" status</li>
-                                <li>• Process EGC level progression (if applicable)</li>
-                                <li>• <strong>Lock the course from further modifications</strong></li>
-                            </ul>
-                            <p class="border-t border-yellow-300 pt-2 text-sm font-semibold text-yellow-900 dark:border-yellow-700 dark:text-yellow-100">⚠️ Once marked as completed, this action cannot be undone.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" @click="closeStatusDialog">Cancel</Button>
-                <Button :disabled="isLoading" @click="updateCourseStatus">
-                    <LoadingSpinner v-if="isLoading" size="sm" />
-                    {{ isLoading ? 'Processing...' : 'Confirm Completion' }}
-                </Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
 </template>

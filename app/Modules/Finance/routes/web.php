@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Web\SemesterContextController;
 use App\Modules\Finance\Http\Web\Admin\BatchStudioController;
 use App\Modules\Finance\Http\Web\Admin\BillingInvoiceController;
 use App\Modules\Finance\Http\Web\Admin\BillingOperationsController;
@@ -16,7 +17,6 @@ use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
 use App\Modules\Finance\Http\Web\Admin\FinanceCockpitController;
 use App\Modules\Finance\Http\Web\Admin\FinanceGlobalSearchController;
 use App\Modules\Finance\Http\Web\Admin\FinanceReportingController;
-use App\Modules\Finance\Http\Web\Admin\FinanceSemesterContextController;
 use App\Modules\Finance\Http\Web\Admin\FinanceStudentOverviewController;
 use App\Modules\Finance\Http\Web\Admin\FinanceStudentPaymentController;
 use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionController;
@@ -190,7 +190,7 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         ->name('search');
 
     // Operator semester selection (single source; reflected via shared prop)
-    Route::post('/semester-context', [FinanceSemesterContextController::class, 'update'])
+    Route::post('/semester-context', [SemesterContextController::class, 'update'])
         ->name('semester-context.update');
 
     // =====================

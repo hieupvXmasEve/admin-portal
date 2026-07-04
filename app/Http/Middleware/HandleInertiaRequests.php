@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Semester;
 use App\Services\PermissionService;
+use App\Support\SemesterContextResolver;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -68,24 +69,21 @@ class HandleInertiaRequests extends Middleware
                 }
 
                 $permissions = app(PermissionService::class)->getUserPermissions($user, $currentCampusId);
-                $financePerms = [
+                $semesterContextPerms = [
                     'view_finance_student_overview',
                     'view_finance_audit_workspace',
                     'view_finance_operations_dashboard',
+                    'view_finance_cockpit',
                     'view_finance_batch_studio',
                     'view_finance_reporting',
+                    'view_course_offering',
                 ];
-                if (count(array_intersect($financePerms, $permissions)) === 0) {
-                    return null; // bound cost: only finance users pay for the semester query
-                }
-
-                $selectedId = session('current_semester_id');
-                if ($selectedId === null) {
-                    $selectedId = Semester::query()->where('is_active', true)->value('id');
+                if (count(array_intersect($semesterContextPerms, $permissions)) === 0) {
+                    return null; // bound cost: only semester-aware surfaces pay for the query
                 }
 
                 return [
-                    'selected_id' => $selectedId !== null ? (int) $selectedId : null,
+                    'selected_id' => SemesterContextResolver::selectedId(),
                     'options' => Semester::query()
                         ->where('is_archived', false)
                         ->orderByDesc('start_date')
