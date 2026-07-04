@@ -142,6 +142,12 @@ class GetStudentFinanceReviewSignalsQuery
         $count = FinanceChargeInstallment::query()
             ->whereIn('status', self::INSTALLMENT_WORK_STATUSES)
             ->whereHas('charge', fn (Builder $query): Builder => $query->where('student_id', $studentId))
+            ->whereIn('finance_charge_id', function ($query): void {
+                $query->select('finance_charge_id')
+                    ->from('finance_charge_installments')
+                    ->groupBy('finance_charge_id')
+                    ->havingRaw('COUNT(*) > 1');
+            })
             ->whereNotIn('finance_charge_id', $collectibleChargeIds)
             ->count();
 

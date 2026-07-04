@@ -106,6 +106,12 @@ class GetStudent360StatusCardsQuery
 
         $installments = FinanceChargeInstallment::query()
             ->whereIn('finance_charge_id', $chargeIds)
+            ->whereIn('finance_charge_id', function ($query): void {
+                $query->select('finance_charge_id')
+                    ->from('finance_charge_installments')
+                    ->groupBy('finance_charge_id')
+                    ->havingRaw('COUNT(*) > 1');
+            })
             ->where('status', '!=', FinanceChargeInstallment::STATUS_CANCELLED)
             ->orderBy('installment_no')
             ->get();

@@ -299,8 +299,15 @@ it('surfaces in-page review signals for surplus, voided DNG fees, stale installm
         FinanceChargeInstallment::create([
             'finance_charge_id' => $paidCharge->id,
             'installment_no' => 1,
-            'amount' => 15_000_000,
+            'amount' => 7_500_000,
             'due_date' => now()->addDays(7),
+            'status' => FinanceChargeInstallment::STATUS_PENDING,
+        ]);
+        FinanceChargeInstallment::create([
+            'finance_charge_id' => $paidCharge->id,
+            'installment_no' => 2,
+            'amount' => 7_500_000,
+            'due_date' => now()->addDays(14),
             'status' => FinanceChargeInstallment::STATUS_PENDING,
         ]);
 
@@ -410,6 +417,39 @@ it('surfaces in-page review signals for surplus, voided DNG fees, stale installm
     } finally {
         CarbonImmutable::setTestNow();
     }
+});
+
+it('does not treat a single pending installment row as an installment plan', function () {
+    $user = grantFinanceOverview(['view_finance_student_overview']);
+    $student = makeOverviewStudent($this->campus, $this->program, $this->semester);
+    $fixture = makeOverviewCharge($student, $this->semester);
+
+    FinanceChargeInstallment::create([
+        'finance_charge_id' => $fixture['charge']->id,
+        'installment_no' => 1,
+        'amount' => 10_000_000,
+        'due_date' => now()->addDays(7),
+        'status' => FinanceChargeInstallment::STATUS_PENDING,
+    ]);
+
+    $payment = Payment::create([
+        'student_id' => $student->id,
+        'amount' => 10_000_000,
+        'method' => Payment::METHOD_BANK_TRANSFER,
+        'source' => 'manual',
+        'external_ref' => 'SINGLE-ROW-PAID',
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+        'received_by_user_id' => $user->id,
+    ]);
+    app(SettlementService::class)->createPaymentApplication($payment, $fixture['line'], 10_000_000, 'application', $user->id);
+
+    actingAs($user)->get("/finance/students/{$student->id}")
+        ->assertInertia(fn ($page) => $page
+            ->where('status_cards.installments.total', 0)
+            ->where('status_cards.installments.paid', 0)
+            ->where('status_cards.installments.next', null)
+            ->where('review_signals', []));
 });
 
 it('does not show review signals when payment, installment, and invoice cache data is consistent', function () {
