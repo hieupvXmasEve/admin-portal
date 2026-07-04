@@ -1,6 +1,6 @@
 # 05 — Student portal course-detail view is scheme-blind (and can show a wrong grade)
 
-Status: ready-for-agent
+Status: ready-for-human (implemented 2026-07-04; all acceptance criteria met)
 
 ## Parent
 
@@ -141,28 +141,28 @@ all, not just unverified.
 
 ## Acceptance criteria
 
-- [ ] `GET /api/v1/student/course/available/{id}` includes `grade_display`
+- [x] `GET /api/v1/student/course/available/{id}` includes `grade_display`
       (`scheme_engine`, `scale`, `final_label`, `final_numeric`,
       `pass_status`, per-component `components[]`) for finalized scheme
       offerings, sourced from the stored grade breakdown (no live
       recomputation)
-- [ ] The gate-fail archetype (`M-SW1PROG-GATE` or equivalent) renders FAIL /
+- [x] The gate-fail archetype (`M-SW1PROG-GATE` or equivalent) renders FAIL /
       the correct final label on the student portal course-detail view, not a
       derived PASS/A+ from raw percentage
-- [ ] Per-component `converted_grade` and `requirement_status` render on the
+- [x] Per-component `converted_grade` and `requirement_status` render on the
       course-detail Grades tab, matching the cockpit/academic-summary
       component-cell behavior (requirement indicator only on gated
       components)
-- [ ] Default-weighted offerings render byte-identical to current behavior
+- [x] Default-weighted offerings render byte-identical to current behavior
       (regression check)
-- [ ] Unfinalized scheme offerings keep showing null/absent scheme fields
-- [ ] `FE/student-nuxt` types/components updated in lockstep; `pnpm lint`,
+- [x] Unfinalized scheme offerings keep showing null/absent scheme fields
+- [x] `FE/student-nuxt` types/components updated in lockstep; `pnpm lint`,
       `pnpm typecheck`, `pnpm build` pass in that repo
-- [ ] Backend feature test(s) at the HTTP seam asserting the new
+- [x] Backend feature test(s) at the HTTP seam asserting the new
       `grade_display` shape on this endpoint for a scheme offering, a
       gate-fail case, a default-weighted offering, and an unfinalized
       offering (prior art: `tests/Feature/Api/V1/Student/GradeBreakdownApiTest.php`)
-- [ ] Disposition recorded for the dead `CourseGradeResource` reference
+- [x] Disposition recorded for the dead `CourseGradeResource` reference
       (fixed, removed, or explicitly deferred with rationale)
 
 ## Blocked by
@@ -171,3 +171,74 @@ None — the presenter, stored breakdowns, and seeded data (issue 01) already
 exist. Can start immediately.
 
 ## Comments
+
+**2026-07-04 — implemented**
+
+Backend (`app/Http/Controllers/Api/V1/Student/CourseRegistrationController.php`):
+- Eager-loads `syllabusTemplate` on the course offering and passes its
+  `grading_scheme` into `formatGradesTable()`.
+- `formatGradesTable()` now attaches `total_grade.grade_display` via
+  `GradeDisplayPresenter::present($academicRecord)` — but only when the
+  syllabus template actually carries a custom scheme (mirrors the
+  `CourseStatisticsService`/cockpit gating from issue 02). The key itself is
+  omitted (not set to `null`) for default-weighted offerings, so their JSON
+  stays byte-identical to before. For scheme offerings with no stored
+  breakdown yet (unfinalized), the key is present with value `null`.
+- Deliberately did **not** restructure `assessment_groups`/`AssessmentDetail`
+  per-row — the presenter's `components` array is already keyed by component
+  `code`, one entry per `AssessmentComponent`, so the client does client-side
+  lookup by `group_code` against `total_grade.grade_display.components`,
+  exactly mirroring the cockpit Scores tab's existing pattern
+  (`student.grade_display?.components.find(c => c.code === code)`). No new
+  backend field needed on `assessment_groups`, and no FE type changes needed
+  either — `TotalGrade.grade_display` and `GradeDisplayComponent` were
+  already declared in `shared/types/course.ts`/`grade.ts`, just never
+  populated.
+
+Frontend (`FE/student-nuxt/app/components/course-enrolled/CourseGrades.vue`):
+- The Total Grade card already preferred `grade_display.final_label`/
+  `pass_status` over the raw-percentage fallback (written in anticipation of
+  S-004, just never fed real data) — no change needed there.
+- Added a `componentDisplay(groupCode)` lookup and two badges (requirement
+  met/not-met, converted grade) on each assessment group's header.
+- `pnpm lint`/`typecheck` on the touched file are clean; the repo-wide
+  `pnpm lint` fails on a pre-existing `pnpm-workspace.yaml`-not-found error
+  in `eslint-plugin-pnpm` unrelated to this change (reproduces on an
+  unmodified file too). `pnpm typecheck` and `pnpm build` both pass (exit 0)
+  with only pre-existing "duplicated imports" warnings from unrelated files.
+
+Verified with the exact gate-fail scenario from issue 04
+(`ASSIGNMENT 30%` against a 40% gate, `EXAM 88%`): the endpoint now returns
+`pass_status: "failed"` and `components[ASSIGNMENT].requirement_status:
+"failed"` instead of a derived "PASS"/"A+" from the raw percentage.
+
+**Dead `CourseGradeResource` — disposition: removed.** Investigating the fix
+surfaced a second, independent bug in the same unreachable method:
+`GradeService::getCourseGrades()` (only caller of the missing class) queries
+`AssessmentComponentDetailScore` with `orderBy('due_date')`, but `due_date`
+isn't a column on that table (it lives on the related
+`assessment_component_detail`) — so even after restoring the missing
+resource class, the endpoint 500s on `SQLSTATE[42S22]: Column not found`.
+The method (and its private helpers `formatAssessmentBreakdown`,
+`calculateGradeBreakdown`, `analyzeCoursePerformance`, used only by it) also
+reference `$score->achieved_score`/`max_score`/`submission_status`, which
+aren't real columns either (`percentage_score`/`max_points`/`status` are, per
+every other correct caller in the codebase) — confirming this was written
+speculatively and never exercised against the real schema. Deleted the dead
+route (`GET /api/v1/student/grades/course/{courseOfferingId}`), the
+`courseGrades()` controller method, and `getCourseGrades()` +
+its three orphaned private helpers from `GradeService`. Left
+`getPerformanceLevel`/`calculateGradeEquivalent`/etc. alone — confirmed they're
+shared with `getAssessments()`/`getAssessmentDetail()`, which are a separate,
+out-of-scope concern not touched by this issue.
+
+Tests: `tests/Feature/Api/V1/Student/CourseDetailGradeDisplayTest.php` (new,
+5 cases: scheme finalized, gate-fail, no-requirement component, unfinalized,
+default-weighted byte-identical). Full `tests/Feature/Api/V1/Student`,
+`tests/Feature/CourseOffering` (cockpit issue 02 regression),
+`tests/Feature/Api/V1/Lecturer`, and
+`tests/Feature/Academic/StudentAcademicSummaryScoresSchemeDisplayTest.php`
+(issue 03 regression) all pass. One unrelated pre-existing flake
+(`CourseOfferingOperationalStateTest`, a factory `sequence_number` unique-key
+collision under cross-test load) reproduces independent of this change and
+passes in isolation.

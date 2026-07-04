@@ -8,9 +8,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Student\GradeFilterRequest;
 use App\Http\Resources\Api\V1\Student\AssessmentDetailResource;
 use App\Http\Resources\Api\V1\Student\AssessmentResource;
-use App\Http\Resources\Api\V1\Student\CourseGradeResource;
 use App\Http\Resources\Api\V1\Student\GradeResource;
 use App\Http\Responses\ApiResponse;
+use App\Models\Student;
 use App\Services\V1\Student\GradeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,7 +26,7 @@ class GradeController extends Controller
      */
     public function index(GradeFilterRequest $request): JsonResponse
     {
-        /** @var \App\Models\Student $student */
+        /** @var Student $student */
         $student = $request->user();
 
         try {
@@ -45,9 +45,10 @@ class GradeController extends Controller
             \Log::error('Failed to retrieve grades', [
                 'student_id' => $student->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            return ApiResponse::serverError('Failed to retrieve grades: ' . $e->getMessage());
+
+            return ApiResponse::serverError('Failed to retrieve grades: '.$e->getMessage());
         }
     }
 
@@ -56,7 +57,7 @@ class GradeController extends Controller
      */
     public function gpaTrend(Request $request): JsonResponse
     {
-        /** @var \App\Models\Student $student */
+        /** @var Student $student */
         $student = $request->user();
 
         try {
@@ -73,31 +74,11 @@ class GradeController extends Controller
     }
 
     /**
-     * Get grades for a specific course
-     */
-    public function courseGrades(Request $request, int $courseOfferingId): JsonResponse
-    {
-        /** @var \App\Models\Student $student */
-        $student = $request->user();
-
-        try {
-            $courseGrades = $this->gradeService->getCourseGrades($student, $courseOfferingId);
-
-            return ApiResponse::success(
-                new CourseGradeResource($courseGrades),
-                'Course grades retrieved successfully'
-            );
-        } catch (\Exception $e) {
-            return ApiResponse::businessLogicError($e->getMessage());
-        }
-    }
-
-    /**
      * Get assessments
      */
     public function assessments(Request $request): JsonResponse
     {
-        /** @var \App\Models\Student $student */
+        /** @var Student $student */
         $student = $request->user();
 
         try {
@@ -128,7 +109,7 @@ class GradeController extends Controller
      */
     public function assessmentDetail(Request $request, int $assessmentId): JsonResponse
     {
-        /** @var \App\Models\Student $student */
+        /** @var Student $student */
         $student = $request->user();
 
         try {

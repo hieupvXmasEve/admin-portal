@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\GoldTransactionController;
 use App\Http\Controllers\Api\ImageUploadController;
 use App\Http\Controllers\Api\StudentWalletController;
+use App\Http\Controllers\Api\V1\NotificationPreferenceController;
 use App\Http\Controllers\Api\V1\Student\AcademicRecordController;
 use App\Http\Controllers\Api\V1\Student\AttendanceController;
 use App\Http\Controllers\Api\V1\Student\CalendarController;
@@ -13,7 +14,9 @@ use App\Http\Controllers\Api\V1\Student\ClubManagementController;
 use App\Http\Controllers\Api\V1\Student\CourseRegistrationController;
 use App\Http\Controllers\Api\V1\Student\CurriculumController;
 use App\Http\Controllers\Api\V1\Student\DashboardController;
+use App\Http\Controllers\Api\V1\Student\EventController;
 use App\Http\Controllers\Api\V1\Student\FinanceController;
+use App\Http\Controllers\Api\V1\Student\FormController;
 use App\Http\Controllers\Api\V1\Student\GradeController;
 use App\Http\Controllers\Api\V1\Student\ModuleController;
 use App\Http\Controllers\Api\V1\Student\NotificationController;
@@ -103,8 +106,6 @@ Route::middleware([
         Route::prefix('grades')->name('grades.')->group(function () {
             Route::get('/', [GradeController::class, 'index'])->name('index');
             Route::get('/gpa-trend', [GradeController::class, 'gpaTrend'])->name('gpa-trend');
-            Route::get('/course/{courseOfferingId}', [GradeController::class, 'courseGrades'])
-                ->name('course-grades');
             Route::get('/assessments', [GradeController::class, 'assessments'])->name('assessments');
             Route::get('/assessment/{assessmentId}', [GradeController::class, 'assessmentDetail'])
                 ->name('assessment-detail');
@@ -168,8 +169,8 @@ Route::middleware([
 
             // Notification preferences
             Route::prefix('preferences')->name('preferences.')->group(function () {
-                Route::get('/events', [\App\Http\Controllers\Api\V1\NotificationPreferenceController::class, 'getEventPreferences'])->name('events.get');
-                Route::put('/events', [\App\Http\Controllers\Api\V1\NotificationPreferenceController::class, 'updateEventPreferences'])->name('events.update');
+                Route::get('/events', [NotificationPreferenceController::class, 'getEventPreferences'])->name('events.get');
+                Route::put('/events', [NotificationPreferenceController::class, 'updateEventPreferences'])->name('events.update');
             });
         });
 
@@ -183,16 +184,16 @@ Route::middleware([
 
         // Form endpoints
         Route::prefix('forms')->name('forms.')->group(function () {
-            Route::get('/', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'index'])->name('index');
+            Route::get('/', [FormController::class, 'index'])->name('index');
             Route::prefix('query')->name('query.')->group(function () {
-                Route::get('/runs', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'queryRuns'])->name('runs');
-                Route::get('/{form}', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'show'])->name('show');
-                Route::post('/{form}/submit', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'submit'])->name('submit');
+                Route::get('/runs', [FormController::class, 'queryRuns'])->name('runs');
+                Route::get('/{form}', [FormController::class, 'show'])->name('show');
+                Route::post('/{form}/submit', [FormController::class, 'submit'])->name('submit');
             });
             Route::prefix('surveys')->name('surveys.')->group(function () {
-                Route::get('/pending', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'pending'])->name('pending');
-                Route::get('/{form}', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'show'])->name('show');
-                Route::post('/{form}/submit', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'submit'])->name('submit');
+                Route::get('/pending', [FormController::class, 'pending'])->name('pending');
+                Route::get('/{form}', [FormController::class, 'show'])->name('show');
+                Route::post('/{form}/submit', [FormController::class, 'submit'])->name('submit');
             });
         });
         // Query ticket endpoints
@@ -274,16 +275,16 @@ Route::middleware([
         // Event endpoints
         Route::prefix('events')->name('events.')->group(function () {
             // Event discovery and details
-            Route::get('/', [\App\Http\Controllers\Api\V1\Student\EventController::class, 'index'])->name('index');
-            Route::get('/{event}', [\App\Http\Controllers\Api\V1\Student\EventController::class, 'show'])->name('show');
+            Route::get('/', [EventController::class, 'index'])->name('index');
+            Route::get('/{event}', [EventController::class, 'show'])->name('show');
 
             // Event registration
-            Route::post('/{event}/register', [\App\Http\Controllers\Api\V1\Student\EventController::class, 'register'])->name('register');
-            Route::delete('/{event}/register', [\App\Http\Controllers\Api\V1\Student\EventController::class, 'unregister'])->name('unregister');
+            Route::post('/{event}/register', [EventController::class, 'register'])->name('register');
+            Route::delete('/{event}/register', [EventController::class, 'unregister'])->name('unregister');
 
             // Student participation history
-            Route::get('/my/participations', [\App\Http\Controllers\Api\V1\Student\EventController::class, 'myEvents'])->name('my-events');
-            Route::get('/my/{event}', [\App\Http\Controllers\Api\V1\Student\EventController::class, 'myEventDetails'])->name('my-event-details');
+            Route::get('/my/participations', [EventController::class, 'myEvents'])->name('my-events');
+            Route::get('/my/{event}', [EventController::class, 'myEventDetails'])->name('my-event-details');
         });
     }); // End either middleware group
 

@@ -11,8 +11,11 @@ use App\Http\Requests\Api\V1\Student\CourseRegistrationRequest;
 use App\Http\Resources\Api\V1\Student\CourseOfferingResource;
 use App\Http\Resources\Api\V1\Student\CourseRegistrationResource;
 use App\Http\Responses\ApiResponse;
+use App\Models\AcademicRecord;
+use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
+use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
 use App\Services\V1\Student\CourseRegistrationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,12 +33,12 @@ class CourseRegistrationController extends Controller
     public function enrolledCourses(AvailableCoursesRequest $request): JsonResponse
     {
         $student = $request->user();
-        Log::info('Getting enrolled courses for student id: ' . $student->id);
+        Log::info('Getting enrolled courses for student id: '.$student->id);
 
         try {
             $filters = $request->validated();
             $enrolledCourses = $this->registrationService->getEnrolledCourses($student, $filters);
-            Log::info('Enrolled courses count: ' . $enrolledCourses->count());
+            Log::info('Enrolled courses count: '.$enrolledCourses->count());
 
             return ApiResponse::success(
                 CourseOfferingResource::collection($enrolledCourses),
@@ -45,7 +48,7 @@ class CourseRegistrationController extends Controller
         } catch (BusinessLogicException $e) {
             return ApiResponse::businessLogicError($e->getMessage());
         } catch (\Exception $e) {
-            Log::error('Enrolled courses error: ' . $e->getMessage(), [
+            Log::error('Enrolled courses error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
 
@@ -59,12 +62,12 @@ class CourseRegistrationController extends Controller
     public function availableForRegistration(AvailableCoursesRequest $request): JsonResponse
     {
         $student = $request->user();
-        Log::info('Getting available courses for registration for student id: ' . $student->id);
+        Log::info('Getting available courses for registration for student id: '.$student->id);
 
         try {
             $filters = $request->validated();
             $availableCourses = $this->registrationService->getAvailableCoursesForRegistration($student, $filters);
-            Log::info('Available courses for registration count: ' . $availableCourses->count());
+            Log::info('Available courses for registration count: '.$availableCourses->count());
 
             return ApiResponse::success(
                 CourseOfferingResource::collection($availableCourses),
@@ -74,7 +77,7 @@ class CourseRegistrationController extends Controller
         } catch (BusinessLogicException $e) {
             return ApiResponse::businessLogicError($e->getMessage());
         } catch (\Exception $e) {
-            Log::error('Available courses for registration error: ' . $e->getMessage(), [
+            Log::error('Available courses for registration error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
 
@@ -118,7 +121,7 @@ class CourseRegistrationController extends Controller
         } catch (BusinessLogicException $e) {
             return ApiResponse::businessLogicError($e->getMessage());
         } catch (\Exception $e) {
-            Log::error('Failed to retrieve registrations: ' . $e->getMessage());
+            Log::error('Failed to retrieve registrations: '.$e->getMessage());
 
             return ApiResponse::serverError('Failed to register for course');
         }
@@ -166,6 +169,7 @@ class CourseRegistrationController extends Controller
             return ApiResponse::serverError('Failed to retrieve registrations');
         }
     }
+
     /**
      * Get course offering detail with full schedule and grades
      */
@@ -180,7 +184,7 @@ class CourseRegistrationController extends Controller
                 ->whereIn('registration_status', ['registered', 'confirmed', 'completed'])
                 ->first();
 
-            if (!$registration) {
+            if (! $registration) {
                 return ApiResponse::businessLogicError('You are not enrolled in this course');
             }
 
@@ -189,24 +193,25 @@ class CourseRegistrationController extends Controller
                 'unit',
                 'lecture',
                 'semester',
+                'syllabusTemplate',
                 'classSessions' => function ($query) {
                     $query->orderBy('session_date')
                         ->orderBy('start_time');
                 },
                 'classSessions.room',
-                'classSessions.lecture'
+                'classSessions.lecture',
             ])->findOrFail($courseOfferingId);
 
             // Get assessment grades for this student and course
-            $assessmentScores = \App\Models\AssessmentComponentDetailScore::where('student_id', $student->id)
+            $assessmentScores = AssessmentComponentDetailScore::where('student_id', $student->id)
                 ->where('course_offering_id', $courseOfferingId)
                 ->with([
-                    'assessmentComponentDetail.assessmentComponent'
+                    'assessmentComponentDetail.assessmentComponent',
                 ])
                 ->get();
 
             // Get academic record for total grade
-            $academicRecord = \App\Models\AcademicRecord::where('student_id', $student->id)
+            $academicRecord = AcademicRecord::where('student_id', $student->id)
                 ->where('course_offering_id', $courseOfferingId)
                 ->first();
 
@@ -229,7 +234,7 @@ class CourseRegistrationController extends Controller
                     ],
                 ],
                 'schedule' => $this->formatSchedule($courseOffering->classSessions),
-                'grades' => $this->formatGradesTable($assessmentScores, $academicRecord),
+                'grades' => $this->formatGradesTable($assessmentScores, $academicRecord, $courseOffering->syllabusTemplate?->grading_scheme),
             ];
 
             return ApiResponse::success(
@@ -240,11 +245,11 @@ class CourseRegistrationController extends Controller
         } catch (BusinessLogicException $e) {
             return ApiResponse::businessLogicError($e->getMessage());
         } catch (\Exception $e) {
-            Log::error('Failed to retrieve course details: ' . $e->getMessage());
+            Log::error('Failed to retrieve course details: '.$e->getMessage());
+
             return ApiResponse::serverError('Failed to retrieve course details');
         }
     }
-
 
     /**
      * Format schedule data for API response
@@ -285,8 +290,10 @@ class CourseRegistrationController extends Controller
 
     /**
      * Format grades data as a table structure for API response
+     *
+     * @param  array<string, mixed>|null  $gradingScheme  the offering's syllabus template scheme, if any
      */
-    protected function formatGradesTable($assessmentScores, $academicRecord): array
+    protected function formatGradesTable($assessmentScores, $academicRecord, ?array $gradingScheme = null): array
     {
         // Group scores by assessment component (groups)
         $gradesByComponent = $assessmentScores->groupBy('assessmentComponentDetail.assessmentComponent.id');
@@ -320,6 +327,12 @@ class CourseRegistrationController extends Controller
             ];
         })->values()->toArray();
 
+        // Scheme grade display only exists for offerings whose syllabus template
+        // carries a custom grading scheme (issues 02/03 precedent) — default-weighted
+        // offerings must render byte-identical to today, so the key itself is
+        // omitted rather than set to null.
+        $hasScheme = ! empty($gradingScheme);
+
         return [
             'assessment_groups' => $assessmentGroups,
             'total_grade' => [
@@ -328,7 +341,22 @@ class CourseRegistrationController extends Controller
                 'grade_points' => $academicRecord?->grade_points,
                 'grade_status' => $academicRecord?->grade_status,
                 'completion_status' => $academicRecord?->completion_status,
+                ...($hasScheme ? ['grade_display' => $this->schemeGradeDisplay($academicRecord)] : []),
             ],
         ];
+    }
+
+    /**
+     * Present the stored grade breakdown for a student's course, or null before
+     * finalization (no breakdown has been persisted yet). Never recalculates —
+     * reads only what finalization/recalculation stored (ADR 0014).
+     */
+    protected function schemeGradeDisplay(?AcademicRecord $academicRecord): ?array
+    {
+        if ($academicRecord === null || empty($academicRecord->grade_breakdown)) {
+            return null;
+        }
+
+        return (new GradeDisplayPresenter)->present($academicRecord);
     }
 }
