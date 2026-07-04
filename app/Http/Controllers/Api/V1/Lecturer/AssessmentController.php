@@ -19,15 +19,18 @@ use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
+use App\Models\Lecture;
 use App\Models\Student;
 use App\Services\AssessmentGradeExcelService;
 use App\Services\AssessmentManagementService;
 use App\Services\AssessmentWeightValidationService;
+use App\Services\CourseCompletionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AssessmentController extends Controller
@@ -37,12 +40,12 @@ class AssessmentController extends Controller
      */
     public function index(Request $request, CourseOffering $courseOffering): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check if lecturer is authorized to access this course offering
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -51,7 +54,7 @@ class AssessmentController extends Controller
             }
 
             // Use the AssessmentManagementService to get the complete structure
-            $assessmentService = app(\App\Services\AssessmentManagementService::class);
+            $assessmentService = app(AssessmentManagementService::class);
             $assessmentStructure = $assessmentService->getAssessmentStructure($courseOffering);
 
             return ApiResponse::success([
@@ -87,12 +90,12 @@ class AssessmentController extends Controller
      */
     public function store(StoreAssessmentRequest $request, CourseOffering $courseOffering): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -101,7 +104,7 @@ class AssessmentController extends Controller
             }
 
             $syllabus = $courseOffering->syllabus;
-            if (!$syllabus) {
+            if (! $syllabus) {
                 return ApiResponse::error(
                     'No syllabus found for this course offering',
                     [],
@@ -163,7 +166,7 @@ class AssessmentController extends Controller
                 }),
                 'total_detail_weight' => $assessmentComponent->total_detail_weight,
             ], [], 'Assessment component created successfully', 201);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return ApiResponse::error(
                 'Validation failed',
                 $e->errors(),
@@ -190,12 +193,12 @@ class AssessmentController extends Controller
      */
     public function update(UpdateAssessmentRequest $request, CourseOffering $courseOffering, AssessmentComponent $assessmentComponent): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -265,7 +268,7 @@ class AssessmentController extends Controller
                 }),
                 'total_detail_weight' => $assessmentComponent->total_detail_weight,
             ], [], 'Assessment component updated successfully');
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return ApiResponse::error(
                 'Validation failed',
                 $e->errors(),
@@ -293,12 +296,12 @@ class AssessmentController extends Controller
      */
     public function destroy(Request $request, CourseOffering $courseOffering, AssessmentComponent $assessmentComponent): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -318,7 +321,7 @@ class AssessmentController extends Controller
             // Enhanced dependency checking
             $dependencyChecks = $this->checkAssessmentDependencies($assessmentComponent, $courseOffering);
 
-            if (!$dependencyChecks['can_delete']) {
+            if (! $dependencyChecks['can_delete']) {
                 return ApiResponse::error(
                     'Cannot delete assessment component due to existing dependencies',
                     ['dependencies' => $dependencyChecks['dependencies']],
@@ -362,12 +365,12 @@ class AssessmentController extends Controller
      */
     public function storeDetail(StoreAssessmentDetailRequest $request, CourseOffering $courseOffering, AssessmentComponent $assessmentComponent): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -403,7 +406,7 @@ class AssessmentController extends Controller
                 'created_at' => $assessmentDetail->created_at->toISOString(),
                 'updated_at' => $assessmentDetail->updated_at->toISOString(),
             ], [], 'Assessment detail created successfully', 201);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return ApiResponse::error(
                 'Validation failed',
                 $e->errors(),
@@ -431,12 +434,12 @@ class AssessmentController extends Controller
      */
     public function updateDetail(UpdateAssessmentDetailRequest $request, CourseOffering $courseOffering, AssessmentComponent $assessmentComponent, AssessmentComponentDetail $assessmentDetail): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -480,7 +483,7 @@ class AssessmentController extends Controller
                 'created_at' => $assessmentDetail->created_at->toISOString(),
                 'updated_at' => $assessmentDetail->updated_at->toISOString(),
             ], [], 'Assessment detail updated successfully');
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return ApiResponse::error(
                 'Validation failed',
                 $e->errors(),
@@ -509,12 +512,12 @@ class AssessmentController extends Controller
      */
     public function destroyDetail(Request $request, CourseOffering $courseOffering, AssessmentComponent $assessmentComponent, AssessmentComponentDetail $assessmentDetail): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -586,12 +589,12 @@ class AssessmentController extends Controller
      */
     public function gradeByStudent(Request $request, CourseOffering $courseOffering, Student $student): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -630,12 +633,12 @@ class AssessmentController extends Controller
      */
     public function gradeByComponent(Request $request, CourseOffering $courseOffering, AssessmentComponent $assessmentComponent): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -674,12 +677,12 @@ class AssessmentController extends Controller
      */
     public function updateGrade(UpdateGradeRequest $request, CourseOffering $courseOffering, AssessmentComponentDetailScore $score): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -707,6 +710,7 @@ class AssessmentController extends Controller
 
             // Update the score
             $score->update($validated);
+            $this->aggregateManualGradesForOpenManualCourse($courseOffering);
 
             // Load fresh data with relationships
             $score->load('assessmentComponentDetail', 'student');
@@ -720,7 +724,7 @@ class AssessmentController extends Controller
                 [],
                 'Grade updated successfully'
             );
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return ApiResponse::error(
                 'Validation failed',
                 $e->errors(),
@@ -748,12 +752,12 @@ class AssessmentController extends Controller
      */
     public function bulkUpdateGrades(BulkUpdateGradesRequest $request, CourseOffering $courseOffering): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -791,12 +795,16 @@ class AssessmentController extends Controller
                             'assessment_component_detail_id' => $score->assessment_component_detail_id,
                         ];
                     } catch (\Exception $e) {
-                        $errors[] = "Failed to update score ID {$scoreData['id']}: " . $e->getMessage();
+                        $errors[] = "Failed to update score ID {$scoreData['id']}: ".$e->getMessage();
                     }
                 }
             });
 
-            if (!empty($errors)) {
+            if (! empty($updatedScores)) {
+                $this->aggregateManualGradesForOpenManualCourse($courseOffering);
+            }
+
+            if (! empty($errors)) {
                 return ApiResponse::error(
                     'Some grades could not be updated',
                     [
@@ -814,7 +822,7 @@ class AssessmentController extends Controller
                 'operation_completed_at' => now()->toISOString(),
 
             ], [], 'All grades updated successfully');
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return ApiResponse::error(
                 'Validation failed',
                 $e->errors(),
@@ -841,12 +849,12 @@ class AssessmentController extends Controller
      */
     public function validateWeights(Request $request, CourseOffering $courseOffering): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -884,12 +892,12 @@ class AssessmentController extends Controller
      */
     public function exportGradeTemplate(Request $request, CourseOffering $courseOffering, AssessmentComponentDetail $assessmentComponentDetail): BinaryFileResponse|JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -898,7 +906,7 @@ class AssessmentController extends Controller
             }
 
             // Verify the assessment component detail belongs to this course offering
-            if (!$this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
+            if (! $this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
                 return ApiResponse::error(
                     'Assessment component detail does not belong to this course offering',
                     [],
@@ -936,12 +944,12 @@ class AssessmentController extends Controller
      */
     public function importGrades(ImportGradesRequest $request, CourseOffering $courseOffering, AssessmentComponentDetail $assessmentComponentDetail): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -950,7 +958,7 @@ class AssessmentController extends Controller
             }
 
             // Verify the assessment component detail belongs to this course offering
-            if (!$this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
+            if (! $this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
                 return ApiResponse::error(
                     'Assessment component detail does not belong to this course offering',
                     [],
@@ -973,8 +981,8 @@ class AssessmentController extends Controller
             );
 
             // Determine response based on results
-            $hasErrors = !empty($importResults['errors']);
-            $hasWarnings = !empty($importResults['warnings']);
+            $hasErrors = ! empty($importResults['errors']);
+            $hasWarnings = ! empty($importResults['warnings']);
 
             if ($hasErrors && $importResults['successful_updates'] === 0 && $importResults['successful_creates'] === 0) {
                 return ApiResponse::error(
@@ -1030,9 +1038,23 @@ class AssessmentController extends Controller
      */
     private function assessmentBelongsToCourse(AssessmentComponentDetail $assessmentComponentDetail, CourseOffering $courseOffering): bool
     {
-        return $assessmentComponentDetail->assessmentComponent
-            && $assessmentComponentDetail->assessmentComponent->syllabusTemplate
-            && $assessmentComponentDetail->assessmentComponent->syllabusTemplate->unit_id === $courseOffering->unit_id;
+        $assessmentComponent = $assessmentComponentDetail->assessmentComponent;
+
+        return $assessmentComponent !== null
+            && (int) $assessmentComponent->syllabus_template_id === (int) $courseOffering->syllabus_template_id;
+    }
+
+    private function aggregateManualGradesForOpenManualCourse(CourseOffering $courseOffering): void
+    {
+        if ($courseOffering->is_canvas_synced) {
+            return;
+        }
+
+        if (! in_array($courseOffering->course_status, ['not_started', 'in_progress'], true)) {
+            return;
+        }
+
+        app(CourseCompletionService::class)->aggregateManualGrades($courseOffering);
     }
 
     /**
@@ -1040,12 +1062,12 @@ class AssessmentController extends Controller
      */
     public function getGradeTable(GradeTableRequest $request, CourseOffering $courseOffering, AssessmentComponentDetail $assessmentComponentDetail): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -1054,7 +1076,7 @@ class AssessmentController extends Controller
             }
 
             // Verify the assessment component detail belongs to this course offering
-            if (!$this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
+            if (! $this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
                 return ApiResponse::error(
                     'Assessment component detail does not belong to this course offering',
                     [],
@@ -1100,12 +1122,12 @@ class AssessmentController extends Controller
      */
     public function getGradeStatistics(Request $request, CourseOffering $courseOffering, AssessmentComponentDetail $assessmentComponentDetail): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -1114,7 +1136,7 @@ class AssessmentController extends Controller
             }
 
             // Verify the assessment component detail belongs to this course offering
-            if (!$this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
+            if (! $this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
                 return ApiResponse::error(
                     'Assessment component detail does not belong to this course offering',
                     [],
@@ -1156,12 +1178,12 @@ class AssessmentController extends Controller
      */
     public function bulkUpsertGrades(Request $request, CourseOffering $courseOffering, AssessmentComponentDetail $assessmentComponentDetail): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -1170,7 +1192,7 @@ class AssessmentController extends Controller
             }
 
             // Verify the assessment component detail belongs to this course offering
-            if (!$this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
+            if (! $this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
                 return ApiResponse::error(
                     'Assessment component detail does not belong to this course offering',
                     [],
@@ -1200,8 +1222,12 @@ class AssessmentController extends Controller
                 $lecturer->id
             );
 
+            if (! empty($results['created']) || ! empty($results['updated'])) {
+                $this->aggregateManualGradesForOpenManualCourse($courseOffering);
+            }
+
             // Check if there were any errors
-            if (!empty($results['errors'])) {
+            if (! empty($results['errors'])) {
                 return ApiResponse::success(
                     $results,
                     [],
@@ -1214,7 +1240,7 @@ class AssessmentController extends Controller
                 [],
                 'Bulk grade operation completed successfully'
             );
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return ApiResponse::error(
                 'Validation failed',
                 $e->errors(),
@@ -1242,12 +1268,12 @@ class AssessmentController extends Controller
      */
     public function exportGrades(Request $request, CourseOffering $courseOffering, AssessmentComponentDetail $assessmentComponentDetail): BinaryFileResponse|JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             // Check authorization
-            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
@@ -1256,7 +1282,7 @@ class AssessmentController extends Controller
             }
 
             // Verify the assessment component detail belongs to this course offering
-            if (!$this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
+            if (! $this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
                 return ApiResponse::error(
                     'Assessment component detail does not belong to this course offering',
                     [],
@@ -1286,7 +1312,7 @@ class AssessmentController extends Controller
 
                 // Convert to CSV format
                 $csv = $this->convertGradesToCsv($gradeData['data']);
-                $filename = "grades_{$assessmentComponentDetail->id}_" . now()->format('Y-m-d_His') . '.csv';
+                $filename = "grades_{$assessmentComponentDetail->id}_".now()->format('Y-m-d_His').'.csv';
 
                 return response($csv, 200, [
                     'Content-Type' => 'text/csv',
@@ -1332,7 +1358,7 @@ class AssessmentController extends Controller
                 $flags = $record['flags'];
 
                 $csv .= sprintf(
-                    '"%s","%s","%s",%s,%s,"%s","%s","%s","%s","%s",%s,%s,%s,%s,%s,%s' . "\n",
+                    '"%s","%s","%s",%s,%s,"%s","%s","%s","%s","%s",%s,%s,%s,%s,%s,%s'."\n",
                     $student['student_id'],
                     $student['name'],
                     $student['email'],
@@ -1354,7 +1380,7 @@ class AssessmentController extends Controller
                 // Student without score
                 $student = $record['student'];
                 $csv .= sprintf(
-                    '"%s","%s","%s",,,,"not_submitted",,,,,,,,,,' . "\n",
+                    '"%s","%s","%s",,,,"not_submitted",,,,,,,,,,'."\n",
                     $student['student_id'],
                     $student['name'],
                     $student['email']

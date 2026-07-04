@@ -69,7 +69,7 @@ final class GradeDisplayPresenter
             'scale' => $this->normalizeScale($breakdown['scale'] ?? null),
             'final_label' => (string) ($breakdown['final_grade'] ?? $breakdown['final_label'] ?? $finalLetterGrade ?? ''),
             'final_numeric' => $this->finalNumeric($breakdown, $finalPercentage),
-            'pass_status' => $isPassed ? 'passed' : 'failed',
+            'pass_status' => $this->passStatus($breakdown, $isPassed),
             'components' => $this->components($breakdown['components'] ?? []),
         ];
     }
@@ -125,6 +125,39 @@ final class GradeDisplayPresenter
         }
 
         return $finalPercentage !== null ? (float) $finalPercentage : null;
+    }
+
+    /**
+     * Prefer the calculator-authored result stored in grade_breakdown. The
+     * top-level AcademicRecord column can lag behind during in-progress manual
+     * grading before course completion/finalization updates the full record.
+     *
+     * @param  array<string, mixed>  $breakdown
+     */
+    private function passStatus(array $breakdown, bool $isPassed): string
+    {
+        if (array_key_exists('passed', $breakdown)) {
+            return $this->truthy($breakdown['passed']) ? 'passed' : 'failed';
+        }
+
+        return $isPassed ? 'passed' : 'failed';
+    }
+
+    private function truthy(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return ((float) $value) !== 0.0;
+        }
+
+        if (is_string($value)) {
+            return in_array(strtolower($value), ['1', 'true', 'passed', 'p', 'yes'], true);
+        }
+
+        return (bool) $value;
     }
 
     /**

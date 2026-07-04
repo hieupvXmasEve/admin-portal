@@ -80,14 +80,21 @@ class MetropoliaV1Calculator implements GradingCalculator
 
             // Component conversion
             $convertedGrade = null;
+            $requirementStatus = null;
             if ($convDef !== null && $score !== null) {
-                $convertedGrade = $this->convertScore($score, $convDef);
-                $fgSum += $convertedGrade;
+                if (($convDef['type'] ?? null) === 'pass_fail') {
+                    $convertedGrade = $score >= (float) $convDef['min_pct'] ? 'P' : 'F';
+                    $requirementStatus = $convertedGrade === 'P' ? 'passed' : 'failed';
+                } else {
+                    $convertedGrade = $this->convertScore($score, $convDef);
+                    $fgSum += $convertedGrade;
+                }
             }
 
             $componentResults[$code] = [
                 'score_pct' => $score,
                 'converted_grade' => $convertedGrade,
+                'requirement_status' => $requirementStatus,
                 'gate_met' => $gateDef === null
                     ? null
                     : ($score !== null && $score >= (float) $gateDef['min_pct']),

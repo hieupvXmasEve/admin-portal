@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\Lecturer\AssessmentReportController;
 use App\Http\Controllers\Api\V1\Lecturer\AttendanceController;
 use App\Http\Controllers\Api\V1\Lecturer\CourseController;
 use App\Http\Controllers\Api\V1\Lecturer\DashboardController;
+use App\Http\Controllers\Api\V1\Lecturer\GradebookController;
 use App\Http\Controllers\Api\V1\Lecturer\StudentController;
 use App\Http\Controllers\Api\V1\Lecturer\TimetableController;
 use Illuminate\Support\Facades\Route;
@@ -57,6 +58,8 @@ Route::middleware([
         Route::get('/{courseOffering}/statistics', [CourseController::class, 'statistics'])->name('statistics');
         Route::get('/{courseOffering}/students', [CourseController::class, 'students'])->name('students');
         Route::get('/{courseOffering}/sessions', [CourseController::class, 'sessions'])->name('sessions');
+        Route::get('/{courseOffering}/gradebook', [GradebookController::class, 'show'])->name('gradebook.show');
+        Route::post('/{courseOffering}/gradebook/scores', [GradebookController::class, 'saveScores'])->name('gradebook.scores.save');
     });
 
     // Attendance management endpoints

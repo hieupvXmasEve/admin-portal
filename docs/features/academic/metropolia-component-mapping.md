@@ -13,10 +13,10 @@ The pack exposes these stable keys (also returned by
 
 | Programme | Keys |
 | --- | --- |
-| Software 1 | `software_1.programming`, `software_1.database`, `software_1.maths_physics`, `software_1.project` |
-| Software 2 | `software_2.programming`, `software_2.web_development`, `software_2.maths_physics`, `software_2.project` |
-| Hardware 1 | `hardware_1.digital_systems`, `hardware_1.networking`, `hardware_1.linux`, `hardware_1.health_technology`, `hardware_1.maths_physics` |
-| Hardware 2 | `hardware_2.electronics`, `hardware_2.maths_physics`, `hardware_2.cloud_computing`, `hardware_2.project` |
+| Software 1 | `software_1.programming`, `software_1.database`, `software_1.maths`, ``software_1.physics`, `software_1.project` |
+| Software 2 | `software_2.programming`, `software_2.web_development`, `software_2.maths`, ``software_2.physics`, `software_2.project` |
+| Hardware 1 | `hardware_1.digital_systems`, `hardware_1.networking`, `hardware_1.linux`, `hardware_1.health_technology`, `hardware_1.maths`, `hardware_1.physics` |
+| Hardware 2 | `hardware_2.electronics`, `hardware_2.maths`, `hardware_2.physics`, `hardware_2.cloud_computing`, `hardware_2.project` |
 
 Each scheme is stored in the executable shape consumed by the `metropolia_v1`
 calculator (`scale` plus `components[].{code,gate,conversion}`). Component scores

@@ -145,3 +145,21 @@ it('builds the same contract from raw parts (string JSON breakdown, int is_passe
         ->and($display['final_label'])->toBe('P')
         ->and($display['pass_status'])->toBe('passed');
 });
+
+it('prefers the stored breakdown pass result over a stale top-level pass flag', function () {
+    $presenter = app(GradeDisplayPresenter::class);
+
+    $display = $presenter->fromParts(
+        breakdown: [
+            'engine' => 'metropolia_v1',
+            'scale' => 'pass_fail',
+            'final_grade' => 'P',
+            'passed' => true,
+        ],
+        finalLetterGrade: 'P',
+        finalPercentage: null,
+        isPassed: false,
+    );
+
+    expect($display['pass_status'])->toBe('passed');
+});

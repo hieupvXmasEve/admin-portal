@@ -167,7 +167,9 @@ test('pass_fail: 80%+ assignments → P', function () {
 
     expect($result->finalGrade)->toBe('P')
         ->and($result->passed)->toBeTrue()
-        ->and($result->finalPercentage)->toBeNull();
+        ->and($result->finalPercentage)->toBeNull()
+        ->and($result->gradeBreakdown['components']['ASSIGNMENT']['converted_grade'])->toBe('P')
+        ->and($result->gradeBreakdown['components']['ASSIGNMENT']['requirement_status'])->toBe('passed');
 });
 
 test('pass_fail: below 80% assignments → F', function () {
@@ -175,7 +177,9 @@ test('pass_fail: below 80% assignments → F', function () {
     $result = $calculator->calculate(['ASSIGNMENT' => 70.0], databaseScheme());
 
     expect($result->finalGrade)->toBe('F')
-        ->and($result->passed)->toBeFalse();
+        ->and($result->passed)->toBeFalse()
+        ->and($result->gradeBreakdown['components']['ASSIGNMENT']['converted_grade'])->toBe('F')
+        ->and($result->gradeBreakdown['components']['ASSIGNMENT']['requirement_status'])->toBe('failed');
 });
 
 // ─── Direct conversion ───────────────────────────────────────────────────────
