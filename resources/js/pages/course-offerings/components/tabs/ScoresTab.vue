@@ -51,6 +51,25 @@ interface ComponentTotal {
     is_attendance: boolean;
 }
 
+// Presenter-shaped output of GradeDisplayPresenter — stored-breakdown only,
+// never recomputed (ADR 0014). Null until the offering is finalized.
+interface GradeDisplayComponent {
+    code: string;
+    label: string;
+    raw_percentage: number | string | null;
+    converted_grade: number | string | null;
+    requirement_status: string | null;
+}
+
+interface GradeDisplay {
+    scheme_engine: string;
+    scale: 'numeric_0_5' | 'pass_fail' | 'percentage';
+    final_label: string;
+    final_numeric: number | null;
+    pass_status: 'passed' | 'failed';
+    components: GradeDisplayComponent[];
+}
+
 interface StudentScore {
     id: number;
     student_id: string;
@@ -62,10 +81,12 @@ interface StudentScore {
     total_letter_grade: string | null;
     grade_status: string;
     completion_status: string;
+    grade_display: GradeDisplay | null;
 }
 
 interface AssessmentComponent {
     id: number;
+    code: string;
     name: string;
     type: string;
     weight: number;
@@ -86,6 +107,7 @@ export interface ScoresData {
         unit_id: number;
         min_grade_threshold: number;
         semester_id: number;
+        scheme: { engine: string; scale: 'numeric_0_5' | 'pass_fail' | 'percentage' } | null;
     };
 }
 
@@ -238,6 +260,26 @@ const getGradeStatusLabel = (status: string): string => {
     return labels[status] || status;
 };
 
+// ---- Scheme display (stored breakdown only — no live recomputation, ADR 0014) ----
+const hasScheme = computed(() => !!props.scoresData?.course_offering.scheme);
+
+// Sticky right-offset math: the "Total" column always stays at the far right
+// (right-0, 120px wide) so non-scheme offerings render byte-identical to
+// today. When a scheme is present, "Scheme Grade" (160px) sits just left of
+// it, pushing "Status" further left.
+const statusColRightPx = computed(() => (hasScheme.value ? 280 : 120));
+
+const schemeAwaitingFinalization = computed(() => hasScheme.value && !(props.scoresData?.scores_grid ?? []).some((s) => s.grade_display !== null));
+
+const scaleLabel = (scale: GradeDisplay['scale']): string => {
+    const labels: Record<GradeDisplay['scale'], string> = { numeric_0_5: '0–5', pass_fail: 'Pass/Fail', percentage: 'Percentage' };
+    return labels[scale] || scale;
+};
+
+const findComponentDisplay = (student: StudentScore, code: string): GradeDisplayComponent | null => {
+    return student.grade_display?.components.find((c) => c.code === code) ?? null;
+};
+
 </script>
 
 <template>
@@ -268,6 +310,9 @@ const getGradeStatusLabel = (status: string): string => {
                     >
                         {{ scoresData.statistics.average_score.toFixed(1) }}%
                     </span>
+                    <Badge v-if="scoresData.course_offering.scheme" variant="outline" class="gap-1 border-purple-300 text-purple-700 dark:text-purple-400">
+                        {{ scoresData.course_offering.scheme.engine }} · {{ scaleLabel(scoresData.course_offering.scheme.scale) }}
+                    </Badge>
                 </div>
 
                 <div class="flex items-center gap-2">
@@ -282,6 +327,9 @@ const getGradeStatusLabel = (status: string): string => {
                     </Button>
                 </div>
             </div>
+
+            <!-- Scheme empty state: badge shown pre-finalization, grades appear after -->
+            <p v-if="schemeAwaitingFinalization" class="text-muted-foreground text-sm">Scheme grades appear after finalization.</p>
 
             <!-- Legend -->
             <Card>
@@ -369,8 +417,17 @@ const getGradeStatusLabel = (status: string): string => {
                                                 <div class="text-muted-foreground text-[11px]">out of {{ component.weight }}%</div>
                                             </div>
                                         </TableHead>
+                                        <TableHead v-if="hasScheme" class="min-w-[140px] bg-purple-50 text-center dark:bg-purple-950/20">
+                                            <div class="space-y-1.5 text-xs">
+                                                <div class="font-bold text-purple-700 dark:text-purple-400">{{ component.name }} Grade</div>
+                                                <div class="text-muted-foreground text-[11px]">converted / requirement</div>
+                                            </div>
+                                        </TableHead>
                                     </template>
-                                    <TableHead class="sticky right-[120px] z-10 min-w-[100px] bg-white text-center dark:bg-gray-950">Status</TableHead>
+                                    <TableHead class="sticky z-10 min-w-[100px] bg-white text-center dark:bg-gray-950" :style="{ right: statusColRightPx + 'px' }">
+                                        Status
+                                    </TableHead>
+                                    <TableHead v-if="hasScheme" class="sticky right-[120px] z-10 min-w-[160px] bg-white text-center dark:bg-gray-950">Scheme Grade</TableHead>
                                     <TableHead class="sticky right-0 z-10 min-w-[120px] bg-white text-center dark:bg-gray-950">Total</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -412,9 +469,31 @@ const getGradeStatusLabel = (status: string): string => {
                                             </Badge>
                                             <Badge v-else variant="outline" class="text-base">-</Badge>
                                         </TableCell>
+                                        <TableCell v-if="hasScheme" class="bg-purple-50 text-center dark:bg-purple-950/20">
+                                            <div v-if="findComponentDisplay(student, component.code)" class="space-y-1 text-xs">
+                                                <div class="font-semibold">{{ findComponentDisplay(student, component.code)!.converted_grade ?? '-' }}</div>
+                                                <Badge
+                                                    v-if="findComponentDisplay(student, component.code)!.requirement_status"
+                                                    :variant="findComponentDisplay(student, component.code)!.requirement_status === 'passed' ? 'success' : 'destructive'"
+                                                    class="text-[10px]"
+                                                >
+                                                    {{ findComponentDisplay(student, component.code)!.requirement_status === 'passed' ? 'Met' : 'Not met' }}
+                                                </Badge>
+                                            </div>
+                                            <span v-else class="text-muted-foreground text-xs">-</span>
+                                        </TableCell>
                                     </template>
-                                    <TableCell class="sticky right-[120px] z-10 bg-white text-center dark:bg-gray-950">
+                                    <TableCell class="sticky z-10 bg-white text-center dark:bg-gray-950" :style="{ right: statusColRightPx + 'px' }">
                                         <Badge :variant="getGradeStatusVariant(student.grade_status)" class="text-xs">{{ getGradeStatusLabel(student.grade_status) }}</Badge>
+                                    </TableCell>
+                                    <TableCell v-if="hasScheme" class="sticky right-[120px] z-10 bg-white text-center dark:bg-gray-950">
+                                        <div v-if="student.grade_display" class="space-y-1">
+                                            <Badge :variant="student.grade_display.pass_status === 'passed' ? 'success' : 'destructive'" class="text-base font-bold">
+                                                {{ student.grade_display.final_label || student.grade_display.final_numeric }}
+                                            </Badge>
+                                            <div class="text-muted-foreground text-[11px] capitalize">{{ student.grade_display.pass_status }}</div>
+                                        </div>
+                                        <span v-else class="text-muted-foreground text-xs">Not finalized</span>
                                     </TableCell>
                                     <TableCell class="sticky right-0 z-10 bg-white text-center dark:bg-gray-950">
                                         <div class="space-y-1">

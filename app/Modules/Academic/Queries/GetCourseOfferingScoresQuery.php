@@ -21,9 +21,9 @@ class GetCourseOfferingScoresQuery
      * Return the assessment scores grid data for the given course offering.
      *
      * @return array{
-     *   course_offering: array{id: int, unit_id: int, semester_id: int, min_grade_threshold: float},
+     *   course_offering: array{id: int, unit_id: int, semester_id: int, min_grade_threshold: float, scheme: array{engine: string, scale: string}|null},
      *   statistics: array{average_score: float},
-     *   assessment_components: array<int, array{id: int, name: string, type: string, weight: float, details: array}>,
+     *   assessment_components: array<int, array{id: int, code: string, name: string, type: string, weight: float, details: array}>,
      *   assessment_details: array<int, array>,
      *   scores_grid: array<int, array>,
      * }

@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\AcademicRecord;
 use App\Models\CourseOffering;
 use App\Models\Student;
+use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
@@ -318,6 +319,17 @@ class CourseStatisticsService
             ->get()
             ->keyBy('student_id');
 
+        // Scheme metadata for the badge (present pre- and post-finalization,
+        // as long as the syllabus template carries a custom grading scheme).
+        // Per-student grade display only appears once a breakdown is stored
+        // at finalization/recalculation — no live recomputation (ADR 0014).
+        $gradingScheme = $courseOffering->syllabusTemplate?->grading_scheme;
+        $schemeMeta = ! empty($gradingScheme) ? [
+            'engine' => (string) ($gradingScheme['engine'] ?? 'metropolia_v1'),
+            'scale' => $this->normalizeSchemeScale($gradingScheme['scale'] ?? null),
+        ] : null;
+        $presenter = new GradeDisplayPresenter;
+
         // Build scores grid - IMPORTANT: Every student must have scores for ALL assessment details
         $scoresGrid = [];
         foreach ($students as $student) {
@@ -441,6 +453,9 @@ class CourseStatisticsService
                 'total_letter_grade' => $academicRecord?->final_letter_grade ?? null,
                 'grade_status' => $academicRecord?->grade_status ?? 'not_graded',
                 'completion_status' => $academicRecord?->completion_status ?? 'in_progress',
+                'grade_display' => $schemeMeta !== null
+                    ? $this->schemeGradeDisplay($presenter, $academicRecord)
+                    : null,
             ];
         }
 
@@ -461,11 +476,13 @@ class CourseStatisticsService
                 'unit_id' => $courseOffering->unit_id,
                 'semester_id' => $courseOffering->semester_id,
                 'min_grade_threshold' => (float) ($courseOffering->syllabusTemplate?->min_grade_threshold ?? 60.00),
+                'scheme' => $schemeMeta,
             ],
             'statistics' => $statistics,
             'assessment_components' => $assessmentComponents->map(function ($component) {
                 return [
                     'id' => $component->id,
+                    'code' => $component->code,
                     'name' => $component->name,
                     'type' => $component->type,
                     'weight' => $component->weight,
@@ -482,6 +499,49 @@ class CourseStatisticsService
             'assessment_details' => $assessmentDetails,
             'scores_grid' => $scoresGrid,
         ];
+    }
+
+    /**
+     * Normalize a syllabus template's raw scheme scale key to the display
+     * scale, mirroring GradeDisplayPresenter's own normalization so the tab
+     * header badge always agrees with the per-student breakdown.
+     */
+    private function normalizeSchemeScale(mixed $scale): string
+    {
+        return match ((string) $scale) {
+            '0-5', 'numeric_0_5' => 'numeric_0_5',
+            'pass_fail' => 'pass_fail',
+            default => 'percentage',
+        };
+    }
+
+    /**
+     * Present the stored grade breakdown for a student, or null before
+     * finalization (no breakdown has been persisted yet). Never
+     * recalculates — reads only what finalization/recalculation stored.
+     *
+     * @param  \stdClass|null  $academicRecord  raw row from academic_records
+     */
+    private function schemeGradeDisplay(GradeDisplayPresenter $presenter, ?\stdClass $academicRecord): ?array
+    {
+        if ($academicRecord === null) {
+            return null;
+        }
+
+        $breakdown = is_string($academicRecord->grade_breakdown ?? null)
+            ? json_decode($academicRecord->grade_breakdown, true)
+            : null;
+
+        if (! is_array($breakdown) || empty($breakdown)) {
+            return null;
+        }
+
+        return $presenter->fromParts(
+            $breakdown,
+            $academicRecord->final_letter_grade ?? null,
+            $academicRecord->final_percentage ?? null,
+            (bool) ($academicRecord->is_passed ?? false),
+        );
     }
 
     public function getCombinedStatisticsGrid(int $courseOfferingId): array
