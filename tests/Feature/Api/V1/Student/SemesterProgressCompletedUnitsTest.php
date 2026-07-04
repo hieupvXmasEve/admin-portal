@@ -104,3 +104,57 @@ it('counts a passed and finalized course as completed', function () {
         ->assertOk()
         ->assertJsonPath('data.grades_by_semester.0.semester_summary.completed_units', 1);
 });
+
+it('counts every curriculum unit planned for the semester, not just ones the student has started', function () {
+    $semester = Semester::factory()->create();
+    $curriculumVersion = CurriculumVersion::factory()->create();
+    $startedUnit = Unit::factory()->create();
+    $notYetStartedUnit = Unit::factory()->create();
+
+    CurriculumUnit::factory()->create([
+        'curriculum_version_id' => $curriculumVersion->id,
+        'unit_id' => $startedUnit->id,
+        'semester_id' => $semester->id,
+        'semester_number' => 1,
+    ]);
+    CurriculumUnit::factory()->create([
+        'curriculum_version_id' => $curriculumVersion->id,
+        'unit_id' => $notYetStartedUnit->id,
+        'semester_id' => $semester->id,
+        'semester_number' => 1,
+    ]);
+
+    $courseOffering = CourseOffering::factory()->create([
+        'unit_id' => $startedUnit->id,
+        'semester_id' => $semester->id,
+    ]);
+
+    $student = Student::factory()->create([
+        'curriculum_version_id' => $curriculumVersion->id,
+        'intake' => 1,
+        'intake_mode' => 'sequential',
+        'intake_semester_id' => $semester->id,
+    ]);
+
+    // Only the started unit has an academic record — the not-yet-started unit
+    // has none at all (matches a real curriculum roadmap unit the student
+    // hasn't enrolled in yet).
+    AcademicRecord::factory()->create([
+        'student_id' => $student->id,
+        'unit_id' => $startedUnit->id,
+        'semester_id' => $semester->id,
+        'course_offering_id' => $courseOffering->id,
+        'completion_status' => 'completed',
+        'grade_status' => 'final',
+        'is_passed' => true,
+        'credit_points_earned' => 3,
+    ]);
+
+    Sanctum::actingAs($student);
+
+    $this->getJson(route('v1.student.grades.index'))
+        ->assertOk()
+        ->assertJsonPath('data.grades_by_semester.0.curriculum_units', fn ($units) => count($units) === 2)
+        ->assertJsonPath('data.grades_by_semester.0.semester_summary.total_units', 2)
+        ->assertJsonPath('data.grades_by_semester.0.semester_summary.completed_units', 1);
+});

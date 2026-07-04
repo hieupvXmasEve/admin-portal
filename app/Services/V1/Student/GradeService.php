@@ -801,15 +801,23 @@ class GradeService
                 ],
                 'curriculum_units' => $allUnits->toArray(),
                 'modules' => $modulesData,
-                'semester_summary' => $this->buildSemesterSummary($student, $semester, $semesterRecords),
+                'semester_summary' => $this->buildSemesterSummary($student, $semester, $semesterRecords, $semesterUnits->count()),
             ];
         })->sortBy('semester.semester_number')->values()->toArray();
     }
 
     /**
      * Build semester summary, preferring stored GPA calculations when available
+     *
+     * @param  int  $totalUnitsInSemester  every curriculum unit planned for this
+     *                                     semester (per the curriculum roadmap),
+     *                                     not just the ones the student has an
+     *                                     academic record for — otherwise a
+     *                                     student who has only started 1 of 18
+     *                                     planned units reads as "100% complete"
+     *                                     the moment that one unit finishes.
      */
-    protected function buildSemesterSummary(Student $student, Semester $semester, Collection $records): array
+    protected function buildSemesterSummary(Student $student, Semester $semester, Collection $records, int $totalUnitsInSemester): array
     {
         $gpaCalculation = GpaCalculation::query()
             ->where('student_id', $student->id)
@@ -825,7 +833,7 @@ class GradeService
             $passed = $records->where('is_passed', true);
 
             return [
-                'total_units' => $records->count(),
+                'total_units' => $totalUnitsInSemester,
                 'completed_units' => $passed->count(),
                 'total_credits' => (float) $gpaCalculation->semester_credit_points,
                 'earned_credits' => (float) $gpaCalculation->semester_credit_points_earned,
@@ -833,7 +841,7 @@ class GradeService
             ];
         }
 
-        return $this->calculateSemesterSummary($records);
+        return $this->calculateSemesterSummary($records, $totalUnitsInSemester);
     }
 
     /**
@@ -1051,13 +1059,13 @@ class GradeService
     /**
      * Calculate semester summary from records
      */
-    protected function calculateSemesterSummary(Collection $records): array
+    protected function calculateSemesterSummary(Collection $records, int $totalUnitsInSemester): array
     {
         // "Completed" means passed, not merely finalized — see buildSemesterSummary.
         $passed = $records->where('is_passed', true);
 
         return [
-            'total_units' => $records->count(),
+            'total_units' => $totalUnitsInSemester,
             'completed_units' => $passed->count(),
             'total_credits' => $records->sum('credit_points'),
             'earned_credits' => $passed->sum('credit_points_earned') ?? 0,
