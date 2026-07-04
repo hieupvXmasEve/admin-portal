@@ -521,6 +521,14 @@ class CourseStatisticsService
      * recalculates — reads only what finalization/recalculation stored.
      *
      * @param  \stdClass|null  $academicRecord  raw row from academic_records
+     * @return array{
+     *   scheme_engine: string,
+     *   scale: string,
+     *   final_label: string,
+     *   final_numeric: int|float|null,
+     *   pass_status: string,
+     *   components: array<int, array{code: string, label: string, raw_percentage: mixed, converted_grade: mixed, requirement_status: string|null}>,
+     * }|null
      */
     private function schemeGradeDisplay(GradeDisplayPresenter $presenter, ?\stdClass $academicRecord): ?array
     {

@@ -470,17 +470,15 @@ const findComponentDisplay = (student: StudentScore, code: string): GradeDisplay
                                             <Badge v-else variant="outline" class="text-base">-</Badge>
                                         </TableCell>
                                         <TableCell v-if="hasScheme" class="bg-purple-50 text-center dark:bg-purple-950/20">
-                                            <div v-if="findComponentDisplay(student, component.code)" class="space-y-1 text-xs">
-                                                <div class="font-semibold">{{ findComponentDisplay(student, component.code)!.converted_grade ?? '-' }}</div>
-                                                <Badge
-                                                    v-if="findComponentDisplay(student, component.code)!.requirement_status"
-                                                    :variant="findComponentDisplay(student, component.code)!.requirement_status === 'passed' ? 'success' : 'destructive'"
-                                                    class="text-[10px]"
-                                                >
-                                                    {{ findComponentDisplay(student, component.code)!.requirement_status === 'passed' ? 'Met' : 'Not met' }}
-                                                </Badge>
-                                            </div>
-                                            <span v-else class="text-muted-foreground text-xs">-</span>
+                                            <template v-for="(cd, cdIdx) in [findComponentDisplay(student, component.code)]" :key="cdIdx">
+                                                <div v-if="cd" class="space-y-1 text-xs">
+                                                    <div class="font-semibold">{{ cd.converted_grade ?? '-' }} <span class="text-muted-foreground font-normal">({{ cd.raw_percentage ?? '-' }}%)</span></div>
+                                                    <Badge v-if="cd.requirement_status" :variant="cd.requirement_status === 'passed' ? 'success' : 'destructive'" class="text-[10px]">
+                                                        {{ cd.requirement_status === 'passed' ? 'Met' : 'Not met' }}
+                                                    </Badge>
+                                                </div>
+                                                <span v-else class="text-muted-foreground text-xs">-</span>
+                                            </template>
                                         </TableCell>
                                     </template>
                                     <TableCell class="sticky z-10 bg-white text-center dark:bg-gray-950" :style="{ right: statusColRightPx + 'px' }">
