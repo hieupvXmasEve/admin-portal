@@ -242,3 +242,24 @@ default-weighted byte-identical). Full `tests/Feature/Api/V1/Student`,
 (`CourseOfferingOperationalStateTest`, a factory `sequence_number` unique-key
 collision under cross-test load) reproduces independent of this change and
 passes in isolation.
+
+**2026-07-04 — follow-on: deeper bug found and fixed while manually
+verifying against live seeded data.** Checking the real `M-SW1PROG-GATE`
+student post-fix showed `pass_status` still wrong — not a display bug this
+time, `academic_records.is_passed` itself was `true` despite
+`grade_breakdown.gates_passed: false`. Root cause and fix:
+`CourseCompletionService::aggregateManualGrades()` computed the grading
+calculator's authoritative gate-aware `GradingResult::$passed` but discarded
+it; `finalizeAcademicRecords()` re-derived `is_passed` via
+`FailureReasonClassifier::classify()` against the diagnostic 0-100
+`final_percentage`, which is a remap of the raw FG sum computed *before* the
+gate veto — so a gate-fail student with one strong component still cleared
+the threshold. This affected every surface reading `is_passed`
+(`GradeDisplayPresenter` → cockpit issue 02, academic summary issue 03,
+student portal issue 05), system-wide, not seeder-specific. Fixed by
+persisting `passed` inside the stored `grade_breakdown` and threading it
+into the classifier as an optional `gradeFailedOverride` (attendance-based
+failure still combines on top, unchanged for default-weighted courses).
+Recalculated the 15 completed Metropolia seed offerings in dev to backfill
+correct `is_passed`/`credit_points_earned` (ADR 0014). See
+`tests/Feature/Academic/Grading/GateFailurePassStatusFinalizeTest.php`.
