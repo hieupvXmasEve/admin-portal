@@ -818,11 +818,15 @@ class GradeService
             ->first();
 
         if ($gpaCalculation) {
-            $completed = $records->where('completion_status', 'completed');
+            // "Completed" means passed, not merely finalized — a failed course
+            // has completion_status='completed' too, and must not count toward
+            // semester progress (matches the is_passed convention already used
+            // by buildSimpleSummary's overall_summary).
+            $passed = $records->where('is_passed', true);
 
             return [
                 'total_units' => $records->count(),
-                'completed_units' => $completed->count(),
+                'completed_units' => $passed->count(),
                 'total_credits' => (float) $gpaCalculation->semester_credit_points,
                 'earned_credits' => (float) $gpaCalculation->semester_credit_points_earned,
                 'semester_gpa' => (float) $gpaCalculation->semester_gpa,
@@ -1049,13 +1053,14 @@ class GradeService
      */
     protected function calculateSemesterSummary(Collection $records): array
     {
-        $completed = $records->where('completion_status', 'completed');
+        // "Completed" means passed, not merely finalized — see buildSemesterSummary.
+        $passed = $records->where('is_passed', true);
 
         return [
             'total_units' => $records->count(),
-            'completed_units' => $completed->count(),
+            'completed_units' => $passed->count(),
             'total_credits' => $records->sum('credit_points'),
-            'earned_credits' => $completed->sum('credit_points_earned') ?? 0,
+            'earned_credits' => $passed->sum('credit_points_earned') ?? 0,
             'semester_gpa' => $this->calculateSemesterGPA($records),
         ];
     }
