@@ -18,6 +18,12 @@ class CourseRegistration extends AuditableModel
         'confirmed',
     ];
 
+    public const VISIBLE_CLASS_ROSTER_REGISTRATION_STATUSES = [
+        'confirmed',
+        'completed',
+        'defer',
+    ];
+
     protected $fillable = [
         'student_id',
         'course_offering_id',
@@ -133,6 +139,11 @@ class CourseRegistration extends AuditableModel
             && (bool) $this->student?->isClassRosterActive();
     }
 
+    public function isClassRosterVisible(): bool
+    {
+        return in_array($this->registration_status, self::VISIBLE_CLASS_ROSTER_REGISTRATION_STATUSES, true);
+    }
+
     public function classRosterStatus(): string
     {
         if (! in_array($this->registration_status, self::CLASS_ROSTER_REGISTRATION_STATUSES, true)) {
@@ -157,6 +168,8 @@ class CourseRegistration extends AuditableModel
         return match ($this->classRosterStatus()) {
             'active' => 'Active',
             'deferred' => 'Deferred',
+            'defer' => 'Deferred',
+            'completed' => 'Completed',
             'dropout' => 'Dropout',
             'dropout_transfer' => 'Dropout Transfer',
             'inactive' => 'Inactive',
@@ -226,6 +239,11 @@ class CourseRegistration extends AuditableModel
             ->whereHas('student', function (Builder $query) {
                 $query->classRosterActive();
             });
+    }
+
+    public function scopeVisibleForClassRoster(Builder $query): void
+    {
+        $query->whereIn('registration_status', self::VISIBLE_CLASS_ROSTER_REGISTRATION_STATUSES);
     }
 
     public function scopeCompleted(Builder $query): void

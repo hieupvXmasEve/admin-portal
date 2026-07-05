@@ -13,7 +13,7 @@ Base path: `/api/v1/lecturer/attendance`
 - Success shape: `{ data, message? }` or paginated: `{ data, meta, links }` per project `ApiResponse`.
 - Date/time follow ISO or sample formatting in examples.
 - Nullable fields may appear when data is not available (e.g., `attendance_percentage`).
-- Lecturer attendance rosters return the full confirmed class roster. Students who entered a class and later move to DE states (`deferred`, `dropout`, `dropout_transfer`, or `inactive`) remain in `students` with inactive roster metadata, but they are excluded from active attendance counts across EGC and Major classes. Historical registrations and attendance records are retained.
+- Lecturer attendance rosters return visible roster history. Students whose registration is `completed` or `defer`, and students who entered a class and later move to DE states (`deferred`, `dropout`, `dropout_transfer`, or `inactive`), remain in `students` with inactive roster metadata, but they are excluded from active attendance counts across EGC and Major classes. Historical registrations and attendance records are retained.
 
 ---
 
@@ -106,7 +106,7 @@ Response (200):
 
 GET `/sessions/{sessionId}`
 
-The `students` list includes active and inactive class-roster students. DE/inactive rows include `is_roster_active: false`, `can_mark_attendance: false`, and a `roster_status`/`roster_status_label` for UI badges. `summary.total_enrolled`, `expected_attendees`, `actual_attendees`, attendance counts, and rates are calculated from active roster students only.
+The `students` list includes active and inactive class-roster students. Completed, defer, DE, and inactive rows include `is_roster_active: false`, `can_mark_attendance: false`, and a `roster_status`/`roster_status_label` for UI badges. `summary.total_enrolled`, `expected_attendees`, `actual_attendees`, attendance counts, and rates are calculated from active roster students only.
 
 Response (200):
 ```json
@@ -202,7 +202,7 @@ Response (200):
 
 POST `/sessions/{sessionId}/mark`
 
-Requests containing a DE/inactive student are accepted for the active students and return a per-student error for the inactive roster entry: `Student is not active in this class roster`. The lecturer portal should not submit rows with `can_mark_attendance: false`.
+Requests containing a completed, defer, DE, or inactive student are accepted for the active students and return a per-student error for the inactive roster entry: `Student is not active in this class roster`. The lecturer portal should not submit rows with `can_mark_attendance: false`.
 
 Body:
 ```json
@@ -348,7 +348,7 @@ Response (200):
 
 POST `/sessions/{sessionId}/generate`
 
-Purpose: Create default `absent` records for all active class-roster students if not existing. DE/inactive students are skipped.
+Purpose: Create default `absent` records for all active class-roster students if not existing. Completed, defer, DE, and inactive students are skipped.
 
 Response (200):
 ```json

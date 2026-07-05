@@ -56,7 +56,9 @@ interface CourseOffering {
   delivery_mode: 'online' | 'in_person' | 'hybrid' | 'blended';
   location?: string;
   max_capacity: number;
-  current_enrollment: number;
+  current_enrollment: number; // Visible roster count (confirmed + completed + defer)
+  active_roster_students: number; // Active/markable attendance targets
+  visible_roster_students: number;
   enrollment_status: 'open' | 'closed' | 'full';
   schedule_days: string[]; // ["Monday", "Wednesday", "Friday"]
   schedule_time_start?: string; // "09:00"
@@ -83,9 +85,15 @@ interface CourseOffering {
   
   // Enrollment Statistics
   enrollment_stats: {
-    enrolled_count: number;
+    enrolled_count: number; // Visible roster count
+    active_roster_count: number;
+    visible_roster_count: number;
+    inactive_roster_count: number;
+    completed_count: number;
+    deferred_count: number;
     capacity_utilization: number; // Percentage (0-100+)
     available_spots: number;
+    active_available_spots: number;
     is_full: boolean;
   };
   
@@ -221,7 +229,9 @@ interface CourseDetail {
     delivery_mode: string;
     location?: string;
     max_capacity: number;
-    current_enrollment: number;
+    current_enrollment: number; // Visible roster count
+    active_roster_students: number;
+    visible_roster_students: number;
     enrollment_status: string;
     schedule_days: string[];
     schedule_time_start?: string;
@@ -245,11 +255,17 @@ interface CourseDetail {
   // Detailed Enrollment Statistics
   enrollment_statistics: {
     total_registrations: number;    // All registrations (including waitlisted/dropped)
-    enrolled_students: number;      // Confirmed enrollments
+    enrolled_students: number;      // Visible roster count
+    active_roster_students: number; // Active/markable attendance targets
+    visible_roster_students: number;
+    inactive_roster_students: number;
+    completed_students: number;
+    deferred_students: number;
     waitlisted_students: number;    // Students on waitlist
     dropped_students: number;       // Students who dropped
     capacity_utilization: number;   // Percentage of capacity used
     available_spots: number;        // Remaining capacity
+    active_available_spots: number; // Remaining active capacity
   };
   
   // Detailed Attendance Statistics
@@ -414,11 +430,17 @@ interface CourseStatisticsResponse {
 interface CourseStatistics {
   enrollment_stats: {
     total_registrations: number;
-    enrolled_students: number;
+    enrolled_students: number; // Visible roster count
+    active_roster_students: number;
+    visible_roster_students: number;
+    inactive_roster_students: number;
+    completed_students: number;
+    deferred_students: number;
     waitlisted_students: number;
     dropped_students: number;
     capacity_utilization: number;
     available_spots: number;
+    active_available_spots: number;
   };
   
   attendance_stats: {
@@ -496,9 +518,19 @@ interface CourseStudent {
   
   // Course Registration Information
   registration: {
-    status: 'confirmed' | 'waitlisted' | 'dropped';
+    status: 'confirmed' | 'completed' | 'defer' | 'waitlisted' | 'dropped';
     attempt_number: number;  // 1, 2, 3... for retakes
     is_retake: boolean;
+  };
+
+  // Class Roster Status
+  // The endpoint includes visible roster history. Only rows with
+  // roster.is_active=true are active/markable attendance targets.
+  roster: {
+    is_active: boolean;
+    status: 'active' | 'completed' | 'defer' | 'deferred' | 'dropout' | 'dropout_transfer' | 'inactive' | string;
+    status_label: string;
+    can_mark_attendance: boolean;
   };
   
   // Academic Scores and Grades
@@ -516,7 +548,7 @@ interface CourseStudent {
     total_sessions: number;
     last_attendance?: string;     // "2024-04-10"
     meets_requirement: boolean;   // >= 75% typically
-    status: 'excellent' | 'good' | 'warning' | 'at_risk';
+    status: 'excellent' | 'good' | 'warning' | 'at_risk' | 'inactive';
     status_label: string;
     status_color: 'green' | 'blue' | 'yellow' | 'red' | 'gray';
   };
@@ -780,6 +812,7 @@ interface FilterOptions {
     code: string;      // "2024S1"
     start_date: string;
     end_date: string;
+    is_active: boolean;
   }>;
   
   delivery_modes: Array<{
@@ -805,7 +838,8 @@ interface FilterOptions {
         "name": "Semester 1, 2024",
         "code": "2024S1",
         "start_date": "2024-02-26",
-        "end_date": "2024-06-21"
+        "end_date": "2024-06-21",
+        "is_active": true
       }
     ],
     "delivery_modes": [

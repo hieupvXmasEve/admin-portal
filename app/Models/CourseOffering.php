@@ -160,7 +160,7 @@ class CourseOffering extends AuditableModel
     public function classRosterRegistrations(): HasMany
     {
         return $this->hasMany(CourseRegistration::class, 'course_offering_id')
-            ->whereIn('registration_status', CourseRegistration::CLASS_ROSTER_REGISTRATION_STATUSES);
+            ->visibleForClassRoster();
     }
 
     public function activeClassRosterRegistrations(): HasMany

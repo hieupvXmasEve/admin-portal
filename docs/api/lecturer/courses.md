@@ -6,7 +6,7 @@
 
 **Description:** Retrieves a paginated list of course offerings assigned to the authenticated lecturer with filtering capabilities.
 
-Enrollment counts are based on the active class roster. Course student lists return the full confirmed roster so lecturers can still see students who entered a class and later moved to DE states (`deferred`, `dropout`, `dropout_transfer`, or `inactive`). Those rows include inactive roster metadata for UI badges and are not counted as active attendees for attendance calculations.
+Enrollment counts are based on the active class roster. Course student lists return visible roster history so lecturers can still see students who entered a class and later moved to completed, deferred, dropout, dropout transfer, or inactive states. Those rows include inactive roster metadata for UI badges and are not counted as active attendees for attendance calculations.
 
 ### Headers
 ```
@@ -136,7 +136,9 @@ interface CourseOffering {
   delivery_mode: string;
   location: string;
   max_capacity: number;
-  current_enrollment: number;
+  current_enrollment: number; // Visible roster count (confirmed + completed + defer)
+  active_roster_students: number; // Active/markable attendance targets
+  visible_roster_students: number;
   enrollment_status: string;
   schedule_days: string[];
   schedule_time_start: string;
@@ -169,9 +171,15 @@ interface Semester {
 }
 
 interface EnrollmentStats {
-  enrolled_count: number;
+  enrolled_count: number; // Visible roster count
+  active_roster_count: number;
+  visible_roster_count: number;
+  inactive_roster_count: number;
+  completed_count: number;
+  deferred_count: number;
   capacity_utilization: number;
   available_spots: number;
+  active_available_spots: number;
   is_full: boolean;
 }
 

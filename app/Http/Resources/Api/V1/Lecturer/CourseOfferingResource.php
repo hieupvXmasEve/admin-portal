@@ -14,7 +14,8 @@ class CourseOfferingResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $activeRosterEnrollment = $this->activeRosterEnrollmentCount();
+        $rosterStats = $this->rosterEnrollmentStats();
+        $visibleRosterEnrollment = $rosterStats['visible_roster_count'];
 
         return [
             'id' => $this->id,
@@ -22,7 +23,7 @@ class CourseOfferingResource extends JsonResource
             'delivery_mode' => $this->delivery_mode,
             'location' => $this->location,
             'max_capacity' => $this->max_capacity,
-            'current_enrollment' => $activeRosterEnrollment,
+            'current_enrollment' => $visibleRosterEnrollment,
             'enrollment_status' => $this->enrollment_status,
             'schedule_days' => $this->schedule_days,
             'schedule_time_start' => $this->schedule_time_start?->format('H:i'),
@@ -53,12 +54,18 @@ class CourseOfferingResource extends JsonResource
 
             // Enrollment Statistics
             'enrollment_stats' => [
-                'enrolled_count' => $activeRosterEnrollment,
+                'enrolled_count' => $visibleRosterEnrollment,
+                'active_roster_count' => $rosterStats['active_roster_count'],
+                'visible_roster_count' => $rosterStats['visible_roster_count'],
+                'inactive_roster_count' => $rosterStats['inactive_roster_count'],
+                'completed_count' => $rosterStats['completed_count'],
+                'deferred_count' => $rosterStats['deferred_count'],
                 'capacity_utilization' => $this->max_capacity > 0
-                    ? round(($activeRosterEnrollment / $this->max_capacity) * 100, 1)
+                    ? round(($visibleRosterEnrollment / $this->max_capacity) * 100, 1)
                     : 0,
-                'available_spots' => max(0, $this->max_capacity - $activeRosterEnrollment),
-                'is_full' => $activeRosterEnrollment >= $this->max_capacity,
+                'available_spots' => max(0, $this->max_capacity - $visibleRosterEnrollment),
+                'active_available_spots' => max(0, $this->max_capacity - $rosterStats['active_roster_count']),
+                'is_full' => $visibleRosterEnrollment >= $this->max_capacity,
             ],
 
             // Session Statistics
@@ -156,11 +163,34 @@ class CourseOfferingResource extends JsonResource
         // 3. Overenrolled
 
         $hasUnmarkedAttendance = $this->hasSessionsNeedingAttendance();
-        $activeRosterEnrollment = $this->activeRosterEnrollmentCount();
-        $lowEnrollment = $this->max_capacity > 0 && ($activeRosterEnrollment / $this->max_capacity) < 0.5;
-        $overenrolled = $activeRosterEnrollment > $this->max_capacity;
+        $visibleRosterEnrollment = $this->rosterEnrollmentStats()['visible_roster_count'];
+        $lowEnrollment = $this->max_capacity > 0 && ($visibleRosterEnrollment / $this->max_capacity) < 0.5;
+        $overenrolled = $visibleRosterEnrollment > $this->max_capacity;
 
         return $hasUnmarkedAttendance || $lowEnrollment || $overenrolled;
+    }
+
+    protected function rosterEnrollmentStats(): array
+    {
+        $registrations = $this->relationLoaded('classRosterRegistrations')
+            ? $this->classRosterRegistrations
+            : $this->classRosterRegistrations()->with('student')->get();
+        $activeRosterCount = $registrations
+            ->filter(fn ($registration) => $registration->isClassRosterActive())
+            ->count();
+        $visibleRosterCount = $registrations->count();
+
+        return [
+            'active_roster_count' => $activeRosterCount,
+            'visible_roster_count' => $visibleRosterCount,
+            'inactive_roster_count' => $visibleRosterCount - $activeRosterCount,
+            'completed_count' => $registrations
+                ->where('registration_status', 'completed')
+                ->count(),
+            'deferred_count' => $registrations
+                ->filter(fn ($registration) => in_array($registration->classRosterStatus(), ['defer', 'deferred'], true))
+                ->count(),
+        ];
     }
 
     protected function activeRosterEnrollmentCount(): int

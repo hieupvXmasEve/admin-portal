@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\V1\Lecturer;
 
 use App\Models\CourseOffering;
-use App\Models\CourseRegistration;
 use App\Models\Lecture;
 use App\Models\Unit;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -55,7 +54,7 @@ class LecturerCourseService
      */
     public function getCourseOfferingDetails(Lecture $lecturer, int $courseOfferingId): ?array
     {
-        $cacheKey = "lecturer-course-details:{$lecturer->id}:{$courseOfferingId}";
+        $cacheKey = "lecturer-course-details:v2:{$lecturer->id}:{$courseOfferingId}";
 
         return Cache::remember($cacheKey, 600, function () use ($lecturer, $courseOfferingId) {
             // Only get course offering if lecturer is assigned to at least one class session
@@ -184,7 +183,7 @@ class LecturerCourseService
                         ->latest('effective_date');
                 },
             ])
-            ->whereIn('registration_status', CourseRegistration::CLASS_ROSTER_REGISTRATION_STATUSES);
+            ->visibleForClassRoster();
 
         // Apply student filters
         $this->applyStudentFilters($studentsQuery, $filters);
@@ -273,6 +272,7 @@ class LecturerCourseService
                     'code' => $semester->code,
                     'start_date' => $semester->start_date?->format('Y-m-d'),
                     'end_date' => $semester->end_date?->format('Y-m-d'),
+                    'is_active' => (bool) $semester->is_active,
                 ];
             }),
             'delivery_modes' => $deliveryModes->map(function ($mode) {
@@ -351,7 +351,7 @@ class LecturerCourseService
      */
     protected function formatCourseOffering(CourseOffering $courseOffering): array
     {
-        $activeRosterEnrollment = $this->getActiveRosterEnrollmentCount($courseOffering);
+        $rosterStats = $this->getRosterEnrollmentStats($courseOffering);
 
         return [
             'id' => $courseOffering->id,
@@ -359,7 +359,9 @@ class LecturerCourseService
             'delivery_mode' => $courseOffering->delivery_mode,
             'location' => $courseOffering->location,
             'max_capacity' => $courseOffering->max_capacity,
-            'current_enrollment' => $activeRosterEnrollment,
+            'current_enrollment' => $rosterStats['visible_roster_students'],
+            'active_roster_students' => $rosterStats['active_roster_students'],
+            'visible_roster_students' => $rosterStats['visible_roster_students'],
             'enrollment_status' => $courseOffering->enrollment_status,
             'schedule_days' => $courseOffering->schedule_days,
             'schedule_time_start' => $courseOffering->schedule_time_start?->format('H:i'),
@@ -387,7 +389,8 @@ class LecturerCourseService
     protected function getEnrollmentStatistics(CourseOffering $courseOffering): array
     {
         $totalRegistrations = $courseOffering->courseRegistrations()->count();
-        $enrolledStudents = $this->getActiveRosterEnrollmentCount($courseOffering);
+        $rosterStats = $this->getRosterEnrollmentStats($courseOffering);
+        $enrolledStudents = $rosterStats['visible_roster_students'];
         $waitlistedStudents = $courseOffering->courseRegistrations()
             ->where('registration_status', 'waitlisted')->count();
         $droppedStudents = $courseOffering->courseRegistrations()
@@ -396,18 +399,43 @@ class LecturerCourseService
         return [
             'total_registrations' => $totalRegistrations,
             'enrolled_students' => $enrolledStudents,
+            'active_roster_students' => $rosterStats['active_roster_students'],
+            'visible_roster_students' => $rosterStats['visible_roster_students'],
+            'inactive_roster_students' => $rosterStats['inactive_roster_students'],
+            'completed_students' => $rosterStats['completed_students'],
+            'deferred_students' => $rosterStats['deferred_students'],
             'waitlisted_students' => $waitlistedStudents,
             'dropped_students' => $droppedStudents,
             'capacity_utilization' => $courseOffering->max_capacity > 0
                 ? round(($enrolledStudents / $courseOffering->max_capacity) * 100, 1)
                 : 0,
             'available_spots' => max(0, $courseOffering->max_capacity - $enrolledStudents),
+            'active_available_spots' => max(0, $courseOffering->max_capacity - $rosterStats['active_roster_students']),
         ];
     }
 
-    protected function getActiveRosterEnrollmentCount(CourseOffering $courseOffering): int
+    protected function getRosterEnrollmentStats(CourseOffering $courseOffering): array
     {
-        return $courseOffering->activeClassRosterEnrollmentCount();
+        $registrations = $courseOffering->relationLoaded('classRosterRegistrations')
+            ? $courseOffering->classRosterRegistrations
+            : $courseOffering->classRosterRegistrations()->with('student')->get();
+
+        $activeRosterStudents = $registrations
+            ->filter(fn ($registration) => $registration->isClassRosterActive())
+            ->count();
+        $visibleRosterStudents = $registrations->count();
+
+        return [
+            'active_roster_students' => $activeRosterStudents,
+            'visible_roster_students' => $visibleRosterStudents,
+            'inactive_roster_students' => $visibleRosterStudents - $activeRosterStudents,
+            'completed_students' => $registrations
+                ->where('registration_status', 'completed')
+                ->count(),
+            'deferred_students' => $registrations
+                ->filter(fn ($registration) => in_array($registration->classRosterStatus(), ['defer', 'deferred'], true))
+                ->count(),
+        ];
     }
 
     /**

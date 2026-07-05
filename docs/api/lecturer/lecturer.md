@@ -147,7 +147,9 @@ interface CourseOffering {
   delivery_mode: string;
   location?: string;
   max_capacity: number;
-  current_enrollment: number;
+  current_enrollment: number; // Visible roster count (confirmed + completed + defer)
+  active_roster_students: number;
+  visible_roster_students: number;
   enrollment_status: string;
   schedule_days: string[];
   schedule_time_start?: string; // "HH:mm"
@@ -171,9 +173,15 @@ interface CourseOffering {
   };
   
   enrollment_stats: {
-    enrolled_count: number;
+    enrolled_count: number; // Visible roster count
+    active_roster_count: number;
+    visible_roster_count: number;
+    inactive_roster_count: number;
+    completed_count: number;
+    deferred_count: number;
     capacity_utilization: number;
     available_spots: number;
+    active_available_spots: number;
     is_full: boolean;
   };
   
@@ -209,10 +217,18 @@ GET /api/v1/lecturer/courses/{courseOfferingId}
 interface CourseDetail {
   course_offering: CourseOffering;
   enrollment_statistics: {
-    current_enrollment: number;
-    max_capacity: number;
+    total_registrations: number;
+    enrolled_students: number; // Visible roster count
+    active_roster_students: number;
+    visible_roster_students: number;
+    inactive_roster_students: number;
+    completed_students: number;
+    deferred_students: number;
+    waitlisted_students: number;
+    dropped_students: number;
     capacity_utilization: number;
-    enrollment_trend: string;
+    available_spots: number;
+    active_available_spots: number;
   };
   attendance_statistics: {
     overall_attendance_rate: number;
@@ -285,9 +301,16 @@ interface CourseStudent {
   registration_date: string;
   
   registration: {
-    status: string;
+    status: 'confirmed' | 'completed' | 'defer' | 'waitlisted' | 'dropped' | string;
     attempt_number: number;
     is_retake: boolean;
+  };
+
+  roster: {
+    is_active: boolean;
+    status: 'active' | 'completed' | 'defer' | 'deferred' | 'dropout' | 'dropout_transfer' | 'inactive' | string;
+    status_label: string;
+    can_mark_attendance: boolean;
   };
   
   academics: {
@@ -303,7 +326,7 @@ interface CourseStudent {
     total_sessions: number;
     last_attendance?: string;
     meets_requirement: boolean;
-    status: 'excellent' | 'good' | 'warning' | 'at_risk';
+    status: 'excellent' | 'good' | 'warning' | 'at_risk' | 'inactive';
     status_label: string;
     status_color: 'green' | 'blue' | 'yellow' | 'red' | 'gray';
   };

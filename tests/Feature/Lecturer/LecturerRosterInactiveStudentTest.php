@@ -14,6 +14,8 @@ use App\Models\Unit;
 use App\Services\V1\Lecturer\LecturerAttendanceService;
 use App\Services\V1\Lecturer\LecturerCourseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
@@ -25,6 +27,9 @@ beforeEach(function () {
     ]);
     $this->lecturer = Lecture::factory()->create([
         'campus_id' => $this->campus->id,
+        'employment_status' => 'active',
+        'is_active' => true,
+        'is_available_for_assignment' => true,
     ]);
     $this->unit = Unit::factory()->create([
         'code' => 'COS10009',
@@ -165,9 +170,17 @@ it('returns active and inactive roster students from the lecturer course student
     $majorStudent = lecturerRosterStudent($this->campus, $this->semester, 'intake_major');
     $deferredStudent = lecturerRosterStudent($this->campus, $this->semester, 'deferred');
     $dropoutStudent = lecturerRosterStudent($this->campus, $this->semester, 'dropout');
+    $completedRegistrationStudent = lecturerRosterStudent($this->campus, $this->semester, 'intake_pre_uni_gc');
+    $deferredRegistrationStudent = lecturerRosterStudent($this->campus, $this->semester, 'intake_pre_uni_gc');
 
     collect([$egcStudent, $majorStudent, $deferredStudent, $dropoutStudent])
         ->each(fn (Student $student) => lecturerRosterRegistration($student, $this->offering));
+    lecturerRosterRegistration($completedRegistrationStudent, $this->offering, [
+        'registration_status' => 'completed',
+    ]);
+    lecturerRosterRegistration($deferredRegistrationStudent, $this->offering, [
+        'registration_status' => 'defer',
+    ]);
 
     $students = app(LecturerCourseService::class)
         ->getCourseStudents($this->lecturer, $this->offering->id);
@@ -175,7 +188,14 @@ it('returns active and inactive roster students from the lecturer course student
     $studentsById = collect($students)->keyBy('student_id');
 
     expect($studentsById->keys()->all())
-        ->toEqualCanonicalizing([$egcStudent->id, $majorStudent->id, $deferredStudent->id, $dropoutStudent->id])
+        ->toEqualCanonicalizing([
+            $egcStudent->id,
+            $majorStudent->id,
+            $deferredStudent->id,
+            $dropoutStudent->id,
+            $completedRegistrationStudent->id,
+            $deferredRegistrationStudent->id,
+        ])
         ->and($studentsById[$egcStudent->id]['is_roster_active'])->toBeTrue()
         ->and($studentsById[$majorStudent->id]['is_roster_active'])->toBeTrue()
         ->and($studentsById[$deferredStudent->id]['is_roster_active'])->toBeFalse()
@@ -184,7 +204,114 @@ it('returns active and inactive roster students from the lecturer course student
         ->and($studentsById[$deferredStudent->id]['can_mark_attendance'])->toBeFalse()
         ->and($studentsById[$deferredStudent->id]['status'])->toBe('inactive')
         ->and($studentsById[$dropoutStudent->id]['is_roster_active'])->toBeFalse()
-        ->and($studentsById[$dropoutStudent->id]['roster_status'])->toBe('dropout');
+        ->and($studentsById[$dropoutStudent->id]['roster_status'])->toBe('dropout')
+        ->and($studentsById[$completedRegistrationStudent->id]['is_roster_active'])->toBeFalse()
+        ->and($studentsById[$completedRegistrationStudent->id]['roster_status'])->toBe('completed')
+        ->and($studentsById[$completedRegistrationStudent->id]['can_mark_attendance'])->toBeFalse()
+        ->and($studentsById[$completedRegistrationStudent->id]['status'])->toBe('inactive')
+        ->and($studentsById[$deferredRegistrationStudent->id]['is_roster_active'])->toBeFalse()
+        ->and($studentsById[$deferredRegistrationStudent->id]['roster_status'])->toBe('defer')
+        ->and($studentsById[$deferredRegistrationStudent->id]['roster_status_label'])->toBe('Deferred')
+        ->and($studentsById[$deferredRegistrationStudent->id]['can_mark_attendance'])->toBeFalse()
+        ->and($studentsById[$deferredRegistrationStudent->id]['status'])->toBe('inactive');
+});
+
+it('returns completed and deferred registrations through the lecturer course students HTTP endpoint', function () {
+    $activeStudent = lecturerRosterStudent($this->campus, $this->semester, 'intake_course');
+    $completedRegistrationStudent = lecturerRosterStudent($this->campus, $this->semester, 'intake_pre_uni_gc');
+    $deferredRegistrationStudent = lecturerRosterStudent($this->campus, $this->semester, 'intake_pre_uni_gc');
+
+    lecturerRosterRegistration($activeStudent, $this->offering);
+    lecturerRosterRegistration($completedRegistrationStudent, $this->offering, [
+        'registration_status' => 'completed',
+    ]);
+    lecturerRosterRegistration($deferredRegistrationStudent, $this->offering, [
+        'registration_status' => 'defer',
+    ]);
+
+    Sanctum::actingAs($this->lecturer);
+
+    $response = $this->getJson("/api/v1/lecturer/courses/{$this->offering->id}/students");
+
+    $response->assertOk()->assertJsonPath('success', true);
+
+    $studentsById = collect($response->json('data'))->keyBy('student_id');
+
+    expect($studentsById->keys()->all())
+        ->toEqualCanonicalizing([
+            $activeStudent->id,
+            $completedRegistrationStudent->id,
+            $deferredRegistrationStudent->id,
+        ])
+        ->and($studentsById[$activeStudent->id]['registration']['status'])->toBe('confirmed')
+        ->and($studentsById[$activeStudent->id]['roster']['is_active'])->toBeTrue()
+        ->and($studentsById[$activeStudent->id]['roster']['can_mark_attendance'])->toBeTrue()
+        ->and($studentsById[$completedRegistrationStudent->id]['registration']['status'])->toBe('completed')
+        ->and($studentsById[$completedRegistrationStudent->id]['roster']['status'])->toBe('completed')
+        ->and($studentsById[$completedRegistrationStudent->id]['roster']['is_active'])->toBeFalse()
+        ->and($studentsById[$completedRegistrationStudent->id]['roster']['can_mark_attendance'])->toBeFalse()
+        ->and($studentsById[$deferredRegistrationStudent->id]['registration']['status'])->toBe('defer')
+        ->and($studentsById[$deferredRegistrationStudent->id]['roster']['status'])->toBe('defer')
+        ->and($studentsById[$deferredRegistrationStudent->id]['roster']['status_label'])->toBe('Deferred')
+        ->and($studentsById[$deferredRegistrationStudent->id]['roster']['is_active'])->toBeFalse()
+        ->and($studentsById[$deferredRegistrationStudent->id]['roster']['can_mark_attendance'])->toBeFalse();
+});
+
+it('returns visible roster counts from the lecturer courses index and detail endpoints', function () {
+    $activeStudent = lecturerRosterStudent($this->campus, $this->semester, 'intake_course');
+    $completedRegistrationStudent = lecturerRosterStudent($this->campus, $this->semester, 'intake_pre_uni_gc');
+    $deferredRegistrationStudent = lecturerRosterStudent($this->campus, $this->semester, 'intake_pre_uni_gc');
+
+    lecturerRosterRegistration($activeStudent, $this->offering);
+    lecturerRosterRegistration($completedRegistrationStudent, $this->offering, [
+        'registration_status' => 'completed',
+    ]);
+    lecturerRosterRegistration($deferredRegistrationStudent, $this->offering, [
+        'registration_status' => 'defer',
+    ]);
+
+    Cache::flush();
+    Sanctum::actingAs($this->lecturer);
+
+    $indexResponse = $this->getJson('/api/v1/lecturer/courses?per_page=12&page=1');
+    $detailResponse = $this->getJson("/api/v1/lecturer/courses/{$this->offering->id}");
+
+    $indexResponse->assertOk()->assertJsonPath('success', true);
+    $detailResponse->assertOk()->assertJsonPath('success', true);
+
+    $course = collect($indexResponse->json('data'))->firstWhere('id', $this->offering->id);
+
+    expect($course)->not->toBeNull()
+        ->and($course['current_enrollment'])->toBe(3)
+        ->and($course['enrollment_stats']['enrolled_count'])->toBe(3)
+        ->and($course['enrollment_stats']['active_roster_count'])->toBe(1)
+        ->and($course['enrollment_stats']['visible_roster_count'])->toBe(3)
+        ->and($course['enrollment_stats']['completed_count'])->toBe(1)
+        ->and($course['enrollment_stats']['deferred_count'])->toBe(1)
+        ->and($detailResponse->json('data.course_offering.current_enrollment'))->toBe(3)
+        ->and($detailResponse->json('data.course_offering.active_roster_students'))->toBe(1)
+        ->and($detailResponse->json('data.course_offering.visible_roster_students'))->toBe(3)
+        ->and($detailResponse->json('data.enrollment_statistics.enrolled_students'))->toBe(3)
+        ->and($detailResponse->json('data.enrollment_statistics.active_roster_students'))->toBe(1)
+        ->and($detailResponse->json('data.enrollment_statistics.visible_roster_students'))->toBe(3)
+        ->and($detailResponse->json('data.enrollment_statistics.completed_students'))->toBe(1)
+        ->and($detailResponse->json('data.enrollment_statistics.deferred_students'))->toBe(1);
+});
+
+it('returns lecturer course semester filter options with active flags', function () {
+    Sanctum::actingAs($this->lecturer);
+
+    $response = $this->getJson('/api/v1/lecturer/courses/filter-options');
+
+    $response->assertOk()->assertJsonPath('success', true);
+
+    $semesters = collect($response->json('data.semesters'));
+    $semester = $semesters->firstWhere('id', $this->semester->id);
+
+    expect($semester)->not->toBeNull()
+        ->and($semester['name'])->toBe($this->semester->name)
+        ->and($semester['code'])->toBe($this->semester->code)
+        ->and($semester['is_active'])->toBeTrue();
 });
 
 function lecturerRosterStudent(Campus $campus, Semester $semester, string $status): Student
