@@ -9,7 +9,6 @@ use App\Modules\Academic\Http\Web\Canvas\PreviewCanvasGradeSyncController;
 use App\Modules\Academic\Http\Web\Canvas\SyncCanvasGradeController;
 use App\Modules\Academic\Http\Web\FinalizeCourseOfferingController;
 use App\Modules\Academic\Http\Web\RecalculateApplyController;
-use App\Modules\Academic\Http\Web\RecalculateCourseOfferingController;
 use App\Modules\Academic\Http\Web\RecalculatePreviewController;
 use App\Modules\Academic\Http\Web\RecordClassSessionAttendanceController;
 use Illuminate\Support\Facades\Route;
@@ -50,10 +49,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{courseOffering}/finalize', FinalizeCourseOfferingController::class)
             ->middleware('can:complete_course_offering')
             ->name(CourseOfferingRoutes::FINALIZE);
-
-        Route::post('/{courseOffering}/recalculate', RecalculateCourseOfferingController::class)
-            ->middleware('can:recalculate_course_offering')
-            ->name(CourseOfferingRoutes::RECALCULATE);
 
         // Cockpit attendance recording (ADR 0013 phase B) — same permission
         // as the standalone AttendanceController::store endpoint it replaces.

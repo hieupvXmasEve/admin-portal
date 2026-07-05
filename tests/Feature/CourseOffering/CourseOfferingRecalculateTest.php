@@ -22,8 +22,6 @@ use App\Services\PermissionService;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Testing\TestResponse;
-use Inertia\Inertia;
 
 use function Pest\Laravel\actingAs;
 
@@ -156,41 +154,6 @@ function makeCompletedRecalcOffering(object $context, array $overrides = []): Co
     return $offering->fresh();
 }
 
-function postRecalculate(object $context, CourseOffering $courseOffering): TestResponse
-{
-    return actingAs($context->user)
-        ->withSession(['current_campus_id' => $context->campus->id])
-        ->from(route(CourseOfferingRoutes::SHOW, $courseOffering))
-        ->post(route(CourseOfferingRoutes::RECALCULATE, $courseOffering));
-}
-
-it('returns 403 when the user lacks recalculate_course_offering', function () {
-    ($this->grantPermissions)(['view_course_offering']);
-    $offering = makeCompletedRecalcOffering($this);
-
-    postRecalculate($this, $offering)->assertForbidden();
-});
-
-it('blocks recalculation when a Canvas-mapped offering is not synced', function () {
-    $offering = makeCompletedRecalcOffering($this, ['is_canvas_synced' => false]);
-    mapRecalcCanvasCourse($offering, 'mapped');
-
-    postRecalculate($this, $offering)
-        ->assertRedirect(route(CourseOfferingRoutes::SHOW, $offering));
-
-    $partialReload = actingAs($this->user)
-        ->withSession(['current_campus_id' => $this->campus->id])
-        ->get(route(CourseOfferingRoutes::SHOW, $offering), [
-            'X-Inertia' => 'true',
-            'X-Inertia-Version' => Inertia::getVersion(),
-            'X-Inertia-Partial-Component' => 'course-offerings/Show',
-            'X-Inertia-Partial-Data' => 'operational_state',
-        ]);
-
-    $partialReload->assertOk();
-    expect($partialReload->json('flash.error'))->toContain('Canvas');
-});
-
 it('exposes the recalculate action with the Canvas blocker on a completed, mapped-but-unsynced offering', function () {
     $offering = makeCompletedRecalcOffering($this, ['is_canvas_synced' => false]);
     mapRecalcCanvasCourse($offering, 'mapped');
@@ -206,31 +169,6 @@ it('exposes the recalculate action with the Canvas blocker on a completed, mappe
             ->where('operational_state.available_actions.0.action', 'recalculate')
             ->where('operational_state.available_actions.0.allowed', false)
             ->where('operational_state.available_actions.0.blocked_by', ['canvas_unsynced']));
-});
-
-it('recalculates a completed offering and serves refreshed operational_state on a partial reload', function () {
-    $offering = makeCompletedRecalcOffering($this);
-
-    postRecalculate($this, $offering)
-        ->assertRedirect(route(CourseOfferingRoutes::SHOW, $offering));
-
-    expect($offering->fresh()->course_status)->toBe('completed');
-
-    actingAs($this->user)
-        ->withSession(['current_campus_id' => $this->campus->id])
-        ->get(route(CourseOfferingRoutes::SHOW, $offering), [
-            'X-Inertia' => 'true',
-            'X-Inertia-Version' => Inertia::getVersion(),
-            'X-Inertia-Partial-Component' => 'course-offerings/Show',
-            'X-Inertia-Partial-Data' => 'operational_state',
-        ])
-        ->assertOk()
-        ->assertJsonPath('component', 'course-offerings/Show')
-        ->assertJsonPath('props.operational_state.lifecycle_stage', 'completed')
-        ->assertJsonPath('props.operational_state.readiness_blockers', [])
-        ->assertJsonPath('props.operational_state.available_actions.0.action', 'recalculate')
-        ->assertJsonPath('props.operational_state.available_actions.0.allowed', true)
-        ->assertJsonMissingPath('props.courseOffering');
 });
 
 it('omits the recalculate action for users lacking recalculate_course_offering', function () {

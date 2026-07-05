@@ -62,15 +62,13 @@ const sessionProgressText = computed(() => {
 
 const blockers = computed(() => props.operationalState.readiness_blockers);
 
-// Backend omits actions the user lacks permission for, so a missing action
-// means no button renders at all. At most one action is ever present:
-// `finalize` pre-completion, `recalculate` once completed.
-const activeAction = computed(() => props.operationalState.available_actions[0]);
-const isRecalculateAction = computed(() => activeAction.value?.action === 'recalculate');
+// Header owns only pre-completion finalization. Completed-offering
+// recalculation lives in the Scores tab's preview-first flow.
+const finalizeAction = computed(() => props.operationalState.available_actions.find((action) => action.action === 'finalize'));
 
 const activeActionBlockedExplanation = computed(() => {
-    if (!activeAction.value || activeAction.value.allowed) return null;
-    const messages = blockers.value.filter((blocker) => activeAction.value!.blocked_by.includes(blocker.code)).map((blocker) => blocker.message);
+    if (!finalizeAction.value || finalizeAction.value.allowed) return null;
+    const messages = blockers.value.filter((blocker) => finalizeAction.value!.blocked_by.includes(blocker.code)).map((blocker) => blocker.message);
     return messages.join(' · ');
 });
 
@@ -80,26 +78,7 @@ const { showConfirmDialog } = useGlobalConfirmDialog();
 // courseOffering is refreshed alongside operational_state so the header's
 // course_status badge doesn't go stale after completion.
 const runActiveAction = () => {
-    if (!activeAction.value) return;
-
-    if (isRecalculateAction.value) {
-        showConfirmDialog(
-            {
-                title: 'Recalculate course',
-                message:
-                    'Recalculating re-evaluates grades for this course. Only students whose pass/fail status changes will be notified. ' +
-                    'The course survey is not re-attached. EGC level progression is re-evaluated against each student’s previous status. Continue?',
-                confirmText: 'Recalculate course',
-            },
-            {
-                onConfirm: () => {
-                    submitCockpitAction(route('course-offerings.recalculate', props.courseOfferingId), {}, ['operational_state', 'courseOffering']);
-                },
-            },
-        );
-
-        return;
-    }
+    if (!finalizeAction.value) return;
 
     showConfirmDialog(
         {
@@ -202,25 +181,23 @@ const runActiveAction = () => {
                     </div>
                 </div>
 
-                <div v-if="activeAction" class="flex shrink-0 flex-col items-start gap-1 md:items-end">
-                    <Button size="sm" :disabled="!activeAction.allowed || isSubmittingAction" :title="activeActionBlockedExplanation ?? undefined" @click="runActiveAction">
-                        {{ isSubmittingAction ? (isRecalculateAction ? 'Recalculating…' : 'Finalizing…') : activeAction.label }}
+                <div v-if="finalizeAction" class="flex shrink-0 flex-col items-start gap-1 md:items-end">
+                    <Button size="sm" :disabled="!finalizeAction.allowed || isSubmittingAction" :title="activeActionBlockedExplanation ?? undefined" @click="runActiveAction">
+                        {{ isSubmittingAction ? 'Finalizing…' : finalizeAction.label }}
                     </Button>
-                    <p v-if="!activeAction.allowed" class="max-w-60 text-right text-xs text-yellow-700 dark:text-yellow-300">
-                        {{ isRecalculateAction ? 'Resolve the readiness blockers to recalculate this course.' : 'Resolve the readiness blockers to finalize this course.' }}
-                    </p>
+                    <p v-if="!finalizeAction.allowed" class="max-w-60 text-right text-xs text-yellow-700 dark:text-yellow-300">Resolve the readiness blockers to finalize this course.</p>
                 </div>
             </div>
         </div>
 
-        <!-- Ready to finalize / recalculate -->
-        <div v-else-if="activeAction" class="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20">
+        <!-- Ready to finalize -->
+        <div v-else-if="finalizeAction" class="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20">
             <div class="flex items-center gap-2 text-sm text-green-800 dark:text-green-200">
                 <CheckCircle2 class="h-4 w-4 shrink-0 text-green-600" />
-                <span>{{ isRecalculateAction ? 'No readiness blockers — this course can be recalculated.' : 'No readiness blockers — this course can be finalized.' }}</span>
+                <span>No readiness blockers — this course can be finalized.</span>
             </div>
-            <Button size="sm" :disabled="!activeAction.allowed || isSubmittingAction" @click="runActiveAction">
-                {{ isSubmittingAction ? (isRecalculateAction ? 'Recalculating…' : 'Finalizing…') : activeAction.label }}
+            <Button size="sm" :disabled="!finalizeAction.allowed || isSubmittingAction" @click="runActiveAction">
+                {{ isSubmittingAction ? 'Finalizing…' : finalizeAction.label }}
             </Button>
         </div>
     </div>

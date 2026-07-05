@@ -27,8 +27,6 @@ class CourseOfferingRoutes
 
     public const FINALIZE = 'course-offerings.finalize';
 
-    public const RECALCULATE = 'course-offerings.recalculate';
-
     public const RECORD_SESSION_ATTENDANCE = 'course-offerings.sessions.record-attendance';
 
     public const SPLIT_SHOW = 'course-offerings.split.show';
@@ -62,9 +60,8 @@ class CourseOfferingRoutes
     public const API_SYNC_GRADES_APPLY = 'api.course-offerings.sync-grades';
 
     // Recalculate preview (issue 11) — dry-run with optional Canvas pull, and apply.
-    // Distinct path from the legacy web RECALCULATE route above: gated solely by
-    // recalculate_course_offering, JSON envelope, replaces the cockpit's use of the
-    // ungated legacy admin recalculate endpoint.
+    // This is the only course-offering recalculate surface; the detail header
+    // no longer exposes a direct fire-and-forget recalculate route.
     public const API_RECALCULATE_PREVIEW = 'api.course-offerings.recalculate.preview';
 
     public const API_RECALCULATE_APPLY = 'api.course-offerings.recalculate.apply';
