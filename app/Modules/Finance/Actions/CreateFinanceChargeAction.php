@@ -33,6 +33,7 @@ class CreateFinanceChargeAction
         return DB::transaction(function () use ($data) {
             // Create the charge
             $charge = FinanceCharge::create([
+                'finance_obligation_id' => $data['finance_obligation_id'] ?? null,
                 'student_id' => $data['student_id'],
                 'semester_id' => $data['semester_id'],
                 'billing_cycle_id' => null,

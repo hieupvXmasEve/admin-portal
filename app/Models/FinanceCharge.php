@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 class FinanceCharge extends Model
 {
     protected $fillable = [
+        'finance_obligation_id',
         'student_id',
         'semester_id',
         'billing_cycle_id',
@@ -118,6 +120,11 @@ class FinanceCharge extends Model
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
+    }
+
+    public function financeObligation(): BelongsTo
+    {
+        return $this->belongsTo(FinanceObligation::class, 'finance_obligation_id');
     }
 
     public function semester(): BelongsTo
