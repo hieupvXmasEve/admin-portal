@@ -224,6 +224,20 @@ class ExamResitAttempt extends AuditableModel
         ]);
     }
 
+    public function markFinanceObligationCreated(int $userId): void
+    {
+        if ($this->hq_fee_status !== self::HQ_FEE_PENDING) {
+            throw new \RuntimeException("Cannot create finance obligation from hq_fee_status: {$this->hq_fee_status}");
+        }
+
+        $this->update([
+            'hq_fee_status' => self::HQ_FEE_CHARGE_CREATED,
+            'finance_charge_id' => null,
+            'charge_created_by_user_id' => $userId,
+            'charge_created_at' => now(),
+        ]);
+    }
+
     /**
      * Mark the HQ fee as paid from canonical Finance payment/settlement evidence.
      * Derived state only — never the primary paid truth.

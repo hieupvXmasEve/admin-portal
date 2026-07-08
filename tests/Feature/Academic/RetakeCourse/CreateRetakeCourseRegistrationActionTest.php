@@ -18,8 +18,14 @@ use App\Models\User;
 use App\Modules\Academic\Actions\CancelRetakeCourseRegistrationAction;
 use App\Modules\Academic\Actions\CreateRetakeCourseRegistrationAction;
 use App\Modules\Academic\Queries\ListRetakeCourseEligibleStudentsQuery;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
+use App\Modules\Finance\Models\FinanceObligation;
+use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
+use App\Shared\Contracts\Finance\DTO\FinanceIntakeResult;
+use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
@@ -60,9 +66,21 @@ beforeEach(function () {
         'completion_status' => 'failed',
         'is_passed' => false,
     ]);
+
+    DB::table('finance_pricing_catalog_items')->insert([
+        'obligation_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 1_500_000,
+        'currency' => 'VND',
+        'rule_version' => 'retake_fee:v1',
+        'description' => 'Fixed retake fee',
+        'is_active' => true,
+        'effective_from' => now()->subDay(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
 });
 
-it('creates an auto-approved academic retake source without academic-owned fee creation', function () {
+it('creates an auto-approved retake source and materializes its finance obligation through intake', function () {
     $result = CreateRetakeCourseRegistrationAction::run([
         'student_id' => $this->student->id,
         'unit_id' => $this->courseOffering->unit_id,
@@ -73,11 +91,11 @@ it('creates an auto-approved academic retake source without academic-owned fee c
     ]);
 
     expect($result)->toBeInstanceOf(CourseRetakeRegistration::class);
-    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_APPROVED);
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
     expect($result->student_id)->toBe($this->student->id);
     expect($result->unit_id)->toBe($this->courseOffering->unit_id);
     expect($result->request_origin)->toBe(CourseRetakeRegistration::REQUEST_ORIGIN_STAFF);
-    expect($result->hq_fee_status)->toBe(CourseRetakeRegistration::HQ_FEE_PENDING);
+    expect($result->hq_fee_status)->toBe(CourseRetakeRegistration::HQ_FEE_CHARGE_CREATED);
     expect($result->original_semester_id)->toBe($this->academicRecord->semester_id);
     expect($result->operation_semester_id)->toBe($this->semester->id);
     expect($result->charge_semester_id)->toBe($this->semester->id);
@@ -85,11 +103,49 @@ it('creates an auto-approved academic retake source without academic-owned fee c
     expect($result->approved_at)->not->toBeNull();
     expect($result->finance_charge_id)->toBeNull();
 
-    expect(FinanceCharge::query()
-        ->where('source_type', CourseRetakeRegistration::class)
-        ->where('source_id', $result->id)
-        ->exists())->toBeFalse();
-    expect(InvoiceLine::query()->count())->toBe(0);
+    $obligation = FinanceObligation::query()
+        ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+        ->where('source_kind', AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION)
+        ->where('source_ref', AcademicFinanceObligationSource::courseRetakeRegistrationRef($result))
+        ->where('obligation_type', FinanceCharge::TYPE_RETAKE_FEE)
+        ->firstOrFail();
+    $charge = FinanceCharge::query()->where('finance_obligation_id', $obligation->id)->firstOrFail();
+
+    expect($obligation->lifecycle_status)->toBe(FinanceObligation::STATUS_ACCEPTED)
+        ->and((float) $obligation->amount)->toBe(1_500_000.0)
+        ->and($obligation->pricing_rule_version)->toBe('retake_fee:v1')
+        ->and($charge->source_type)->toBeNull()
+        ->and($charge->source_id)->toBeNull()
+        ->and($charge->charge_type)->toBe(FinanceCharge::TYPE_RETAKE_FEE)
+        ->and(InvoiceLine::query()->where('charge_id', $charge->id)->count())->toBe(1);
+});
+
+it('rolls back the retake source when finance intake fails', function () {
+    app()->instance(FinanceIntakeContract::class, new class implements FinanceIntakeContract
+    {
+        public function request(FinanceIntakeData $intake): FinanceIntakeResult
+        {
+            throw new RuntimeException('finance intake unavailable');
+        }
+
+        public function requestDebit(FinanceIntakeData $intake): FinanceIntakeResult
+        {
+            throw new RuntimeException('finance intake unavailable');
+        }
+    });
+
+    expect(fn () => CreateRetakeCourseRegistrationAction::run([
+        'student_id' => $this->student->id,
+        'unit_id' => $this->courseOffering->unit_id,
+        'original_academic_record_id' => $this->academicRecord->id,
+        'course_offering_id' => $this->courseOffering->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+    ]))->toThrow(RuntimeException::class, 'finance intake unavailable');
+
+    expect(CourseRetakeRegistration::query()->count())->toBe(0)
+        ->and(FinanceObligation::query()->count())->toBe(0)
+        ->and(FinanceCharge::query()->count())->toBe(0);
 });
 
 it('allows staff-created retake source before class placement', function () {
@@ -101,7 +157,7 @@ it('allows staff-created retake source before class placement', function () {
         'campus_id' => $this->campus->id,
     ]);
 
-    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_APPROVED);
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
     expect($result->course_offering_id)->toBeNull();
     expect($result->finance_charge_id)->toBeNull();
 });
@@ -197,7 +253,7 @@ it('allows registration after previous one was cancelled', function () {
         'campus_id' => $this->campus->id,
     ]);
 
-    expect($second->status)->toBe(CourseRetakeRegistration::STATUS_APPROVED);
+    expect($second->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
     expect($second->finance_charge_id)->toBeNull();
 
     $charges = FinanceCharge::where('student_id', $this->student->id)
@@ -305,7 +361,7 @@ it('allows retake when academic record failed by attendance', function () {
         'campus_id' => $this->campus->id,
     ]);
 
-    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_APPROVED);
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
 });
 
 it('allows retake when academic record failed by both grade and attendance', function () {
@@ -320,7 +376,7 @@ it('allows retake when academic record failed by both grade and attendance', fun
         'campus_id' => $this->campus->id,
     ]);
 
-    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_APPROVED);
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
 });
 
 it('allows retake when academic record failed manually', function () {
@@ -336,7 +392,7 @@ it('allows retake when academic record failed manually', function () {
         'campus_id' => $this->campus->id,
     ]);
 
-    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_APPROVED);
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
 });
 
 it('allows retake for legacy failed record with null failure_reason', function () {
@@ -352,7 +408,7 @@ it('allows retake for legacy failed record with null failure_reason', function (
         'campus_id' => $this->campus->id,
     ]);
 
-    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_APPROVED);
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
 });
 
 it('excludes grade-only failures from the retake eligibility list', function () {
@@ -430,5 +486,5 @@ it('allows retake when student has passed prerequisite unit', function () {
     ]);
 
     expect($result)->toBeInstanceOf(CourseRetakeRegistration::class);
-    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_APPROVED);
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
 });

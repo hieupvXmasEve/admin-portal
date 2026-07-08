@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Providers;
 
 use App\Models\FinanceCharge;
+use App\Modules\Finance\Actions\CancelFinanceObligationAction;
 use App\Modules\Finance\Dng\Services\DngChecksumService;
 use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
@@ -23,6 +24,7 @@ use App\Modules\Finance\Support\HubStudentFinanceSummaryReader as ModuleHubStude
 use App\Shared\Contracts\Finance\AiFinanceMetricReader;
 use App\Shared\Contracts\Finance\AiFinanceStudentProfileReader;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
+use App\Shared\Contracts\Finance\FinanceObligationCancellationContract;
 use App\Shared\Contracts\Finance\HubStudentFinanceSummaryReader;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -37,6 +39,7 @@ class FinanceServiceProvider extends ServiceProvider
         $this->app->bind(AiFinanceMetricReader::class, ModuleAiFinanceMetricReader::class);
         $this->app->bind(AiFinanceStudentProfileReader::class, ModuleAiFinanceStudentProfileReader::class);
         $this->app->bind(FinanceIntakeContract::class, FinanceIntakeRouter::class);
+        $this->app->bind(FinanceObligationCancellationContract::class, CancelFinanceObligationAction::class);
         $this->app->bind(HubStudentFinanceSummaryReader::class, ModuleHubStudentFinanceSummaryReader::class);
 
         // Register services as singletons

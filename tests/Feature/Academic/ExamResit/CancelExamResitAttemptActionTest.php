@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Models\AcademicRecord;
 use App\Models\Campus;
+use App\Models\CourseOffering;
 use App\Models\EmailLog;
 use App\Models\ExamResitAttempt;
 use App\Models\ExamResitSession;
@@ -12,13 +14,18 @@ use App\Models\PaymentApplication;
 use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Actions\CancelExamResitAttemptAction;
+use App\Modules\Academic\Actions\CreateExamResitAttemptAction;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -34,6 +41,18 @@ beforeEach(function () {
         'intake' => 1,
         'intake_mode' => 'sequential',
         'intake_semester_id' => $this->semester->id,
+    ]);
+
+    DB::table('finance_pricing_catalog_items')->insert([
+        'obligation_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
+        'amount' => 750_000,
+        'currency' => 'VND',
+        'rule_version' => 'exam_resit_fee:v1',
+        'description' => 'Fixed resit fee',
+        'is_active' => true,
+        'effective_from' => now()->subDay(),
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 });
 
@@ -107,6 +126,78 @@ it('cancels an approved hq_fee_pending attempt without a charge to void', functi
         ->and($result->attempt_number)->toBeNull();
 
     expect(EmailLog::query()->where('recipient', $this->student->email)->exists())->toBeTrue();
+});
+
+it('cancels a target-path charge-created attempt through the finance obligation cancellation service', function () {
+    Queue::fake();
+
+    $unit = Unit::factory()->create();
+    $syllabus = SyllabusTemplate::create([
+        'unit_id' => $unit->id,
+        'title' => 'Exam resit cancellation policy test syllabus',
+        'version' => '1.0',
+        'total_hours' => 120,
+        'total_sessions' => 30,
+        'learning_outcomes' => ['Complete the unit outcomes'],
+        'grading_criteria' => [['name' => 'Final Exam', 'weight' => 100]],
+        'required_materials' => [],
+        'is_default' => true,
+        'is_active' => true,
+        'created_by' => $this->user->id,
+        'exam_resit_fee' => 750_000,
+        'exam_resit_max_attempts' => 1,
+        'exam_resit_late_payment_grace_days' => 14,
+        'exam_resit_allow_unpaid_sitting' => false,
+    ]);
+    $courseOffering = CourseOffering::factory()->create([
+        'semester_id' => $this->semester->id,
+        'unit_id' => $unit->id,
+        'campus_id' => $this->campus->id,
+        'syllabus_template_id' => $syllabus->id,
+    ]);
+    $record = AcademicRecord::factory()->create([
+        'student_id' => $this->student->id,
+        'campus_id' => $this->campus->id,
+        'semester_id' => $this->semester->id,
+        'unit_id' => $unit->id,
+        'course_offering_id' => $courseOffering->id,
+        'completion_status' => 'failed',
+        'grade_status' => 'final',
+        'is_passed' => false,
+        'override_pass' => false,
+        'final_percentage' => 48,
+        'attendance_percentage' => 95,
+        'meets_attendance_requirement' => true,
+        'failure_reason' => AcademicRecord::FAILURE_GRADE_FAILED,
+        'failure_reason_snapshot' => [
+            'attendance_evidence_state' => 'recorded',
+        ],
+    ]);
+
+    $attempt = app(CreateExamResitAttemptAction::class)->run([
+        'student_id' => $this->student->id,
+        'academic_record_id' => $record->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+    ]);
+    $obligation = FinanceObligation::query()
+        ->where('source_kind', AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT)
+        ->where('source_ref', AcademicFinanceObligationSource::examResitAttemptRef($attempt))
+        ->firstOrFail();
+    $charge = FinanceCharge::query()->where('finance_obligation_id', $obligation->id)->firstOrFail();
+
+    $result = runCancelExamResit($attempt->id, overrides: [
+        'confirmation' => CancelExamResitAttemptAction::CONFIRM_VOID_UNPAID_EXAM_RESIT_FEE,
+    ]);
+
+    expect($result->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
+        ->and($result->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_CANCELLED)
+        ->and($result->finance_charge_id)->toBeNull()
+        ->and($result->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_VOIDED_UNPAID_CHARGE)
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID)
+        ->and($charge->fresh()->void_reason)->toBe('exam_resit_cancelled')
+        ->and($obligation->fresh()->lifecycle_status)->toBe(FinanceObligation::STATUS_VOIDED);
 });
 
 it('requires confirmation before cancelling an unpaid charge_created attempt', function () {

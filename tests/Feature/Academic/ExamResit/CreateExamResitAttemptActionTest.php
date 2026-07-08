@@ -7,13 +7,20 @@ use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\ExamResitAttempt;
 use App\Models\FinanceCharge;
+use App\Models\InvoiceLine;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Actions\CreateExamResitAttemptAction;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
+use App\Modules\Finance\Models\FinanceObligation;
+use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
+use App\Shared\Contracts\Finance\DTO\FinanceIntakeResult;
+use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
@@ -54,6 +61,18 @@ beforeEach(function () {
         'campus_id' => $this->campus->id,
         'syllabus_template_id' => $this->syllabus->id,
     ]);
+
+    DB::table('finance_pricing_catalog_items')->insert([
+        'obligation_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
+        'amount' => 750_000,
+        'currency' => 'VND',
+        'rule_version' => 'exam_resit_fee:v1',
+        'description' => 'Fixed resit fee',
+        'is_active' => true,
+        'effective_from' => now()->subDay(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
 });
 
 function examResitRecordFor(string $failureReason): AcademicRecord
@@ -83,7 +102,7 @@ function examResitRecordFor(string $failureReason): AcademicRecord
     ]);
 }
 
-it('creates an auto-approved exam resit source for a grade failure without academic-owned fee creation', function () {
+it('creates an auto-approved exam resit source and materializes its finance obligation through intake', function () {
     $record = examResitRecordFor(AcademicRecord::FAILURE_GRADE_FAILED);
 
     $attempt = app(CreateExamResitAttemptAction::class)->run([
@@ -100,7 +119,7 @@ it('creates an auto-approved exam resit source for a grade failure without acade
     expect($attempt->request_origin)->toBe(ExamResitAttempt::REQUEST_ORIGIN_STAFF);
     expect($attempt->request_sequence)->toBe(1);
     expect($attempt->attempt_number)->toBeNull();
-    expect($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_PENDING);
+    expect($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_CHARGE_CREATED);
     expect((float) $attempt->fee_amount)->toBe(750000.0);
     expect($attempt->finance_charge_id)->toBeNull();
     expect($attempt->policy_snapshot['max_attempts'])->toBe(1);
@@ -108,10 +127,50 @@ it('creates an auto-approved exam resit source for a grade failure without acade
     expect($attempt->policy_snapshot['late_payment_grace_days'])->toBe(14);
     expect($attempt->policy_snapshot['allow_unpaid_sitting'])->toBeFalse();
 
-    expect(FinanceCharge::query()
-        ->where('source_type', ExamResitAttempt::class)
-        ->where('source_id', $attempt->id)
-        ->exists())->toBeFalse();
+    $obligation = FinanceObligation::query()
+        ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+        ->where('source_kind', AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT)
+        ->where('source_ref', AcademicFinanceObligationSource::examResitAttemptRef($attempt))
+        ->where('obligation_type', FinanceCharge::TYPE_EXAM_RESIT_FEE)
+        ->firstOrFail();
+    $charge = FinanceCharge::query()->where('finance_obligation_id', $obligation->id)->firstOrFail();
+
+    expect($obligation->lifecycle_status)->toBe(FinanceObligation::STATUS_ACCEPTED)
+        ->and((float) $obligation->amount)->toBe(750_000.0)
+        ->and($obligation->pricing_rule_version)->toBe('exam_resit_fee:v1')
+        ->and($charge->source_type)->toBeNull()
+        ->and($charge->source_id)->toBeNull()
+        ->and($charge->charge_type)->toBe(FinanceCharge::TYPE_EXAM_RESIT_FEE)
+        ->and(InvoiceLine::query()->where('charge_id', $charge->id)->count())->toBe(1);
+});
+
+it('rolls back the exam resit source when finance intake fails', function () {
+    app()->instance(FinanceIntakeContract::class, new class implements FinanceIntakeContract
+    {
+        public function request(FinanceIntakeData $intake): FinanceIntakeResult
+        {
+            throw new RuntimeException('finance intake unavailable');
+        }
+
+        public function requestDebit(FinanceIntakeData $intake): FinanceIntakeResult
+        {
+            throw new RuntimeException('finance intake unavailable');
+        }
+    });
+
+    $record = examResitRecordFor(AcademicRecord::FAILURE_GRADE_FAILED);
+
+    expect(fn () => app(CreateExamResitAttemptAction::class)->run([
+        'student_id' => $this->student->id,
+        'academic_record_id' => $record->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+    ]))->toThrow(RuntimeException::class, 'finance intake unavailable');
+
+    expect(ExamResitAttempt::query()->count())->toBe(0)
+        ->and(FinanceObligation::query()->count())->toBe(0)
+        ->and(FinanceCharge::query()->count())->toBe(0);
 });
 
 it('rejects attendance failures from exam resit', function () {

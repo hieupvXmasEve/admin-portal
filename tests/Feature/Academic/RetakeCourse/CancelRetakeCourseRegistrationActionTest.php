@@ -12,11 +12,15 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
 use App\Modules\Academic\Actions\CancelRetakeCourseRegistrationAction;
+use App\Modules\Academic\Actions\CreateRetakeCourseRegistrationAction;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateRetakeCourseChargeSimpleAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -88,6 +92,18 @@ function createPaidRetakeDngForCharge(CourseRetakeRegistration $registration, Fi
 beforeEach(function () {
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
+
+    DB::table('finance_pricing_catalog_items')->insert([
+        'obligation_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 1_500_000,
+        'currency' => 'VND',
+        'rule_version' => 'retake_fee:v1',
+        'description' => 'Fixed retake fee',
+        'is_active' => true,
+        'effective_from' => now()->subDay(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
 });
 
 it('cancels an approved registration', function () {
@@ -101,6 +117,54 @@ it('cancels an approved registration', function () {
     expect($result->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED);
     expect($result->cancellation_reason)->toBe('Student request');
     expect($result->cancelled_by_user_id)->toBe($this->user->id);
+});
+
+it('cancels a target-path retake registration through the finance obligation cancellation service', function () {
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->create();
+    $student = Student::factory()->forCampus($campus)->create([
+        'status' => 'intake_course',
+        'intake' => 1,
+        'intake_mode' => 'sequential',
+        'intake_semester_id' => $semester->id,
+    ]);
+    $courseOffering = CourseOffering::factory()->create([
+        'semester_id' => $semester->id,
+    ]);
+    $academicRecord = AcademicRecord::factory()->create([
+        'student_id' => $student->id,
+        'campus_id' => $campus->id,
+        'unit_id' => $courseOffering->unit_id,
+        'course_offering_id' => $courseOffering->id,
+        'completion_status' => 'failed',
+        'is_passed' => false,
+    ]);
+
+    $registration = CreateRetakeCourseRegistrationAction::run([
+        'student_id' => $student->id,
+        'unit_id' => $courseOffering->unit_id,
+        'original_academic_record_id' => $academicRecord->id,
+        'course_offering_id' => $courseOffering->id,
+        'semester_id' => $semester->id,
+        'campus_id' => $campus->id,
+    ]);
+    $obligation = FinanceObligation::query()
+        ->where('source_kind', AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION)
+        ->where('source_ref', AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration))
+        ->firstOrFail();
+    $charge = FinanceCharge::query()->where('finance_obligation_id', $obligation->id)->firstOrFail();
+
+    $result = CancelRetakeCourseRegistrationAction::run([
+        'registration_id' => $registration->id,
+        'reason' => 'Student request',
+    ]);
+
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED)
+        ->and($result->hq_fee_status)->toBe(CourseRetakeRegistration::HQ_FEE_CANCELLED)
+        ->and($result->finance_charge_id)->toBeNull()
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID)
+        ->and($charge->fresh()->void_reason)->toBe('retake_course_cancelled')
+        ->and($obligation->fresh()->lifecycle_status)->toBe(FinanceObligation::STATUS_VOIDED);
 });
 
 it('cancels a payment_pending registration and voids charge', function () {

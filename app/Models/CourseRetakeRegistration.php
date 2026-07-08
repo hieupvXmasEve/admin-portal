@@ -200,6 +200,23 @@ class CourseRetakeRegistration extends AuditableModel
         ]);
     }
 
+    public function markFinanceObligationCreated(int $userId): void
+    {
+        if ($this->status !== self::STATUS_APPROVED) {
+            throw new \RuntimeException(
+                "Cannot mark finance obligation created from status: {$this->status}"
+            );
+        }
+
+        $this->update([
+            'status' => self::STATUS_PAYMENT_PENDING,
+            'hq_fee_status' => self::HQ_FEE_CHARGE_CREATED,
+            'finance_charge_id' => null,
+            'charge_created_by_user_id' => $userId,
+            'charge_created_at' => now(),
+        ]);
+    }
+
     public function transitionToPaid(?\DateTimeInterface $paidAt = null): void
     {
         if ($this->status !== self::STATUS_PAYMENT_PENDING) {

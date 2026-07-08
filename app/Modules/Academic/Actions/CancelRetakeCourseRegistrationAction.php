@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Actions;
 
 use App\Models\CourseRetakeRegistration;
-use App\Models\FinanceCharge;
-use App\Modules\Finance\Actions\BridgePaidDngRequestsForChargeAction;
-use App\Modules\Finance\Actions\VoidFinanceChargeAction;
-use App\Modules\Finance\Dng\Models\DngPaymentRequest;
-use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
+use App\Shared\Contracts\Finance\DTO\FinanceObligationCancellationData;
+use App\Shared\Contracts\Finance\DTO\FinanceObligationCancellationResult;
+use App\Shared\Contracts\Finance\FinanceObligationCancellationContract;
 use Illuminate\Support\Facades\DB;
 
 class CancelRetakeCourseRegistrationAction
@@ -27,7 +26,6 @@ class CancelRetakeCourseRegistrationAction
     {
         return DB::transaction(function () use ($data) {
             $registration = CourseRetakeRegistration::query()
-                ->with('financeCharge')
                 ->lockForUpdate()
                 ->findOrFail($data['registration_id']);
             $userId = auth()->id();
@@ -38,83 +36,28 @@ class CancelRetakeCourseRegistrationAction
                 );
             }
 
-            $charge = $registration->financeCharge;
-            $bridgePaidDngRequestsForChargeAction = app(BridgePaidDngRequestsForChargeAction::class);
-            $hasPaidDng = $bridgePaidDngRequestsForChargeAction->hasPaidDngForCharge($charge);
-            if ($hasPaidDng && $charge !== null && ! $charge->is_fully_paid) {
-                $bridgePaidDngRequestsForChargeAction->handle($charge);
-                $charge = $charge->fresh();
-                self::assertPaidDngCoveredCharge($charge);
-            }
-
-            $isPaid = $registration->hq_fee_status === CourseRetakeRegistration::HQ_FEE_PAID
-                || ($charge !== null && $charge->status === FinanceCharge::STATUS_ACTIVE && $charge->is_fully_paid)
-                || $hasPaidDng;
-
-            if ($isPaid && $charge !== null && $charge->status === FinanceCharge::STATUS_ACTIVE) {
-                app(VoidFinanceChargeAction::class)->handle(
-                    $charge->id,
-                    'retake_course_cancelled_paid_no_refund',
-                    $userId,
-                    false,
-                );
-                $charge = $charge->fresh();
-            }
-
-            // If payment_pending, void the finance charge and cancel DNG request
-            if ($registration->status === CourseRetakeRegistration::STATUS_PAYMENT_PENDING && $charge !== null && ! $isPaid) {
-                // Void charge
-                app(VoidFinanceChargeAction::class)->handle(
-                    $charge->id,
-                    'retake_course_cancelled',
-                    $userId,
-                );
-
-                self::cancelAwaitingDngRequestsForCharge($charge->id);
-            }
+            $cancellation = app(FinanceObligationCancellationContract::class)->cancel(
+                new FinanceObligationCancellationData(
+                    source_system: AcademicFinanceObligationSource::SOURCE_SYSTEM,
+                    source_kind: AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION,
+                    source_ref: AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration),
+                    obligation_type: AcademicFinanceObligationSource::RETAKE_FEE,
+                    unpaid_void_reason: 'retake_course_cancelled',
+                    paid_no_refund_void_reason: 'retake_course_cancelled_paid_no_refund',
+                    legacy_finance_charge_id: $registration->finance_charge_id === null ? null : (int) $registration->finance_charge_id,
+                    user_id: $userId,
+                )
+            );
 
             $registration->cancel(
                 $userId,
                 $data['reason'],
-                $isPaid ? CourseRetakeRegistration::HQ_FEE_PAID : null,
+                $cancellation->fee_disposition === FinanceObligationCancellationResult::FEE_DISPOSITION_KEPT_PAID_NO_REFUND
+                    ? CourseRetakeRegistration::HQ_FEE_PAID
+                    : null,
             );
 
             return $registration->fresh();
         });
-    }
-
-    private static function assertPaidDngCoveredCharge(?FinanceCharge $charge): void
-    {
-        if ($charge === null || $charge->status !== FinanceCharge::STATUS_ACTIVE || ! $charge->is_fully_paid) {
-            throw new \RuntimeException(
-                'DNG đã ghi nhận thanh toán phí học lại nhưng chưa thể phân bổ đủ vào khoản phí nội bộ. Vui lòng kiểm tra liên kết DNG/charge trước khi hủy.'
-            );
-        }
-    }
-
-    private static function cancelAwaitingDngRequestsForCharge(int $chargeId): int
-    {
-        $directIds = DngPaymentRequest::query()
-            ->awaitingPayment()
-            ->where('finance_charge_id', $chargeId)
-            ->pluck('id');
-
-        $pivotIds = DngPaymentRequestCharge::query()
-            ->where('finance_charge_id', $chargeId)
-            ->whereHas('dngPaymentRequest', fn ($query) => $query->awaitingPayment())
-            ->pluck('dng_payment_request_id');
-
-        $requestIds = $directIds
-            ->merge($pivotIds)
-            ->unique()
-            ->values();
-
-        if ($requestIds->isEmpty()) {
-            return 0;
-        }
-
-        return DngPaymentRequest::query()
-            ->whereIn('id', $requestIds)
-            ->update(['status' => DngPaymentRequest::STATUS_CANCELLED]);
     }
 }

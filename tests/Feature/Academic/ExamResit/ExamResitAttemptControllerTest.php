@@ -17,6 +17,7 @@ use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
 use App\Modules\Finance\Queries\GetStudentBalanceQuery;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 
 use function Pest\Laravel\actingAs;
@@ -40,6 +41,18 @@ beforeEach(function () {
     $permissionService->shouldReceive('getUserPermissions')
         ->andReturn(['view_exam_resit', 'create_exam_resit', 'cancel_exam_resit']);
     app()->singleton(PermissionService::class, fn () => $permissionService);
+
+    DB::table('finance_pricing_catalog_items')->insert([
+        'obligation_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
+        'amount' => 750_000,
+        'currency' => 'VND',
+        'rule_version' => 'exam_resit_fee:v1',
+        'description' => 'Fixed resit fee',
+        'is_active' => true,
+        'effective_from' => now()->subDay(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
 });
 
 function gradeFailedRecordForController(): AcademicRecord

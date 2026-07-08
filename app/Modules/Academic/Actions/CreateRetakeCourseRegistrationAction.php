@@ -9,7 +9,11 @@ use App\Models\CourseOffering;
 use App\Models\CourseRetakeRegistration;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Services\V1\Student\PrerequisiteValidationService;
+use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
+use App\Shared\Contracts\Finance\Enums\FinancialEffect;
+use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -137,6 +141,8 @@ class CreateRetakeCourseRegistrationAction
             // Snapshot retake_fee from unit
             $retakeFee = $unit->retake_fee ?? 0;
 
+            $userId = (int) auth()->id();
+
             $registration = CourseRetakeRegistration::create([
                 'student_id' => $data['student_id'],
                 'unit_id' => $data['unit_id'],
@@ -149,9 +155,9 @@ class CreateRetakeCourseRegistrationAction
                 'charge_semester_id' => $data['charge_semester_id'] ?? $data['semester_id'],
                 'status' => CourseRetakeRegistration::STATUS_APPROVED,
                 'request_origin' => CourseRetakeRegistration::REQUEST_ORIGIN_STAFF,
-                'requested_by_user_id' => auth()->id(),
+                'requested_by_user_id' => $userId,
                 'requested_at' => now(),
-                'reviewed_by_user_id' => auth()->id(),
+                'reviewed_by_user_id' => $userId,
                 'reviewed_at' => now(),
                 'hq_fee_status' => CourseRetakeRegistration::HQ_FEE_PENDING,
                 'attempt_number' => $attemptNumber,
@@ -159,9 +165,34 @@ class CreateRetakeCourseRegistrationAction
                 'registration_start_date' => $data['registration_start_date'] ?? null,
                 'registration_end_date' => $data['registration_end_date'] ?? null,
                 'notes' => $data['notes'] ?? null,
-                'approved_by_user_id' => auth()->id(),
+                'approved_by_user_id' => $userId,
                 'approved_at' => now(),
             ]);
+
+            app(FinanceIntakeContract::class)->request(new FinanceIntakeData(
+                source_system: AcademicFinanceObligationSource::SOURCE_SYSTEM,
+                source_kind: AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION,
+                source_ref: AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration),
+                financial_effect: FinancialEffect::Debit,
+                obligation_type: AcademicFinanceObligationSource::RETAKE_FEE,
+                facts: [
+                    'student_id' => $registration->student_id,
+                    'semester_id' => $registration->charge_semester_id ?? $registration->semester_id,
+                    'campus_id' => $registration->campus_id,
+                    'unit_id' => $registration->unit_id,
+                    'course_offering_id' => $registration->course_offering_id,
+                    'original_academic_record_id' => $registration->original_academic_record_id,
+                    'original_semester_id' => $registration->original_semester_id,
+                    'operation_semester_id' => $registration->operation_semester_id,
+                    'charge_semester_id' => $registration->charge_semester_id,
+                    'attempt_number' => $registration->attempt_number,
+                    'student_program_id' => $student->program_id ?? null,
+                    'student_curriculum_version_id' => $student->curriculum_version_id ?? null,
+                    'description' => "Phí học lại: {$unit->code} - {$unit->name}",
+                ],
+            ));
+
+            $registration->markFinanceObligationCreated($userId);
 
             return $registration->fresh();
         });

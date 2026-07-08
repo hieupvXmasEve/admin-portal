@@ -7,6 +7,10 @@ namespace App\Modules\Academic\Actions;
 use App\Models\AcademicRecord;
 use App\Models\ExamResitAttempt;
 use App\Models\SyllabusTemplate;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
+use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
+use App\Shared\Contracts\Finance\Enums\FinancialEffect;
+use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -41,7 +45,9 @@ class CreateExamResitAttemptAction
                 ->where('academic_record_id', $record->id)
                 ->count() + 1;
 
-            return ExamResitAttempt::create([
+            $userId = (int) auth()->id();
+
+            $attempt = ExamResitAttempt::create([
                 'student_id' => $record->student_id,
                 'academic_record_id' => $record->id,
                 'original_course_offering_id' => $record->course_offering_id,
@@ -52,9 +58,9 @@ class CreateExamResitAttemptAction
                 'operation_semester_id' => $data['operation_semester_id'],
                 'charge_semester_id' => $data['charge_semester_id'],
                 'request_origin' => ExamResitAttempt::REQUEST_ORIGIN_STAFF,
-                'requested_by_user_id' => auth()->id(),
+                'requested_by_user_id' => $userId,
                 'requested_at' => now(),
-                'reviewed_by_user_id' => auth()->id(),
+                'reviewed_by_user_id' => $userId,
                 'reviewed_at' => now(),
                 'status' => ExamResitAttempt::STATUS_APPROVED,
                 'request_sequence' => $requestSequence,
@@ -69,6 +75,37 @@ class CreateExamResitAttemptAction
                 'allow_unpaid_sitting_snapshot' => $policySnapshot['allow_unpaid_sitting'],
                 'notes' => $data['notes'] ?? null,
             ]);
+
+            $unit = $record->unit;
+
+            app(FinanceIntakeContract::class)->request(new FinanceIntakeData(
+                source_system: AcademicFinanceObligationSource::SOURCE_SYSTEM,
+                source_kind: AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT,
+                source_ref: AcademicFinanceObligationSource::examResitAttemptRef($attempt),
+                financial_effect: FinancialEffect::Debit,
+                obligation_type: AcademicFinanceObligationSource::EXAM_RESIT_FEE,
+                facts: [
+                    'student_id' => $attempt->student_id,
+                    'semester_id' => $attempt->charge_semester_id,
+                    'campus_id' => $attempt->campus_id,
+                    'unit_id' => $attempt->unit_id,
+                    'academic_record_id' => $attempt->academic_record_id,
+                    'original_course_offering_id' => $attempt->original_course_offering_id,
+                    'original_semester_id' => $attempt->original_semester_id,
+                    'operation_semester_id' => $attempt->operation_semester_id,
+                    'charge_semester_id' => $attempt->charge_semester_id,
+                    'request_sequence' => $attempt->request_sequence,
+                    'syllabus_template_id' => $attempt->syllabus_template_id,
+                    'max_attempts_snapshot' => $attempt->max_attempts_snapshot,
+                    'late_payment_grace_days_snapshot' => $attempt->late_payment_grace_days_snapshot,
+                    'allow_unpaid_sitting_snapshot' => $attempt->allow_unpaid_sitting_snapshot,
+                    'description' => "Phí thi lại: {$unit?->code} - {$unit?->name}",
+                ],
+            ));
+
+            $attempt->markFinanceObligationCreated($userId);
+
+            return $attempt->fresh();
         });
     }
 
