@@ -22,8 +22,10 @@ use Illuminate\Support\Facades\DB;
  * Balance is computed in a single batched query (no N+1) by joining aggregated
  * payment_applications and discount_allocations subqueries at the invoice_lines level.
  *
- * For fee_type = HL, also surfaces CourseRetakeRegistration records in 'approved' status
- * that do not yet have a linked finance_charge (needs_charge_creation = true rows).
+ * For fee_type = HL/PTL, also surfaces approved Academic sources that have
+ * neither a legacy charge link nor a visible payable yet. The legacy
+ * needs_charge_creation flag now means Finance repair/obligation intake is
+ * required before DNG can push.
  */
 class ListDngWorklistQuery
 {
@@ -277,7 +279,7 @@ class ListDngWorklistQuery
         // Attach individual charge breakdown for expandable rows (current page only)
         $chargesByStudent = $this->loadChargeBreakdown($pagedStudentIds, $chargeTypes, $semesterId);
 
-        // For HL/PTL fee_type: approved Academic sources without charges (needs_charge_creation)
+        // For HL/PTL fee_type: approved Academic sources missing Finance obligation/repair.
         $needsChargeByStudent = match ($dngFeeType) {
             'HL' => $this->loadApprovedRetakeRegistrationsWithoutCharge($pagedStudentIds, $semesterId),
             'PTL' => $this->loadApprovedExamResitAttemptsWithoutCharge($pagedStudentIds, $semesterId),
@@ -410,8 +412,8 @@ class ListDngWorklistQuery
     }
 
     /**
-     * For HL fee_type: find approved retake registrations without a charge yet.
-     * These students need charge creation before DNG can be pushed.
+     * For HL fee_type: find approved retake registrations without a charge link.
+     * These students need Finance obligation repair before DNG can be pushed.
      *
      * @param  array<int, int>  $studentIds
      * @return Collection<int, Collection> student_id → array of registration rows
@@ -483,8 +485,8 @@ class ListDngWorklistQuery
     }
 
     /**
-     * For PTL fee_type: find approved exam-resit attempts without a charge yet.
-     * These students need charge creation before DNG can be pushed.
+     * For PTL fee_type: find approved exam-resit attempts without a charge link.
+     * These students need Finance obligation repair before DNG can be pushed.
      *
      * @param  array<int, int>  $studentIds
      * @return Collection<int, Collection> student_id → array of attempt rows

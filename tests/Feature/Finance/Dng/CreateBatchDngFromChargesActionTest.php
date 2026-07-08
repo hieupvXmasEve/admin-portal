@@ -7,6 +7,7 @@ use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\CourseRetakeRegistration;
 use App\Models\CurriculumVersion;
+use App\Models\ExamResitAttempt;
 use App\Models\FinanceCharge;
 use App\Models\Program;
 use App\Models\Semester;
@@ -14,8 +15,6 @@ use App\Models\Student;
 use App\Models\User;
 use App\Modules\Finance\Actions\CancelDngPaymentRequestAction;
 use App\Modules\Finance\Actions\CreateBatchDngFromChargesAction;
-use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
-use App\Modules\Finance\Actions\CreateRetakeCourseChargeSimpleAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
@@ -96,15 +95,11 @@ function makeBatchAction(?DngPaymentRequest $fakeCreatedRequest = null, bool $dn
     $campusResolverMock->shouldReceive('requireForStudent')->andReturn('FAUHN');
 
     $cancelAction = app(CancelDngPaymentRequestAction::class);
-    $simpleChargeAction = app(CreateRetakeCourseChargeSimpleAction::class);
-    $examResitChargeAction = app(CreateExamResitChargeSimpleAction::class);
 
     $action = new CreateBatchDngFromChargesAction(
         $dngPaymentServiceMock,
         $campusResolverMock,
         $cancelAction,
-        $simpleChargeAction,
-        $examResitChargeAction,
     );
 
     return [$action, $dngPaymentServiceMock];
@@ -283,7 +278,7 @@ it('fails if DNG service throws, and records error', function () {
         ->and($result['errors'][0])->toContain('DNG API failed');
 });
 
-it('HL fee_type: auto-creates charge for approved retake registration before DNG push', function () {
+it('HL fee_type: blocks approved retake registration without finance obligation instead of creating a charge', function () {
     $student = makeBatchStudent('HL001', $this->campus, $this->semester);
 
     $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
@@ -313,12 +308,65 @@ it('HL fee_type: auto-creates charge for approved retake registration before DNG
     [$action] = makeBatchAction();
 
     $payload = batchPayload([$student->id], $this->semester, 'HL');
-    $action->handle($payload);
+    $result = $action->handle($payload);
 
-    // Registration should now have a finance_charge_id (transitioned to payment_pending)
     $refreshed = $reg->fresh();
-    expect($refreshed->finance_charge_id)->not->toBeNull()
-        ->and($refreshed->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
+    expect($result['created'])->toBe(0)
+        ->and($result['failed'])->toBe(1)
+        ->and($result['errors'][0])->toContain('missing_finance_obligation')
+        ->and($refreshed->finance_charge_id)->toBeNull()
+        ->and($refreshed->status)->toBe(CourseRetakeRegistration::STATUS_APPROVED)
+        ->and(FinanceCharge::where('student_id', $student->id)->count())->toBe(0)
+        ->and(DngPaymentRequest::where('student_id', $student->id)->count())->toBe(0);
+});
+
+it('PTL fee_type: blocks approved exam resit attempt without finance obligation instead of creating a charge', function () {
+    $student = makeBatchStudent('PTL001', $this->campus, $this->semester);
+
+    $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
+
+    $academicRecord = AcademicRecord::factory()->create([
+        'student_id' => $student->id,
+        'campus_id' => $this->campus->id,
+        'unit_id' => $offering->unit_id,
+        'course_offering_id' => $offering->id,
+        'completion_status' => 'failed',
+        'is_passed' => false,
+    ]);
+
+    $attempt = ExamResitAttempt::create([
+        'student_id' => $student->id,
+        'academic_record_id' => $academicRecord->id,
+        'original_course_offering_id' => $offering->id,
+        'unit_id' => $offering->unit_id,
+        'campus_id' => $this->campus->id,
+        'original_semester_id' => $this->semester->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'request_origin' => ExamResitAttempt::REQUEST_ORIGIN_STAFF,
+        'requested_by_user_id' => $this->user->id,
+        'requested_at' => now(),
+        'reviewed_by_user_id' => $this->user->id,
+        'reviewed_at' => now(),
+        'status' => ExamResitAttempt::STATUS_APPROVED,
+        'approved_at' => now(),
+        'hq_fee_status' => ExamResitAttempt::HQ_FEE_PENDING,
+        'fee_amount' => 750_000,
+        'finance_charge_id' => null,
+    ]);
+
+    [$action] = makeBatchAction();
+
+    $result = $action->handle(batchPayload([$student->id], $this->semester, 'PTL'));
+
+    $refreshed = $attempt->fresh();
+    expect($result['created'])->toBe(0)
+        ->and($result['failed'])->toBe(1)
+        ->and($result['errors'][0])->toContain('missing_finance_obligation')
+        ->and($refreshed->finance_charge_id)->toBeNull()
+        ->and($refreshed->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_PENDING)
+        ->and(FinanceCharge::where('student_id', $student->id)->count())->toBe(0)
+        ->and(DngPaymentRequest::where('student_id', $student->id)->count())->toBe(0);
 });
 
 it('HL fee_type: skips registration that already has a charge', function () {

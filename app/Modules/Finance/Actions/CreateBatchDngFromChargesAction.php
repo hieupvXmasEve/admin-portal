@@ -9,10 +9,12 @@ use App\Models\ExamResitAttempt;
 use App\Models\FinanceCharge;
 use App\Models\FinanceChargeInstallment;
 use App\Models\Student;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Queries\Dng\ListDngWorklistQuery;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -26,8 +28,9 @@ use Illuminate\Support\Facades\Log;
  * dng_payment_request_charges pivot, enabling precise per-charge allocation
  * on webhook confirmation.
  *
- * For fee_type = HL, auto-creates charges for approved retake registrations
- * that do not yet have a finance_charge_id before pushing the DNG.
+ * DNG pushes only existing Finance payables. Retake/resit source rows that
+ * still have no legacy charge link and no FinanceObligation are blocked as
+ * missing_finance_obligation instead of being silently charged here.
  */
 class CreateBatchDngFromChargesAction
 {
@@ -35,8 +38,6 @@ class CreateBatchDngFromChargesAction
         protected DngPaymentService $dngPaymentService,
         protected DngCampusCodeResolver $campusCodeResolver,
         protected CancelDngPaymentRequestAction $cancelDngAction,
-        protected CreateRetakeCourseChargeSimpleAction $createChargeSimpleAction,
-        protected CreateExamResitChargeSimpleAction $createExamResitChargeSimpleAction,
     ) {}
 
     /**
@@ -96,7 +97,7 @@ class CreateBatchDngFromChargesAction
     }
 
     /**
-     * Process a single student: auto-create charges for HL if needed, then push DNG.
+     * Process a single student: guard missing HL/PTL obligations, then push DNG.
      *
      * @param  array<int, string>  $chargeTypes
      * @return array{cancelled_old: int}
@@ -127,14 +128,12 @@ class CreateBatchDngFromChargesAction
             // Lock student row to prevent concurrent pushes
             $student = Student::lockForUpdate()->findOrFail($studentId);
 
-            // For HL: auto-create charges for approved retake registrations without charges
             if ($dngFeeType === 'HL') {
-                $this->ensureRetakeChargesExist($student, $semesterId);
+                $this->assertNoMissingRetakeObligations($student, $semesterId);
             }
 
-            // For PTL: auto-create charges for approved exam-resit attempts without charges
             if ($dngFeeType === 'PTL') {
-                $this->ensureExamResitChargesExist($student, $semesterId);
+                $this->assertNoMissingExamResitObligations($student, $semesterId);
             }
 
             // Load active charges with positive balance
@@ -271,66 +270,91 @@ class CreateBatchDngFromChargesAction
     }
 
     /**
-     * For HL fee_type: ensure approved retake registrations have charges before DNG push.
-     * Calls CreateRetakeCourseChargeSimpleAction for each approved registration without charge.
+     * For HL fee_type: fail fast when a chargeable retake source has no
+     * legacy charge link and no FinanceObligation.
      */
-    private function ensureRetakeChargesExist(Student $student, int $semesterId): void
+    private function assertNoMissingRetakeObligations(Student $student, int $semesterId): void
     {
         $pendingRegistrations = CourseRetakeRegistration::query()
             ->where('student_id', $student->id)
-            ->where('semester_id', $semesterId)
-            ->where('status', CourseRetakeRegistration::STATUS_APPROVED)
+            ->where(function ($query) use ($semesterId): void {
+                $query->where('charge_semester_id', $semesterId)
+                    ->orWhere(function ($legacyQuery) use ($semesterId): void {
+                        $legacyQuery->whereNull('charge_semester_id')
+                            ->where('semester_id', $semesterId);
+                    });
+            })
+            ->whereIn('status', [
+                CourseRetakeRegistration::STATUS_APPROVED,
+                CourseRetakeRegistration::STATUS_PAYMENT_PENDING,
+            ])
+            ->whereIn('hq_fee_status', [
+                CourseRetakeRegistration::HQ_FEE_PENDING,
+                CourseRetakeRegistration::HQ_FEE_CHARGE_CREATED,
+            ])
             ->whereNull('finance_charge_id')
             ->lockForUpdate()
             ->get();
 
         foreach ($pendingRegistrations as $registration) {
-            try {
-                $this->createChargeSimpleAction->handle([
-                    'registration_id' => $registration->id,
-                    'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
-                    'amount' => (float) $registration->retake_fee,
-                    'description' => "Phí học lại môn {$registration->unit?->code}",
-                ]);
-            } catch (\Throwable $e) {
-                Log::warning('CreateBatchDngFromChargesAction: failed to auto-create retake charge', [
-                    'registration_id' => $registration->id,
-                    'student_id' => $student->id,
-                    'error' => $e->getMessage(),
-                ]);
+            $sourceRef = AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration);
+
+            if (! $this->financeObligationExists(
+                AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION,
+                $sourceRef,
+                FinanceCharge::TYPE_RETAKE_FEE,
+            )) {
+                throw new \RuntimeException(
+                    "missing_finance_obligation: Retake registration #{$registration->id} has no Finance obligation."
+                );
             }
         }
     }
 
     /**
-     * For PTL fee_type: ensure approved exam-resit attempts have charges before DNG push.
-     * Calls CreateExamResitChargeSimpleAction for each approved attempt without a charge.
-     * Charges are billed on the attempt's charge_semester, so we match on charge_semester_id.
+     * For PTL fee_type: fail fast when a chargeable exam-resit source has no
+     * legacy charge link and no FinanceObligation.
      */
-    private function ensureExamResitChargesExist(Student $student, int $semesterId): void
+    private function assertNoMissingExamResitObligations(Student $student, int $semesterId): void
     {
         $pendingAttempts = ExamResitAttempt::query()
             ->where('student_id', $student->id)
             ->where('charge_semester_id', $semesterId)
-            ->where('status', ExamResitAttempt::STATUS_APPROVED)
-            ->where('hq_fee_status', ExamResitAttempt::HQ_FEE_PENDING)
+            ->whereIn('status', [
+                ExamResitAttempt::STATUS_APPROVED,
+                ExamResitAttempt::STATUS_SCHEDULED,
+            ])
+            ->whereIn('hq_fee_status', [
+                ExamResitAttempt::HQ_FEE_PENDING,
+                ExamResitAttempt::HQ_FEE_CHARGE_CREATED,
+            ])
             ->whereNull('finance_charge_id')
             ->lockForUpdate()
             ->get();
 
         foreach ($pendingAttempts as $attempt) {
-            try {
-                $this->createExamResitChargeSimpleAction->handle([
-                    'attempt_id' => $attempt->id,
-                ]);
-            } catch (\Throwable $e) {
-                Log::warning('CreateBatchDngFromChargesAction: failed to auto-create exam resit charge', [
-                    'attempt_id' => $attempt->id,
-                    'student_id' => $student->id,
-                    'error' => $e->getMessage(),
-                ]);
+            $sourceRef = AcademicFinanceObligationSource::examResitAttemptRef($attempt);
+
+            if (! $this->financeObligationExists(
+                AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT,
+                $sourceRef,
+                FinanceCharge::TYPE_EXAM_RESIT_FEE,
+            )) {
+                throw new \RuntimeException(
+                    "missing_finance_obligation: Exam resit attempt #{$attempt->id} has no Finance obligation."
+                );
             }
         }
+    }
+
+    private function financeObligationExists(string $sourceKind, string $sourceRef, string $obligationType): bool
+    {
+        return FinanceObligation::query()
+            ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+            ->where('source_kind', $sourceKind)
+            ->where('source_ref', $sourceRef)
+            ->where('obligation_type', $obligationType)
+            ->exists();
     }
 
     /**

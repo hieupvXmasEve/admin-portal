@@ -289,7 +289,7 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
     });
 
     // Retake Course Charge routes removed — absorbed by Batch Studio DNG (fee_type=HL)
-    // See: DngWorklistController + CreateBatchDngFromChargesAction (auto-creates charges for approved registrations)
+    // See: DngWorklistController + CreateBatchDngFromChargesAction (blocks missing obligations for approved registrations)
 
     Route::prefix('batch-studio')->name('batch-studio.')->group(function () {
         Route::get('/', [BatchStudioController::class, 'hub'])

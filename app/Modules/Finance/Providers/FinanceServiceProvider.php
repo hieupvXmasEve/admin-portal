@@ -21,11 +21,13 @@ use App\Modules\Finance\Support\AiFinanceMetricReader as ModuleAiFinanceMetricRe
 use App\Modules\Finance\Support\AiFinanceStudentProfileReader as ModuleAiFinanceStudentProfileReader;
 use App\Modules\Finance\Support\FinanceIntakeRouter;
 use App\Modules\Finance\Support\HubStudentFinanceSummaryReader as ModuleHubStudentFinanceSummaryReader;
+use App\Modules\Finance\Support\ObligationLedgerSettlementReader;
 use App\Shared\Contracts\Finance\AiFinanceMetricReader;
 use App\Shared\Contracts\Finance\AiFinanceStudentProfileReader;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use App\Shared\Contracts\Finance\FinanceObligationCancellationContract;
 use App\Shared\Contracts\Finance\HubStudentFinanceSummaryReader;
+use App\Shared\Contracts\Finance\ObligationSettlementReader;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -41,6 +43,7 @@ class FinanceServiceProvider extends ServiceProvider
         $this->app->bind(FinanceIntakeContract::class, FinanceIntakeRouter::class);
         $this->app->bind(FinanceObligationCancellationContract::class, CancelFinanceObligationAction::class);
         $this->app->bind(HubStudentFinanceSummaryReader::class, ModuleHubStudentFinanceSummaryReader::class);
+        $this->app->bind(ObligationSettlementReader::class, ObligationLedgerSettlementReader::class);
 
         // Register services as singletons
         $this->app->singleton(FinanceChargeService::class);
