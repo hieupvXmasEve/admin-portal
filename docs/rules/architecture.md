@@ -4,7 +4,7 @@
 
 - **Modular Monolith**: The system is divided into independent Modules (e.g., Identity, Academic, Finance, Notification) sharing a common data layer.
 - **Independence**: One module must NOT depend directly on the internal logic of another module.
-- **Shared Models**: `app/Models` contains shared Eloquent models (unless a module owns distinct data).
+- **Shared Models**: `app/Models` contains shared Eloquent models (unless a module owns distinct data). **Exception — bounded contexts (ADR-0026):** Academic and Finance do **not** share money/lifecycle Eloquent models. Money models (`FinanceCharge`, `Payment`, `StudentInvoice`, `InvoiceLine`, …) are Finance-owned and move to `App\Modules\Finance\Models`; the only cross-context shared model is `Student` as a Shared Kernel **identity reference**. Cross-context access goes through `app/Shared/Contracts/*`, never a shared money model or an Eloquent join.
 - **Actions over Services**: Business logic is concentrated in **Actions** (Single Use-Case).
 - **Thin Controllers**: Controllers act only as Adapters: receive input, call Action/Query, return response.
 
@@ -38,7 +38,7 @@ app/Modules/{Domain}/
 ## 4. Development Workflow
 
 1. **Analyze**: Identify Module and Business Case (Action).
-2. **Database**: Update `app/Models` and Migrations.
+2. **Database**: Update the **owning module's** model + migration. Use `app/Models` only for a Shared Kernel identity (`Student`) or legacy not-yet-relocated models — never to add a new cross-context shared money/lifecycle model (ADR-0026).
 3. **Backend**:
     - Create `Action` in `app/Modules/{Module}/Actions`.
     - Create `FormRequest` for validation.
