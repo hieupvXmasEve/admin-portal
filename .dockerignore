@@ -8,6 +8,9 @@
 .env.*
 !.env.example
 
+# Portal repos (separate Nuxt apps — not part of Swinx image)
+FE/
+
 # Dependencies
 node_modules
 vendor
