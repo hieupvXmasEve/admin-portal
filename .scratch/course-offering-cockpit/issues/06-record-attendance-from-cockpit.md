@@ -1,6 +1,6 @@
 # Record attendance directly from cockpit sessions view
 
-Status: ready-for-agent
+Status: ready-for-human (implemented; see commit 5cd80e87 on dev)
 
 ## Parent
 

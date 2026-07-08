@@ -1,6 +1,6 @@
 # Demote standalone Attendance pages to cross-offering reporting only
 
-Status: ready-for-agent
+Status: ready-for-human (implemented; see commit be508902 on dev)
 
 ## Parent
 
