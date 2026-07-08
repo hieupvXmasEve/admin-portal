@@ -7,25 +7,41 @@ Prove that defer Finance behavior preserves existing ledger truth:
 - item-level defer evidence exists for old and new defer cases;
 - deferred original registrations are non-billable in expected-fee logic;
 - paid cash is either preserved or consumed according to policy;
-- `FORFEIT` and `PARTIAL` never create debt beyond real paid cash;
+- `FORFEIT` never creates debt beyond real paid cash;
+- partial defer is modeled as course-scope defer, not as an amount policy;
+- early-study defer requires Academic Affairs and Student Services
+  confirmation, and partial payment preserves only actual paid cash;
 - future re-enrollment creates a normal charge and uses available cash through
   the normal allocation path;
+- future re-enrollment uses new registrations linked to the original deferred
+  registrations, never by reactivating the old deferred registrations;
 - DNG-linked cases do not bypass provider lifecycle safety.
 
 ## Test Plan
 
 | Layer | Cases |
 | --- | --- |
-| Unit | Defer policy amount capping: preserve, forfeit, partial, unpaid, overpaid, partial amount greater than paid. |
+| Unit | Defer policy amount capping: preserve, forfeit, unpaid, overpaid. |
 | Unit | Charge mapping classifier: course-linked charge, full-semester charge, missing charge, voided charge, multi-course ambiguous charge, discount present, live DNG present. |
+| Unit | Legacy `fee_policy = PARTIAL` rows classify as needs-review and are never auto-settled as percentage/amount-based money policy. |
 | Integration | Backfill creates missing `defer_case_items` for full-scope cases idempotently. |
 | Integration | Runtime full-scope defer creates item-level records and marks affected registrations `defer`. |
 | Integration | Billing exception and Fee Monitor expected-fee queries exclude `registration_status = defer`. |
 | Integration | Preserve with paid charge voids/releases source obligation with auto-reallocation disabled and leaves cash available. |
 | Integration | Preserve with unpaid charge does not create credit or debt. |
 | Integration | Forfeit consumes only paid cash, capped by paid amount, and does not create unpaid debt. |
-| Integration | Partial consumes only the paid portion selected by policy and leaves the remainder available. |
+| Integration | Course-scope defer records selected `defer_case_items`; if the source charge is semester-level tuition, the case remains manual Finance review and is never auto-split. |
+| Integration | Manual Finance review for course-scope defer on semester-level tuition records one of three outcomes: keep fee unchanged, manual release/adjustment with explicit amount and free-text reason capped by real paid cash, or follow up later without money mutation. |
+| Integration | Manual release/adjustment refuses amounts above real paid cash and does not silently reduce or void unpaid obligations. |
+| Integration | Early-study defer without Academic Affairs and Student Services confirmation blocks preservation and routes to review. |
+| Integration | Early-study fully paid defer preserves the confirmed covered scope under term tuition entitlement without per-course cash splitting. |
+| Integration | Early-study partially paid defer preserves only actual paid cash as balance, closes the old obligation, creates a normal return-study obligation later, and applies the balance first. |
+| Integration | Early-study unpaid defer closes the old obligation without collection and creates a normal return-study obligation later. |
+| Integration | Early-study ambiguous payment state routes to Finance review before money mutation. |
+| Integration | Future re-enrollment creates/uses new registrations linked to original deferred registrations; it does not reactivate old `defer` registrations and does not register completed or non-deferred courses again. |
 | Integration | Future re-enrollment generates a normal charge; existing available cash can allocate normally; preserve policy does not skip the charge. |
+| Integration | DNG preview/commit for a re-enrollment charge offers a use-balance / do-not-use-balance choice when applicable preserved/unapplied cash exists; default use-balance allocates before collection and DNG is created only for any remaining balance. |
+| Integration | DNG preview/commit records an explicit free-text reason when staff chooses do-not-use-balance, leaves the cash unapplied, creates provider collection only for the confirmed amount, and does not require a separate override permission or controlled reason list. |
 | Integration | Live DNG-linked charge blocks direct defer settlement and requires DNG cancellation flow first. |
 | E2E | Optional admin smoke only if an implementation slice changes web pages. |
 | Platform | Targeted Pint, PHP tests, any touched frontend checks, and `git diff --check`. |
@@ -43,12 +59,22 @@ Prove that defer Finance behavior preserves existing ledger truth:
 - Unpaid preserve case.
 - Paid forfeit case.
 - Unpaid forfeit case.
-- Partial case where paid amount is below, equal to, and above consumed amount.
+- Course-scope defer where selected registrations map directly to source
+  charges.
+- Course-scope defer where selected registrations are covered only by a
+  semester-level tuition charge and must stay manual-review only.
+- Manual-review examples for each accepted outcome: keep fee unchanged, manual
+  release/adjustment, and follow up later.
 - Charge with scholarship/discount allocation.
 - Charge with active DNG pending/pushed request.
 - Already-voided source charge.
-- Future re-enrollment registration with `original_registration_id` or the
-  current lineage mechanism used in the repo.
+- Full-scope re-enrollment fixture where only the deferred term/course set gets
+  new return-study registrations.
+- Course-scope re-enrollment fixture where only the selected deferred courses
+  get new return-study registrations.
+- Future re-enrollment registrations with `original_registration_id` or the
+  current lineage mechanism used in the repo, linked back to the original
+  deferred registrations.
 
 ## Commands
 
@@ -131,8 +157,9 @@ not a regression from this work.
 ### Slice 2 — money settlement (FULL-scope PRESERVE/FORFEIT) — M1–M4 done
 
 Decomposed into ordered child stories. M1–M4 implement the FULL-scope
-PRESERVE/FORFEIT path via TDD; PARTIAL/COURSE-scope and live-DNG/discount cases
-stay report-only (needs-review) until a later increment defines those rules.
+PRESERVE/FORFEIT path via TDD; COURSE-scope, legacy `fee_policy = PARTIAL`, and
+live-DNG/discount cases stay report-only (needs-review) until a later increment
+defines those rules.
 
 - **M1** `FIN-REV-020-01` — `ApplyDeferFinancePolicyAction` (isolated settlement).
 - **M2** `FIN-REV-020-02` — defer-aware charge generation; preserve-skip removed.
@@ -180,6 +207,7 @@ migrate fresh. Not a code change.
 
 #### Still gated (later increment)
 
-PARTIAL on a semester-level tuition charge (no accepted split rule), live-DNG
-routing through `CancelDngPaymentRequestAction` before void, and
-discount/scholarship resolution during settlement.
+COURSES-scope defer on a semester-level tuition charge (manual Finance review;
+no automatic split formula), legacy `fee_policy = PARTIAL` cleanup, live-DNG routing through
+`CancelDngPaymentRequestAction` before void, and discount/scholarship resolution
+during settlement.
