@@ -4,8 +4,16 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support\Reporting;
 
-use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Support\ObligationType\ObligationTypeDefinition;
+use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
 
+/**
+ * Fee Monitor expected-fee catalog.
+ *
+ * Per-type mandatory / missing-inference / charge_type / label facts are owned
+ * by ObligationTypeRegistry (ADR-0027). This class exposes the Fee Monitor
+ * source-key API and applies the ACAD-RET gate at read time.
+ */
 final class FeeMonitorExpectedFeeCatalog
 {
     public const SOURCE_TUITION_PLAN = 'tuition_plan';
@@ -26,7 +34,6 @@ final class FeeMonitorExpectedFeeCatalog
      * `mandatory` declares the business rule: only mandatory fees may report a
      * "missing" row when no charge exists yet. Optional fees (admission, BHYT)
      * never report missing — they only surface once a charge already exists.
-     * Add future mandatory fees here with `mandatory => true`.
      *
      * `missing_inference` is the effective switch the query honours:
      * mandatory AND not otherwise gated. Retake/resit stay mandatory but are
@@ -36,44 +43,42 @@ final class FeeMonitorExpectedFeeCatalog
      */
     public static function sources(): array
     {
-        return [
-            self::SOURCE_TUITION_PLAN => [
-                'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
-                'label' => 'Học phí theo kế hoạch',
-                'mandatory' => true,
-                'missing_inference' => true,
-            ],
-            self::SOURCE_EGC_TUITION => [
-                'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-                'label' => 'Phí EGC',
-                'mandatory' => true,
-                'missing_inference' => true,
-            ],
-            self::SOURCE_ADMISSION_ENROLLMENT => [
-                'charge_type' => FinanceCharge::TYPE_ADMISSION_FEE,
-                'label' => 'Lệ phí tuyển sinh / nhập học',
-                'mandatory' => false,
-                'missing_inference' => false,
-            ],
-            self::SOURCE_BHYT => [
-                'charge_type' => FinanceCharge::TYPE_BHYT,
-                'label' => 'BHYT',
-                'mandatory' => false,
-                'missing_inference' => false,
-            ],
-            self::SOURCE_COURSE_RETAKE => [
-                'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
-                'label' => 'Phí học lại',
-                'mandatory' => true,
-                'missing_inference' => FeeMonitorAcadRetGate::missingInferenceEnabled(),
-            ],
-            self::SOURCE_EXAM_RESIT => [
-                'charge_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
-                'label' => 'Phí thi lại',
-                'mandatory' => true,
-                'missing_inference' => FeeMonitorAcadRetGate::missingInferenceEnabled(),
-            ],
+        $acadRetGateEnabled = FeeMonitorAcadRetGate::missingInferenceEnabled();
+        $bySourceKey = [];
+
+        foreach (ObligationTypeRegistry::feeMonitorTracked() as $definition) {
+            $sourceKey = $definition->feeMonitorSourceKey;
+            if ($sourceKey === null) {
+                continue;
+            }
+
+            $bySourceKey[$sourceKey] = self::metaFromDefinition($definition, $acadRetGateEnabled);
+        }
+
+        // Stable staff-visible order (pre-registry catalog order).
+        $orderedKeys = [
+            self::SOURCE_TUITION_PLAN,
+            self::SOURCE_EGC_TUITION,
+            self::SOURCE_ADMISSION_ENROLLMENT,
+            self::SOURCE_BHYT,
+            self::SOURCE_COURSE_RETAKE,
+            self::SOURCE_EXAM_RESIT,
         ];
+
+        $sources = [];
+        foreach ($orderedKeys as $key) {
+            if (isset($bySourceKey[$key])) {
+                $sources[$key] = $bySourceKey[$key];
+                unset($bySourceKey[$key]);
+            }
+        }
+
+        // Any future tracked sources append after the known set.
+        foreach ($bySourceKey as $key => $meta) {
+            $sources[$key] = $meta;
+        }
+
+        return $sources;
     }
 
     /**
@@ -110,5 +115,18 @@ final class FeeMonitorExpectedFeeCatalog
             ->keys()
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array{charge_type: string, label: string, mandatory: bool, missing_inference: bool}
+     */
+    private static function metaFromDefinition(ObligationTypeDefinition $definition, bool $acadRetGateEnabled): array
+    {
+        return [
+            'charge_type' => $definition->type,
+            'label' => $definition->label,
+            'mandatory' => $definition->feeMonitorMandatory,
+            'missing_inference' => $definition->resolveFeeMonitorMissingInference($acadRetGateEnabled),
+        ];
     }
 }

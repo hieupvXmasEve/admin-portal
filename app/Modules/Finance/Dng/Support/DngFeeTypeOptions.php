@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Dng\Support;
 
-use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
 
 /**
  * Quản lý danh sách mã loại phí (fee_type) của hệ thống DNG.
+ *
+ * charge_type → DNG fee_type mapping is owned by ObligationTypeRegistry
+ * (ADR-0027). This class keeps the staff dropdown of DNG codes and delegates
+ * auto-mapping to the registry so per-type facts cannot drift.
  *
  * =====================================================================
  * LUỒNG SỬ DỤNG
@@ -15,33 +19,24 @@ use App\Modules\Finance\Models\FinanceCharge;
  *
  * 1. TẠO CHARGE (finance_charges):
  *    - Charge được tạo với charge_type nội bộ (vd: tuition_term, egc_level_fee).
- *    - Các charge_type được định nghĩa trong FinanceCharge::TYPE_*.
+ *    - Các type + DNG collection code được định nghĩa trong ObligationTypeRegistry.
  *    - Charge KHÔNG chứa mã DNG fee_type — việc chuyển đổi xảy ra ở bước push DNG.
  *
  * 2. TẠO DNG PAYMENT REQUEST (dng_payment_requests):
  *    - Khi push nợ lên DNG, mỗi request cần một fee_type theo chuẩn DNG.
  *    - Mã fee_type DNG được chọn theo hai cách:
- *      a) Tự động: dùng fromChargeType() để map từ charge_type nội bộ sang mã DNG.
- *         Dùng trong BatchDng và các flow tự động gộp charge → DNG.
- *      b) Thủ công: admin chọn từ dropdown all() tại trang tạo DNG thủ công
- *         (/finance/payments/create, /finance/operations/batch-dng).
+ *      a) Tự động: dùng fromChargeType() → ObligationTypeRegistry::dngCollectionCodeFor().
+ *      b) Thủ công: admin chọn từ dropdown all() tại trang tạo DNG thủ công.
  *    - Mã fee_type được lưu vào cột dng_payment_requests.fee_type.
  *
  * =====================================================================
- * KHI DNG CẤP MÃ FEE_TYPE MỚI
+ * KHI DNG CẤP MÃ FEE_TYPE MỚI / KHI THÊM OBLIGATION TYPE
  * =====================================================================
  *
- * Bước 1 — Thêm vào all():
- *   ['value' => 'MA_MOI', 'label' => 'MA_MOI: Mô tả ngắn gọn'],
- *
- * Bước 2 — Thêm vào fromChargeType() nếu có charge_type nội bộ tương ứng:
- *   FinanceCharge::TYPE_XXX => 'MA_MOI',
- *   Nếu không có charge_type tương ứng (phí chỉ tạo thủ công), bỏ qua bước này.
- *
- * Bước 3 — Nếu cần charge_type nội bộ mới (phí hoàn toàn mới chưa có trong hệ thống):
- *   - Thêm hằng TYPE_XXX vào FinanceCharge.
- *   - Thêm vào cột ENUM finance_charges.charge_type qua migration.
- *   - Map trong fromChargeType() như bước 2.
+ * Bước 1 — Thêm mã DNG vào all() nếu staff cần chọn thủ công.
+ * Bước 2 — Thêm/ cập nhật entry trong ObligationTypeRegistry (dngCollectionCode).
+ * Bước 3 — Nếu cần charge_type nội bộ mới: FinanceCharge::TYPE_*, migration ENUM,
+ *           registry entry, parity tests.
  * =====================================================================
  */
 final class DngFeeTypeOptions
@@ -82,26 +77,12 @@ final class DngFeeTypeOptions
     /**
      * Chuyển đổi charge_type nội bộ (finance_charges.charge_type) sang mã fee_type DNG.
      *
-     * Quy tắc hiện tại:
-     *   - tuition_term, egc_level_fee, course_fee → HP   (học phí chính)
-     *   - retake_fee                              → HL   (học lại môn)
-     *   - exam_resit_fee                          → PTL  (phí thi lại)
-     *   - manual_fee, adjustment                  → KHAC (phí khác)
-     *   - các loại credit (âm) KHÔNG được map tại đây;
-     *     caller phải lọc amount_snapshot > 0 trước khi gọi hàm này.
+     * Source of truth: ObligationTypeRegistry::dngCollectionCodeFor().
+     * Credits must not be pushed — callers filter amount_snapshot > 0 first.
+     * Unmapped / null collection codes fall back to KHAC (legacy behaviour).
      */
     public static function fromChargeType(string $chargeType): string
     {
-        return match ($chargeType) {
-            FinanceCharge::TYPE_TUITION_TERM,
-            FinanceCharge::TYPE_COURSE_FEE,
-            FinanceCharge::TYPE_EGC_LEVEL_FEE => 'HP',
-            FinanceCharge::TYPE_RETAKE_FEE => 'HL',
-            FinanceCharge::TYPE_EXAM_RESIT_FEE => 'PTL',
-            FinanceCharge::TYPE_BHYT => 'BHYT',
-            FinanceCharge::TYPE_MANUAL_FEE,
-            FinanceCharge::TYPE_ADJUSTMENT => 'KHAC',
-            default => 'KHAC',
-        };
+        return ObligationTypeRegistry::dngCollectionCodeFor($chargeType);
     }
 }

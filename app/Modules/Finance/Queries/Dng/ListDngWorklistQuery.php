@@ -11,6 +11,7 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -328,18 +329,20 @@ class ListDngWorklistQuery
     /**
      * Map DNG fee_type to internal charge_type values.
      *
+     * Derived from ObligationTypeRegistry so reverse mapping cannot drift from
+     * charge_type → DNG collection codes (ADR-0027).
+     *
      * @return array<int, string>
      */
     public static function mapFeeTypeToChargeTypes(string $dngFeeType): array
     {
-        return match ($dngFeeType) {
-            'HP' => [FinanceCharge::TYPE_TUITION_TERM, FinanceCharge::TYPE_EGC_LEVEL_FEE, FinanceCharge::TYPE_COURSE_FEE],
-            'HL' => [FinanceCharge::TYPE_RETAKE_FEE],
-            'PTL' => [FinanceCharge::TYPE_EXAM_RESIT_FEE],
-            'BHYT' => [FinanceCharge::TYPE_BHYT],
-            'KHAC' => [FinanceCharge::TYPE_MANUAL_FEE, FinanceCharge::TYPE_ADJUSTMENT],
-            default => throw new \InvalidArgumentException("Unknown DNG fee type: {$dngFeeType}"),
-        };
+        $types = ObligationTypeRegistry::chargeTypesForDngCollectionCode($dngFeeType);
+
+        if ($types === []) {
+            throw new \InvalidArgumentException("Unknown DNG fee type: {$dngFeeType}");
+        }
+
+        return $types;
     }
 
     /**
