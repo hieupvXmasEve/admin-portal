@@ -132,6 +132,11 @@ it('rolls back the retake source when finance intake fails', function () {
         {
             throw new RuntimeException('finance intake unavailable');
         }
+
+        public function requestCredit(FinanceIntakeData $intake): FinanceIntakeResult
+        {
+            throw new RuntimeException('finance intake unavailable');
+        }
     });
 
     expect(fn () => CreateRetakeCourseRegistrationAction::run([

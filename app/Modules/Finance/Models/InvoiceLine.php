@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Models;
 
 use App\Models\Student;
-
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -49,6 +48,11 @@ class InvoiceLine extends Model
     public function discountAllocations(): HasMany
     {
         return $this->hasMany(DiscountAllocation::class);
+    }
+
+    public function creditApplications(): HasMany
+    {
+        return $this->hasMany(CreditApplication::class);
     }
 
     // =====================

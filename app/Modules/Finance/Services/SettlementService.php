@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Services;
 
+use App\Modules\Finance\Models\CreditApplication;
 use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceDiscount;
@@ -47,6 +48,7 @@ class SettlementService
             'invoiceLines.charge',
             'invoiceLines.paymentApplications',
             'invoiceLines.discountAllocations.invoiceDiscount',
+            'invoiceLines.creditApplications',
         ]);
 
         $activeLines = $invoice->invoiceLines
@@ -66,25 +68,38 @@ class SettlementService
                 ->reject(fn (DiscountAllocation $allocation) => $this->isReversedDiscountAllocation($allocation))
                 ->sum('amount')));
 
-        if ($discount === 0.0) {
+        // ADR-0030 fourth reduction source: credit applications reduce outstanding
+        // like payments (payment-like), not like discounts (fee reduction).
+        // Signed sum: applications positive, reversals negative.
+        // Use 0.0 (not 0) with max() so the result stays float — PHP max(0, 0.0)
+        // returns int 0, which breaks strict float comparisons later.
+        $credit = max(0.0, (float) $activeLines
+            ->sum(fn (InvoiceLine $line) => (float) $line->creditApplications->sum('amount')));
+
+        if ($discount == 0.0 && $credit == 0.0) {
+            // Legacy backstop (ADR-0030): negative charge lines net as discount until
+            // wave-7 hardening deletes this path once zero active negatives remain.
+            // Skip when credit applications already carry the reduction so a partial
+            // conversion cannot double-count.
             $discount = abs((float) $activeLines
-                ->where('amount_snapshot', '<', 0)
+                ->filter(fn (InvoiceLine $line) => (float) $line->amount_snapshot < 0)
                 ->sum('amount_snapshot'));
         }
 
-        $net = max(0, $gross - $discount);
+        $net = max(0.0, $gross - $discount);
 
-        $paid = max(0, (float) $activeLines
-            ->sum(fn (InvoiceLine $line) => max(0, (float) $line->paymentApplications->sum('amount'))));
+        $paid = max(0.0, (float) $activeLines
+            ->sum(fn (InvoiceLine $line) => max(0.0, (float) $line->paymentApplications->sum('amount'))));
 
         $paid = min($paid, $net);
-        $remaining = max(0, $net - $paid);
+        $credit = min($credit, max(0.0, $net - $paid));
+        $remaining = max(0.0, $net - $paid - $credit);
 
         $status = $invoice->status === 'draft' ? 'draft' : 'pending';
 
         if ($net <= 0 || $remaining <= 0) {
             $status = 'paid';
-        } elseif ($paid > 0) {
+        } elseif ($paid > 0 || $credit > 0) {
             $status = 'partial';
         } elseif ($invoice->due_date && $invoice->due_date->isPast()) {
             $status = 'overdue';
@@ -93,6 +108,7 @@ class SettlementService
         return [
             'gross' => $gross,
             'discount' => $discount,
+            'credit' => $credit,
             'net' => $net,
             'paid' => $paid,
             'remaining' => $remaining,
@@ -164,6 +180,17 @@ class SettlementService
             ->sum('amount'));
     }
 
+    /**
+     * Net credit applied to a line (signed sum of credit_applications).
+     * Application rows are positive; reversal rows are negative.
+     */
+    public function getLineCreditAmount(InvoiceLine $line): float
+    {
+        return max(0, (float) CreditApplication::query()
+            ->where('invoice_line_id', $line->id)
+            ->sum('amount'));
+    }
+
     public function getLineNetDue(InvoiceLine $line): float
     {
         return max(0, (float) $line->amount_snapshot - $this->getLineDiscountAmount($line));
@@ -171,7 +198,7 @@ class SettlementService
 
     public function getLineOutstandingAmount(InvoiceLine $line): float
     {
-        return max(0, $this->getLineNetDue($line) - $this->getLinePaidAmount($line));
+        return max(0, $this->getLineNetDue($line) - $this->getLinePaidAmount($line) - $this->getLineCreditAmount($line));
     }
 
     /**
@@ -199,11 +226,19 @@ class SettlementService
             ? $invoice->status
             : $snapshot['status'];
 
+        // Cache columns predate the credit ledger. Fold credit into paid so
+        // readers that compute remaining as total − paid still see the fourth
+        // reduction source. Cash paid alone remains in the derived snapshot.
+        $cachedSettled = min(
+            (float) $snapshot['net'],
+            (float) $snapshot['paid'] + (float) ($snapshot['credit'] ?? 0),
+        );
+
         $invoice->forceFill([
             'cached_subtotal' => $snapshot['gross'],
             'cached_discount_total' => $snapshot['discount'],
             'cached_total_amount' => $snapshot['net'],
-            'cached_paid_amount' => $snapshot['paid'],
+            'cached_paid_amount' => $cachedSettled,
             'status' => $status,
             'cached_paid_at' => $cachedPaidAt,
         ])->save();

@@ -156,6 +156,11 @@ it('rolls back the exam resit source when finance intake fails', function () {
         {
             throw new RuntimeException('finance intake unavailable');
         }
+
+        public function requestCredit(FinanceIntakeData $intake): FinanceIntakeResult
+        {
+            throw new RuntimeException('finance intake unavailable');
+        }
     });
 
     $record = examResitRecordFor(AcademicRecord::FAILURE_GRADE_FAILED);

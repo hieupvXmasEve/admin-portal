@@ -44,13 +44,13 @@ class RequestFinanceDebitAction
             }
 
             return new FinanceIntakeResult(
-                finance_obligation_id: $obligation->id,
-                finance_charge_id: $charge->id,
-                invoice_line_id: $line->id,
                 lifecycle_status: $obligation->lifecycle_status,
                 amount: (float) $obligation->amount,
                 currency: $obligation->currency,
                 pricing_rule_version: $obligation->pricing_rule_version,
+                finance_obligation_id: $obligation->id,
+                finance_charge_id: $charge->id,
+                invoice_line_id: $line->id,
             );
         });
     }

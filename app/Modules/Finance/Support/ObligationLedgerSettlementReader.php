@@ -125,6 +125,7 @@ class ObligationLedgerSettlementReader implements ObligationSettlementReader
 
         $paid = 0.0;
         $discount = 0.0;
+        $credit = 0.0;
 
         if ($lineIds->isNotEmpty()) {
             $paid = (float) DB::table('payment_applications as pa')
@@ -141,13 +142,18 @@ class ObligationLedgerSettlementReader implements ObligationSettlementReader
                         ->orWhere('idc.status', '!=', 'reversed');
                 })
                 ->sum('da.amount');
+
+            $credit = (float) DB::table('credit_applications as ca')
+                ->whereIn('ca.invoice_line_id', $lineIds)
+                ->sum('ca.amount');
         }
 
         $payable = max(0.0, $payable);
         $paid = max(0.0, $paid);
         $discount = max(0.0, $discount);
+        $credit = max(0.0, $credit);
         $netPayable = max(0.0, $payable - $discount);
-        $outstanding = max(0.0, $netPayable - $paid);
+        $outstanding = max(0.0, $netPayable - $paid - $credit);
 
         return new ObligationSettlementResult(
             source_system: $sourceSystem,
@@ -155,7 +161,7 @@ class ObligationLedgerSettlementReader implements ObligationSettlementReader
             source_ref: $sourceRef,
             obligation_type: $obligationType,
             finance_obligation_id: $financeObligationId,
-            settlement_state: $this->deriveState($payable, $paid, $discount, $netPayable, $outstanding),
+            settlement_state: $this->deriveState($payable, $paid, $discount, $credit, $netPayable, $outstanding),
             payable: $payable,
             paid: $paid,
             discount: $discount,
@@ -267,6 +273,7 @@ class ObligationLedgerSettlementReader implements ObligationSettlementReader
         float $payable,
         float $paid,
         float $discount,
+        float $credit,
         float $netPayable,
         float $outstanding,
     ): string {
@@ -274,8 +281,8 @@ class ObligationLedgerSettlementReader implements ObligationSettlementReader
             return ObligationSettlementResult::STATE_OVERPAID;
         }
 
-        // Zero-payable with no discount is unpaid/empty — not "settled by discount".
-        if ($payable > 0.0 && $netPayable <= 0.0 && $discount >= $payable) {
+        // Fully reduced by discount and/or credit applications with no cash.
+        if ($payable > 0.0 && $outstanding <= 0.0 && $paid <= 0.0 && ($discount + $credit) > 0.0) {
             return ObligationSettlementResult::STATE_SETTLED_BY_DISCOUNT_OR_CREDIT;
         }
 
@@ -283,7 +290,7 @@ class ObligationLedgerSettlementReader implements ObligationSettlementReader
             return ObligationSettlementResult::STATE_PAID;
         }
 
-        if ($paid > 0.0) {
+        if ($paid > 0.0 || $credit > 0.0) {
             return ObligationSettlementResult::STATE_PARTIALLY_PAID;
         }
 

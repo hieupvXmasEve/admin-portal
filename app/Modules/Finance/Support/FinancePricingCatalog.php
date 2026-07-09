@@ -30,7 +30,8 @@ class FinancePricingCatalog
             PricingStrategy::CatalogFixed, PricingStrategy::CatalogFacts => $this->priceFromCatalogOrFail($intake),
             PricingStrategy::StaffSupplied => $this->priceFromStaffSupplied($intake),
             PricingStrategy::GeneratorAmount => $this->priceFromGeneratorAmount($intake),
-            PricingStrategy::PolicyComputed, PricingStrategy::NotApplicable => throw new RuntimeException(
+            PricingStrategy::PolicyComputed => $this->priceFromPolicyComputed($intake),
+            PricingStrategy::NotApplicable => throw new RuntimeException(
                 "Pricing strategy [{$definition->pricingStrategy->value}] is not supported for intake type [{$intake->obligation_type}] yet."
             ),
         };
@@ -38,7 +39,7 @@ class FinancePricingCatalog
 
     /**
      * Whether intake facts may carry amount/currency for this obligation type.
-     * Catalog-priced types forbid them (ADR-0026); staff/generator strategies allow amount.
+     * Catalog-priced types forbid them (ADR-0026); staff/generator/policy strategies allow amount.
      * tuition_term is GeneratorAmount transitional wiring but prices from catalog/TuitionPlan
      * facts only (wave 3) — callers must not supply final amounts.
      */
@@ -53,6 +54,7 @@ class FinancePricingCatalog
         return in_array($strategy, [
             PricingStrategy::StaffSupplied,
             PricingStrategy::GeneratorAmount,
+            PricingStrategy::PolicyComputed,
         ], true);
     }
 
@@ -105,6 +107,17 @@ class FinancePricingCatalog
     private function priceFromStaffSupplied(FinanceIntakeData $intake): array
     {
         return $this->priceFromSuppliedAmount($intake, PricingStrategy::StaffSupplied, 'staff_supplied');
+    }
+
+    /**
+     * Policy-computed amount supplied by Finance after policy evaluation
+     * (defer_credit preserve amount, scholarship grant, etc.).
+     *
+     * @return array{amount: float, currency: string, rule_version: string, snapshot: array<string, mixed>}
+     */
+    private function priceFromPolicyComputed(FinanceIntakeData $intake): array
+    {
+        return $this->priceFromSuppliedAmount($intake, PricingStrategy::PolicyComputed, 'policy_computed');
     }
 
     /**

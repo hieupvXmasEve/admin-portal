@@ -139,20 +139,6 @@ it('rejects source supplied pricing values', function (): void {
     ));
 })->throws(InvalidFinanceIntakePayload::class);
 
-it('rejects credit intake until that branch exists', function (): void {
-    app(FinanceIntakeContract::class)->request(new FinanceIntakeData(
-        source_system: 'academic',
-        source_kind: 'future_source',
-        source_ref: 'FUTURE-1',
-        financial_effect: FinancialEffect::Credit,
-        obligation_type: 'future_entitlement',
-        facts: [
-            'student_id' => $this->student->id,
-            'semester_id' => $this->semester->id,
-        ],
-    ));
-})->throws(UnsupportedFinancialEffectYet::class);
-
 it('rejects discount intake until that branch exists', function (): void {
     app(FinanceIntakeContract::class)->request(new FinanceIntakeData(
         source_system: 'academic',

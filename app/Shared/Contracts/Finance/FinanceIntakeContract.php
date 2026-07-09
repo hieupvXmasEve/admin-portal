@@ -12,4 +12,6 @@ interface FinanceIntakeContract
     public function request(FinanceIntakeData $intake): FinanceIntakeResult;
 
     public function requestDebit(FinanceIntakeData $intake): FinanceIntakeResult;
+
+    public function requestCredit(FinanceIntakeData $intake): FinanceIntakeResult;
 }
