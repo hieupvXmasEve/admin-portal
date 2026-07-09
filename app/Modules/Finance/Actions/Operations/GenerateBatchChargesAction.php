@@ -7,6 +7,7 @@ namespace App\Modules\Finance\Actions\Operations;
 use App\Models\Student;
 use App\Models\StudentScholarshipAward;
 use App\Models\Unit;
+use App\Modules\Finance\Actions\Major\SubmitTuitionTermDebitAction;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
@@ -73,6 +74,7 @@ class GenerateBatchChargesAction
         $studentChargeTimingResolver = app(StudentChargeTimingResolver::class);
         $voucherDiscountAmountResolver = app(VoucherDiscountAmountResolver::class);
         $egcFeeResolver = app(EgcLevelFeeResolver::class);
+        $submitTuition = app(SubmitTuitionTermDebitAction::class);
         $students = $students
             ->filter(fn (Student $student) => $studentChargeTimingResolver->shouldIncludeStudentForChargeGeneration($student, $semesterId, $chargeTypes))
             ->values();
@@ -245,7 +247,7 @@ class GenerateBatchChargesAction
                         }
                     }
 
-                    // Case B: Intake Course -> Tuition
+                    // Case B: Intake Course -> Tuition (via Finance Intake Contract)
                     if ($canGenerateTuition) {
                         if ($shouldSkipFullCharges) {
                             // Deferred enrollment is non-billable (FIN-REV-020-02): generate nothing.
@@ -255,37 +257,43 @@ class GenerateBatchChargesAction
 
                             if ($amount !== null && $amount > 0) {
                                 $termIdx = $tuitionTerm['chargeable_term_index'] ?? $tuitionTerm['term_number'] ?? 1;
+                                $charge = null;
+                                $createdViaIntake = false;
 
                                 if ($existingTuitionCharge) {
                                     $charge = null;
                                 } else {
-                                    $charge = self::createChargeIfNotExists(
-                                        $student, $semesterId,
-                                        FinanceCharge::TYPE_TUITION_TERM,
-                                        $amount,
-                                        null,
-                                        null,
-                                        $createdByUserId
-                                    );
+                                    $intakeResult = $submitTuition->handle($student, $semesterId, [
+                                        'source_kind' => SubmitTuitionTermDebitAction::SOURCE_KIND_LEGACY_TUITION,
+                                        'due_date' => $dueDate->toDateString(),
+                                        'invoice_id' => $invoice->id,
+                                        'description' => "Major Tuition (Installment {$termIdx})",
+                                    ]);
+
+                                    $charge = FinanceCharge::query()->find($intakeResult->finance_charge_id);
+                                    $createdViaIntake = $charge instanceof FinanceCharge;
                                 }
 
-                                if ($charge) {
-                                    $charge->update(['description' => "Major Tuition (Installment {$termIdx})"]);
-                                    $charge->refresh();
+                                if ($charge instanceof FinanceCharge) {
                                     $chargesToLink[] = $charge;
                                     $hasInvoiceMutation = true;
                                 }
 
-                                // Apply scholarship discount regardless of expiry — business rule: scholarship applies to all semesters
-                                $chargeAmountForScholarship = $charge ? (float) $charge->amount : (float) $existingTuitionCharge->amount;
-                                $scholarshipDiscount = self::resolveScholarshipDiscountPayload(
-                                    $invoice,
-                                    $student->scholarshipAward,
-                                    $chargeAmountForScholarship,
-                                );
-                                if ($scholarshipDiscount !== null) {
-                                    $pendingDiscounts[] = $scholarshipDiscount;
-                                    $hasInvoiceMutation = true;
+                                // Scholarship: CreateFinanceChargeAction already applies it for new
+                                // tuition_term intakes. Re-apply only when reusing an existing charge.
+                                if (! $createdViaIntake) {
+                                    $chargeAmountForScholarship = $charge
+                                        ? (float) $charge->amount
+                                        : (float) $existingTuitionCharge->amount;
+                                    $scholarshipDiscount = self::resolveScholarshipDiscountPayload(
+                                        $invoice,
+                                        $student->scholarshipAward,
+                                        $chargeAmountForScholarship,
+                                    );
+                                    if ($scholarshipDiscount !== null) {
+                                        $pendingDiscounts[] = $scholarshipDiscount;
+                                        $hasInvoiceMutation = true;
+                                    }
                                 }
                             }
                         }

@@ -118,7 +118,13 @@ class RequestFinanceDebitAction
         $existing = $obligation->financeCharge()->with('invoiceLines')->first();
 
         if ($existing instanceof FinanceCharge) {
-            return $existing;
+            // FIN-05: a voided projection must not block regeneration. Detach the
+            // voided row so a fresh materialization can bind to the same obligation.
+            if ($existing->status === FinanceCharge::STATUS_VOID) {
+                $existing->forceFill(['finance_obligation_id' => null])->save();
+            } else {
+                return $existing;
+            }
         }
 
         $payload = [
