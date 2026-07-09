@@ -6,6 +6,7 @@ use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
@@ -74,6 +75,7 @@ it('prices and materializes a debit obligation into one finance charge and invoi
     $obligation = FinanceObligation::query()->firstOrFail();
     $charge = FinanceCharge::query()->where('finance_obligation_id', $obligation->id)->firstOrFail();
     $line = InvoiceLine::query()->where('charge_id', $charge->id)->firstOrFail();
+    $billingAccount = BillingAccount::query()->where('student_id', $this->student->id)->firstOrFail();
 
     expect($result->finance_obligation_id)->toBe($obligation->id)
         ->and($result->finance_charge_id)->toBe($charge->id)
@@ -83,11 +85,13 @@ it('prices and materializes a debit obligation into one finance charge and invoi
         ->and($obligation->source_ref)->toBe('RET-2026-0001')
         ->and($obligation->obligation_type)->toBe(FinanceCharge::TYPE_RETAKE_FEE)
         ->and($obligation->lifecycle_status)->toBe(FinanceObligation::STATUS_ACCEPTED)
+        ->and($obligation->billing_account_id)->toBe($billingAccount->id)
         ->and((float) $obligation->amount)->toBe(1_500_000.0)
         ->and($obligation->currency)->toBe('VND')
         ->and($obligation->pricing_rule_version)->toBe('retake_fee:v1')
         ->and($obligation->pricing_snapshot['catalog_rule_version'])->toBe('retake_fee:v1')
         ->and($charge->charge_type)->toBe(FinanceCharge::TYPE_RETAKE_FEE)
+        ->and($charge->student_id)->toBe($this->student->id)
         ->and((float) $charge->amount)->toBe(1_500_000.0)
         ->and($charge->source_type)->toBeNull()
         ->and($charge->source_id)->toBeNull()

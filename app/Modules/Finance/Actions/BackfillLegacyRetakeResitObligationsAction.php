@@ -9,10 +9,15 @@ use App\Models\ExamResitAttempt;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
 use Illuminate\Support\Facades\DB;
 
 class BackfillLegacyRetakeResitObligationsAction
 {
+    public function __construct(
+        private readonly BillingAccountProvisioner $billingAccountProvisioner,
+    ) {}
+
     /**
      * @return array{
      *     checked:int,
@@ -106,7 +111,10 @@ class BackfillLegacyRetakeResitObligationsAction
             return;
         }
 
+        $billingAccount = $this->billingAccountProvisioner->forStudent((int) $charge->student_id);
+
         $obligation = FinanceObligation::query()->create([
+            'billing_account_id' => $billingAccount->id,
             'source_system' => AcademicFinanceObligationSource::SOURCE_SYSTEM,
             'source_kind' => $source['source_kind'],
             'source_ref' => $source['source_ref'],
@@ -145,6 +153,9 @@ class BackfillLegacyRetakeResitObligationsAction
         bool $dryRun,
     ): void {
         if ((int) $charge->finance_obligation_id === (int) $obligation->id) {
+            if (! $dryRun) {
+                $this->ensureObligationBillingAccount($obligation, $charge);
+            }
             $summary['already_linked']++;
 
             return;
@@ -164,9 +175,20 @@ class BackfillLegacyRetakeResitObligationsAction
 
         if (! $dryRun) {
             $charge->update(['finance_obligation_id' => $obligation->id]);
+            $this->ensureObligationBillingAccount($obligation, $charge);
         }
 
         $summary['linked_existing']++;
+    }
+
+    private function ensureObligationBillingAccount(FinanceObligation $obligation, FinanceCharge $charge): void
+    {
+        if ($obligation->billing_account_id !== null || $charge->student_id === null) {
+            return;
+        }
+
+        $billingAccount = $this->billingAccountProvisioner->forStudent((int) $charge->student_id);
+        $obligation->update(['billing_account_id' => $billingAccount->id]);
     }
 
     /**

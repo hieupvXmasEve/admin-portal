@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class FinanceObligation extends Model
@@ -22,6 +23,7 @@ class FinanceObligation extends Model
     public const STATUS_SUPERSEDED = 'superseded';
 
     protected $fillable = [
+        'billing_account_id',
         'source_system',
         'source_kind',
         'source_ref',
@@ -39,6 +41,11 @@ class FinanceObligation extends Model
         'pricing_snapshot' => 'array',
         'accepted_at' => 'datetime',
     ];
+
+    public function billingAccount(): BelongsTo
+    {
+        return $this->belongsTo(BillingAccount::class);
+    }
 
     public function financeCharge(): HasOne
     {

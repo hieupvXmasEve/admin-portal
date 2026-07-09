@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
@@ -425,6 +426,14 @@ class Student extends StudentAuditableModel
             'student_id',
             'student_decision_id'
         )->withTimestamps();
+    }
+
+    /**
+     * Finance-owned payer identity for this student (exactly one; ADR-0029).
+     */
+    public function billingAccount(): HasOne
+    {
+        return $this->hasOne(BillingAccount::class);
     }
 
     /**

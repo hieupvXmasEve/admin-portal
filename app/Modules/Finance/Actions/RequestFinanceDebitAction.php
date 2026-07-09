@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions;
 
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\FinancePricingCatalog;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeResult;
@@ -19,12 +21,14 @@ class RequestFinanceDebitAction
     public function __construct(
         private readonly FinancePricingCatalog $pricingCatalog,
         private readonly CreateFinanceChargeAction $createChargeAction,
+        private readonly BillingAccountProvisioner $billingAccountProvisioner,
     ) {}
 
     public function handle(FinanceIntakeData $intake): FinanceIntakeResult
     {
         return DB::transaction(function () use ($intake): FinanceIntakeResult {
             $this->assertFactsCarryNoPricing($intake);
+            $this->assertFactsCarryNoPayerIdentity($intake);
 
             $obligation = $this->findExistingObligation($intake);
 
@@ -60,6 +64,13 @@ class RequestFinanceDebitAction
         }
     }
 
+    private function assertFactsCarryNoPayerIdentity(FinanceIntakeData $intake): void
+    {
+        if (array_key_exists('billing_account_id', $intake->facts)) {
+            throw InvalidFinanceIntakePayload::forbiddenPayerFact('billing_account_id');
+        }
+    }
+
     private function findExistingObligation(FinanceIntakeData $intake): ?FinanceObligation
     {
         return FinanceObligation::query()
@@ -74,8 +85,10 @@ class RequestFinanceDebitAction
     private function createAcceptedObligation(FinanceIntakeData $intake): FinanceObligation
     {
         $priced = $this->pricingCatalog->price($intake);
+        $billingAccount = $this->resolveBillingAccount($intake);
 
         return FinanceObligation::query()->create([
+            'billing_account_id' => $billingAccount->id,
             'source_system' => $intake->source_system,
             'source_kind' => $intake->source_kind,
             'source_ref' => $intake->source_ref,
@@ -99,13 +112,54 @@ class RequestFinanceDebitAction
 
         return $this->createChargeAction->handle([
             'finance_obligation_id' => $obligation->id,
-            'student_id' => $this->requiredIntFact($intake, 'student_id'),
+            'student_id' => $this->resolveStudentIdForMaterialization($obligation, $intake),
             'semester_id' => $this->requiredIntFact($intake, 'semester_id'),
             'charge_type' => $obligation->obligation_type,
             'amount' => (float) $obligation->amount,
             'description' => $this->description($intake),
             'created_by_user_id' => auth()->id(),
         ]);
+    }
+
+    /**
+     * Resolve the student-keyed ledger projection target from the obligation's
+     * billing account (ADR-0029). Sources still send student_id so Finance can
+     * provision/resolve the account; they never send billing_account_id.
+     *
+     * Pre-student accounts (student_id null) must not materialize into the
+     * student-keyed collection ledger until Approve links a Student.
+     */
+    private function resolveStudentIdForMaterialization(
+        FinanceObligation $obligation,
+        FinanceIntakeData $intake,
+    ): int {
+        $obligation->loadMissing('billingAccount');
+
+        $account = $obligation->billingAccount;
+
+        if ($account instanceof BillingAccount) {
+            if ($account->student_id === null) {
+                throw new RuntimeException(
+                    "Cannot materialize finance obligation {$obligation->id}: billing account is not linked to a Student."
+                );
+            }
+
+            return (int) $account->student_id;
+        }
+
+        // Transition path: obligation created before payer-key backfill.
+        $studentId = $this->requiredIntFact($intake, 'student_id');
+        $account = $this->billingAccountProvisioner->forStudent($studentId);
+        $obligation->update(['billing_account_id' => $account->id]);
+
+        return (int) $account->student_id;
+    }
+
+    private function resolveBillingAccount(FinanceIntakeData $intake): BillingAccount
+    {
+        $studentId = $this->requiredIntFact($intake, 'student_id');
+
+        return $this->billingAccountProvisioner->forStudent($studentId);
     }
 
     private function requiredIntFact(FinanceIntakeData $intake, string $key): int

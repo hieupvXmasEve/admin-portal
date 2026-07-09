@@ -17,4 +17,9 @@ class InvalidFinanceIntakePayload extends InvalidArgumentException
     {
         return new self("Finance intake fact must not supply pricing value: {$fact}.");
     }
+
+    public static function forbiddenPayerFact(string $fact): self
+    {
+        return new self("Finance intake fact must not supply payer identity: {$fact}. Finance resolves the billing account.");
+    }
 }
