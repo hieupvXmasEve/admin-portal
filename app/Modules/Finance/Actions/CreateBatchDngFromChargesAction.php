@@ -33,6 +33,9 @@ use Illuminate\Support\Facades\Log;
  *   blocked as missing_finance_obligation (no silent charge create).
  * - BHYT (wave 2): every pushed payable must already be linked to a
  *   FinanceObligation; unlinked legacy charges are blocked until backfill.
+ * - HP (wave 3 tuition_term only): tuition_term payables must already be linked
+ *   to a FinanceObligation; EGC/course_fee under the same DNG code stay free
+ *   until their owning waves cut over.
  */
 class CreateBatchDngFromChargesAction
 {
@@ -149,6 +152,12 @@ class CreateBatchDngFromChargesAction
             // a FinanceObligation. Never invent BHYT debt at push time.
             if ($dngFeeType === 'BHYT') {
                 $this->assertChargesHaveFinanceObligations($charges, $dngFeeType);
+            }
+
+            // Wave-3 tuition_term: HP may mix tuition/EGC/course_fee. Guard only
+            // tuition_term rows so EGC collection is not blocked pre-wave-5.
+            if ($dngFeeType === 'HP') {
+                $this->assertTuitionTermChargesHaveFinanceObligations($charges);
             }
 
             // Installment-aware total: for each charge, take its next PENDING installment.
@@ -367,18 +376,32 @@ class CreateBatchDngFromChargesAction
 
     /**
      * Fail fast when any payable selected for DNG push has no accepted FinanceObligation.
-     * Used for cut-over types (BHYT) so DNG cannot collect orphan or voided-obligation charges.
+     * Used for cut-over types (BHYT, tuition_term) so DNG cannot collect orphan or voided-obligation charges.
      *
      * @param  Collection<int, object{id: int, amount: float, balance: float, finance_obligation_id?: int|null}>  $charges
+     * @param  array<int, string>|null  $onlyChargeTypes  When set, only these charge_types are checked.
      */
-    private function assertChargesHaveFinanceObligations(Collection $charges, string $dngFeeType): void
-    {
+    private function assertChargesHaveFinanceObligations(
+        Collection $charges,
+        string $dngFeeType,
+        ?array $onlyChargeTypes = null,
+    ): void {
         $chargeIds = $charges->pluck('id')->map(fn ($id) => (int) $id)->all();
 
-        $invalidIds = FinanceCharge::query()
-            ->whereIn('id', $chargeIds)
-            ->where(function ($query): void {
-                $query->whereNull('finance_obligation_id')
+        if ($chargeIds === []) {
+            return;
+        }
+
+        $query = FinanceCharge::query()
+            ->whereIn('id', $chargeIds);
+
+        if ($onlyChargeTypes !== null) {
+            $query->whereIn('charge_type', $onlyChargeTypes);
+        }
+
+        $invalidIds = $query
+            ->where(function ($inner): void {
+                $inner->whereNull('finance_obligation_id')
                     ->orWhereDoesntHave('financeObligation', function ($obligationQuery): void {
                         $obligationQuery->where('lifecycle_status', FinanceObligation::STATUS_ACCEPTED);
                     });
@@ -391,10 +414,28 @@ class CreateBatchDngFromChargesAction
             return;
         }
 
+        $repairHint = $dngFeeType === 'HP'
+            ? 'Run finance:backfill-legacy-tuition-term-obligations or re-generate via intake.'
+            : 'Run finance:backfill-legacy-bhyt-obligations or re-generate via intake.';
+
         throw new \RuntimeException(
             'missing_finance_obligation: '.$dngFeeType.' charge(s) #'
             .implode(', #', $invalidIds)
-            .' have no accepted Finance obligation. Run finance:backfill-legacy-bhyt-obligations or re-generate via intake.'
+            .' have no accepted Finance obligation. '.$repairHint
+        );
+    }
+
+    /**
+     * Wave-3: among HP payables, only tuition_term rows require an accepted obligation.
+     *
+     * @param  Collection<int, object{id: int, amount: float, balance: float}>  $charges
+     */
+    private function assertTuitionTermChargesHaveFinanceObligations(Collection $charges): void
+    {
+        $this->assertChargesHaveFinanceObligations(
+            $charges,
+            'HP',
+            [FinanceCharge::TYPE_TUITION_TERM],
         );
     }
 

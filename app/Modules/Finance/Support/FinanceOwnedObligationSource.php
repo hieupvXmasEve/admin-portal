@@ -50,4 +50,24 @@ final class FinanceOwnedObligationSource
     {
         return "legacy:bhyt:charge:{$chargeId}";
     }
+
+    /**
+     * Synthetic source_ref for legacy tuition_term charges that pre-date intake.
+     * Stable per charge so backfill is idempotent under the source quad unique key
+     * and never collides with post-cutover mint refs
+     * (`tuition_term:student:{id}:semester:{id}`).
+     */
+    public static function legacyTuitionTermChargeRef(int $chargeId): string
+    {
+        return "legacy:tuition_term:charge:{$chargeId}";
+    }
+
+    /**
+     * Synthetic source_ref for legacy defer_credit charges that pre-date entitlement intake.
+     * Stable per charge so conversion is idempotent under the source quad unique key.
+     */
+    public static function legacyDeferCreditChargeRef(int $chargeId): string
+    {
+        return "legacy:defer_credit:charge:{$chargeId}";
+    }
 }

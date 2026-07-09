@@ -6,6 +6,7 @@ use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Actions\CreateBatchDngFromChargesAction;
+use App\Modules\Finance\Actions\Major\SubmitTuitionTermDebitAction;
 use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
@@ -15,6 +16,9 @@ use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Jobs\PushNextInstallmentJob;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\FinanceOwnedObligationSource;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 
@@ -47,9 +51,29 @@ beforeEach(function () {
 
 /**
  * Build a tuition_term charge with N installments for a student in a specific semester.
+ * Wave-3: HP DNG requires an accepted FinanceObligation on tuition_term payables.
  */
 function makeBatchChargeWithInstallments(int $studentId, int $semesterId, float $gross, int $installmentCount): FinanceCharge
 {
+    $billingAccount = app(BillingAccountProvisioner::class)->forStudent($studentId);
+
+    $obligation = FinanceObligation::query()->create([
+        'billing_account_id' => $billingAccount->id,
+        'source_system' => FinanceOwnedObligationSource::SOURCE_SYSTEM,
+        'source_kind' => SubmitTuitionTermDebitAction::SOURCE_KIND_LEGACY_TUITION,
+        'source_ref' => FinanceOwnedObligationSource::legacyTuitionTermChargeRef(
+            // provisional; updated after charge insert for stable uniqueness
+            random_int(1_000_000, 9_999_999)
+        ),
+        'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $gross,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'tuition_term:test',
+        'pricing_snapshot' => ['provenance' => 'test_fixture'],
+        'accepted_at' => now(),
+    ]);
+
     $charge = FinanceCharge::create([
         'student_id' => $studentId,
         'semester_id' => $semesterId,
@@ -58,6 +82,11 @@ function makeBatchChargeWithInstallments(int $studentId, int $semesterId, float 
         'description' => 'HP test',
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
+        'finance_obligation_id' => $obligation->id,
+    ]);
+
+    $obligation->update([
+        'source_ref' => FinanceOwnedObligationSource::legacyTuitionTermChargeRef((int) $charge->id),
     ]);
 
     $per = $gross / $installmentCount;
@@ -313,7 +342,22 @@ it('worklist falls back to charge.balance when a charge has no installment row (
         'intake_semester_id' => $semester->id,
     ]);
 
-    // Charge with NO installments (legacy / never backfilled).
+    // Charge with NO installments (legacy / never backfilled installments),
+    // but still obligation-linked (wave-3 DNG guard).
+    $billingAccount = app(BillingAccountProvisioner::class)->forStudent($student->id);
+    $obligation = FinanceObligation::query()->create([
+        'billing_account_id' => $billingAccount->id,
+        'source_system' => FinanceOwnedObligationSource::SOURCE_SYSTEM,
+        'source_kind' => SubmitTuitionTermDebitAction::SOURCE_KIND_LEGACY_TUITION,
+        'source_ref' => 'legacy:tuition_term:test:no-installment',
+        'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 5_000_000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'tuition_term:test',
+        'pricing_snapshot' => ['provenance' => 'test_fixture'],
+        'accepted_at' => now(),
+    ]);
     FinanceCharge::create([
         'student_id' => $student->id,
         'semester_id' => $semester->id,
@@ -322,6 +366,7 @@ it('worklist falls back to charge.balance when a charge has no installment row (
         'description' => 'Legacy HP',
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
+        'finance_obligation_id' => $obligation->id,
     ]);
 
     app()->forgetInstance(CreateBatchDngFromChargesAction::class);
