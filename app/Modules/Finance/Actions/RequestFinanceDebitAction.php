@@ -57,7 +57,18 @@ class RequestFinanceDebitAction
 
     private function assertFactsCarryNoPricing(FinanceIntakeData $intake): void
     {
-        foreach (['amount', 'currency', 'pricing_rule_version'] as $forbiddenFact) {
+        // Finance always stamps pricing_rule_version — sources never supply it.
+        if (array_key_exists('pricing_rule_version', $intake->facts)) {
+            throw InvalidFinanceIntakePayload::forbiddenPricingFact('pricing_rule_version');
+        }
+
+        // Catalog-priced types reject amount/currency (ADR-0026). Staff-supplied and
+        // generator-amount strategies accept amount as the Finance-owned price input.
+        if ($this->pricingCatalog->allowsAmountInFacts($intake->obligation_type)) {
+            return;
+        }
+
+        foreach (['amount', 'currency'] as $forbiddenFact) {
             if (array_key_exists($forbiddenFact, $intake->facts)) {
                 throw InvalidFinanceIntakePayload::forbiddenPricingFact($forbiddenFact);
             }
@@ -110,7 +121,7 @@ class RequestFinanceDebitAction
             return $existing;
         }
 
-        return $this->createChargeAction->handle([
+        $payload = [
             'finance_obligation_id' => $obligation->id,
             'student_id' => $this->resolveStudentIdForMaterialization($obligation, $intake),
             'semester_id' => $this->requiredIntFact($intake, 'semester_id'),
@@ -118,7 +129,21 @@ class RequestFinanceDebitAction
             'amount' => (float) $obligation->amount,
             'description' => $this->description($intake),
             'created_by_user_id' => auth()->id(),
-        ]);
+        ];
+
+        if (isset($intake->facts['effective_at']) && is_string($intake->facts['effective_at']) && $intake->facts['effective_at'] !== '') {
+            $payload['effective_at'] = $intake->facts['effective_at'];
+        }
+
+        if (isset($intake->facts['due_date']) && is_string($intake->facts['due_date']) && $intake->facts['due_date'] !== '') {
+            $payload['due_date'] = $intake->facts['due_date'];
+        }
+
+        if (isset($intake->facts['invoice_id']) && is_numeric($intake->facts['invoice_id'])) {
+            $payload['invoice_id'] = (int) $intake->facts['invoice_id'];
+        }
+
+        return $this->createChargeAction->handle($payload);
     }
 
     /**

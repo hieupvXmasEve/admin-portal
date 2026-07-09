@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
+use App\Modules\Finance\Actions\CreateManualFeeDebitAction;
 use App\Modules\Finance\Actions\PushNextInstallmentAction;
 use App\Modules\Finance\Actions\SplitChargeIntoInstallmentsAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
@@ -16,6 +17,7 @@ use App\Modules\Finance\Exceptions\ChargeHasPaidInstallmentException;
 use App\Modules\Finance\Exceptions\InstallmentSplitNotAllowedException;
 use App\Modules\Finance\Exceptions\InvalidInstallmentPlanException;
 use App\Modules\Finance\Http\Requests\Charges\SplitChargeIntoInstallmentsRequest;
+use App\Modules\Finance\Http\Requests\Charges\StoreFinanceChargeRequest;
 use App\Modules\Finance\Http\Requests\Lookup\FilterFinanceChargesRequest;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
@@ -51,6 +53,7 @@ class FinanceChargeController extends Controller
 
     public function __construct(
         private CreateFinanceChargeAction $createChargeAction,
+        private CreateManualFeeDebitAction $createManualFeeDebitAction,
         private VoidFinanceChargeAction $voidChargeAction,
     ) {}
 
@@ -270,26 +273,30 @@ class FinanceChargeController extends Controller
 
     /**
      * Store a newly created charge.
+     *
+     * manual_fee is cut over to the Finance Intake Contract (wave 2). Other
+     * charge types on this form remain on the direct create path until their
+     * owning migration wave.
      */
-    public function store(Request $request)
+    public function store(StoreFinanceChargeRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'student_id' => 'required|integer|exists:students,id',
-            'semester_id' => 'required|integer|exists:semesters,id',
-            'charge_type' => 'required|string|in:'.implode(',', self::MANUAL_CREATE_CHARGE_TYPES),
-            'amount' => 'required|numeric',
-            'description' => 'required|string|max:500',
-            'effective_at' => 'nullable|date',
-            'invoice_id' => 'nullable|integer|exists:student_invoices,id',
-        ]);
+        $validated = $request->validated();
 
         try {
+            if ($validated['charge_type'] === FinanceCharge::TYPE_MANUAL_FEE) {
+                $result = $this->createManualFeeDebitAction->handle($validated);
+
+                Inertia::flash('success', 'Charge created successfully.');
+
+                return redirect()->route('finance.charges.show', $result->finance_charge_id);
+            }
+
             $charge = $this->createChargeAction->handle($validated);
 
-            return redirect()
-                ->route('finance.charges.show', $charge)
-                ->with('success', 'Charge created successfully.');
-        } catch (\Exception $e) {
+            Inertia::flash('success', 'Charge created successfully.');
+
+            return redirect()->route('finance.charges.show', $charge);
+        } catch (\Throwable $e) {
             return back()
                 ->withInput()
                 ->withErrors(['error' => $e->getMessage()]);

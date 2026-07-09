@@ -196,7 +196,8 @@ const handleSubmit = () => {
 
                                     <!-- <Label for="amount">Số tiền (VNĐ) *</Label> -->
                                     <!-- <Input v-model.number="form.amount" type="number" placeholder="Nhập số tiền" /> -->
-                                    <p class="text-muted-foreground text-xs">Số dương = Phí, Số âm = Tín dụng/Hoàn tiền
+                                    <p class="text-muted-foreground text-xs">
+                                        Phí thủ công (manual fee) phải &gt; 0. Các loại khác có thể dùng số âm cho tín dụng (chưa qua intake).
                                     </p>
                                     <p v-if="form.errors.amount" class="text-sm text-red-500">{{ form.errors.amount }}
                                     </p>
@@ -217,6 +218,7 @@ const handleSubmit = () => {
                             <CardTitle>Hành động</CardTitle>
                         </CardHeader>
                         <CardContent class="space-y-3">
+                            <p v-if="form.errors.error" class="text-sm text-red-500">{{ form.errors.error }}</p>
                             <Button type="submit" class="w-full"
                                 :disabled="form.processing || !form.student_id || !form.charge_type || !form.semester_id">
                                 Tạo khoản phí
@@ -232,8 +234,7 @@ const handleSubmit = () => {
                             <CardTitle>Hướng dẫn</CardTitle>
                         </CardHeader>
                         <CardContent class="text-muted-foreground space-y-2 text-sm">
-                            <p>• Số tiền <strong>dương</strong>: Khoản phí sinh viên cần đóng</p>
-                            <p>• Số tiền <strong>âm</strong>: Tín dụng/hoàn tiền cho sinh viên</p>
+                            <p>• <strong>Phí thủ công</strong> đi qua Finance Intake (số tiền &gt; 0 do Finance định giá staff-supplied)</p>
                             <p>• Mọi khoản phí sẽ được gán vào hóa đơn của học kỳ</p>
                             <p>• Nếu chưa có hóa đơn, hệ thống sẽ tự động tạo mới</p>
                         </CardContent>
