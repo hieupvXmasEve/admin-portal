@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Policies;
 
-use App\Models\FinanceCharge;
 use App\Models\User;
+use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 /**

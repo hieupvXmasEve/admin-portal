@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\CurriculumVersion;
-use App\Models\DiscountAllocation;
-use App\Models\FinanceCharge;
-use App\Models\InvoiceDiscount;
-use App\Models\InvoiceLine;
-use App\Models\Payment;
-use App\Models\PaymentApplication;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
 use App\Models\User;
+use App\Modules\Finance\Models\DiscountAllocation;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceDiscount;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\PaymentApplication;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Services\PermissionService;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -147,7 +148,7 @@ it('shows all invoice statuses and finance totals for a student row on the billi
         'paid_amount' => 0,
     ])->save();
 
-    /** @var \Illuminate\Contracts\Auth\Authenticatable $authenticatedUser */
+    /** @var Authenticatable $authenticatedUser */
     $authenticatedUser = $authorizedUser;
 
     $response = actingAs($authenticatedUser)
@@ -278,7 +279,7 @@ it('keeps a student row when any semester invoice matches the selected status fi
         'applied_at' => now(),
     ]);
 
-    /** @var \Illuminate\Contracts\Auth\Authenticatable $authenticatedUser */
+    /** @var Authenticatable $authenticatedUser */
     $authenticatedUser = $authorizedUser;
 
     $response = actingAs($authenticatedUser)

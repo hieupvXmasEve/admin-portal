@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\FinanceCharge;
-use App\Models\FinanceChargeInstallment;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Actions\CreateBatchDngFromChargesAction;
@@ -15,6 +13,8 @@ use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Jobs\PushNextInstallmentJob;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 

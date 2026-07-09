@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Actions;
 
 use App\Models\ExamResitAttempt;
-use App\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -14,9 +14,8 @@ use Illuminate\Validation\ValidationException;
  * Dùng khi HQ ghi nhận khoản phí cho một ExamResitAttempt đã được Academic duyệt và
  * đang chờ HQ tạo phí (hq_fee_status = hq_fee_pending).
  *
- * Charge được khoá theo nguồn (source_type/source_id) và bảo vệ trùng bởi
- * finance_charges.active_source_key, nên HQ gọi đồng thời không thể tạo hai charge
- * active cho cùng một nguồn thi lại.
+ * Prefer FinanceIntakeContract for new work. Legacy simple create still keys by
+ * source_type/source_id; intake idempotency now lives on finance_obligations.
  *
  * Academic là chủ nguồn; HQ/Finance là chủ việc tạo phí và theo dõi thanh toán.
  *

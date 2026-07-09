@@ -2,14 +2,14 @@
 
 namespace App\Console\Commands;
 
-use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
 use App\Models\TuitionPlan;
 use App\Models\TuitionPlanTerm;
 use App\Models\VoucherApplication;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -69,7 +69,7 @@ class BackfillStudentFees extends Command
                 // ->whereNotIn('status', Student::BLOCKED_STATUSES) // Optional: fail-safe
                 ->get();
 
-            $this->info('Found ' . $students->count() . ' eligible students.');
+            $this->info('Found '.$students->count().' eligible students.');
             $bar = $this->output->createProgressBar($students->count());
             $bar->start();
 
@@ -84,7 +84,7 @@ class BackfillStudentFees extends Command
                             'semester_id' => $semesterId,
                         ],
                         [
-                            'invoice_number' => 'INV-BF-' . time() . '-' . $student->student_id . '-' . $semesterId,
+                            'invoice_number' => 'INV-BF-'.time().'-'.$student->student_id.'-'.$semesterId,
                             'due_date' => now()->addDays(30),
                             'opened_at' => now(),
                             'status' => 'draft', // or 'issued' if backfilling history? Let's stick to draft/issued
@@ -270,7 +270,7 @@ class BackfillStudentFees extends Command
                     $stats['processed']++;
                     $bar->advance();
                 } catch (\Exception $e) {
-                    Log::error("Backfill Error Student {$student->id}: " . $e->getMessage());
+                    Log::error("Backfill Error Student {$student->id}: ".$e->getMessage());
                     $stats['errors']++;
                     $this->error("Error processing student {$student->student_id}: {$e->getMessage()}");
                 }
@@ -294,7 +294,7 @@ class BackfillStudentFees extends Command
             $this->info('Backfill completed successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
-            $this->error('Critical Error: ' . $e->getMessage());
+            $this->error('Critical Error: '.$e->getMessage());
             $this->error('Transaction rolled back.');
 
             return 1;

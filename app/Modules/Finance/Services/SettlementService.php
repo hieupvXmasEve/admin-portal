@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Services;
 
-use App\Models\DiscountAllocation;
-use App\Models\FinanceCharge;
-use App\Models\InvoiceDiscount;
-use App\Models\InvoiceLine;
-use App\Models\Payment;
-use App\Models\PaymentApplication;
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\DiscountAllocation;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceDiscount;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\PaymentApplication;
+use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 

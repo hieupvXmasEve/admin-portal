@@ -6,7 +6,7 @@ namespace App\Modules\Finance\Queries\Egc;
 
 use App\Models\EgcBlock;
 use App\Models\EgcRetakeDiscountLink;
-use App\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Support\EgcRetakeTargetResolver;
 use Illuminate\Support\Collection;
 

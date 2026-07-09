@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Operations;
 
 use App\Models\DeferCase;
-use App\Models\Payment;
 use App\Models\Student;
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;

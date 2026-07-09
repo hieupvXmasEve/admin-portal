@@ -6,14 +6,16 @@ namespace App\Modules\Academic\Actions;
 
 use App\Models\CourseRegistration;
 use App\Models\CourseRetakeRegistration;
-use App\Models\FinanceCharge;
-use App\Models\PaymentApplication;
-use DateTimeInterface;
+use App\Modules\Academic\Support\AcademicObligationSettlement;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class LinkPaidRetakeRegistrationToCourseRegistrationAction
 {
+    public function __construct(
+        private readonly AcademicObligationSettlement $obligationSettlement,
+    ) {}
+
     public function run(CourseRegistration $courseRegistration): ?CourseRetakeRegistration
     {
         $courseRegistration->loadMissing(['courseOffering.unit']);
@@ -37,13 +39,12 @@ class LinkPaidRetakeRegistrationToCourseRegistrationAction
                 return null;
             }
 
-            $charge = $registration->financeCharge;
-            if (! $charge || $charge->status !== FinanceCharge::STATUS_ACTIVE || ! $charge->is_fully_paid) {
+            if (! $this->obligationSettlement->isRetakeSettled($registration)) {
                 return null;
             }
 
             if ($registration->status === CourseRetakeRegistration::STATUS_PAYMENT_PENDING) {
-                $registration->transitionToPaid($this->resolvePaidAt($charge));
+                $registration->transitionToPaid(now());
                 $registration->refresh();
             }
 
@@ -93,7 +94,7 @@ class LinkPaidRetakeRegistrationToCourseRegistrationAction
         }
 
         return CourseRetakeRegistration::query()
-            ->with(['courseRegistration', 'financeCharge', 'unit'])
+            ->with(['courseRegistration', 'unit'])
             ->lockForUpdate()
             ->where('student_id', $courseRegistration->student_id)
             ->where('semester_id', $courseRegistration->semester_id)
@@ -129,23 +130,5 @@ class LinkPaidRetakeRegistrationToCourseRegistrationAction
             CourseRegistration::CLASS_ROSTER_REGISTRATION_STATUSES,
             true,
         );
-    }
-
-    private function resolvePaidAt(FinanceCharge $charge): ?DateTimeInterface
-    {
-        $lineIds = $charge->invoiceLines()->pluck('id');
-        if ($lineIds->isEmpty()) {
-            return null;
-        }
-
-        return PaymentApplication::query()
-            ->with('payment:id,paid_at')
-            ->whereIn('invoice_line_id', $lineIds)
-            ->where('amount', '>', 0)
-            ->get()
-            ->map(fn (PaymentApplication $application) => $application->payment?->paid_at)
-            ->filter()
-            ->sortBy(fn (DateTimeInterface $paidAt) => $paidAt->getTimestamp())
-            ->last();
     }
 }

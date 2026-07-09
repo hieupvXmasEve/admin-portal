@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Egc;
 
-use App\Models\DiscountAllocation;
 use App\Models\EgcBlock;
 use App\Models\EgcRetakeDiscountLink;
-use App\Models\FinanceCharge;
-use App\Models\InvoiceDiscount;
-use App\Models\InvoiceLine;
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\DiscountAllocation;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceDiscount;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\EgcRetakeTargetResolver;
 use Illuminate\Database\UniqueConstraintViolationException;

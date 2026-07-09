@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Operations;
 
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 
 class GetDueInvoicesSummaryQuery

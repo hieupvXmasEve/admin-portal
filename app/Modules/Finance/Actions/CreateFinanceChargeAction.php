@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions;
 
-use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
-use App\Models\StudentInvoice;
 use App\Models\StudentScholarshipAward;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use Carbon\Carbon;

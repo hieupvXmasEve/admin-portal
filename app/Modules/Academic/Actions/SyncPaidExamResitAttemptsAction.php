@@ -5,22 +5,22 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Actions;
 
 use App\Models\ExamResitAttempt;
-use App\Models\FinanceCharge;
+use App\Modules\Academic\Support\AcademicObligationSettlement;
 use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Derive exam-resit (thi lại) HQ paid state from canonical Finance evidence.
+ * Derive exam-resit (thi lại) HQ paid state from Finance settlement (source triple).
  *
- * An attempt is considered paid only when its linked FinanceCharge is active and
- * fully paid (FinanceCharge::is_fully_paid, computed from payment_applications via
- * SettlementService). Payment is never asserted from a manual flag.
- *
- * @see SyncPaidRetakeRegistrationsAction cho luồng học lại (HL) tương đương.
+ * @see SyncPaidRetakeRegistrationsAction for the retake equivalent.
  */
 class SyncPaidExamResitAttemptsAction implements ExamResitAttemptPaymentSyncer
 {
+    public function __construct(
+        private readonly AcademicObligationSettlement $obligationSettlement,
+    ) {}
+
     /**
      * @return array{checked:int,eligible:int,synced:int,skipped:int,failed:int,details:array<int,array<string,mixed>>}
      */
@@ -63,6 +63,7 @@ class SyncPaidExamResitAttemptsAction implements ExamResitAttemptPaymentSyncer
             return $this->emptyResult();
         }
 
+        // Legacy bridge: still accept finance_charge_id matches for pre-cutover rows.
         return $this->runQuery(
             ExamResitAttempt::query()->whereIn('finance_charge_id', $chargeIds),
             $dryRun,
@@ -78,16 +79,15 @@ class SyncPaidExamResitAttemptsAction implements ExamResitAttemptPaymentSyncer
 
         $attempts = $query
             ->where('hq_fee_status', ExamResitAttempt::HQ_FEE_CHARGE_CREATED)
-            ->whereNotNull('finance_charge_id')
-            ->with(['student:id,student_id,full_name', 'financeCharge'])
+            ->with(['student:id,student_id,full_name'])
             ->orderBy('id')
             ->get();
 
         foreach ($attempts as $attempt) {
             $result['checked']++;
 
-            $charge = $attempt->financeCharge;
-            if (! $charge || $charge->status !== FinanceCharge::STATUS_ACTIVE || ! $charge->is_fully_paid) {
+            $settlement = $this->obligationSettlement->forExamResit($attempt);
+            if (! $settlement->isSettled()) {
                 $result['skipped']++;
 
                 continue;
@@ -97,9 +97,9 @@ class SyncPaidExamResitAttemptsAction implements ExamResitAttemptPaymentSyncer
             $detail = [
                 'attempt_id' => $attempt->id,
                 'student_id' => $attempt->student?->student_id,
-                'finance_charge_id' => $charge->id,
-                'paid_amount' => $charge->paid_amount,
-                'balance' => $charge->balance,
+                'finance_obligation_id' => $settlement->finance_obligation_id,
+                'paid_amount' => $settlement->paid,
+                'outstanding' => $settlement->outstanding,
             ];
 
             if ($dryRun) {
@@ -118,10 +118,8 @@ class SyncPaidExamResitAttemptsAction implements ExamResitAttemptPaymentSyncer
                     'status' => 'failed',
                     'error' => $e->getMessage(),
                 ];
-
-                Log::warning('Failed to sync paid exam resit attempt', [
+                Log::error('SyncPaidExamResitAttempts: failed to mark paid', [
                     'attempt_id' => $attempt->id,
-                    'finance_charge_id' => $charge->id,
                     'error' => $e->getMessage(),
                 ]);
             }

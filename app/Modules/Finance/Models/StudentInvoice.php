@@ -2,7 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Models;
+namespace App\Modules\Finance\Models;
+
+use App\Models\BillingCycle;
+use App\Models\Semester;
+use App\Models\Student;
+use App\Models\User;
 
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Database\Eloquent\Model;

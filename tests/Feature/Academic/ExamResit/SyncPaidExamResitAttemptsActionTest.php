@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\ExamResitAttempt;
-use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
-use App\Models\Payment;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
 use App\Modules\Academic\Actions\SyncPaidExamResitAttemptsAction;
 use App\Modules\Finance\Actions\AllocatePaymentAction;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
 use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

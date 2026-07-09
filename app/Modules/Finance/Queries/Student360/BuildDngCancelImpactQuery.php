@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Student360;
 
-use App\Models\FinanceCharge;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Support\LifecycleDueExceptionRowMapper;
 use Illuminate\Support\Collection;
 

@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Reporting;
 
-use App\Models\DiscountAllocation;
-use App\Models\InvoiceLine;
-use App\Models\Payment;
-use App\Models\PaymentApplication;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\DiscountAllocation;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\PaymentApplication;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\LifecycleDueItemPredicate;
 use App\Modules\Finance\Support\Reporting\CollectionProgressCatalog as Catalog;

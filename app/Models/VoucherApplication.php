@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 

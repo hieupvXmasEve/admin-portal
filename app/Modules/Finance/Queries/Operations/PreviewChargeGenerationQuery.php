@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Operations;
 
-use App\Models\FinanceCharge;
-use App\Models\InvoiceDiscount;
 use App\Models\Student;
-use App\Models\StudentInvoice;
 use App\Models\StudentScholarshipAward;
 use App\Models\Unit;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceDiscount;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Support\BillingScopeHelper;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;

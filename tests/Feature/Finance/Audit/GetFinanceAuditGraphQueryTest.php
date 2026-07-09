@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Semester;
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Audit\GetFinanceAuditGraphQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

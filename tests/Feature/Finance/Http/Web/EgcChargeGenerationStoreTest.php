@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\User;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support\Integrity;
 
-use App\Models\InvoiceDiscount;
-use App\Models\InvoiceLine;
+use App\Modules\Finance\Models\InvoiceDiscount;
+use App\Modules\Finance\Models\InvoiceLine;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 

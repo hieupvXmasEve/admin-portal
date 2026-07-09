@@ -6,31 +6,25 @@ namespace App\Modules\Academic\Actions;
 
 use App\Models\CourseRegistration;
 use App\Models\CourseRetakeRegistration;
-use App\Models\FinanceCharge;
-use App\Models\PaymentApplication;
-use DateTimeInterface;
+use App\Modules\Academic\Support\AcademicObligationSettlement;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class AutoEnrollRetakeCourseAction
 {
     /**
-     * Record paid retake charges and link an existing staff-created class registration.
-     * Called from DngWebhookService after payment bridge.
+     * Record paid retake registration and link an existing staff-created class registration.
+     * Called after Finance settlement evidence confirms payment (DNG webhook / sync jobs).
+     *
+     * Settlement is resolved via ObligationSettlementReader — Academic never loads Finance models.
      */
-    public static function handlePaymentConfirmed(FinanceCharge $charge): void
+    public static function handlePaymentConfirmed(int $registrationId): void
     {
-        // Only handle retake course registrations
-        if ($charge->source_type !== CourseRetakeRegistration::class) {
-            return;
-        }
-
-        $registration = CourseRetakeRegistration::find($charge->source_id);
+        $registration = CourseRetakeRegistration::query()->find($registrationId);
 
         if (! $registration) {
             Log::warning('AutoEnrollRetakeCourse: Registration not found', [
-                'charge_id' => $charge->id,
-                'source_id' => $charge->source_id,
+                'registration_id' => $registrationId,
             ]);
 
             return;
@@ -50,12 +44,12 @@ class AutoEnrollRetakeCourseAction
             return;
         }
 
-        DB::transaction(function () use ($registration) {
-            $charge = $registration->financeCharge;
-            if (! $charge || $charge->status !== FinanceCharge::STATUS_ACTIVE || ! $charge->is_fully_paid) {
-                Log::info('AutoEnrollRetakeCourse: Charge is not fully paid, skipping', [
+        DB::transaction(function () use ($registration): void {
+            $settlement = app(AcademicObligationSettlement::class);
+            if (! $settlement->isRetakeSettled($registration)) {
+                Log::info('AutoEnrollRetakeCourse: Obligation is not settled, skipping', [
                     'registration_id' => $registration->id,
-                    'finance_charge_id' => $charge?->id,
+                    'settlement_state' => $settlement->forRetake($registration)->settlement_state,
                 ]);
 
                 return;
@@ -63,7 +57,7 @@ class AutoEnrollRetakeCourseAction
 
             // Step 1: Transition to paid. Class placement remains staff-owned.
             if ($registration->status === CourseRetakeRegistration::STATUS_PAYMENT_PENDING) {
-                $registration->transitionToPaid(self::resolvePaidAt($charge));
+                $registration->transitionToPaid(now());
                 $registration->refresh();
             }
 
@@ -100,30 +94,7 @@ class AutoEnrollRetakeCourseAction
                     'student_id' => $registration->student_id,
                     'error' => $e->getMessage(),
                 ]);
-                // Don't rethrow — payment status (paid) is separate from enrollment status
             }
         });
-    }
-
-    private static function resolvePaidAt(?FinanceCharge $charge): ?DateTimeInterface
-    {
-        if (! $charge) {
-            return null;
-        }
-
-        $lineIds = $charge->invoiceLines()->pluck('id');
-        if ($lineIds->isEmpty()) {
-            return null;
-        }
-
-        return PaymentApplication::query()
-            ->with('payment:id,paid_at')
-            ->whereIn('invoice_line_id', $lineIds)
-            ->where('amount', '>', 0)
-            ->get()
-            ->map(fn (PaymentApplication $application) => $application->payment?->paid_at)
-            ->filter()
-            ->sortBy(fn (DateTimeInterface $paidAt) => $paidAt->getTimestamp())
-            ->last();
     }
 }

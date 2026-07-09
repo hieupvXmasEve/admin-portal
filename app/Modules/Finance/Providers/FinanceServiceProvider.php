@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Providers;
 
-use App\Models\FinanceCharge;
 use App\Modules\Finance\Actions\CancelFinanceObligationAction;
 use App\Modules\Finance\Dng\Services\DngChecksumService;
 use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Dng\Services\DngReconciliationService;
 use App\Modules\Finance\Dng\Services\DngWebhookService;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Policies\FinanceChargePolicy;
+use App\Modules\Finance\Queries\GetStudentFeeSummaryQuery;
 use App\Modules\Finance\Services\DeferCaseService;
 use App\Modules\Finance\Services\FinanceChargeService;
 use App\Modules\Finance\Services\InvoiceGenerationService;
@@ -28,6 +29,7 @@ use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use App\Shared\Contracts\Finance\FinanceObligationCancellationContract;
 use App\Shared\Contracts\Finance\HubStudentFinanceSummaryReader;
 use App\Shared\Contracts\Finance\ObligationSettlementReader;
+use App\Shared\Contracts\Finance\StudentFeeSummaryReader;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -44,6 +46,7 @@ class FinanceServiceProvider extends ServiceProvider
         $this->app->bind(FinanceObligationCancellationContract::class, CancelFinanceObligationAction::class);
         $this->app->bind(HubStudentFinanceSummaryReader::class, ModuleHubStudentFinanceSummaryReader::class);
         $this->app->bind(ObligationSettlementReader::class, ObligationLedgerSettlementReader::class);
+        $this->app->bind(StudentFeeSummaryReader::class, GetStudentFeeSummaryQuery::class);
 
         // Register services as singletons
         $this->app->singleton(FinanceChargeService::class);

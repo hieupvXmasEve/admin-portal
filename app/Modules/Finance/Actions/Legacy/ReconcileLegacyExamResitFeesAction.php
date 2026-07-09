@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Actions;
+namespace App\Modules\Finance\Actions\Legacy;
 
 use App\Console\Commands\Academic\ReconcileLegacyExamResitFeesCommand;
 use App\Models\AcademicRecord;
 use App\Models\ExamResitAttempt;
-use App\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -309,7 +309,7 @@ class ReconcileLegacyExamResitFeesAction
             ]);
 
             // Repoint the charge so future idempotency + Fee Monitor inference see a
-            // real Academic exam-resit source. active_source_key is recomputed on save.
+            // real Academic exam-resit source.
             $charge->update([
                 'source_type' => ExamResitAttempt::class,
                 'source_id' => $attempt->id,

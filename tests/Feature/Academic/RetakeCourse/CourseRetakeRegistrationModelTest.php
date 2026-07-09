@@ -7,10 +7,10 @@ use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\CourseRetakeRegistration;
-use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

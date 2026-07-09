@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries;
 
-use App\Models\Payment;
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 
 class GetStudentBalanceQuery

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Models\FinanceCharge;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Queries\Dng\ListDngWorklistQuery;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;

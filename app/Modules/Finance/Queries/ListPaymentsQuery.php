@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries;
 
-use App\Models\Payment;
 use App\Models\Student;
+use App\Modules\Finance\Models\Payment;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 

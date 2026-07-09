@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Models\DiscountAllocation;
-use App\Models\FinanceCharge;
-use App\Models\InvoiceDiscount;
-use App\Models\InvoiceLine;
 use App\Models\Student;
 use App\Models\VoucherApplication;
+use App\Modules\Finance\Models\DiscountAllocation;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceDiscount;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -263,7 +264,7 @@ class MigrateVoucherDiscountsToInvoiceDiscounts extends Command
                     return $discount;
                 }
 
-                $invoice = \App\Models\StudentInvoice::query()
+                $invoice = StudentInvoice::query()
                     ->with(['student', 'invoiceLines.charge'])
                     ->find($candidate['invoice_id']);
 

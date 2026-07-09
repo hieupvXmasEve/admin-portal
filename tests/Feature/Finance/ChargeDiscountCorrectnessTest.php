@@ -3,12 +3,12 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\FinanceCharge;
 use App\Models\ScholarshipDefinition;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentScholarshipAward;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
+use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

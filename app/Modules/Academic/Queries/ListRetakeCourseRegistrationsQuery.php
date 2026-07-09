@@ -6,8 +6,7 @@ namespace App\Modules\Academic\Queries;
 
 use App\Models\CourseRegistration;
 use App\Models\CourseRetakeRegistration;
-use App\Models\FinanceCharge;
-use App\Modules\Finance\Actions\BridgePaidDngRequestsForChargeAction;
+use App\Modules\Academic\Support\AcademicObligationSettlement;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
@@ -15,7 +14,7 @@ use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 class ListRetakeCourseRegistrationsQuery
 {
     public function __construct(
-        private readonly BridgePaidDngRequestsForChargeAction $bridgePaidDngRequestsForChargeAction,
+        private readonly AcademicObligationSettlement $obligationSettlement,
     ) {}
 
     /**
@@ -60,7 +59,6 @@ class ListRetakeCourseRegistrationsQuery
                 'semester:id,name,code',
                 'campus:id,name,code',
                 'approvedBy:id,name',
-                'financeCharge',
                 'courseRegistration:id,student_id,course_offering_id,semester_id,registration_status,is_retake,attempt_number,retake_fee,is_retake_paid',
             ])
             ->when($filters['search'] ?? null, function (Builder $query, string $search): void {
@@ -267,8 +265,6 @@ class ListRetakeCourseRegistrationsQuery
 
     private function hasPaidEvidence(CourseRetakeRegistration $registration): bool
     {
-        $charge = $registration->financeCharge;
-
         if (in_array($registration->status, [CourseRetakeRegistration::STATUS_PAID, CourseRetakeRegistration::STATUS_ENROLLED], true)) {
             return true;
         }
@@ -277,10 +273,6 @@ class ListRetakeCourseRegistrationsQuery
             return true;
         }
 
-        if ($charge !== null && $charge->status === FinanceCharge::STATUS_ACTIVE && $charge->is_fully_paid) {
-            return true;
-        }
-
-        return $this->bridgePaidDngRequestsForChargeAction->hasPaidDngForCharge($charge);
+        return $this->obligationSettlement->hasRetakePaidEvidence($registration);
     }
 }

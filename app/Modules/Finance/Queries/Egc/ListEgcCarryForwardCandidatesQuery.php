@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Egc;
 
-use App\Models\FinanceCharge;
-use App\Models\Payment;
 use App\Models\Student;
 use App\Modules\Finance\Actions\Egc\BuildEgcCarryForwardPlanAction;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\Payment;
 
 class ListEgcCarryForwardCandidatesQuery
 {

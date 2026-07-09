@@ -2,7 +2,7 @@
 
 namespace App\Modules\Finance\Http\Export;
 
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\StudentInvoice;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;

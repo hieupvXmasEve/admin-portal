@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
-use App\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\FinanceChargeInstallment>
+ * @extends Factory<FinanceChargeInstallment>
  *
  * Note: FinanceCharge has no factory in this codebase. Callers MUST pass
  * `finance_charge_id` explicitly via ->create(['finance_charge_id' => $id]).

@@ -1,8 +1,16 @@
 # 05 — Boundary hardening
 
-**Status:** ready-for-agent
+**Status:** done
 **Depends on:** 01, 02, 03, 04
 **PRD:** ../PRD.md · **ADR:** docs/adr/0026-…
+
+## Delivery notes (2026-07-09)
+
+- Money models relocated to `App\Modules\Finance\Models`; bulk import update.
+- Academic has zero `Finance\Models` imports; fee summary via `StudentFeeSummaryReader`; list/sync/cancel via `ObligationSettlementReader` (+ external-paid helper).
+- Pest arch + red-proof under `tests/Feature/Architecture/`.
+- `active_source_key` dropped (migration + model).
+- Residual (follow-up, not blocking arch green): column drop of `finance_charge_id` on retake/resit tables (deprecated on target path; still present for legacy); morph `source_type`/`source_id` still used by non-intake charge creators; CI D1 re-enable is ops.
 
 ## Goal
 

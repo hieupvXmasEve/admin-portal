@@ -6,7 +6,7 @@ namespace App\Modules\Finance\Queries\Operations;
 
 use App\Models\DeferCase;
 use App\Models\Student;
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Database\Eloquent\Builder;
 

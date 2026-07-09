@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
 use App\Models\VoucherApplication;
 use App\Models\VoucherDefinition;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;

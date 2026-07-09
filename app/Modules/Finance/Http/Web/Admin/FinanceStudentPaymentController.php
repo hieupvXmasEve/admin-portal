@@ -6,9 +6,9 @@ namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
-use App\Models\Payment;
 use App\Models\Student;
 use App\Modules\Finance\Http\Requests\Student360\RecordManualPaymentRequest;
+use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Queries\Student360\PreviewManualAllocationQuery;
 use App\Modules\Finance\Services\PaymentService;
 use Illuminate\Http\JsonResponse;

@@ -7,14 +7,16 @@ use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\CourseRetakeRegistration;
-use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
-use App\Models\Payment;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
 use App\Modules\Academic\Actions\SyncPaidRetakeRegistrationsAction;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -78,14 +80,26 @@ function createPaidPendingRetakeContext(bool $withExistingCourseRegistration = f
         ]);
     }
 
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => AcademicFinanceObligationSource::SOURCE_SYSTEM,
+        'source_kind' => AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION,
+        'source_ref' => AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration),
+        'obligation_type' => AcademicFinanceObligationSource::RETAKE_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 5000000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => ['test' => true],
+        'accepted_at' => now(),
+    ]);
+
     $charge = app(CreateFinanceChargeAction::class)->handle([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
         'amount' => 5000000,
         'description' => 'Retake fee',
-        'source_type' => CourseRetakeRegistration::class,
-        'source_id' => $registration->id,
         'created_by_user_id' => $user->id,
     ]);
     $registration->update(['finance_charge_id' => $charge->id]);

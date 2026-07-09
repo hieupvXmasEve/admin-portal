@@ -2,41 +2,34 @@
 
 declare(strict_types=1);
 
-namespace App\Models;
+namespace App\Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class PaymentApplication extends Model
+class DiscountAllocation extends Model
 {
     protected $fillable = [
-        'payment_id',
+        'invoice_discount_id',
         'invoice_line_id',
         'amount',
         'entry_type',
         'source_ref_id',
         'source_ref_type',
-        'applied_at',
-        'created_by',
+        'allocation_rule',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
-        'applied_at' => 'datetime',
     ];
 
-    public function payment(): BelongsTo
+    public function invoiceDiscount(): BelongsTo
     {
-        return $this->belongsTo(Payment::class);
+        return $this->belongsTo(InvoiceDiscount::class);
     }
 
     public function invoiceLine(): BelongsTo
     {
         return $this->belongsTo(InvoiceLine::class);
-    }
-
-    public function createdBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'created_by');
     }
 }

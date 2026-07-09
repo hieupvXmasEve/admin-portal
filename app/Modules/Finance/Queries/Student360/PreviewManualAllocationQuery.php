@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Student360;
 
-use App\Models\InvoiceLine;
-use App\Models\Payment;
 use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Services\SettlementService;
 
 /**

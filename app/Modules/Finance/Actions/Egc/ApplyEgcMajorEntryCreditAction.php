@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Egc;
 
-use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
 use App\Models\Student;
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions;
 
-use App\Models\FinanceCharge;
-use App\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Exceptions\ChargeHasPaidInstallmentException;
 use App\Modules\Finance\Exceptions\InstallmentSplitNotAllowedException;
 use App\Modules\Finance\Exceptions\InvalidInstallmentPlanException;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -193,7 +193,7 @@ class SplitChargeIntoInstallmentsAction
 
     /**
      * @param  array<int, array{installment_no:int, amount:float|string, due_date:string}>  $installments
-     * @return array<int, int>  inserted installment IDs
+     * @return array<int, int> inserted installment IDs
      */
     private function insertPlan(FinanceCharge $charge, array $installments): array
     {

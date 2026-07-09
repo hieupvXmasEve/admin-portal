@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Services;
 
-use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
-use App\Models\Payment;
-use App\Models\PaymentApplication;
 use App\Models\Student;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Queries\GetStudentBalanceQuery;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;

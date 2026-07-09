@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Actions;
+namespace App\Modules\Finance\Actions\Legacy;
 
-use App\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use Illuminate\Support\Collection;

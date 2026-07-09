@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\EgcBlock;
-use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
 use App\Models\Student;
-use App\Models\StudentInvoice;
 use App\Modules\Finance\Actions\Egc\SyncEgcBlockResultsAction;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -200,7 +200,7 @@ class BackfillEgcBlocks extends Command
         }
     }
 
-    private function syncResults(int|null $fall2025SemId, array &$stats): void
+    private function syncResults(?int $fall2025SemId, array &$stats): void
     {
         $semesterIds = DB::table('egc_blocks')->distinct()->pluck('semester_id')->toArray();
 

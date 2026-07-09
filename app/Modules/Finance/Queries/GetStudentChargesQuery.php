@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries;
 
-use App\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Support\Collection;
 
 class GetStudentChargesQuery

@@ -6,7 +6,6 @@ use App\Models\Campus;
 use App\Models\CurriculumVersion;
 use App\Models\Department;
 use App\Models\DepartmentMembership;
-use App\Models\Payment;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
@@ -14,6 +13,7 @@ use App\Models\User;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
+use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Services\PaymentService;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Models\NotificationEventOutbox;
@@ -101,7 +101,7 @@ it('publishes finance.dng_payment_allocated with success body when allocations e
     $request = makeUnbridgedRequest($this->student);
     $payment = makeAllocatedPayment($this->student, 5000000);
 
-    $fakeAllocation = new \stdClass;
+    $fakeAllocation = new stdClass;
     $fakeAllocation->amount = 5000000;
     $allocations = collect([$fakeAllocation]);
 
@@ -155,7 +155,7 @@ it('does not throw when HQ department not found and logs warning', function () {
 
     $service = makeBridgingDngPaymentService($paymentServiceMock);
 
-    expect(fn () => $service->bridgeToPayment($request))->not->toThrow(\Throwable::class);
+    expect(fn () => $service->bridgeToPayment($request))->not->toThrow(Throwable::class);
 
     expect(NotificationEventOutbox::where('event_name', 'finance.dng_payment_allocated')->exists())->toBeFalse();
 });

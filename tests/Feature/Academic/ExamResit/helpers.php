@@ -6,13 +6,13 @@ use App\Models\AcademicRecord;
 use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\ExamResitAttempt;
-use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
-use App\Models\Payment;
-use App\Models\PaymentApplication;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Queries\Dng\ListDngWorklistQuery;
 use Illuminate\Http\Request;
 

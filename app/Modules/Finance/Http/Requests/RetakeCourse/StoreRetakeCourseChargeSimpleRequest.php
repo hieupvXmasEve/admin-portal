@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Http\Requests\RetakeCourse;
 
-use App\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 

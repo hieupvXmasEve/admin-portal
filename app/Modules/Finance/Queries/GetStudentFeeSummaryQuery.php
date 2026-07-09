@@ -2,24 +2,34 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Queries;
+namespace App\Modules\Finance\Queries;
 
-use App\Models\FinanceCharge;
-use App\Models\InvoiceDiscount;
-use App\Models\InvoiceLine;
-use App\Models\Payment;
-use App\Models\PaymentApplication;
+use App\Shared\Contracts\Finance\StudentFeeSummaryReader;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceDiscount;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\PaymentApplication;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Models\StudentScholarshipAward;
 use App\Models\TuitionPlan;
 use App\Models\TuitionPlanTerm;
 use Illuminate\Support\Collection;
 
-class GetStudentFeeSummaryQuery
+class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
 {
-    public function execute(Student $student): array
+    public function execute(int $studentId): array
+    {
+        $student = Student::query()
+            ->with(['program', 'intakeSemester'])
+            ->findOrFail($studentId);
+
+        return $this->build($student);
+    }
+
+    public function build(Student $student): array
     {
         $tuitionPlan = TuitionPlan::query()
             ->where('curriculum_version_id', $student->curriculum_version_id)

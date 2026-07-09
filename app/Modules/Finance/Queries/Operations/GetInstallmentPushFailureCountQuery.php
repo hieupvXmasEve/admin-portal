@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Operations;
 
-use App\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 
 class GetInstallmentPushFailureCountQuery
 {

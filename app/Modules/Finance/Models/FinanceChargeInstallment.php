@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Models;
+namespace App\Modules\Finance\Models;
 
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use Database\Factories\FinanceChargeInstallmentFactory;

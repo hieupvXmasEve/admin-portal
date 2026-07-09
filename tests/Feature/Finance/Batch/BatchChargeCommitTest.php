@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\EgcBlock;
-use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\User;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Queries\Batch\AssembleBatchChargePreviewQuery;
 use App\Modules\Finance\Services\Batch\BatchPreviewTokenService;
 use App\Modules\Finance\Support\Batch\BatchJobType;

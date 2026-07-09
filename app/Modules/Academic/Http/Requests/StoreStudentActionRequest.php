@@ -7,9 +7,9 @@ namespace App\Modules\Academic\Http\Requests;
 use App\Enums\StudentActionType;
 use App\Models\CourseRegistration;
 use App\Models\DeferCaseItem;
-use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Modules\Finance\Services\FinanceChargeService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -143,8 +143,8 @@ class StoreStudentActionRequest extends FormRequest
                     return $query
                         ->where('student_id', $this->input('student_id'))
                         ->where('semester_id', $this->input('from_semester_id'))
-                        ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
-                        ->where('status', FinanceCharge::STATUS_ACTIVE);
+                        ->where('charge_type', 'egc_level_fee')
+                        ->where('status', 'active');
                 }),
                 function (string $attribute, mixed $value, \Closure $fail): void {
                     $feePolicy = $this->input('defer_fee_policy') ?? 'FORFEIT';
@@ -161,21 +161,14 @@ class StoreStudentActionRequest extends FormRequest
                         return;
                     }
 
-                    $charge = FinanceCharge::find($value);
-                    if ($charge && ! $charge->is_fully_paid) {
-                        $fail('EGC fee must be fully paid before preserve is allowed.');
+                    $error = app(FinanceChargeService::class)->validateEgcChargeForPreserve(
+                        (int) $value,
+                        (int) $this->input('student_id'),
+                        $this->input('from_semester_id') !== null ? (int) $this->input('from_semester_id') : null,
+                    );
 
-                        return;
-                    }
-
-                    $hasCredit = FinanceCharge::query()
-                        ->where('charge_type', FinanceCharge::TYPE_DEFER_CREDIT)
-                        ->where('source_type', FinanceCharge::class)
-                        ->where('source_id', $value)
-                        ->exists();
-
-                    if ($hasCredit) {
-                        $fail('Selected EGC level has already been preserved.');
+                    if ($error !== null) {
+                        $fail($error);
                     }
                 },
             ],

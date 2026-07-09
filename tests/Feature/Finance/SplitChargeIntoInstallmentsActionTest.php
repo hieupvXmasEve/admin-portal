@@ -3,18 +3,18 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\DiscountAllocation;
-use App\Models\FinanceCharge;
-use App\Models\FinanceChargeInstallment;
-use App\Models\InvoiceDiscount;
-use App\Models\InvoiceLine;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
 use App\Modules\Finance\Actions\SplitChargeIntoInstallmentsAction;
 use App\Modules\Finance\Exceptions\ChargeHasPaidInstallmentException;
 use App\Modules\Finance\Exceptions\InstallmentSplitNotAllowedException;
 use App\Modules\Finance\Exceptions\InvalidInstallmentPlanException;
+use App\Modules\Finance\Models\DiscountAllocation;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\InvoiceDiscount;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

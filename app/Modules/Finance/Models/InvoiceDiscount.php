@@ -2,7 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Models;
+namespace App\Modules\Finance\Models;
+
+use App\Models\ScholarshipDefinition;
+use App\Models\User;
+use App\Models\VoucherDefinition;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

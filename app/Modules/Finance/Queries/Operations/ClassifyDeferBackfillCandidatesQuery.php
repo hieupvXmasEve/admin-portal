@@ -6,7 +6,7 @@ namespace App\Modules\Finance\Queries\Operations;
 
 use App\Models\CourseRegistration;
 use App\Models\DeferCase;
-use App\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\DeferBackfillClassification as C;
 use Illuminate\Support\Collection;

@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\DiscountAllocation;
-use App\Models\InvoiceLine;
-use App\Models\PaymentApplication;
-use App\Models\StudentInvoice;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use App\Modules\Finance\Http\Export\InvoiceExport;
 use App\Modules\Finance\Http\Requests\Lookup\FilterStudentInvoicesRequest;
+use App\Modules\Finance\Models\DiscountAllocation;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\PaymentApplication;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Lookup\ListStudentInvoicesQuery;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\FinanceSemesterContextResolver;

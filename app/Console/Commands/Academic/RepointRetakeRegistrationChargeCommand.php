@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\Academic;
 
-use App\Modules\Academic\Actions\RepointCourseRetakeRegistrationChargeAction;
+use App\Modules\Finance\Actions\Legacy\RepointCourseRetakeRegistrationChargeAction;
 use Illuminate\Console\Command;
 
 class RepointRetakeRegistrationChargeCommand extends Command

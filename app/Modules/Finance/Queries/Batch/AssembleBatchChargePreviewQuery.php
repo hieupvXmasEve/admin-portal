@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Batch;
 
-use App\Models\FinanceCharge;
 use App\Models\Student;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Queries\Egc\PreviewEgcChargeGenerationQuery;
 use App\Modules\Finance\Queries\Major\PreviewMajorChargeGenerationQuery;
 use App\Modules\Finance\Support\Batch\BatchPreviewLine;

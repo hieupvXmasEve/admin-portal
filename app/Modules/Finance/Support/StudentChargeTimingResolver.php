@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\TuitionPlan;
 use App\Models\TuitionPlanTerm;
+use App\Modules\Finance\Models\FinanceCharge;
 use Carbon\CarbonInterface;
 
 class StudentChargeTimingResolver

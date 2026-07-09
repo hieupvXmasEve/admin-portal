@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\CurriculumVersion;
-use App\Models\FinanceCharge;
-use App\Models\Payment;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -68,7 +70,7 @@ it('returns preview data for auto-allocation', function () {
     ]);
 
     // Create unpaid invoice and link charge to it
-    $invoice = \App\Models\StudentInvoice::create([
+    $invoice = StudentInvoice::create([
         'student_id' => $student->id,
         'semester_id' => $this->semester->id,
         'invoice_number' => 'INV-TEST-001',
@@ -76,7 +78,7 @@ it('returns preview data for auto-allocation', function () {
         'due_date' => now()->addDays(30),
     ]);
 
-    \App\Models\InvoiceLine::create([
+    InvoiceLine::create([
         'invoice_id' => $invoice->id,
         'charge_id' => $charge->id,
         'amount_snapshot' => $charge->amount,
@@ -163,7 +165,7 @@ it('executes auto-allocation and redirects with success', function () {
     ]);
 
     // Create unpaid invoice and link charge to it
-    $invoice = \App\Models\StudentInvoice::create([
+    $invoice = StudentInvoice::create([
         'student_id' => $student->id,
         'semester_id' => $this->semester->id,
         'invoice_number' => 'INV-TEST-002',
@@ -171,7 +173,7 @@ it('executes auto-allocation and redirects with success', function () {
         'due_date' => now()->addDays(30),
     ]);
 
-    \App\Models\InvoiceLine::create([
+    InvoiceLine::create([
         'invoice_id' => $invoice->id,
         'charge_id' => $charge->id,
         'amount_snapshot' => $charge->amount,

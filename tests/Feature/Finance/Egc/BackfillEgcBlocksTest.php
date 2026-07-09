@@ -6,12 +6,12 @@ use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\CurriculumVersion;
 use App\Models\EgcBlock;
-use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
 use App\Models\Unit;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

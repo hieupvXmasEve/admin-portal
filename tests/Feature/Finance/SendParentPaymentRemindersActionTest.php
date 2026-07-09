@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\EmailLog;
-use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
 use App\Models\ParentProfile;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
 use App\Models\User;
 use App\Modules\Finance\Actions\Operations\SendParentPaymentRemindersAction;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
 use App\Services\EmailService;
 use App\Shared\Support\Enums\UserType;

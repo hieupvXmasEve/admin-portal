@@ -3,12 +3,12 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Support\Integrity\FinanceInvariantSampleResolver;
 
 it('maps each invariant code to its audit target type or a list view', function () {

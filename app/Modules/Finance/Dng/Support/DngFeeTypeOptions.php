@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Dng\Support;
 
-use App\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceCharge;
 
 /**
  * Quản lý danh sách mã loại phí (fee_type) của hệ thống DNG.

@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Dng\Services;
 
 use App\Models\Department;
-use App\Models\FinanceChargeInstallment;
-use App\Models\Payment;
 use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Services\PaymentService;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;

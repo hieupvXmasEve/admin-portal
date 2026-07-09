@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\FinanceCharge;
-use App\Models\FinanceChargeInstallment;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Actions\PushNextInstallmentAction;
@@ -12,8 +10,12 @@ use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngClient;
+use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Jobs\PushNextInstallmentJob;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -22,7 +24,7 @@ uses(RefreshDatabase::class);
  * Create a charge + student fixture for DNG push tests. Returns the charge
  * (with student preloaded) and the seeded 2-installment plan.
  *
- * @return array{charge: FinanceCharge, installments: \Illuminate\Support\Collection<int, FinanceChargeInstallment>}
+ * @return array{charge: FinanceCharge, installments: Collection<int, FinanceChargeInstallment>}
  */
 function createInstallmentPushFixture(): array
 {
@@ -75,7 +77,7 @@ function mockDngClientPushSuccess(): void
         ],
     ]);
     app()->instance(DngClient::class, $mock);
-    app()->forgetInstance(\App\Modules\Finance\Dng\Services\DngPaymentService::class);
+    app()->forgetInstance(DngPaymentService::class);
 }
 
 /**
@@ -85,9 +87,9 @@ function mockDngClientPushFail(string $reason = 'DNG HTTP 502'): void
 {
     $mock = Mockery::mock(DngClient::class);
     $mock->shouldReceive('buildInsertNewRecordPayload')->andReturn(['fake' => 'payload']);
-    $mock->shouldReceive('insertNewRecord')->andThrow(new \RuntimeException($reason));
+    $mock->shouldReceive('insertNewRecord')->andThrow(new RuntimeException($reason));
     app()->instance(DngClient::class, $mock);
-    app()->forgetInstance(\App\Modules\Finance\Dng\Services\DngPaymentService::class);
+    app()->forgetInstance(DngPaymentService::class);
 }
 
 /**
@@ -111,6 +113,7 @@ beforeEach(function () {
 function freshPushAction(): PushNextInstallmentAction
 {
     app()->forgetInstance(PushNextInstallmentAction::class);
+
     return app(PushNextInstallmentAction::class);
 }
 
@@ -190,7 +193,7 @@ it('records last_push_error and increments push_attempt_count when DNG push fail
     $fix = createInstallmentPushFixture();
 
     expect(fn () => freshPushAction()->handle($fix['charge']->id))
-        ->toThrow(\RuntimeException::class, 'Connection timeout');
+        ->toThrow(RuntimeException::class, 'Connection timeout');
 
     $installment = $fix['installments'][0]->fresh();
     expect($installment->status)->toBe(FinanceChargeInstallment::STATUS_PENDING);
@@ -209,7 +212,7 @@ it('clears push error on successful retry after a failed attempt', function () {
     mockDngClientPushFail('Transient 502');
     try {
         freshPushAction()->handle($fix['charge']->id);
-    } catch (\Throwable) {
+    } catch (Throwable) {
         // expected
     }
 

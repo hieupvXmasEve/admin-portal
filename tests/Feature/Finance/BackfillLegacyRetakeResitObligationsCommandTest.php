@@ -7,12 +7,12 @@ use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\CourseRetakeRegistration;
 use App\Models\ExamResitAttempt;
-use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Dng\Services;
 
-use App\Models\FinanceCharge;
+use App\Models\CourseRetakeRegistration;
 use App\Modules\Academic\Actions\AutoEnrollRetakeCourseAction;
 use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
@@ -343,7 +345,10 @@ class DngWebhookService
                 foreach ($chargeLinks as $link) {
                     $charge = FinanceCharge::find($link->finance_charge_id);
                     if ($charge) {
-                        AutoEnrollRetakeCourseAction::handlePaymentConfirmed($charge);
+                        $registrationId = $this->resolveRetakeRegistrationId($charge);
+                        if ($registrationId !== null) {
+                            AutoEnrollRetakeCourseAction::handlePaymentConfirmed($registrationId);
+                        }
                     }
                 }
             } else {
@@ -353,7 +358,10 @@ class DngWebhookService
                     : null;
 
                 if ($charge) {
-                    AutoEnrollRetakeCourseAction::handlePaymentConfirmed($charge);
+                    $registrationId = $this->resolveRetakeRegistrationId($charge);
+                    if ($registrationId !== null) {
+                        AutoEnrollRetakeCourseAction::handlePaymentConfirmed($registrationId);
+                    }
                 }
             }
 
@@ -454,5 +462,28 @@ class DngWebhookService
             DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG => -2,
             default => 0,
         };
+    }
+
+    private function resolveRetakeRegistrationId(FinanceCharge $charge): ?int
+    {
+        if ($charge->source_type === CourseRetakeRegistration::class && $charge->source_id) {
+            return (int) $charge->source_id;
+        }
+
+        if ($charge->finance_obligation_id) {
+            $obligation = FinanceObligation::query()->find($charge->finance_obligation_id);
+            if ($obligation && $obligation->source_kind === 'course_retake_registration') {
+                $ref = (string) $obligation->source_ref;
+                if (str_starts_with($ref, 'retake:')) {
+                    return (int) substr($ref, strlen('retake:'));
+                }
+            }
+        }
+
+        $registrationId = CourseRetakeRegistration::query()
+            ->where('finance_charge_id', $charge->id)
+            ->value('id');
+
+        return $registrationId !== null ? (int) $registrationId : null;
     }
 }

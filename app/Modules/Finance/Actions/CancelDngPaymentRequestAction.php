@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Actions;
 
 use App\Models\CourseRetakeRegistration;
-use App\Models\FinanceCharge;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngClient;
+use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;

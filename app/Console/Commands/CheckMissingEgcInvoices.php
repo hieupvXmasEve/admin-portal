@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Student;
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -77,6 +77,7 @@ class CheckMissingEgcInvoices extends Command
 
         if ($studentsInEgcCourses->isEmpty()) {
             $this->info('✓ All students with EGC courses have invoices (partial or pending)!');
+
             return self::SUCCESS;
         }
 

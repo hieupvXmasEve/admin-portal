@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ExamResitAttempt extends AuditableModel
@@ -200,6 +201,9 @@ class ExamResitAttempt extends AuditableModel
         return $this->belongsTo(EmailLog::class, 'cancellation_notice_email_log_id');
     }
 
+    /**
+     * @deprecated Deprecated for target path (ADR-0026): new intakes leave this null; correlate via obligation source triple.
+     */
     public function financeCharge(): BelongsTo
     {
         return $this->belongsTo(FinanceCharge::class);

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries;
 
-use App\Models\Payment;
+use App\Modules\Finance\Models\Payment;
 
 class GetPaymentDetailsQuery
 {

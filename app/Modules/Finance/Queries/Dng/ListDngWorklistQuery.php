@@ -6,11 +6,11 @@ namespace App\Modules\Finance\Queries\Dng;
 
 use App\Models\CourseRetakeRegistration;
 use App\Models\ExamResitAttempt;
-use App\Models\FinanceCharge;
-use App\Models\FinanceChargeInstallment;
 use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;

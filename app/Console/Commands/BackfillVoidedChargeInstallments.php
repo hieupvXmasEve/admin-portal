@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Models\FinanceCharge;
-use App\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Console\Command;
 

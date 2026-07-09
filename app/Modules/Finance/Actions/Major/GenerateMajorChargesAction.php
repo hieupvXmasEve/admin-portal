@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Major;
 
-use App\Models\FinanceCharge;
-use App\Models\InvoiceDiscount;
-use App\Models\InvoiceLine;
 use App\Models\ScholarshipDefinition;
 use App\Models\Student;
-use App\Models\StudentInvoice;
 use App\Models\StudentScholarshipAward;
 use App\Models\VoucherApplication;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceDiscount;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;

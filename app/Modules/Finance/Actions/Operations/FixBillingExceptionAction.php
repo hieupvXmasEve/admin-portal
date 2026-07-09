@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Actions\Operations;
 
 use App\Models\CourseRegistration;
-use App\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Services\FinanceChargeService;
 use App\Modules\Finance\Support\BillingExceptionIdentifier;
 use Illuminate\Support\Facades\DB;

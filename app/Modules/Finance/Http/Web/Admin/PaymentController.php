@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\FinanceCharge as FinanceChargeModel;
-use App\Models\Payment;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Actions\AllocatePaymentAction;
@@ -15,6 +13,8 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
 use App\Modules\Finance\Http\Requests\Lookup\FilterPaymentsRequest;
+use App\Modules\Finance\Models\FinanceCharge as FinanceChargeModel;
+use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Queries\GetPaymentDetailsQuery;
 use App\Modules\Finance\Queries\ListPaymentsQuery;
 use App\Modules\Finance\Queries\Operations\PreviewAutoAllocateQuery;

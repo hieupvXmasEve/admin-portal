@@ -14,12 +14,12 @@ use App\Modules\Academic\Actions\AttachDecisionToTransitionAction;
 use App\Modules\Academic\Exports\StudentAcademicSummaryExport;
 use App\Modules\Academic\Queries\GetStudentAttendanceDetailsQuery;
 use App\Modules\Academic\Queries\GetStudentAttendanceQuery;
-use App\Modules\Academic\Queries\GetStudentFeeSummaryQuery;
 use App\Modules\Academic\Queries\GetStudentLifecycleTimelineQuery;
 use App\Modules\Academic\Support\LifecycleFormOptions;
 use App\Services\ExcelExportService;
 use App\Services\StudentAcademicSummaryService;
 use App\Shared\Contracts\Finance\HubStudentFinanceSummaryReader;
+use App\Shared\Contracts\Finance\StudentFeeSummaryReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -360,9 +360,9 @@ class StudentAcademicSummaryController extends Controller
      * @param  Student  $student  The student to display fees for
      * @return Response Inertia response with fees data
      */
-    public function fees(Student $student, GetStudentFeeSummaryQuery $query): Response
+    public function fees(Student $student, StudentFeeSummaryReader $reader): Response
     {
-        $feeSummary = $query->execute($student);
+        $feeSummary = $reader->execute((int) $student->id);
 
         return Inertia::render('students/AcademicSummary/Fee', [
             'student' => $this->hubStudentContext($student),

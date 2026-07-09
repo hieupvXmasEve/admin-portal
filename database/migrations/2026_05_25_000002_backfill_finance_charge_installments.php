@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Models\FinanceCharge;
-use App\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -105,7 +105,7 @@ return new class extends Migration
      * For status=awaiting/paid → prefer DNG.amount (preserves history of what was actually pushed/paid).
      * For status=pending → use computed netTarget (fresh state, no DNG yet).
      *
-     * @return array{0:string, 1:?string, 2:?int, 3:float}  [status, paid_at, dng_payment_request_id, amount]
+     * @return array{0:string, 1:?string, 2:?int, 3:float} [status, paid_at, dng_payment_request_id, amount]
      */
     private function mapStatus(?object $dng, float $netTarget): array
     {

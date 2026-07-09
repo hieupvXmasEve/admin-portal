@@ -6,9 +6,9 @@ namespace App\Modules\Finance\Services;
 
 use App\Models\CourseRegistration;
 use App\Models\DeferCase;
-use App\Models\FinanceCharge;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Queries\GetStudentChargesQuery;
 use Illuminate\Support\Collection;
 
@@ -224,5 +224,122 @@ class FinanceChargeService
             ->where('status', FinanceCharge::STATUS_ACTIVE)
             ->where('amount', '>', 0)
             ->exists();
+    }
+
+    /**
+     * Active EGC level fee charges for Academic lifecycle form options (read DTOs only).
+     *
+     * @return list<array{id:int,semester_id:int|null,amount:float|string,description:string|null,effective_at:string|null,paid_amount:float,is_fully_paid:bool}>
+     */
+    public function listActiveEgcChargesForStudent(int $studentId, ?int $semesterId = null): array
+    {
+        return FinanceCharge::query()
+            ->where('student_id', $studentId)
+            ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))
+            ->orderBy('effective_at')
+            ->get()
+            ->map(fn (FinanceCharge $charge): array => [
+                'id' => (int) $charge->id,
+                'semester_id' => $charge->semester_id !== null ? (int) $charge->semester_id : null,
+                'amount' => $charge->amount,
+                'description' => $charge->description,
+                'effective_at' => $charge->effective_at?->toDateString(),
+                'paid_amount' => $charge->paid_amount,
+                'is_fully_paid' => $charge->is_fully_paid,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Validate an EGC charge may be preserved as a defer credit.
+     *
+     * @return string|null validation error message, or null when valid
+     */
+    public function validateEgcChargeForPreserve(int $chargeId, int $studentId, ?int $semesterId): ?string
+    {
+        $charge = FinanceCharge::query()->find($chargeId);
+        if (! $charge) {
+            return 'Selected EGC charge was not found.';
+        }
+
+        if ((int) $charge->student_id !== $studentId
+            || $charge->charge_type !== FinanceCharge::TYPE_EGC_LEVEL_FEE
+            || $charge->status !== FinanceCharge::STATUS_ACTIVE
+        ) {
+            return 'Selected EGC charge is not an active EGC level fee for this student.';
+        }
+
+        if ($semesterId !== null && (int) $charge->semester_id !== $semesterId) {
+            return 'Selected EGC charge does not belong to the chosen semester.';
+        }
+
+        if (! $charge->is_fully_paid) {
+            return 'EGC fee must be fully paid before preserve is allowed.';
+        }
+
+        $hasCredit = FinanceCharge::query()
+            ->where('charge_type', FinanceCharge::TYPE_DEFER_CREDIT)
+            ->where('source_type', FinanceCharge::class)
+            ->where('source_id', $charge->id)
+            ->exists();
+
+        if ($hasCredit) {
+            return 'Selected EGC level has already been preserved.';
+        }
+
+        return null;
+    }
+
+    /**
+     * Create defer-credit charges for selected paid EGC level fees.
+     *
+     * @param  list<int>  $chargeIds
+     */
+    public function createEgcDeferCredits(
+        int $studentId,
+        ?int $fromSemesterId,
+        array $chargeIds,
+        ?\DateTimeInterface $effectiveAt,
+        int $userId,
+    ): void {
+        $chargeIds = array_values(array_unique(array_filter(array_map('intval', $chargeIds))));
+        if ($chargeIds === []) {
+            return;
+        }
+
+        $charges = FinanceCharge::query()
+            ->whereIn('id', $chargeIds)
+            ->where('student_id', $studentId)
+            ->where('semester_id', $fromSemesterId)
+            ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->get();
+
+        foreach ($charges as $charge) {
+            $exists = FinanceCharge::query()
+                ->where('charge_type', FinanceCharge::TYPE_DEFER_CREDIT)
+                ->where('source_type', FinanceCharge::class)
+                ->where('source_id', $charge->id)
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            $this->createCharge([
+                'student_id' => $studentId,
+                'semester_id' => $charge->semester_id,
+                'charge_type' => FinanceCharge::TYPE_DEFER_CREDIT,
+                'amount' => -abs((float) $charge->amount),
+                'description' => 'EGC Defer Credit: '.($charge->description ?? 'EGC Level Fee'),
+                'effective_at' => $effectiveAt ?? now(),
+                'source_type' => FinanceCharge::class,
+                'source_id' => $charge->id,
+                'created_by_user_id' => $userId,
+            ]);
+        }
     }
 }

@@ -6,7 +6,6 @@ use App\Models\Campus;
 use App\Models\ExamResitAttempt;
 use App\Models\ExamResitSession;
 use App\Models\ExamRoomSlot;
-use App\Models\FinanceCharge;
 use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Student;
@@ -15,6 +14,7 @@ use App\Models\User;
 use App\Modules\Academic\Queries\ListExamResitAttemptsQuery;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

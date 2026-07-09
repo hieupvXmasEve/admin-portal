@@ -6,10 +6,10 @@ namespace App\Http\Controllers\Api\V1\Student;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
-use App\Models\FinanceCharge;
-use App\Models\Payment;
 use App\Models\Semester;
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

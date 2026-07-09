@@ -8,7 +8,6 @@ use App\Models\CourseOffering;
 use App\Models\CourseRetakeRegistration;
 use App\Models\CurriculumVersion;
 use App\Models\ExamResitAttempt;
-use App\Models\FinanceCharge;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
@@ -19,6 +18,7 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
+use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

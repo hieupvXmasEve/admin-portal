@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\FinanceCharge;
-use App\Models\Payment;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
@@ -18,8 +16,10 @@ use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Enums\LifecycleDueExceptionResolutionAction;
 use App\Modules\Finance\Enums\LifecycleDueExceptionReviewEventType;
 use App\Modules\Finance\Enums\LifecycleDueExceptionReviewStatus;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceLifecycleDueExceptionReview;
 use App\Modules\Finance\Models\FinanceLifecycleDueExceptionReviewEvent;
+use App\Modules\Finance\Models\Payment;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

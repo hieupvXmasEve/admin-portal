@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions;
 
-use App\Models\FinanceCharge;
-use App\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Events\InstallmentPushed;
-use Illuminate\Support\Facades\DB;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 use Illuminate\Support\Facades\Log;
 
 /**

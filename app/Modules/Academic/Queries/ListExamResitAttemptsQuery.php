@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Queries;
 
 use App\Models\ExamResitAttempt;
-use App\Models\FinanceCharge;
-use App\Modules\Finance\Actions\BridgePaidDngRequestsForChargeAction;
+use App\Modules\Academic\Support\AcademicObligationSettlement;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
@@ -22,7 +21,7 @@ use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 class ListExamResitAttemptsQuery
 {
     public function __construct(
-        private readonly BridgePaidDngRequestsForChargeAction $bridgePaidDngRequestsForChargeAction,
+        private readonly AcademicObligationSettlement $obligationSettlement,
     ) {}
 
     /**
@@ -63,7 +62,6 @@ class ListExamResitAttemptsQuery
                 'unit:id,code,name',
                 'operationSemester:id,name,code',
                 'campus:id,name,code',
-                'financeCharge',
                 'session:id,exam_room_slot_id,unit_id,status',
                 'session.roomSlot:id,room_id,exam_date,start_time,end_time',
                 'session.roomSlot.room:id,name,code',
@@ -274,14 +272,11 @@ class ListExamResitAttemptsQuery
      */
     private function deriveCancelContext(ExamResitAttempt $attempt): array
     {
-        $charge = $attempt->financeCharge;
         $isPaid = $this->hasPaidEvidence($attempt);
 
         $hasUnpaidCharge = $attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_CHARGE_CREATED
-            && $charge
-            && $charge->status === FinanceCharge::STATUS_ACTIVE
-            && ! $charge->is_fully_paid
-            && ! $isPaid;
+            && ! $isPaid
+            && $this->obligationSettlement->hasUnsettledExamResitObligation($attempt);
 
         if ($isPaid) {
             return [
@@ -317,16 +312,10 @@ class ListExamResitAttemptsQuery
 
     private function hasPaidEvidence(ExamResitAttempt $attempt): bool
     {
-        $charge = $attempt->financeCharge;
-
         if ($attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_PAID) {
             return true;
         }
 
-        if ($charge !== null && $charge->status === FinanceCharge::STATUS_ACTIVE && $charge->is_fully_paid) {
-            return true;
-        }
-
-        return $this->bridgePaidDngRequestsForChargeAction->hasPaidDngForCharge($charge);
+        return $this->obligationSettlement->hasExamResitPaidEvidence($attempt);
     }
 }

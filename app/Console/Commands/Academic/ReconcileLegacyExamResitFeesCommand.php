@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\Academic;
 
-use App\Modules\Academic\Actions\CreateLegacyExamResitChargeFromPaidPtlAction;
-use App\Modules\Academic\Actions\ReconcileLegacyExamResitFeesAction;
+use App\Modules\Finance\Actions\Legacy\CreateLegacyExamResitChargeFromPaidPtlAction;
+use App\Modules\Finance\Actions\Legacy\ReconcileLegacyExamResitFeesAction;
 use Illuminate\Console\Command;
 
 /**

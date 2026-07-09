@@ -7,8 +7,8 @@ namespace App\Modules\Finance\Services;
 use App\Models\CourseRegistration;
 use App\Models\DeferCase;
 use App\Models\DeferCaseItem;
-use App\Models\FinanceCharge;
 use App\Models\StudentActionLog;
+use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 

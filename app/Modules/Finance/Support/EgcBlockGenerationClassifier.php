@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Support;
 
 use App\Models\EgcBlock;
-use App\Models\FinanceCharge;
-use App\Models\FinanceChargeInstallment;
-use App\Models\InvoiceLine;
-use App\Models\PaymentApplication;
 use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;

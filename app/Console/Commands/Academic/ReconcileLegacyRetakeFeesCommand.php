@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\Academic;
 
-use App\Modules\Academic\Actions\LinkLegacyRetakeDngToChargeAction;
-use App\Modules\Academic\Actions\ReconcileLegacyRetakeFeesAction;
+use App\Modules\Finance\Actions\Legacy\LinkLegacyRetakeDngToChargeAction;
+use App\Modules\Finance\Actions\Legacy\ReconcileLegacyRetakeFeesAction;
 use Illuminate\Console\Command;
 
 /**

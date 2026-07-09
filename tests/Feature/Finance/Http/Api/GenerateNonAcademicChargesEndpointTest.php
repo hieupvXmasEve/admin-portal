@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -22,7 +22,7 @@ beforeEach(function () {
     app()->singleton('campus', fn () => $campus);
 
     session([
-        '_token'            => NAC_ENDPOINT_TEST_CSRF,
+        '_token' => NAC_ENDPOINT_TEST_CSRF,
         'current_campus_id' => $campus->id,
     ]);
 });
@@ -37,6 +37,7 @@ function nacApiUser(array $permissions = ['view_finance_operations_generate_char
     $mock = Mockery::mock(PermissionService::class);
     $mock->shouldReceive('getUserPermissions')->andReturn($permissions);
     app()->singleton(PermissionService::class, fn () => $mock);
+
     return $user;
 }
 
@@ -50,10 +51,10 @@ function makeNacApiStudent(Campus $campus, string $code): Student
     $semester = Semester::factory()->create();
 
     return Student::factory()->forCampus($campus)->create([
-        'student_id'         => $code,
-        'status'             => 'intake_course',
-        'intake'             => 1,
-        'intake_mode'        => 'sequential',
+        'student_id' => $code,
+        'status' => 'intake_course',
+        'intake' => 1,
+        'intake_mode' => 'sequential',
         'intake_semester_id' => $semester->id,
     ]);
 }
@@ -69,14 +70,14 @@ it('returns 401 JSON for unauthenticated requests', function () {
         ->post(
             route('api.finance.operations.generate-non-academic-charges'),
             [
-                'fee_type'    => 'bhyt',
+                'fee_type' => 'bhyt',
                 'semester_id' => $semester->id,
-                'amount'      => 500000,
-                'due_date'    => now()->addDays(30)->toDateString(),
-                'csv_file'    => csvUpload("student_code\nSE100001\n"),
+                'amount' => 500000,
+                'due_date' => now()->addDays(30)->toDateString(),
+                'csv_file' => csvUpload("student_code\nSE100001\n"),
             ],
         )->assertStatus(401)
-         ->assertJson(['success' => false]);
+        ->assertJson(['success' => false]);
 });
 
 // ---------------------------------------------------------------------------
@@ -85,18 +86,18 @@ it('returns 401 JSON for unauthenticated requests', function () {
 
 it('returns 403 when the user lacks the required permission', function () {
     $semester = Semester::factory()->active()->create();
-    $user     = nacApiUser([]);
+    $user = nacApiUser([]);
 
     $this->actingAs($user)
         ->withHeaders(['X-CSRF-TOKEN' => NAC_ENDPOINT_TEST_CSRF])
         ->post(
             route('api.finance.operations.generate-non-academic-charges'),
             [
-                'fee_type'    => 'bhyt',
+                'fee_type' => 'bhyt',
                 'semester_id' => $semester->id,
-                'amount'      => 500000,
-                'due_date'    => now()->addDays(30)->toDateString(),
-                'csv_file'    => csvUpload("student_code\nSE100001\n"),
+                'amount' => 500000,
+                'due_date' => now()->addDays(30)->toDateString(),
+                'csv_file' => csvUpload("student_code\nSE100001\n"),
             ],
         )
         ->assertStatus(403);
@@ -107,9 +108,9 @@ it('returns 403 when the user lacks the required permission', function () {
 // ---------------------------------------------------------------------------
 
 it('returns ApiResponse success envelope with created and skipped lists', function () {
-    $campus   = app('campus');  // bound in beforeEach
+    $campus = app('campus');  // bound in beforeEach
     $semester = Semester::factory()->active()->create();
-    $user     = nacApiUser();
+    $user = nacApiUser();
 
     $student = makeNacApiStudent($campus, 'SE500001');
 
@@ -118,12 +119,12 @@ it('returns ApiResponse success envelope with created and skipped lists', functi
         ->post(
             route('api.finance.operations.generate-non-academic-charges'),
             [
-                'fee_type'    => 'bhyt',
+                'fee_type' => 'bhyt',
                 'semester_id' => $semester->id,
-                'amount'      => 300000,
-                'due_date'    => now()->addDays(14)->toDateString(),
-                'note'        => 'API test',
-                'csv_file'    => csvUpload("student_code\nSE500001\nSE_GHOST\n"),
+                'amount' => 300000,
+                'due_date' => now()->addDays(14)->toDateString(),
+                'note' => 'API test',
+                'csv_file' => csvUpload("student_code\nSE500001\nSE_GHOST\n"),
             ],
         );
 
@@ -159,9 +160,9 @@ it('returns ApiResponse success envelope with created and skipped lists', functi
 // ---------------------------------------------------------------------------
 
 it('skips the header row and creates one charge for the single data row', function () {
-    $campus   = app('campus');
+    $campus = app('campus');
     $semester = Semester::factory()->active()->create();
-    $user     = nacApiUser();
+    $user = nacApiUser();
 
     makeNacApiStudent($campus, 'SE600001');
 
@@ -170,11 +171,11 @@ it('skips the header row and creates one charge for the single data row', functi
         ->post(
             route('api.finance.operations.generate-non-academic-charges'),
             [
-                'fee_type'    => 'bhyt',
+                'fee_type' => 'bhyt',
                 'semester_id' => $semester->id,
-                'amount'      => 200000,
-                'due_date'    => now()->addDays(7)->toDateString(),
-                'csv_file'    => csvUpload("student_code\nSE600001\n"),
+                'amount' => 200000,
+                'due_date' => now()->addDays(7)->toDateString(),
+                'csv_file' => csvUpload("student_code\nSE600001\n"),
             ],
         );
 

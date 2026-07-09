@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Actions\Operations;
 
 use App\Models\ParentProfile;
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Notification\EmailContent\EmailContentRegistry;
 use App\Services\EmailService;

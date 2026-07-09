@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Actions\Operations\GenerateNonAcademicChargesAction;
+use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -20,10 +20,10 @@ function makeNacStudent(Campus $campus, string $code): Student
     $semester = Semester::factory()->create();
 
     return Student::factory()->forCampus($campus)->create([
-        'student_id'         => $code,
-        'status'             => 'intake_course',
-        'intake'             => 1,
-        'intake_mode'        => 'sequential',
+        'student_id' => $code,
+        'status' => 'intake_course',
+        'intake' => 1,
+        'intake_mode' => 'sequential',
         'intake_semester_id' => $semester->id,
     ]);
 }
@@ -31,13 +31,13 @@ function makeNacStudent(Campus $campus, string $code): Student
 function seedActiveCharge(Student $student, Semester $semester, string $chargeType): FinanceCharge
 {
     return FinanceCharge::create([
-        'student_id'   => $student->id,
-        'semester_id'  => $semester->id,
-        'charge_type'  => $chargeType,
-        'amount'       => 100000,
-        'description'  => 'Existing charge',
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'charge_type' => $chargeType,
+        'amount' => 100000,
+        'description' => 'Existing charge',
         'effective_at' => now(),
-        'status'       => FinanceCharge::STATUS_ACTIVE,
+        'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
 }
 
@@ -46,9 +46,9 @@ function seedActiveCharge(Student $student, Semester $semester, string $chargeTy
 // ---------------------------------------------------------------------------
 
 it('creates charges for valid students and skips duplicates and wrong-campus students', function () {
-    $campus      = Campus::factory()->create();
+    $campus = Campus::factory()->create();
     $otherCampus = Campus::factory()->create();
-    $semester    = Semester::factory()->active()->create();
+    $semester = Semester::factory()->active()->create();
 
     app()->singleton('campus', fn () => $campus);
 
@@ -63,11 +63,11 @@ it('creates charges for valid students and skips duplicates and wrong-campus stu
     seedActiveCharge($s2, $semester, 'bhyt');
 
     $result = GenerateNonAcademicChargesAction::run([
-        'fee_type'      => 'bhyt',
-        'semester_id'   => $semester->id,
-        'amount'        => 500000,
-        'due_date'      => now()->addDays(30)->toDateString(),
-        'note'          => 'BHYT test',
+        'fee_type' => 'bhyt',
+        'semester_id' => $semester->id,
+        'amount' => 500000,
+        'due_date' => now()->addDays(30)->toDateString(),
+        'note' => 'BHYT test',
         'student_codes' => ['SE100001', 'SE100002', 'SE100003', 'SE999999'],
     ]);
 
@@ -105,7 +105,7 @@ it('creates charges for valid students and skips duplicates and wrong-campus stu
 // ---------------------------------------------------------------------------
 
 it('creates at least two charges when two valid students are submitted', function () {
-    $campus   = Campus::factory()->create();
+    $campus = Campus::factory()->create();
     $semester = Semester::factory()->active()->create();
 
     app()->singleton('campus', fn () => $campus);
@@ -114,11 +114,11 @@ it('creates at least two charges when two valid students are submitted', functio
     $s2 = makeNacStudent($campus, 'SE200002');
 
     $result = GenerateNonAcademicChargesAction::run([
-        'fee_type'      => 'bhyt',
-        'semester_id'   => $semester->id,
-        'amount'        => 300000,
-        'due_date'      => now()->addDays(14)->toDateString(),
-        'note'          => '',
+        'fee_type' => 'bhyt',
+        'semester_id' => $semester->id,
+        'amount' => 300000,
+        'due_date' => now()->addDays(14)->toDateString(),
+        'note' => '',
         'student_codes' => ['SE200001', 'SE200002', 'GHOST_A', 'GHOST_B'],
     ]);
 
@@ -140,7 +140,7 @@ it('creates at least two charges when two valid students are submitted', functio
 // ---------------------------------------------------------------------------
 
 it('does not create scholarship or voucher credit charges (D3)', function () {
-    $campus   = Campus::factory()->create();
+    $campus = Campus::factory()->create();
     $semester = Semester::factory()->active()->create();
 
     app()->singleton('campus', fn () => $campus);
@@ -148,11 +148,11 @@ it('does not create scholarship or voucher credit charges (D3)', function () {
     $s1 = makeNacStudent($campus, 'SE300001');
 
     GenerateNonAcademicChargesAction::run([
-        'fee_type'      => 'bhyt',
-        'semester_id'   => $semester->id,
-        'amount'        => 200000,
-        'due_date'      => now()->addDays(10)->toDateString(),
-        'note'          => '',
+        'fee_type' => 'bhyt',
+        'semester_id' => $semester->id,
+        'amount' => 200000,
+        'due_date' => now()->addDays(10)->toDateString(),
+        'note' => '',
         'student_codes' => ['SE300001'],
     ]);
 
@@ -171,7 +171,7 @@ it('does not create scholarship or voucher credit charges (D3)', function () {
 // ---------------------------------------------------------------------------
 
 it('processes all valid students even when a middle student encounters an error', function () {
-    $campus   = Campus::factory()->create();
+    $campus = Campus::factory()->create();
     $semester = Semester::factory()->active()->create();
 
     app()->singleton('campus', fn () => $campus);
@@ -180,11 +180,11 @@ it('processes all valid students even when a middle student encounters an error'
     makeNacStudent($campus, 'SE400002');
 
     $result = GenerateNonAcademicChargesAction::run([
-        'fee_type'      => 'bhyt',
-        'semester_id'   => $semester->id,
-        'amount'        => 400000,
-        'due_date'      => now()->addDays(7)->toDateString(),
-        'note'          => '',
+        'fee_type' => 'bhyt',
+        'semester_id' => $semester->id,
+        'amount' => 400000,
+        'due_date' => now()->addDays(7)->toDateString(),
+        'note' => '',
         'student_codes' => ['SE400001', 'SE400002'],
     ]);
 
@@ -197,7 +197,7 @@ it('processes all valid students even when a middle student encounters an error'
 // ---------------------------------------------------------------------------
 
 it('skips student codes that fail the format guard (formula injection / invalid format)', function () {
-    $campus   = Campus::factory()->create();
+    $campus = Campus::factory()->create();
     $semester = Semester::factory()->active()->create();
 
     app()->singleton('campus', fn () => $campus);
@@ -206,11 +206,11 @@ it('skips student codes that fail the format guard (formula injection / invalid 
     makeNacStudent($campus, 'SE500001');
 
     $result = GenerateNonAcademicChargesAction::run([
-        'fee_type'      => 'bhyt',
-        'semester_id'   => $semester->id,
-        'amount'        => 100000,
-        'due_date'      => now()->addDays(10)->toDateString(),
-        'note'          => '',
+        'fee_type' => 'bhyt',
+        'semester_id' => $semester->id,
+        'amount' => 100000,
+        'due_date' => now()->addDays(10)->toDateString(),
+        'note' => '',
         // Mix of injection attempts, invalid formats, and one valid code
         'student_codes' => [
             '=CMD|cmd.exe',   // formula injection
@@ -246,13 +246,13 @@ it('throws RuntimeException when no campus context is bound', function () {
     $semester = Semester::factory()->active()->create();
 
     expect(fn () => GenerateNonAcademicChargesAction::run([
-        'fee_type'      => 'bhyt',
-        'semester_id'   => $semester->id,
-        'amount'        => 100000,
-        'due_date'      => now()->addDays(5)->toDateString(),
-        'note'          => '',
+        'fee_type' => 'bhyt',
+        'semester_id' => $semester->id,
+        'amount' => 100000,
+        'due_date' => now()->addDays(5)->toDateString(),
+        'note' => '',
         'student_codes' => ['SE600001'],
-    ]))->toThrow(\RuntimeException::class, 'No campus context resolved');
+    ]))->toThrow(RuntimeException::class, 'No campus context resolved');
 });
 
 // ---------------------------------------------------------------------------
@@ -264,11 +264,11 @@ it('handles an empty student list without error', function () {
     $semester = Semester::factory()->active()->create();
 
     $result = GenerateNonAcademicChargesAction::run([
-        'fee_type'      => 'bhyt',
-        'semester_id'   => $semester->id,
-        'amount'        => 100000,
-        'due_date'      => now()->addDays(5)->toDateString(),
-        'note'          => '',
+        'fee_type' => 'bhyt',
+        'semester_id' => $semester->id,
+        'amount' => 100000,
+        'due_date' => now()->addDays(5)->toDateString(),
+        'note' => '',
         'student_codes' => [],
     ]);
 

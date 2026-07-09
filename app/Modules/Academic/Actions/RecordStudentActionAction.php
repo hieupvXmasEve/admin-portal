@@ -9,7 +9,6 @@ use App\Enums\ProgressionTriggerSource;
 use App\Enums\StudentActionType;
 use App\Models\AcademicProgressionEvent;
 use App\Models\DeferCase;
-use App\Models\FinanceCharge;
 use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\StudentChange;
@@ -544,48 +543,13 @@ class RecordStudentActionAction
         array $data,
         int $userId
     ): void {
-        $chargeIds = array_values(array_unique($data['defer_egc_charge_ids'] ?? []));
-        if (empty($chargeIds)) {
-            return;
-        }
-
-        $charges = FinanceCharge::query()
-            ->whereIn('id', $chargeIds)
-            ->where('student_id', $student->id)
-            ->where('semester_id', $data['from_semester_id'] ?? null)
-            ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
-            ->where('status', FinanceCharge::STATUS_ACTIVE)
-            ->get();
-
-        if ($charges->isEmpty()) {
-            return;
-        }
-
-        $chargeService = app(FinanceChargeService::class);
-
-        foreach ($charges as $charge) {
-            $exists = FinanceCharge::query()
-                ->where('charge_type', FinanceCharge::TYPE_DEFER_CREDIT)
-                ->where('source_type', FinanceCharge::class)
-                ->where('source_id', $charge->id)
-                ->exists();
-
-            if ($exists) {
-                continue;
-            }
-
-            $chargeService->createCharge([
-                'student_id' => $student->id,
-                'semester_id' => $charge->semester_id,
-                'charge_type' => FinanceCharge::TYPE_DEFER_CREDIT,
-                'amount' => -abs((float) $charge->amount),
-                'description' => 'EGC Defer Credit: '.($charge->description ?? 'EGC Level Fee'),
-                'effective_at' => $deferCase->effective_at ?? now(),
-                'source_type' => FinanceCharge::class,
-                'source_id' => $charge->id,
-                'created_by_user_id' => $userId,
-            ]);
-        }
+        app(FinanceChargeService::class)->createEgcDeferCredits(
+            studentId: (int) $student->id,
+            fromSemesterId: isset($data['from_semester_id']) ? (int) $data['from_semester_id'] : null,
+            chargeIds: array_values(array_unique($data['defer_egc_charge_ids'] ?? [])),
+            effectiveAt: $deferCase->effective_at,
+            userId: $userId,
+        );
     }
 
     /**

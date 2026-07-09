@@ -2,14 +2,13 @@
 
 declare(strict_types=1);
 
-use App\Models\FinanceChargeInstallment;
-use App\Modules\Finance\Actions\PushNextInstallmentAction;
 use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Events\ChargeFullySettled;
 use App\Modules\Finance\Events\InstallmentPushed;
 use App\Modules\Finance\Events\InstallmentPushFailed;
 use App\Modules\Finance\Jobs\PushNextInstallmentJob;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 
@@ -49,7 +48,7 @@ it('does not dispatch InstallmentPushed when push fails', function () {
 
     try {
         freshPushAction()->handle($fix['charge']->id);
-    } catch (\Throwable) {
+    } catch (Throwable) {
         // expected
     }
 
@@ -108,7 +107,7 @@ it('dispatches InstallmentPushFailed when job exhausts all retries', function ()
     $fix = createInstallmentPushFixture();
 
     $job = new PushNextInstallmentJob($fix['charge']->id);
-    $exception = new \RuntimeException('DNG sustained outage');
+    $exception = new RuntimeException('DNG sustained outage');
 
     // Simulate Laravel calling failed() after final retry.
     $job->failed($exception);

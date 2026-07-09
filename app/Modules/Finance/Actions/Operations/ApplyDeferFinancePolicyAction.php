@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Actions\Operations;
 
 use App\Models\DeferCase;
-use App\Models\FinanceCharge;
-use App\Models\FinanceChargeInstallment;
-use App\Models\Payment;
-use App\Models\StudentInvoice;
 use App\Modules\Finance\Actions\AllocatePaymentAction;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;

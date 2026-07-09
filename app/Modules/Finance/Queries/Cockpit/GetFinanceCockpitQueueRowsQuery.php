@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Cockpit;
 
-use App\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 
 /**
  * Top-N rows for a single cockpit queue, fetched on demand when the Action Panel

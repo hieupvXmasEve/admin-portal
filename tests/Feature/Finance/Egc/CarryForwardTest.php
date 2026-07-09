@@ -2,23 +2,23 @@
 
 declare(strict_types=1);
 
-use App\Models\CurriculumVersion;
 use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Models\DiscountAllocation;
+use App\Models\CurriculumVersion;
 use App\Models\EgcBlock;
-use App\Models\FinanceCharge;
-use App\Models\InvoiceDiscount;
-use App\Models\InvoiceLine;
-use App\Models\Payment;
-use App\Models\PaymentApplication;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Finance\Actions\Egc\ApplyEgcCarryForwardAction;
+use App\Modules\Finance\Models\DiscountAllocation;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceDiscount;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\PaymentApplication;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Egc\ListEgcCarryForwardCandidatesQuery;
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -88,8 +88,7 @@ function makeCarryForwardEgcRegistration(
     int $level,
     int $attemptNumber = 1,
     string $registrationStatus = 'confirmed'
-): CourseRegistration
-{
+): CourseRegistration {
     $unit = Unit::factory()->state([
         'unit_type' => 'egc',
         'level' => $level,

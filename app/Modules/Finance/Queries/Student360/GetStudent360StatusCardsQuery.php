@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Student360;
 
-use App\Models\FinanceChargeInstallment;
-use App\Models\Payment;
 use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Queries\GetStudentBalanceQuery;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\LifecycleDueExceptionRowMapper;

@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\CurriculumVersion;
-use App\Models\FinanceCharge;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Services\PermissionService;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -83,7 +84,7 @@ it('shows charges scoped to the selected student', function () {
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
 
-    /** @var \Illuminate\Contracts\Auth\Authenticatable $authenticatedUser */
+    /** @var Authenticatable $authenticatedUser */
     $authenticatedUser = $authorizedUser;
 
     $response = actingAs($authenticatedUser)

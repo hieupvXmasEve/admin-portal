@@ -8,11 +8,11 @@ use App\Enums\AcademicProgressionEventType;
 use App\Enums\ProgressionTriggerSource;
 use App\Enums\StudentActionType;
 use App\Models\Campus;
-use App\Models\FinanceCharge;
 use App\Models\IeltsCertificate;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentDecision;
+use App\Modules\Finance\Services\FinanceChargeService;
 use Illuminate\Support\Collection;
 
 /**
@@ -87,22 +87,8 @@ class LifecycleFormOptions
                     'registration_status' => $reg->registration_status,
                 ]);
 
-            $options['egcCharges'] = FinanceCharge::query()
-                ->where('student_id', $student->id)
-                ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
-                ->where('status', FinanceCharge::STATUS_ACTIVE)
-                ->when($activeSemesterId, fn ($query) => $query->where('semester_id', $activeSemesterId))
-                ->orderBy('effective_at')
-                ->get()
-                ->map(fn (FinanceCharge $charge) => [
-                    'id' => $charge->id,
-                    'semester_id' => $charge->semester_id,
-                    'amount' => $charge->amount,
-                    'description' => $charge->description,
-                    'effective_at' => $charge->effective_at?->toDateString(),
-                    'paid_amount' => $charge->paid_amount,
-                    'is_fully_paid' => $charge->is_fully_paid,
-                ]);
+            $options['egcCharges'] = app(FinanceChargeService::class)
+                ->listActiveEgcChargesForStudent((int) $student->id, $activeSemesterId);
         }
 
         return $options;

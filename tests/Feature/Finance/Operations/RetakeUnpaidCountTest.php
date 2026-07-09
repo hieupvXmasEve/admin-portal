@@ -8,7 +8,7 @@ use App\Models\CourseRegistration;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Operations\GetBillingDashboardStatsQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

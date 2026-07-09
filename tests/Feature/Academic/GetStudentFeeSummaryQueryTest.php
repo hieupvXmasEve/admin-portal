@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\CurriculumVersion;
-use App\Models\FinanceCharge;
-use App\Models\InvoiceDiscount;
-use App\Models\InvoiceLine;
-use App\Models\Payment;
-use App\Models\PaymentApplication;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
-use App\Modules\Academic\Queries\GetStudentFeeSummaryQuery;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceDiscount;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\PaymentApplication;
+use App\Modules\Finance\Models\StudentInvoice;
+use App\Shared\Contracts\Finance\StudentFeeSummaryReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -100,7 +100,7 @@ it('builds fee summary from invoice discounts and payment applications only', fu
         'applied_at' => now(),
     ]);
 
-    $summary = app(GetStudentFeeSummaryQuery::class)->execute($student);
+    $summary = app(StudentFeeSummaryReader::class)->execute((int) $student->id);
 
     expect($summary['summary']['total_discount'])->toBe(5000000.0)
         ->and($summary['summary']['active_due'])->toBe(10000000.0)

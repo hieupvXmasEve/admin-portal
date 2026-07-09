@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Egc;
 
 use App\Models\EgcBlock;
-use App\Models\FinanceCharge;
 use App\Models\Student;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Support\EgcBlockGenerationClassifier;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
 use Illuminate\Pagination\LengthAwarePaginator;

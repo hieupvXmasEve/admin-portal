@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -71,6 +72,7 @@ class BillingCycle extends Model
         if ($this->isDraft()) {
             return $this->update(['status' => 'active']);
         }
+
         return false;
     }
 
@@ -82,6 +84,7 @@ class BillingCycle extends Model
         if ($this->isActive()) {
             return $this->update(['status' => 'closed']);
         }
+
         return false;
     }
 }

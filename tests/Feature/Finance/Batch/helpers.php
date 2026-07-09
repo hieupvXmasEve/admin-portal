@@ -5,15 +5,15 @@ declare(strict_types=1);
 use App\Models\Campus;
 use App\Models\CurriculumVersion;
 use App\Models\EgcBlock;
-use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
 use App\Models\TuitionPlan;
 use App\Models\TuitionPlanTerm;
 use App\Models\User;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Services\PermissionService;
 
 const BATCH_STUDIO_CSRF = 'batch-studio-test-csrf';

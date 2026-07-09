@@ -6,9 +6,9 @@ namespace App\Modules\Finance\Actions\Egc;
 
 use App\Models\CourseRegistration;
 use App\Models\EgcBlock;
-use App\Models\FinanceCharge;
-use App\Models\Payment;
 use App\Models\Student;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\Payment;
 use Illuminate\Support\Collection;
 
 class BuildEgcCarryForwardPlanAction

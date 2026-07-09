@@ -6,13 +6,17 @@ namespace App\Modules\Academic\Actions;
 
 use App\Models\CourseRegistration;
 use App\Models\CourseRetakeRegistration;
-use App\Models\FinanceCharge;
+use App\Modules\Academic\Support\AcademicObligationSettlement;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
 
 class SyncPaidRetakeRegistrationsAction implements RetakeRegistrationPaymentSyncer
 {
+    public function __construct(
+        private readonly AcademicObligationSettlement $obligationSettlement,
+    ) {}
+
     /**
      * @return array{checked:int,eligible:int,synced:int,waiting_for_class:int,skipped:int,failed:int,details:array<int,array<string,mixed>>}
      */
@@ -55,6 +59,7 @@ class SyncPaidRetakeRegistrationsAction implements RetakeRegistrationPaymentSync
             return $this->emptyResult();
         }
 
+        // Legacy bridge: pre-cutover rows still store finance_charge_id.
         return $this->runQuery(
             CourseRetakeRegistration::query()->whereIn('finance_charge_id', $chargeIds),
             $dryRun,
@@ -95,16 +100,15 @@ class SyncPaidRetakeRegistrationsAction implements RetakeRegistrationPaymentSync
                             });
                     });
             })
-            ->whereNotNull('finance_charge_id')
-            ->with(['student:id,student_id,full_name', 'financeCharge'])
+            ->with(['student:id,student_id,full_name'])
             ->orderBy('id')
             ->get();
 
         foreach ($registrations as $registration) {
             $result['checked']++;
 
-            $charge = $registration->financeCharge;
-            if (! $charge || $charge->status !== FinanceCharge::STATUS_ACTIVE || ! $charge->is_fully_paid) {
+            $settlement = $this->obligationSettlement->forRetake($registration);
+            if (! $settlement->isSettled()) {
                 $result['skipped']++;
 
                 continue;
@@ -114,9 +118,9 @@ class SyncPaidRetakeRegistrationsAction implements RetakeRegistrationPaymentSync
             $detail = [
                 'registration_id' => $registration->id,
                 'student_id' => $registration->student?->student_id,
-                'finance_charge_id' => $charge->id,
-                'paid_amount' => $charge->paid_amount,
-                'balance' => $charge->balance,
+                'finance_obligation_id' => $settlement->finance_obligation_id,
+                'paid_amount' => $settlement->paid,
+                'outstanding' => $settlement->outstanding,
             ];
 
             if ($dryRun) {
@@ -126,7 +130,7 @@ class SyncPaidRetakeRegistrationsAction implements RetakeRegistrationPaymentSync
             }
 
             try {
-                AutoEnrollRetakeCourseAction::handlePaymentConfirmed($charge);
+                AutoEnrollRetakeCourseAction::handlePaymentConfirmed((int) $registration->id);
 
                 $fresh = $registration->fresh(['courseRegistration']);
                 $freshStatus = $fresh->status;
@@ -152,7 +156,7 @@ class SyncPaidRetakeRegistrationsAction implements RetakeRegistrationPaymentSync
 
                 Log::warning('Failed to sync paid retake registration', [
                     'registration_id' => $registration->id,
-                    'finance_charge_id' => $charge->id,
+                    'finance_obligation_id' => $settlement->finance_obligation_id,
                     'error' => $e->getMessage(),
                 ]);
             }

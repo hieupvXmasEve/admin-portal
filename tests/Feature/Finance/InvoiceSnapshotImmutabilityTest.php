@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\CurriculumVersion;
-use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

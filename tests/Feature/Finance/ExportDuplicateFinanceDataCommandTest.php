@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
 use App\Models\Semester;
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 

@@ -6,8 +6,8 @@ namespace App\Modules\Finance\Actions;
 
 use App\Models\CourseRetakeRegistration;
 use App\Models\ExamResitAttempt;
-use App\Models\FinanceCharge;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use Illuminate\Support\Facades\DB;
 

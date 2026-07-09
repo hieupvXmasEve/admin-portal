@@ -2,17 +2,18 @@
 
 declare(strict_types=1);
 
-use App\Models\FinanceCharge;
-use App\Models\InvoiceLine;
+use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 it('sorts outstanding lines by configured charge-type priority before due date', function () {
-    $semester = \App\Models\Semester::factory()->create();
+    $semester = Semester::factory()->create();
 
     $student = Student::factory()->state([
         'intake' => 1,

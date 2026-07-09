@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Models\FinanceCharge;
 use App\Models\Semester;
+use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;

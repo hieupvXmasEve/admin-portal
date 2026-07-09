@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Support;
 
 use App\Models\ExamResitAttempt;
-use App\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceCharge;
 use Carbon\CarbonInterface;
 
 /**

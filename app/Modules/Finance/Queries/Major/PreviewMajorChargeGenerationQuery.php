@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Major;
 
-use App\Models\FinanceCharge;
 use App\Models\ScholarshipDefinition;
 use App\Models\Student;
 use App\Models\StudentScholarshipAward;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;

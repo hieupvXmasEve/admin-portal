@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Operations;
 
-use App\Models\FinanceCharge;
 use App\Models\Student;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Enums\NonAcademicChargeTypeEnum;
+use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 

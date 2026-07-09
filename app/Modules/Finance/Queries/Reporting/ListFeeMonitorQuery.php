@@ -6,11 +6,11 @@ namespace App\Modules\Finance\Queries\Reporting;
 
 use App\Models\CourseRetakeRegistration;
 use App\Models\ExamResitAttempt;
-use App\Models\FinanceCharge;
-use App\Models\PaymentApplication;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Queries\Egc\PreviewEgcChargeGenerationQuery;
 use App\Modules\Finance\Queries\Major\PreviewMajorChargeGenerationQuery;
 use App\Modules\Finance\Support\Reporting\FeeMonitorExpectedFeeCatalog;
