@@ -8,6 +8,7 @@ final readonly class FinanceIntakeResult
 {
     /**
      * @param  list<int>  $credit_application_ids
+     * @param  list<int>  $invoice_discount_ids
      */
     public function __construct(
         public string $lifecycle_status,
@@ -19,5 +20,7 @@ final readonly class FinanceIntakeResult
         public ?int $invoice_line_id = null,
         public ?int $finance_credit_entitlement_id = null,
         public array $credit_application_ids = [],
+        public ?int $finance_discount_entitlement_id = null,
+        public array $invoice_discount_ids = [],
     ) {}
 }

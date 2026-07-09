@@ -70,4 +70,13 @@ final class FinanceOwnedObligationSource
     {
         return "legacy:defer_credit:charge:{$chargeId}";
     }
+
+    /**
+     * Synthetic source_ref for legacy voucher_credit charges that pre-date discount entitlement intake.
+     * Stable per charge so conversion is idempotent under the source quad unique key.
+     */
+    public static function legacyVoucherCreditChargeRef(int $chargeId): string
+    {
+        return "legacy:voucher_credit:charge:{$chargeId}";
+    }
 }

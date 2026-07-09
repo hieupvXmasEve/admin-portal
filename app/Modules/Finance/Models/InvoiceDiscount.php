@@ -7,7 +7,6 @@ namespace App\Modules\Finance\Models;
 use App\Models\ScholarshipDefinition;
 use App\Models\User;
 use App\Models\VoucherDefinition;
-
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -24,6 +23,7 @@ class InvoiceDiscount extends Model
         'approved_by',
         'memo',
         'reference_id',
+        'finance_discount_entitlement_id',
     ];
 
     protected $casts = [
@@ -57,6 +57,11 @@ class InvoiceDiscount extends Model
     public function allocations(): HasMany
     {
         return $this->hasMany(DiscountAllocation::class);
+    }
+
+    public function financeDiscountEntitlement(): BelongsTo
+    {
+        return $this->belongsTo(FinanceDiscountEntitlement::class);
     }
 
     public function approvedBy(): BelongsTo

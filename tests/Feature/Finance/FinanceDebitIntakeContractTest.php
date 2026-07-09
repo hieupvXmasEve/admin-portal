@@ -13,7 +13,6 @@ use App\Modules\Finance\Models\InvoiceLine;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\Exceptions\InvalidFinanceIntakePayload;
-use App\Shared\Contracts\Finance\Exceptions\UnsupportedFinancialEffectYet;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -139,16 +138,20 @@ it('rejects source supplied pricing values', function (): void {
     ));
 })->throws(InvalidFinanceIntakePayload::class);
 
-it('rejects discount intake until that branch exists', function (): void {
-    app(FinanceIntakeContract::class)->request(new FinanceIntakeData(
-        source_system: 'academic',
-        source_kind: 'future_source',
-        source_ref: 'FUTURE-1',
+it('routes discount intake for registered voucher_credit entitlement type', function (): void {
+    // Full voucher allocation coverage lives in VoucherDiscountEntitlementCutoverTest;
+    // this pins the router branch is open (no UnsupportedFinancialEffectYet).
+    expect(fn () => app(FinanceIntakeContract::class)->request(new FinanceIntakeData(
+        source_system: 'finance',
+        source_kind: 'voucher_application',
+        source_ref: 'router-open-check',
         financial_effect: FinancialEffect::Discount,
-        obligation_type: 'future_entitlement',
+        obligation_type: FinanceCharge::TYPE_VOUCHER_CREDIT,
         facts: [
             'student_id' => $this->student->id,
             'semester_id' => $this->semester->id,
+            // amount required; invoice missing will fail later in action — still proves branch is open.
+            'amount' => 1000,
         ],
-    ));
-})->throws(UnsupportedFinancialEffectYet::class);
+    )))->toThrow(InvalidFinanceIntakePayload::class);
+});

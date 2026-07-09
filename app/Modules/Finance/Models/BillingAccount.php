@@ -29,4 +29,9 @@ class BillingAccount extends Model
     {
         return $this->hasMany(FinanceCreditEntitlement::class);
     }
+
+    public function financeDiscountEntitlements(): HasMany
+    {
+        return $this->hasMany(FinanceDiscountEntitlement::class);
+    }
 }
