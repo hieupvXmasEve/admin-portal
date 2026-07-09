@@ -467,6 +467,12 @@ export const classSessionRoutes = {
 // Finance Office Routes
 export const financeRoutes = {
     audit: () => route(FINANCE_ROUTE_NAMES.AUDIT_INDEX),
+    pricingOperations: {
+        index: (params?: Record<string, unknown>) => route(FINANCE_ROUTE_NAMES.PRICING_OPERATIONS_INDEX, params ?? {}),
+        store: () => route(FINANCE_ROUTE_NAMES.PRICING_OPERATIONS_STORE),
+        activate: (pricingRuleId: number) => route(FINANCE_ROUTE_NAMES.PRICING_OPERATIONS_ACTIVATE, { pricingRule: pricingRuleId }),
+        deactivate: (pricingRuleId: number) => route(FINANCE_ROUTE_NAMES.PRICING_OPERATIONS_DEACTIVATE, { pricingRule: pricingRuleId }),
+    },
     today: {
         dashboard: () => route(FINANCE_ROUTE_NAMES.OPERATIONS_DASHBOARD),
     },

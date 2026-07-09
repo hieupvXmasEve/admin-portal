@@ -114,3 +114,14 @@ it('requires every registry entry to declare required behaviour metadata', funct
             ->and($definition->allowedSourceKinds)->toBeArray();
     }
 });
+
+it('marks catalog-fixed retake and resit as requiring pricing catalog coverage', function () {
+    expect(ObligationTypeRegistry::typesRequiringPricingCatalog())
+        ->toEqualCanonicalizing([
+            FinanceCharge::TYPE_RETAKE_FEE,
+            FinanceCharge::TYPE_EXAM_RESIT_FEE,
+        ])
+        ->and(ObligationTypeRegistry::get(FinanceCharge::TYPE_RETAKE_FEE)->requiresPricingCatalog())->toBeTrue()
+        ->and(ObligationTypeRegistry::get(FinanceCharge::TYPE_MANUAL_FEE)->requiresPricingCatalog())->toBeFalse()
+        ->and(ObligationTypeRegistry::get(FinanceCharge::TYPE_TUITION_TERM)->requiresPricingCatalog())->toBeFalse();
+});

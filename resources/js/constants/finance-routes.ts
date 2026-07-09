@@ -5,6 +5,12 @@ export const FINANCE_ROUTE_NAMES = {
     CHARGES_SHOW: 'finance.charges.show',
     INVOICES_INDEX: 'finance.invoices.index',
     INVOICES_SHOW: 'finance.invoices.show',
+    // Pricing Operations (obligation v2 wave 1)
+    PRICING_OPERATIONS_INDEX: 'finance.pricing-operations.index',
+    PRICING_OPERATIONS_STORE: 'finance.pricing-operations.store',
+    PRICING_OPERATIONS_ACTIVATE: 'finance.pricing-operations.activate',
+    PRICING_OPERATIONS_DEACTIVATE: 'finance.pricing-operations.deactivate',
+
     // Today
     OPERATIONS_DASHBOARD: 'finance.operations.dashboard',
     COCKPIT_INDEX: 'finance.cockpit.index',

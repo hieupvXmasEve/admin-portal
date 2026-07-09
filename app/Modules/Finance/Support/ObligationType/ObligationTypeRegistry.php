@@ -138,6 +138,30 @@ final class ObligationTypeRegistry
     }
 
     /**
+     * Obligation types whose intake path requires an active pricing catalog rule.
+     *
+     * @return list<ObligationTypeDefinition>
+     */
+    public static function requiringPricingCatalog(): array
+    {
+        return array_values(array_filter(
+            self::all(),
+            static fn (ObligationTypeDefinition $definition): bool => $definition->requiresPricingCatalog(),
+        ));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function typesRequiringPricingCatalog(): array
+    {
+        return array_map(
+            static fn (ObligationTypeDefinition $definition): string => $definition->type,
+            self::requiringPricingCatalog(),
+        );
+    }
+
+    /**
      * @return array<string, ObligationTypeDefinition>
      */
     private static function buildDefinitions(): array

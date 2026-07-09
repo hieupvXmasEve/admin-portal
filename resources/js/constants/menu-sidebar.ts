@@ -356,6 +356,12 @@ export const mainNavGroups: NavGroup[] = [
                 children: [
                     { title: 'Batch Studio', href: financeRoutes.batchStudio.hub(), icon: Layers, requiredPermissions: ['view_finance_batch_studio'] },
                     {
+                        title: 'Pricing Operations',
+                        href: financeRoutes.pricingOperations.index(),
+                        icon: DollarSign,
+                        requiredPermissions: ['view_finance_pricing_operations'],
+                    },
+                    {
                         title: 'EGC · Kết quả & học lại',
                         href: financeRoutes.feeGeneration.egcBlockResults(),
                         icon: TrendingUp,

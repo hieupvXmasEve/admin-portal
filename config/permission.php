@@ -407,6 +407,9 @@ return [
             'view_finance_cockpit' => 'view_finance_cockpit',
             // Finance Reporting (FIN-REV-016) — thin shell gate; lens stories own data permissions later
             'view_finance_reporting' => 'view_finance_reporting',
+            // Pricing Operations (obligation v2 wave 1) — catalog rules only; types are code-owned
+            'view_finance_pricing_operations' => 'view_finance_pricing_operations',
+            'manage_finance_pricing_operations' => 'manage_finance_pricing_operations',
         ],
         'modules' => [
             'view_module' => 'view_module',

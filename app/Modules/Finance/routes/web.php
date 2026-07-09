@@ -23,6 +23,7 @@ use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionController;
 use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionHistoryController;
 use App\Modules\Finance\Http\Web\Admin\MajorChargeGenerationController;
 use App\Modules\Finance\Http\Web\Admin\PaymentController;
+use App\Modules\Finance\Http\Web\Admin\PricingOperationsController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(function () {
@@ -192,6 +193,24 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
     // Operator semester selection (single source; reflected via shared prop)
     Route::post('/semester-context', [SemesterContextController::class, 'update'])
         ->name('semester-context.update');
+
+    // =====================
+    // Pricing Operations (immutable rule versions + coverage warning)
+    // =====================
+    Route::prefix('pricing-operations')->name('pricing-operations.')->group(function () {
+        Route::get('/', [PricingOperationsController::class, 'index'])
+            ->middleware('can:view_finance_pricing_operations')
+            ->name('index');
+        Route::post('/', [PricingOperationsController::class, 'store'])
+            ->middleware('can:manage_finance_pricing_operations')
+            ->name('store');
+        Route::post('/{pricingRule}/activate', [PricingOperationsController::class, 'activate'])
+            ->middleware('can:manage_finance_pricing_operations')
+            ->name('activate');
+        Route::post('/{pricingRule}/deactivate', [PricingOperationsController::class, 'deactivate'])
+            ->middleware('can:manage_finance_pricing_operations')
+            ->name('deactivate');
+    });
 
     // =====================
     // Finance Charges

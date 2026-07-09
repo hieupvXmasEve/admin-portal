@@ -29,4 +29,16 @@ enum PricingStrategy: string
 
     /** No independent pricing (e.g. pure ledger conversion / not yet priced). */
     case NotApplicable = 'not_applicable';
+
+    /**
+     * True when intake/pricing must resolve an active row in finance_pricing_catalog_items.
+     * Staff-supplied / generator / policy paths do not need catalog coverage.
+     */
+    public function requiresPricingCatalog(): bool
+    {
+        return match ($this) {
+            self::CatalogFixed, self::CatalogFacts => true,
+            default => false,
+        };
+    }
 }

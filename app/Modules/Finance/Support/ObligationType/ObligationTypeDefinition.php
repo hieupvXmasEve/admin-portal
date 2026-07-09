@@ -56,6 +56,14 @@ final readonly class ObligationTypeDefinition
     }
 
     /**
+     * True when FinancePricingCatalog must supply amount/currency at intake.
+     */
+    public function requiresPricingCatalog(): bool
+    {
+        return $this->pricingStrategy->requiresPricingCatalog();
+    }
+
+    /**
      * Effective Fee Monitor missing-inference switch (may honour ACAD-RET gate).
      */
     public function resolveFeeMonitorMissingInference(bool $acadRetGateEnabled): bool
