@@ -28,9 +28,11 @@ use Illuminate\Support\Facades\Log;
  * dng_payment_request_charges pivot, enabling precise per-charge allocation
  * on webhook confirmation.
  *
- * DNG pushes only existing Finance payables. Retake/resit source rows that
- * still have no legacy charge link and no FinanceObligation are blocked as
- * missing_finance_obligation instead of being silently charged here.
+ * DNG pushes only existing Finance payables:
+ * - Retake/resit source rows with no charge link and no FinanceObligation are
+ *   blocked as missing_finance_obligation (no silent charge create).
+ * - BHYT (wave 2): every pushed payable must already be linked to a
+ *   FinanceObligation; unlinked legacy charges are blocked until backfill.
  */
 class CreateBatchDngFromChargesAction
 {
@@ -141,6 +143,12 @@ class CreateBatchDngFromChargesAction
 
             if ($charges->isEmpty()) {
                 throw new \RuntimeException('Không tìm thấy khoản phí nào có số dư > 0');
+            }
+
+            // Wave-2 BHYT: DNG may only push existing payables that already have
+            // a FinanceObligation. Never invent BHYT debt at push time.
+            if ($dngFeeType === 'BHYT') {
+                $this->assertChargesHaveFinanceObligations($charges, $dngFeeType);
             }
 
             // Installment-aware total: for each charge, take its next PENDING installment.
@@ -355,6 +363,39 @@ class CreateBatchDngFromChargesAction
             ->where('source_ref', $sourceRef)
             ->where('obligation_type', $obligationType)
             ->exists();
+    }
+
+    /**
+     * Fail fast when any payable selected for DNG push has no accepted FinanceObligation.
+     * Used for cut-over types (BHYT) so DNG cannot collect orphan or voided-obligation charges.
+     *
+     * @param  Collection<int, object{id: int, amount: float, balance: float, finance_obligation_id?: int|null}>  $charges
+     */
+    private function assertChargesHaveFinanceObligations(Collection $charges, string $dngFeeType): void
+    {
+        $chargeIds = $charges->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        $invalidIds = FinanceCharge::query()
+            ->whereIn('id', $chargeIds)
+            ->where(function ($query): void {
+                $query->whereNull('finance_obligation_id')
+                    ->orWhereDoesntHave('financeObligation', function ($obligationQuery): void {
+                        $obligationQuery->where('lifecycle_status', FinanceObligation::STATUS_ACCEPTED);
+                    });
+            })
+            ->orderBy('id')
+            ->pluck('id')
+            ->all();
+
+        if ($invalidIds === []) {
+            return;
+        }
+
+        throw new \RuntimeException(
+            'missing_finance_obligation: '.$dngFeeType.' charge(s) #'
+            .implode(', #', $invalidIds)
+            .' have no accepted Finance obligation. Run finance:backfill-legacy-bhyt-obligations or re-generate via intake.'
+        );
     }
 
     /**

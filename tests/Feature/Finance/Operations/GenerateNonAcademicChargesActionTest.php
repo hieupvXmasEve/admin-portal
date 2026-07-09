@@ -5,11 +5,19 @@ declare(strict_types=1);
 use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Models\User;
 use App\Modules\Finance\Actions\Operations\GenerateNonAcademicChargesAction;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Support\FinanceOwnedObligationSource;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    // Intake materializer stamps created_by_user_id from auth()->id().
+    $this->actingAs(User::factory()->create());
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -85,7 +93,15 @@ it('creates charges for valid students and skips duplicates and wrong-campus stu
         ->and($charge->student_id)->toBe($s1->id)
         ->and($charge->charge_type)->toBe('bhyt')
         ->and($charge->semester_id)->toBe($semester->id)
-        ->and($charge->status)->toBe(FinanceCharge::STATUS_ACTIVE);
+        ->and($charge->status)->toBe(FinanceCharge::STATUS_ACTIVE)
+        ->and($charge->finance_obligation_id)->not->toBeNull()
+        ->and($charge->source_type)->toBeNull();
+
+    $obligation = FinanceObligation::query()->findOrFail($charge->finance_obligation_id);
+    expect($obligation->source_system)->toBe(FinanceOwnedObligationSource::SOURCE_SYSTEM)
+        ->and($obligation->source_kind)->toBe(FinanceOwnedObligationSource::NON_ACADEMIC_BATCH)
+        ->and($obligation->obligation_type)->toBe(FinanceCharge::TYPE_BHYT)
+        ->and((float) $obligation->amount)->toBe(500000.0);
 
     // Skipped: assert per-row reason (R3)
     $byCode = collect($result['skipped'])->keyBy('student_code');

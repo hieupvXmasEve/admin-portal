@@ -5,20 +5,27 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Actions\Operations;
 
 use App\Models\Student;
-use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Enums\NonAcademicChargeTypeEnum;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Support\FinanceOwnedObligationSource;
+use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
+use App\Shared\Contracts\Finance\Enums\FinancialEffect;
+use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Generate non-academic charges for a list of students from a CSV upload.
  *
+ * Wave 2 (BHYT tracer): each row enters through the Finance Intake Contract.
+ * Finance mints the source_ref, prices via GeneratorAmount strategy, and the
+ * materializer creates FinanceCharge + InvoiceLine. No direct charge create.
+ *
  * Decisions honoured:
  *  D3 — NO voucher/scholarship resolver called.
  *  D7 — Duplicate = skip + report (same student_id + charge_type + semester_id + status=active).
  *  D8 — Campus resolved via app('campus')->id; students not on current campus are skipped.
- *  D9 — No batch history table; source_type='NonAcademicChargeBatch', source_id=null.
+ *  D9 — No batch history table; correlation is the obligation source triple.
  *
  * Transaction: DB::beginTransaction() + per-student inner try/catch + DB::commit(),
  * mirroring GenerateBatchChargesAction lines 85-367.
@@ -33,7 +40,7 @@ class GenerateNonAcademicChargesAction
      *     due_date: string,
      *     note: string,
      *     student_codes: array<string>,
-     * } $data
+     * }  $data
      * @return array{
      *     created: array<int, array{student_code: string, charge_id: int}>,
      *     skipped: array<int, array{student_code: string, reason: string}>,
@@ -48,7 +55,6 @@ class GenerateNonAcademicChargesAction
         $dueDate = $data['due_date'];
         $note = $data['note'] ?? '';
         $studentCodes = $data['student_codes'];
-        $createdByUserId = auth()->id();
 
         // Resolve current campus — canonical pattern from GenerateBatchChargesAction:53-58.
         // A missing or null campus context is an unrecoverable misconfiguration; throw rather
@@ -74,7 +80,7 @@ class GenerateNonAcademicChargesAction
         $created = [];
         $skipped = [];
 
-        $createAction = app(CreateFinanceChargeAction::class);
+        $intake = app(FinanceIntakeContract::class);
 
         DB::beginTransaction();
         try {
@@ -105,10 +111,12 @@ class GenerateNonAcademicChargesAction
                     $student = $foundStudents[$code];
 
                     // Skip: duplicate active charge for same (student, type, semester).
+                    // lockForUpdate reduces double-submit races under the outer batch txn.
                     $existingCharge = FinanceCharge::where('student_id', $student->id)
                         ->where('charge_type', $feeType)
                         ->where('semester_id', $semesterId)
                         ->where('status', FinanceCharge::STATUS_ACTIVE)
+                        ->lockForUpdate()
                         ->first();
 
                     if ($existingCharge) {
@@ -120,22 +128,35 @@ class GenerateNonAcademicChargesAction
                         continue;
                     }
 
-                    // Create charge + invoice line via shared action.
-                    // D3: no voucher/scholarship resolver called here.
-                    $charge = $createAction->handle([
-                        'student_id' => $student->id,
-                        'semester_id' => $semesterId,
-                        'charge_type' => $feeType,
-                        'amount' => $amount,
-                        'description' => $note !== '' ? $note : NonAcademicChargeTypeEnum::from($feeType)->label(),
-                        'effective_at' => now(),
-                        'due_date' => $dueDate,
-                        'source_type' => 'NonAcademicChargeBatch',
-                        'source_id' => null,
-                        'created_by_user_id' => $createdByUserId,
-                    ]);
+                    $description = $note !== ''
+                        ? $note
+                        : NonAcademicChargeTypeEnum::from($feeType)->label();
 
-                    $created[] = ['student_code' => $code, 'charge_id' => $charge->id];
+                    // Finance-owned intake: mint source_ref, price via GeneratorAmount,
+                    // materialize charge + invoice line (no direct FinanceCharge::create).
+                    $result = $intake->request(new FinanceIntakeData(
+                        source_system: FinanceOwnedObligationSource::SOURCE_SYSTEM,
+                        source_kind: FinanceOwnedObligationSource::NON_ACADEMIC_BATCH,
+                        source_ref: FinanceOwnedObligationSource::nonAcademicBatchRef(
+                            $feeType,
+                            (int) $student->id,
+                            $semesterId,
+                        ),
+                        financial_effect: FinancialEffect::Debit,
+                        obligation_type: $feeType,
+                        facts: [
+                            'student_id' => (int) $student->id,
+                            'semester_id' => $semesterId,
+                            'amount' => $amount,
+                            'description' => $description,
+                            'due_date' => $dueDate,
+                        ],
+                    ));
+
+                    $created[] = [
+                        'student_code' => $code,
+                        'charge_id' => $result->finance_charge_id,
+                    ];
 
                 } catch (\Throwable $e) {
                     // Per-student error does not abort the whole batch.
