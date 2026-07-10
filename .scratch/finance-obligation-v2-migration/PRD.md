@@ -52,7 +52,7 @@ Local DB counts sampled 2026-07-09 (`asia`); **wave-6 audit re-sampled 2026-07-1
 | `voucher_credit` | 111 active, sum −555,000,000 | Voucher application | — | FinanceDiscountEntitlement | 4 |
 | `egc_level_fee` | 370 active, 58 void | Batch Studio EGC (blocks, relevel, carry-forward) | HP | FinanceObligation (+ egc_retake FinanceDiscountEntitlement) | 5 |
 | `admission_fee` | **0** (re-sample) | Manual form only (requires Student); no auto generator; Fee Monitor soft-expects intake students | PRE dropdown only; auto-map **KHAC** | **No-action wave 6** — post-Approve only; no pre-Approve ADR; keep dormant until business volume | **6 audit done** |
-| `course_fee` | **0** (re-sample) | **None** — enum/registry/HP free-pass only | HP | **Formally retire** | **6 → issue 02** |
+| `course_fee` | **0** (re-sample) | **None** — formally retired (registry + no DNG reverse map) | — (retired; historical enum kept) | **Formally retire (wave 6 audit)** | **6 done (issue 02)** |
 | `adjustment` | **0** (re-sample) | Manual form (signed); defer FORFEIT positive debit | KHAC | **3-way split** (no legacy backfill on sample) | **6 → issue 03** |
 
 DNG codes with **no** internal charge_type (manual-only): `THHB` (thu hồi học bổng
@@ -144,7 +144,7 @@ Dependencies: 1 → {2,3}; 4 → 5; {2,3,4,5,6} → 7. Waves 2 and 3 may overlap
   3-way split with no legacy backfill; THHB/F1/PRE stay manual DNG.
 - `admission_fee`: **no-action** implement this wave (dormant manual/student path).
 - `adjustment` 3-way split on **new** writes — issue 03.
-- `course_fee`: **formally retire** — issue 02.
+- `course_fee`: **formally retire (wave 6 audit)** — issue 02 done (registry retired, HP free-pass closed).
 
 ### Wave 7 — Hardening (endgame)
 - Arch tests: no `FinanceCharge::create` in production app code outside the
@@ -225,8 +225,8 @@ Dependencies: 1 → {2,3}; 4 → 5; {2,3,4,5,6} → 7. Waves 2 and 3 may overlap
 
 ## Unresolved questions
 
-1. `course_fee`: no generator or data located — real feature or dead enum value?
-   (Wave 6 audit.)
+1. ~~`course_fee`: no generator or data located — real feature or dead enum value?~~
+   **Resolved (wave 6 audit + issue 02):** formally retire; historical enum kept.
 2. DNG `PRE`: is admission-fee collection actually happening in prod today, and
    pre- or post-Approve? Also `fromChargeType()` does not map `admission_fee` → PRE
    (falls through to KHAC) — bug or unused path? If pre-Approve collection is a

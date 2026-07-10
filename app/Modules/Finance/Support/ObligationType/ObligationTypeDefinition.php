@@ -18,6 +18,7 @@ final readonly class ObligationTypeDefinition
      * @param  string|null  $dngCollectionCode  DNG fee_type used by auto-map; null → never auto-mapped (falls to KHAC for debits).
      * @param  string|null  $feeMonitorSourceKey  Fee Monitor expected-source id; null → not tracked as expected fee.
      * @param  string|null  $permission  Primary staff permission key for generating/managing this type, if any.
+     * @param  bool  $retired  True when formally retired: no new generation path; excluded from active DNG reverse maps.
      */
     public function __construct(
         public string $type,
@@ -33,6 +34,7 @@ final readonly class ObligationTypeDefinition
         public bool $feeMonitorMandatory = false,
         public bool $feeMonitorMissingInference = false,
         public bool $feeMonitorMissingInferenceUsesAcadRetGate = false,
+        public bool $retired = false,
     ) {}
 
     public function isDebit(): bool
@@ -50,9 +52,14 @@ final readonly class ObligationTypeDefinition
         return $this->financialEffect === FinancialEffect::Discount;
     }
 
+    public function isRetired(): bool
+    {
+        return $this->retired || $this->cancellationPolicy === CancellationPolicy::Retired;
+    }
+
     public function isTrackedByFeeMonitor(): bool
     {
-        return $this->feeMonitorSourceKey !== null;
+        return $this->feeMonitorSourceKey !== null && ! $this->isRetired();
     }
 
     /**

@@ -33,9 +33,9 @@ use Illuminate\Support\Facades\Log;
  *   blocked as missing_finance_obligation (no silent charge create).
  * - BHYT (wave 2): every pushed payable must already be linked to a
  *   FinanceObligation; unlinked legacy charges are blocked until backfill.
- * - HP (wave 3 tuition_term + wave 5 egc_level_fee): those payables must already
- *   be linked to a FinanceObligation; course_fee under the same DNG code stays
- *   free until its owning wave cuts over.
+ * - HP (wave 3 tuition_term + wave 5 egc_level_fee): every pushed payable must
+ *   already be linked to a FinanceObligation. course_fee is formally retired
+ *   (wave 6) and is excluded from the HP reverse charge-type map.
  */
 class CreateBatchDngFromChargesAction
 {
@@ -154,10 +154,10 @@ class CreateBatchDngFromChargesAction
                 $this->assertChargesHaveFinanceObligations($charges, $dngFeeType);
             }
 
-            // Wave-3 tuition_term + wave-5 egc_level_fee: HP may mix those with
-            // course_fee. Guard cut-over types; course_fee stays free until wave 6.
+            // Wave-3 tuition_term + wave-5 egc_level_fee: HP reverse map is only
+            // active cut-over types (course_fee formally retired, wave 6).
             if ($dngFeeType === 'HP') {
-                $this->assertHpCutoverChargesHaveFinanceObligations($charges);
+                $this->assertChargesHaveFinanceObligations($charges, 'HP');
             }
 
             // Installment-aware total: for each charge, take its next PENDING installment.
@@ -376,15 +376,13 @@ class CreateBatchDngFromChargesAction
 
     /**
      * Fail fast when any payable selected for DNG push has no accepted FinanceObligation.
-     * Used for cut-over types (BHYT, tuition_term) so DNG cannot collect orphan or voided-obligation charges.
+     * Used for cut-over types (BHYT, HP) so DNG cannot collect orphan or voided-obligation charges.
      *
      * @param  Collection<int, object{id: int, amount: float, balance: float, finance_obligation_id?: int|null}>  $charges
-     * @param  array<int, string>|null  $onlyChargeTypes  When set, only these charge_types are checked.
      */
     private function assertChargesHaveFinanceObligations(
         Collection $charges,
         string $dngFeeType,
-        ?array $onlyChargeTypes = null,
     ): void {
         $chargeIds = $charges->pluck('id')->map(fn ($id) => (int) $id)->all();
 
@@ -392,14 +390,8 @@ class CreateBatchDngFromChargesAction
             return;
         }
 
-        $query = FinanceCharge::query()
-            ->whereIn('id', $chargeIds);
-
-        if ($onlyChargeTypes !== null) {
-            $query->whereIn('charge_type', $onlyChargeTypes);
-        }
-
-        $invalidIds = $query
+        $invalidIds = FinanceCharge::query()
+            ->whereIn('id', $chargeIds)
             ->where(function ($inner): void {
                 $inner->whereNull('finance_obligation_id')
                     ->orWhereDoesntHave('financeObligation', function ($obligationQuery): void {
@@ -424,24 +416,6 @@ class CreateBatchDngFromChargesAction
             'missing_finance_obligation: '.$dngFeeType.' charge(s) #'
             .implode(', #', $invalidIds)
             .' have no accepted Finance obligation. '.$repairHint
-        );
-    }
-
-    /**
-     * Wave-3 + wave-5: among HP payables, tuition_term and egc_level_fee require
-     * an accepted obligation. course_fee remains ungated until its wave.
-     *
-     * @param  Collection<int, object{id: int, amount: float, balance: float}>  $charges
-     */
-    private function assertHpCutoverChargesHaveFinanceObligations(Collection $charges): void
-    {
-        $this->assertChargesHaveFinanceObligations(
-            $charges,
-            'HP',
-            [
-                FinanceCharge::TYPE_TUITION_TERM,
-                FinanceCharge::TYPE_EGC_LEVEL_FEE,
-            ],
         );
     }
 

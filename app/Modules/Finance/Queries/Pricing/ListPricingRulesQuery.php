@@ -41,6 +41,12 @@ class ListPricingRulesQuery
         $options = [];
 
         foreach (ObligationTypeRegistry::all() as $definition) {
+            // Retired types stay in the registry for historical enum/read-model
+            // parity but are not offered for new pricing rules.
+            if ($definition->isRetired()) {
+                continue;
+            }
+
             $options[] = [
                 'value' => $definition->type,
                 'label' => $definition->label,

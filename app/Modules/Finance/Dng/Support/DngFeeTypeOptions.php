@@ -51,7 +51,7 @@ final class DngFeeTypeOptions
     public static function all(): array
     {
         return [
-            ['value' => 'HP',   'label' => 'HP: Học phí (tuition, EGC, course)'],
+            ['value' => 'HP',   'label' => 'HP: Học phí (tuition, EGC)'],
             ['value' => 'BHYT', 'label' => 'BHYT: Bảo hiểm y tế'],
             ['value' => 'HL',   'label' => 'HL: Học lại'],
             ['value' => 'PRE',  'label' => 'PRE: Lệ phí xét tuyển'],

@@ -258,14 +258,14 @@ it('HP fee_type: pushes DNG only from existing obligation-linked tuition payable
         ->and(DngPaymentRequest::where('student_id', $student->id)->where('fee_type', 'HP')->count())->toBe(1);
 });
 
-it('HP fee_type: still allows course_fee-only payables missing obligations (wave-6 scope)', function (): void {
+it('HP fee_type: ignores retired course_fee payables (no free-pass, not in reverse map)', function (): void {
     $student = makeTuitionStudent($this->campus, $this->semester, 'TUI3003');
     $courseFee = FinanceCharge::query()->create([
         'student_id' => $student->id,
         'semester_id' => $this->semester->id,
         'charge_type' => FinanceCharge::TYPE_COURSE_FEE,
         'amount' => 2_000_000,
-        'description' => 'Course fee',
+        'description' => 'Course fee (retired type fixture)',
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
         'created_by_user_id' => $this->user->id,
@@ -283,10 +283,13 @@ it('HP fee_type: still allows course_fee-only payables missing obligations (wave
         'amount_overrides' => null,
     ]);
 
-    expect($result['created'])->toBe(1)
-        ->and($result['failed'])->toBe(0)
+    // course_fee is formally retired: excluded from HP reverse map, so batch
+    // finds no HP payables and does not free-pass orphan course_fee rows.
+    expect($result['created'])->toBe(0)
+        ->and($result['failed'])->toBe(1)
+        ->and($result['errors'][0])->toContain('Không tìm thấy khoản phí')
         ->and($courseFee->fresh()->finance_obligation_id)->toBeNull()
-        ->and(DngPaymentRequest::where('student_id', $student->id)->where('fee_type', 'HP')->count())->toBe(1);
+        ->and(DngPaymentRequest::where('student_id', $student->id)->where('fee_type', 'HP')->count())->toBe(0);
 });
 
 it('HP fee_type: fails with no payables when student has no HP charges (no auto-create)', function (): void {

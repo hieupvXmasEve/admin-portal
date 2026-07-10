@@ -46,7 +46,8 @@ it('keeps DngFeeTypeOptions::fromChargeType identical to known auto-map codes', 
     $expected = [
         FinanceCharge::TYPE_TUITION_TERM => 'HP',
         FinanceCharge::TYPE_EGC_LEVEL_FEE => 'HP',
-        FinanceCharge::TYPE_COURSE_FEE => 'HP',
+        // course_fee formally retired (wave 6) — no active DNG auto-map.
+        FinanceCharge::TYPE_COURSE_FEE => 'KHAC',
         FinanceCharge::TYPE_RETAKE_FEE => 'HL',
         FinanceCharge::TYPE_EXAM_RESIT_FEE => 'PTL',
         FinanceCharge::TYPE_BHYT => 'BHYT',
@@ -65,12 +66,27 @@ it('keeps DngFeeTypeOptions::fromChargeType identical to known auto-map codes', 
     }
 });
 
+it('marks course_fee as formally retired and excludes it from active DNG reverse maps', function () {
+    $definition = ObligationTypeRegistry::get(FinanceCharge::TYPE_COURSE_FEE);
+
+    expect($definition->isRetired())->toBeTrue()
+        ->and($definition->dngCollectionCode)->toBeNull()
+        ->and($definition->allowedSourceKinds)->toBe([])
+        ->and($definition->isTrackedByFeeMonitor())->toBeFalse()
+        ->and(ObligationTypeRegistry::chargeTypesForDngCollectionCode('HP'))
+        ->not->toContain(FinanceCharge::TYPE_COURSE_FEE)
+        ->and(ObligationTypeRegistry::chargeTypesForDngCollectionCode('HP'))
+        ->toEqualCanonicalizing([
+            FinanceCharge::TYPE_TUITION_TERM,
+            FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        ]);
+});
+
 it('derives reverse DNG fee-type map with the same charge types as before', function () {
     expect(ObligationTypeRegistry::chargeTypesForDngCollectionCode('HP'))
         ->toEqualCanonicalizing([
             FinanceCharge::TYPE_TUITION_TERM,
             FinanceCharge::TYPE_EGC_LEVEL_FEE,
-            FinanceCharge::TYPE_COURSE_FEE,
         ])
         ->and(ObligationTypeRegistry::chargeTypesForDngCollectionCode('HL'))
         ->toBe([FinanceCharge::TYPE_RETAKE_FEE])

@@ -25,4 +25,10 @@ enum CancellationPolicy: string
 
     /** Explicitly not cancelled as a standalone type (audit/split later). */
     case AuditPending = 'audit_pending';
+
+    /**
+     * Formally retired type: no new generation, no active DNG reverse-map.
+     * Historical enum/CHECK value may remain until wave-7 cleanup.
+     */
+    case Retired = 'retired';
 }

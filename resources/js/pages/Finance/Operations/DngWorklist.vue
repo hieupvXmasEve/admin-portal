@@ -305,7 +305,7 @@ const chargeTypeLabel = (ct: string): string => {
     const map: Record<string, string> = {
         tuition_term: 'Học phí',
         egc_level_fee: 'EGC Level Fee',
-        course_fee: 'Course Fee',
+        course_fee: 'Course Fee (đã ngừng)',
         retake_fee: 'Phí học lại',
         exam_resit_fee: 'Phí thi lại',
         manual_fee: 'Phí thủ công',

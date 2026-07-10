@@ -55,6 +55,7 @@ class FinanceCharge extends Model
 
     public const TYPE_EXAM_RESIT_FEE = 'exam_resit_fee';
 
+    /** Formally retired (wave 6 audit). Kept for DB enum/CHECK parity only. */
     public const TYPE_COURSE_FEE = 'course_fee';
 
     public const TYPE_MANUAL_FEE = 'manual_fee';

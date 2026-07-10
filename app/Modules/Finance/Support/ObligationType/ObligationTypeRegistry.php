@@ -108,6 +108,7 @@ final class ObligationTypeRegistry
     /**
      * Reverse of dngCollectionCodeFor for debit charge types that auto-map to a code.
      * Manual-only DNG codes (PRE, THHB, F1, GC) have no reverse charge-type set.
+     * Retired types are excluded so worklist / batch DNG never target them.
      *
      * @return list<string>
      */
@@ -116,7 +117,11 @@ final class ObligationTypeRegistry
         $types = [];
 
         foreach (self::all() as $definition) {
-            if ($definition->dngCollectionCode === $dngFeeType && $definition->isDebit()) {
+            if (
+                $definition->dngCollectionCode === $dngFeeType
+                && $definition->isDebit()
+                && ! $definition->isRetired()
+            ) {
                 $types[] = $definition->type;
             }
         }
@@ -227,16 +232,21 @@ final class ObligationTypeRegistry
                 feeMonitorMandatory: true,
                 feeMonitorMissingInference: true,
             ),
+            // Wave 6 audit: formally retired — zero generators, zero rows on sample,
+            // not on manual create form. Historical enum/CHECK kept until wave 7.
+            // allowedSourceKinds empty: no intake source kind may mint this type.
             new ObligationTypeDefinition(
                 type: FinanceCharge::TYPE_COURSE_FEE,
                 financialEffect: FinancialEffect::Debit,
-                allowedSourceKinds: ['legacy_course_fee'],
+                allowedSourceKinds: [],
                 pricingStrategy: PricingStrategy::GeneratorAmount,
-                dngCollectionCode: 'HP',
+                // No active DNG reverse-map; fromChargeType falls to KHAC.
+                dngCollectionCode: null,
                 supportsInstallments: false,
-                cancellationPolicy: CancellationPolicy::AuditPending,
+                cancellationPolicy: CancellationPolicy::Retired,
                 permission: null,
-                label: 'Phí môn học',
+                label: 'Phí môn học (đã ngừng)',
+                retired: true,
             ),
             new ObligationTypeDefinition(
                 type: FinanceCharge::TYPE_BHYT,

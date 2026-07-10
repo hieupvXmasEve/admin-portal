@@ -102,7 +102,7 @@ export const CHARGE_TYPE_LABELS: Record<ChargeType, string> = {
     egc_level_fee: 'Phí EGC (EGC Level Fee)',
     retake_fee: 'Phí học lại môn (Course Retake)',
     exam_resit_fee: 'Phí thi lại (Exam Resit)',
-    course_fee: 'Phí môn học (Course Fee)',
+    course_fee: 'Phí môn học (Course Fee, đã ngừng)',
     manual_fee: 'Phí thủ công (Manual Fee)',
     admission_fee: 'Lệ phí xét tuyển (Admission Fee)',
     defer_credit: 'Hoàn phí bảo lưu (Defer Credit)',

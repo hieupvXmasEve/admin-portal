@@ -181,11 +181,12 @@ it('excludes voided charges', function () {
     expect($result['students']->total())->toBe(0);
 });
 
-it('maps fee_type HP to tuition_term, egc_level_fee, course_fee', function () {
+it('maps fee_type HP to tuition_term and egc_level_fee only (course_fee retired)', function () {
     $s = makeWorklistStudent('HP-MAP', $this->campus, $this->semester);
 
     makeActiveCharge($s, $this->semester, FinanceCharge::TYPE_TUITION_TERM, 1_000_000);
     makeActiveCharge($s, $this->semester, FinanceCharge::TYPE_EGC_LEVEL_FEE, 2_000_000);
+    // Formally retired — must not appear under HP worklist.
     makeActiveCharge($s, $this->semester, FinanceCharge::TYPE_COURSE_FEE, 3_000_000);
 
     // retake_fee should NOT be included under HP
@@ -194,8 +195,8 @@ it('maps fee_type HP to tuition_term, egc_level_fee, course_fee', function () {
     $result = runWorklist(['dng_fee_type' => 'HP']);
     $row = collect($result['students']->items())->first();
 
-    expect($row['charge_count'])->toBe(3)
-        ->and($row['balance'])->toBe(6_000_000.0);
+    expect($row['charge_count'])->toBe(2)
+        ->and($row['balance'])->toBe(3_000_000.0);
 });
 
 it('maps fee_type HL to retake_fee only', function () {
