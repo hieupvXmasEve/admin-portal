@@ -305,7 +305,7 @@ final class ObligationTypeRegistry
             new ObligationTypeDefinition(
                 type: FinanceCharge::TYPE_EGC_EXEMPT_CREDIT,
                 financialEffect: FinancialEffect::Credit,
-                allowedSourceKinds: ['egc_exemption', 'egc_major_entry_credit'],
+                allowedSourceKinds: ['egc_exemption', 'egc_major_entry_credit', 'legacy_egc_exempt_credit'],
                 pricingStrategy: PricingStrategy::PolicyComputed,
                 dngCollectionCode: null,
                 supportsInstallments: false,
@@ -344,7 +344,7 @@ final class ObligationTypeRegistry
             new ObligationTypeDefinition(
                 type: self::TYPE_EGC_RETAKE,
                 financialEffect: FinancialEffect::Discount,
-                allowedSourceKinds: ['egc_retake_adjustment'],
+                allowedSourceKinds: ['egc_retake_adjustment', 'legacy_egc_retake'],
                 pricingStrategy: PricingStrategy::PolicyComputed,
                 dngCollectionCode: null,
                 supportsInstallments: false,

@@ -6,6 +6,7 @@ use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Finance\Actions\BackfillLegacyEgcLevelFeeObligationsAction;
 use App\Modules\Finance\Actions\CancelDngPaymentRequestAction;
 use App\Modules\Finance\Actions\CreateBatchDngFromChargesAction;
 use App\Modules\Finance\Actions\Egc\ApplyEgcRetakeDiscountAction;
@@ -299,6 +300,13 @@ it('converts legacy egc_exempt_credit negative rows with unchanged remaining set
 
     expect(FinanceCreditEntitlement::query()->count())->toBe(1)
         ->and(CreditApplication::query()->count())->toBe(1);
+
+    // Debit hard-gate must still pass after credit conversion (credits reduce outstanding).
+    $debitSummary = app(BackfillLegacyEgcLevelFeeObligationsAction::class)->run(false);
+
+    expect($debitSummary['mismatches'])->toBe(0)
+        ->and($debitSummary['created'])->toBe(1)
+        ->and($debit->fresh()->finance_obligation_id)->not->toBeNull();
 });
 
 // ─── Retake discount conversion ─────────────────────────────────────────────

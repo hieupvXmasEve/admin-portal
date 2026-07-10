@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Actions;
 
 use App\Modules\Finance\Actions\Egc\SubmitEgcLevelFeeDebitAction;
+use App\Modules\Finance\Models\CreditApplication;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
@@ -359,7 +360,8 @@ class BackfillLegacyEgcLevelFeeObligationsAction
 
         $paid = $this->settlementService->getChargePaidAmount((int) $charge->id);
         $discount = $this->settlementService->getChargeDiscountAmount((int) $charge->id);
-        $lineOutstanding = max(0.0, $linePayable - $discount - $paid);
+        $credit = $this->chargeCreditAmount((int) $charge->id);
+        $lineOutstanding = max(0.0, $linePayable - $discount - $paid - $credit);
 
         if ($this->amountsDiffer($oldBalance, $lineOutstanding)) {
             $summary['mismatches']++;
@@ -385,6 +387,11 @@ class BackfillLegacyEgcLevelFeeObligationsAction
         );
     }
 
+    /**
+     * Pre-conversion / charge-scoped balance: amount − paid − discount − credit.
+     * Credit applications are included so re-running after exempt-credit
+     * entitlement conversion still hard-gates cleanly (ADR-0030).
+     */
     private function oldComputedBalance(FinanceCharge $charge): float
     {
         if ((float) $charge->amount <= 0) {
@@ -393,8 +400,24 @@ class BackfillLegacyEgcLevelFeeObligationsAction
 
         $paid = $this->settlementService->getChargePaidAmount((int) $charge->id);
         $discount = $this->settlementService->getChargeDiscountAmount((int) $charge->id);
+        $credit = $this->chargeCreditAmount((int) $charge->id);
 
-        return max(0.0, (float) $charge->amount - $paid - $discount);
+        return max(0.0, (float) $charge->amount - $paid - $discount - $credit);
+    }
+
+    private function chargeCreditAmount(int $chargeId): float
+    {
+        $lineIds = InvoiceLine::query()
+            ->where('charge_id', $chargeId)
+            ->pluck('id');
+
+        if ($lineIds->isEmpty()) {
+            return 0.0;
+        }
+
+        return max(0.0, (float) CreditApplication::query()
+            ->whereIn('invoice_line_id', $lineIds)
+            ->sum('amount'));
     }
 
     /**
