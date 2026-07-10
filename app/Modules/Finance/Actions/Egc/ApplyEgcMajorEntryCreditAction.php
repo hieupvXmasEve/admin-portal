@@ -6,19 +6,32 @@ namespace App\Modules\Finance\Actions\Egc;
 
 use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
-use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\FinanceCreditEntitlement;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
+use App\Shared\Contracts\Finance\Enums\FinancialEffect;
+use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
+/**
+ * Apply -15M EGC early major-entry credit via FinanceCreditEntitlement + credit applications.
+ * Never writes a negative FinanceCharge (ADR-0030 / wave 5).
+ */
 class ApplyEgcMajorEntryCreditAction
 {
-    public const CREDIT_AMOUNT = -15_000_000;
+    /** Absolute credit amount in VND (positive). */
+    public const CREDIT_AMOUNT = 15_000_000;
+
+    public const SOURCE_SYSTEM = 'finance';
+
+    public const SOURCE_KIND = 'egc_major_entry_credit';
 
     /**
-     * Apply -15M EGC exempt credit to a transitioned student's invoice.
+     * Apply EGC exempt credit to a transitioned student's invoice.
      */
-    public static function run(int $studentId, int $semesterId): FinanceCharge
+    public static function run(int $studentId, int $semesterId): FinanceCreditEntitlement
     {
         return DB::transaction(function () use ($studentId, $semesterId) {
             $student = Student::findOrFail($studentId);
@@ -41,41 +54,68 @@ class ApplyEgcMajorEntryCreditAction
                 ]);
             }
 
-            // Guard: double-apply check
-            $existing = FinanceCharge::where('student_id', $studentId)
-                ->where('semester_id', $semesterId)
-                ->where('charge_type', FinanceCharge::TYPE_EGC_EXEMPT_CREDIT)
-                ->where('status', FinanceCharge::STATUS_ACTIVE)
+            // Guard: double-apply — entitlement path or legacy negative charge
+            $existingEntitlement = FinanceCreditEntitlement::query()
+                ->where('source_system', self::SOURCE_SYSTEM)
+                ->where('source_kind', self::SOURCE_KIND)
+                ->where('source_ref', self::mintSourceRef($studentId, $semesterId))
+                ->where('entitlement_type', FinanceCharge::TYPE_EGC_EXEMPT_CREDIT)
                 ->first();
 
-            if ($existing) {
+            if ($existingEntitlement instanceof FinanceCreditEntitlement) {
                 throw ValidationException::withMessages([
                     'student_id' => ['An EGC exempt credit has already been applied for this student and semester.'],
                 ]);
             }
 
-            // Create the credit charge
-            $charge = FinanceCharge::create([
-                'student_id' => $studentId,
-                'semester_id' => $semesterId,
-                'charge_type' => FinanceCharge::TYPE_EGC_EXEMPT_CREDIT,
-                'amount' => self::CREDIT_AMOUNT,
-                'description' => 'EGC Early Major Entry Credit',
-                'effective_at' => now(),
-                'status' => FinanceCharge::STATUS_ACTIVE,
-                'created_by_user_id' => auth()->id(),
-            ]);
+            $existingLegacyCharge = FinanceCharge::where('student_id', $studentId)
+                ->where('semester_id', $semesterId)
+                ->where('charge_type', FinanceCharge::TYPE_EGC_EXEMPT_CREDIT)
+                ->where('status', FinanceCharge::STATUS_ACTIVE)
+                ->first();
 
-            // Assign to invoice line
-            InvoiceLine::updateOrCreate(
-                ['invoice_id' => $invoice->id, 'charge_id' => $charge->id],
-                ['amount_snapshot' => $charge->amount, 'description_snapshot' => $charge->description]
-            );
+            if ($existingLegacyCharge) {
+                throw ValidationException::withMessages([
+                    'student_id' => ['An EGC exempt credit has already been applied for this student and semester.'],
+                ]);
+            }
 
-            // Recalculate invoice totals
+            $result = app(FinanceIntakeContract::class)->requestCredit(new FinanceIntakeData(
+                source_system: self::SOURCE_SYSTEM,
+                source_kind: self::SOURCE_KIND,
+                source_ref: self::mintSourceRef($studentId, $semesterId),
+                financial_effect: FinancialEffect::Credit,
+                obligation_type: FinanceCharge::TYPE_EGC_EXEMPT_CREDIT,
+                facts: [
+                    'student_id' => $studentId,
+                    'semester_id' => $semesterId,
+                    'amount' => self::CREDIT_AMOUNT,
+                    'invoice_id' => (int) $invoice->id,
+                    'description' => 'EGC Early Major Entry Credit',
+                ],
+            ));
+
+            if ($result->finance_credit_entitlement_id === null) {
+                throw new RuntimeException('EGC major-entry credit intake did not materialize a FinanceCreditEntitlement.');
+            }
+
+            if ($result->credit_application_ids === []) {
+                throw ValidationException::withMessages([
+                    'semester_id' => ['No billable invoice lines with remaining capacity were found for this student and semester. Cannot apply EGC exempt credit.'],
+                ]);
+            }
+
+            $entitlement = FinanceCreditEntitlement::query()
+                ->findOrFail($result->finance_credit_entitlement_id);
+
             $invoice->recalculateTotals();
 
-            return $charge;
+            return $entitlement;
         });
+    }
+
+    public static function mintSourceRef(int $studentId, int $semesterId): string
+    {
+        return "egc_exempt_credit:student:{$studentId}:semester:{$semesterId}";
     }
 }

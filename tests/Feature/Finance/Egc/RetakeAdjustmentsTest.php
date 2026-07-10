@@ -9,7 +9,11 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Actions\Egc\ApplyEgcMajorEntryCreditAction;
 use App\Modules\Finance\Actions\Egc\ApplyEgcRetakeDiscountAction;
+use App\Modules\Finance\Models\CreditApplication;
+use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceCreditEntitlement;
+use App\Modules\Finance\Models\FinanceDiscountEntitlement;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
@@ -102,8 +106,12 @@ it('applies retake discount to current-semester charge', function () {
 
     expect($discount->amount)->toBe('7500000.00');
     expect($discount->discount_type)->toBe('egc_retake');
+    expect($discount->finance_discount_entitlement_id)->not->toBeNull();
     expect($block->fresh()->retake_discount_id)->toBe($discount->id);
     expect(EgcRetakeDiscountLink::where('target_finance_charge_id', $targetCharge->id)->exists())->toBeTrue();
+    expect(FinanceDiscountEntitlement::query()->whereKey($discount->finance_discount_entitlement_id)->exists())->toBeTrue();
+    expect(DiscountAllocation::query()->where('invoice_discount_id', $discount->id)->count())->toBe(1);
+    expect(CreditApplication::query()->count())->toBe(0);
 });
 
 it('lists only later block charges as retake targets', function () {
@@ -353,10 +361,40 @@ it('applies major entry credit to transitioned student', function () {
         'due_date' => now()->addDays(30),
     ]);
 
-    $charge = ApplyEgcMajorEntryCreditAction::run($student->id, $semester->id);
+    // Positive EGC debit so the credit application has capacity.
+    $debit = FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'amount' => 15_000_000,
+        'description' => 'EGC Level 1 Fee',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    InvoiceLine::create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $debit->id,
+        'amount_snapshot' => $debit->amount,
+        'description_snapshot' => $debit->description,
+        'status' => 'active',
+    ]);
 
-    expect($charge->charge_type)->toBe(FinanceCharge::TYPE_EGC_EXEMPT_CREDIT);
-    expect((int) $charge->amount)->toBe(-15_000_000);
+    $entitlement = ApplyEgcMajorEntryCreditAction::run($student->id, $semester->id);
+
+    expect($entitlement)->toBeInstanceOf(FinanceCreditEntitlement::class)
+        ->and($entitlement->entitlement_type)->toBe(FinanceCharge::TYPE_EGC_EXEMPT_CREDIT)
+        ->and((float) $entitlement->amount)->toBe(15_000_000.0)
+        ->and(CreditApplication::query()->where('finance_credit_entitlement_id', $entitlement->id)->count())->toBe(1)
+        ->and(
+            FinanceCharge::query()
+                ->where('charge_type', FinanceCharge::TYPE_EGC_EXEMPT_CREDIT)
+                ->count()
+        )->toBe(0)
+        ->and(
+            FinanceCharge::query()
+                ->where('amount', '<', 0)
+                ->count()
+        )->toBe(0);
 });
 
 it('blocks major entry credit for active EGC students', function () {
@@ -371,12 +409,29 @@ it('prevents double-apply of major entry credit', function () {
     $semester = Semester::factory()->create();
     $student = makeRetakeStudent(['status' => 'intake_major']);
 
-    StudentInvoice::create([
+    $invoice = StudentInvoice::create([
         'invoice_number' => 'TEST-'.rand(1000, 9999),
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'status' => 'draft',
         'due_date' => now()->addDays(30),
+    ]);
+
+    $debit = FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'amount' => 15_000_000,
+        'description' => 'EGC Level 1 Fee',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    InvoiceLine::create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $debit->id,
+        'amount_snapshot' => $debit->amount,
+        'description_snapshot' => $debit->description,
+        'status' => 'active',
     ]);
 
     ApplyEgcMajorEntryCreditAction::run($student->id, $semester->id);

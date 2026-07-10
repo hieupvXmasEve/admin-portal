@@ -159,23 +159,144 @@ class RequestFinanceDiscountAction
             ? $intake->facts['description']
             : $discountType;
 
-        $discount = $this->settlementService->createOrRefreshInvoiceDiscount(
-            invoice: $invoice,
-            discountType: $discountType,
-            amount: (float) $entitlement->amount,
-            discountSource: $intake->source_kind,
-            description: $description,
-            referenceId: $referenceId,
-            approvedBy: auth()->id(),
-        );
+        $discountSource = isset($intake->facts['discount_source']) && is_string($intake->facts['discount_source'])
+            ? $intake->facts['discount_source']
+            : $intake->source_kind;
 
-        $discount->forceFill([
-            'finance_discount_entitlement_id' => $entitlement->id,
-        ])->save();
+        $targetLine = $this->resolveTargetLine($entitlement, $intake, $invoice);
+
+        if ($targetLine instanceof InvoiceLine) {
+            $discount = $this->createTargetedLineDiscount(
+                invoice: $invoice,
+                line: $targetLine,
+                entitlement: $entitlement,
+                discountType: $discountType,
+                discountSource: $discountSource,
+                description: $description,
+                referenceId: $referenceId,
+                allocationRule: $this->allocationRuleForEntitlement($entitlement->entitlement_type, $intake),
+            );
+        } else {
+            $discount = $this->settlementService->createOrRefreshInvoiceDiscount(
+                invoice: $invoice,
+                discountType: $discountType,
+                amount: (float) $entitlement->amount,
+                discountSource: $discountSource,
+                description: $description,
+                referenceId: $referenceId,
+                approvedBy: auth()->id(),
+            );
+
+            $discount->forceFill([
+                'finance_discount_entitlement_id' => $entitlement->id,
+            ])->save();
+        }
 
         $this->refreshAllocationStatus($entitlement);
 
         return [(int) $discount->id];
+    }
+
+    private function resolveTargetLine(
+        FinanceDiscountEntitlement $entitlement,
+        FinanceIntakeData $intake,
+        StudentInvoice $invoice,
+    ): ?InvoiceLine {
+        if (! isset($intake->facts['invoice_line_id']) || ! is_numeric($intake->facts['invoice_line_id'])) {
+            return null;
+        }
+
+        $studentId = $this->resolveStudentId($entitlement, $intake);
+
+        $line = InvoiceLine::query()
+            ->with(['invoice', 'charge'])
+            ->whereKey((int) $intake->facts['invoice_line_id'])
+            ->where('invoice_id', $invoice->id)
+            ->where('status', 'active')
+            ->where('amount_snapshot', '>', 0)
+            ->whereHas('invoice', function ($query) use ($studentId): void {
+                $query->where('student_id', $studentId)
+                    ->whereNotIn('status', ['cancelled', 'void']);
+            })
+            ->first();
+
+        if (! $line instanceof InvoiceLine) {
+            throw InvalidFinanceIntakePayload::invalidFact(
+                'invoice_line_id',
+                'must be an active line on the target invoice for the entitlement student'
+            );
+        }
+
+        return $line;
+    }
+
+    private function createTargetedLineDiscount(
+        StudentInvoice $invoice,
+        InvoiceLine $line,
+        FinanceDiscountEntitlement $entitlement,
+        string $discountType,
+        string $discountSource,
+        string $description,
+        ?int $referenceId,
+        string $allocationRule,
+    ): InvoiceDiscount {
+        if ((int) $line->invoice_id !== (int) $invoice->id) {
+            throw InvalidFinanceIntakePayload::invalidFact(
+                'invoice_line_id',
+                'must belong to the target invoice'
+            );
+        }
+
+        $amount = (float) $entitlement->amount;
+
+        $lineCapacity = max(
+            0.0,
+            (float) $line->amount_snapshot - $this->settlementService->getLineDiscountAmount($line)
+        );
+        $allocateAmount = min($amount, $lineCapacity);
+
+        if ($allocateAmount <= 0) {
+            throw InvalidFinanceIntakePayload::invalidFact(
+                'invoice_line_id',
+                'has no remaining discount capacity'
+            );
+        }
+
+        $discount = InvoiceDiscount::query()->create([
+            'invoice_id' => $invoice->id,
+            'discount_type' => $discountType,
+            'discount_source' => $discountSource,
+            'description' => $description,
+            'amount' => $amount,
+            'status' => 'active',
+            'reference_id' => $referenceId,
+            'approved_by' => auth()->id(),
+            'finance_discount_entitlement_id' => $entitlement->id,
+        ]);
+
+        DiscountAllocation::query()->create([
+            'invoice_discount_id' => $discount->id,
+            'invoice_line_id' => $line->id,
+            'amount' => $allocateAmount,
+            'entry_type' => 'allocation',
+            'allocation_rule' => $allocationRule,
+        ]);
+
+        $this->settlementService->recalculateInvoiceSnapshot($invoice);
+
+        return $discount;
+    }
+
+    private function allocationRuleForEntitlement(string $entitlementType, FinanceIntakeData $intake): string
+    {
+        if (isset($intake->facts['allocation_rule']) && is_string($intake->facts['allocation_rule']) && $intake->facts['allocation_rule'] !== '') {
+            return $intake->facts['allocation_rule'];
+        }
+
+        return match ($entitlementType) {
+            ObligationTypeRegistry::TYPE_EGC_RETAKE => 'egc_retake_target',
+            default => 'current_line_chronology',
+        };
     }
 
     private function resolveTargetInvoice(
@@ -218,14 +339,13 @@ class RequestFinanceDiscountAction
 
     private function discountTypeForEntitlement(string $entitlementType): string
     {
-        // Wave 4 voucher cutover only. Other discount types (egc_retake) wire in their wave.
-        if ($entitlementType !== FinanceCharge::TYPE_VOUCHER_CREDIT) {
-            throw new RuntimeException(
+        return match ($entitlementType) {
+            FinanceCharge::TYPE_VOUCHER_CREDIT => 'voucher',
+            ObligationTypeRegistry::TYPE_EGC_RETAKE => 'egc_retake',
+            default => throw new RuntimeException(
                 "Discount intake for entitlement type [{$entitlementType}] is not supported yet."
-            );
-        }
-
-        return 'voucher';
+            ),
+        };
     }
 
     private function refreshAllocationStatus(FinanceDiscountEntitlement $entitlement): void

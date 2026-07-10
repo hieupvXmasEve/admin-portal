@@ -6,22 +6,34 @@ namespace App\Modules\Finance\Actions\Egc;
 
 use App\Models\EgcBlock;
 use App\Models\EgcRetakeDiscountLink;
-use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\EgcRetakeTargetResolver;
+use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
+use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
+use App\Shared\Contracts\Finance\Enums\FinancialEffect;
+use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
+/**
+ * Apply a 50% EGC retake discount via FinanceDiscountEntitlement + discount allocations.
+ * Never writes a negative FinanceCharge or credit application (ADR-0030 / wave 5).
+ */
 class ApplyEgcRetakeDiscountAction
 {
     public const DISCOUNT_TYPE = 'egc_retake';
 
     public const DISCOUNT_AMOUNT = 7_500_000;
+
+    public const SOURCE_SYSTEM = 'finance';
+
+    public const SOURCE_KIND = 'egc_retake_adjustment';
 
     /**
      * Apply a 50% retake discount to the target EGC charge.
@@ -86,26 +98,40 @@ class ApplyEgcRetakeDiscountAction
 
             $invoice = StudentInvoice::findOrFail($invoiceLine->invoice_id);
 
-            // Create InvoiceDiscount on the target invoice
-            $discount = InvoiceDiscount::create([
-                'invoice_id' => $invoice->id,
-                'discount_type' => self::DISCOUNT_TYPE,
-                'discount_source' => EgcBlock::class,
-                'description' => "EGC Retake Discount — Block #{$block->block_number} Level {$block->level_number}",
-                'amount' => self::DISCOUNT_AMOUNT,
-                'status' => 'active',
-                'reference_id' => $block->id,
-                'approved_by' => auth()->id(),
-            ]);
+            $result = app(FinanceIntakeContract::class)->requestDiscount(new FinanceIntakeData(
+                source_system: self::SOURCE_SYSTEM,
+                source_kind: self::SOURCE_KIND,
+                source_ref: self::mintSourceRef((int) $block->id),
+                financial_effect: FinancialEffect::Discount,
+                obligation_type: ObligationTypeRegistry::TYPE_EGC_RETAKE,
+                facts: [
+                    'student_id' => (int) $targetCharge->student_id,
+                    'semester_id' => (int) $targetCharge->semester_id,
+                    'amount' => self::DISCOUNT_AMOUNT,
+                    'invoice_id' => (int) $invoice->id,
+                    'invoice_line_id' => (int) $invoiceLine->id,
+                    'reference_id' => (int) $block->id,
+                    'discount_source' => EgcBlock::class,
+                    'allocation_rule' => 'egc_retake_target',
+                    'description' => "EGC Retake Discount — Block #{$block->block_number} Level {$block->level_number}",
+                    'egc_block_id' => (int) $block->id,
+                    'target_charge_id' => (int) $targetCharge->id,
+                ],
+            ));
 
-            // Create DiscountAllocation to the specific invoice line
-            DiscountAllocation::create([
-                'invoice_discount_id' => $discount->id,
-                'invoice_line_id' => $invoiceLine->id,
-                'amount' => self::DISCOUNT_AMOUNT,
-                'entry_type' => 'allocation',
-                'allocation_rule' => 'egc_retake_target',
-            ]);
+            $discountId = $result->invoice_discount_ids[0] ?? null;
+
+            if ($discountId === null) {
+                throw new RuntimeException('EGC retake discount intake did not materialize an invoice discount.');
+            }
+
+            $discount = InvoiceDiscount::query()->findOrFail($discountId);
+
+            if ($discount->finance_discount_entitlement_id === null
+                || (int) $discount->finance_discount_entitlement_id !== (int) $result->finance_discount_entitlement_id
+            ) {
+                throw new RuntimeException('EGC retake discount is not linked to a FinanceDiscountEntitlement.');
+            }
 
             // Create audit link (DB-level guard against double discount on same charge)
             try {
@@ -135,6 +161,11 @@ class ApplyEgcRetakeDiscountAction
 
             return $discount;
         });
+    }
+
+    public static function mintSourceRef(int $egcBlockId): string
+    {
+        return "egc_retake:block:{$egcBlockId}";
     }
 
     private static function isValidTargetCharge(EgcBlock $sourceBlock, FinanceCharge $targetCharge): bool
