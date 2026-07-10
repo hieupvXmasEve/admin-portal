@@ -292,8 +292,11 @@ final class ObligationTypeRegistry
             new ObligationTypeDefinition(
                 type: FinanceCharge::TYPE_ADJUSTMENT,
                 financialEffect: FinancialEffect::Debit,
-                // defer_forfeit: FORFEIT settlement mints a positive debit via intake (wave 7).
-                allowedSourceKinds: ['manual_adjustment', 'settlement_correction', 'defer_forfeit'],
+                // Wave 6 issue 03 — adjustment 3-way split on new writes:
+                // positive debit only. settlement_correction is ledger reallocation
+                // (never a charge row). Negative credits use FinanceCreditEntitlement.
+                // defer_forfeit: FORFEIT settlement mints a positive debit via intake.
+                allowedSourceKinds: ['manual_adjustment', 'defer_forfeit'],
                 pricingStrategy: PricingStrategy::StaffSupplied,
                 dngCollectionCode: 'KHAC',
                 supportsInstallments: false,

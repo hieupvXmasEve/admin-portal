@@ -10,13 +10,18 @@ import { useStudentSearch } from '@/composables';
 import { type ChargeType, type Semester, type StudentBasic } from '@/types/finance';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, Search } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
-
+interface AdjustmentIntentOption {
+    value: string;
+    label: string;
+    creates_charge: boolean;
+}
 
 interface Props {
     chargeTypes: { value: string; label: string }[];
+    adjustmentIntents?: AdjustmentIntentOption[];
     semesters: Semester[];
     student?: StudentBasic;
 }
@@ -26,11 +31,34 @@ const props = defineProps<Props>();
 const form = useForm({
     student_id: props.student?.id ?? null,
     charge_type: '' as ChargeType | '',
+    adjustment_intent: '' as string,
     description: '',
     amount: null as number | null,
     semester_id: null as number | null,
     due_date: '',
 });
+
+const isAdjustment = computed(() => form.charge_type === 'adjustment');
+const selectedAdjustmentIntent = computed(() =>
+    (props.adjustmentIntents ?? []).find((intent) => intent.value === form.adjustment_intent) ?? null,
+);
+/** Adjustment requires a declared intent; non-charge intents still submit so server returns the clear rejection message. */
+const canSubmitAdjustment = computed(() => {
+    if (!isAdjustment.value) {
+        return true;
+    }
+
+    return form.adjustment_intent !== '';
+});
+
+watch(
+    () => form.charge_type,
+    (type) => {
+        if (type !== 'adjustment') {
+            form.adjustment_intent = '';
+        }
+    },
+);
 
 // Student search
 const {
@@ -82,7 +110,7 @@ const handleSubmit = () => {
             </Link>
             <div>
                 <h1 class="text-3xl font-bold tracking-tight">Tạo khoản phí mới</h1>
-                <p class="text-muted-foreground mt-1">Thêm khoản phí hoặc tín dụng cho sinh viên</p>
+                <p class="text-muted-foreground mt-1">Thêm khoản phí (debit) cho sinh viên — tín dụng dùng luồng credit memo riêng</p>
             </div>
         </div>
 
@@ -151,6 +179,28 @@ const handleSubmit = () => {
                                     <p v-if="form.errors.charge_type" class="text-sm text-red-500">{{
                                         form.errors.charge_type }}</p>
                                 </div>
+                                <div v-if="isAdjustment" class="space-y-2">
+                                    <Label for="adjustment_intent">Hình thức điều chỉnh *</Label>
+                                    <Select v-model="form.adjustment_intent">
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Chọn hình thức (bắt buộc)" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem v-for="intent in (adjustmentIntents ?? [])" :key="intent.value"
+                                                :value="intent.value">
+                                                {{ intent.label }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p v-if="form.errors.adjustment_intent" class="text-sm text-red-500">{{
+                                        form.errors.adjustment_intent }}</p>
+                                    <p v-else-if="selectedAdjustmentIntent && !selectedAdjustmentIntent.creates_charge"
+                                        class="text-amber-700 dark:text-amber-400 text-xs">
+                                        {{ form.adjustment_intent === 'credit_memo'
+                                            ? 'Credit memo: reductions must use FinanceCreditEntitlement — never a negative adjustment charge. Submit to confirm (server will reject this create path).'
+                                            : 'Settlement correction: ledger reallocation only — never a charge row. Submit to confirm (server will reject this create path).' }}
+                                    </p>
+                                </div>
                                 <div class="space-y-2">
                                     <Label for="semester_id">Học kỳ *</Label>
                                     <Select v-model="form.semester_id">
@@ -178,15 +228,15 @@ const handleSubmit = () => {
 
                             <div class="grid gap-4 sm:grid-cols-2">
                                 <div class="space-y-2">
-                                    <NumberField id="amount" :default-value="form.amount ?? 0"
+                                    <NumberField id="amount" :default-value="form.amount ?? 0" :min="0"
                                         :model-value="form.amount ?? 0" @update:model-value="(v: number | null) => {
-                                            if (v) { form.amount = v }
+                                            if (v !== null && v > 0) { form.amount = v }
                                             else { form.amount = null }
                                         }" :format-options="{
                                             style: 'currency',
                                             currency: 'VND',
                                             currencyDisplay: 'code',
-                                            currencySign: 'accounting',
+                                            currencySign: 'standard',
                                         }">
                                         <Label for="amount">Số tiền (VNĐ) *</Label>
                                         <NumberFieldContent>
@@ -197,7 +247,8 @@ const handleSubmit = () => {
                                     <!-- <Label for="amount">Số tiền (VNĐ) *</Label> -->
                                     <!-- <Input v-model.number="form.amount" type="number" placeholder="Nhập số tiền" /> -->
                                     <p class="text-muted-foreground text-xs">
-                                        Phí thủ công (manual fee) phải &gt; 0. Các loại khác có thể dùng số âm cho tín dụng (chưa qua intake).
+                                        Mọi khoản trên form này là debit (số tiền &gt; 0). Tín dụng âm không được tạo
+                                        qua charge — dùng credit memo / entitlement.
                                     </p>
                                     <p v-if="form.errors.amount" class="text-sm text-red-500">{{ form.errors.amount }}
                                     </p>
@@ -220,7 +271,7 @@ const handleSubmit = () => {
                         <CardContent class="space-y-3">
                             <p v-if="form.errors.error" class="text-sm text-red-500">{{ form.errors.error }}</p>
                             <Button type="submit" class="w-full"
-                                :disabled="form.processing || !form.student_id || !form.charge_type || !form.semester_id">
+                                :disabled="form.processing || !form.student_id || !form.charge_type || !form.semester_id || (isAdjustment && !canSubmitAdjustment)">
                                 Tạo khoản phí
                             </Button>
                             <Link :href="route('finance.charges.index')">
@@ -234,9 +285,10 @@ const handleSubmit = () => {
                             <CardTitle>Hướng dẫn</CardTitle>
                         </CardHeader>
                         <CardContent class="text-muted-foreground space-y-2 text-sm">
-                            <p>• <strong>Phí thủ công</strong> đi qua Finance Intake (số tiền &gt; 0 do Finance định giá staff-supplied)</p>
+                            <p>• <strong>Phí thủ công / admission / adjustment (positive debit)</strong> đi qua Finance Intake</p>
+                            <p>• <strong>Adjustment</strong> bắt buộc chọn hình thức: positive debit, credit memo, hoặc settlement correction</p>
+                            <p>• Credit memo và settlement correction <strong>không</strong> tạo charge trên form này</p>
                             <p>• Mọi khoản phí sẽ được gán vào hóa đơn của học kỳ</p>
-                            <p>• Nếu chưa có hóa đơn, hệ thống sẽ tự động tạo mới</p>
                         </CardContent>
                     </Card>
                 </div>

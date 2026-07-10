@@ -165,7 +165,7 @@ class FinanceIntegrityAuditor
 
         return match ($code) {
             'INV-2' => "si.semester_id = {$id}",
-            'INV-3', 'INV-8', 'INV-13' => "fc.semester_id = {$id}",
+            'INV-3', 'INV-8', 'INV-13', 'INV-16' => "fc.semester_id = {$id}",
             'INV-6', 'INV-9' => "semester_id = {$id}",
             'INV-4' => "il.invoice_id IN (SELECT id FROM student_invoices WHERE semester_id = {$id})",
             'INV-5' => "idc.invoice_id IN (SELECT id FROM student_invoices WHERE semester_id = {$id})",

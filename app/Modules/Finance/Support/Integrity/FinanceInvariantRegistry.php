@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Support\Integrity;
 
 /**
- * Single source of truth for the finance integrity invariants (INV-1..INV-15).
+ * Single source of truth for the finance integrity invariants (INV-1..INV-16).
  *
  * Each invariant's SQL is the exact query used by the `finance:audit-invariants`
  * command, with a `{scope}` token spliced into the innermost WHERE so the same
@@ -252,6 +252,25 @@ class FinanceInvariantRegistry
                     WHERE dprc.finance_charge_installment_id IS NOT NULL
                       AND ABS(dprc.amount - fci.amount) > 0.01 AND ({scope}) LIMIT 5',
                 'dprc.dng_payment_request_id IN (SELECT id FROM dng_payment_requests WHERE student_id IN ({ids}))',
+            ),
+            // Wave 6 issue 03: zero-row sample had no legacy signed adjustments.
+            // If any active negative adjustment appears later, exception-list it
+            // (convert to credit entitlement or void) — never new free-signed charges.
+            new FinanceInvariant(
+                'INV-16',
+                'HIGH',
+                'Active signed (negative) adjustment charge rows',
+                'SELECT COUNT(*) c FROM finance_charges fc
+                    WHERE fc.status = "active"
+                      AND fc.charge_type = "adjustment"
+                      AND fc.amount < 0
+                      AND ({scope})',
+                'SELECT fc.id FROM finance_charges fc
+                    WHERE fc.status = "active"
+                      AND fc.charge_type = "adjustment"
+                      AND fc.amount < 0
+                      AND ({scope}) LIMIT 5',
+                'fc.student_id IN ({ids})',
             ),
         ];
     }

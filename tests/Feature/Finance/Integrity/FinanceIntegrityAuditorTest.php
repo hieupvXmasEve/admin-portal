@@ -45,8 +45,8 @@ it('findForScope() returns nothing for an empty scope rather than scanning globa
     expect(app(FinanceIntegrityAuditor::class)->findForScope(new FinanceAuditScope))->toBe([]);
 });
 
-it('runs every one of the 15 invariants cleanly, globally and scoped (no SQL errors)', function () {
-    // Guards all 15 ported SQL splices: a bad column or mis-spliced {scope}/{ids}
+it('runs every one of the 16 invariants cleanly, globally and scoped (no SQL errors)', function () {
+    // Guards all 16 ported SQL splices: a bad column or mis-spliced {scope}/{ids}
     // would throw here, catching regressions the token-only registry test cannot.
     $student = auditStudent();
     $registry = app(FinanceInvariantRegistry::class);

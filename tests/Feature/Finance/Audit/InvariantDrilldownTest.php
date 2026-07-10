@@ -23,6 +23,7 @@ it('maps each invariant code to its audit target type or a list view', function 
     expect($resolver->targetTypeFor('INV-7'))->toBe('student');
     expect($resolver->targetTypeFor('INV-11'))->toBeNull();
     expect($resolver->targetTypeFor('INV-15'))->toBe('dng');
+    expect($resolver->targetTypeFor('INV-16'))->toBe('charge');
     expect($resolver->listUrlFor('INV-11'))->not->toBeNull();
 });
 

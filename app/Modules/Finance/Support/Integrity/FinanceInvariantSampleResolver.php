@@ -21,7 +21,7 @@ class FinanceInvariantSampleResolver
     private const TARGET_TYPE = [
         'INV-1' => 'payment', 'INV-10' => 'payment',
         'INV-2' => 'invoice', 'INV-6' => 'invoice', 'INV-9' => 'invoice',
-        'INV-3' => 'charge', 'INV-8' => 'charge', 'INV-13' => 'charge',
+        'INV-3' => 'charge', 'INV-8' => 'charge', 'INV-13' => 'charge', 'INV-16' => 'charge',
         'INV-4' => 'invoice',
         'INV-5' => 'invoice',
         'INV-7' => 'student',
@@ -46,7 +46,7 @@ class FinanceInvariantSampleResolver
     public function resolveTargetId(string $code, int $sampleId): ?int
     {
         return match ($code) {
-            'INV-1', 'INV-10', 'INV-2', 'INV-6', 'INV-9', 'INV-3', 'INV-8', 'INV-13', 'INV-7', 'INV-12', 'INV-14' => $sampleId,
+            'INV-1', 'INV-10', 'INV-2', 'INV-6', 'INV-9', 'INV-3', 'INV-8', 'INV-13', 'INV-16', 'INV-7', 'INV-12', 'INV-14' => $sampleId,
             'INV-4' => ($line = InvoiceLine::find($sampleId))?->invoice_id !== null ? (int) $line->invoice_id : null,
             'INV-5' => $this->invoiceOfDiscount($sampleId),
             'INV-15' => $this->dngOfPivot($sampleId),

@@ -18,10 +18,38 @@ use InvalidArgumentException;
  *
  * Manual charge page creates staff-supplied debit obligations through the intake
  * contract. Only the materializer writes FinanceCharge.
+ *
+ * Adjustment 3-way split (PRD Q10 / wave 6 issue 03):
+ *  - positive_debit → FinanceObligation (charge_type=adjustment) via intake
+ *  - credit_memo → never a negative charge; staff must use credit entitlement flow
+ *  - settlement_correction → ledger reallocation only; never a charge row
+ *
+ * Defer FORFEIT keeps minting a positive debit via intake (source_kind=defer_forfeit)
+ * — option (a) minimal change; not a pure reallocation.
  */
 class CreateStaffDebitAction
 {
     public const SOURCE_SYSTEM = 'finance';
+
+    public const SOURCE_KIND_MANUAL_ADJUSTMENT = 'manual_adjustment';
+
+    public const SOURCE_KIND_DEFER_FORFEIT = 'defer_forfeit';
+
+    /** Staff must declare which of the three adjustment shapes they intend. */
+    public const ADJUSTMENT_INTENT_POSITIVE_DEBIT = 'positive_debit';
+
+    public const ADJUSTMENT_INTENT_CREDIT_MEMO = 'credit_memo';
+
+    public const ADJUSTMENT_INTENT_SETTLEMENT_CORRECTION = 'settlement_correction';
+
+    /**
+     * @var list<string>
+     */
+    public const ADJUSTMENT_INTENTS = [
+        self::ADJUSTMENT_INTENT_POSITIVE_DEBIT,
+        self::ADJUSTMENT_INTENT_CREDIT_MEMO,
+        self::ADJUSTMENT_INTENT_SETTLEMENT_CORRECTION,
+    ];
 
     /**
      * charge_type => default source_kind for staff form creates.
@@ -31,7 +59,18 @@ class CreateStaffDebitAction
     public const STAFF_DEBIT_SOURCE_KINDS = [
         FinanceCharge::TYPE_MANUAL_FEE => 'manual_fee',
         FinanceCharge::TYPE_ADMISSION_FEE => 'manual_fee',
-        FinanceCharge::TYPE_ADJUSTMENT => 'manual_adjustment',
+        FinanceCharge::TYPE_ADJUSTMENT => self::SOURCE_KIND_MANUAL_ADJUSTMENT,
+    ];
+
+    /**
+     * source_kinds allowed to materialize an adjustment debit charge.
+     * settlement_correction is intentionally absent — never a charge row.
+     *
+     * @var list<string>
+     */
+    public const ADJUSTMENT_CHARGE_SOURCE_KINDS = [
+        self::SOURCE_KIND_MANUAL_ADJUSTMENT,
+        self::SOURCE_KIND_DEFER_FORFEIT,
     ];
 
     public function __construct(
@@ -49,7 +88,8 @@ class CreateStaffDebitAction
      *     due_date?:string|null,
      *     invoice_id?:int|null,
      *     source_kind?:string|null,
-     *     source_ref?:string|null
+     *     source_ref?:string|null,
+     *     adjustment_intent?:string|null
      * }  $data
      */
     public function handle(array $data): FinanceIntakeResult
@@ -69,6 +109,10 @@ class CreateStaffDebitAction
             throw new InvalidArgumentException(
                 "Charge type [{$chargeType}] is not a debit. Use the credit entitlement flow."
             );
+        }
+
+        if ($chargeType === FinanceCharge::TYPE_ADJUSTMENT) {
+            $this->assertAdjustmentMayCreateCharge($data, $sourceKind);
         }
 
         $amount = (float) $data['amount'];
@@ -110,5 +154,42 @@ class CreateStaffDebitAction
             obligation_type: $chargeType,
             facts: $facts,
         ));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function assertAdjustmentMayCreateCharge(array $data, string $sourceKind): void
+    {
+        if (! in_array($sourceKind, self::ADJUSTMENT_CHARGE_SOURCE_KINDS, true)) {
+            throw new InvalidArgumentException(
+                'Settlement correction is a ledger reallocation operation and must never create an adjustment charge row.'
+            );
+        }
+
+        // System path (defer FORFEIT): source_kind already stamps the debit shape.
+        if ($sourceKind === self::SOURCE_KIND_DEFER_FORFEIT) {
+            return;
+        }
+
+        $intent = $data['adjustment_intent'] ?? null;
+
+        if ($intent === self::ADJUSTMENT_INTENT_CREDIT_MEMO) {
+            throw new InvalidArgumentException(
+                'Credit reductions must use the FinanceCreditEntitlement credit-memo flow — never a negative adjustment charge.'
+            );
+        }
+
+        if ($intent === self::ADJUSTMENT_INTENT_SETTLEMENT_CORRECTION) {
+            throw new InvalidArgumentException(
+                'Settlement correction is a ledger reallocation operation and must never create an adjustment charge row.'
+            );
+        }
+
+        if ($intent !== self::ADJUSTMENT_INTENT_POSITIVE_DEBIT) {
+            throw new InvalidArgumentException(
+                'Adjustment creates require adjustment_intent=positive_debit. Credit memo and settlement correction are not charge rows.'
+            );
+        }
     }
 }

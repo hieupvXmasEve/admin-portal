@@ -235,9 +235,21 @@ class FinanceChargeController extends Controller
             $student = Student::find($request->get('student_id'));
         }
 
+        $adjustmentIntents = collect(CreateStaffDebitAction::ADJUSTMENT_INTENTS)->map(fn (string $intent) => [
+            'value' => $intent,
+            'label' => match ($intent) {
+                CreateStaffDebitAction::ADJUSTMENT_INTENT_POSITIVE_DEBIT => 'Positive debit (charge / receivable)',
+                CreateStaffDebitAction::ADJUSTMENT_INTENT_CREDIT_MEMO => 'Credit memo (FinanceCreditEntitlement — not a charge)',
+                CreateStaffDebitAction::ADJUSTMENT_INTENT_SETTLEMENT_CORRECTION => 'Settlement correction (ledger reallocation — not a charge)',
+                default => $intent,
+            },
+            'creates_charge' => $intent === CreateStaffDebitAction::ADJUSTMENT_INTENT_POSITIVE_DEBIT,
+        ]);
+
         return Inertia::render('Finance/Charges/Create', [
             'semesters' => $semesters,
             'chargeTypes' => $chargeTypes,
+            'adjustmentIntents' => $adjustmentIntents,
             'student' => $student,
         ]);
     }

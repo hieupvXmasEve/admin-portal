@@ -1,6 +1,6 @@
 # 03 - Adjustment three-way split (new path)
 
-Status: ready-for-agent
+Status: done
 Depends on: 01
 Program PRD: ../../finance-obligation-v2-migration/PRD.md
 ADRs: docs/adr/0030-credit-reduction-flows-through-credit-application-ledger.md
@@ -22,13 +22,13 @@ Legacy rows to classify/backfill: **none** on sample. If remote prod later shows
 
 ## Acceptance criteria
 
-- [ ] New staff adjustments **declare** which of the three shapes they are (UI + validation); default must not be "free-signed charge".
-- [ ] Positive debit path goes through Finance Intake (`source_system=finance`, appropriate `source_kind`), not bare `FinanceCharge::create` / unconstrained `CreateFinanceChargeAction` for this type.
-- [ ] Negative credit path creates a credit entitlement (or is rejected with a clear message pointing at the credit-memo flow) — no new negative `finance_charges.adjustment` rows.
-- [ ] Settlement correction is not expressible as `charge_type=adjustment`.
-- [ ] Defer FORFEIT settlement either (a) keeps minting a positive debit obligation via intake, or (b) is redesigned as an explicit ledger settlement op — choice documented in the issue Comments; prefer (a) minimal change unless (b) is already available.
-- [ ] Tests cover: positive debit intake; negative rejected/routed; FORFEIT still settles without inventing unpaid debt (existing defer forfeit invariants).
-- [ ] Zero-row sample: no legacy backfill command required; add a data guard or one-shot check that active signed adjustments, if any appear later, are exception-listed.
+- [x] New staff adjustments **declare** which of the three shapes they are (UI + validation); default must not be "free-signed charge".
+- [x] Positive debit path goes through Finance Intake (`source_system=finance`, appropriate `source_kind`), not bare `FinanceCharge::create` / unconstrained `CreateFinanceChargeAction` for this type.
+- [x] Negative credit path creates a credit entitlement (or is rejected with a clear message pointing at the credit-memo flow) — no new negative `finance_charges.adjustment` rows.
+- [x] Settlement correction is not expressible as `charge_type=adjustment`.
+- [x] Defer FORFEIT settlement either (a) keeps minting a positive debit obligation via intake, or (b) is redesigned as an explicit ledger settlement op — choice documented in the issue Comments; prefer (a) minimal change unless (b) is already available.
+- [x] Tests cover: positive debit intake; negative rejected/routed; FORFEIT still settles without inventing unpaid debt (existing defer forfeit invariants).
+- [x] Zero-row sample: no legacy backfill command required; add a data guard or one-shot check that active signed adjustments, if any appear later, are exception-listed.
 
 ## Out of scope
 
@@ -40,3 +40,28 @@ Legacy rows to classify/backfill: **none** on sample. If remote prod later shows
 
 - `.scratch/finance-obligation-v2-wave-6-audit-tail/issues/01-admission-course-adjustment-dng-audit.md`
 - Prefer wave 4 credit entitlement spine already landed (for negative path): `finance-obligation-v2-wave-4-credit-discount-entitlements`
+
+---
+
+## Comments (implementation 2026-07-10)
+
+### FORFEIT settlement choice: **(a) positive debit via intake**
+
+Kept `ApplyDeferFinancePolicyAction::applyForfeit` minting a **positive** `adjustment` debit through `CreateStaffDebitAction` + Finance Intake (`source_system=finance`, `source_kind=defer_forfeit`, `source_ref=defer_forfeit:{case_id}`), then cash-allocating released paid amounts. Not redesigned as a pure ledger reallocation op — option (a) is minimal change and already matched the wave-7 intake cutover path. Unpaid FORFEIT still creates **no** adjustment / no invented debt.
+
+### Routing
+
+| Intent | Staff form | Runtime effect |
+|---|---|---|
+| `positive_debit` | required when `charge_type=adjustment` | Intake debit, `source_kind=manual_adjustment` |
+| `credit_memo` | selectable, blocked at validation | Clear error → FinanceCreditEntitlement credit-memo flow; no charge row |
+| `settlement_correction` | selectable, blocked at validation | Clear error → ledger reallocation only; removed from `allowedSourceKinds` |
+
+### Data guard
+
+- **INV-16**: active `finance_charges` with `charge_type=adjustment` and `amount < 0` (exception-list via `finance:audit-invariants`). Zero-row baseline on clean DB; no backfill command.
+
+### Tests
+
+- `tests/Feature/Finance/AdjustmentThreeWaySplitTest.php`
+- Existing defer FORFEIT suite still green for no residual unpaid debt.

@@ -148,7 +148,7 @@ class ApplyDeferFinancePolicyAction
     {
         $forfeitObligationIds = FinanceObligation::query()
             ->where('source_system', CreateStaffDebitAction::SOURCE_SYSTEM)
-            ->where('source_kind', 'defer_forfeit')
+            ->where('source_kind', CreateStaffDebitAction::SOURCE_KIND_DEFER_FORFEIT)
             ->where('source_ref', 'defer_forfeit:'.$case->id)
             ->where('obligation_type', FinanceCharge::TYPE_ADJUSTMENT)
             ->pluck('id');
@@ -247,7 +247,7 @@ class ApplyDeferFinancePolicyAction
             'charge_type' => FinanceCharge::TYPE_ADJUSTMENT,
             'amount' => $consumed,
             'description' => "Defer forfeit settlement (case #{$case->id})",
-            'source_kind' => 'defer_forfeit',
+            'source_kind' => CreateStaffDebitAction::SOURCE_KIND_DEFER_FORFEIT,
             'source_ref' => 'defer_forfeit:'.$case->id,
             'invoice_id' => $this->resolveAdjustmentInvoiceId($case),
         ]);
