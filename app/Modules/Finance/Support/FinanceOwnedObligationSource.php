@@ -79,4 +79,14 @@ final class FinanceOwnedObligationSource
     {
         return "legacy:voucher_credit:charge:{$chargeId}";
     }
+
+    /**
+     * Synthetic source_ref for legacy scholarship_credit charges that pre-date
+     * entitlement conversion. Stable per charge so discount/credit conversion is
+     * idempotent under the source quad unique key.
+     */
+    public static function legacyScholarshipCreditChargeRef(int $chargeId): string
+    {
+        return "legacy:scholarship_credit:charge:{$chargeId}";
+    }
 }
