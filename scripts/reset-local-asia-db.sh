@@ -30,19 +30,30 @@ DB_NAME="${DB_NAME:-$(env_value DB_DATABASE asia)}"
 DB_ROOT_USER="${DB_ROOT_USER:-root}"
 DB_ROOT_PASSWORD="${DB_ROOT_PASSWORD:-$(env_value DB_ROOT_PASSWORD root)}"
 BACKUP_FILE="${BACKUP_FILE:-}"
+CUSTOM_DATABASE=0
+DEV_ASIA_MODE=0
+RUN_APP_STEPS=1
 YES=0
 
 usage() {
     cat <<'USAGE'
-Usage: ./scripts/reset-local-asia-db.sh [--yes] [--asia | --metro]
+Usage: ./scripts/reset-local-asia-db.sh [options]
 
-Drops and recreates the local database, imports a SQL backup, then runs:
+Drops and recreates the local database and imports a SQL backup. By default it then runs:
   ./scripts/dev.sh artisan migrate --force
   ./scripts/dev.sh artisan db:seed --class=UpdatePermissionsSeeder
+
+Quick test-database restore (no Artisan commands):
+  ./scripts/reset-local-dev-asia-db.sh
 
 Backup presets:
   --asia (default)   backups/asia.sql
   --metro            backups/metropolia.sql
+
+Database options:
+  --dev-asia         Use database dev_asia and skip migrations/seeders.
+  --database NAME    Override the target database name.
+  --import-only      Skip migrations/seeders after importing the SQL dump.
 
 Environment overrides:
   DB_CONTAINER       default: swinx-db-dev
@@ -111,6 +122,23 @@ while [ "$#" -gt 0 ]; do
         --metro|--metropolia)
             BACKUP_PRESET="metro"
             ;;
+        --dev-asia)
+            DB_NAME="dev_asia"
+            DEV_ASIA_MODE=1
+            RUN_APP_STEPS=0
+            ;;
+        --database)
+            if [ "$#" -lt 2 ]; then
+                echo "Missing database name after --database." >&2
+                exit 1
+            fi
+            DB_NAME="$2"
+            CUSTOM_DATABASE=1
+            shift
+            ;;
+        --import-only)
+            RUN_APP_STEPS=0
+            ;;
         -h|--help)
             usage
             exit 0
@@ -126,9 +154,23 @@ done
 
 resolve_backup_file
 
+if [ "$DEV_ASIA_MODE" -eq 1 ] && [ "$CUSTOM_DATABASE" -eq 1 ]; then
+    echo "--dev-asia cannot be combined with --database; its target is always dev_asia." >&2
+    exit 1
+fi
+
 if [[ ! "$DB_NAME" =~ ^[A-Za-z0-9_]+$ ]]; then
     echo "Refusing unsafe database name: $DB_NAME" >&2
     exit 1
+fi
+
+if [ "$RUN_APP_STEPS" -eq 1 ]; then
+    APP_DB_NAME="$(env_value DB_DATABASE asia)"
+    if [ "$DB_NAME" != "$APP_DB_NAME" ]; then
+        echo "Refusing to run migrations: import target '$DB_NAME' differs from .env DB_DATABASE '$APP_DB_NAME'." >&2
+        echo "Use --import-only, or use --dev-asia for the isolated SQL test database." >&2
+        exit 1
+    fi
 fi
 
 if [ ! -f "$BACKUP_FILE" ]; then
@@ -181,10 +223,24 @@ docker exec "$DB_CONTAINER" mariadb -u"$DB_ROOT_USER" -p"$DB_ROOT_PASSWORD" \
 echo "Importing '$BACKUP_FILE' into '$DB_NAME'..."
 docker exec -i "$DB_CONTAINER" mariadb -u"$DB_ROOT_USER" -p"$DB_ROOT_PASSWORD" "$DB_NAME" < "$BACKUP_FILE"
 
-echo "Running Laravel migrations..."
-./scripts/dev.sh artisan migrate --force
+IMPORTED_TABLE_COUNT=$(docker exec "$DB_CONTAINER" mariadb -u"$DB_ROOT_USER" -p"$DB_ROOT_PASSWORD" -N \
+    -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = '$DB_NAME';")
 
-echo "Syncing permissions..."
-./scripts/dev.sh artisan db:seed --class=UpdatePermissionsSeeder
+if [ "$IMPORTED_TABLE_COUNT" -eq 0 ]; then
+    echo "Import verification failed: database '$DB_NAME' contains no tables." >&2
+    exit 1
+fi
 
-echo "Local '$DB_NAME' database reset, imported, migrated, and permissions synced successfully."
+echo "SQL verification passed: '$DB_NAME' contains $IMPORTED_TABLE_COUNT tables."
+
+if [ "$RUN_APP_STEPS" -eq 1 ]; then
+    echo "Running Laravel migrations..."
+    ./scripts/dev.sh artisan migrate --force
+
+    echo "Syncing permissions..."
+    ./scripts/dev.sh artisan db:seed --class=UpdatePermissionsSeeder
+
+    echo "Local '$DB_NAME' database reset, imported, migrated, and permissions synced successfully."
+else
+    echo "Local '$DB_NAME' database reset and imported successfully (Artisan steps skipped)."
+fi
