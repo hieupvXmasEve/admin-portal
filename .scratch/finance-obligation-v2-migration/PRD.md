@@ -37,7 +37,7 @@ never runs a big-bang migration and never leaves a group half-cut.
 
 ## Fee inventory (source of truth)
 
-Local DB counts sampled 2026-07-09 (`asia`). Prod counts must be re-sampled at each wave start.
+Local DB counts sampled 2026-07-09 (`asia`); **wave-6 audit re-sampled 2026-07-10** (same `asia` baseline). Live remote prod was not opened from the audit agent — re-sample there if ops knows `asia` diverges.
 
 | charge_type | Local rows | Generator(s) today | DNG code | Target aggregate | Wave |
 |---|---|---|---|---|---|
@@ -51,13 +51,13 @@ Local DB counts sampled 2026-07-09 (`asia`). Prod counts must be re-sampled at e
 | `scholarship_credit` | 124 active, sum −1,668,000,000 | Scholarship application | — | audit: FinanceCreditEntitlement when grant-like, FinanceDiscountEntitlement when fee-specific | 4 |
 | `voucher_credit` | 111 active, sum −555,000,000 | Voucher application | — | FinanceDiscountEntitlement | 4 |
 | `egc_level_fee` | 370 active, 58 void | Batch Studio EGC (blocks, relevel, carry-forward) | HP | FinanceObligation (+ egc_retake FinanceDiscountEntitlement) | 5 |
-| `admission_fee` | 0 | None found — DNG dropdown has PRE but `fromChargeType()` does **not** map it (falls to KHAC) | PRE (manual only) | FinanceObligation (billing-account payer) | 6 |
-| `course_fee` | 0 local | None found — enum value exists, no generator located | HP | audit → decide | 6 |
-| `adjustment` | 0 local | Manual/ad-hoc | KHAC | 3-way split (see cross-cutting rules) | 6 |
+| `admission_fee` | **0** (re-sample) | Manual form only (requires Student); no auto generator; Fee Monitor soft-expects intake students | PRE dropdown only; auto-map **KHAC** | **No-action wave 6** — post-Approve only; no pre-Approve ADR; keep dormant until business volume | **6 audit done** |
+| `course_fee` | **0** (re-sample) | **None** — enum/registry/HP free-pass only | HP | **Formally retire** | **6 → issue 02** |
+| `adjustment` | **0** (re-sample) | Manual form (signed); defer FORFEIT positive debit | KHAC | **3-way split** (no legacy backfill on sample) | **6 → issue 03** |
 
 DNG codes with **no** internal charge_type (manual-only): `THHB` (thu hồi học bổng
-— scholarship clawback), `F1` (phí giữ chỗ học bổng), `GC` (legacy, frozen). Wave 6
-audit decides whether THHB/F1 deserve obligation types or stay manual DNG requests.
+— scholarship clawback), `F1` (phí giữ chỗ học bổng), `GC` (legacy, frozen).
+**Wave 6 audit (2026-07-10):** PRE/THHB/F1 have **0** `dng_payment_requests` on `asia` → **stay manual DNG**; do not invent obligation types.
 
 ## Wave map
 
@@ -138,17 +138,13 @@ Dependencies: 1 → {2,3}; 4 → 5; {2,3,4,5,6} → 7. Waves 2 and 3 may overlap
   `defer_credit` in wave 4.
 
 ### Wave 6 — admission_fee + course_fee + adjustment (audit-first)
-- **Audit opens the wave:** does DNG `PRE` see real use? does any `course_fee` row
-  or generator exist anywhere (prod)? what do existing `adjustment` rows actually
-  mean? THHB/F1 disposition.
-- `admission_fee`: Applicant billing-account provisioning (ADR-0029); obligation
-  may exist pre-Approve as aggregate truth, but **materialization, invoicing, and
-  DNG/payment collection are post-Approve only** — the collection ledger is
-  student-keyed. If the audit finds a real need to collect before Approve, that
-  is a separate ADR (applicant-scoped holding ledger + carry-over + Approve
-  reconciliation), not an improvisation inside this wave.
-- `adjustment` 3-way split (see cross-cutting rules); classify every legacy row.
-- `course_fee`: migrate or formally retire the enum value based on audit.
+- **Audit done 2026-07-10** (`.scratch/finance-obligation-v2-wave-6-audit-tail/issues/01-…`):
+  zero rows for admission/course/adjustment; zero PRE/THHB/F1 DNG; post-Approve
+  only for admission (no pre-Approve ADR); course_fee → retire; adjustment →
+  3-way split with no legacy backfill; THHB/F1/PRE stay manual DNG.
+- `admission_fee`: **no-action** implement this wave (dormant manual/student path).
+- `adjustment` 3-way split on **new** writes — issue 03.
+- `course_fee`: **formally retire** — issue 02.
 
 ### Wave 7 — Hardening (endgame)
 - Arch tests: no `FinanceCharge::create` in production app code outside the
