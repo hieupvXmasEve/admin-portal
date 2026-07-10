@@ -213,7 +213,7 @@ it('does not create deferred block at the total level boundary', function () {
     expect(FinanceCharge::where('student_id', $student->id)->count())->toBe(1);
 });
 
-it('skips creating charge when student has not finished the current level', function () {
+it('charges the next level when the student is still studying the current level', function () {
     $semester = Semester::factory()->create();
     $student = makeEgcChargeStudent([
         'status' => 'intake_pre_uni_gc',
@@ -232,9 +232,11 @@ it('skips creating charge when student has not finished the current level', func
         ]],
     ]);
 
-    expect($results['created'])->toBe(0);
-    expect($results['skipped'])->toBe(1);
-    expect(FinanceCharge::where('student_id', $student->id)->count())->toBe(0);
+    // Studying level 2 ⇒ bill level 3 (effective start = current + 1).
+    expect($results['created'])->toBe(1)
+        ->and($results['errors'])->toBeEmpty()
+        ->and(FinanceCharge::where('student_id', $student->id)->value('description'))
+        ->toContain('Level 3');
 });
 
 it('sets is_retake = true when prior block failed with attendance >= 80%', function () {
@@ -624,7 +626,7 @@ it('filters preview by name student id email and paginates eligible rows', funct
 
     expect($byEmail['summary']['eligible_count'])->toBe(1);
     expect($byEmail['eligible_students']->items()[0]['current_level'])->toBe(0);
-    expect($byStudentId['eligible_students']->items()[0]['student_name'])->toBe('Bob Example');
+    expect(strtoupper((string) $byStudentId['eligible_students']->items()[0]['student_name']))->toBe('BOB EXAMPLE');
     expect($paginated['eligible_students']->total())->toBe(21);
     expect($paginated['eligible_students']->currentPage())->toBe(2);
     expect($paginated['eligible_students']->lastPage())->toBe(2);

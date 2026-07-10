@@ -7,8 +7,6 @@ namespace App\Modules\Finance\Actions\Egc;
 use App\Models\EgcBlock;
 use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
-use App\Modules\Finance\Models\InvoiceLine;
-use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Support\EgcBlockGenerationClassifier;
 use App\Modules\Finance\Support\EgcBlockGenerationState;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
@@ -21,7 +19,7 @@ class GenerateEgcChargesAction
 {
     /**
      * Deprecated flat fee. Retained for backward compatibility; the canonical
-     * source is now {@see EgcLevelFeeResolver} (FIN-06).
+     * source is now {@see EgcLevelFeeResolver} (FIN-06) via intake pricing.
      */
     public const CHARGE_AMOUNT = EgcLevelFeeResolver::FALLBACK_FEE;
 
@@ -34,7 +32,6 @@ class GenerateEgcChargesAction
     {
         $semesterId = (int) $data['semester_id'];
         $dueDate = (string) ($data['due_date'] ?? now()->addDays(30)->toDateString());
-        $createdByUserId = auth()->id();
         $results = ['created' => 0, 'skipped' => 0, 'errors' => []];
 
         foreach ($data['students'] as $studentData) {
@@ -78,8 +75,8 @@ class GenerateEgcChargesAction
 
             if ($blockState->shouldReissue()) {
                 try {
-                    DB::transaction(function () use ($studentId, $semesterId, $dueDate, $blockCount, $totalLevels, $createdByUserId, $blockState, &$results) {
-                        self::reissueExistingBlocks($studentId, $semesterId, $dueDate, $blockCount, $totalLevels, $createdByUserId, $blockState, $results);
+                    DB::transaction(function () use ($studentId, $semesterId, $dueDate, $blockCount, $totalLevels, $blockState, &$results) {
+                        self::reissueExistingBlocks($studentId, $semesterId, $dueDate, $blockCount, $totalLevels, $blockState, $results);
                     });
                 } catch (\Exception $e) {
                     Log::error('GenerateEgcChargesAction reissue failed', [
@@ -106,8 +103,8 @@ class GenerateEgcChargesAction
             }
 
             try {
-                DB::transaction(function () use ($studentId, $semesterId, $dueDate, $blockCount, $effectiveStartLevel, $totalLevels, $existingChargeCount, $createdByUserId, &$results) {
-                    self::generateForStudent($studentId, $semesterId, $dueDate, $blockCount, $effectiveStartLevel, $totalLevels, $existingChargeCount, $createdByUserId, $results);
+                DB::transaction(function () use ($studentId, $semesterId, $dueDate, $blockCount, $effectiveStartLevel, $totalLevels, $existingChargeCount, &$results) {
+                    self::generateForStudent($studentId, $semesterId, $dueDate, $blockCount, $effectiveStartLevel, $totalLevels, $existingChargeCount, $results);
                 });
             } catch (\Exception $e) {
                 Log::error('GenerateEgcChargesAction failed', [
@@ -128,7 +125,6 @@ class GenerateEgcChargesAction
         string $dueDate,
         int $blockCount,
         int $totalLevels,
-        ?int $createdByUserId,
         EgcBlockGenerationState $blockState,
         array &$results,
     ): void {
@@ -144,7 +140,17 @@ class GenerateEgcChargesAction
                 continue;
             }
 
-            $charge = self::createCharge($studentId, $semesterId, $dueDate, (int) $block->level_number, $createdByUserId);
+            $charge = self::createChargeViaIntake(
+                $studentId,
+                $semesterId,
+                $dueDate,
+                (int) $block->level_number,
+                [
+                    'generation_mode' => SubmitEgcLevelFeeDebitAction::GENERATION_MODE_REISSUE,
+                    'block_number' => (int) $block->block_number,
+                    'is_retake' => (bool) $block->is_retake,
+                ],
+            );
             $block->update([
                 'finance_charge_id' => $charge->id,
                 'result' => EgcBlock::RESULT_PENDING,
@@ -165,7 +171,6 @@ class GenerateEgcChargesAction
         int $currentLevel,
         int $totalLevels,
         int $existingChargeCount,
-        ?int $createdByUserId,
         array &$results
     ): void {
         $deferredBlocks = EgcBlock::where('student_id', $studentId)
@@ -174,7 +179,17 @@ class GenerateEgcChargesAction
             ->get();
 
         foreach ($deferredBlocks as $block) {
-            $charge = self::createCharge($studentId, $semesterId, $dueDate, $block->level_number, $createdByUserId);
+            $charge = self::createChargeViaIntake(
+                $studentId,
+                $semesterId,
+                $dueDate,
+                (int) $block->level_number,
+                [
+                    'generation_mode' => SubmitEgcLevelFeeDebitAction::GENERATION_MODE_DEFERRED,
+                    'block_number' => (int) $block->block_number,
+                    'is_retake' => (bool) $block->is_retake,
+                ],
+            );
             $block->update(['finance_charge_id' => $charge->id]);
             $results['created']++;
         }
@@ -210,7 +225,17 @@ class GenerateEgcChargesAction
             $isRetake = self::isRetakeEligible($studentId, $levelNumber);
 
             try {
-                $charge = self::createCharge($studentId, $semesterId, $dueDate, $levelNumber, $createdByUserId);
+                $charge = self::createChargeViaIntake(
+                    $studentId,
+                    $semesterId,
+                    $dueDate,
+                    $levelNumber,
+                    [
+                        'generation_mode' => SubmitEgcLevelFeeDebitAction::GENERATION_MODE_FRESH,
+                        'block_number' => $blockNumber,
+                        'is_retake' => $isRetake,
+                    ],
+                );
 
                 EgcBlock::create([
                     'student_id' => $studentId,
@@ -278,60 +303,44 @@ class GenerateEgcChargesAction
             ->exists();
     }
 
-    private static function createCharge(
+    /**
+     * Materialize an egc_level_fee debit through the Finance Intake Contract.
+     * Generators must not write FinanceCharge rows directly (wave 5 cutover).
+     *
+     * @param  array{
+     *     generation_mode: string,
+     *     block_number?: int,
+     *     is_retake?: bool,
+     * }  $options
+     */
+    private static function createChargeViaIntake(
         int $studentId,
         int $semesterId,
         string $dueDate,
         int $levelNumber,
-        ?int $createdByUserId
+        array $options,
     ): FinanceCharge {
-        $charge = FinanceCharge::create([
-            'student_id' => $studentId,
-            'semester_id' => $semesterId,
-            'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-            // FIN-06: canonical fee = Unit.base_fee for the level, flat fallback.
-            'amount' => app(EgcLevelFeeResolver::class)->resolve($levelNumber),
-            'description' => "EGC Level {$levelNumber} Fee",
-            'effective_at' => now(),
-            'status' => FinanceCharge::STATUS_ACTIVE,
-            'created_by_user_id' => $createdByUserId,
-        ]);
-
-        // Assign charge to a reusable invoice, always syncing due_date. Cancelled
-        // or paid invoices remain historical evidence and must not receive new lines.
-        $invoice = StudentInvoice::query()
-            ->where('student_id', $studentId)
-            ->where('semester_id', $semesterId)
-            ->whereNull('billing_cycle_id')
-            ->reusableForChargeGeneration()
-            ->latest('id')
-            ->first();
-
-        if (! $invoice) {
-            $invoice = StudentInvoice::create([
-                'student_id' => $studentId,
-                'semester_id' => $semesterId,
-                'billing_cycle_id' => null,
-                'invoice_number' => 'EGC-'.$studentId.'-'.$semesterId.'-'.now()->format('mdHis').rand(100, 999),
-                'status' => 'draft',
-                'due_date' => $dueDate,
-            ]);
-        } else {
-            $invoice->update(['due_date' => $dueDate]);
-        }
-
-        InvoiceLine::updateOrCreate(
-            ['invoice_id' => $invoice->id, 'charge_id' => $charge->id],
+        $result = app(SubmitEgcLevelFeeDebitAction::class)->handle(
+            $studentId,
+            $semesterId,
+            $levelNumber,
             [
-                'amount_snapshot' => $charge->amount,
-                'description_snapshot' => $charge->description,
-                'status' => 'active',
-                'voided_at' => null,
-                'void_reason' => null,
-            ]
+                'source_kind' => SubmitEgcLevelFeeDebitAction::SOURCE_KIND_BATCH_STUDIO,
+                'due_date' => $dueDate,
+                'description' => "EGC Level {$levelNumber} Fee",
+                'generation_mode' => $options['generation_mode'],
+                'block_number' => $options['block_number'] ?? null,
+                'is_retake' => (bool) ($options['is_retake'] ?? false),
+            ],
         );
 
-        $invoice->recalculateTotals();
+        $charge = FinanceCharge::query()->find($result->finance_charge_id);
+
+        if (! $charge instanceof FinanceCharge) {
+            throw new \RuntimeException(
+                "EGC intake materialization incomplete for student {$studentId} level {$levelNumber}."
+            );
+        }
 
         return $charge;
     }

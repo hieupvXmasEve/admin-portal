@@ -6,7 +6,7 @@ namespace App\Modules\Finance\Actions\Operations;
 
 use App\Models\Student;
 use App\Models\StudentScholarshipAward;
-use App\Models\Unit;
+use App\Modules\Finance\Actions\Egc\SubmitEgcLevelFeeDebitAction;
 use App\Modules\Finance\Actions\Major\SubmitTuitionTermDebitAction;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceDiscount;
@@ -29,7 +29,6 @@ class GenerateBatchChargesAction
     {
         $semesterId = (int) $data['semester_id'];
         $chargeTypes = $data['charge_types'];
-        $createdByUserId = auth()->id();
         $dueDate = isset($data['due_date']) ? Carbon::parse($data['due_date']) : now()->addDays(30);
 
         // 1. Strict Scope: Only specific statuses and current campus
@@ -75,6 +74,7 @@ class GenerateBatchChargesAction
         $voucherDiscountAmountResolver = app(VoucherDiscountAmountResolver::class);
         $egcFeeResolver = app(EgcLevelFeeResolver::class);
         $submitTuition = app(SubmitTuitionTermDebitAction::class);
+        $submitEgc = app(SubmitEgcLevelFeeDebitAction::class);
         $students = $students
             ->filter(fn (Student $student) => $studentChargeTimingResolver->shouldIncludeStudentForChargeGeneration($student, $semesterId, $chargeTypes))
             ->values();
@@ -211,29 +211,41 @@ class GenerateBatchChargesAction
                                 }
 
                                 foreach ($levelsToCharge as $level) {
-                                    $unit = Unit::where('unit_type', 'egc')->where('level', $level)->first();
                                     // FIN-06: same canonical resolver as preview/dedicated flow.
                                     $fee = $egcFeeResolver->resolve($level);
 
                                     if ($fee > 0) {
                                         $levelDescription = "EGC Level {$level} Fee";
 
-                                        // When an EGC Unit exists it is the dedupe source (one
-                                        // unit per level → distinct charges). On the FIN-06
-                                        // fallback (no Unit) there is no source, so the
-                                        // level-bearing description is the dedupe key — otherwise
-                                        // every unit-less level collapses onto source_id 0 and the
-                                        // second level reuses the first level's charge.
-                                        $charge = self::createChargeIfNotExists(
-                                            $student, $semesterId,
-                                            FinanceCharge::TYPE_EGC_LEVEL_FEE,
-                                            $fee,
-                                            $unit ? 'App\Models\Unit' : null,
-                                            $unit?->id,
-                                            $createdByUserId,
-                                            $levelDescription,
-                                        );
-                                        if ($charge) {
+                                        // Dedupe on active charge for this student/semester/level
+                                        // description (matches pre-intake batch natural key).
+                                        $existingLevelCharge = FinanceCharge::query()
+                                            ->where('student_id', $student->id)
+                                            ->where('semester_id', $semesterId)
+                                            ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
+                                            ->where('status', FinanceCharge::STATUS_ACTIVE)
+                                            ->where('description', $levelDescription)
+                                            ->first();
+
+                                        if ($existingLevelCharge instanceof FinanceCharge) {
+                                            $charge = $existingLevelCharge;
+                                        } else {
+                                            $intakeResult = $submitEgc->handle(
+                                                (int) $student->id,
+                                                $semesterId,
+                                                (int) $level,
+                                                [
+                                                    'source_kind' => SubmitEgcLevelFeeDebitAction::SOURCE_KIND_EGC_BATCH,
+                                                    'due_date' => $dueDate->toDateString(),
+                                                    'invoice_id' => $invoice->id,
+                                                    'description' => $levelDescription,
+                                                    'generation_mode' => SubmitEgcLevelFeeDebitAction::GENERATION_MODE_BATCH,
+                                                ],
+                                            );
+                                            $charge = FinanceCharge::query()->find($intakeResult->finance_charge_id);
+                                        }
+
+                                        if ($charge instanceof FinanceCharge) {
                                             if ($charge->description !== $levelDescription) {
                                                 $charge->update(['description' => $levelDescription]);
                                             }
@@ -408,50 +420,6 @@ class GenerateBatchChargesAction
             'due_date' => $dueDate,
             'opened_at' => now(),
             'status' => 'draft',
-        ]);
-    }
-
-    private static function createChargeIfNotExists(Student $student, int $semesterId, string $type, float $amount, ?string $sourceType = null, $sourceId = null, ?int $createdByUserId = null, ?string $description = null): ?FinanceCharge
-    {
-        // FIN-05: only ACTIVE charges count as "already exists". A voided charge
-        // must neither block regeneration nor be returned and re-linked into an
-        // invoice as if it were live.
-        $query = FinanceCharge::where('student_id', $student->id)
-            ->where('semester_id', $semesterId)
-            ->where('charge_type', $type)
-            ->where('status', FinanceCharge::STATUS_ACTIVE);
-
-        if ($sourceType) {
-            $query->where('source_type', $sourceType)->where('source_id', $sourceId);
-        } elseif ($description !== null) {
-            // No external source to dedupe on (e.g. EGC level fee on the FIN-06
-            // fallback): the level-bearing description is the natural key so two
-            // levels do not collapse into one charge.
-            $query->where('description', $description);
-        }
-
-        if ($query->exists()) {
-            return $query->first();
-        }
-
-        $resolvedDescription = $description ?? match ($type) {
-            FinanceCharge::TYPE_TUITION_TERM => 'Tuition Fee',
-            FinanceCharge::TYPE_EGC_LEVEL_FEE => 'EGC Level Fee',
-            FinanceCharge::TYPE_SCHOLARSHIP_CREDIT => 'Scholarship Credit',
-            default => 'Charge'
-        };
-
-        return FinanceCharge::create([
-            'student_id' => $student->id,
-            'semester_id' => $semesterId,
-            'charge_type' => $type,
-            'description' => $resolvedDescription,
-            'amount' => $amount,
-            'source_type' => $sourceType,
-            'source_id' => $sourceId,
-            'status' => 'active',
-            'effective_at' => now(),
-            'created_by_user_id' => $createdByUserId,
         ]);
     }
 

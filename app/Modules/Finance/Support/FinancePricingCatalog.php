@@ -8,6 +8,7 @@ use App\Modules\Finance\Enums\PricingStrategy;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinancePricingCatalogItem;
 use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
+use App\Modules\Finance\Support\Pricing\EgcLevelFeePricingResolver;
 use App\Modules\Finance\Support\Pricing\TuitionTermPricingResolver;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Exceptions\InvalidFinanceIntakePayload;
@@ -17,6 +18,7 @@ class FinancePricingCatalog
 {
     public function __construct(
         private readonly TuitionTermPricingResolver $tuitionTermPricingResolver,
+        private readonly EgcLevelFeePricingResolver $egcLevelFeePricingResolver,
     ) {}
 
     /**
@@ -40,12 +42,15 @@ class FinancePricingCatalog
     /**
      * Whether intake facts may carry amount/currency for this obligation type.
      * Catalog-priced types forbid them (ADR-0026); staff/generator/policy strategies allow amount.
-     * tuition_term is GeneratorAmount transitional wiring but prices from catalog/TuitionPlan
-     * facts only (wave 3) — callers must not supply final amounts.
+     * tuition_term and egc_level_fee are GeneratorAmount transitional wiring but price from
+     * Finance-owned resolvers/catalog facts only — callers must not supply final amounts.
      */
     public function allowsAmountInFacts(string $obligationType): bool
     {
-        if ($obligationType === FinanceCharge::TYPE_TUITION_TERM) {
+        if (in_array($obligationType, [
+            FinanceCharge::TYPE_TUITION_TERM,
+            FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        ], true)) {
             return false;
         }
 
@@ -92,6 +97,11 @@ class FinancePricingCatalog
         // until every plan/term is mirrored into finance_pricing_catalog_items.
         if ($intake->obligation_type === FinanceCharge::TYPE_TUITION_TERM) {
             return $this->tuitionTermPricingResolver->price($intake);
+        }
+
+        // EGC level fee: Finance-owned Unit.base_fee (+ flat fallback) via resolver.
+        if ($intake->obligation_type === FinanceCharge::TYPE_EGC_LEVEL_FEE) {
+            return $this->egcLevelFeePricingResolver->price($intake);
         }
 
         throw new RuntimeException(
