@@ -10,6 +10,7 @@ use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Queries\GetStudentChargesQuery;
+use App\Modules\Finance\Queries\GetStudentChargeSummaryQuery;
 use Illuminate\Support\Collection;
 
 class FinanceChargeService
@@ -18,6 +19,7 @@ class FinanceChargeService
         protected CreateFinanceChargeAction $createChargeAction,
         protected VoidFinanceChargeAction $voidChargeAction,
         protected GetStudentChargesQuery $getStudentChargesQuery,
+        protected GetStudentChargeSummaryQuery $getStudentChargeSummaryQuery,
         protected DeferChargeResolver $deferChargeResolver
     ) {}
 
@@ -168,35 +170,30 @@ class FinanceChargeService
     }
 
     /**
+     * Student charges API summary: total_charges, total_credits, net_amount.
+     *
+     * @return array{total_charges: float, total_credits: float, net_amount: float}
+     */
+    public function getChargeSummary(int $studentId, ?int $semesterId = null): array
+    {
+        return $this->getStudentChargeSummaryQuery->handle($studentId, $semesterId);
+    }
+
+    /**
      * Calculate total charges (positive amounts) for a student.
      */
     public function getTotalCharges(int $studentId, ?int $semesterId = null): float
     {
-        $query = FinanceCharge::where('student_id', $studentId)
-            ->where('status', FinanceCharge::STATUS_ACTIVE)
-            ->where('amount', '>', 0);
-
-        if ($semesterId) {
-            $query->where('semester_id', $semesterId);
-        }
-
-        return (float) $query->sum('amount');
+        return $this->getStudentChargeSummaryQuery->totalCharges($studentId, $semesterId);
     }
 
     /**
-     * Calculate total credits (negative amounts) for a student.
+     * Calculate total credits for a student from entitlement carriers
+     * (discount allocations + credit applications + legacy backstop).
      */
     public function getTotalCredits(int $studentId, ?int $semesterId = null): float
     {
-        $query = FinanceCharge::where('student_id', $studentId)
-            ->where('status', FinanceCharge::STATUS_ACTIVE)
-            ->where('amount', '<', 0);
-
-        if ($semesterId) {
-            $query->where('semester_id', $semesterId);
-        }
-
-        return abs((float) $query->sum('amount'));
+        return $this->getStudentChargeSummaryQuery->totalCredits($studentId, $semesterId);
     }
 
     /**
@@ -204,14 +201,7 @@ class FinanceChargeService
      */
     public function getNetAmount(int $studentId, ?int $semesterId = null): float
     {
-        $query = FinanceCharge::where('student_id', $studentId)
-            ->where('status', FinanceCharge::STATUS_ACTIVE);
-
-        if ($semesterId) {
-            $query->where('semester_id', $semesterId);
-        }
-
-        return (float) $query->sum('amount');
+        return $this->getStudentChargeSummaryQuery->netAmount($studentId, $semesterId);
     }
 
     /**

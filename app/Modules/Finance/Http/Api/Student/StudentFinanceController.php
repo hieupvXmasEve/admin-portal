@@ -83,11 +83,7 @@ class StudentFinanceController extends Controller
 
         return ApiResponse::success([
             'charges' => $charges,
-            'summary' => [
-                'total_charges' => $this->chargeService->getTotalCharges($student->id, $semesterId),
-                'total_credits' => $this->chargeService->getTotalCredits($student->id, $semesterId),
-                'net_amount' => $this->chargeService->getNetAmount($student->id, $semesterId),
-            ],
+            'summary' => $this->chargeService->getChargeSummary($student->id, $semesterId),
         ]);
     }
 

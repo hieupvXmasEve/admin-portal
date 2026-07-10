@@ -182,6 +182,13 @@ GET /charges?semester_id=5&unpaid=true
 - `is_credit === true` → green text, negative amount (giảm trừ)
 - Toggle "Chỉ chưa thanh toán" → add `?unpaid=true`
 
+**Summary derivation (ADR-0030):**
+
+- `total_charges` — sum of active positive charges for the student (optional semester filter).
+- `total_credits` — fee reductions + applied credits: discount allocations + credit applications from `FinanceDiscountEntitlement` / `FinanceCreditEntitlement` carriers (via invoice settlement). Legacy active negative charge lines still count only as a backstop when those ledger carriers are absent (no double-count with dual-carrier rows).
+- `net_amount` — `total_charges - total_credits`.
+- Response field names and types are unchanged; the student portal does not need a contract change.
+
 ---
 
 ## 3. Payments (Lịch sử thanh toán)
