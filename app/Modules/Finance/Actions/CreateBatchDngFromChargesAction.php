@@ -33,9 +33,9 @@ use Illuminate\Support\Facades\Log;
  *   blocked as missing_finance_obligation (no silent charge create).
  * - BHYT (wave 2): every pushed payable must already be linked to a
  *   FinanceObligation; unlinked legacy charges are blocked until backfill.
- * - HP (wave 3 tuition_term only): tuition_term payables must already be linked
- *   to a FinanceObligation; EGC/course_fee under the same DNG code stay free
- *   until their owning waves cut over.
+ * - HP (wave 3 tuition_term + wave 5 egc_level_fee): those payables must already
+ *   be linked to a FinanceObligation; course_fee under the same DNG code stays
+ *   free until its owning wave cuts over.
  */
 class CreateBatchDngFromChargesAction
 {
@@ -154,10 +154,10 @@ class CreateBatchDngFromChargesAction
                 $this->assertChargesHaveFinanceObligations($charges, $dngFeeType);
             }
 
-            // Wave-3 tuition_term: HP may mix tuition/EGC/course_fee. Guard only
-            // tuition_term rows so EGC collection is not blocked pre-wave-5.
+            // Wave-3 tuition_term + wave-5 egc_level_fee: HP may mix those with
+            // course_fee. Guard cut-over types; course_fee stays free until wave 6.
             if ($dngFeeType === 'HP') {
-                $this->assertTuitionTermChargesHaveFinanceObligations($charges);
+                $this->assertHpCutoverChargesHaveFinanceObligations($charges);
             }
 
             // Installment-aware total: for each charge, take its next PENDING installment.
@@ -414,9 +414,11 @@ class CreateBatchDngFromChargesAction
             return;
         }
 
-        $repairHint = $dngFeeType === 'HP'
-            ? 'Run finance:backfill-legacy-tuition-term-obligations or re-generate via intake.'
-            : 'Run finance:backfill-legacy-bhyt-obligations or re-generate via intake.';
+        $repairHint = match ($dngFeeType) {
+            'HP' => 'Run finance:backfill-legacy-tuition-term-obligations / finance:backfill-legacy-egc-level-fee-obligations or re-generate via intake.',
+            'BHYT' => 'Run finance:backfill-legacy-bhyt-obligations or re-generate via intake.',
+            default => 'Re-generate via intake or run the type-specific legacy backfill.',
+        };
 
         throw new \RuntimeException(
             'missing_finance_obligation: '.$dngFeeType.' charge(s) #'
@@ -426,16 +428,20 @@ class CreateBatchDngFromChargesAction
     }
 
     /**
-     * Wave-3: among HP payables, only tuition_term rows require an accepted obligation.
+     * Wave-3 + wave-5: among HP payables, tuition_term and egc_level_fee require
+     * an accepted obligation. course_fee remains ungated until its wave.
      *
      * @param  Collection<int, object{id: int, amount: float, balance: float}>  $charges
      */
-    private function assertTuitionTermChargesHaveFinanceObligations(Collection $charges): void
+    private function assertHpCutoverChargesHaveFinanceObligations(Collection $charges): void
     {
         $this->assertChargesHaveFinanceObligations(
             $charges,
             'HP',
-            [FinanceCharge::TYPE_TUITION_TERM],
+            [
+                FinanceCharge::TYPE_TUITION_TERM,
+                FinanceCharge::TYPE_EGC_LEVEL_FEE,
+            ],
         );
     }
 

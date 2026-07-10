@@ -14,11 +14,15 @@ use App\Models\Student;
 use App\Models\User;
 use App\Modules\Finance\Actions\CancelDngPaymentRequestAction;
 use App\Modules\Finance\Actions\CreateBatchDngFromChargesAction;
+use App\Modules\Finance\Actions\Egc\SubmitEgcLevelFeeDebitAction;
+use App\Modules\Finance\Actions\Major\SubmitTuitionTermDebitAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Support\FinanceOwnedObligationSource;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -47,7 +51,7 @@ function makeBatchStudent(string $code, Campus $campus, Semester $semester): Stu
 
 function makeCharge(Student $student, Semester $semester, string $type, float $amount): FinanceCharge
 {
-    return FinanceCharge::create([
+    $charge = FinanceCharge::create([
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'charge_type' => $type,
@@ -56,6 +60,33 @@ function makeCharge(Student $student, Semester $semester, string $type, float $a
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
+
+    // HP cutover types require an accepted obligation before DNG push.
+    if (in_array($type, [FinanceCharge::TYPE_TUITION_TERM, FinanceCharge::TYPE_EGC_LEVEL_FEE], true)) {
+        $sourceKind = $type === FinanceCharge::TYPE_EGC_LEVEL_FEE
+            ? SubmitEgcLevelFeeDebitAction::SOURCE_KIND_LEGACY_EGC
+            : SubmitTuitionTermDebitAction::SOURCE_KIND_LEGACY_TUITION;
+        $sourceRef = $type === FinanceCharge::TYPE_EGC_LEVEL_FEE
+            ? FinanceOwnedObligationSource::legacyEgcLevelFeeChargeRef((int) $charge->id)
+            : FinanceOwnedObligationSource::legacyTuitionTermChargeRef((int) $charge->id);
+
+        $obligation = FinanceObligation::query()->create([
+            'source_system' => FinanceOwnedObligationSource::SOURCE_SYSTEM,
+            'source_kind' => $sourceKind,
+            'source_ref' => $sourceRef,
+            'obligation_type' => $type,
+            'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+            'amount' => $amount,
+            'currency' => 'VND',
+            'pricing_rule_version' => "{$type}:test",
+            'pricing_snapshot' => ['provenance' => 'test'],
+            'accepted_at' => now(),
+        ]);
+
+        $charge->update(['finance_obligation_id' => $obligation->id]);
+    }
+
+    return $charge->fresh() ?? $charge;
 }
 
 /**

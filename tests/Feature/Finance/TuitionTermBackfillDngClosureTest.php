@@ -258,19 +258,19 @@ it('HP fee_type: pushes DNG only from existing obligation-linked tuition payable
         ->and(DngPaymentRequest::where('student_id', $student->id)->where('fee_type', 'HP')->count())->toBe(1);
 });
 
-it('HP fee_type: does not block EGC-only payables missing obligations (wave-5 scope)', function (): void {
+it('HP fee_type: still allows course_fee-only payables missing obligations (wave-6 scope)', function (): void {
     $student = makeTuitionStudent($this->campus, $this->semester, 'TUI3003');
-    $egc = FinanceCharge::query()->create([
+    $courseFee = FinanceCharge::query()->create([
         'student_id' => $student->id,
         'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-        'amount' => 15_000_000,
-        'description' => 'EGC',
+        'charge_type' => FinanceCharge::TYPE_COURSE_FEE,
+        'amount' => 2_000_000,
+        'description' => 'Course fee',
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
         'created_by_user_id' => $this->user->id,
     ]);
-    attachTuitionInvoiceLine($egc, 15_000_000);
+    attachTuitionInvoiceLine($courseFee, 2_000_000);
 
     $action = makeTuitionBatchDngAction();
     $result = $action->handle([
@@ -278,14 +278,14 @@ it('HP fee_type: does not block EGC-only payables missing obligations (wave-5 sc
         'dng_fee_type' => 'HP',
         'due_date' => now()->addDays(7)->toDateString(),
         'semester_id' => $this->semester->id,
-        'description' => 'EGC DNG',
+        'description' => 'Course fee DNG',
         'estimate_time' => now()->addDays(7)->toDateTimeString(),
         'amount_overrides' => null,
     ]);
 
     expect($result['created'])->toBe(1)
         ->and($result['failed'])->toBe(0)
-        ->and($egc->fresh()->finance_obligation_id)->toBeNull()
+        ->and($courseFee->fresh()->finance_obligation_id)->toBeNull()
         ->and(DngPaymentRequest::where('student_id', $student->id)->where('fee_type', 'HP')->count())->toBe(1);
 });
 

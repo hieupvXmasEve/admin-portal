@@ -89,4 +89,33 @@ final class FinanceOwnedObligationSource
     {
         return "legacy:scholarship_credit:charge:{$chargeId}";
     }
+
+    /**
+     * Synthetic source_ref for legacy egc_level_fee charges that pre-date intake.
+     * Stable per charge so backfill is idempotent under the source quad unique key
+     * and never collides with post-cutover mint refs
+     * (`egc_level_fee:student:{id}:semester:{id}:level:{n}`).
+     */
+    public static function legacyEgcLevelFeeChargeRef(int $chargeId): string
+    {
+        return "legacy:egc_level_fee:charge:{$chargeId}";
+    }
+
+    /**
+     * Synthetic source_ref for legacy egc_exempt_credit charges that pre-date
+     * entitlement conversion. Stable per charge so conversion is idempotent.
+     */
+    public static function legacyEgcExemptCreditChargeRef(int $chargeId): string
+    {
+        return "legacy:egc_exempt_credit:charge:{$chargeId}";
+    }
+
+    /**
+     * Synthetic source_ref for legacy egc_retake InvoiceDiscount rows that
+     * pre-date FinanceDiscountEntitlement linking. Stable per discount id.
+     */
+    public static function legacyEgcRetakeDiscountRef(int $invoiceDiscountId): string
+    {
+        return "legacy:egc_retake:invoice_discount:{$invoiceDiscountId}";
+    }
 }
