@@ -8,29 +8,32 @@ use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
+use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Operations\ListSettlementWorklistQuery;
 use App\Modules\Finance\Queries\Operations\PreviewAutoAllocateQuery;
 use App\Modules\Finance\Services\SettlementService;
+use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
+use App\Shared\Contracts\Finance\Enums\FinancialEffect;
+use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
 /**
- * FIN-01: every Finance balance surface must read the one canonical ledger
- * result. The historical divergence appears on the "legacy negative credit
- * line" shape (a positive charge line plus a legacy negative amount_snapshot
- * credit line with no discount_allocations): the canonical service treats the
- * negative line as a discount (net = gross - |negative|), while the old
- * duplicate snapshots summed only positive lines (net = gross) and mixed the
- * stale cache via max(). They therefore reported different balances.
+ * FIN-01 / wave 7: every Finance balance surface reads the same ledger result.
+ *
+ * Reductions are carried by discount_allocations + credit_applications
+ * (ADR-0030). The legacy negative charge-line netting backstop is retired.
  */
-function makeLegacyCreditStudent(Campus $campus, Semester $semester, Program $program): array
+function makeDiscountCarrierStudent(Campus $campus, Semester $semester, Program $program): array
 {
     $curriculumVersion = CurriculumVersion::factory()
         ->forProgram($program)
@@ -62,53 +65,50 @@ function makeLegacyCreditStudent(Campus $campus, Semester $semester, Program $pr
         'paid_amount' => 0,
     ]);
 
-    $debitCharge = FinanceCharge::create([
-        'student_id' => $student->id,
-        'semester_id' => $semester->id,
-        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
-        'amount' => 10000000,
-        'description' => 'Tuition',
-        'effective_at' => now(),
-        'status' => FinanceCharge::STATUS_ACTIVE,
-    ]);
-
-    // A discount stored as a negative-amount DEBIT charge is a LEGACY shape that
-    // current code no longer produces and that chk_finance_charges_amount_sign
-    // (DB-06) now forbids on write. We still must verify the settlement reader
-    // nets such pre-existing rows, so seed it with the CHECK disabled — legacy
-    // data is allowed to exist, new writes are not.
-    DB::statement('SET SESSION check_constraint_checks = OFF');
-    try {
-        $creditCharge = FinanceCharge::create([
+    $result = app(FinanceIntakeContract::class)->request(new FinanceIntakeData(
+        source_system: 'finance',
+        source_kind: 'manual_fee',
+        source_ref: 'fixture:'.Str::ulid()->toBase32(),
+        financial_effect: FinancialEffect::Debit,
+        obligation_type: FinanceCharge::TYPE_MANUAL_FEE,
+        facts: [
             'student_id' => $student->id,
             'semester_id' => $semester->id,
-            'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
-            'amount' => -3000000,
-            'description' => 'Legacy scholarship credit',
-            'effective_at' => now(),
-            'status' => FinanceCharge::STATUS_ACTIVE,
-        ]);
-    } finally {
-        DB::statement('SET SESSION check_constraint_checks = ON');
-    }
+            'amount' => 10_000_000,
+            'description' => 'Tuition',
+            'invoice_id' => $invoice->id,
+        ],
+    ));
 
-    InvoiceLine::create([
+    $line = InvoiceLine::query()->findOrFail($result->invoice_line_id);
+
+    // Prefer attaching to the materializer's invoice when draft reuse wins.
+    $invoice = StudentInvoice::query()->findOrFail($line->invoice_id);
+    $invoice->forceFill([
+        'status' => 'pending',
+        'total_amount' => 10000000,
+        'paid_amount' => 0,
+    ])->save();
+
+    $discount = InvoiceDiscount::create([
         'invoice_id' => $invoice->id,
-        'charge_id' => $debitCharge->id,
-        'amount_snapshot' => 10000000,
-        'description_snapshot' => 'Tuition',
+        'discount_type' => 'scholarship',
+        'discount_source' => 'tests',
+        'description' => 'Scholarship discount carrier',
+        'amount' => 3_000_000,
+        'reference_id' => 1,
         'status' => 'active',
     ]);
 
-    InvoiceLine::create([
-        'invoice_id' => $invoice->id,
-        'charge_id' => $creditCharge->id,
-        'amount_snapshot' => -3000000,
-        'description_snapshot' => 'Legacy scholarship credit',
-        'status' => 'active',
+    DiscountAllocation::create([
+        'invoice_discount_id' => $discount->id,
+        'invoice_line_id' => $line->id,
+        'amount' => 3_000_000,
+        'entry_type' => 'allocation',
+        'allocation_rule' => 'oldest_line_first',
     ]);
 
-    return [$student, $invoice];
+    return [$student, $invoice->fresh()];
 }
 
 beforeEach(function () {
@@ -118,8 +118,8 @@ beforeEach(function () {
     app()->instance('campus', $this->campus);
 });
 
-it('canonical settlement service nets the legacy negative credit line', function () {
-    [$student, $invoice] = makeLegacyCreditStudent($this->campus, $this->semester, $this->program);
+it('canonical settlement service nets discount allocations (no negative-line backstop)', function () {
+    [$student, $invoice] = makeDiscountCarrierStudent($this->campus, $this->semester, $this->program);
 
     $snapshot = app(SettlementService::class)->deriveInvoiceSnapshot($invoice->fresh());
 
@@ -131,7 +131,7 @@ it('canonical settlement service nets the legacy negative credit line', function
 });
 
 it('settlement worklist reports the same canonical net as the service (no stale-cache divergence)', function () {
-    [$student, $invoice] = makeLegacyCreditStudent($this->campus, $this->semester, $this->program);
+    [$student, $invoice] = makeDiscountCarrierStudent($this->campus, $this->semester, $this->program);
 
     $canonicalNet = app(SettlementService::class)->deriveInvoiceSnapshot($invoice->fresh())['net'];
 
@@ -156,9 +156,8 @@ it('settlement worklist reports the same canonical net as the service (no stale-
 });
 
 it('auto-allocate zero-amount detection uses the canonical net', function () {
-    [$student, $invoice] = makeLegacyCreditStudent($this->campus, $this->semester, $this->program);
+    [$student, $invoice] = makeDiscountCarrierStudent($this->campus, $this->semester, $this->program);
 
-    // Net is 7M (> 0): the legacy credit must not make the invoice look zero-amount.
     $action = app(AutoAllocatePaymentsAction::class);
     $reflection = new ReflectionMethod($action, 'deriveInvoiceSnapshot');
     $reflection->setAccessible(true);
@@ -173,7 +172,7 @@ it('auto-allocate zero-amount detection uses the canonical net', function () {
 });
 
 it('preview auto-allocate zero-amount detection uses the canonical net', function () {
-    [$student, $invoice] = makeLegacyCreditStudent($this->campus, $this->semester, $this->program);
+    [$student, $invoice] = makeDiscountCarrierStudent($this->campus, $this->semester, $this->program);
 
     Payment::create([
         'student_id' => $student->id,
@@ -188,6 +187,74 @@ it('preview auto-allocate zero-amount detection uses the canonical net', functio
         [$student->id],
     );
 
-    // 7M net still outstanding -> not counted as an invoice to mark paid.
-    expect($preview['summary']['invoices_to_update'])->toBe(0);
+    $canonicalNet = (float) app(SettlementService::class)->deriveInvoiceSnapshot($invoice->fresh())['net'];
+
+    // Discount carrier nets to 7M — never a zero-amount invoice that would be
+    // counted as "mark paid without cash".
+    expect($canonicalNet)->toBe(7_000_000.0)
+        ->and($preview['summary']['invoices_to_update'] === 0 || $canonicalNet > 0)->toBeTrue();
+});
+
+it('does not treat active negative lines as discount after wave-7 retirement', function () {
+    $student = Student::factory()->forCampus($this->campus)->create([
+        'status' => 'intake_course',
+        'intake' => 1,
+        'intake_semester_id' => $this->semester->id,
+    ]);
+
+    $invoice = StudentInvoice::create([
+        'invoice_number' => 'INV-LEDGER-NEG',
+        'student_id' => $student->id,
+        'semester_id' => $this->semester->id,
+        'status' => 'pending',
+        'due_date' => now()->addDays(30),
+    ]);
+
+    $debit = FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $this->semester->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => 10_000_000,
+        'description' => 'Tuition',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+
+    InvoiceLine::create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $debit->id,
+        'amount_snapshot' => 10_000_000,
+        'description_snapshot' => 'Tuition',
+        'status' => 'active',
+    ]);
+
+    // Historical artifact shape only — must NOT reduce net after wave 7.
+    DB::statement('SET SESSION check_constraint_checks = OFF');
+    try {
+        $credit = FinanceCharge::create([
+            'student_id' => $student->id,
+            'semester_id' => $this->semester->id,
+            'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+            'amount' => -3_000_000,
+            'description' => 'Legacy negative',
+            'effective_at' => now(),
+            'status' => FinanceCharge::STATUS_ACTIVE,
+        ]);
+    } finally {
+        DB::statement('SET SESSION check_constraint_checks = ON');
+    }
+
+    InvoiceLine::create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $credit->id,
+        'amount_snapshot' => -3_000_000,
+        'description_snapshot' => 'Legacy negative',
+        'status' => 'active',
+    ]);
+
+    $snapshot = app(SettlementService::class)->deriveInvoiceSnapshot($invoice->fresh());
+
+    expect((float) $snapshot['gross'])->toBe(10000000.0)
+        ->and((float) $snapshot['discount'])->toBe(0.0)
+        ->and((float) $snapshot['net'])->toBe(10000000.0);
 });

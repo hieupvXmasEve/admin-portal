@@ -378,17 +378,12 @@ class BackfillStudentFees extends Command
             return $query->first(); // Already exists
         }
 
-        return FinanceCharge::create([
-            'student_id' => $student->id,
-            'semester_id' => $semesterId,
-            'charge_type' => $type,
-            'amount' => $amount,
-            'description' => $description,
-            'effective_at' => now(),
-            'status' => FinanceCharge::STATUS_ACTIVE,
-            'created_by_user_id' => 1, // System admin or null
-            'source_type' => $sourceType,
-            'source_id' => $sourceId,
-        ]);
+        // Wave 7: FinanceCharge is materializer-only. This one-shot command must
+        // not invent charges; re-run the type-specific intake generator / backfill.
+        $this->warn(
+            "Skipping create for student {$student->id} type {$type}: use FinanceIntakeContract generators (wave 7)."
+        );
+
+        return null;
     }
 }

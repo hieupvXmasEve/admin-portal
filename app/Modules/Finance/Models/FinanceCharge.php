@@ -8,7 +8,6 @@ use App\Models\BillingCycle;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
-
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -97,8 +96,9 @@ class FinanceCharge extends Model
     ];
 
     /**
-     * Charge types that represent a credit (negative ledger entry). Used to keep
-     * model logic and the finance_charges money-sign DB CHECK aligned (DB-06).
+     * Historical credit charge_types (negative ledger rows). New credit flows use
+     * FinanceCreditEntitlement / FinanceDiscountEntitlement (ADR-0030 / wave 7).
+     * Kept for money-sign CHECK parity and voided historical rows only.
      *
      * @var array<int, string>
      */
@@ -112,7 +112,6 @@ class FinanceCharge extends Model
     // =====================
     // Relationships
     // =====================
-
 
     public function student(): BelongsTo
     {
@@ -258,5 +257,4 @@ class FinanceCharge extends Model
 
         return $this;
     }
-
 }

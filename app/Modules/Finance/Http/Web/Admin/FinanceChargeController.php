@@ -7,8 +7,7 @@ namespace App\Modules\Finance\Http\Web\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Modules\Finance\Actions\CreateFinanceChargeAction;
-use App\Modules\Finance\Actions\CreateManualFeeDebitAction;
+use App\Modules\Finance\Actions\CreateStaffDebitAction;
 use App\Modules\Finance\Actions\PushNextInstallmentAction;
 use App\Modules\Finance\Actions\SplitChargeIntoInstallmentsAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
@@ -30,30 +29,21 @@ use Inertia\Response;
 
 class FinanceChargeController extends Controller
 {
+    /** Wave 7: staff form is intake-only for staff-supplied debits. */
     private const MANUAL_CREATE_CHARGE_TYPES = [
-        FinanceCharge::TYPE_TUITION_TERM,
-        FinanceCharge::TYPE_EGC_LEVEL_FEE,
-        FinanceCharge::TYPE_RETAKE_FEE,
-        FinanceCharge::TYPE_EXAM_RESIT_FEE,
         FinanceCharge::TYPE_MANUAL_FEE,
         FinanceCharge::TYPE_ADMISSION_FEE,
-        FinanceCharge::TYPE_DEFER_CREDIT,
-        FinanceCharge::TYPE_EGC_EXEMPT_CREDIT,
         FinanceCharge::TYPE_ADJUSTMENT,
     ];
 
     private const MANUAL_CREATE_CHARGE_TYPE_DNG_LABELS = [
-        FinanceCharge::TYPE_TUITION_TERM => 'HP',
-        FinanceCharge::TYPE_EGC_LEVEL_FEE => 'GC',
-        FinanceCharge::TYPE_RETAKE_FEE => 'HL',
-        FinanceCharge::TYPE_EXAM_RESIT_FEE => 'PTL',
         FinanceCharge::TYPE_MANUAL_FEE => 'KHAC',
         FinanceCharge::TYPE_ADMISSION_FEE => 'PRE',
+        FinanceCharge::TYPE_ADJUSTMENT => 'KHAC',
     ];
 
     public function __construct(
-        private CreateFinanceChargeAction $createChargeAction,
-        private CreateManualFeeDebitAction $createManualFeeDebitAction,
+        private CreateStaffDebitAction $createStaffDebitAction,
         private VoidFinanceChargeAction $voidChargeAction,
     ) {}
 
@@ -272,30 +262,18 @@ class FinanceChargeController extends Controller
     }
 
     /**
-     * Store a newly created charge.
-     *
-     * manual_fee is cut over to the Finance Intake Contract (wave 2). Other
-     * charge types on this form remain on the direct create path until their
-     * owning migration wave.
+     * Store a newly created charge via Finance Intake (wave 7 materializer-only).
      */
     public function store(StoreFinanceChargeRequest $request): RedirectResponse
     {
         $validated = $request->validated();
 
         try {
-            if ($validated['charge_type'] === FinanceCharge::TYPE_MANUAL_FEE) {
-                $result = $this->createManualFeeDebitAction->handle($validated);
-
-                Inertia::flash('success', 'Charge created successfully.');
-
-                return redirect()->route('finance.charges.show', $result->finance_charge_id);
-            }
-
-            $charge = $this->createChargeAction->handle($validated);
+            $result = $this->createStaffDebitAction->handle($validated);
 
             Inertia::flash('success', 'Charge created successfully.');
 
-            return redirect()->route('finance.charges.show', $charge);
+            return redirect()->route('finance.charges.show', $result->finance_charge_id);
         } catch (\Throwable $e) {
             return back()
                 ->withInput()

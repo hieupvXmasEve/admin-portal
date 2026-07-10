@@ -15,6 +15,7 @@ use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
@@ -61,6 +62,18 @@ beforeEach(function () {
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
 
+    DB::table('finance_pricing_catalog_items')->insert([
+        'obligation_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 5_000_000,
+        'currency' => 'VND',
+        'rule_version' => 'retake_fee:v1',
+        'description' => 'Fixed retake fee',
+        'is_active' => true,
+        'effective_from' => now()->subDay(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
     // Mock DNG services. createAndPush must return a persisted DngPaymentRequest so
     // the action can insert dng_payment_request_charges FK rows against a real DB id.
     $mockDngService = Mockery::mock(DngPaymentService::class);
@@ -98,46 +111,40 @@ it('creates finance charge for approved registration', function () {
     expect($result->charge_created_by_user_id)->toBe($this->user->id);
     expect($result->charge_created_at)->not->toBeNull();
 
-    // Verify FinanceCharge was created
+    // Verify FinanceCharge was materialized via intake (no source_type write).
     $charge = FinanceCharge::find($result->finance_charge_id);
     expect($charge)->not->toBeNull();
     expect($charge->charge_type)->toBe(FinanceCharge::TYPE_RETAKE_FEE);
     expect((float) $charge->amount)->toBe(5000000.00);
-    expect($charge->source_type)->toBe(CourseRetakeRegistration::class);
-    expect($charge->source_id)->toBe($reg->id);
+    expect($charge->source_type)->toBeNull();
+    expect($charge->finance_obligation_id)->not->toBeNull();
     expect($charge->status)->toBe(FinanceCharge::STATUS_ACTIVE);
 });
 
-it('reuses an existing active source charge for an approved registration', function () {
+it('reuses an existing intake charge for an approved registration', function () {
     $reg = createChargeTestRegistration();
-    $existingCharge = FinanceCharge::create([
-        'student_id' => $reg->student_id,
-        'semester_id' => $reg->semester_id,
-        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
-        'amount' => 5000000,
-        'description' => 'Pre-existing HQ retake fee',
-        'effective_at' => now(),
-        'status' => FinanceCharge::STATUS_ACTIVE,
-        'source_type' => CourseRetakeRegistration::class,
-        'source_id' => $reg->id,
-    ]);
 
     $action = app(CreateRetakeCourseChargeAction::class);
+    $first = $action->handle([
+        'registration_id' => $reg->id,
+    ]);
+
+    $reg->forceFill(['status' => CourseRetakeRegistration::STATUS_APPROVED])->save();
+
     $result = $action->handle([
         'registration_id' => $reg->id,
     ]);
 
     expect($result->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
-    expect($result->finance_charge_id)->toBe($existingCharge->id);
+    expect($result->finance_charge_id)->toBe($first->finance_charge_id);
     expect(FinanceCharge::query()
-        ->where('source_type', CourseRetakeRegistration::class)
-        ->where('source_id', $reg->id)
         ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
+        ->where('student_id', $reg->student_id)
         ->where('status', FinanceCharge::STATUS_ACTIVE)
         ->count())->toBe(1);
 });
 
-it('uses custom amount when provided', function () {
+it('prices retake fee from the Finance catalog (amount override ignored)', function () {
     $reg = createChargeTestRegistration();
 
     $action = app(CreateRetakeCourseChargeAction::class);
@@ -147,7 +154,8 @@ it('uses custom amount when provided', function () {
     ]);
 
     $charge = FinanceCharge::find($result->finance_charge_id);
-    expect((float) $charge->amount)->toBe(3000000.00);
+    // CatalogFixed prices from finance_pricing_catalog_items (5M), not request amount.
+    expect((float) $charge->amount)->toBe(5_000_000.0);
 });
 
 it('sets payment_deadline when provided', function () {

@@ -6,8 +6,11 @@ namespace App\Modules\Finance\Actions\Operations;
 
 use App\Models\CourseRegistration;
 use App\Modules\Finance\Models\FinanceCharge;
-use App\Modules\Finance\Services\FinanceChargeService;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Support\BillingExceptionIdentifier;
+use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
+use App\Shared\Contracts\Finance\Enums\FinancialEffect;
+use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -91,7 +94,36 @@ class FixBillingExceptionAction
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $existingCharge = FinanceCharge::query()
+            if (! $registration->is_retake) {
+                throw new RuntimeException('Registration is not marked as retake');
+            }
+
+            $sourceRef = 'legacy-course-registration:'.$registration->id;
+
+            $existingObligationId = FinanceObligation::query()
+                ->where('source_system', 'finance')
+                ->where('source_kind', 'legacy_course_registration')
+                ->where('source_ref', $sourceRef)
+                ->where('obligation_type', FinanceCharge::TYPE_RETAKE_FEE)
+                ->value('id');
+
+            if ($existingObligationId !== null) {
+                $existingCharge = FinanceCharge::query()
+                    ->where('finance_obligation_id', $existingObligationId)
+                    ->where('status', FinanceCharge::STATUS_ACTIVE)
+                    ->first();
+
+                if ($existingCharge) {
+                    return [
+                        'fixed' => true,
+                        'message' => 'Retake fee charge already exists',
+                        'charge_id' => $existingCharge->id,
+                    ];
+                }
+            }
+
+            // Legacy morph-source rows (pre wave-7 materializer).
+            $legacyCharge = FinanceCharge::query()
                 ->where('student_id', $registration->student_id)
                 ->where('semester_id', $registration->semester_id)
                 ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
@@ -100,24 +132,34 @@ class FixBillingExceptionAction
                 ->where('source_id', $registration->id)
                 ->first();
 
-            if ($existingCharge) {
+            if ($legacyCharge) {
                 return [
                     'fixed' => true,
                     'message' => 'Retake fee charge already exists',
-                    'charge_id' => $existingCharge->id,
+                    'charge_id' => $legacyCharge->id,
                 ];
             }
 
-            $charge = app(FinanceChargeService::class)->generateRetakeCharge($registration);
+            $courseName = $registration->courseOffering?->unit?->name ?? 'Unknown Course';
 
-            if ($charge === null) {
-                throw new RuntimeException('Retake charge skipped by defer policy');
-            }
+            // CatalogFixed: amount comes from finance_pricing_catalog_items only.
+            $result = app(FinanceIntakeContract::class)->request(new FinanceIntakeData(
+                source_system: 'finance',
+                source_kind: 'legacy_course_registration',
+                source_ref: $sourceRef,
+                financial_effect: FinancialEffect::Debit,
+                obligation_type: FinanceCharge::TYPE_RETAKE_FEE,
+                facts: [
+                    'student_id' => $registration->student_id,
+                    'semester_id' => $registration->semester_id,
+                    'description' => "Retake Fee: {$courseName}",
+                ],
+            ));
 
             return [
                 'fixed' => true,
                 'message' => 'Created retake fee charge',
-                'charge_id' => $charge->id,
+                'charge_id' => $result->finance_charge_id,
             ];
         });
     }

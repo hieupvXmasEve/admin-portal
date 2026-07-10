@@ -15,6 +15,7 @@ use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Queries\Dng\ListDngWorklistQuery;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Build an Academic-approved exam-resit attempt (thi lại) source that is waiting
@@ -50,6 +51,26 @@ function makeApprovedExamResitAttempt(
         'failure_reason' => AcademicRecord::FAILURE_GRADE_FAILED,
     ]);
 
+    $feeAmount = (float) ($overrides['fee_amount'] ?? 750_000);
+
+    // Wave 7: CreateExamResitChargeSimpleAction goes through CatalogFixed intake.
+    if (! DB::table('finance_pricing_catalog_items')
+        ->where('obligation_type', FinanceCharge::TYPE_EXAM_RESIT_FEE)
+        ->where('is_active', true)
+        ->exists()) {
+        DB::table('finance_pricing_catalog_items')->insert([
+            'obligation_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
+            'amount' => $feeAmount,
+            'currency' => 'VND',
+            'rule_version' => 'exam_resit_fee:v1',
+            'description' => 'Fixed resit fee',
+            'is_active' => true,
+            'effective_from' => now()->subDay(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     return ExamResitAttempt::create(array_merge([
         'student_id' => $student->id,
         'academic_record_id' => $record->id,
@@ -65,8 +86,8 @@ function makeApprovedExamResitAttempt(
         'attempt_number' => null,
         'approved_at' => now(),
         'hq_fee_status' => ExamResitAttempt::HQ_FEE_PENDING,
-        'fee_amount' => 750_000,
-        'exam_resit_fee_snapshot' => 750_000,
+        'fee_amount' => $feeAmount,
+        'exam_resit_fee_snapshot' => $feeAmount,
     ], $overrides));
 }
 

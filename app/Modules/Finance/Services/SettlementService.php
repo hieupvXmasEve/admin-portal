@@ -76,15 +76,9 @@ class SettlementService
         $credit = max(0.0, (float) $activeLines
             ->sum(fn (InvoiceLine $line) => (float) $line->creditApplications->sum('amount')));
 
-        if ($discount == 0.0 && $credit == 0.0) {
-            // Legacy backstop (ADR-0030): negative charge lines net as discount until
-            // wave-7 hardening deletes this path once zero active negatives remain.
-            // Skip when credit applications already carry the reduction so a partial
-            // conversion cannot double-count.
-            $discount = abs((float) $activeLines
-                ->filter(fn (InvoiceLine $line) => (float) $line->amount_snapshot < 0)
-                ->sum('amount_snapshot'));
-        }
+        // Wave 7 / ADR-0030: negative charge lines are historical artifacts only.
+        // Reductions live in discount_allocations + credit_applications. The
+        // legacy "net negative amount_snapshot as discount" backstop is retired.
 
         $net = max(0.0, $gross - $discount);
 

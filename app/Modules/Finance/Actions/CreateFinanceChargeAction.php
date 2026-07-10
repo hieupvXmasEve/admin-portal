@@ -14,6 +14,13 @@ use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Debit materializer writer (ADR-0028 / wave 7).
+ *
+ * Sole production owner of FinanceCharge::create. Called only from
+ * RequestFinanceDebitAction (intake debit path). source_type/source_id are
+ * retired on new writes — source identity lives on FinanceObligation.
+ */
 class CreateFinanceChargeAction
 {
     /**
@@ -31,7 +38,8 @@ class CreateFinanceChargeAction
     public function handle(array $data): FinanceCharge
     {
         return DB::transaction(function () use ($data) {
-            // Create the charge
+            // Materialize the debit read-model row. source_type/source_id are
+            // intentionally never written (wave 7 retirement).
             $charge = FinanceCharge::create([
                 'finance_obligation_id' => $data['finance_obligation_id'] ?? null,
                 'student_id' => $data['student_id'],
@@ -42,12 +50,11 @@ class CreateFinanceChargeAction
                 'description' => $data['description'],
                 'effective_at' => $data['effective_at'] ?? now(),
                 'status' => FinanceCharge::STATUS_ACTIVE,
-                'source_type' => $data['source_type'] ?? null,
-                'source_id' => $data['source_id'] ?? null,
                 'created_by_user_id' => $data['created_by_user_id'] ?? auth()->id() ?? null,
             ]);
 
-            // All charges (positive & negative) get assigned to invoice
+            // Debit materializer: project charge → invoice line. Credits never
+            // materialize charge rows (ADR-0030 / wave 7).
             $dueDate = isset($data['due_date']) ? Carbon::parse($data['due_date']) : null;
             $invoice = $this->getInvoiceForCharge($charge, $data['invoice_id'] ?? null, $dueDate);
             $this->assignChargeToInvoice($charge, $invoice);

@@ -5,11 +5,16 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Actions;
 
 use App\Models\CourseRetakeRegistration;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
+use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
+use App\Shared\Contracts\Finance\Enums\FinancialEffect;
+use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -18,7 +23,7 @@ use Illuminate\Validation\ValidationException;
 class CreateRetakeCourseChargeAction
 {
     public function __construct(
-        protected CreateFinanceChargeAction $createChargeAction,
+        protected FinanceIntakeContract $intake,
         protected DngPaymentService $dngPaymentService,
         protected DngCampusCodeResolver $dngCampusCodeResolver,
     ) {}
@@ -60,25 +65,46 @@ class CreateRetakeCourseChargeAction
             $userId = auth()->id();
             $paymentDeadline = $data['payment_deadline'] ?? null;
 
-            // Legacy path: registration still approved → create charge + transition
+            // Registration still approved → ensure intake debit + transition
             if ($registration->status === CourseRetakeRegistration::STATUS_APPROVED) {
                 $unit = $registration->unit;
-                $amount = $data['amount'] ?? $registration->retake_fee;
+                $facts = [
+                    'student_id' => $registration->student_id,
+                    'semester_id' => $registration->charge_semester_id ?? $registration->semester_id,
+                    'campus_id' => $registration->campus_id,
+                    'unit_id' => $registration->unit_id,
+                    'course_offering_id' => $registration->course_offering_id,
+                    'original_academic_record_id' => $registration->original_academic_record_id,
+                    'original_semester_id' => $registration->original_semester_id,
+                    'operation_semester_id' => $registration->operation_semester_id,
+                    'charge_semester_id' => $registration->charge_semester_id,
+                    'attempt_number' => $registration->attempt_number,
+                    'description' => "Phí học lại: {$unit->code} - {$unit->name}",
+                ];
 
-                $charge = $this->findActiveSourceCharge($registration)
-                    ?? $this->createChargeAction->handle([
-                        'student_id' => $registration->student_id,
-                        'semester_id' => $registration->charge_semester_id ?? $registration->semester_id,
-                        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
-                        'amount' => $amount,
-                        'description' => "Phí học lại: {$unit->code} - {$unit->name}",
-                        'source_type' => CourseRetakeRegistration::class,
-                        'source_id' => $registration->id,
-                        'created_by_user_id' => $userId,
-                        'due_date' => $paymentDeadline,
+                if ($paymentDeadline) {
+                    $facts['due_date'] = $paymentDeadline;
+                }
+
+                $result = $this->intake->request(new FinanceIntakeData(
+                    source_system: AcademicFinanceObligationSource::SOURCE_SYSTEM,
+                    source_kind: AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION,
+                    source_ref: AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration),
+                    financial_effect: FinancialEffect::Debit,
+                    obligation_type: AcademicFinanceObligationSource::RETAKE_FEE,
+                    facts: $facts,
+                ));
+
+                $chargeId = $result->finance_charge_id
+                    ?? $this->findActiveIntakeCharge($registration)?->id;
+
+                if ($chargeId === null) {
+                    throw ValidationException::withMessages([
+                        'registration_id' => ['Finance intake did not materialize a retake charge.'],
                     ]);
+                }
 
-                $registration->transitionToPaymentPending($charge->id, $userId);
+                $registration->transitionToPaymentPending((int) $chargeId, $userId);
                 $registration->refresh();
             }
 
@@ -160,12 +186,27 @@ class CreateRetakeCourseChargeAction
         });
     }
 
-    private function findActiveSourceCharge(CourseRetakeRegistration $registration): ?FinanceCharge
+    private function findActiveIntakeCharge(CourseRetakeRegistration $registration): ?FinanceCharge
     {
+        $obligationId = FinanceObligation::query()
+            ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+            ->where('source_kind', AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION)
+            ->where('source_ref', AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration))
+            ->where('obligation_type', AcademicFinanceObligationSource::RETAKE_FEE)
+            ->value('id');
+
+        if ($obligationId === null) {
+            // Legacy rows still keyed by morph source until wave-7 data closure.
+            return FinanceCharge::query()
+                ->where('source_type', CourseRetakeRegistration::class)
+                ->where('source_id', $registration->id)
+                ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
+                ->where('status', FinanceCharge::STATUS_ACTIVE)
+                ->first();
+        }
+
         return FinanceCharge::query()
-            ->where('source_type', CourseRetakeRegistration::class)
-            ->where('source_id', $registration->id)
-            ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
+            ->where('finance_obligation_id', $obligationId)
             ->where('status', FinanceCharge::STATUS_ACTIVE)
             ->first();
     }

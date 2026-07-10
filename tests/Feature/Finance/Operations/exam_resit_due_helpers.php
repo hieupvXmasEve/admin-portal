@@ -12,6 +12,7 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Models\FinanceCharge;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Shared fixtures for ACAD-RET-002 exam-resit Due Reminders tests. Complements
@@ -65,9 +66,36 @@ function scheduleExamResitAttemptInSlot(
  */
 function createExamResitChargeFor(ExamResitAttempt $attempt): FinanceCharge
 {
+    ensureExamResitPricingCatalog((float) ($attempt->fee_amount ?: 750_000));
+
     $updated = app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
 
     return FinanceCharge::findOrFail($updated->finance_charge_id);
+}
+
+/**
+ * Wave 7: exam_resit_fee is CatalogFixed — SimpleAction intake needs a catalog rule.
+ */
+function ensureExamResitPricingCatalog(float $amount = 750_000): void
+{
+    if (DB::table('finance_pricing_catalog_items')
+        ->where('obligation_type', FinanceCharge::TYPE_EXAM_RESIT_FEE)
+        ->where('is_active', true)
+        ->exists()) {
+        return;
+    }
+
+    DB::table('finance_pricing_catalog_items')->insert([
+        'obligation_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
+        'amount' => $amount,
+        'currency' => 'VND',
+        'rule_version' => 'exam_resit_fee:v1',
+        'description' => 'Fixed resit fee',
+        'is_active' => true,
+        'effective_from' => now()->subDay(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
 }
 
 /**

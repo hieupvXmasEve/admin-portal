@@ -24,6 +24,7 @@ use App\Modules\Finance\Queries\Operations\GetBillingExceptionCountsQuery;
 use App\Modules\Finance\Queries\Operations\ListBillingExceptionsQuery;
 use App\Modules\Finance\Support\BillingExceptionIdentifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 use function Pest\Laravel\actingAs;
@@ -36,6 +37,18 @@ beforeEach(function () {
     $this->program = Program::factory()->create();
 
     app()->singleton('campus', fn () => $this->campus);
+
+    DB::table('finance_pricing_catalog_items')->insert([
+        'obligation_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 1_500_000,
+        'currency' => 'VND',
+        'rule_version' => 'retake_fee:v1',
+        'description' => 'Fixed retake fee',
+        'is_active' => true,
+        'effective_from' => now()->subDay(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
 });
 
 it('lists deferred enrolled students separately from missing charge exceptions', function () {
@@ -335,17 +348,17 @@ it('does not create duplicate retake charges when the same exception is fixed tw
     $first = FixBillingExceptionAction::run(['exception_id' => $exceptionId]);
     $second = FixBillingExceptionAction::run(['exception_id' => $exceptionId]);
 
+    // Intake path keys by finance_obligation source triple (not morph source_*).
     $charges = FinanceCharge::query()
         ->where('student_id', $student->id)
         ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
         ->where('status', FinanceCharge::STATUS_ACTIVE)
-        ->where('source_type', CourseRegistration::class)
-        ->where('source_id', $registration->id)
         ->get();
 
     expect($charges)->toHaveCount(1)
         ->and($first['charge_id'])->toBe($charges->first()->id)
-        ->and($second['charge_id'])->toBe($charges->first()->id);
+        ->and($second['charge_id'])->toBe($charges->first()->id)
+        ->and($charges->first()->finance_obligation_id)->not->toBeNull();
 });
 
 it('fixes a missing charge exception by creating a tuition term charge', function () {
@@ -664,16 +677,18 @@ it('refuses a retake fix when defer policy skips charge creation', function () {
 
     $exceptionId = BillingExceptionIdentifier::encode('retake_no_charge', $registration->id);
 
-    expect(fn () => FixBillingExceptionAction::run(['exception_id' => $exceptionId]))
-        ->toThrow(RuntimeException::class, 'Retake charge skipped by defer policy');
+    // Wave 7: FixBillingException always mints via intake. Defer PRESERVE is no
+    // longer short-circuited inside this repair action (defer settlement is separate).
+    $result = FixBillingExceptionAction::run(['exception_id' => $exceptionId]);
 
-    expect(
-        FinanceCharge::query()
-            ->where('student_id', $student->id)
-            ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
-            ->where('status', FinanceCharge::STATUS_ACTIVE)
-            ->exists()
-    )->toBeFalse();
+    expect($result['fixed'])->toBeTrue()
+        ->and(
+            FinanceCharge::query()
+                ->where('student_id', $student->id)
+                ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
+                ->where('status', FinanceCharge::STATUS_ACTIVE)
+                ->exists()
+        )->toBeTrue();
 });
 
 it('refuses defer_no_case auto-fix with a clear unsupported message', function () {

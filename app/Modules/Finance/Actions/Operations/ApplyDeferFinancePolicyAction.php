@@ -6,11 +6,12 @@ namespace App\Modules\Finance\Actions\Operations;
 
 use App\Models\DeferCase;
 use App\Modules\Finance\Actions\AllocatePaymentAction;
-use App\Modules\Finance\Actions\CreateFinanceChargeAction;
+use App\Modules\Finance\Actions\CreateStaffDebitAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
@@ -43,7 +44,8 @@ use Illuminate\Support\Facades\DB;
  *
  * This action is built in isolation (M1): it is NOT wired into the runtime
  * defer flow and does not change charge generation (those are M3 / M2).
- * Traceability relies on existing source_type/source_id + void_reason only.
+ * Traceability: FORFEIT adjustment via intake source_ref defer_forfeit:{case_id};
+ * void_reason on released obligations. Wave 7 no longer writes charge source_type.
  */
 class ApplyDeferFinancePolicyAction
 {
@@ -75,7 +77,7 @@ class ApplyDeferFinancePolicyAction
 
     public function __construct(
         private readonly VoidFinanceChargeAction $voidAction,
-        private readonly CreateFinanceChargeAction $createChargeAction,
+        private readonly CreateStaffDebitAction $createStaffDebitAction,
         private readonly AllocatePaymentAction $allocateAction,
         private readonly SettlementService $settlementService,
     ) {}
@@ -136,23 +138,36 @@ class ApplyDeferFinancePolicyAction
     /**
      * Active positive finance charges for the student in the defer semester.
      *
-     * Excludes this settlement's own output — the FORFEIT adjustment charge
-     * (charge_type = adjustment, source_type = DeferCase) — so a re-run treats
-     * an already-settled case as a noop instead of voiding and re-consuming its
-     * own adjustment. Real obligations carry other source types and remain in.
+     * Excludes this settlement's own FORFEIT adjustment (intake source_ref
+     * defer_forfeit:{case_id}, or legacy source_type=DeferCase rows) so a re-run
+     * treats an already-settled case as a noop.
      *
      * @return Collection<int, FinanceCharge>
      */
     private function resolveObligations(DeferCase $case): Collection
     {
+        $forfeitObligationIds = FinanceObligation::query()
+            ->where('source_system', CreateStaffDebitAction::SOURCE_SYSTEM)
+            ->where('source_kind', 'defer_forfeit')
+            ->where('source_ref', 'defer_forfeit:'.$case->id)
+            ->where('obligation_type', FinanceCharge::TYPE_ADJUSTMENT)
+            ->pluck('id');
+
         return FinanceCharge::query()
             ->where('student_id', $case->student_id)
             ->where('semester_id', $case->semester_id)
             ->where('status', FinanceCharge::STATUS_ACTIVE)
             ->where('amount', '>', 0)
-            ->whereNot(fn ($query) => $query
-                ->where('charge_type', FinanceCharge::TYPE_ADJUSTMENT)
-                ->where('source_type', DeferCase::class))
+            ->whereNot(function ($query) use ($case, $forfeitObligationIds) {
+                $query->where(function ($legacy) use ($case) {
+                    $legacy->where('charge_type', FinanceCharge::TYPE_ADJUSTMENT)
+                        ->where('source_type', DeferCase::class)
+                        ->where('source_id', $case->id);
+                })->orWhere(function ($intake) use ($forfeitObligationIds) {
+                    $intake->where('charge_type', FinanceCharge::TYPE_ADJUSTMENT)
+                        ->whereIn('finance_obligation_id', $forfeitObligationIds);
+                });
+            })
             ->orderBy('id')
             ->get();
     }
@@ -226,17 +241,18 @@ class ApplyDeferFinancePolicyAction
             ]);
         }
 
-        $adjustment = $this->createChargeAction->handle([
+        $result = $this->createStaffDebitAction->handle([
             'student_id' => $case->student_id,
             'semester_id' => $case->semester_id,
             'charge_type' => FinanceCharge::TYPE_ADJUSTMENT,
             'amount' => $consumed,
             'description' => "Defer forfeit settlement (case #{$case->id})",
-            'source_type' => DeferCase::class,
-            'source_id' => $case->id,
-            'created_by_user_id' => $actorId,
+            'source_kind' => 'defer_forfeit',
+            'source_ref' => 'defer_forfeit:'.$case->id,
             'invoice_id' => $this->resolveAdjustmentInvoiceId($case),
         ]);
+
+        $adjustment = FinanceCharge::query()->findOrFail($result->finance_charge_id);
 
         $this->allocateReleasedCash($adjustment, $paymentIds, $consumed, $actorId);
 

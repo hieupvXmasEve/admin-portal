@@ -165,8 +165,8 @@ it('FORFEIT paid voids the obligation, creates an adjustment equal to paid and f
         ->and($adjustment->charge_type)->toBe(FinanceCharge::TYPE_ADJUSTMENT)
         ->and((float) $adjustment->amount)->toBe(45_000_000.0)
         ->and($adjustment->status)->toBe(FinanceCharge::STATUS_ACTIVE)
-        ->and($adjustment->source_type)->toBe(DeferCase::class)
-        ->and((int) $adjustment->source_id)->toBe($case->id)
+        ->and($adjustment->source_type)->toBeNull()
+        ->and($adjustment->finance_obligation_id)->not->toBeNull()
         // Consumed paid cash is re-allocated onto the adjustment — no residual debt.
         ->and(app(SettlementService::class)->getChargePaidAmount($adjustment->id))->toBe(45_000_000.0)
         ->and($adjustment->fresh()->balance)->toBe(0.0)

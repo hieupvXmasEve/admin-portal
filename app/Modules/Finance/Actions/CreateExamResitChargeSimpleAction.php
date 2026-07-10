@@ -5,26 +5,23 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Actions;
 
 use App\Models\ExamResitAttempt;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
+use App\Shared\Contracts\Finance\Enums\FinancialEffect;
+use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Tạo FinanceCharge + invoice line cho nguồn thi lại (exam_resit_fee) — không tạo DNG.
- * Dùng khi HQ ghi nhận khoản phí cho một ExamResitAttempt đã được Academic duyệt và
- * đang chờ HQ tạo phí (hq_fee_status = hq_fee_pending).
+ * Ensure an exam resit fee debit exists for an HQ-pending attempt via intake.
  *
- * Prefer FinanceIntakeContract for new work. Legacy simple create still keys by
- * source_type/source_id; intake idempotency now lives on finance_obligations.
- *
- * Academic là chủ nguồn; HQ/Finance là chủ việc tạo phí và theo dõi thanh toán.
- *
- * @see CreateRetakeCourseChargeSimpleAction cho luồng học lại (HL) tương đương.
+ * Wave 7: materializer-only; charge identity resolved from FinanceObligation.
  */
 class CreateExamResitChargeSimpleAction
 {
     public function __construct(
-        protected CreateFinanceChargeAction $createChargeAction,
+        private readonly FinanceIntakeContract $intake,
     ) {}
 
     /**
@@ -46,34 +43,52 @@ class CreateExamResitChargeSimpleAction
             }
 
             $unit = $attempt->unit;
-            $amount = $data['amount'] ?? (float) $attempt->fee_amount;
+            $facts = [
+                'student_id' => $attempt->student_id,
+                'semester_id' => $attempt->charge_semester_id,
+                'campus_id' => $attempt->campus_id,
+                'unit_id' => $attempt->unit_id,
+                'academic_record_id' => $attempt->academic_record_id,
+                'original_course_offering_id' => $attempt->original_course_offering_id,
+                'original_semester_id' => $attempt->original_semester_id,
+                'operation_semester_id' => $attempt->operation_semester_id,
+                'charge_semester_id' => $attempt->charge_semester_id,
+                'request_sequence' => $attempt->request_sequence,
+                'syllabus_template_id' => $attempt->syllabus_template_id,
+                'max_attempts_snapshot' => $attempt->max_attempts_snapshot,
+                'late_payment_grace_days_snapshot' => $attempt->late_payment_grace_days_snapshot,
+                'allow_unpaid_sitting_snapshot' => $attempt->allow_unpaid_sitting_snapshot,
+                'description' => "Phí thi lại: {$unit?->code} - {$unit?->name}",
+            ];
 
-            $charge = $this->findActiveSourceCharge($attempt)
-                ?? $this->createChargeAction->handle([
-                    'student_id' => $attempt->student_id,
-                    'semester_id' => $attempt->charge_semester_id,
-                    'charge_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
-                    'amount' => $amount,
-                    'description' => "Phí thi lại: {$unit?->code} - {$unit?->name}",
-                    'source_type' => ExamResitAttempt::class,
-                    'source_id' => $attempt->id,
-                    'created_by_user_id' => auth()->id(),
-                    'due_date' => $data['due_date'] ?? null,
+            if (! empty($data['due_date'])) {
+                $facts['due_date'] = $data['due_date'];
+            }
+
+            $result = $this->intake->request(new FinanceIntakeData(
+                source_system: AcademicFinanceObligationSource::SOURCE_SYSTEM,
+                source_kind: AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT,
+                source_ref: AcademicFinanceObligationSource::examResitAttemptRef($attempt),
+                financial_effect: FinancialEffect::Debit,
+                obligation_type: AcademicFinanceObligationSource::EXAM_RESIT_FEE,
+                facts: $facts,
+            ));
+
+            $chargeId = $result->finance_charge_id
+                ?? FinanceCharge::query()
+                    ->where('finance_obligation_id', $result->finance_obligation_id)
+                    ->where('status', FinanceCharge::STATUS_ACTIVE)
+                    ->value('id');
+
+            if ($chargeId === null) {
+                throw ValidationException::withMessages([
+                    'attempt_id' => ['Finance intake did not materialize an exam resit charge.'],
                 ]);
+            }
 
-            $attempt->transitionToChargeCreated($charge->id, (int) auth()->id());
+            $attempt->transitionToChargeCreated((int) $chargeId, (int) auth()->id());
 
             return $attempt->fresh();
         });
-    }
-
-    private function findActiveSourceCharge(ExamResitAttempt $attempt): ?FinanceCharge
-    {
-        return FinanceCharge::query()
-            ->where('source_type', ExamResitAttempt::class)
-            ->where('source_id', $attempt->id)
-            ->where('charge_type', FinanceCharge::TYPE_EXAM_RESIT_FEE)
-            ->where('status', FinanceCharge::STATUS_ACTIVE)
-            ->first();
     }
 }

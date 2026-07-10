@@ -168,7 +168,7 @@ it('includes discount and credit entitlement carriers in charges summary without
         ->and($summary['net_amount'])->toBe(5_000_000.0);
 });
 
-it('still counts legacy active negative charges when entitlement carriers are absent', function (): void {
+it('does not count legacy negative charge lines after wave-7 backstop retirement', function (): void {
     seedPositiveTuitionCharge($this->student, $this->semester, 10_000_000);
 
     $invoice = StudentInvoice::query()->where('student_id', $this->student->id)->firstOrFail();
@@ -193,9 +193,10 @@ it('still counts legacy active negative charges when entitlement carriers are ab
 
     $summary = studentChargesSummary($this->student, $this->semester->id);
 
+    // Wave 7: reductions require discount_allocations / credit_applications.
     expect($summary['total_charges'])->toBe(10_000_000.0)
-        ->and($summary['total_credits'])->toBe(1_500_000.0)
-        ->and($summary['net_amount'])->toBe(8_500_000.0);
+        ->and($summary['total_credits'])->toBe(0.0)
+        ->and($summary['net_amount'])->toBe(10_000_000.0);
 });
 
 it('counts full credit applications even when payments would clamp settlement residual credit', function (): void {

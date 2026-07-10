@@ -6,10 +6,10 @@ namespace App\Console\Commands;
 
 use App\Models\EgcBlock;
 use App\Models\Student;
+use App\Modules\Finance\Actions\Egc\SubmitEgcLevelFeeDebitAction;
 use App\Modules\Finance\Actions\Egc\SyncEgcBlockResultsAction;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
-use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -357,40 +357,19 @@ class BackfillEgcBlocks extends Command
             return $existingCharge;
         }
 
-        $invoice = StudentInvoice::query()->firstOrCreate(
+        // Wave 7: materialize via intake (no FinanceCharge::create).
+        $result = app(SubmitEgcLevelFeeDebitAction::class)->handle(
+            (int) $student->id,
+            $semesterId,
+            $levelNumber,
             [
-                'student_id' => $student->id,
-                'semester_id' => $semesterId,
-            ],
-            [
-                'invoice_number' => 'INV-BF-'.time().'-'.$student->student_id.'-'.$semesterId,
-                'status' => 'draft',
-                'due_date' => now()->addDays(30),
+                'source_kind' => SubmitEgcLevelFeeDebitAction::SOURCE_KIND_LEGACY_EGC,
+                'description' => "EGC Level {$levelNumber} Fee",
+                'generation_mode' => SubmitEgcLevelFeeDebitAction::GENERATION_MODE_BATCH,
             ],
         );
 
-        $charge = FinanceCharge::query()->create([
-            'student_id' => $student->id,
-            'semester_id' => $semesterId,
-            'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-            'amount' => 15_000_000,
-            'description' => "EGC Level {$levelNumber} Fee",
-            'effective_at' => now(),
-            'status' => FinanceCharge::STATUS_ACTIVE,
-            'created_by_user_id' => auth()->id(),
-        ]);
-
-        InvoiceLine::query()->create([
-            'invoice_id' => $invoice->id,
-            'charge_id' => $charge->id,
-            'amount_snapshot' => $charge->amount,
-            'description_snapshot' => $charge->description,
-            'status' => 'active',
-        ]);
-
-        $invoice->recalculateTotals();
-
-        return $charge;
+        return FinanceCharge::query()->findOrFail($result->finance_charge_id);
     }
 
     /**

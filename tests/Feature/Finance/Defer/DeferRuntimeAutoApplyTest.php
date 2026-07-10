@@ -188,9 +188,12 @@ it('settles a runtime FULL FORFEIT defer: voids the obligation, creates an adjus
     recordRuntimeDefer($student, $this->semester, $this->returnSemester, $this->user, DeferCase::POLICY_FORFEIT);
 
     $deferCase = DeferCase::where('student_id', $student->id)->firstOrFail();
-    $adjustment = FinanceCharge::where('charge_type', FinanceCharge::TYPE_ADJUSTMENT)
-        ->where('source_type', DeferCase::class)
-        ->where('source_id', $deferCase->id)
+    $adjustment = FinanceCharge::query()
+        ->where('charge_type', FinanceCharge::TYPE_ADJUSTMENT)
+        ->where('status', FinanceCharge::STATUS_ACTIVE)
+        ->whereHas('financeObligation', fn ($q) => $q
+            ->where('source_kind', 'defer_forfeit')
+            ->where('source_ref', 'defer_forfeit:'.$deferCase->id))
         ->first();
 
     expect($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID)
@@ -261,9 +264,12 @@ it('settles a historical auto-safe case via finance:defer-backfill --apply-money
         '--apply-money' => true,
     ])->assertExitCode(0);
 
-    $adjustment = FinanceCharge::where('charge_type', FinanceCharge::TYPE_ADJUSTMENT)
-        ->where('source_type', DeferCase::class)
-        ->where('source_id', $deferCase->id)
+    $adjustment = FinanceCharge::query()
+        ->where('charge_type', FinanceCharge::TYPE_ADJUSTMENT)
+        ->where('status', FinanceCharge::STATUS_ACTIVE)
+        ->whereHas('financeObligation', fn ($q) => $q
+            ->where('source_kind', 'defer_forfeit')
+            ->where('source_ref', 'defer_forfeit:'.$deferCase->id))
         ->first();
 
     expect($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID)

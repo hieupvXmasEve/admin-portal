@@ -12,9 +12,9 @@ use App\Modules\Finance\Services\SettlementService;
 /**
  * Student charges API summary totals (total_charges / total_credits / net_amount).
  *
- * ADR-0030: total_credits and net_amount read discount allocations + credit
- * applications (and the legacy negative-line settlement backstop), not only
- * active negative finance_charges rows.
+ * ADR-0030 / wave 7: total_credits and net_amount read discount allocations +
+ * credit applications only. Negative charge lines are not part of the active
+ * debit read model.
  */
 class GetStudentChargeSummaryQuery
 {
@@ -68,16 +68,9 @@ class GetStudentChargeSummaryQuery
             ])
             ->get();
 
-        $ledgerCredits = (float) $invoices->sum(
+        return (float) $invoices->sum(
             fn (StudentInvoice $invoice): float => $this->invoiceReductionTotal($invoice)
         );
-
-        // Uninvoiced legacy negatives (no invoice line) still reduce student totals.
-        // Invoiced negatives are folded in via SettlementService's ADR-0030 backstop
-        // when no discount/credit carriers exist on the invoice.
-        $uninvoicedLegacyCredits = $this->uninvoicedLegacyNegativeCredits($studentId, $semesterId);
-
-        return $ledgerCredits + $uninvoicedLegacyCredits;
     }
 
     public function netAmount(int $studentId, ?int $semesterId = null): float
@@ -91,7 +84,6 @@ class GetStudentChargeSummaryQuery
      * Uses SettlementService line helpers so reversed discounts and signed credit
      * applications match settlement truth, but does NOT apply the payment residual
      * clamp from deriveInvoiceSnapshot (charges summary is "giảm trừ", not remaining).
-     * Legacy negative lines only fill in when both carriers are empty (ADR-0030).
      */
     private function invoiceReductionTotal(StudentInvoice $invoice): float
     {
@@ -113,32 +105,6 @@ class GetStudentChargeSummaryQuery
             fn (InvoiceLine $line): float => $this->settlementService->getLineCreditAmount($line)
         );
 
-        if ($discount == 0.0 && $credit == 0.0) {
-            $discount = abs((float) $activeLines
-                ->filter(fn (InvoiceLine $line): bool => (float) $line->amount_snapshot < 0)
-                ->sum('amount_snapshot'));
-        }
-
         return $discount + $credit;
-    }
-
-    /**
-     * Active negative charges that have no active invoice line (pure legacy rows
-     * not yet attached to settlement). Avoids double-counting negatives already
-     * reflected through the invoice reduction path.
-     */
-    private function uninvoicedLegacyNegativeCredits(int $studentId, ?int $semesterId = null): float
-    {
-        $query = FinanceCharge::query()
-            ->where('student_id', $studentId)
-            ->where('status', FinanceCharge::STATUS_ACTIVE)
-            ->where('amount', '<', 0)
-            ->whereDoesntHave('invoiceLines', fn ($lineQuery) => $lineQuery->where('status', 'active'));
-
-        if ($semesterId !== null) {
-            $query->where('semester_id', $semesterId);
-        }
-
-        return abs((float) $query->sum('amount'));
     }
 }

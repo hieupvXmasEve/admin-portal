@@ -171,7 +171,8 @@ final class ObligationTypeRegistry
             new ObligationTypeDefinition(
                 type: FinanceCharge::TYPE_RETAKE_FEE,
                 financialEffect: FinancialEffect::Debit,
-                allowedSourceKinds: ['course_retake_registration'],
+                // legacy_course_registration: FixBillingException repair for pre-CourseRetakeRegistration rows.
+                allowedSourceKinds: ['course_retake_registration', 'legacy_course_registration'],
                 pricingStrategy: PricingStrategy::CatalogFixed,
                 dngCollectionCode: 'HL',
                 supportsInstallments: false,
@@ -281,7 +282,8 @@ final class ObligationTypeRegistry
             new ObligationTypeDefinition(
                 type: FinanceCharge::TYPE_ADJUSTMENT,
                 financialEffect: FinancialEffect::Debit,
-                allowedSourceKinds: ['manual_adjustment', 'settlement_correction'],
+                // defer_forfeit: FORFEIT settlement mints a positive debit via intake (wave 7).
+                allowedSourceKinds: ['manual_adjustment', 'settlement_correction', 'defer_forfeit'],
                 pricingStrategy: PricingStrategy::StaffSupplied,
                 dngCollectionCode: 'KHAC',
                 supportsInstallments: false,

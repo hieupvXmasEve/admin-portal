@@ -185,7 +185,7 @@ GET /charges?semester_id=5&unpaid=true
 **Summary derivation (ADR-0030):**
 
 - `total_charges` — sum of active positive charges for the student (optional semester filter).
-- `total_credits` — fee reductions + applied credits: discount allocations + credit applications from `FinanceDiscountEntitlement` / `FinanceCreditEntitlement` carriers (via invoice settlement). Legacy active negative charge lines still count only as a backstop when those ledger carriers are absent (no double-count with dual-carrier rows).
+- `total_credits` — fee reductions + applied credits: discount allocations + credit applications from `FinanceDiscountEntitlement` / `FinanceCreditEntitlement` carriers (via invoice settlement). Wave 7 retired the legacy negative-line settlement backstop; active negative charge lines are not part of the debit read model.
 - `net_amount` — `total_charges - total_credits`.
 - Response field names and types are unchanged; the student portal does not need a contract change.
 
