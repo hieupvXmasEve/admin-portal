@@ -15,6 +15,9 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
+use App\Shared\Contracts\Finance\Enums\FinancialEffect;
+use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -153,4 +156,34 @@ it('holds the request for review when its exact target changes before finalizati
     expect($reservation->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
         ->and($reservation->reservationTargets)->toHaveCount(1)
         ->and($reservation->error_message)->toContain('targets changed');
+});
+
+it('blocks a concurrent credit application during the unlocked DNG provider call without over-collecting or losing a settlement version', function (): void {
+    $line = reservationPayableLine($this->invoice, $this->billingAccount, '1500000.00');
+    $credit = null;
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldReceive('pushReserved')->once()->andReturnUsing(function () use (&$credit, $line): array {
+        $credit = app(FinanceIntakeContract::class)->requestCredit(new FinanceIntakeData(
+            source_system: 'finance-test',
+            source_kind: 'credit_dng_race',
+            source_ref: uniqid('credit-dng:', true),
+            financial_effect: FinancialEffect::Credit,
+            obligation_type: FinanceCharge::TYPE_DEFER_CREDIT,
+            facts: [
+                'student_id' => $this->student->id,
+                'semester_id' => $this->semester->id,
+                'amount' => 500_000,
+                'invoice_line_id' => $line->id,
+            ],
+        ));
+
+        return ['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []];
+    });
+
+    $reservation = guardedReservationAction($service)->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
+
+    expect($credit)->not->toBeNull()
+        ->and($credit->credit_application_ids)->toBe([])
+        ->and((float) $reservation->amount)->toBe(1_500_000.0)
+        ->and((int) $this->billingAccount->fresh()->settlement_version)->toBe(2);
 });

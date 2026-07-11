@@ -157,6 +157,21 @@ it('processes callback 1 (no invoice) and transitions to paid_uninvoiced', funct
     expect($event->is_valid_checksum)->toBeTrue();
 });
 
+it('processes a verified receipt after a pushed request is held for settlement review', function () {
+    $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY001', 5000000);
+    $dngPaymentRequest->update(['status' => DngPaymentRequest::STATUS_NEEDS_REVIEW]);
+    $event = createWebhookEvent($dngPaymentRequest, DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE);
+
+    $mockPaymentService = Mockery::mock(DngPaymentService::class);
+    $mockPaymentService->shouldReceive('bridgeToPayment')->once();
+    app()->instance(DngPaymentService::class, $mockPaymentService);
+
+    (new ProcessDngWebhookJob($event->id))->handle(app(DngWebhookService::class));
+
+    expect($dngPaymentRequest->fresh()->status)->toBe(DngPaymentRequest::STATUS_PAID_UNINVOICED)
+        ->and($event->fresh()->processing_status)->toBe(DngWebhookEvent::STATUS_PROCESSED);
+});
+
 it('processes callback 2 (with invoice) and transitions to paid_invoiced', function () {
     $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY001', 5000000);
 

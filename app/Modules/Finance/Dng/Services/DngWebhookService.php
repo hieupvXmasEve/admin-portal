@@ -513,6 +513,7 @@ class DngWebhookService
             DngPaymentRequest::STATUS_PAID_UNINVOICED => 2,
             DngPaymentRequest::STATUS_PAID_INVOICED => 3,
             DngPaymentRequest::STATUS_RECONCILED => 4,
+            DngPaymentRequest::STATUS_NEEDS_REVIEW => 1,
             DngPaymentRequest::STATUS_FAILED => -1,
             DngPaymentRequest::STATUS_CANCELLED => -2,
             // FIN-18: cancel pushed to DNG is terminal too; without this it fell

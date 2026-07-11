@@ -6,11 +6,16 @@ use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentScholarshipAward;
+use App\Modules\Finance\Actions\ReconcileChargeInstallmentsAction;
 use App\Modules\Finance\Actions\SplitChargeIntoInstallmentsAction;
 use App\Modules\Finance\Exceptions\InstallmentReconciliationException;
+use App\Modules\Finance\Models\BillingAccount;
+use App\Modules\Finance\Models\CreditApplication;
 use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\FinanceCreditEntitlement;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
@@ -34,7 +39,23 @@ function makeReconcileCharge(float $gross): array
         'intake_semester_id' => $semester->id,
     ]);
 
+    $billingAccount = BillingAccount::query()->firstOrCreate(['student_id' => $student->id]);
+    $obligation = FinanceObligation::query()->create([
+        'billing_account_id' => $billingAccount->id,
+        'source_system' => 'test',
+        'source_kind' => 'installment_reconcile',
+        'source_ref' => uniqid('charge:', true),
+        'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $gross,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+
     $charge = FinanceCharge::create([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
@@ -151,4 +172,32 @@ it('blocks reconciliation when committed installments already exceed the new net
         ->and(DiscountAllocation::query()
             ->whereIn('invoice_line_id', InvoiceLine::where('charge_id', $charge->id)->pluck('id'))
             ->count())->toBe(0);
+});
+
+it('reconciles only pending installments from canonical remaining after credit is applied', function (): void {
+    [$charge, $invoice] = makeReconcileCharge(20_000_000);
+
+    app(SplitChargeIntoInstallmentsAction::class)->handle($charge->id, [
+        ['installment_no' => 1, 'amount' => 10_000_000, 'due_date' => now()->addDays(30)->toDateString()],
+        ['installment_no' => 2, 'amount' => 10_000_000, 'due_date' => now()->addDays(60)->toDateString()],
+    ]);
+
+    $first = FinanceChargeInstallment::query()->where('finance_charge_id', $charge->id)->where('installment_no', 1)->firstOrFail();
+    $first->update(['status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT]);
+    $line = InvoiceLine::query()->where('charge_id', $charge->id)->firstOrFail();
+    $entitlement = FinanceCreditEntitlement::query()->create([
+        'source_system' => 'test', 'source_kind' => 'credit', 'source_ref' => uniqid(),
+        'entitlement_type' => FinanceCharge::TYPE_DEFER_CREDIT, 'lifecycle_status' => FinanceCreditEntitlement::STATUS_APPROVED,
+        'allocation_status' => FinanceCreditEntitlement::ALLOCATION_FULLY_APPLIED, 'amount' => 5_000_000,
+        'currency' => 'VND', 'pricing_rule_version' => 'test', 'pricing_snapshot' => [], 'approved_at' => now(),
+    ]);
+    CreditApplication::query()->create([
+        'finance_credit_entitlement_id' => $entitlement->id, 'invoice_line_id' => $line->id,
+        'amount' => 5_000_000, 'entry_type' => CreditApplication::ENTRY_APPLICATION, 'applied_at' => now(),
+    ]);
+
+    app(ReconcileChargeInstallmentsAction::class)->handle($charge);
+
+    expect((float) $first->fresh()->amount)->toBe(10_000_000.0)
+        ->and((float) FinanceChargeInstallment::query()->where('finance_charge_id', $charge->id)->where('installment_no', 2)->value('amount'))->toBe(5_000_000.0);
 });

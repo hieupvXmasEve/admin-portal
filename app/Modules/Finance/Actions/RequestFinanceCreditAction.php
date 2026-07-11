@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions;
 
+use App\Modules\Finance\Dng\Models\DngPaymentRequestReservationTarget;
 use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\CreditApplication;
 use App\Modules\Finance\Models\FinanceCharge;
@@ -13,6 +14,7 @@ use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\FinancePricingCatalog;
 use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeResult;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
@@ -33,6 +35,8 @@ class RequestFinanceCreditAction
         private readonly FinancePricingCatalog $pricingCatalog,
         private readonly BillingAccountProvisioner $billingAccountProvisioner,
         private readonly SettlementService $settlementService,
+        private readonly ReconcileChargeInstallmentsAction $reconcileChargeInstallments,
+        private readonly SettlementMutationGuard $settlementMutationGuard,
     ) {}
 
     public function handle(FinanceIntakeData $intake): FinanceIntakeResult
@@ -40,23 +44,26 @@ class RequestFinanceCreditAction
         return DB::transaction(function () use ($intake): FinanceIntakeResult {
             $this->assertCreditIntake($intake);
             $this->assertFactsCarryNoPayerIdentity($intake);
+            $billingAccount = $this->resolveBillingAccount($intake);
 
-            $entitlement = $this->findExistingEntitlement($intake);
+            return $this->settlementMutationGuard->handle((int) $billingAccount->id, function () use ($intake, $billingAccount): FinanceIntakeResult {
+                $entitlement = $this->findExistingEntitlement($intake);
 
-            if (! $entitlement instanceof FinanceCreditEntitlement) {
-                $entitlement = $this->createApprovedEntitlement($intake);
-            }
+                if (! $entitlement instanceof FinanceCreditEntitlement) {
+                    $entitlement = $this->createApprovedEntitlement($intake, $billingAccount);
+                }
 
-            $applicationIds = $this->ensureApplications($entitlement, $intake);
+                $applicationIds = $this->ensureApplications($entitlement, $intake);
 
-            return new FinanceIntakeResult(
-                lifecycle_status: $entitlement->lifecycle_status,
-                amount: (float) $entitlement->amount,
-                currency: $entitlement->currency,
-                pricing_rule_version: $entitlement->pricing_rule_version,
-                finance_credit_entitlement_id: $entitlement->id,
-                credit_application_ids: $applicationIds,
-            );
+                return new FinanceIntakeResult(
+                    lifecycle_status: $entitlement->lifecycle_status,
+                    amount: (float) $entitlement->amount,
+                    currency: $entitlement->currency,
+                    pricing_rule_version: $entitlement->pricing_rule_version,
+                    finance_credit_entitlement_id: $entitlement->id,
+                    credit_application_ids: $applicationIds,
+                );
+            });
         });
     }
 
@@ -97,10 +104,9 @@ class RequestFinanceCreditAction
             ->first();
     }
 
-    private function createApprovedEntitlement(FinanceIntakeData $intake): FinanceCreditEntitlement
+    private function createApprovedEntitlement(FinanceIntakeData $intake, BillingAccount $billingAccount): FinanceCreditEntitlement
     {
         $priced = $this->pricingCatalog->price($intake);
-        $billingAccount = $this->resolveBillingAccount($intake);
         $amount = abs((float) $priced['amount']);
 
         if ($amount <= 0) {
@@ -150,6 +156,10 @@ class RequestFinanceCreditAction
                 break;
             }
 
+            if ($this->isHeld($line)) {
+                continue;
+            }
+
             $capacity = $this->settlementService->getLineOutstandingAmount($line);
             if ($capacity <= 0) {
                 continue;
@@ -173,6 +183,9 @@ class RequestFinanceCreditAction
             $invoice = $line->invoice()->first();
             if ($invoice !== null) {
                 $this->settlementService->recalculateInvoiceSnapshot($invoice);
+            }
+            if ($line->charge instanceof FinanceCharge) {
+                $this->reconcileChargeInstallments->handle($line->charge);
             }
         }
 
@@ -278,5 +291,14 @@ class RequestFinanceCreditAction
         }
 
         return (int) $intake->facts[$key];
+    }
+
+    private function isHeld(InvoiceLine $line): bool
+    {
+        return DngPaymentRequestReservationTarget::query()
+            ->where('invoice_line_id', $line->id)
+            ->whereHas('dngPaymentRequest', fn ($query) => $query->holdingCollection())
+            ->lockForUpdate()
+            ->exists();
     }
 }

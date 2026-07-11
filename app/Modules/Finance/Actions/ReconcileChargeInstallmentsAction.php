@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions;
 
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Exceptions\InstallmentReconciliationException;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
-use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Keep a charge's PENDING installments in sync with its net due after a discount
@@ -28,83 +31,140 @@ class ReconcileChargeInstallmentsAction
     private const AMOUNT_SCALE = 2;
 
     public function __construct(
-        private readonly SettlementService $settlementService,
+        private readonly SettlementPositionReader $settlementPositionReader,
     ) {}
 
     public function handle(FinanceCharge $charge): void
     {
-        $installments = FinanceChargeInstallment::query()
-            ->where('finance_charge_id', $charge->id)
-            ->orderBy('installment_no')
-            ->get();
+        DB::transaction(function () use ($charge): void {
+            $installments = FinanceChargeInstallment::query()
+                ->where('finance_charge_id', $charge->id)
+                ->orderBy('installment_no')
+                ->lockForUpdate()
+                ->get();
 
-        if ($installments->isEmpty()) {
-            return; // no plan to reconcile
-        }
-
-        $pending = $installments
-            ->where('status', FinanceChargeInstallment::STATUS_PENDING)
-            ->values();
-
-        $committedCents = $installments
-            ->whereIn('status', [
-                FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
-                FinanceChargeInstallment::STATUS_PAID,
-            ])
-            ->sum(fn (FinanceChargeInstallment $i) => $this->toCents($i->amount));
-
-        $netDueCents = $this->toCents($this->netDue($charge));
-        $pendingTargetCents = $netDueCents - $committedCents;
-
-        $currentPendingCents = $pending
-            ->sum(fn (FinanceChargeInstallment $i) => $this->toCents($i->amount));
-
-        // Already consistent — nothing drifted.
-        if ($currentPendingCents === $pendingTargetCents) {
-            return;
-        }
-
-        // Committed rows alone already meet/exceed net due, but pending rows still
-        // expect to collect more (or net due dropped below what was committed):
-        // cannot fix without changing committed/pushed installments.
-        if ($pendingTargetCents < 0) {
-            throw new InstallmentReconciliationException(
-                'committed_exceeds_net_due',
-                "FinanceCharge #{$charge->id}: committed installments (".
-                $this->fromCents($committedCents).') exceed net due ('.
-                $this->fromCents($netDueCents).') after a discount change. '.
-                'Resolve the pushed/paid installments before re-discounting.'
-            );
-        }
-
-        if ($pending->isEmpty()) {
-            // No pending rows to absorb the delta, yet drift exists.
-            throw new InstallmentReconciliationException(
-                'no_pending_to_reconcile',
-                "FinanceCharge #{$charge->id}: net due changed to ".
-                $this->fromCents($netDueCents).' but all installments are committed; '.
-                'no pending row can absorb the difference.'
-            );
-        }
-
-        if ($pendingTargetCents === 0) {
-            // Discount fully covers the remaining balance — cancel pending rows.
-            foreach ($pending as $row) {
-                $row->update(['status' => FinanceChargeInstallment::STATUS_CANCELLED]);
+            if ($installments->isEmpty()) {
+                return; // no plan to reconcile
             }
 
-            return;
-        }
+            $pending = $installments
+                ->where('status', FinanceChargeInstallment::STATUS_PENDING)
+                ->values();
 
-        $this->redistribute($pending, $pendingTargetCents, $currentPendingCents);
+            $committedCents = $installments
+                ->whereIn('status', [
+                    FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
+                    FinanceChargeInstallment::STATUS_PAID,
+                ])
+                ->sum(fn (FinanceChargeInstallment $i) => $this->toCents($i->amount));
+
+            $collectibleCents = $this->canonicalCollectible($charge);
+            $pendingTargetCents = $collectibleCents - $committedCents;
+
+            $currentPendingCents = $pending
+                ->sum(fn (FinanceChargeInstallment $i) => $this->toCents($i->amount));
+
+            // Already consistent — nothing drifted.
+            if ($currentPendingCents === $pendingTargetCents) {
+                return;
+            }
+
+            // Committed rows alone already meet/exceed net due, but pending rows still
+            // expect to collect more (or net due dropped below what was committed):
+            // cannot fix without changing committed/pushed installments.
+            if ($pendingTargetCents < 0) {
+                if ($this->markHoldingDngRequestsForReview($charge, $committedCents, $collectibleCents)) {
+                    return;
+                }
+
+                throw new InstallmentReconciliationException(
+                    'committed_exceeds_net_due',
+                    "FinanceCharge #{$charge->id}: committed installments (".
+                    $this->fromCents($committedCents).') exceed net due ('.
+                    $this->fromCents($collectibleCents).') after a settlement mutation. '.
+                    'Resolve the pushed/paid installments before re-discounting.'
+                );
+            }
+
+            if ($pending->isEmpty()) {
+                // No pending rows to absorb the delta, yet drift exists.
+                throw new InstallmentReconciliationException(
+                    'no_pending_to_reconcile',
+                    "FinanceCharge #{$charge->id}: net due changed to ".
+                    $this->fromCents($collectibleCents).' but all installments are committed; '.
+                    'no pending row can absorb the difference.'
+                );
+            }
+
+            if ($pendingTargetCents === 0) {
+                // Discount fully covers the remaining balance — cancel pending rows.
+                foreach ($pending as $row) {
+                    $row->update(['status' => FinanceChargeInstallment::STATUS_CANCELLED]);
+                }
+
+                return;
+            }
+
+            $this->redistribute($pending, $pendingTargetCents, $currentPendingCents);
+        });
     }
 
     /**
-     * Net due = gross charge amount - active discount allocations on the charge.
+     * Preserve the provider request and its captured targets while making the
+     * local collection hold explicitly repairable by staff.
      */
-    private function netDue(FinanceCharge $charge): float
+    private function markHoldingDngRequestsForReview(FinanceCharge $charge, int $committedCents, int $collectibleCents): bool
     {
-        return max(0.0, (float) $charge->amount - $this->settlementService->getChargeDiscountAmount($charge->id));
+        $lineIds = InvoiceLine::query()
+            ->where('charge_id', $charge->id)
+            ->where('status', 'active')
+            ->pluck('id');
+
+        if ($lineIds->isEmpty()) {
+            return false;
+        }
+
+        $evidence = sprintf(
+            'Cần kiểm tra: committed installments exceed canonical collectible for FinanceCharge #%d (committed=%s, collectible=%s). Provider request and reserved targets were preserved; staff review is required before changing the collection plan.',
+            $charge->id,
+            $this->fromCents($committedCents),
+            $this->fromCents($collectibleCents),
+        );
+
+        return DngPaymentRequest::query()
+            ->whereIn('status', [
+                DngPaymentRequest::STATUS_PENDING,
+                DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+                DngPaymentRequest::STATUS_UNKNOWN_OUTCOME,
+            ])
+            ->whereHas('reservationTargets', fn ($query) => $query
+                ->whereIn('invoice_line_id', $lineIds))
+            ->lockForUpdate()
+            ->update([
+                'status' => DngPaymentRequest::STATUS_NEEDS_REVIEW,
+                'error_message' => $evidence,
+            ]) > 0;
+    }
+
+    /** Canonical collectible includes applied credit and cash, never a local formula. */
+    private function canonicalCollectible(FinanceCharge $charge): int
+    {
+        $lineIds = InvoiceLine::query()
+            ->where('charge_id', $charge->id)
+            ->where('status', 'active')
+            ->pluck('id')
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->all();
+        $position = $this->settlementPositionReader->forPayableLines($lineIds);
+
+        if (! $position->isValid() || $position->amounts === null) {
+            throw new InstallmentReconciliationException(
+                'settlement_position_invalid',
+                "FinanceCharge #{$charge->id}: Cần kiểm tra Settlement Position before reconciling installments.",
+            );
+        }
+
+        return $this->toCents($position->amounts->remaining->amount);
     }
 
     /**
