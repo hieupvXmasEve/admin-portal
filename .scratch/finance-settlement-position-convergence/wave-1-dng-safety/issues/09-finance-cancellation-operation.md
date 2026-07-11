@@ -1,6 +1,6 @@
 # 09 — Hủy obligation qua Finance Cancellation Operation
 
-**Status:** done  
+**Status:** ready-for-review  
 **Portal impact:** none
 
 ## Parent
@@ -27,25 +27,32 @@ Triển khai durable, source-keyed Finance Cancellation Operation cho source wor
 
 ---
 
-## Comments (implementation hardening 2026-07-11)
+## Comments
 
-### Standards blockers fixed
+### Hardening pass 2026-07-11 (review blockers)
 
-1. Academic no longer reads FinanceCharge/DNG directly for cancel preconditions — uses `FinanceCancellationChargeStateReader` + `FinanceCancellationChargeState` DTO.
-2. Fee disposition constants live in shared `FinanceCancellationFeeDisposition` enum; Academic maps from payload values only.
-3. `CancelExamResitAttemptAction::run(array $data)` is static (repo convention).
-4. `RequestFinanceCancellationOperationAction` wraps firstOrCreate + `afterCommit` job dispatch in a Finance DB transaction.
+Addressed Standards + Spec blockers from second review:
 
-### Spec blockers fixed
+| Blocker | Fix |
+|---|---|
+| Durable handoff | Academic writes `academic_finance_cancellation_handoffs` **in the same TX** as Finance-Pending; job delivers Finance request after commit |
+| ADR-0026 overclaim | ADR rewritten: same correctness window = pending + Academic handoff outbox (not cross-context Finance write) |
+| Late payment production trigger | `ResumeFinanceCancellationOnPaidEvidenceAction` from DNG webhook (late cancelled receipt + first settlement) and `BridgePaidDngRequestsForChargeAction` |
+| Aggregate fail-open | Invalid Settlement Position → `requires_review`, **no** guessed local balance replacement |
+| Stale claim double provider | `provider_attempts` ledger: `in_flight` refuse re-call on reclaim → review |
+| Append-only completion | Dropped unique on operation_id; versioned outbox rows (`completed`, `paid_disposition_upgrade`) |
 
-1. **No cross-context TX:** Academic marks Finance-Pending under its own transaction, then calls Finance request **outside** that transaction (exam resit + retake).
-2. **Concurrency claim:** processor optimistically claims `requested|requires_review|(stale processing)` → `processing` before provider cancel; concurrent workers exit without calling provider.
-3. **Aggregate replacement:** planned during collection cancel; created **after successful void** inside settlement TX; amounts from Settlement Position when available, else ledger cash/discount remaining (not pivot copy alone).
-4. **Late payment after completion:** re-entry on `completed` upgrades to `kept_paid_no_refund`, bridges cash, re-dispatches completion outbox; Academic upgrades fee disposition on already-cancelled sources.
-5. **Tests added** in `CancellationOperationTest`: concurrent claim, provider once on re-entry, late paid disposition, canonical remaining, no replacement when void fails.
+### Quality gates (2026-07-11)
 
-### Validation
+| Gate | Result | Notes |
+|---|---|---|
+| Targeted Pest (cancellation) | **31 passed / 160 assertions** | `DB_TEST_DATABASE=db_test_issue09` sequential |
+| CancellationOperationTest | 15 passed | claim, late pay, SP, stale reclaim, append-only outbox |
+| Exam resit cancel | 10 passed | handoff deliver helper under Queue::fake |
+| Retake cancel | 6 passed | handoff deliver helper under Queue::fake |
+| Pint `--dirty` | **passed** | |
+| `pnpm type-check` | **not green** | process **killed OOM (exit 137)** in container — not attributable to this change |
+| `pnpm lint` | **not green** | **4784 pre-existing** eslint errors across app (unrelated pages); no new Finance cancel Vue surface |
+| Full suite | **not run** | shared `db_test` has migration races under parallel/agent load; targeted suite on isolated DB is the correctness evidence for this issue |
 
-- `CancellationOperationTest`: 12 passed
-- Exam resit + retake cancel suites: 16 passed
-- Isolated test DB `db_test_cancel` used when shared `db_test` had migration races
+### Still not claiming `done` until human accepts quality-gate gaps (type-check OOM / lint repo noise).

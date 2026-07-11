@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class FinanceCancellationOperation extends Model
@@ -21,7 +22,7 @@ class FinanceCancellationOperation extends Model
     protected $fillable = [
         'source_system', 'source_kind', 'source_ref', 'obligation_type', 'status',
         'unpaid_void_reason', 'paid_void_reason', 'actor_user_id', 'source_payload',
-        'result_payload', 'completed_at',
+        'result_payload', 'provider_attempts', 'processing_claimed_at', 'completed_at',
     ];
 
     protected function casts(): array
@@ -29,6 +30,8 @@ class FinanceCancellationOperation extends Model
         return [
             'source_payload' => 'array',
             'result_payload' => 'array',
+            'provider_attempts' => 'array',
+            'processing_claimed_at' => 'datetime',
             'completed_at' => 'datetime',
         ];
     }
@@ -36,5 +39,10 @@ class FinanceCancellationOperation extends Model
     public function completionOutbox(): HasOne
     {
         return $this->hasOne(FinanceCancellationCompletionOutbox::class);
+    }
+
+    public function completionEvents(): HasMany
+    {
+        return $this->hasMany(FinanceCancellationCompletionOutbox::class);
     }
 }

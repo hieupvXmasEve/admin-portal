@@ -21,6 +21,7 @@ use App\Modules\Finance\Jobs\DispatchFinanceCancellationCompletionJob;
 use App\Modules\Finance\Models\FinanceCancellationCompletionOutbox;
 use App\Modules\Finance\Models\FinanceCancellationOperation;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
@@ -86,12 +87,18 @@ function requestCancellationOperation(
 
 function dispatchCancellationCompletion(int $operationId): void
 {
-    $outbox = FinanceCancellationCompletionOutbox::query()
+    $outboxes = FinanceCancellationCompletionOutbox::query()
         ->where('finance_cancellation_operation_id', $operationId)
-        ->firstOrFail();
+        ->where('status', FinanceCancellationCompletionOutbox::STATUS_PENDING)
+        ->orderBy('event_version')
+        ->get();
 
-    app(DispatchFinanceCancellationCompletionJob::class, ['outboxId' => $outbox->id])
-        ->handle(app(FinanceCancellationCompletionContract::class));
+    expect($outboxes)->not->toBeEmpty();
+
+    foreach ($outboxes as $outbox) {
+        app(DispatchFinanceCancellationCompletionJob::class, ['outboxId' => $outbox->id])
+            ->handle(app(FinanceCancellationCompletionContract::class));
+    }
 }
 
 it('completes a no-request cancellation only through the durable completion outbox', function () {
@@ -452,9 +459,10 @@ it('claims the operation so a concurrent worker does not call the provider again
         'legacy_finance_charge_id' => $charge->id,
     ]);
 
-    // Simulate another worker already claiming the operation.
+    // Simulate another worker already claiming the operation (fresh claim, not stale).
     FinanceCancellationOperation::query()->whereKey($operation->operationId)->update([
         'status' => FinanceCancellationOperation::STATUS_PROCESSING,
+        'processing_claimed_at' => now(),
         'updated_at' => now(),
     ]);
 
@@ -580,6 +588,19 @@ it('uses Settlement Position remaining when building aggregate replacement amoun
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
+
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'academic',
+        'source_kind' => 'course_retake_registration',
+        'source_ref' => 'retake:cancel-remaining:'.$registration->id,
+        'obligation_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 300000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'retake_fee:test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
     $remaining = FinanceCharge::query()->create([
         'student_id' => $registration->student_id,
         'semester_id' => $registration->semester_id,
@@ -588,6 +609,7 @@ it('uses Settlement Position remaining when building aggregate replacement amoun
         'description' => 'Remaining target',
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
+        'finance_obligation_id' => $obligation->id,
     ]);
 
     $invoice = StudentInvoice::query()->create([
@@ -612,10 +634,10 @@ it('uses Settlement Position remaining when building aggregate replacement amoun
     $payment = Payment::query()->create([
         'student_id' => $registration->student_id,
         'amount' => 100000,
-        'method' => 'cash',
+        'method' => Payment::METHOD_CASH,
         'paid_at' => now(),
-        'status' => 'completed',
-        'source' => 'manual',
+        'status' => Payment::STATUS_COMPLETED,
+        'source' => 'cancellation-canonical-test',
     ]);
     PaymentApplication::query()->create([
         'payment_id' => $payment->id,
@@ -656,6 +678,178 @@ it('uses Settlement Position remaining when building aggregate replacement amoun
     // Pivot still had 300000; canonical remaining after 100000 cash is 200000.
     expect($replacement->amount)->toBe('200000.00')
         ->and((string) $replacement->chargeLinks()->firstOrFail()->amount)->toBe('200000.00');
+});
+
+it('requires review when Settlement Position is invalid for aggregate remaining targets', function () {
+    Queue::fake();
+    $registration = cancellationOperationRetake();
+    $voided = FinanceCharge::query()->create([
+        'student_id' => $registration->student_id,
+        'semester_id' => $registration->semester_id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 500000,
+        'description' => 'Void target',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    // Remaining has invoice lines but no obligation currency → SP invalid.
+    $remaining = FinanceCharge::query()->create([
+        'student_id' => $registration->student_id,
+        'semester_id' => $registration->semester_id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 300000,
+        'description' => 'Remaining target',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    $invoice = StudentInvoice::query()->create([
+        'invoice_number' => 'INV-CANCEL-INVALID-'.$registration->id,
+        'student_id' => $registration->student_id,
+        'semester_id' => $registration->semester_id,
+        'status' => 'draft',
+        'due_date' => now()->addDays(7),
+        'subtotal' => 300000,
+        'discount_total' => 0,
+        'total_amount' => 300000,
+        'paid_amount' => 0,
+        'currency' => 'VND',
+    ]);
+    InvoiceLine::query()->create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $remaining->id,
+        'amount_snapshot' => 300000,
+        'description_snapshot' => 'Remaining',
+        'status' => 'active',
+    ]);
+    $aggregate = DngPaymentRequest::query()->create([
+        'student_id' => $registration->student_id,
+        'campus_code' => 'TEST',
+        'student_code' => $registration->student->student_id,
+        'fee_type' => 'HP',
+        'item_id' => 'aggregate-cancel-invalid-sp-'.$registration->id,
+        'amount' => 800000,
+        'status' => DngPaymentRequest::STATUS_PENDING,
+        'finance_charge_id' => $voided->id,
+    ]);
+    foreach ([[$voided, 500000], [$remaining, 300000]] as [$charge, $amount]) {
+        DngPaymentRequestCharge::query()->create([
+            'dng_payment_request_id' => $aggregate->id,
+            'finance_charge_id' => $charge->id,
+            'amount' => $amount,
+        ]);
+    }
+
+    $operation = requestCancellationOperation($registration, [
+        'legacy_finance_charge_id' => $voided->id,
+    ]);
+
+    $result = app(ProcessFinanceCancellationOperationAction::class)->handle($operation->operationId);
+
+    expect($result->status)->toBe(FinanceCancellationOperation::STATUS_REQUIRES_REVIEW)
+        ->and(DngPaymentRequest::query()
+            ->where('item_id', $aggregate->item_id.'-replacement-'.$operation->operationId)
+            ->exists())->toBeFalse();
+});
+
+it('refuses stale reclaim mid-flight without a second provider call', function () {
+    Queue::fake();
+    $registration = cancellationOperationRetake();
+    $charge = FinanceCharge::query()->create([
+        'student_id' => $registration->student_id,
+        'semester_id' => $registration->semester_id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 500000,
+        'description' => 'Retake fee',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    $request = DngPaymentRequest::query()->create([
+        'student_id' => $registration->student_id,
+        'campus_code' => 'TEST',
+        'student_code' => $registration->student->student_id,
+        'fee_type' => 'HL',
+        'item_id' => 'cancel-operation-inflight-'.$registration->id,
+        'amount' => 500000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+        'finance_charge_id' => $charge->id,
+        'push_payload' => [
+            'StudentName' => 'Test',
+            'Email' => 'test@example.com',
+            'EstimateTime' => now()->toDateString(),
+            'StudentAddress' => 'Hanoi',
+        ],
+    ]);
+    $client = Mockery::mock(DngClient::class);
+    $client->shouldReceive('buildInsertNewRecordPayload')->andReturn(['Amount' => -1]);
+    $client->shouldReceive('cancelRecord')->never();
+    app()->instance(DngClient::class, $client);
+
+    $operation = requestCancellationOperation($registration, [
+        'legacy_finance_charge_id' => $charge->id,
+    ]);
+    FinanceCancellationOperation::query()->whereKey($operation->operationId)->update([
+        'status' => FinanceCancellationOperation::STATUS_PROCESSING,
+        'processing_claimed_at' => now()->subMinutes(10),
+        'provider_attempts' => [
+            (string) $request->id => ['status' => 'in_flight', 'at' => now()->subMinutes(9)->toIso8601String()],
+        ],
+    ]);
+
+    $result = app(ProcessFinanceCancellationOperationAction::class)->handle($operation->operationId);
+
+    expect($result->status)->toBe(FinanceCancellationOperation::STATUS_REQUIRES_REVIEW)
+        ->and($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+});
+
+it('appends a second completion outbox event on late paid disposition upgrade', function () {
+    Queue::fake();
+    $this->actingAs(User::factory()->create());
+    $registration = cancellationOperationRetake();
+    $charge = FinanceCharge::query()->create([
+        'student_id' => $registration->student_id,
+        'semester_id' => $registration->semester_id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 500000,
+        'description' => 'Retake fee',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    $operation = requestCancellationOperation($registration, [
+        'legacy_finance_charge_id' => $charge->id,
+    ]);
+
+    app(ProcessFinanceCancellationOperationAction::class)->handle($operation->operationId);
+    expect(FinanceCancellationCompletionOutbox::query()->count())->toBe(1);
+
+    $paidDng = DngPaymentRequest::query()->create([
+        'student_id' => $registration->student_id,
+        'campus_code' => 'TEST',
+        'student_code' => $registration->student->student_id,
+        'fee_type' => 'HL',
+        'item_id' => 'cancel-operation-late-paid-outbox-'.$registration->id,
+        'amount' => 500000,
+        'status' => DngPaymentRequest::STATUS_PAID_UNINVOICED,
+        'finance_charge_id' => null,
+        'dng_payment_id' => 'DNG-LATE-OUTBOX-'.$registration->id,
+        'paid_at' => now(),
+    ]);
+    DngPaymentRequestCharge::query()->create([
+        'dng_payment_request_id' => $paidDng->id,
+        'finance_charge_id' => $charge->id,
+        'amount' => 500000,
+    ]);
+
+    app(ProcessFinanceCancellationOperationAction::class)->handle($operation->operationId);
+
+    $events = FinanceCancellationCompletionOutbox::query()
+        ->where('finance_cancellation_operation_id', $operation->operationId)
+        ->orderBy('event_version')
+        ->get();
+
+    expect($events)->toHaveCount(2)
+        ->and($events[0]->event_kind)->toBe(FinanceCancellationCompletionOutbox::EVENT_KIND_COMPLETED)
+        ->and($events[1]->event_kind)->toBe(FinanceCancellationCompletionOutbox::EVENT_KIND_PAID_DISPOSITION_UPGRADE)
+        ->and($events[0]->event_id)->not->toBe($events[1]->event_id);
 });
 
 it('does not create a replacement when void fails after collection cancel', function () {

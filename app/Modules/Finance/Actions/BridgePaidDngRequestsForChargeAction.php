@@ -31,7 +31,7 @@ class BridgePaidDngRequestsForChargeAction
     {
         $chargeId = $charge instanceof FinanceCharge ? (int) $charge->id : $charge;
 
-        return $this->paidRequestsForCharge($chargeId)
+        $bridged = $this->paidRequestsForCharge($chargeId)
             ->map(function (DngPaymentRequest $request) use ($chargeId): ?Payment {
                 $payment = $this->dngPaymentService->bridgeToPayment($request);
 
@@ -48,6 +48,15 @@ class BridgePaidDngRequestsForChargeAction
             })
             ->filter()
             ->values();
+
+        if ($bridged->isNotEmpty()) {
+            // Avoid re-entrancy when ProcessFinanceCancellation is already bridging mid-void.
+            // Resume only when there is completed unpaid-disposition work to upgrade, or
+            // requested/review ops that need re-entry — always safe afterCommit job.
+            app(ResumeFinanceCancellationOnPaidEvidenceAction::class)->handle($chargeId);
+        }
+
+        return $bridged;
     }
 
     public function hasPaidDngForCharge(?FinanceCharge $charge): bool

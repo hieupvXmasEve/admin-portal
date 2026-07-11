@@ -8,7 +8,6 @@ use App\Models\ExamResitAttempt;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Shared\Contracts\Finance\DTO\FinanceCancellationChargeState;
 use App\Shared\Contracts\Finance\FinanceCancellationChargeStateReader;
-use App\Shared\Contracts\Finance\FinanceCancellationOperationRequestContract;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -16,10 +15,9 @@ use RuntimeException;
 /**
  * Cancel an exam-resit (thi lại) operation before the student sits the resit.
  *
- * Academic enters Finance-Pending Cancellation under its own transaction, then
- * requests a durable Finance Cancellation Operation outside that transaction so
- * Finance writes never share a lock with Academic. The source becomes terminal
- * only after Finance completion is consumed.
+ * Academic marks Finance-Pending and writes a durable handoff outbox in the
+ * same transaction. Finance Cancellation Operation is requested only via the
+ * handoff worker after commit — no cross-context transaction, no lost handoff.
  */
 class CancelExamResitAttemptAction
 {
@@ -53,51 +51,49 @@ class CancelExamResitAttemptAction
                 ->lockForUpdate()
                 ->findOrFail($data['attempt_id']);
 
-            // Idempotent re-entry while Finance is still working.
-            if ($attempt->status === ExamResitAttempt::STATUS_FINANCE_PENDING_CANCELLATION) {
-                return $attempt;
+            $alreadyPending = $attempt->status === ExamResitAttempt::STATUS_FINANCE_PENDING_CANCELLATION;
+
+            if (! $alreadyPending) {
+                if (! $attempt->isCancellable()) {
+                    throw new RuntimeException(
+                        "Không thể hủy thi lại ở trạng thái: {$attempt->status}. Chỉ requested/approved/scheduled mới được hủy."
+                    );
+                }
+
+                $this->assertCancellationAcknowledgements($attempt, $data);
+
+                $attempt->update([
+                    'status' => ExamResitAttempt::STATUS_FINANCE_PENDING_CANCELLATION,
+                    'cancellation_reason' => $data['reason'],
+                    'cancelled_by_user_id' => auth()->id(),
+                ]);
+                $attempt = $attempt->fresh() ?? $attempt;
             }
 
-            if (! $attempt->isCancellable()) {
-                throw new RuntimeException(
-                    "Không thể hủy thi lại ở trạng thái: {$attempt->status}. Chỉ requested/approved/scheduled mới được hủy."
-                );
-            }
-
-            $this->assertCancellationAcknowledgements($attempt, $data);
-
-            $attempt->update([
-                'status' => ExamResitAttempt::STATUS_FINANCE_PENDING_CANCELLATION,
-                'cancellation_reason' => $data['reason'],
-                'cancelled_by_user_id' => auth()->id(),
+            // Same correctness window as pending: durable handoff outbox.
+            RecordAcademicFinanceCancellationHandoffAction::run([
+                'source_system' => AcademicFinanceObligationSource::SOURCE_SYSTEM,
+                'source_kind' => AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT,
+                'source_ref' => AcademicFinanceObligationSource::examResitAttemptRef($attempt),
+                'obligation_type' => AcademicFinanceObligationSource::EXAM_RESIT_FEE,
+                'unpaid_void_reason' => 'exam_resit_cancelled',
+                'paid_void_reason' => 'exam_resit_cancelled_paid_no_refund',
+                'actor_user_id' => auth()->id() === null ? null : (int) auth()->id(),
+                'payload' => [
+                    'reason' => $data['reason'] ?? $attempt->cancellation_reason,
+                    'acknowledge_no_refund' => (bool) ($data['acknowledge_no_refund'] ?? false),
+                    'legacy_finance_charge_id' => $attempt->finance_charge_id === null
+                        ? null
+                        : (int) $attempt->finance_charge_id,
+                ],
             ]);
 
-            return $attempt->fresh() ?? $attempt;
+            return $attempt;
         });
 
-        // Finance request is intentionally outside the Academic transaction
-        // (no cross-context transaction / no Academic lock across Finance writes).
-        $operation = app(FinanceCancellationOperationRequestContract::class)->request(
-            AcademicFinanceObligationSource::SOURCE_SYSTEM,
-            AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT,
-            AcademicFinanceObligationSource::examResitAttemptRef($attempt),
-            AcademicFinanceObligationSource::EXAM_RESIT_FEE,
-            'exam_resit_cancelled',
-            'exam_resit_cancelled_paid_no_refund',
-            auth()->id() === null ? null : (int) auth()->id(),
-            [
-                'reason' => $data['reason'],
-                'acknowledge_no_refund' => (bool) ($data['acknowledge_no_refund'] ?? false),
-                'legacy_finance_charge_id' => $attempt->finance_charge_id === null
-                    ? null
-                    : (int) $attempt->finance_charge_id,
-            ],
-        );
-
-        Log::info('Exam resit cancellation requested', [
+        Log::info('Exam resit cancellation handoff recorded', [
             'exam_resit_attempt_id' => $attempt->id,
             'student_id' => $attempt->student_id,
-            'finance_cancellation_operation_id' => $operation->operationId,
             'cancelled_by_user_id' => auth()->id(),
         ]);
 

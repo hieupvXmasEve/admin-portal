@@ -12,19 +12,20 @@ use App\Modules\Finance\Models\FinanceCancellationOperation;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
-use App\Modules\Finance\Services\SettlementService;
 use App\Shared\Contracts\Finance\Enums\FinanceCancellationFeeDisposition;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /**
  * Processes a durable Finance Cancellation Operation:
  * claim → cancel collection (provider outside settlement TX) → void payable
- * effects → create aggregate replacements from Settlement Position → outbox.
+ * effects → create aggregate replacements from valid Settlement Position → outbox.
  *
- * Concurrency: only one worker claims STATUS_PROCESSING; others exit without
- * calling the provider. Late paid evidence after completion upgrades disposition.
+ * Concurrency: only one worker claims STATUS_PROCESSING. Provider cancel attempts
+ * are ledgered so stale reclaim never double-calls the provider. Late paid
+ * evidence upgrades completed operations via append-only completion events.
  */
 class ProcessFinanceCancellationOperationAction
 {
@@ -47,7 +48,7 @@ class ProcessFinanceCancellationOperationAction
         DngPaymentRequest::STATUS_NEEDS_REVIEW,
     ];
 
-    /** Stale processing claims may be reclaimed after this window. */
+    /** Stale processing claims may be reclaimed only for recovery — never re-calls in-flight provider. */
     private const CLAIM_STALE_SECONDS = 300;
 
     public function __construct(
@@ -55,7 +56,6 @@ class ProcessFinanceCancellationOperationAction
         private readonly BridgePaidDngRequestsForChargeAction $bridgePaidDngRequestsForChargeAction,
         private readonly VoidFinanceChargeAction $voidFinanceChargeAction,
         private readonly SettlementPositionReader $settlementPositionReader,
-        private readonly SettlementService $settlementService,
     ) {}
 
     public function handle(int $operationId): FinanceCancellationOperation
@@ -68,7 +68,6 @@ class ProcessFinanceCancellationOperationAction
                 return $this->reconcileLatePayment($current);
             }
 
-            // Another worker owns STATUS_PROCESSING (or unclaimable state).
             return $current;
         }
 
@@ -94,7 +93,6 @@ class ProcessFinanceCancellationOperationAction
                 && $this->bridgePaidDngRequestsForChargeAction->hasPaidDngForCharge($lockedCharge);
 
             if ($hasPaidDng && $lockedCharge !== null) {
-                // Bridge verified cash before any void releases applications.
                 $this->bridgePaidDngRequestsForChargeAction->handle($lockedCharge);
                 $lockedCharge->refresh();
             }
@@ -111,17 +109,27 @@ class ProcessFinanceCancellationOperationAction
                 $lockedCharge->refresh();
             }
 
-            // Replacement only after void succeeds inside this transaction so a
-            // void failure cannot leave an orphan replacement DNG.
-            foreach ($replacementPlans as $plan) {
-                $cancelledRequest = DngPaymentRequest::query()->find($plan['request_id']);
-                if ($cancelledRequest instanceof DngPaymentRequest) {
-                    $this->createReplacementForRemainingTargets(
-                        $locked,
-                        $cancelledRequest,
-                        $plan['voided_charge_id'],
-                    );
+            try {
+                foreach ($replacementPlans as $plan) {
+                    $cancelledRequest = DngPaymentRequest::query()->find($plan['request_id']);
+                    if ($cancelledRequest instanceof DngPaymentRequest) {
+                        $this->createReplacementForRemainingTargets(
+                            $locked,
+                            $cancelledRequest,
+                            $plan['voided_charge_id'],
+                        );
+                    }
                 }
+            } catch (RuntimeException $exception) {
+                // Fail-closed: invalid Settlement Position must not invent amounts.
+                $locked->update([
+                    'status' => FinanceCancellationOperation::STATUS_REQUIRES_REVIEW,
+                    'result_payload' => array_merge($locked->result_payload ?? [], [
+                        'review_reason' => $exception->getMessage(),
+                    ]),
+                ]);
+
+                return $locked->fresh() ?? $locked;
             }
 
             $obligation = $this->findObligation($locked);
@@ -137,15 +145,16 @@ class ProcessFinanceCancellationOperationAction
             $locked->update([
                 'status' => FinanceCancellationOperation::STATUS_COMPLETED,
                 'completed_at' => now(),
-                'result_payload' => [
+                'processing_claimed_at' => null,
+                'result_payload' => array_merge($locked->result_payload ?? [], [
                     'is_paid' => $paid,
                     'finance_charge_id' => $lockedCharge?->id,
                     'fee_disposition' => $feeDisposition->value,
                     'had_unpaid_charge' => $feeDisposition === FinanceCancellationFeeDisposition::VoidedUnpaidCharge,
-                ],
+                ]),
             ]);
 
-            $this->queueCompletionOutbox($locked);
+            $this->appendCompletionOutbox($locked, FinanceCancellationCompletionOutbox::EVENT_KIND_COMPLETED);
 
             return $locked->fresh() ?? $locked;
         });
@@ -157,9 +166,6 @@ class ProcessFinanceCancellationOperationAction
         return app(self::class)->handle($data['operation_id']);
     }
 
-    /**
-     * Optimistic claim: only one concurrent worker transitions into processing.
-     */
     private function claimForProcessing(int $operationId): ?FinanceCancellationOperation
     {
         $staleBefore = now()->subSeconds(self::CLAIM_STALE_SECONDS);
@@ -172,11 +178,15 @@ class ProcessFinanceCancellationOperationAction
                     FinanceCancellationOperation::STATUS_REQUIRES_REVIEW,
                 ])->orWhere(function ($processing) use ($staleBefore): void {
                     $processing->where('status', FinanceCancellationOperation::STATUS_PROCESSING)
-                        ->where('updated_at', '<', $staleBefore);
+                        ->where(function ($claimed) use ($staleBefore): void {
+                            $claimed->whereNull('processing_claimed_at')
+                                ->orWhere('processing_claimed_at', '<', $staleBefore);
+                        });
                 });
             })
             ->update([
                 'status' => FinanceCancellationOperation::STATUS_PROCESSING,
+                'processing_claimed_at' => now(),
                 'updated_at' => now(),
             ]);
 
@@ -187,9 +197,6 @@ class ProcessFinanceCancellationOperationAction
         return FinanceCancellationOperation::query()->find($operationId);
     }
 
-    /**
-     * PRD 7.5: cash confirmed after completion upgrades to paid disposition.
-     */
     private function reconcileLatePayment(FinanceCancellationOperation $operation): FinanceCancellationOperation
     {
         $payload = $operation->result_payload ?? [];
@@ -213,11 +220,10 @@ class ProcessFinanceCancellationOperationAction
             return $operation;
         }
 
-        // Paid DNG evidence is valid even after the charge was voided.
-        $paidRequestIds = $this->bridgePaidDngRequestsForChargeAction
+        $paidRequests = $this->bridgePaidDngRequestsForChargeAction
             ->paidRequestsForCharge((int) $charge->id);
 
-        if ($paidRequestIds->isEmpty() && ! $charge->is_fully_paid) {
+        if ($paidRequests->isEmpty() && ! $charge->is_fully_paid) {
             return $operation;
         }
 
@@ -240,29 +246,33 @@ class ProcessFinanceCancellationOperationAction
                 ]),
             ]);
 
-            $this->queueCompletionOutbox($locked, redispatch: true);
+            $this->appendCompletionOutbox(
+                $locked,
+                FinanceCancellationCompletionOutbox::EVENT_KIND_PAID_DISPOSITION_UPGRADE,
+            );
 
             return $locked->fresh() ?? $locked;
         });
     }
 
-    private function queueCompletionOutbox(FinanceCancellationOperation $operation, bool $redispatch = false): void
+    private function appendCompletionOutbox(FinanceCancellationOperation $operation, string $eventKind): void
     {
-        $outbox = FinanceCancellationCompletionOutbox::query()->firstOrCreate(
-            ['finance_cancellation_operation_id' => $operation->id],
-            [
-                'event_id' => 'finance-cancellation-operation-completed-'.$operation->id,
-                'status' => FinanceCancellationCompletionOutbox::STATUS_PENDING,
-            ],
-        );
+        $nextVersion = (int) FinanceCancellationCompletionOutbox::query()
+            ->where('finance_cancellation_operation_id', $operation->id)
+            ->max('event_version') + 1;
 
-        if ($redispatch && $outbox->status === FinanceCancellationCompletionOutbox::STATUS_DISPATCHED) {
-            $outbox->update([
-                'event_id' => 'finance-cancellation-operation-completed-'.$operation->id.'-paid-'.now()->timestamp,
-                'status' => FinanceCancellationCompletionOutbox::STATUS_PENDING,
-                'dispatched_at' => null,
-            ]);
-        }
+        $outbox = FinanceCancellationCompletionOutbox::query()->create([
+            'finance_cancellation_operation_id' => $operation->id,
+            'event_id' => sprintf(
+                'finance-cancellation-operation-%s-%d-v%d',
+                $eventKind,
+                $operation->id,
+                $nextVersion,
+            ),
+            'event_kind' => $eventKind,
+            'event_version' => $nextVersion,
+            'status' => FinanceCancellationCompletionOutbox::STATUS_PENDING,
+        ]);
 
         DispatchFinanceCancellationCompletionJob::dispatch($outbox->id)->afterCommit();
     }
@@ -282,10 +292,49 @@ class ProcessFinanceCancellationOperationAction
                 return false;
             }
 
+            $attempt = $this->providerAttempt($operation, (int) $request->id);
+
+            // Stale reclaim: never re-call provider while a previous attempt is in-flight.
+            if (($attempt['status'] ?? null) === 'in_flight') {
+                $request->refresh();
+                if (in_array($request->status, self::TERMINAL_COLLECTION_STATUSES, true)) {
+                    $this->markProviderAttempt($operation, (int) $request->id, 'done');
+                    $replacementPlans[] = [
+                        'request_id' => (int) $request->id,
+                        'voided_charge_id' => (int) $charge->id,
+                    ];
+
+                    continue;
+                }
+
+                $operation->update([
+                    'status' => FinanceCancellationOperation::STATUS_REQUIRES_REVIEW,
+                    'result_payload' => array_merge($operation->result_payload ?? [], [
+                        'review_reason' => 'Stale processing reclaim refused to re-call provider for DNG #'.$request->id,
+                    ]),
+                ]);
+
+                return false;
+            }
+
+            if (($attempt['status'] ?? null) === 'done') {
+                $request->refresh();
+                if (in_array($request->status, self::TERMINAL_COLLECTION_STATUSES, true)) {
+                    $replacementPlans[] = [
+                        'request_id' => (int) $request->id,
+                        'voided_charge_id' => (int) $charge->id,
+                    ];
+                }
+
+                continue;
+            }
+
             try {
-                // Provider calls occur outside this operation's settlement transaction.
+                $this->markProviderAttempt($operation, (int) $request->id, 'in_flight');
                 $this->cancelDngPaymentRequestAction->run($request);
+                $this->markProviderAttempt($operation, (int) $request->id, 'done');
             } catch (\Throwable) {
+                $this->markProviderAttempt($operation, (int) $request->id, 'failed');
                 $operation->update(['status' => FinanceCancellationOperation::STATUS_REQUIRES_REVIEW]);
 
                 return false;
@@ -314,6 +363,27 @@ class ProcessFinanceCancellationOperationAction
         }
 
         return true;
+    }
+
+    /** @return array{status?: string, at?: string} */
+    private function providerAttempt(FinanceCancellationOperation $operation, int $requestId): array
+    {
+        $attempts = $operation->provider_attempts ?? [];
+
+        return is_array($attempts[(string) $requestId] ?? null)
+            ? $attempts[(string) $requestId]
+            : [];
+    }
+
+    private function markProviderAttempt(FinanceCancellationOperation $operation, int $requestId, string $status): void
+    {
+        $attempts = $operation->provider_attempts ?? [];
+        $attempts[(string) $requestId] = [
+            'status' => $status,
+            'at' => now()->toIso8601String(),
+        ];
+        $operation->forceFill(['provider_attempts' => $attempts])->save();
+        $operation->refresh();
     }
 
     /** @return Collection<int, DngPaymentRequest> */
@@ -383,6 +453,12 @@ class ProcessFinanceCancellationOperationAction
 
         foreach ($targets as $target) {
             $canonical = $this->canonicalRemainingForCharge((int) $target->finance_charge_id);
+            if ($canonical === null) {
+                throw new RuntimeException(
+                    'Settlement Position is invalid for charge #'.$target->finance_charge_id
+                    .'; aggregate replacement requires review (no guessed amount).'
+                );
+            }
             if (bccomp($canonical, '0.00', 2) <= 0) {
                 continue;
             }
@@ -417,7 +493,6 @@ class ProcessFinanceCancellationOperationAction
             ],
         );
 
-        // Keep amount aligned when firstOrCreate hit an existing row with stale amount.
         if ((string) $replacement->amount !== $total) {
             $replacement->update(['amount' => $total]);
         }
@@ -437,10 +512,11 @@ class ProcessFinanceCancellationOperationAction
     }
 
     /**
-     * Remaining collectible for a charge from Settlement Position when lines
-     * exist; otherwise falls back to gross charge amount (no line yet).
+     * Canonical remaining collectible for a charge.
+     * Returns null when Settlement Position cannot be trusted (fail-closed).
+     * Charges without invoice lines use gross amount (nothing settled yet).
      */
-    private function canonicalRemainingForCharge(int $chargeId): string
+    private function canonicalRemainingForCharge(int $chargeId): ?string
     {
         $lineIds = InvoiceLine::query()
             ->where('charge_id', $chargeId)
@@ -449,35 +525,26 @@ class ProcessFinanceCancellationOperationAction
             ->map(fn ($id): int => (int) $id)
             ->all();
 
-        if ($lineIds !== []) {
-            $position = count($lineIds) === 1
-                ? $this->settlementPositionReader->forPayableLine($lineIds[0])
-                : $this->settlementPositionReader->forPayableLines($lineIds);
-
-            if ($position->amounts !== null) {
-                $remaining = $position->amounts->remaining->amount;
-
-                return bccomp($remaining, '0.00', 2) < 0 ? '0.00' : $remaining;
+        if ($lineIds === []) {
+            $charge = FinanceCharge::query()->find($chargeId);
+            if (! $charge instanceof FinanceCharge || $charge->status !== FinanceCharge::STATUS_ACTIVE) {
+                return '0.00';
             }
 
-            // Settlement Position may be invalid (e.g. missing obligation currency)
-            // while ledger cash/discount still define collectible remaining.
-            $paid = $this->settlementService->getChargePaidAmount($chargeId);
-            $discount = $this->settlementService->getChargeDiscountAmount($chargeId);
-            $gross = (float) InvoiceLine::query()
-                ->whereIn('id', $lineIds)
-                ->sum('amount_snapshot');
-            $remaining = max(0, round($gross - $discount - $paid, 2));
-
-            return number_format($remaining, 2, '.', '');
+            return number_format((float) $charge->amount, 2, '.', '');
         }
 
-        $charge = FinanceCharge::query()->find($chargeId);
-        if (! $charge instanceof FinanceCharge || $charge->status !== FinanceCharge::STATUS_ACTIVE) {
-            return '0.00';
+        $position = count($lineIds) === 1
+            ? $this->settlementPositionReader->forPayableLine($lineIds[0])
+            : $this->settlementPositionReader->forPayableLines($lineIds);
+
+        if (! $position->valid || $position->amounts === null) {
+            return null;
         }
 
-        return number_format((float) $charge->amount, 2, '.', '');
+        $remaining = $position->amounts->remaining->amount;
+
+        return bccomp($remaining, '0.00', 2) < 0 ? '0.00' : $remaining;
     }
 
     private function resolveFeeDisposition(?FinanceCharge $charge, bool $paid): FinanceCancellationFeeDisposition

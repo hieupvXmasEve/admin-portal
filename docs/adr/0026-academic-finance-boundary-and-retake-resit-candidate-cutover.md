@@ -1,7 +1,7 @@
 # Academic/Finance boundary, source-agnostic Finance intake, and the retake/resit debit cutover
 
 **Status:** accepted (supersedes the earlier candidate-centric draft of this ADR)
-**Last updated:** 2026-07-11
+**Last updated:** 2026-07-11 (cancellation handoff clarified: Academic outbox, not cross-context TX)
 
 Swinx stays a Laravel modular monolith, but Academic and Finance are separate bounded contexts that must be able to change independently: a business change on one side must not force a schema or code change on the other. `Student` is a Shared Kernel identity reference only (see **Student Identity** in `CONTEXT.md`). Academic owns the **Academic Student Lifecycle**; Finance owns all money — charges, credits, discounts, invoices, payments, DNG, settlement, review, and audit.
 
@@ -90,13 +90,22 @@ confirmed completion may move the source to cancelled. Failed or unknown DNG
 outcomes leave the source pending with review evidence. No cross-context
 transaction holds database locks across the provider call.
 
-The forward cancellation request creates a durable, source-keyed Finance
-Cancellation Operation in the same correctness window that marks the source
-pending. Finance processes it idempotently and publishes a durable completion
-event through the outbox after collection and obligation effects are committed.
-Academic consumes that event idempotently to finish its local lifecycle. UI
-polling may show progress but is never the completion mechanism, and Finance
-never calls an Academic model callback directly.
+The forward cancellation request is durable without a cross-context DB
+transaction. In the **same Academic transaction** that marks the source
+Finance-Pending, Academic writes a durable **handoff outbox** row
+(`academic_finance_cancellation_handoffs`). After commit, a worker delivers that
+handoff into Finance, which firstOrCreates a source-keyed Finance Cancellation
+Operation and processes it. A crash after pending therefore still has a
+recoverable handoff (retry/re-drive), not a silent lost Finance request.
+
+Finance processes the operation idempotently (claim + provider-attempt ledger so
+stale reclaim never double-calls the provider) and publishes **append-only**
+completion events through the outbox after collection and obligation effects are
+committed. Late verified cash (webhook/receipt/bridge) re-enters the processor
+and may append a paid-disposition upgrade event. Academic consumes each event
+idempotently to finish or upgrade its local lifecycle. UI polling may show
+progress but is never the completion mechanism, and Finance never calls an
+Academic model callback directly.
 
 **5.6 — Router opens the enum, enables only debit.** The intake `FinancialEffect` enum defines `Debit`, `Credit`, `Discount`; slice 1 wires only `Debit` and throws `UnsupportedFinancialEffectYet` for the others, so the interface points the right direction without pretending to support unmigrated effects.
 

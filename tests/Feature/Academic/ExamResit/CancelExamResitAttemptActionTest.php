@@ -17,6 +17,8 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Actions\CancelExamResitAttemptAction;
 use App\Modules\Academic\Actions\CreateExamResitAttemptAction;
+use App\Modules\Academic\Actions\DispatchAcademicFinanceCancellationHandoffAction;
+use App\Modules\Academic\Models\AcademicFinanceCancellationHandoff;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
 use App\Modules\Finance\Actions\ProcessFinanceCancellationOperationAction;
@@ -63,10 +65,20 @@ beforeEach(function () {
 
 function runCancelExamResit(int $attemptId, string $reason = 'Sinh viên xin rút', array $overrides = []): ExamResitAttempt
 {
-    return CancelExamResitAttemptAction::run(array_merge([
+    $attempt = CancelExamResitAttemptAction::run(array_merge([
         'attempt_id' => $attemptId,
         'reason' => $reason,
     ], $overrides));
+
+    // Durable handoff is afterCommit; under Queue::fake deliver it synchronously.
+    AcademicFinanceCancellationHandoff::query()
+        ->where('status', AcademicFinanceCancellationHandoff::STATUS_PENDING)
+        ->orderBy('id')
+        ->each(fn (AcademicFinanceCancellationHandoff $handoff) => DispatchAcademicFinanceCancellationHandoffAction::run([
+            'handoff_id' => $handoff->id,
+        ]));
+
+    return $attempt->fresh() ?? $attempt;
 }
 
 function scheduledExamResitSessionForAttempt(ExamResitAttempt $attempt): ExamResitSession
@@ -127,14 +139,14 @@ function settleExamResitFinanceCancellation(ExamResitAttempt $attempt): void
 
     app(ProcessFinanceCancellationOperationAction::class)->handle($operation->id);
 
-    $outbox = FinanceCancellationCompletionOutbox::query()
+    FinanceCancellationCompletionOutbox::query()
         ->where('finance_cancellation_operation_id', $operation->id)
-        ->first();
-
-    if ($outbox !== null && $outbox->status !== FinanceCancellationCompletionOutbox::STATUS_DISPATCHED) {
-        app(DispatchFinanceCancellationCompletionJob::class, ['outboxId' => $outbox->id])
-            ->handle(app(FinanceCancellationCompletionContract::class));
-    }
+        ->where('status', FinanceCancellationCompletionOutbox::STATUS_PENDING)
+        ->orderBy('event_version')
+        ->each(function (FinanceCancellationCompletionOutbox $outbox): void {
+            app(DispatchFinanceCancellationCompletionJob::class, ['outboxId' => $outbox->id])
+                ->handle(app(FinanceCancellationCompletionContract::class));
+        });
 }
 
 it('requests finance cancellation and completes only through the durable outbox', function () {

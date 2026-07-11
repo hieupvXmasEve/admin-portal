@@ -13,13 +13,27 @@ class FinanceCancellationCompletionOutbox extends Model
 
     public const STATUS_DISPATCHED = 'dispatched';
 
+    public const EVENT_KIND_COMPLETED = 'completed';
+
+    public const EVENT_KIND_PAID_DISPOSITION_UPGRADE = 'paid_disposition_upgrade';
+
     protected $table = 'finance_cancellation_completion_outbox';
 
-    protected $fillable = ['finance_cancellation_operation_id', 'event_id', 'status', 'dispatched_at'];
+    protected $fillable = [
+        'finance_cancellation_operation_id',
+        'event_id',
+        'event_kind',
+        'event_version',
+        'status',
+        'dispatched_at',
+    ];
 
     protected function casts(): array
     {
-        return ['dispatched_at' => 'datetime'];
+        return [
+            'dispatched_at' => 'datetime',
+            'event_version' => 'integer',
+        ];
     }
 
     public function operation(): BelongsTo

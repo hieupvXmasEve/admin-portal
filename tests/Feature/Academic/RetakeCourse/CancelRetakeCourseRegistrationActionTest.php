@@ -11,6 +11,8 @@ use App\Models\Student;
 use App\Models\User;
 use App\Modules\Academic\Actions\CancelRetakeCourseRegistrationAction;
 use App\Modules\Academic\Actions\CreateRetakeCourseRegistrationAction;
+use App\Modules\Academic\Actions\DispatchAcademicFinanceCancellationHandoffAction;
+use App\Modules\Academic\Models\AcademicFinanceCancellationHandoff;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateRetakeCourseChargeSimpleAction;
 use App\Modules\Finance\Actions\ProcessFinanceCancellationOperationAction;
@@ -94,8 +96,20 @@ function createPaidRetakeDngForCharge(CourseRetakeRegistration $registration, Fi
     return $dng;
 }
 
+function deliverAcademicFinanceCancellationHandoffs(): void
+{
+    AcademicFinanceCancellationHandoff::query()
+        ->where('status', AcademicFinanceCancellationHandoff::STATUS_PENDING)
+        ->orderBy('id')
+        ->each(fn (AcademicFinanceCancellationHandoff $handoff) => DispatchAcademicFinanceCancellationHandoffAction::run([
+            'handoff_id' => $handoff->id,
+        ]));
+}
+
 function settleRetakeFinanceCancellation(CourseRetakeRegistration $registration): void
 {
+    deliverAcademicFinanceCancellationHandoffs();
+
     $operation = FinanceCancellationOperation::query()
         ->where('source_kind', AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION)
         ->where('source_ref', AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration))
@@ -103,14 +117,14 @@ function settleRetakeFinanceCancellation(CourseRetakeRegistration $registration)
 
     app(ProcessFinanceCancellationOperationAction::class)->handle($operation->id);
 
-    $outbox = FinanceCancellationCompletionOutbox::query()
+    FinanceCancellationCompletionOutbox::query()
         ->where('finance_cancellation_operation_id', $operation->id)
-        ->first();
-
-    if ($outbox !== null && $outbox->status !== FinanceCancellationCompletionOutbox::STATUS_DISPATCHED) {
-        app(DispatchFinanceCancellationCompletionJob::class, ['outboxId' => $outbox->id])
-            ->handle(app(FinanceCancellationCompletionContract::class));
-    }
+        ->where('status', FinanceCancellationCompletionOutbox::STATUS_PENDING)
+        ->orderBy('event_version')
+        ->each(function (FinanceCancellationCompletionOutbox $outbox): void {
+            app(DispatchFinanceCancellationCompletionJob::class, ['outboxId' => $outbox->id])
+                ->handle(app(FinanceCancellationCompletionContract::class));
+        });
 }
 
 beforeEach(function () {
@@ -138,10 +152,13 @@ it('requests finance cancellation and keeps the source pending until completion'
         'registration_id' => $reg->id,
         'reason' => 'Student request',
     ]);
+    deliverAcademicFinanceCancellationHandoffs();
 
     expect($result->status)->toBe(CourseRetakeRegistration::STATUS_FINANCE_PENDING_CANCELLATION)
         ->and($result->cancellation_reason)->toBe('Student request')
-        ->and($result->cancelled_by_user_id)->toBe($this->user->id);
+        ->and($result->cancelled_by_user_id)->toBe($this->user->id)
+        ->and(AcademicFinanceCancellationHandoff::query()->where('status', AcademicFinanceCancellationHandoff::STATUS_DISPATCHED)->count())->toBe(1)
+        ->and(FinanceCancellationOperation::query()->count())->toBe(1);
 
     settleRetakeFinanceCancellation($reg);
 

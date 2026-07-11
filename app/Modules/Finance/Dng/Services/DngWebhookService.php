@@ -8,6 +8,7 @@ use App\Models\CourseRetakeRegistration;
 use App\Modules\Academic\Actions\AutoEnrollRetakeCourseAction;
 use App\Modules\Finance\Actions\CaptureDngProviderReceiptAction;
 use App\Modules\Finance\Actions\RegisterDngReceiptExceptionAction;
+use App\Modules\Finance\Actions\ResumeFinanceCancellationOnPaidEvidenceAction;
 use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
@@ -179,9 +180,11 @@ class DngWebhookService
                 // Cancellation is terminal for collection state, not for provider cash.
                 // A verified late receipt remains attributable and must enter the
                 // canonical Payment ledger without reviving the request.
-                $this->captureProviderReceipt($request->fresh(), $payload, 'webhook', [
+                $freshCancelled = $request->fresh();
+                $this->captureProviderReceipt($freshCancelled, $payload, 'webhook', [
                     'checksum' => 'valid',
                 ]);
+                $this->resumeFinanceCancellationForRequest($freshCancelled);
                 $event->markSkipped('Captured verified receipt without reviving cancelled request');
 
                 return;
@@ -220,6 +223,7 @@ class DngWebhookService
             // Mark linked installment as paid + dispatch next push (post-commit).
             // No-op if the DNG request has no linked installment (legacy / non-installment flow).
             $this->settleInstallmentAction->handle($freshRequest);
+            $this->resumeFinanceCancellationForRequest($freshRequest);
 
             // Auto-enroll retake course registrations when payment confirmed.
             $this->handleRetakeCourseAutoEnroll($freshRequest);
@@ -329,6 +333,25 @@ class DngWebhookService
     {
         if (! $request->hasBridgedPayment()) {
             $this->dngPaymentService->bridgeToPayment($request);
+        }
+
+        $this->resumeFinanceCancellationForRequest($request);
+    }
+
+    /**
+     * PRD 7.5 production trigger: paid evidence may arrive during/after a Finance
+     * Cancellation Operation — re-enter the processor for matching ops.
+     */
+    private function resumeFinanceCancellationForRequest(DngPaymentRequest $request): void
+    {
+        $chargeIds = collect([(int) ($request->finance_charge_id ?? 0)])
+            ->merge($request->chargeLinks()->pluck('finance_charge_id')->map(fn ($id): int => (int) $id))
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        foreach ($chargeIds as $chargeId) {
+            app(ResumeFinanceCancellationOnPaidEvidenceAction::class)->handle($chargeId);
         }
     }
 
