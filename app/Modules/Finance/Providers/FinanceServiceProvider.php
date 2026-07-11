@@ -25,12 +25,14 @@ use App\Modules\Finance\Support\AiFinanceStudentProfileReader as ModuleAiFinance
 use App\Modules\Finance\Support\FinanceIntakeRouter;
 use App\Modules\Finance\Support\HubStudentFinanceSummaryReader as ModuleHubStudentFinanceSummaryReader;
 use App\Modules\Finance\Support\ObligationLedgerSettlementReader;
+use App\Modules\Finance\Support\SettlementPosition\CurrentPayableSettlementPositionReader;
 use App\Shared\Contracts\Finance\AiFinanceMetricReader;
 use App\Shared\Contracts\Finance\AiFinanceStudentProfileReader;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use App\Shared\Contracts\Finance\FinanceObligationCancellationContract;
 use App\Shared\Contracts\Finance\HubStudentFinanceSummaryReader;
 use App\Shared\Contracts\Finance\ObligationSettlementReader;
+use App\Shared\Contracts\Finance\SettlementPositionReader;
 use App\Shared\Contracts\Finance\StudentFeeSummaryReader;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -48,6 +50,7 @@ class FinanceServiceProvider extends ServiceProvider
         $this->app->bind(FinanceObligationCancellationContract::class, CancelFinanceObligationAction::class);
         $this->app->bind(HubStudentFinanceSummaryReader::class, ModuleHubStudentFinanceSummaryReader::class);
         $this->app->bind(ObligationSettlementReader::class, ObligationLedgerSettlementReader::class);
+        $this->app->bind(SettlementPositionReader::class, CurrentPayableSettlementPositionReader::class);
         $this->app->bind(StudentFeeSummaryReader::class, GetStudentFeeSummaryQuery::class);
 
         // Register services as singletons
