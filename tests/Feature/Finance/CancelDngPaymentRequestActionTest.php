@@ -11,8 +11,8 @@ use App\Models\Student;
 use App\Models\User;
 use App\Modules\Finance\Actions\CancelDngPaymentRequestAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
-use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Services\DngClient;
+use App\Modules\Finance\Models\DngReceiptException;
 use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -39,7 +39,7 @@ function makeCancelTestStudent(): array
 }
 
 /**
- * Create a CourseRetakeRegistration + FinanceCharge linked together.
+ * Create a FinanceCharge linked to a source record.
  */
 function makeRetakeChargeLinked(array $context, string $regStatus = CourseRetakeRegistration::STATUS_PAYMENT_PENDING): array
 {
@@ -151,36 +151,14 @@ it('cancels a pending request — transitions to cancelled', function () {
     expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED);
 });
 
-it('cancels a pending request — voids the directly linked charge', function () {
+it('cancels a pending request without voiding the directly linked charge or source workflow', function () {
     ['charge' => $charge] = makeRetakeChargeLinked($this->ctx);
     $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PENDING, $charge);
 
     app(CancelDngPaymentRequestAction::class)->run($request);
 
-    expect($charge->fresh()->status)->toBe('void');
-});
-
-it('cancels a pending request — cancels the linked retake registration', function () {
-    ['registration' => $reg, 'charge' => $charge] = makeRetakeChargeLinked($this->ctx);
-    $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PENDING, $charge);
-
-    app(CancelDngPaymentRequestAction::class)->run($request);
-
-    expect($reg->fresh()->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED);
-});
-
-it('does not cancel a retake registration in terminal status when cancelling pending request', function () {
-    ['registration' => $reg, 'charge' => $charge] = makeRetakeChargeLinked(
-        $this->ctx,
-        CourseRetakeRegistration::STATUS_ENROLLED // terminal — not cancellable
-    );
-    $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PENDING, $charge);
-
-    app(CancelDngPaymentRequestAction::class)->run($request);
-
-    // Registration stays enrolled; only the charge is voided
-    expect($reg->fresh()->status)->toBe(CourseRetakeRegistration::STATUS_ENROLLED);
-    expect($charge->fresh()->status)->toBe('void');
+    expect($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE)
+        ->and($charge->fresh()->source_id)->not->toBeNull();
 });
 
 it('cancels a pushed_to_dng request — calls DNG API and transitions to cancel_pushed_to_dng', function () {
@@ -203,9 +181,10 @@ it('cancels a pushed_to_dng request — stores cancel payload and response for a
     $fresh = $request->fresh();
     expect($fresh->cancel_push_payload)->not->toBeNull();
     expect($fresh->cancel_push_response)->not->toBeNull();
+    expect(DngReceiptException::query()->where('exception_type', 'cancel_confirmed')->count())->toBe(1);
 });
 
-it('cancels a pushed_to_dng request — voids directly linked charge', function () {
+it('cancels a pushed_to_dng request without voiding directly linked charge', function () {
     mockDngClientSuccess();
 
     ['charge' => $charge] = makeRetakeChargeLinked($this->ctx);
@@ -213,101 +192,10 @@ it('cancels a pushed_to_dng request — voids directly linked charge', function 
 
     app(CancelDngPaymentRequestAction::class)->run($request);
 
-    expect($charge->fresh()->status)->toBe('void');
+    expect($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE);
 });
 
-it('cancels a pushed_to_dng request — cancels the linked retake registration', function () {
-    mockDngClientSuccess();
-
-    ['registration' => $reg, 'charge' => $charge] = makeRetakeChargeLinked($this->ctx);
-    $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PUSHED_TO_DNG, $charge);
-
-    app(CancelDngPaymentRequestAction::class)->run($request);
-
-    expect($reg->fresh()->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED);
-});
-
-it('cancels a pushed_to_dng request — voids all charges linked via chargeLinks pivot', function () {
-    mockDngClientSuccess();
-
-    // Two registrations / charges, linked via pivot (multi-retake batch)
-    ['registration' => $regA, 'charge' => $chargeA] = makeRetakeChargeLinked($this->ctx);
-
-    // Second registration for the same student in the same context
-    $courseOfferingB = CourseOffering::factory()->create(['semester_id' => $this->ctx['semester']->id]);
-    $academicRecordB = AcademicRecord::factory()->create([
-        'student_id' => $this->ctx['student']->id,
-        'campus_id' => $this->ctx['campus']->id,
-        'unit_id' => $courseOfferingB->unit_id,
-        'course_offering_id' => $courseOfferingB->id,
-        'completion_status' => 'failed',
-        'is_passed' => false,
-    ]);
-    $regB = CourseRetakeRegistration::create([
-        'student_id' => $this->ctx['student']->id,
-        'unit_id' => $courseOfferingB->unit_id,
-        'original_academic_record_id' => $academicRecordB->id,
-        'course_offering_id' => $courseOfferingB->id,
-        'semester_id' => $this->ctx['semester']->id,
-        'campus_id' => $this->ctx['campus']->id,
-        'status' => CourseRetakeRegistration::STATUS_PAYMENT_PENDING,
-        'attempt_number' => 2,
-        'retake_fee' => 7000000,
-        'approved_by_user_id' => $this->ctx['user']->id,
-        'approved_at' => now(),
-    ]);
-    $chargeB = FinanceCharge::create([
-        'student_id' => $this->ctx['student']->id,
-        'semester_id' => $this->ctx['semester']->id,
-        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
-        'amount' => 7000000,
-        'description' => 'Retake B',
-        'effective_at' => now()->addSecond(),
-        'status' => FinanceCharge::STATUS_ACTIVE,
-        'source_type' => CourseRetakeRegistration::class,
-        'source_id' => $regB->id,
-    ]);
-    $regB->update(['finance_charge_id' => $chargeB->id]);
-
-    // Aggregate DNG request (no direct finance_charge_id — uses pivot instead)
-    $request = DngPaymentRequest::create([
-        'student_id' => $this->ctx['student']->id,
-        'campus_code' => 'HCM',
-        'student_code' => 'STU001',
-        'fee_type' => 'HL',
-        'item_id' => 'ITEM-BATCH-001',
-        'amount' => 12000000,
-        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
-        'finance_charge_id' => null,
-        'push_payload' => [
-            'StudentName' => 'Test Student',
-            'Email' => 'test@example.com',
-            'EstimateTime' => '2026-05-01T00:00:00',
-            'StudentAddress' => '123 Main St',
-        ],
-    ]);
-
-    // Create pivot links
-    DngPaymentRequestCharge::create([
-        'dng_payment_request_id' => $request->id,
-        'finance_charge_id' => $chargeA->id,
-        'amount' => 5000000,
-    ]);
-    DngPaymentRequestCharge::create([
-        'dng_payment_request_id' => $request->id,
-        'finance_charge_id' => $chargeB->id,
-        'amount' => 7000000,
-    ]);
-
-    app(CancelDngPaymentRequestAction::class)->run($request);
-
-    expect($chargeA->fresh()->status)->toBe('void');
-    expect($chargeB->fresh()->status)->toBe('void');
-    expect($regA->fresh()->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED);
-    expect($regB->fresh()->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED);
-});
-
-it('DNG API failure — does not change status', function () {
+it('DNG API failure becomes an unknown outcome and keeps collection blocked', function () {
     mockDngClientFailure();
 
     $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PUSHED_TO_DNG);
@@ -315,10 +203,11 @@ it('DNG API failure — does not change status', function () {
     expect(fn () => app(CancelDngPaymentRequestAction::class)->run($request))
         ->toThrow(RuntimeException::class);
 
-    expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+    expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_UNKNOWN_OUTCOME)
+        ->and($request->fresh()->cancel_push_payload)->not->toBeNull();
 });
 
-it('DNG API failure — does not void linked charge', function () {
+it('DNG API failure does not void linked charge', function () {
     mockDngClientFailure();
 
     ['charge' => $charge] = makeRetakeChargeLinked($this->ctx);
@@ -330,7 +219,7 @@ it('DNG API failure — does not void linked charge', function () {
     expect($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE);
 });
 
-it('DNG API failure — stores attempted cancel payload for audit', function () {
+it('DNG API failure records one idempotent exception for reconciliation', function () {
     mockDngClientFailure();
 
     $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PUSHED_TO_DNG);
@@ -338,8 +227,22 @@ it('DNG API failure — stores attempted cancel payload for audit', function () 
     expect(fn () => app(CancelDngPaymentRequestAction::class)->run($request))
         ->toThrow(RuntimeException::class);
 
-    // cancel_push_payload should be persisted even on failure for audit trail
-    expect($request->fresh()->cancel_push_payload)->not->toBeNull();
+    expect($request->fresh()->cancel_push_payload)->not->toBeNull()
+        ->and(DngReceiptException::query()->where('exception_type', 'unknown_collection_outcome')->count())->toBe(1);
+});
+
+it('does not classify an explicit provider rejection as an unknown outcome', function () {
+    $mock = Mockery::mock(DngClient::class);
+    $mock->shouldReceive('buildInsertNewRecordPayload')->andReturn(['mock' => 'payload']);
+    $mock->shouldReceive('cancelRecord')->andThrow(new RuntimeException('DNG API error [422]: cancellation denied'));
+    app()->instance(DngClient::class, $mock);
+    $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+
+    expect(fn () => app(CancelDngPaymentRequestAction::class)->run($request))
+        ->toThrow(RuntimeException::class);
+
+    expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
+        ->and(DngReceiptException::query()->where('exception_type', 'cancel_rejected')->count())->toBe(1);
 });
 
 it('throws when attempting to cancel a non-cancellable status', function () {

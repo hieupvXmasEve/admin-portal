@@ -36,7 +36,11 @@ class CaptureDngProviderReceiptAction
 
         $issues = $receipt['target_validation']['issues'] ?? [];
         $exceptionType = null;
-        if (($receipt['target_validation']['status'] ?? 'matched') !== 'matched') {
+        $freshRequest = $request->fresh();
+        if ($freshRequest !== null && in_array($freshRequest->status, [DngPaymentRequest::STATUS_CANCELLED, DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG], true)) {
+            $exceptionType = 'payment_after_cancellation';
+            $issues[] = 'Verified provider payment arrived after collection cancellation; payment was captured without reviving collection.';
+        } elseif (($receipt['target_validation']['status'] ?? 'matched') !== 'matched') {
             $exceptionType = 'amount_mismatch';
         } elseif ($payment !== null
             && ($request->reservationTargets()->exists() || $request->chargeLinks()->exists() || $request->finance_charge_id !== null)

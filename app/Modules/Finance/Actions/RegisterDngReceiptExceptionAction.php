@@ -12,13 +12,13 @@ use Illuminate\Support\Facades\DB;
 
 class RegisterDngReceiptExceptionAction
 {
-    /** @param array{exception_type: string, mismatch_reasons: list<string>, raw_provider_evidence: array<string, mixed>, request?: DngPaymentRequest|null, webhook_event?: DngWebhookEvent|null, payment?: Payment|null} $data */
+    /** @param array{exception_type: string, mismatch_reasons: list<string>, raw_provider_evidence: array<string, mixed>, hold_request?: bool, request?: DngPaymentRequest|null, webhook_event?: DngWebhookEvent|null, payment?: Payment|null} $data */
     public static function run(array $data): DngReceiptException
     {
         return app(self::class)->handle($data);
     }
 
-    /** @param array{exception_type: string, mismatch_reasons: list<string>, raw_provider_evidence: array<string, mixed>, request?: DngPaymentRequest|null, webhook_event?: DngWebhookEvent|null, payment?: Payment|null} $data */
+    /** @param array{exception_type: string, mismatch_reasons: list<string>, raw_provider_evidence: array<string, mixed>, hold_request?: bool, request?: DngPaymentRequest|null, webhook_event?: DngWebhookEvent|null, payment?: Payment|null} $data */
     public function handle(array $data): DngReceiptException
     {
         return DB::transaction(function () use ($data): DngReceiptException {
@@ -43,7 +43,9 @@ class RegisterDngReceiptExceptionAction
                 ],
             );
 
-            if ($request !== null && ! in_array($request->fresh()->status, [DngPaymentRequest::STATUS_CANCELLED, DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG], true)) {
+            if (($data['hold_request'] ?? true)
+                && $request !== null
+                && ! in_array($request->fresh()->status, [DngPaymentRequest::STATUS_CANCELLED, DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG, DngPaymentRequest::STATUS_UNKNOWN_OUTCOME], true)) {
                 $request->fresh()->update([
                     'status' => DngPaymentRequest::STATUS_NEEDS_REVIEW,
                     'error_message' => 'Cần kiểm tra: '.implode('; ', $data['mismatch_reasons']),

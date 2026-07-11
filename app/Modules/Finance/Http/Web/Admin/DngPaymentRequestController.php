@@ -74,20 +74,14 @@ class DngPaymentRequestController extends Controller
         return ApiResponse::success($query->handle($dngPaymentRequest));
     }
 
-    /** 4-layer reviewed cancel: reason + ack + void gate when linked charges exist. */
+    /** Reviewed collection cancel: reason + acknowledgement, never a charge void. */
     public function cancelReviewed(
         DngPaymentRequest $dngPaymentRequest,
         ReviewedCancelDngRequest $request,
-        BuildDngCancelImpactQuery $impact,
         CancelDngPaymentRequestAction $action,
     ): RedirectResponse {
         $dngPaymentRequest->loadMissing('student:id,campus_id');
         $this->assertCampusAccess($dngPaymentRequest);
-
-        if ($impact->handle($dngPaymentRequest)['requires_void_permission']
-            && ! ($request->user()?->can('void_finance_charges') ?? false)) {
-            throw new AuthorizationException('Cancelling this DNG voids linked charges and requires the void_finance_charges permission.');
-        }
 
         $cancellable = [DngPaymentRequest::STATUS_PENDING, DngPaymentRequest::STATUS_PUSHED_TO_DNG];
         if (! in_array($dngPaymentRequest->status, $cancellable, true)) {
@@ -105,7 +99,7 @@ class DngPaymentRequestController extends Controller
         }
 
         $dngPaymentRequest->forceFill(['error_message' => null])->save();
-        Inertia::flash('success', 'DNG payment request cancelled. Reason: '.$request->validated('reason'));
+        Inertia::flash('success', 'DNG collection cancellation completed. Underlying obligations remain active. Reason: '.$request->validated('reason'));
 
         return back();
     }

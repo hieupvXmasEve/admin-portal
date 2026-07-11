@@ -46,12 +46,12 @@ class DngPaymentRequest extends Model
      */
     public const TRANSITIONS = [
         self::STATUS_PENDING => [self::STATUS_PUSHED_TO_DNG, self::STATUS_FAILED, self::STATUS_CANCELLED, self::STATUS_UNKNOWN_OUTCOME, self::STATUS_NEEDS_REVIEW],
-        self::STATUS_PUSHED_TO_DNG => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_FAILED, self::STATUS_CANCELLED, self::STATUS_CANCEL_PUSHED_TO_DNG, self::STATUS_NEEDS_REVIEW],
+        self::STATUS_PUSHED_TO_DNG => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_FAILED, self::STATUS_CANCELLED, self::STATUS_CANCEL_PUSHED_TO_DNG, self::STATUS_UNKNOWN_OUTCOME, self::STATUS_NEEDS_REVIEW],
         self::STATUS_PAID_UNINVOICED => [self::STATUS_PAID_INVOICED, self::STATUS_RECONCILED],
         self::STATUS_PAID_INVOICED => [self::STATUS_RECONCILED],
         self::STATUS_RECONCILED => [],
         self::STATUS_FAILED => [self::STATUS_PENDING],
-        self::STATUS_UNKNOWN_OUTCOME => [self::STATUS_NEEDS_REVIEW],
+        self::STATUS_UNKNOWN_OUTCOME => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_NEEDS_REVIEW],
         // Review blocks new collection mutations, but it must never discard a
         // later verified provider receipt for an already-pushed request.
         self::STATUS_NEEDS_REVIEW => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED],

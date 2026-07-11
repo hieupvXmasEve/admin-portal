@@ -71,3 +71,41 @@ it('captures the actual provider receipt exactly once despite reservation drift'
         ->and($exception->mismatch_reasons)->toBe(['Provider receipt requires target reconciliation.'])
         ->and($exception->raw_provider_evidence)->toBe(['PaymentId' => 'PAY-RECEIPT-001', 'Amount' => '75000']);
 });
+
+it('captures a verified payment after cancellation without reviving collection', function () {
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $program = Program::factory()->create();
+    $curriculumVersion = CurriculumVersion::factory()->forProgram($program)->withEffectiveSemester($semester)->create();
+    $student = Student::factory()->forCampus($campus)->forProgram($program)->state([
+        'student_id' => 'STU-CANCEL-001',
+        'curriculum_version_id' => $curriculumVersion->id,
+        'intake_semester_id' => $semester->id,
+        'intake' => 1,
+        'intake_mode' => 'sequential',
+    ])->create();
+    $request = DngPaymentRequest::query()->create([
+        'student_id' => $student->id,
+        'campus_code' => 'CAMPUS001',
+        'student_code' => $student->student_id,
+        'fee_type' => 'HP',
+        'item_id' => 'ITEM-CANCELLED-RECEIPT-001',
+        'amount' => 100000,
+        'status' => DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG,
+        'dng_payment_id' => 'PAY-CANCELLED-RECEIPT-001',
+    ]);
+
+    $payment = CaptureDngProviderReceiptAction::run(['request' => $request, 'receipt' => [
+        'amount' => '100000',
+        'payload' => ['PaymentId' => 'PAY-CANCELLED-RECEIPT-001', 'Amount' => '100000'],
+        'source' => 'webhook',
+        'authenticity' => ['status' => 'verified'],
+        'payer_correlation' => ['status' => 'matched'],
+        'target_validation' => ['status' => 'matched', 'issues' => []],
+    ]]);
+
+    expect($payment)->not->toBeNull()
+        ->and($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG)
+        ->and($request->fresh()->payment_id)->toBe($payment?->id)
+        ->and(DngReceiptException::query()->where('exception_type', 'payment_after_cancellation')->count())->toBe(1);
+});

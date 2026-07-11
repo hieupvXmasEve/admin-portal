@@ -18,6 +18,8 @@ defineProps<{
         raw_provider_evidence: Record<string, unknown>;
         request_id: number | null;
         student_name: string | null;
+        outcome: string;
+        next_action: string;
     }[];
 }>();
 
@@ -40,10 +42,10 @@ const resolveException = (exceptionId: number) => {
         <Head title="DNG · Cần kiểm tra" />
         <div>
             <h1 class="text-2xl font-semibold">DNG · Cần kiểm tra</h1>
-            <p class="text-muted-foreground text-sm">Provider evidence chưa thể đối soát hoặc cần xử lý trước khi thu lại.</p>
+            <p class="text-muted-foreground text-sm">Provider evidence, kết quả hủy hoặc payment muộn cần được đối soát trước khi thu lại.</p>
         </div>
         <Card v-if="items.length === 0">
-            <CardContent class="py-8 text-sm text-muted-foreground">Không có DNG receipt cần kiểm tra.</CardContent>
+            <CardContent class="py-8 text-sm text-muted-foreground">Không có DNG exception cần kiểm tra.</CardContent>
         </Card>
         <Card v-for="exception in items" :key="exception.id" class="border-amber-300">
             <CardHeader class="flex-row items-center justify-between">
@@ -54,6 +56,8 @@ const resolveException = (exceptionId: number) => {
             </CardHeader>
             <CardContent class="space-y-3 text-sm">
                 <div>Provider payment: <span class="font-mono">{{ exception.provider_payment_id || '-' }}</span></div>
+                <div>Kết quả: <span class="font-medium">{{ exception.outcome }}</span></div>
+                <div>Hành động tiếp theo: {{ exception.next_action }}</div>
                 <div>Lý do: {{ exception.mismatch_reasons.join('; ') }}</div>
                 <Link v-if="exception.request_id" :href="route('finance.dng.payment-requests.show', exception.request_id)" class="text-blue-600 hover:underline">DNG request #{{ exception.request_id }} · {{ exception.student_name || 'Unknown student' }}</Link>
                 <JsonPayloadCard title="Affected scope" :payload="exception.affected_scope" />

@@ -114,7 +114,7 @@ it('cancels a pending DNG with no linked charges', function () {
     expect($dng->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED);
 });
 
-it('requires void permission when the DNG has a linked charge', function () {
+it('does not require void permission when the DNG has a linked charge', function () {
     $user = grantDngCancel(['create_finance_payments']);
     $student = makeReviewedCancelStudent($this);
     $charge = FinanceCharge::create([
@@ -135,9 +135,10 @@ it('requires void permission when the DNG has a linked charge', function () {
             'reason' => 'Voiding',
             'acknowledged' => true,
         ])
-        ->assertForbidden();
+        ->assertRedirect();
 
-    expect($dng->fresh()->status)->toBe(DngPaymentRequest::STATUS_PENDING);
+    expect($dng->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED)
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE);
 });
 
 it('blocks reviewed cancel for a non-cancellable status', function () {

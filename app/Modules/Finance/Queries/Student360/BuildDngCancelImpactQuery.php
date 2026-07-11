@@ -10,8 +10,8 @@ use App\Modules\Finance\Support\LifecycleDueExceptionRowMapper;
 use Illuminate\Support\Collection;
 
 /**
- * Read-only impact for the 4-layer DNG cancel drawer: linked charges that would
- * be voided plus blocking reasons reused from the lifecycle mapper.
+ * Read-only impact for the DNG cancel drawer. Linked charges remain obligations;
+ * cancelling collection does not void them.
  */
 class BuildDngCancelImpactQuery
 {
@@ -31,7 +31,7 @@ class BuildDngCancelImpactQuery
                 'amount' => (float) $charge->amount,
             ])->values()->all(),
             'blocking_reasons' => LifecycleDueExceptionRowMapper::blockingReasons($request),
-            'requires_void_permission' => $charges->isNotEmpty(),
+            'requires_void_permission' => false,
         ];
     }
 

@@ -4,69 +4,106 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions;
 
-use App\Models\CourseRetakeRegistration;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngClient;
-use App\Modules\Finance\Models\FinanceCharge;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Cancels collection only. It never voids the underlying obligation, charge,
+ * installment, or source workflow.
+ */
 class CancelDngPaymentRequestAction
 {
-    public function __construct(
-        protected DngClient $dngClient,
-        protected VoidFinanceChargeAction $voidChargeAction,
-    ) {}
+    public function __construct(private readonly DngClient $dngClient) {}
 
     /**
-     * Cancel a DNG payment request and void any linked charges + retake registrations.
-     *
-     * - For `pending` requests: transition directly to `cancelled` (never reached DNG).
-     * - For `pushed_to_dng` requests: call DNG API with amount=-1 first; only transition
-     *   to `cancel_pushed_to_dng` on success. Throws on DNG API failure.
-     *
-     * After the DNG status is settled, all linked FinanceCharges are voided and any
-     * CourseRetakeRegistrations linked to those charges are cancelled.
+     * An unattempted reservation is released locally. A pushed request is only
+     * released after a provider-confirmed cancellation; ambiguous provider calls
+     * remain held as unknown outcomes.
      *
      * @throws \RuntimeException if the request status cannot be cancelled.
-     * @throws \Throwable if the DNG API call fails for a pushed_to_dng request.
+     * @throws \Throwable if the provider cancellation outcome is unknown.
      */
     public function run(DngPaymentRequest $request): void
     {
         if ($request->status === DngPaymentRequest::STATUS_PENDING) {
             DB::transaction(function () use ($request): void {
-                $request->transitionTo(DngPaymentRequest::STATUS_CANCELLED);
-                $this->voidLinkedChargesAndRegistrations($request);
+                $locked = DngPaymentRequest::query()->lockForUpdate()->findOrFail($request->id);
+                $locked->transitionTo(DngPaymentRequest::STATUS_CANCELLED);
             });
 
             return;
         }
 
-        if ($request->status === DngPaymentRequest::STATUS_PUSHED_TO_DNG) {
-            $this->cancelPushedRequest($request);
-
-            return;
+        if ($request->status !== DngPaymentRequest::STATUS_PUSHED_TO_DNG) {
+            throw new \RuntimeException(
+                "Cannot cancel DNG payment request #{$request->id}: current status '{$request->status}' does not allow cancellation."
+            );
         }
 
-        throw new \RuntimeException(
-            "Cannot cancel DNG payment request #{$request->id}: current status '{$request->status}' does not allow cancellation."
-        );
+        $this->cancelPushedRequest($request);
     }
 
-    /**
-     * Cancel a request that was already pushed to DNG by calling the DNG API with amount=-1.
-     * Stores cancel payload/response for audit. Does NOT save on DNG API failure.
-     * On DNG API success, voids linked charges and cancels retake registrations.
-     */
     private function cancelPushedRequest(DngPaymentRequest $request): void
     {
-        // Reconstruct the original data fields needed for the cancel call.
-        // Student-specific fields (name, email, etc.) are recovered from the stored push_payload
-        // since the model itself only stores student_code / campus_code / fee_type / item_id.
+        $originalData = $this->originalData($request);
+        $cancelPayload = $this->dngClient->buildInsertNewRecordPayload([...$originalData, 'amount' => -1]);
+
+        try {
+            // Provider calls intentionally happen outside every DB transaction/lock.
+            $response = $this->dngClient->cancelRecord($originalData);
+        } catch (\Throwable $exception) {
+            if ($this->isProviderRejection($exception)) {
+                $this->recordProviderRejection($request, $cancelPayload, $exception);
+
+                throw $exception;
+            }
+
+            $this->recordUnknownOutcome($request, $cancelPayload, $exception);
+
+            throw $exception;
+        }
+
+        DB::transaction(function () use ($request, $cancelPayload, $response): void {
+            $locked = DngPaymentRequest::query()->lockForUpdate()->findOrFail($request->id);
+            $locked->update([
+                'cancel_push_payload' => $cancelPayload,
+                'cancel_push_response' => $response,
+            ]);
+
+            if ($locked->status === DngPaymentRequest::STATUS_PUSHED_TO_DNG) {
+                $locked->transitionTo(DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG);
+
+                RegisterDngReceiptExceptionAction::run([
+                    'exception_type' => 'cancel_confirmed',
+                    'request' => $locked,
+                    'hold_request' => false,
+                    'mismatch_reasons' => ['Provider confirmed collection cancellation. Underlying obligations remain active.'],
+                    'raw_provider_evidence' => ['cancel_payload' => $cancelPayload, 'cancel_response' => $response],
+                ]);
+
+                return;
+            }
+
+            if (in_array($locked->status, [DngPaymentRequest::STATUS_PAID_UNINVOICED, DngPaymentRequest::STATUS_PAID_INVOICED, DngPaymentRequest::STATUS_RECONCILED], true)) {
+                RegisterDngReceiptExceptionAction::run([
+                    'exception_type' => 'payment_during_cancellation',
+                    'request' => $locked,
+                    'hold_request' => false,
+                    'mismatch_reasons' => ['Provider payment was confirmed while cancellation was in progress.'],
+                    'raw_provider_evidence' => ['cancel_payload' => $cancelPayload, 'cancel_response' => $response],
+                ]);
+            }
+        });
+    }
+
+    /** @return array<string, string|null> */
+    private function originalData(DngPaymentRequest $request): array
+    {
         $pushPayload = $request->push_payload ?? [];
 
-        $originalData = [
+        return [
             'student_code' => $request->student_code,
             'campus_code' => $request->campus_code,
             'type' => $request->fee_type,
@@ -77,134 +114,61 @@ class CancelDngPaymentRequestAction
             'student_address' => $pushPayload['StudentAddress'] ?? '',
             'cccd' => $pushPayload['CCCD'] ?? null,
         ];
+    }
 
-        // Build the cancel payload before calling so we can store it regardless of outcome.
-        $cancelPayload = $this->dngClient->buildInsertNewRecordPayload(
-            array_merge($originalData, ['amount' => -1])
-        );
+    private function recordUnknownOutcome(DngPaymentRequest $request, array $cancelPayload, \Throwable $exception): void
+    {
+        Log::warning('DNG cancellation outcome is unknown', [
+            'dng_payment_request_id' => $request->id,
+            'error' => $exception->getMessage(),
+        ]);
 
-        try {
-            $response = $this->dngClient->cancelRecord($originalData);
-        } catch (\Throwable $e) {
-            Log::error('DNG cancel call failed', [
-                'dng_payment_request_id' => $request->id,
-                'error' => $e->getMessage(),
-                'cancel_payload' => $cancelPayload,
+        DB::transaction(function () use ($request, $cancelPayload, $exception): void {
+            $locked = DngPaymentRequest::query()->lockForUpdate()->findOrFail($request->id);
+            $locked->update(['cancel_push_payload' => $cancelPayload]);
+
+            if ($locked->status !== DngPaymentRequest::STATUS_PUSHED_TO_DNG) {
+                return;
+            }
+
+            $locked->transitionTo(DngPaymentRequest::STATUS_UNKNOWN_OUTCOME);
+            $locked->update(['error_message' => 'Unknown collection outcome: '.$exception->getMessage()]);
+
+            RegisterDngReceiptExceptionAction::run([
+                'exception_type' => 'unknown_collection_outcome',
+                'request' => $locked,
+                'hold_request' => false,
+                'mismatch_reasons' => ['Provider cancellation outcome is unknown. Keep collection blocked until reconciliation confirms the outcome.'],
+                'raw_provider_evidence' => ['cancel_payload' => $cancelPayload, 'error' => $exception->getMessage()],
             ]);
-
-            // Store the attempted payload for audit but do NOT change the status.
-            $request->update(['cancel_push_payload' => $cancelPayload]);
-
-            throw $e;
-        }
-
-        // DNG API succeeded — persist status + clean up linked data atomically.
-        DB::transaction(function () use ($request, $cancelPayload, $response): void {
-            $request->update([
-                'cancel_push_payload' => $cancelPayload,
-                'cancel_push_response' => $response,
-            ]);
-
-            $request->transitionTo(DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG);
-
-            $this->voidLinkedChargesAndRegistrations($request);
         });
     }
 
-    /**
-     * Collect all FinanceCharges linked to this DNG request (via chargeLinks pivot or
-     * single finance_charge_id), void each one, and cancel any associated
-     * CourseRetakeRegistrations.
-     */
-    private function voidLinkedChargesAndRegistrations(DngPaymentRequest $request): void
+    private function isProviderRejection(\Throwable $exception): bool
     {
-        $charges = $this->resolveLinkedCharges($request);
-
-        if ($charges->isEmpty()) {
-            return;
-        }
-
-        $userId = auth()->id();
-        $reason = "DNG payment request #{$request->id} cancelled";
-
-        foreach ($charges as $charge) {
-            if ($charge->status === FinanceCharge::STATUS_VOID) {
-                Log::info('Skipping void for already-voided charge during DNG cancel', [
-                    'dng_payment_request_id' => $request->id,
-                    'finance_charge_id' => $charge->id,
-                ]);
-
-                continue;
-            }
-
-            // Cancel retake registration first (before void, to avoid mutation conflicts)
-            $this->cancelRetakeRegistration($charge, $userId, $reason);
-
-            try {
-                $this->voidChargeAction->handle($charge->id, $reason, $userId, autoReallocate: false);
-            } catch (\Throwable $e) {
-                Log::error('Failed to void charge after DNG cancel', [
-                    'dng_payment_request_id' => $request->id,
-                    'finance_charge_id' => $charge->id,
-                    'error' => $e->getMessage(),
-                ]);
-
-                throw $e;
-            }
-        }
+        return str_starts_with($exception->getMessage(), 'DNG API error [');
     }
 
-    /**
-     * Resolve the FinanceCharges linked to this DNG request.
-     *
-     * Priority:
-     *  1. chargeLinks pivot (multi-charge aggregate requests)
-     *  2. direct finance_charge_id (single-charge legacy)
-     *
-     * @return Collection<int, FinanceCharge>
-     */
-    private function resolveLinkedCharges(DngPaymentRequest $request): Collection
+    private function recordProviderRejection(DngPaymentRequest $request, array $cancelPayload, \Throwable $exception): void
     {
-        $request->loadMissing(['chargeLinks.financeCharge']);
+        DB::transaction(function () use ($request, $cancelPayload, $exception): void {
+            $locked = DngPaymentRequest::query()->lockForUpdate()->findOrFail($request->id);
+            $locked->update(['cancel_push_payload' => $cancelPayload]);
 
-        $pivotCharges = $request->chargeLinks
-            ->map(fn ($link) => $link->financeCharge)
-            ->filter()
-            ->values();
+            if ($locked->status !== DngPaymentRequest::STATUS_PUSHED_TO_DNG) {
+                return;
+            }
 
-        if ($pivotCharges->isNotEmpty()) {
-            return $pivotCharges;
-        }
+            $locked->transitionTo(DngPaymentRequest::STATUS_NEEDS_REVIEW);
+            $locked->update(['error_message' => 'Provider rejected collection cancellation: '.$exception->getMessage()]);
 
-        if ($request->finance_charge_id !== null) {
-            $charge = FinanceCharge::find($request->finance_charge_id);
-
-            return $charge ? collect([$charge]) : collect();
-        }
-
-        return collect();
-    }
-
-    /**
-     * Cancel the CourseRetakeRegistration linked to the given charge (if any).
-     * Only cancels non-terminal registrations.
-     */
-    private function cancelRetakeRegistration(FinanceCharge $charge, ?int $userId, string $reason): void
-    {
-        if ($charge->source_type !== CourseRetakeRegistration::class || $charge->source_id === null) {
-            return;
-        }
-
-        $registration = CourseRetakeRegistration::find($charge->source_id);
-
-        if ($registration === null) {
-            return;
-        }
-
-        if (! in_array($registration->status, CourseRetakeRegistration::CANCELLABLE_STATUSES, true)) {
-            return;
-        }
-
-        $registration->cancel($userId ?? 0, $reason);
+            RegisterDngReceiptExceptionAction::run([
+                'exception_type' => 'cancel_rejected',
+                'request' => $locked,
+                'hold_request' => false,
+                'mismatch_reasons' => ['Provider rejected collection cancellation. The request remains active until Finance verifies or retries it.'],
+                'raw_provider_evidence' => ['cancel_payload' => $cancelPayload, 'error' => $exception->getMessage()],
+            ]);
+        });
     }
 }
