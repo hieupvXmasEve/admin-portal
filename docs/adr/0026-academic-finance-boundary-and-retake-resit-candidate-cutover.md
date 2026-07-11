@@ -1,6 +1,7 @@
 # Academic/Finance boundary, source-agnostic Finance intake, and the retake/resit debit cutover
 
 **Status:** accepted (supersedes the earlier candidate-centric draft of this ADR)
+**Last updated:** 2026-07-11
 
 Swinx stays a Laravel modular monolith, but Academic and Finance are separate bounded contexts that must be able to change independently: a business change on one side must not force a schema or code change on the other. `Student` is a Shared Kernel identity reference only (see **Student Identity** in `CONTEXT.md`). Academic owns the **Academic Student Lifecycle**; Finance owns all money — charges, credits, discounts, invoices, payments, DNG, settlement, review, and audit.
 
@@ -57,6 +58,11 @@ The target architecture defines all three aggregates so the debit design is not 
 
 **4.1 — Two read modes.** A local projection (Academic `hq_fee_status`) serves display, lists, badges, and queues (eventually consistent). A **hard gate** — allowing exam sitting, active course participation, final registration, or irreversible academic progression — MUST obtain **Financial Clearance** via a *synchronous* Finance contract that reads the authoritative ledger fresh. A projection is never the sole condition of a hard gate.
 
+The full Settlement Position contract remains internal to Finance. Shared
+cross-context readers expose only narrow, source-keyed clearance or settlement
+answers and delegate to Finance's canonical reader; they never expose payable
+lines or payment/discount/credit application structure to Academic.
+
 **4.2 — Absence is not clearance.** A chargeable source with no matching obligation blocks as `missing_finance_obligation`. A genuine no-fee case must be an explicit Finance decision (`waived` / `not_required` / `zero_amount`), never inferred from absence.
 
 **4.3 — Event durability is asymmetric.** The **forward** intake (source → Finance) is correctness-critical: losing it means a lost receivable, so it is durable + idempotent (§5.2). The **reverse** settlement event (Finance → source projection) is *not* correctness-critical, because hard gates query synchronously; it may be best-effort, with light retry/reconciliation so projections do not go permanently stale.
@@ -76,6 +82,21 @@ The target architecture defines all three aggregates so the debit design is not 
 **5.4 — Backfill (debit retake/resit only).** Existing active `retake_fee`/`exam_resit_fee` charges become `accepted` `FinanceObligation`s linked to the existing charge, synthesising the source triple from the current `source_type`→`source_kind` and `source_id`→`source_ref`. Voided charges become obligations with `lifecycle_status = voided` (this cleanly replaces the earlier "voided → committed candidate" contortion). Backfill MUST NOT touch scholarship/voucher/defer-credit `charge_type`s — those are future `FinanceCreditEntitlement` / `FinanceDiscountEntitlement` migrations. Legacy `course_retake_registrations.retake_fee` / `exam_resit_attempts.fee_amount` may seed historical `priced_amount` with provenance `legacy_backfill`, but are never a pricing source for new obligations.
 
 **5.5 — Bypass removal / conversion.** After cutover: the manual charge form cannot create `retake_fee`/`exam_resit_fee`; `CreateRetakeCourseChargeSimpleAction` and `CreateExamResitChargeSimpleAction` (which today take a caller-supplied amount and, for resit, read the Academic `fee_amount` column, and mutate `hq_fee_status` directly) are retired or converted into idempotent reconcile commands that never create charges directly; Academic retake/resit cancellation keeps its UI/use case but routes Finance side effects through a Finance-owned cancellation service (Academic never voids charges, mutates invoice lines, recalculates allocation, or cancels DNG). Idempotency moves onto the obligation; `finance_charges.active_source_key` is dropped after backfill (a charge no longer knows any external source — it keys on `finance_obligation_id`).
+
+When cancellation requires an external DNG transition, the source enters
+**Finance-Pending Cancellation** instead of becoming terminal inside the request
+transaction. Finance resolves the collection request and obligation first; only
+confirmed completion may move the source to cancelled. Failed or unknown DNG
+outcomes leave the source pending with review evidence. No cross-context
+transaction holds database locks across the provider call.
+
+The forward cancellation request creates a durable, source-keyed Finance
+Cancellation Operation in the same correctness window that marks the source
+pending. Finance processes it idempotently and publishes a durable completion
+event through the outbox after collection and obligation effects are committed.
+Academic consumes that event idempotently to finish its local lifecycle. UI
+polling may show progress but is never the completion mechanism, and Finance
+never calls an Academic model callback directly.
 
 **5.6 — Router opens the enum, enables only debit.** The intake `FinancialEffect` enum defines `Debit`, `Credit`, `Discount`; slice 1 wires only `Debit` and throws `UnsupportedFinancialEffectYet` for the others, so the interface points the right direction without pretending to support unmigrated effects.
 

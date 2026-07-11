@@ -2,6 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-07-09
+**Last updated:** 2026-07-11
 **Owner:** Finance
 
 ## Context
@@ -25,6 +26,14 @@ derivation gains a fourth source:
 ```
 outstanding = invoice line − payment applications − discount allocations − credit applications
 ```
+
+Cash and credit remain distinct in every derived settlement position and
+staff/student presentation. Applied credit reduces **Còn phải thu** but never
+increases **Đã thu**; a cache or compatibility projection must not relabel
+credit as cash received. In particular, `cached_paid_amount` and any field whose
+contract means "paid" contain matched cash only. If applied credit ever needs a
+cache, it uses an explicitly separate credit field and remains rebuildable from
+the credit-application ledger.
 
 Discounts keep their existing carrier (`invoice_discounts`/`discount_allocations`);
 credits get their own, because the glossary distinguishes them deliberately — a
@@ -62,6 +71,34 @@ remain.
 
 - Every settlement/outstanding reader must include credit applications; the
   reader ships in the same wave as the first credit entitlement.
+- Applied credit is derived directly from the indexed credit-application ledger
+  by default; this decision does not introduce a credit cache column. A separate,
+  rebuildable credit cache may be added only after measured read performance
+  shows the ledger-derived path is insufficient.
+- Applying or reversing credit reconciles any Installment Plan against the
+  canonical remaining collectible. The FIN-09 reconciliation target includes
+  applied credit, may redistribute only pending portions, and never rewrites a
+  portion already awaiting collection or paid. If committed portions exceed the
+  new collectible amount, the operation fails closed for staff review rather
+  than rewriting a DNG request already sent.
+- A credit reversal that increases collectible amount without enough pending
+  installment capacity requires an explicit staff-confirmed collection plan,
+  including its amount and due date. The reversal effect and new pending portion
+  are committed atomically; without that plan the settlement effect remains
+  blocked for review. Finance never invents an installment schedule or pushes a
+  DNG request automatically.
+- Credit approval and credit application are separate decisions. When an active
+  unpaid DNG request would collect more than the post-credit Settlement Position,
+  Finance records the approved entitlement but blocks its application to the
+  payable line and surfaces staff review. Staff explicitly resolves or cancels
+  the conflicting DNG request before applying the credit; any replacement DNG
+  request is created later through the normal collection flow.
+- Credit approved after a payable line is already cash-settled remains an
+  approved, available entitlement; Finance does not silently rewrite historical
+  payment applications or relabel cash as surplus. Applying that credit
+  retroactively requires an explicit reallocation/refund workflow that releases
+  cash, applies the credit, and records whether the released cash becomes
+  **Còn dư** or is refunded.
 - Student-facing summaries that summed negative charge rows
   (`total_credits`/`net_amount` in the student charges API) are reworked to
   read entitlements.
