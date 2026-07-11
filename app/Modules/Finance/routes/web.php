@@ -6,6 +6,7 @@ use App\Modules\Finance\Http\Web\Admin\BillingInvoiceController;
 use App\Modules\Finance\Http\Web\Admin\BillingOperationsController;
 use App\Modules\Finance\Http\Web\Admin\BillingSettlementController;
 use App\Modules\Finance\Http\Web\Admin\DngPaymentRequestController;
+use App\Modules\Finance\Http\Web\Admin\DngReceiptExceptionController;
 use App\Modules\Finance\Http\Web\Admin\DngWebhookEventController;
 use App\Modules\Finance\Http\Web\Admin\DngWorklistController;
 use App\Modules\Finance\Http\Web\Admin\EgcBlockResultsController;
@@ -276,6 +277,9 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
     });
 
     Route::prefix('dng')->name('dng.')->group(function () {
+        Route::get('/receipt-exceptions', [DngReceiptExceptionController::class, 'index'])
+            ->middleware('can:view_finance_dng_receipt_exceptions')
+            ->name('receipt-exceptions.index');
         Route::prefix('payment-requests')->name('payment-requests.')->group(function () {
             Route::get('/', [DngPaymentRequestController::class, 'index'])
                 ->middleware('can:view_finance_dng_payment_requests')
@@ -296,14 +300,17 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
 
         Route::prefix('webhook-events')->name('webhook-events.')->group(function () {
             Route::get('/', [DngWebhookEventController::class, 'index'])
-                ->middleware('can:view_finance_dng_webhook_events')
+                ->middleware('can:view_finance_dng_receipt_exceptions')
                 ->name('index');
             Route::get('/{dngWebhookEvent}', [DngWebhookEventController::class, 'show'])
-                ->middleware('can:view_finance_dng_webhook_events')
+                ->middleware('can:view_finance_dng_receipt_exceptions')
                 ->name('show');
             Route::post('/{dngWebhookEvent}/retry', [DngWebhookEventController::class, 'retry'])
-                ->middleware('can:create_finance_payments')
+                ->middleware('can:resolve_finance_dng_receipt_exceptions')
                 ->name('retry');
+            Route::post('/receipt-exceptions/{dngReceiptException}/resolve', [DngWebhookEventController::class, 'resolveException'])
+                ->middleware('can:resolve_finance_dng_receipt_exceptions')
+                ->name('receipt-exceptions.resolve');
         });
     });
 

@@ -508,6 +508,7 @@ export const financeRoutes = {
         dngWorklist: () => route(FINANCE_ROUTE_NAMES.DNG_WORKLIST),
         dngPaymentRequests: () => route(FINANCE_ROUTE_NAMES.DNG_PAYMENT_REQUESTS_INDEX),
         dngPaymentRequestDetail: (dngPaymentRequestId: number) => route(FINANCE_ROUTE_NAMES.DNG_PAYMENT_REQUESTS_SHOW, { dngPaymentRequest: dngPaymentRequestId }),
+        dngReceiptExceptions: () => route('finance.dng.receipt-exceptions.index'),
         dngWebhookEvents: () => route(FINANCE_ROUTE_NAMES.DNG_WEBHOOK_EVENTS_INDEX),
         dngWebhookEventDetail: (dngWebhookEventId: number) => route(FINANCE_ROUTE_NAMES.DNG_WEBHOOK_EVENTS_SHOW, { dngWebhookEvent: dngWebhookEventId }),
         settlement: () => route(FINANCE_ROUTE_NAMES.SETTLEMENT_INDEX),

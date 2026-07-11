@@ -9,6 +9,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Actions\CaptureDngProviderReceiptAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Models\DngReceiptException;
 use App\Modules\Finance\Models\Payment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -60,5 +61,13 @@ it('captures the actual provider receipt exactly once despite reservation drift'
             'target_validation' => ['status' => 'amount_mismatch'],
         ])
         ->and($request->fresh()->payment_id)->toBe($first->id)
-        ->and($request->fresh()->error_message)->toContain('target allocation requires review');
+        ->and($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
+        ->and($request->fresh()->error_message)->toContain('target allocation requires review')
+        ->and(DngReceiptException::query()->count())->toBe(1);
+
+    $exception = DngReceiptException::query()->sole();
+    expect($exception->status)->toBe(DngReceiptException::STATUS_OPEN)
+        ->and($exception->payment_id)->toBe($first->id)
+        ->and($exception->mismatch_reasons)->toBe(['Provider receipt requires target reconciliation.'])
+        ->and($exception->raw_provider_evidence)->toBe(['PaymentId' => 'PAY-RECEIPT-001', 'Amount' => '75000']);
 });

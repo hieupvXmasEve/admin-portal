@@ -288,7 +288,7 @@ it('captures the actual provider receipt when amount differs', function () {
 
     // Receipt is recorded while target validation evidence preserves the drift.
     $dngPaymentRequest->refresh();
-    expect($dngPaymentRequest->status)->toBe(DngPaymentRequest::STATUS_PAID_UNINVOICED)
+    expect($dngPaymentRequest->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
         ->and($dngPaymentRequest->payment_id)->not->toBeNull();
 });
 
@@ -374,7 +374,7 @@ it('marks event as mismatch when ItemId differs from the matched request (P2)', 
     expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_MISMATCH)
         ->and($event->error_message)->toContain('Item mismatch')
         ->and($event->error_category)->toBe(DngWebhookEvent::ERROR_CATEGORY_MISMATCH);
-    expect($dngPaymentRequest->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+    expect($dngPaymentRequest->fresh()->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW);
 });
 
 it('marks event as mismatch when checksum verification fails', function () {
@@ -776,7 +776,7 @@ it('does not create duplicate Payment on second callback', function () {
     // Mock the payment service to return a payment on first call
     $callCount = 0;
     $mockPaymentService = Mockery::mock(DngPaymentService::class);
-    $mockPaymentService->shouldReceive('bridgeToPayment')->once()->andReturnUsing(function ($request) use (&$callCount) {
+    $mockPaymentService->shouldReceive('bridgeToPayment')->twice()->andReturnUsing(function ($request) use (&$callCount) {
         $callCount++;
         if ($callCount === 1) {
             // First call: create a payment
@@ -977,7 +977,7 @@ it('marks event as mismatch when campus differs even if checksum passes (FIN-32)
     expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_MISMATCH);
     expect($event->error_message)->toContain('Campus mismatch');
     expect($event->error_category)->toBe(DngWebhookEvent::ERROR_CATEGORY_MISMATCH);
-    expect($dngPaymentRequest->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+    expect($dngPaymentRequest->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW);
 });
 
 it('captures late callback cash for a cancel_pushed_to_dng request without reviving state (FIN-18)', function () {

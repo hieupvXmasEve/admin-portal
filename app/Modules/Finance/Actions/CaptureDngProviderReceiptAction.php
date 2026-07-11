@@ -34,7 +34,25 @@ class CaptureDngProviderReceiptAction
     {
         $payment = $this->dngPaymentService->bridgeToPayment($request, $receipt);
 
+        $issues = $receipt['target_validation']['issues'] ?? [];
+        $exceptionType = null;
         if (($receipt['target_validation']['status'] ?? 'matched') !== 'matched') {
+            $exceptionType = 'amount_mismatch';
+        } elseif ($payment !== null
+            && ($request->reservationTargets()->exists() || $request->chargeLinks()->exists() || $request->finance_charge_id !== null)
+            && $payment->fresh()->unapplied_amount > 0.01) {
+            $exceptionType = 'target_drift';
+            $issues[] = 'Current target collectible is lower than the verified provider receipt.';
+        }
+
+        if ($exceptionType !== null) {
+            RegisterDngReceiptExceptionAction::run([
+                'exception_type' => $exceptionType,
+                'request' => $request,
+                'payment' => $payment,
+                'mismatch_reasons' => $issues !== [] ? $issues : ['Provider receipt requires target reconciliation.'],
+                'raw_provider_evidence' => $receipt['payload'],
+            ]);
             $request->fresh()?->update([
                 'error_message' => 'Provider receipt captured; target allocation requires review: '
                     .implode('; ', $receipt['target_validation']['issues'] ?? []),

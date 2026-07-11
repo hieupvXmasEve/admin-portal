@@ -7,6 +7,7 @@ namespace App\Modules\Finance\Dng\Services;
 use App\Models\CourseRetakeRegistration;
 use App\Modules\Academic\Actions\AutoEnrollRetakeCourseAction;
 use App\Modules\Finance\Actions\CaptureDngProviderReceiptAction;
+use App\Modules\Finance\Actions\RegisterDngReceiptExceptionAction;
 use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
@@ -50,6 +51,12 @@ class DngWebhookService
         $request = $this->resolvePaymentRequest($payload, $dngPaymentId);
 
         if (! $request) {
+            RegisterDngReceiptExceptionAction::run([
+                'exception_type' => 'unmatched_provider_receipt',
+                'webhook_event' => $event,
+                'mismatch_reasons' => ["No DNG payment request found for PaymentId: {$dngPaymentId}"],
+                'raw_provider_evidence' => $payload,
+            ]);
             $event->markFailedTerminal(
                 "No DNG payment request found for PaymentId: {$dngPaymentId}",
                 DngWebhookEvent::ERROR_CATEGORY_NOT_FOUND,
@@ -250,6 +257,13 @@ class DngWebhookService
 
         if (! empty($issues)) {
             $reason = implode('; ', $issues);
+            RegisterDngReceiptExceptionAction::run([
+                'exception_type' => 'unmatched_provider_receipt',
+                'request' => $request,
+                'webhook_event' => $event,
+                'mismatch_reasons' => $issues,
+                'raw_provider_evidence' => $payload,
+            ]);
             $event->markMismatch($reason, DngWebhookEvent::ERROR_CATEGORY_MISMATCH);
             Log::warning('DNG webhook: data mismatch', [
                 'event_id' => $event->id,

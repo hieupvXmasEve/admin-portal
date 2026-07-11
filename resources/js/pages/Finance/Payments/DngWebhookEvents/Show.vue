@@ -45,6 +45,14 @@ interface Props {
         payload_facts: Record<string, string | number | null>;
         headers: unknown;
         payload: unknown;
+        receipt_exceptions: {
+            id: number;
+            status: string;
+            exception_type: string;
+            mismatch_reasons: string[];
+            affected_scope: Record<string, unknown>;
+            raw_provider_evidence: Record<string, unknown>;
+        }[];
     };
 }
 
@@ -54,8 +62,9 @@ const permission = usePermission();
 const { showConfirmDialog } = useGlobalConfirmDialog();
 
 const isRetrying = ref(false);
+const resolvingExceptionId = ref<number | null>(null);
 
-const canRetry = computed(() => props.event.processing_status !== 'processed' && permission.can('create_finance_payments'));
+const canRetry = computed(() => props.event.processing_status !== 'processed' && permission.can('resolve_finance_dng_receipt_exceptions'));
 
 type DiagnosisVariant = 'success' | 'skipped' | 'error' | 'pending';
 
@@ -96,6 +105,16 @@ const handleRetry = () => {
             onConfirm: () => runRetry(),
         },
     );
+};
+
+const resolveException = (exceptionId: number) => {
+    resolvingExceptionId.value = exceptionId;
+    router.post(route('finance.dng.webhook-events.receipt-exceptions.resolve', exceptionId), {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            resolvingExceptionId.value = null;
+        },
+    });
 };
 </script>
 
@@ -219,5 +238,20 @@ const handleRetry = () => {
             <JsonPayloadCard title="Headers" :payload="event.headers" />
             <JsonPayloadCard title="Payload" :payload="event.payload" />
         </div>
+
+        <Card v-for="exception in event.receipt_exceptions" :key="exception.id" class="border-amber-300">
+            <CardHeader class="flex-row items-center justify-between">
+                <CardTitle class="flex items-center gap-2 text-amber-800"><AlertTriangle class="h-5 w-5" />Cần kiểm tra</CardTitle>
+                <Button v-if="exception.status === 'open' && permission.can('resolve_finance_dng_receipt_exceptions')" variant="outline" size="sm" :disabled="resolvingExceptionId === exception.id" @click="resolveException(exception.id)">
+                    {{ resolvingExceptionId === exception.id ? 'Đang xử lý...' : 'Đánh dấu đã đối soát' }}
+                </Button>
+            </CardHeader>
+            <CardContent class="space-y-4 text-sm">
+                <div><span class="text-muted-foreground">Loại:</span> {{ exception.exception_type }}</div>
+                <div><span class="text-muted-foreground">Lý do:</span> {{ exception.mismatch_reasons.join('; ') }}</div>
+                <JsonPayloadCard title="Affected scope" :payload="exception.affected_scope" />
+                <JsonPayloadCard title="Raw provider evidence" :payload="exception.raw_provider_evidence" />
+            </CardContent>
+        </Card>
     </div>
 </template>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Dng;
 
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
+use App\Modules\Finance\Models\DngReceiptException;
 
 class GetDngWebhookEventDetailsQuery
 {
@@ -19,6 +20,20 @@ class GetDngWebhookEventDetailsQuery
 
         $request = $webhookEvent->dngPaymentRequest;
         $payload = $webhookEvent->payload ?? [];
+        $exceptions = DngReceiptException::query()
+            ->where('dng_webhook_event_id', $webhookEvent->id)
+            ->when($request !== null, fn ($query) => $query->orWhere('dng_payment_request_id', $request->id))
+            ->orderByDesc('id')
+            ->get()
+            ->map(static fn (DngReceiptException $exception): array => [
+                'id' => $exception->id,
+                'status' => $exception->status,
+                'exception_type' => $exception->exception_type,
+                'mismatch_reasons' => $exception->mismatch_reasons,
+                'affected_scope' => $exception->affected_scope,
+                'raw_provider_evidence' => $exception->raw_provider_evidence,
+            ])
+            ->all();
 
         return [
             'id' => $webhookEvent->id,
@@ -63,6 +78,7 @@ class GetDngWebhookEventDetailsQuery
             ],
             'headers' => $webhookEvent->headers,
             'payload' => $payload,
+            'receipt_exceptions' => $exceptions,
         ];
     }
 }

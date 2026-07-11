@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Finance\Actions\ResolveDngReceiptExceptionAction;
 use App\Modules\Finance\Actions\RetryDngWebhookEventAction;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
+use App\Modules\Finance\Models\DngReceiptException;
 use App\Modules\Finance\Queries\Dng\GetDngWebhookEventDetailsQuery;
 use App\Modules\Finance\Queries\Dng\ListDngWebhookEventsQuery;
 use Illuminate\Http\RedirectResponse;
@@ -55,6 +57,18 @@ class DngWebhookEventController extends Controller
 
         $flashKey = $event->processing_status === DngWebhookEvent::STATUS_PROCESSED ? 'success' : 'info';
         Inertia::flash($flashKey, $message);
+
+        return back();
+    }
+
+    public function resolveException(DngReceiptException $dngReceiptException, Request $request): RedirectResponse
+    {
+        $this->authorize('resolve', $dngReceiptException);
+        ResolveDngReceiptExceptionAction::run([
+            'exception' => $dngReceiptException,
+            'user_id' => (int) $request->user()->id,
+        ]);
+        Inertia::flash('success', 'DNG receipt exception marked resolved. Provider evidence remains unchanged.');
 
         return back();
     }

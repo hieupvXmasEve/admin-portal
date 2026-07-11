@@ -13,6 +13,7 @@ use App\Modules\Finance\Dng\Services\DngReconciliationService;
 use App\Modules\Finance\Dng\Services\DngWebhookService;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Observers\StudentBillingAccountObserver;
+use App\Modules\Finance\Policies\DngReceiptExceptionPolicy;
 use App\Modules\Finance\Policies\FinanceChargePolicy;
 use App\Modules\Finance\Queries\GetStudentFeeSummaryQuery;
 use App\Modules\Finance\Services\DeferCaseService;
@@ -93,5 +94,6 @@ class FinanceServiceProvider extends ServiceProvider
         // Explicit registration required: Laravel 13 auto-discovery does not
         // resolve policies in module namespaces (App\Modules\*) automatically.
         Gate::policy(FinanceCharge::class, FinanceChargePolicy::class);
+        Gate::policy(DngReceiptException::class, DngReceiptExceptionPolicy::class);
     }
 }

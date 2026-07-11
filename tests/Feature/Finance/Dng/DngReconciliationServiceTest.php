@@ -83,7 +83,7 @@ it('captures the provider receipt when the paid amount does not match local amou
     ]);
 
     $request->refresh();
-    expect($request->status)->toBe(DngPaymentRequest::STATUS_PAID_UNINVOICED)
+    expect($request->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
         ->and($request->paid_at)->not->toBeNull()
         ->and($request->payment_id)->toBeNull();
 });
@@ -238,7 +238,7 @@ it('does not bind dng_payment_id to a fallback-matched request that fails the mi
     expect($summary['errors'])->toBe(0);
     // Exact ItemId correlation remains safe; the actual receipt is captured.
     expect($request->fresh()->dng_payment_id)->toBe('PAY-RECON')
-        ->and($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_PAID_UNINVOICED);
+        ->and($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW);
 });
 
 it('does not bridge or settle a failed request during reconciliation (P1 cannot_transition)', function () {

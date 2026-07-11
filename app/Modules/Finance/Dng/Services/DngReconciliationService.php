@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Dng\Services;
 
 use App\Modules\Finance\Actions\CaptureDngProviderReceiptAction;
+use App\Modules\Finance\Actions\RegisterDngReceiptExceptionAction;
 use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use Illuminate\Support\Facades\DB;
@@ -102,6 +103,11 @@ class DngReconciliationService
         }
 
         if (! $request) {
+            RegisterDngReceiptExceptionAction::run([
+                'exception_type' => 'unmatched_provider_receipt',
+                'mismatch_reasons' => ["No DNG payment request found for PaymentId: {$dngPaymentId}"],
+                'raw_provider_evidence' => $txn,
+            ]);
             // Orphan: DNG knows about a payment we don't have locally
             Log::warning('DNG reconciliation: orphan payment found', [
                 'dng_payment_id' => $dngPaymentId,
@@ -133,6 +139,12 @@ class DngReconciliationService
         $mismatchReasons = $request->receiptCorrelationMismatchReasons($receiptPayload);
 
         if ($mismatchReasons !== []) {
+            RegisterDngReceiptExceptionAction::run([
+                'exception_type' => 'unmatched_provider_receipt',
+                'request' => $request,
+                'mismatch_reasons' => $mismatchReasons,
+                'raw_provider_evidence' => $txn,
+            ]);
             Log::warning('DNG reconciliation: payload mismatch', [
                 'dng_payment_request_id' => $request->id,
                 'dng_payment_id' => $dngPaymentId,

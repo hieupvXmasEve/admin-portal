@@ -392,6 +392,8 @@ return [
             'create_finance_payments' => 'create_finance_payments',
             'view_finance_dng_payment_requests' => 'view_finance_dng_payment_requests',
             'view_finance_dng_webhook_events' => 'view_finance_dng_webhook_events',
+            'view_finance_dng_receipt_exceptions' => 'view_finance_dng_receipt_exceptions',
+            'resolve_finance_dng_receipt_exceptions' => 'resolve_finance_dng_receipt_exceptions',
             // Audit Workspace (export endpoint deferred; permission seeded now)
             'view_finance_audit_workspace' => 'view_finance_audit_workspace',
             'export_finance_audit_workspace' => 'export_finance_audit_workspace',
