@@ -13,14 +13,19 @@ use App\Modules\Academic\Actions\CancelRetakeCourseRegistrationAction;
 use App\Modules\Academic\Actions\CreateRetakeCourseRegistrationAction;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateRetakeCourseChargeSimpleAction;
-use App\Modules\Finance\Actions\VoidFinanceChargeAction;
+use App\Modules\Finance\Actions\ProcessFinanceCancellationOperationAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
+use App\Modules\Finance\Jobs\DispatchFinanceCancellationCompletionJob;
+use App\Modules\Finance\Models\FinanceCancellationCompletionOutbox;
+use App\Modules\Finance\Models\FinanceCancellationOperation;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\PaymentApplication;
+use App\Shared\Contracts\Finance\FinanceCancellationCompletionContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -89,6 +94,25 @@ function createPaidRetakeDngForCharge(CourseRetakeRegistration $registration, Fi
     return $dng;
 }
 
+function settleRetakeFinanceCancellation(CourseRetakeRegistration $registration): void
+{
+    $operation = FinanceCancellationOperation::query()
+        ->where('source_kind', AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION)
+        ->where('source_ref', AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration))
+        ->firstOrFail();
+
+    app(ProcessFinanceCancellationOperationAction::class)->handle($operation->id);
+
+    $outbox = FinanceCancellationCompletionOutbox::query()
+        ->where('finance_cancellation_operation_id', $operation->id)
+        ->first();
+
+    if ($outbox !== null && $outbox->status !== FinanceCancellationCompletionOutbox::STATUS_DISPATCHED) {
+        app(DispatchFinanceCancellationCompletionJob::class, ['outboxId' => $outbox->id])
+            ->handle(app(FinanceCancellationCompletionContract::class));
+    }
+}
+
 beforeEach(function () {
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
@@ -106,7 +130,8 @@ beforeEach(function () {
     ]);
 });
 
-it('cancels an approved registration', function () {
+it('requests finance cancellation and keeps the source pending until completion', function () {
+    Queue::fake();
     $reg = createCancelTestRegistration('approved');
 
     $result = CancelRetakeCourseRegistrationAction::run([
@@ -114,12 +139,17 @@ it('cancels an approved registration', function () {
         'reason' => 'Student request',
     ]);
 
-    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED);
-    expect($result->cancellation_reason)->toBe('Student request');
-    expect($result->cancelled_by_user_id)->toBe($this->user->id);
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_FINANCE_PENDING_CANCELLATION)
+        ->and($result->cancellation_reason)->toBe('Student request')
+        ->and($result->cancelled_by_user_id)->toBe($this->user->id);
+
+    settleRetakeFinanceCancellation($reg);
+
+    expect($reg->fresh()->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED);
 });
 
-it('cancels a target-path retake registration through the finance obligation cancellation service', function () {
+it('cancels a target-path retake registration through the finance cancellation operation', function () {
+    Queue::fake();
     $campus = Campus::factory()->create();
     $semester = Semester::factory()->create();
     $student = Student::factory()->forCampus($campus)->create([
@@ -159,16 +189,20 @@ it('cancels a target-path retake registration through the finance obligation can
         'reason' => 'Student request',
     ]);
 
-    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED)
-        ->and($result->hq_fee_status)->toBe(CourseRetakeRegistration::HQ_FEE_CANCELLED)
-        ->and($result->finance_charge_id)->toBeNull()
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_FINANCE_PENDING_CANCELLATION);
+
+    settleRetakeFinanceCancellation($registration);
+    $registration->refresh();
+
+    expect($registration->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED)
+        ->and($registration->hq_fee_status)->toBe(CourseRetakeRegistration::HQ_FEE_CANCELLED)
         ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID)
         ->and($charge->fresh()->void_reason)->toBe('retake_course_cancelled')
         ->and($obligation->fresh()->lifecycle_status)->toBe(FinanceObligation::STATUS_VOIDED);
 });
 
-it('cancels a payment_pending registration and voids charge', function () {
-    // Create charge
+it('cancels a payment_pending registration and voids charge after finance completion', function () {
+    Queue::fake();
     $reg = createCancelTestRegistration('approved');
     $charge = FinanceCharge::create([
         'student_id' => $reg->student_id,
@@ -187,22 +221,21 @@ it('cancels a payment_pending registration and voids charge', function () {
         'finance_charge_id' => $charge->id,
     ]);
 
-    // Mock VoidFinanceChargeAction to avoid complex dependencies
-    $mockVoid = Mockery::mock(VoidFinanceChargeAction::class);
-    $mockVoid->shouldReceive('handle')
-        ->once()
-        ->with($charge->id, 'retake_course_cancelled', $this->user->id);
-    app()->instance(VoidFinanceChargeAction::class, $mockVoid);
-
     $result = CancelRetakeCourseRegistrationAction::run([
         'registration_id' => $reg->id,
         'reason' => 'Fee issue',
     ]);
 
-    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED);
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_FINANCE_PENDING_CANCELLATION);
+
+    settleRetakeFinanceCancellation($reg);
+
+    expect($reg->fresh()->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED)
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID);
 });
 
 it('bridges linked paid dng evidence before cancelling a payment_pending registration', function () {
+    Queue::fake();
     $reg = createCancelTestRegistration('approved');
     app(CreateRetakeCourseChargeSimpleAction::class)->handle([
         'registration_id' => $reg->id,
@@ -221,21 +254,26 @@ it('bridges linked paid dng evidence before cancelling a payment_pending registr
         'reason' => 'Student request after DNG paid',
     ]);
 
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_FINANCE_PENDING_CANCELLATION);
+
+    settleRetakeFinanceCancellation($reg);
+
+    $reg->refresh();
     $charge->refresh();
     $paidDng->refresh();
 
-    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED)
-        ->and($result->hq_fee_status)->toBe(CourseRetakeRegistration::HQ_FEE_PAID)
+    expect($reg->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED)
+        ->and($reg->hq_fee_status)->toBe(CourseRetakeRegistration::HQ_FEE_PAID)
         ->and($charge->status)->toBe(FinanceCharge::STATUS_VOID)
         ->and($charge->void_reason)->toBe('retake_course_cancelled_paid_no_refund')
         ->and($paidDng->status)->toBe(DngPaymentRequest::STATUS_PAID_UNINVOICED)
         ->and($paidDng->payment_id)->not->toBeNull();
 
     $payment = $paidDng->payment()->firstOrFail();
-    expect(PaymentApplication::query()
+    expect((float) PaymentApplication::query()
         ->whereIn('invoice_line_id', $charge->invoiceLines()->pluck('id'))
-        ->sum('amount'))->toBe('0.00')
-        ->and($payment->unapplied_amount)->toBe(5000000.0);
+        ->sum('amount'))->toBe(0.0)
+        ->and((float) $payment->unapplied_amount)->toBe((float) $charge->amount);
 });
 
 it('throws when cancelling a paid registration', function () {

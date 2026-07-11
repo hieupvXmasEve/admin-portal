@@ -17,6 +17,8 @@ class ExamResitAttempt extends AuditableModel
 
     public const STATUS_CANCELLED = 'cancelled';
 
+    public const STATUS_FINANCE_PENDING_CANCELLATION = 'finance_pending_cancellation';
+
     public const STATUS_SCHEDULED = 'scheduled';
 
     public const STATUS_NO_SHOW = 'no_show';

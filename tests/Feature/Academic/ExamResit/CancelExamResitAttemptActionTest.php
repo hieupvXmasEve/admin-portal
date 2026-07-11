@@ -19,11 +19,16 @@ use App\Modules\Academic\Actions\CancelExamResitAttemptAction;
 use App\Modules\Academic\Actions\CreateExamResitAttemptAction;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
+use App\Modules\Finance\Actions\ProcessFinanceCancellationOperationAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
+use App\Modules\Finance\Jobs\DispatchFinanceCancellationCompletionJob;
+use App\Modules\Finance\Models\FinanceCancellationCompletionOutbox;
+use App\Modules\Finance\Models\FinanceCancellationOperation;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\PaymentApplication;
+use App\Shared\Contracts\Finance\FinanceCancellationCompletionContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -58,7 +63,7 @@ beforeEach(function () {
 
 function runCancelExamResit(int $attemptId, string $reason = 'Sinh viên xin rút', array $overrides = []): ExamResitAttempt
 {
-    return app(CancelExamResitAttemptAction::class)->run(array_merge([
+    return CancelExamResitAttemptAction::run(array_merge([
         'attempt_id' => $attemptId,
         'reason' => $reason,
     ], $overrides));
@@ -82,8 +87,12 @@ function scheduledExamResitSessionForAttempt(ExamResitAttempt $attempt): ExamRes
     ]);
 }
 
-function makeExamResitDng(Student $student, FinanceCharge $charge, string $status = DngPaymentRequest::STATUS_PUSHED_TO_DNG, bool $viaPivot = false): DngPaymentRequest
-{
+function makeExamResitDng(
+    Student $student,
+    FinanceCharge $charge,
+    string $status = DngPaymentRequest::STATUS_PENDING,
+    bool $viaPivot = false,
+): DngPaymentRequest {
     $dng = DngPaymentRequest::create([
         'student_id' => $student->id,
         'campus_code' => 'TEST',
@@ -109,26 +118,51 @@ function makeExamResitDng(Student $student, FinanceCharge $charge, string $statu
     return $dng;
 }
 
-it('cancels an approved hq_fee_pending attempt without a charge to void', function () {
+function settleExamResitFinanceCancellation(ExamResitAttempt $attempt): void
+{
+    $operation = FinanceCancellationOperation::query()
+        ->where('source_kind', AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT)
+        ->where('source_ref', AcademicFinanceObligationSource::examResitAttemptRef($attempt))
+        ->firstOrFail();
+
+    app(ProcessFinanceCancellationOperationAction::class)->handle($operation->id);
+
+    $outbox = FinanceCancellationCompletionOutbox::query()
+        ->where('finance_cancellation_operation_id', $operation->id)
+        ->first();
+
+    if ($outbox !== null && $outbox->status !== FinanceCancellationCompletionOutbox::STATUS_DISPATCHED) {
+        app(DispatchFinanceCancellationCompletionJob::class, ['outboxId' => $outbox->id])
+            ->handle(app(FinanceCancellationCompletionContract::class));
+    }
+}
+
+it('requests finance cancellation and completes only through the durable outbox', function () {
     Queue::fake();
     $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
 
     $result = runCancelExamResit($attempt->id, 'Đổi sang học lại');
 
-    expect($result->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
-        ->and($result->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_CANCELLED)
+    expect($result->status)->toBe(ExamResitAttempt::STATUS_FINANCE_PENDING_CANCELLATION)
         ->and($result->cancelled_by_user_id)->toBe($this->user->id)
-        ->and($result->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_NO_CHARGE)
-        ->and($result->cancellation_notice_sent_at)->not->toBeNull()
-        ->and($result->cancellation_notice_error)->toBeNull()
         ->and($result->cancellation_reason)->toBe('Đổi sang học lại')
-        ->and($result->cancelled_at)->not->toBeNull()
+        ->and($result->cancelled_at)->toBeNull()
         ->and($result->attempt_number)->toBeNull();
+
+    settleExamResitFinanceCancellation($attempt);
+    $attempt->refresh();
+
+    expect($attempt->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
+        ->and($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_CANCELLED)
+        ->and($attempt->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_NO_CHARGE)
+        ->and($attempt->cancellation_notice_sent_at)->not->toBeNull()
+        ->and($attempt->cancellation_notice_error)->toBeNull()
+        ->and($attempt->cancelled_at)->not->toBeNull();
 
     expect(EmailLog::query()->where('recipient', $this->student->email)->exists())->toBeTrue();
 });
 
-it('cancels a target-path charge-created attempt through the finance obligation cancellation service', function () {
+it('cancels a target-path charge-created attempt through the finance cancellation operation', function () {
     Queue::fake();
 
     $unit = Unit::factory()->create();
@@ -191,10 +225,14 @@ it('cancels a target-path charge-created attempt through the finance obligation 
         'confirmation' => CancelExamResitAttemptAction::CONFIRM_VOID_UNPAID_EXAM_RESIT_FEE,
     ]);
 
-    expect($result->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
-        ->and($result->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_CANCELLED)
-        ->and($result->finance_charge_id)->toBeNull()
-        ->and($result->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_VOIDED_UNPAID_CHARGE)
+    expect($result->status)->toBe(ExamResitAttempt::STATUS_FINANCE_PENDING_CANCELLATION);
+
+    settleExamResitFinanceCancellation($attempt);
+    $attempt->refresh();
+
+    expect($attempt->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
+        ->and($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_CANCELLED)
+        ->and($attempt->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_VOIDED_UNPAID_CHARGE)
         ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID)
         ->and($charge->fresh()->void_reason)->toBe('exam_resit_cancelled')
         ->and($obligation->fresh()->lifecycle_status)->toBe(FinanceObligation::STATUS_VOIDED);
@@ -228,16 +266,21 @@ it('voids only the linked finance charge and linked awaiting dng when cancelling
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
-    $unrelatedDng = makeExamResitDng($this->student, $otherCharge);
+    $unrelatedDng = makeExamResitDng($this->student, $otherCharge, DngPaymentRequest::STATUS_PUSHED_TO_DNG);
 
     $result = runCancelExamResit($attempt->id, overrides: [
         'confirmation' => CancelExamResitAttemptAction::CONFIRM_VOID_UNPAID_EXAM_RESIT_FEE,
     ]);
 
-    expect($result->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
-        ->and($result->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_CANCELLED)
-        ->and($result->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_VOIDED_UNPAID_CHARGE)
-        ->and($result->cancellation_notice_sent_at)->not->toBeNull();
+    expect($result->status)->toBe(ExamResitAttempt::STATUS_FINANCE_PENDING_CANCELLATION);
+
+    settleExamResitFinanceCancellation($attempt);
+    $attempt->refresh();
+
+    expect($attempt->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
+        ->and($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_CANCELLED)
+        ->and($attempt->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_VOIDED_UNPAID_CHARGE)
+        ->and($attempt->cancellation_notice_sent_at)->not->toBeNull();
 
     expect($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID);
     expect($directDng->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED)
@@ -249,18 +292,22 @@ it('cancels a scheduled-but-unpaid attempt before sitting and releases the sessi
     Queue::fake();
     $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester, [
         'status' => ExamResitAttempt::STATUS_SCHEDULED,
-        'hq_fee_status' => ExamResitAttempt::HQ_FEE_CHARGE_CREATED,
+        'hq_fee_status' => ExamResitAttempt::HQ_FEE_PENDING,
         'scheduled_at' => now(),
     ]);
     $session = scheduledExamResitSessionForAttempt($attempt);
     $attempt->update(['exam_resit_session_id' => $session->id]);
 
-    $result = runCancelExamResit($attempt->id, overrides: [
-        'confirmation' => CancelExamResitAttemptAction::CONFIRM_VOID_UNPAID_EXAM_RESIT_FEE,
-    ]);
+    $result = runCancelExamResit($attempt->id);
 
-    expect($result->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
-        ->and($result->exam_resit_session_id)->toBeNull();
+    expect($result->status)->toBe(ExamResitAttempt::STATUS_FINANCE_PENDING_CANCELLATION)
+        ->and($result->exam_resit_session_id)->toBe($session->id);
+
+    settleExamResitFinanceCancellation($attempt);
+    $attempt->refresh();
+
+    expect($attempt->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
+        ->and($attempt->exam_resit_session_id)->toBeNull();
 
     expect($session->fresh()->actual_candidates)->toBe(0);
 });
@@ -295,22 +342,27 @@ it('bridges linked paid dng evidence before cancelling a charge_created attempt'
         'acknowledge_no_refund' => true,
     ]);
 
+    expect($result->status)->toBe(ExamResitAttempt::STATUS_FINANCE_PENDING_CANCELLATION);
+
+    settleExamResitFinanceCancellation($attempt);
+
+    $attempt->refresh();
     $charge->refresh();
     $paidDng->refresh();
 
-    expect($result->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
-        ->and($result->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_PAID)
-        ->and($result->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_KEPT_PAID_NO_REFUND)
+    expect($attempt->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
+        ->and($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_PAID)
+        ->and($attempt->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_KEPT_PAID_NO_REFUND)
         ->and($charge->status)->toBe(FinanceCharge::STATUS_VOID)
         ->and($charge->void_reason)->toBe('exam_resit_cancelled_paid_no_refund')
         ->and($paidDng->status)->toBe(DngPaymentRequest::STATUS_PAID_INVOICED)
         ->and($paidDng->payment_id)->not->toBeNull();
 
     $payment = $paidDng->payment()->firstOrFail();
-    expect(PaymentApplication::query()
+    expect((float) PaymentApplication::query()
         ->whereIn('invoice_line_id', $charge->invoiceLines()->pluck('id'))
-        ->sum('amount'))->toBe('0.00')
-        ->and($payment->unapplied_amount)->toBe(750000.0);
+        ->sum('amount'))->toBe(0.0)
+        ->and((float) $payment->unapplied_amount)->toBe(750000.0);
 });
 
 it('cancels a paid scheduled attempt and releases the paid fee to unapplied credit without cancelling dng', function () {
@@ -334,9 +386,13 @@ it('cancels a paid scheduled attempt and releases the paid fee to unapplied cred
         'acknowledge_no_refund' => true,
     ]);
 
+    expect($result->status)->toBe(ExamResitAttempt::STATUS_FINANCE_PENDING_CANCELLATION);
+
+    settleExamResitFinanceCancellation($attempt);
+
     $attempt->refresh();
     $charge->refresh();
-    expect($result->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
+    expect($attempt->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
         ->and($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_PAID)
         ->and($attempt->paid_at)->not->toBeNull()
         ->and($attempt->finance_charge_id)->toBe($charge->id)
@@ -354,10 +410,10 @@ it('cancels a paid scheduled attempt and releases the paid fee to unapplied cred
         ->payment()
         ->firstOrFail();
 
-    expect(PaymentApplication::query()
+    expect((float) PaymentApplication::query()
         ->whereIn('invoice_line_id', $charge->invoiceLines()->pluck('id'))
-        ->sum('amount'))->toBe('0.00')
-        ->and($payment->unapplied_amount)->toBe(750000.0)
+        ->sum('amount'))->toBe(0.0)
+        ->and((float) $payment->unapplied_amount)->toBe(750000.0)
         ->and($session->fresh()->actual_candidates)->toBe(0);
 });
 
@@ -397,6 +453,7 @@ it('refreshes session candidate count from non-cancelled attempts after cancelli
     runCancelExamResit($attempt->id, overrides: [
         'acknowledge_no_refund' => true,
     ]);
+    settleExamResitFinanceCancellation($attempt);
 
     expect($session->fresh()->actual_candidates)->toBe(1);
 });

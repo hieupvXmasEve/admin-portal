@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Providers;
 
 use App\Models\CourseRegistration;
+use App\Modules\Academic\Actions\CompleteFinanceCancellationOperationAction;
 use App\Modules\Academic\Actions\SyncPaidExamResitAttemptsAction;
 use App\Modules\Academic\Actions\SyncPaidRetakeRegistrationsAction;
 use App\Modules\Academic\Observers\CourseRegistrationObserver;
@@ -16,6 +17,7 @@ use App\Shared\Contracts\Academic\AiAcademicMetricReader;
 use App\Shared\Contracts\Academic\AiAcademicStudentProfileReader;
 use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
+use App\Shared\Contracts\Finance\FinanceCancellationCompletionContract;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -28,6 +30,7 @@ class AcademicServiceProvider extends ServiceProvider
         $this->app->bind(AiAcademicStudentProfileReader::class, ModuleAiAcademicStudentProfileReader::class);
         $this->app->bind(RetakeRegistrationPaymentSyncer::class, SyncPaidRetakeRegistrationsAction::class);
         $this->app->bind(ExamResitAttemptPaymentSyncer::class, SyncPaidExamResitAttemptsAction::class);
+        $this->app->bind(FinanceCancellationCompletionContract::class, CompleteFinanceCancellationOperationAction::class);
     }
 
     public function boot(): void

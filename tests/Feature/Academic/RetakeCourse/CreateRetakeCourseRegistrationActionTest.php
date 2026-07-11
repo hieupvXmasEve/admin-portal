@@ -17,15 +17,21 @@ use App\Modules\Academic\Actions\CancelRetakeCourseRegistrationAction;
 use App\Modules\Academic\Actions\CreateRetakeCourseRegistrationAction;
 use App\Modules\Academic\Queries\ListRetakeCourseEligibleStudentsQuery;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
+use App\Modules\Finance\Actions\ProcessFinanceCancellationOperationAction;
+use App\Modules\Finance\Jobs\DispatchFinanceCancellationCompletionJob;
+use App\Modules\Finance\Models\FinanceCancellationCompletionOutbox;
+use App\Modules\Finance\Models\FinanceCancellationOperation;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeResult;
+use App\Shared\Contracts\Finance\FinanceCancellationCompletionContract;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
@@ -237,6 +243,8 @@ it('rejects duplicate active registration for same student+unit+semester', funct
 })->throws(ValidationException::class);
 
 it('allows registration after previous one was cancelled', function () {
+    Queue::fake();
+
     // Create and cancel first registration.
     $first = CreateRetakeCourseRegistrationAction::run([
         'student_id' => $this->student->id,
@@ -247,11 +255,24 @@ it('allows registration after previous one was cancelled', function () {
         'campus_id' => $this->campus->id,
     ]);
 
-    // Use full cancel action to properly void charge + cancel registration
+    // Source enters finance-pending; Finance completion terminalizes it.
     CancelRetakeCourseRegistrationAction::run([
         'registration_id' => $first->id,
         'reason' => 'Test cancellation',
     ]);
+
+    $operation = FinanceCancellationOperation::query()
+        ->where('source_kind', AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION)
+        ->where('source_ref', AcademicFinanceObligationSource::courseRetakeRegistrationRef($first))
+        ->firstOrFail();
+    app(ProcessFinanceCancellationOperationAction::class)->handle($operation->id);
+    $outbox = FinanceCancellationCompletionOutbox::query()
+        ->where('finance_cancellation_operation_id', $operation->id)
+        ->firstOrFail();
+    app(DispatchFinanceCancellationCompletionJob::class, ['outboxId' => $outbox->id])
+        ->handle(app(FinanceCancellationCompletionContract::class));
+
+    expect($first->fresh()->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED);
 
     // Should succeed because previous was cancelled (terminal)
     $second = CreateRetakeCourseRegistrationAction::run([

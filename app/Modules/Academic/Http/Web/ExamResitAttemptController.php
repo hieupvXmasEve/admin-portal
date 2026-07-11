@@ -207,11 +207,10 @@ class ExamResitAttemptController extends Controller
     public function cancel(
         CancelExamResitRequest $request,
         ExamResitAttempt $examResit,
-        CancelExamResitAttemptAction $action,
     ): RedirectResponse {
         $validated = $request->validated();
 
-        $action->run([
+        CancelExamResitAttemptAction::run([
             'attempt_id' => $examResit->id,
             'reason' => $validated['reason'],
             'acknowledge_no_refund' => (bool) ($validated['acknowledge_no_refund'] ?? false),

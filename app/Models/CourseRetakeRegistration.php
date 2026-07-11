@@ -19,6 +19,8 @@ class CourseRetakeRegistration extends AuditableModel
 
     public const STATUS_PAYMENT_PENDING = 'payment_pending';
 
+    public const STATUS_FINANCE_PENDING_CANCELLATION = 'finance_pending_cancellation';
+
     public const STATUS_PAID = 'paid';
 
     public const STATUS_ENROLLED = 'enrolled';
@@ -45,6 +47,7 @@ class CourseRetakeRegistration extends AuditableModel
     public const NON_TERMINAL_STATUSES = [
         self::STATUS_APPROVED,
         self::STATUS_PAYMENT_PENDING,
+        self::STATUS_FINANCE_PENDING_CANCELLATION,
         self::STATUS_PAID,
     ];
 
@@ -275,6 +278,19 @@ class CourseRetakeRegistration extends AuditableModel
             'hq_fee_status' => $hqFeeStatus ?? self::HQ_FEE_CANCELLED,
             'cancelled_by_user_id' => $userId,
             'cancelled_at' => now(),
+            'cancellation_reason' => $reason,
+        ]);
+    }
+
+    public function markFinancePendingCancellation(int $userId, string $reason): void
+    {
+        if (! $this->isCancellable()) {
+            throw new \RuntimeException("Cannot start Finance cancellation from status: {$this->status}.");
+        }
+
+        $this->update([
+            'status' => self::STATUS_FINANCE_PENDING_CANCELLATION,
+            'cancelled_by_user_id' => $userId,
             'cancellation_reason' => $reason,
         ]);
     }
