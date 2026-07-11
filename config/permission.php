@@ -388,6 +388,8 @@ return [
             // Payments
             'view_finance_payments' => 'view_finance_payments',
             'allocate_finance_payment' => 'allocate_finance_payment',
+            'refund_finance_payment' => 'refund_finance_payment',
+            'forfeit_finance_payment_surplus' => 'forfeit_finance_payment_surplus',
             'view_finance_payment_details' => 'view_finance_payment_details',
             'create_finance_payments' => 'create_finance_payments',
             'view_finance_dng_payment_requests' => 'view_finance_dng_payment_requests',

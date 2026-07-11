@@ -5,6 +5,7 @@ import LedgerLens from '@/components/finance/student360/LedgerLens.vue';
 import RecordPaymentDrawer from '@/components/finance/student360/RecordPaymentDrawer.vue';
 import StatusCards from '@/components/finance/student360/StatusCards.vue';
 import StudentActionMenu from '@/components/finance/student360/StudentActionMenu.vue';
+import SurplusDispositionDrawer from '@/components/finance/student360/SurplusDispositionDrawer.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,6 +46,10 @@ const allocateOpen = ref(false);
 const cancelOpen = ref(false);
 const allocatePaymentId = ref<number | null>(null);
 const cancelDngId = ref<number | null>(null);
+const dispositionOpen = ref(false);
+const dispositionPaymentId = ref<number | null>(null);
+const dispositionAmount = ref(0);
+const dispositionType = ref<'refund' | 'retain_forfeit'>('refund');
 const tuitionKpis = computed<Array<StudentFinanceOverviewKpi & { key: string; tone: string }>>(() => [
     {
         ...props.tuition_overview.kpis.collectible_due,
@@ -77,6 +82,13 @@ const openAllocate = (): void => {
 const openAllocatePayment = (paymentId: number): void => {
     allocatePaymentId.value = paymentId;
     allocateOpen.value = true;
+};
+
+const openDisposition = (row: StudentFinancePaymentHistoryRow, type: 'refund' | 'retain_forfeit'): void => {
+    dispositionPaymentId.value = row.id;
+    dispositionAmount.value = row.surplus_amount;
+    dispositionType.value = type;
+    dispositionOpen.value = true;
 };
 
 const openCancel = (id: number): void => {
@@ -259,7 +271,11 @@ onMounted(() => {
                                     </Badge>
                                 </td>
                                 <td class="px-4 py-3 text-right">
-                                    <Button v-if="row.action.can_allocate && props.actions.can_allocate" size="sm" variant="outline" @click="openAllocatePayment(row.id)"> Phân bổ </Button>
+                                    <div v-if="row.surplus_amount > 0" class="flex justify-end gap-1">
+                                        <Button v-if="row.action.can_allocate && props.actions.can_allocate" size="sm" variant="outline" @click="openAllocatePayment(row.id)">Phân bổ</Button>
+                                        <Button v-if="props.actions.can_refund_surplus" size="sm" variant="outline" @click="openDisposition(row, 'refund')">Hoàn tiền</Button>
+                                        <Button v-if="props.actions.can_forfeit_surplus" size="sm" variant="outline" @click="openDisposition(row, 'retain_forfeit')">Giữ lại</Button>
+                                    </div>
                                     <p v-else-if="row.action.message" class="text-muted-foreground ml-auto max-w-[220px] text-xs">
                                         {{ row.action.message }}
                                     </p>
@@ -283,5 +299,6 @@ onMounted(() => {
         <RecordPaymentDrawer v-model:open="recordOpen" :student-id="props.student.id" />
         <AllocatePreviewDrawer v-model:open="allocateOpen" :payment-id="allocatePaymentId" />
         <CancelDngDrawer v-model:open="cancelOpen" :dng-id="cancelDngId" :can-void-charges="props.actions.can_void_charges" />
+        <SurplusDispositionDrawer v-model:open="dispositionOpen" :payment-id="dispositionPaymentId" :type="dispositionType" :amount="dispositionAmount" />
     </div>
 </template>

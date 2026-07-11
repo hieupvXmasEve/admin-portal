@@ -268,6 +268,8 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::get('/{payment}/allocate-preview', [FinanceStudentPaymentController::class, 'allocatePreview'])
             ->middleware('can:allocate_finance_payment')
             ->name('allocate-preview');
+        Route::post('/{payment}/surplus-dispositions', [FinanceStudentPaymentController::class, 'dispose'])
+            ->name('surplus-dispositions.store');
         Route::get('/{payment}', [PaymentController::class, 'show'])
             ->middleware('can:view_finance_payment_details')
             ->name('show');

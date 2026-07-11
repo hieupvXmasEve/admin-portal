@@ -7,6 +7,7 @@ namespace App\Modules\Finance\Queries\Student360;
 use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\PaymentSurplusDisposition;
 use App\Modules\Finance\Services\SettlementService;
 
 class GetStudentFinancePaymentHistoryQuery
@@ -54,8 +55,11 @@ class GetStudentFinancePaymentHistoryQuery
     private function row(Payment $payment, ?DngPaymentRequest $dng, bool $hasCurrentFeeObligations): array
     {
         $amountPaid = $this->money((float) $payment->amount);
-        $surplus = $this->money($this->settlement->getPaymentUnappliedAmount($payment));
-        $collected = $this->money(max(0, $amountPaid - $surplus));
+        $disposed = (float) PaymentSurplusDisposition::query()->where('payment_id', $payment->id)
+            ->whereIn('type', [PaymentSurplusDisposition::TYPE_REFUND, PaymentSurplusDisposition::TYPE_RETAIN_FORFEIT])
+            ->sum('amount');
+        $surplus = $this->money(max(0, $this->settlement->getPaymentUnappliedAmount($payment) - $disposed));
+        $collected = $this->money($this->settlement->getPaymentAllocatedAmount($payment));
         $hasSurplus = $surplus > 0;
 
         return [

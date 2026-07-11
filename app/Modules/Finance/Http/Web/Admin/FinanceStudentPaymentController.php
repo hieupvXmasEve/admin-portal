@@ -7,6 +7,8 @@ namespace App\Modules\Finance\Http\Web\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\Student;
+use App\Modules\Finance\Actions\DisposePaymentSurplusAction;
+use App\Modules\Finance\Http\Requests\Student360\DisposePaymentSurplusRequest;
 use App\Modules\Finance\Http\Requests\Student360\RecordManualPaymentRequest;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Queries\Student360\PreviewManualAllocationQuery;
@@ -23,6 +25,16 @@ class FinanceStudentPaymentController extends Controller
         $this->assertCampusVisible((int) $payment->student_id);
 
         return ApiResponse::success($query->handle($payment));
+    }
+
+    public function dispose(Payment $payment, DisposePaymentSurplusRequest $request, DisposePaymentSurplusAction $action): RedirectResponse
+    {
+        $this->assertCampusVisible((int) $payment->student_id);
+        $action->run($payment, $request->validated(), (int) $request->user()->id);
+
+        Inertia::flash('success', 'Đã ghi nhận xử lý khoản Còn dư.');
+
+        return back();
     }
 
     /** Thin adapter: records a manual payment via the existing PaymentService. */

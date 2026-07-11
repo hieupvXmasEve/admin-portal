@@ -48,8 +48,8 @@ const apply = (candidate: Candidate): void => {
 
     applyingLineId.value = candidate.invoice_line_id;
     router.post(
-        financeRoutes.student360.allocate(props.paymentId),
-        { charge_id: candidate.charge_id, amount: candidate.would_apply },
+        financeRoutes.student360.disposeSurplus(props.paymentId),
+        { idempotency_key: crypto.randomUUID(), type: 'reallocate', invoice_line_id: candidate.invoice_line_id, amount: candidate.would_apply },
         {
             preserveScroll: true,
             onSuccess: () => emit('update:open', false),
