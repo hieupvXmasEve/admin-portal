@@ -28,3 +28,12 @@ it('finds an invariant by code and returns null for an unknown code', function (
         ->and($registry->find('INV-1')->code)->toBe('INV-1')
         ->and($registry->find('INV-999'))->toBeNull();
 });
+
+it('includes credit applications in the negative-balance invariant', function (): void {
+    $invariant = app(FinanceInvariantRegistry::class)->find('INV-8');
+
+    expect($invariant)->not->toBeNull()
+        ->and($invariant->label)->toContain('credit')
+        ->and($invariant->countSqlTemplate)->toContain('credit_applications')
+        ->and($invariant->sampleSqlTemplate)->toContain('credit_applications');
+});

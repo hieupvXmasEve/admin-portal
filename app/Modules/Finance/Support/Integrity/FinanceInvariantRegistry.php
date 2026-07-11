@@ -130,7 +130,7 @@ class FinanceInvariantRegistry
             new FinanceInvariant(
                 'INV-8',
                 'CRITICAL',
-                'Negative balance (discount+paid > charge) on active positive charge',
+                'Negative balance (discount+cash+credit > charge) on active positive charge',
                 'SELECT COUNT(*) c FROM finance_charges fc
                     WHERE fc.status = "active" AND fc.amount > 0 AND (
                         fc.amount
@@ -139,6 +139,9 @@ class FinanceInvariantRegistry
                             WHERE il.charge_id = fc.id AND il.status = "active"),0)
                         - COALESCE((SELECT SUM(da.amount) FROM invoice_lines il
                             JOIN discount_allocations da ON da.invoice_line_id = il.id
+                            WHERE il.charge_id = fc.id AND il.status = "active"),0)
+                        - COALESCE((SELECT SUM(ca.amount) FROM invoice_lines il
+                            JOIN credit_applications ca ON ca.invoice_line_id = il.id
                             WHERE il.charge_id = fc.id AND il.status = "active"),0)
                     ) < -0.01 AND ({scope})',
                 'SELECT fc.id FROM finance_charges fc
@@ -149,6 +152,9 @@ class FinanceInvariantRegistry
                             WHERE il.charge_id = fc.id AND il.status = "active"),0)
                         - COALESCE((SELECT SUM(da.amount) FROM invoice_lines il
                             JOIN discount_allocations da ON da.invoice_line_id = il.id
+                            WHERE il.charge_id = fc.id AND il.status = "active"),0)
+                        - COALESCE((SELECT SUM(ca.amount) FROM invoice_lines il
+                            JOIN credit_applications ca ON ca.invoice_line_id = il.id
                             WHERE il.charge_id = fc.id AND il.status = "active"),0)
                     ) < -0.01 AND ({scope}) LIMIT 5',
                 'fc.student_id IN ({ids})',
