@@ -10,14 +10,19 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
 use App\Modules\Academic\Actions\CompleteFinanceCancellationOperationAction;
+use App\Modules\Academic\Actions\RecoverAcademicFinanceCancellationHandoffsAction;
+use App\Modules\Academic\Jobs\DispatchAcademicFinanceCancellationHandoffJob;
+use App\Modules\Academic\Models\AcademicFinanceCancellationHandoff;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateRetakeCourseChargeSimpleAction;
 use App\Modules\Finance\Actions\ProcessFinanceCancellationOperationAction;
+use App\Modules\Finance\Actions\RecoverFinanceCancellationWorkAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Jobs\DispatchFinanceCancellationCompletionJob;
+use App\Modules\Finance\Jobs\ProcessFinanceCancellationOperationJob;
 use App\Modules\Finance\Models\FinanceCancellationCompletionOutbox;
 use App\Modules\Finance\Models\FinanceCancellationOperation;
 use App\Modules\Finance\Models\FinanceCharge;
@@ -192,7 +197,7 @@ it('keeps the source pending when the provider cancellation outcome is unknown',
     ]);
     $client = Mockery::mock(DngClient::class);
     $client->shouldReceive('buildInsertNewRecordPayload')->andReturn([]);
-    $client->shouldReceive('cancelRecord')->andThrow(new RuntimeException('timeout'));
+    $client->shouldReceive('cancelRecord')->once()->andThrow(new RuntimeException('timeout'));
     app()->instance(DngClient::class, $client);
 
     $operation = requestCancellationOperation($registration, [
@@ -200,12 +205,80 @@ it('keeps the source pending when the provider cancellation outcome is unknown',
     ]);
 
     app(ProcessFinanceCancellationOperationAction::class)->handle($operation->operationId);
+    app(ProcessFinanceCancellationOperationAction::class)->handle($operation->operationId);
 
+    $stored = FinanceCancellationOperation::query()->findOrFail($operation->operationId);
     expect($registration->fresh()->status)->toBe(CourseRetakeRegistration::STATUS_FINANCE_PENDING_CANCELLATION)
-        ->and(FinanceCancellationOperation::query()->findOrFail($operation->operationId)->status)
+        ->and($stored->status)
         ->toBe(FinanceCancellationOperation::STATUS_REQUIRES_REVIEW)
+        ->and($stored->provider_attempts[(string) DngPaymentRequest::query()->firstOrFail()->id]['status'] ?? null)
+        ->toBe('unknown')
         ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE)
         ->and(FinanceCancellationCompletionOutbox::query()->count())->toBe(0);
+});
+
+it('re-dispatches committed pending rows when their original enqueue was lost', function () {
+    Queue::fake();
+    $registration = cancellationOperationRetake();
+    $handoff = AcademicFinanceCancellationHandoff::query()->create([
+        'source_system' => 'academic',
+        'source_kind' => 'course_retake_registration',
+        'source_ref' => 'retake:'.$registration->id,
+        'obligation_type' => 'retake_fee',
+        'unpaid_void_reason' => 'retake_course_cancelled',
+        'paid_void_reason' => 'retake_course_cancelled_paid_no_refund',
+        'payload' => ['reason' => 'Student withdrew'],
+        'status' => AcademicFinanceCancellationHandoff::STATUS_PENDING,
+    ]);
+    $failedHandoff = AcademicFinanceCancellationHandoff::query()->create([
+        'source_system' => 'academic',
+        'source_kind' => 'exam_resit_attempt',
+        'source_ref' => 'exam-resit:failed-recovery:'.$registration->id,
+        'obligation_type' => 'exam_resit_fee',
+        'unpaid_void_reason' => 'exam_resit_cancelled',
+        'paid_void_reason' => 'exam_resit_cancelled_paid_no_refund',
+        'payload' => ['reason' => 'Retry failed handoff'],
+        'status' => AcademicFinanceCancellationHandoff::STATUS_FAILED,
+        'attempts' => 1,
+        'last_error' => 'lost queue publish',
+    ]);
+    $operation = FinanceCancellationOperation::query()->create([
+        'source_system' => 'academic',
+        'source_kind' => 'course_retake_registration',
+        'source_ref' => 'retake:recovery:'.$registration->id,
+        'obligation_type' => 'retake_fee',
+        'status' => FinanceCancellationOperation::STATUS_REQUESTED,
+        'unpaid_void_reason' => 'retake_course_cancelled',
+        'paid_void_reason' => 'retake_course_cancelled_paid_no_refund',
+        'source_payload' => [],
+    ]);
+    $staleOperation = FinanceCancellationOperation::query()->create([
+        'source_system' => 'academic',
+        'source_kind' => 'exam_resit_attempt',
+        'source_ref' => 'exam-resit:recovery:'.$registration->id,
+        'obligation_type' => 'exam_resit_fee',
+        'status' => FinanceCancellationOperation::STATUS_PROCESSING,
+        'unpaid_void_reason' => 'exam_resit_cancelled',
+        'paid_void_reason' => 'exam_resit_cancelled_paid_no_refund',
+        'source_payload' => [],
+        'processing_claimed_at' => now()->subMinutes(10),
+    ]);
+    $outbox = FinanceCancellationCompletionOutbox::query()->create([
+        'finance_cancellation_operation_id' => $operation->id,
+        'event_id' => 'recovery-completion-'.$operation->id,
+        'event_kind' => FinanceCancellationCompletionOutbox::EVENT_KIND_COMPLETED,
+        'event_version' => 1,
+        'status' => FinanceCancellationCompletionOutbox::STATUS_PENDING,
+    ]);
+
+    RecoverAcademicFinanceCancellationHandoffsAction::run(['limit' => 100]);
+    RecoverFinanceCancellationWorkAction::run(['limit' => 100]);
+
+    Queue::assertPushed(DispatchAcademicFinanceCancellationHandoffJob::class, fn ($job) => $job->handoffId === $handoff->id);
+    Queue::assertPushed(DispatchAcademicFinanceCancellationHandoffJob::class, fn ($job) => $job->handoffId === $failedHandoff->id);
+    Queue::assertPushed(ProcessFinanceCancellationOperationJob::class, fn ($job) => $job->operationId === $operation->id);
+    Queue::assertPushed(ProcessFinanceCancellationOperationJob::class, fn ($job) => $job->operationId === $staleOperation->id);
+    Queue::assertPushed(DispatchFinanceCancellationCompletionJob::class, fn ($job) => $job->outboxId === $outbox->id);
 });
 
 it('voids only after an unattempted collection is cancelled locally', function () {
@@ -387,6 +460,38 @@ it('replaces only the remaining targets after cancelling an aggregate request', 
         'description' => 'Remaining target',
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'academic',
+        'source_kind' => 'course_retake_registration',
+        'source_ref' => 'retake:aggregate-remaining:'.$registration->id,
+        'obligation_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 300000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test:v1',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+    $remaining->update(['finance_obligation_id' => $obligation->id]);
+    $invoice = StudentInvoice::query()->create([
+        'invoice_number' => 'INV-CANCEL-AGG-'.$registration->id,
+        'student_id' => $registration->student_id,
+        'semester_id' => $registration->semester_id,
+        'status' => 'draft',
+        'due_date' => now()->addDays(7),
+        'subtotal' => 300000,
+        'discount_total' => 0,
+        'total_amount' => 300000,
+        'paid_amount' => 0,
+        'currency' => 'VND',
+    ]);
+    InvoiceLine::query()->create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $remaining->id,
+        'amount_snapshot' => 300000,
+        'description_snapshot' => 'Remaining target',
+        'status' => 'active',
     ]);
     $aggregate = DngPaymentRequest::query()->create([
         'student_id' => $registration->student_id,
@@ -746,6 +851,44 @@ it('requires review when Settlement Position is invalid for aggregate remaining 
     $result = app(ProcessFinanceCancellationOperationAction::class)->handle($operation->operationId);
 
     expect($result->status)->toBe(FinanceCancellationOperation::STATUS_REQUIRES_REVIEW)
+        ->and($voided->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE)
+        ->and(DngPaymentRequest::query()
+            ->where('item_id', $aggregate->item_id.'-replacement-'.$operation->operationId)
+            ->exists())->toBeFalse();
+});
+
+it('requires review when an aggregate remaining target has no canonical payable line', function () {
+    Queue::fake();
+    $registration = cancellationOperationRetake();
+    $voided = FinanceCharge::query()->create([
+        'student_id' => $registration->student_id, 'semester_id' => $registration->semester_id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE, 'amount' => 500000,
+        'description' => 'Void target', 'effective_at' => now(), 'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    $remaining = FinanceCharge::query()->create([
+        'student_id' => $registration->student_id, 'semester_id' => $registration->semester_id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE, 'amount' => 300000,
+        'description' => 'No canonical line', 'effective_at' => now(), 'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    $aggregate = DngPaymentRequest::query()->create([
+        'student_id' => $registration->student_id, 'campus_code' => 'TEST',
+        'student_code' => $registration->student->student_id, 'fee_type' => 'HP',
+        'item_id' => 'aggregate-cancel-no-line-'.$registration->id, 'amount' => 800000,
+        'status' => DngPaymentRequest::STATUS_PENDING, 'finance_charge_id' => $voided->id,
+    ]);
+    foreach ([[$voided, 500000], [$remaining, 300000]] as [$charge, $amount]) {
+        DngPaymentRequestCharge::query()->create([
+            'dng_payment_request_id' => $aggregate->id,
+            'finance_charge_id' => $charge->id,
+            'amount' => $amount,
+        ]);
+    }
+    $operation = requestCancellationOperation($registration, ['legacy_finance_charge_id' => $voided->id]);
+
+    $result = app(ProcessFinanceCancellationOperationAction::class)->handle($operation->operationId);
+
+    expect($result->status)->toBe(FinanceCancellationOperation::STATUS_REQUIRES_REVIEW)
+        ->and($voided->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE)
         ->and(DngPaymentRequest::query()
             ->where('item_id', $aggregate->item_id.'-replacement-'.$operation->operationId)
             ->exists())->toBeFalse();
@@ -872,6 +1015,38 @@ it('does not create a replacement when void fails after collection cancel', func
         'description' => 'Remaining target',
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'academic',
+        'source_kind' => 'course_retake_registration',
+        'source_ref' => 'retake:void-failure-remaining:'.$registration->id,
+        'obligation_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 300000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test:v1',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+    $remaining->update(['finance_obligation_id' => $obligation->id]);
+    $invoice = StudentInvoice::query()->create([
+        'invoice_number' => 'INV-CANCEL-VOID-FAIL-'.$registration->id,
+        'student_id' => $registration->student_id,
+        'semester_id' => $registration->semester_id,
+        'status' => 'draft',
+        'due_date' => now()->addDays(7),
+        'subtotal' => 300000,
+        'discount_total' => 0,
+        'total_amount' => 300000,
+        'paid_amount' => 0,
+        'currency' => 'VND',
+    ]);
+    InvoiceLine::query()->create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $remaining->id,
+        'amount_snapshot' => 300000,
+        'description_snapshot' => 'Remaining target',
+        'status' => 'active',
     ]);
     $aggregate = DngPaymentRequest::query()->create([
         'student_id' => $registration->student_id,

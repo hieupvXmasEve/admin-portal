@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Finance\Dng\Jobs\ReconcileDngPaymentsJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -71,8 +72,15 @@ Schedule::command('notifications:process-outbox --limit=100')
     ->onOneServer()
     ->runInBackground();
 
+// Recovery safety-net for committed cancellation rows whose afterCommit enqueue was lost.
+Schedule::command('finance:recover-cancellation-work --limit=100')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->runInBackground();
+
 // DNG payment reconciliation - every 15 minutes
-Schedule::job(new \App\Modules\Finance\Dng\Jobs\ReconcileDngPaymentsJob)
+Schedule::job(new ReconcileDngPaymentsJob)
     ->everyFifteenMinutes()
     ->withoutOverlapping(10)
     ->onOneServer();

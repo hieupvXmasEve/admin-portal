@@ -53,7 +53,7 @@ class BridgePaidDngRequestsForChargeAction
             // Avoid re-entrancy when ProcessFinanceCancellation is already bridging mid-void.
             // Resume only when there is completed unpaid-disposition work to upgrade, or
             // requested/review ops that need re-entry — always safe afterCommit job.
-            app(ResumeFinanceCancellationOnPaidEvidenceAction::class)->handle($chargeId);
+            ResumeFinanceCancellationOnPaidEvidenceAction::run(['finance_charge_id' => $chargeId]);
         }
 
         return $bridged;
@@ -66,6 +66,12 @@ class BridgePaidDngRequestsForChargeAction
         }
 
         return $this->linkedPaidRequestIds((int) $charge->id)->isNotEmpty();
+    }
+
+    /** @param array{finance_charge_id: int} $data @return Collection<int, Payment> */
+    public static function run(array $data): Collection
+    {
+        return app(self::class)->handle((int) $data['finance_charge_id']);
     }
 
     /**

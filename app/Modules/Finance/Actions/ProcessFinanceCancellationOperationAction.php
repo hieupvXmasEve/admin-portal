@@ -49,7 +49,7 @@ class ProcessFinanceCancellationOperationAction
     ];
 
     /** Stale processing claims may be reclaimed only for recovery — never re-calls in-flight provider. */
-    private const CLAIM_STALE_SECONDS = 300;
+    public const PROCESSING_CLAIM_STALE_SECONDS = 300;
 
     public function __construct(
         private readonly CancelDngPaymentRequestAction $cancelDngPaymentRequestAction,
@@ -89,6 +89,32 @@ class ProcessFinanceCancellationOperationAction
                 ? null
                 : FinanceCharge::query()->lockForUpdate()->find($charge->id);
 
+            try {
+                // Build replacement inside the same transaction, before voiding.
+                // Invalid canonical evidence therefore commits only requires_review;
+                // any later void failure rolls the replacement back atomically.
+                foreach ($replacementPlans as $plan) {
+                    $cancelledRequest = DngPaymentRequest::query()->find($plan['request_id']);
+                    if ($cancelledRequest instanceof DngPaymentRequest) {
+                        $this->createReplacementForRemainingTargets(
+                            $locked,
+                            $cancelledRequest,
+                            $plan['voided_charge_id'],
+                        );
+                    }
+                }
+            } catch (RuntimeException $exception) {
+                $locked->update([
+                    'status' => FinanceCancellationOperation::STATUS_REQUIRES_REVIEW,
+                    'processing_claimed_at' => null,
+                    'result_payload' => array_merge($locked->result_payload ?? [], [
+                        'review_reason' => $exception->getMessage(),
+                    ]),
+                ]);
+
+                return $locked->fresh() ?? $locked;
+            }
+
             $hasPaidDng = $lockedCharge !== null
                 && $this->bridgePaidDngRequestsForChargeAction->hasPaidDngForCharge($lockedCharge);
 
@@ -107,29 +133,6 @@ class ProcessFinanceCancellationOperationAction
                     false,
                 );
                 $lockedCharge->refresh();
-            }
-
-            try {
-                foreach ($replacementPlans as $plan) {
-                    $cancelledRequest = DngPaymentRequest::query()->find($plan['request_id']);
-                    if ($cancelledRequest instanceof DngPaymentRequest) {
-                        $this->createReplacementForRemainingTargets(
-                            $locked,
-                            $cancelledRequest,
-                            $plan['voided_charge_id'],
-                        );
-                    }
-                }
-            } catch (RuntimeException $exception) {
-                // Fail-closed: invalid Settlement Position must not invent amounts.
-                $locked->update([
-                    'status' => FinanceCancellationOperation::STATUS_REQUIRES_REVIEW,
-                    'result_payload' => array_merge($locked->result_payload ?? [], [
-                        'review_reason' => $exception->getMessage(),
-                    ]),
-                ]);
-
-                return $locked->fresh() ?? $locked;
             }
 
             $obligation = $this->findObligation($locked);
@@ -168,7 +171,7 @@ class ProcessFinanceCancellationOperationAction
 
     private function claimForProcessing(int $operationId): ?FinanceCancellationOperation
     {
-        $staleBefore = now()->subSeconds(self::CLAIM_STALE_SECONDS);
+        $staleBefore = now()->subSeconds(self::PROCESSING_CLAIM_STALE_SECONDS);
 
         $affected = FinanceCancellationOperation::query()
             ->whereKey($operationId)
@@ -295,7 +298,7 @@ class ProcessFinanceCancellationOperationAction
             $attempt = $this->providerAttempt($operation, (int) $request->id);
 
             // Stale reclaim: never re-call provider while a previous attempt is in-flight.
-            if (($attempt['status'] ?? null) === 'in_flight') {
+            if (in_array(($attempt['status'] ?? null), ['in_flight', 'unknown', 'failed'], true)) {
                 $request->refresh();
                 if (in_array($request->status, self::TERMINAL_COLLECTION_STATUSES, true)) {
                     $this->markProviderAttempt($operation, (int) $request->id, 'done');
@@ -333,9 +336,16 @@ class ProcessFinanceCancellationOperationAction
                 $this->markProviderAttempt($operation, (int) $request->id, 'in_flight');
                 $this->cancelDngPaymentRequestAction->run($request);
                 $this->markProviderAttempt($operation, (int) $request->id, 'done');
-            } catch (\Throwable) {
-                $this->markProviderAttempt($operation, (int) $request->id, 'failed');
-                $operation->update(['status' => FinanceCancellationOperation::STATUS_REQUIRES_REVIEW]);
+            } catch (\Throwable $exception) {
+                $request->refresh();
+                $this->markProviderAttempt($operation, (int) $request->id, 'unknown');
+                $operation->update([
+                    'status' => FinanceCancellationOperation::STATUS_REQUIRES_REVIEW,
+                    'result_payload' => array_merge($operation->result_payload ?? [], [
+                        'review_reason' => 'Provider cancellation outcome is unknown for DNG #'.$request->id,
+                        'provider_error' => mb_substr($exception->getMessage(), 0, 1000),
+                    ]),
+                ]);
 
                 return false;
             }
@@ -514,7 +524,7 @@ class ProcessFinanceCancellationOperationAction
     /**
      * Canonical remaining collectible for a charge.
      * Returns null when Settlement Position cannot be trusted (fail-closed).
-     * Charges without invoice lines use gross amount (nothing settled yet).
+     * Missing payable lines are non-canonical and therefore fail closed.
      */
     private function canonicalRemainingForCharge(int $chargeId): ?string
     {
@@ -526,12 +536,7 @@ class ProcessFinanceCancellationOperationAction
             ->all();
 
         if ($lineIds === []) {
-            $charge = FinanceCharge::query()->find($chargeId);
-            if (! $charge instanceof FinanceCharge || $charge->status !== FinanceCharge::STATUS_ACTIVE) {
-                return '0.00';
-            }
-
-            return number_format((float) $charge->amount, 2, '.', '');
+            return null;
         }
 
         $position = count($lineIds) === 1

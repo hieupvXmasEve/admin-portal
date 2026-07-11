@@ -1,6 +1,6 @@
 # 09 — Hủy obligation qua Finance Cancellation Operation
 
-**Status:** ready-for-review  
+**Status:** completed
 **Portal impact:** none
 
 ## Parent
@@ -41,18 +41,21 @@ Addressed Standards + Spec blockers from second review:
 | Aggregate fail-open | Invalid Settlement Position → `requires_review`, **no** guessed local balance replacement |
 | Stale claim double provider | `provider_attempts` ledger: `in_flight` refuse re-call on reclaim → review |
 | Append-only completion | Dropped unique on operation_id; versioned outbox rows (`completed`, `paid_disposition_upgrade`) |
+| Lost enqueue recovery | Scheduled one-minute scanner re-dispatches pending/failed Academic handoffs, requested/stale Finance operations, and pending completion events |
+| Provider exception retry | Ambiguous provider exceptions persist as `unknown`; re-entry refuses another provider call until reconciliation proves outcome |
+| Canonical replacement atomicity | Replacement validates/creates inside the void transaction before void; invalid/missing Settlement Position leaves the target active and moves operation to review |
 
 ### Quality gates (2026-07-11)
 
 | Gate | Result | Notes |
 |---|---|---|
-| Targeted Pest (cancellation) | **31 passed / 160 assertions** | `DB_TEST_DATABASE=db_test_issue09` sequential |
-| CancellationOperationTest | 15 passed | claim, late pay, SP, stale reclaim, append-only outbox |
+| Targeted Pest (cancellation) | **33 passed / 171 assertions** | isolated DBs, sequential |
+| CancellationOperationTest | **17 passed / 81 assertions** | recovery scanner, including pending/failed handoffs and stale operations; ambiguous provider retry; canonical fail-closed atomicity |
 | Exam resit cancel | 10 passed | handoff deliver helper under Queue::fake |
-| Retake cancel | 6 passed | handoff deliver helper under Queue::fake |
+| Retake cancel | 6 passed / 27 assertions | handoff deliver helper under Queue::fake |
 | Pint `--dirty` | **passed** | |
-| `pnpm type-check` | **not green** | process **killed OOM (exit 137)** in container — not attributable to this change |
-| `pnpm lint` | **not green** | **4784 pre-existing** eslint errors across app (unrelated pages); no new Finance cancel Vue surface |
-| Full suite | **not run** | shared `db_test` has migration races under parallel/agent load; targeted suite on isolated DB is the correctness evidence for this issue |
+| `pnpm type-check` | **passed** | `vue-tsc --noEmit` |
+| `pnpm lint` | **passed** | `eslint . --fix`; no unrelated file drift |
+| Full suite | **exit 0** | single process on isolated `db_test_issue09_full`; Collision emitted no count output |
 
-### Still not claiming `done` until human accepts quality-gate gaps (type-check OOM / lint repo noise).
+### Completed after final Standards + Spec review found no remaining acceptance-criteria blocker.

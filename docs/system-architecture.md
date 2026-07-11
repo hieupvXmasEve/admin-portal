@@ -269,16 +269,17 @@ Phase 1 guardrails:
 
 Scheduled via `routes/console.php` with `onOneServer()` guard:
 
-| Command                                    | Frequency     | Purpose                       |
-| ------------------------------------------ | ------------- | ----------------------------- |
-| `notifications:process-outbox --limit=100` | Every minute  | Process pending outbox events |
-| `sessions:update-statuses`                 | Every 30 min  | Update class session statuses |
-| `events:process-completions`               | Hourly        | Process event completions     |
-| `events:send-reminders`                    | Daily 00:10   | Send event reminders          |
-| `events:process-failed-gold-rewards`       | Daily 02:00   | Retry failed gold rewards     |
-| `academic-records:sync`                    | Daily 03:00   | Sync from Canvas              |
-| `attendance:sync-to-academic-records`      | Every 2 hours | Sync attendance               |
-| `academic-records:aggregate-manual`        | Daily 04:00   | Aggregate manual grades       |
+| Command                                          | Frequency     | Purpose                                                           |
+| ------------------------------------------------ | ------------- | ----------------------------------------------------------------- |
+| `notifications:process-outbox --limit=100`       | Every 5 min   | Process pending notification outbox events                        |
+| `finance:recover-cancellation-work --limit=100`  | Every minute  | Recover committed cancellation handoffs, operations, and outboxes |
+| `sessions:update-statuses`                       | Every 30 min  | Update class session statuses                                     |
+| `events:process-completions`                     | Hourly        | Process event completions                                         |
+| `events:send-reminders`                          | Daily 00:10   | Send event reminders                                              |
+| `events:process-failed-gold-rewards`             | Daily 02:00   | Retry failed gold rewards                                         |
+| `academic-records:sync`                          | Daily 03:00   | Sync from Canvas                                                  |
+| `attendance:sync-to-academic-records`            | Every 2 hours | Sync attendance                                                   |
+| `academic-records:aggregate-manual`              | Daily 04:00   | Aggregate manual grades                                           |
 
 ### Queue Worker Requirements
 
