@@ -6,8 +6,10 @@ namespace App\Modules\Finance\Dng\Models;
 
 use App\Models\Semester;
 use App\Models\Student;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\Payment;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -35,30 +37,42 @@ class DngPaymentRequest extends Model
      */
     public const STATUS_CANCEL_PUSHED_TO_DNG = 'cancel_pushed_to_dng';
 
+    public const STATUS_UNKNOWN_OUTCOME = 'unknown_outcome';
+
+    public const STATUS_NEEDS_REVIEW = 'needs_review';
+
     /**
      * Allowed forward transitions. Key = current status, value = allowed next statuses.
      */
     public const TRANSITIONS = [
-        self::STATUS_PENDING => [self::STATUS_PUSHED_TO_DNG, self::STATUS_FAILED, self::STATUS_CANCELLED],
+        self::STATUS_PENDING => [self::STATUS_PUSHED_TO_DNG, self::STATUS_FAILED, self::STATUS_CANCELLED, self::STATUS_UNKNOWN_OUTCOME, self::STATUS_NEEDS_REVIEW],
         self::STATUS_PUSHED_TO_DNG => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_FAILED, self::STATUS_CANCELLED, self::STATUS_CANCEL_PUSHED_TO_DNG],
         self::STATUS_PAID_UNINVOICED => [self::STATUS_PAID_INVOICED, self::STATUS_RECONCILED],
         self::STATUS_PAID_INVOICED => [self::STATUS_RECONCILED],
         self::STATUS_RECONCILED => [],
         self::STATUS_FAILED => [self::STATUS_PENDING],
+        self::STATUS_UNKNOWN_OUTCOME => [self::STATUS_NEEDS_REVIEW],
+        self::STATUS_NEEDS_REVIEW => [],
         self::STATUS_CANCELLED => [],
         self::STATUS_CANCEL_PUSHED_TO_DNG => [],
     ];
 
     protected $fillable = [
         'student_id',
+        'billing_account_id',
         'campus_code',
+        'provider_rail',
         'student_code',
         'fee_type',
         'description',
         'semester_id',
         'due_date',
         'item_id',
+        'active_slot_key',
         'amount',
+        'captured_settlement_version',
+        'target_fingerprint',
+        'reserved_at',
         'status',
         'dng_transaction_id',
         'dng_payment_id',
@@ -85,6 +99,7 @@ class DngPaymentRequest extends Model
             'due_date' => 'date',
             'invoice_date' => 'datetime',
             'paid_at' => 'datetime',
+            'reserved_at' => 'datetime',
             'push_payload' => 'array',
             'push_response' => 'array',
             'qr_payload' => 'array',
@@ -106,6 +121,11 @@ class DngPaymentRequest extends Model
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class);
+    }
+
+    public function billingAccount(): BelongsTo
+    {
+        return $this->belongsTo(BillingAccount::class);
     }
 
     public function semester(): BelongsTo
@@ -134,6 +154,11 @@ class DngPaymentRequest extends Model
     public function chargeLinks(): HasMany
     {
         return $this->hasMany(DngPaymentRequestCharge::class);
+    }
+
+    public function reservationTargets(): HasMany
+    {
+        return $this->hasMany(DngPaymentRequestReservationTarget::class);
     }
 
     // =====================
@@ -235,6 +260,17 @@ class DngPaymentRequest extends Model
         return $query->whereIn('status', [
             self::STATUS_PENDING,
             self::STATUS_PUSHED_TO_DNG,
+        ]);
+    }
+
+    /** @param Builder<self> $query */
+    public function scopeHoldingCollection(Builder $query): Builder
+    {
+        return $query->whereIn('status', [
+            self::STATUS_PENDING,
+            self::STATUS_PUSHED_TO_DNG,
+            self::STATUS_UNKNOWN_OUTCOME,
+            self::STATUS_NEEDS_REVIEW,
         ]);
     }
 }

@@ -173,6 +173,22 @@ class DngPaymentService
     }
 
     /**
+     * Send an already-persisted guarded reservation to DNG.
+     *
+     * Persistence/finalization deliberately belongs to the reservation action so
+     * this external call cannot accidentally run under its payer transaction.
+     *
+     * @param  array<string, mixed>  $chargeData
+     * @return array{Code: int, Type: string, Message: string, data: mixed}
+     */
+    public function pushReserved(array $chargeData): array
+    {
+        $payload = $this->dngClient->buildInsertNewRecordPayload($chargeData);
+
+        return $this->dngClient->insertNewRecord($chargeData, $payload);
+    }
+
+    /**
      * Create local DNG payment request records and push them as a batch to DNG.
      *
      * @param  array<int, array{
@@ -486,6 +502,7 @@ class DngPaymentService
                     $result = $this->paymentService->allocatePayment(
                         $payment->id,
                         [$link->finance_charge_id => (float) $link->amount],
+                        allowHeldTargets: true,
                     );
                     $allocations = $allocations->merge($result);
                 }
@@ -493,6 +510,7 @@ class DngPaymentService
                 $allocations = $this->paymentService->allocatePayment(
                     $payment->id,
                     [$request->finance_charge_id => (float) $request->amount],
+                    allowHeldTargets: true,
                 );
             } else {
                 $allocations = $this->paymentService->autoAllocatePayment($payment->id);

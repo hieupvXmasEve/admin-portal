@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions;
 
+use App\Modules\Finance\Dng\Models\DngPaymentRequestReservationTarget;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
@@ -133,6 +134,15 @@ class AutoAllocatePaymentsAction
                         // manual) from racing onto the same line and overpaying it.
                         $lockedLine = InvoiceLine::query()->lockForUpdate()->find($line->id);
                         if (! $lockedLine || $lockedLine->status !== 'active') {
+                            continue;
+                        }
+
+                        $isHeld = DngPaymentRequestReservationTarget::query()
+                            ->where('invoice_line_id', $lockedLine->id)
+                            ->whereHas('dngPaymentRequest', fn ($query) => $query->holdingCollection())
+                            ->lockForUpdate()
+                            ->exists();
+                        if ($isHeld) {
                             continue;
                         }
 

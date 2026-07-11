@@ -43,6 +43,7 @@ class CreateBatchDngFromChargesAction
         protected DngPaymentService $dngPaymentService,
         protected DngCampusCodeResolver $campusCodeResolver,
         protected CancelDngPaymentRequestAction $cancelDngAction,
+        protected ?ReserveAndPushSingleFeeDngAction $guardedReservationAction = null,
     ) {}
 
     /**
@@ -117,6 +118,20 @@ class CreateBatchDngFromChargesAction
         string $estimateTime,
         ?float $amountOverride,
     ): array {
+        if ($dngFeeType === 'HL') {
+            $student = Student::query()->findOrFail($studentId);
+            $this->assertNoMissingRetakeObligations($student, $semesterId);
+            $reservation = $this->guardedReservationAction ?? app(ReserveAndPushSingleFeeDngAction::class);
+            $reservation->handle($studentId, $dngFeeType, [
+                'description' => $description,
+                'semester_id' => $semesterId,
+                'due_date' => $dueDate,
+                'estimate_time' => $estimateTime,
+            ]);
+
+            return ['cancelled_old' => 0];
+        }
+
         $cancelledOld = 0;
 
         return DB::transaction(function () use (

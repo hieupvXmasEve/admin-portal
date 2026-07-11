@@ -272,9 +272,9 @@ it('creates proportional pivot amounts when charge amount is overridden', functi
     expect($pivots->sum('amount'))->toBe(8_000_000.0);
 });
 
-it('keeps pivot sum exactly equal to the request amount despite rounding (FIN-10)', function () {
-    // Three equal balances + an override that does not divide evenly forces a
-    // rounding remainder; the pivot sum must still equal the request amount.
+it('does not create an HL request from an arbitrary override outside canonical targets', function () {
+    // The guarded HL path no longer supports amount_override or the legacy
+    // charge-balance fallback. These unmaterialized rows must fail closed.
     $student = makeBatchStudent('ROUND01', $this->campus, $this->semester);
     makeCharge($student, $this->semester, FinanceCharge::TYPE_RETAKE_FEE, 1_000_000);
     makeCharge($student, $this->semester, FinanceCharge::TYPE_RETAKE_FEE, 1_000_000);
@@ -286,14 +286,11 @@ it('keeps pivot sum exactly equal to the request amount despite rounding (FIN-10
     // 10,000,000 / 3 = 3,333,333.33… → rounding must not drift the total.
     $payload['amount_overrides'] = [$student->id => 10_000_000.0];
 
-    $action->handle($payload);
+    $result = $action->handle($payload);
 
-    $dng = DngPaymentRequest::where('student_id', $student->id)->first();
-    $pivots = DngPaymentRequestCharge::where('dng_payment_request_id', $dng->id)->get();
-
-    expect($pivots)->toHaveCount(3)
-        ->and($pivots->sum('amount'))->toBe(10_000_000.0)
-        ->and((float) $dng->amount)->toBe(10_000_000.0);
+    expect($result['created'])->toBe(0)
+        ->and($result['failed'])->toBe(1)
+        ->and(DngPaymentRequest::query()->where('student_id', $student->id)->count())->toBe(0);
 });
 
 it('fails if DNG service throws, and records error', function () {
@@ -400,7 +397,7 @@ it('PTL fee_type: blocks approved exam resit attempt without finance obligation 
         ->and(DngPaymentRequest::where('student_id', $student->id)->count())->toBe(0);
 });
 
-it('HL fee_type: skips registration that already has a charge', function () {
+it('HL fee_type: fails closed when a legacy registration has no canonical payable line', function () {
     $student = makeBatchStudent('HL002', $this->campus, $this->semester);
 
     // Pre-existing charge (registration already transitioned)
@@ -433,8 +430,9 @@ it('HL fee_type: skips registration that already has a charge', function () {
 
     $result = $action->handle(batchPayload([$student->id], $this->semester, 'HL'));
 
-    // Should succeed (charge exists and has balance)
-    expect($result['created'])->toBe(1);
+    expect($result['created'])->toBe(0)
+        ->and($result['failed'])->toBe(1)
+        ->and($result['errors'][0])->toContain('Settlement Position');
 
     // Only 1 charge should exist (no duplicate created)
     expect(FinanceCharge::where('student_id', $student->id)->count())->toBe(1);

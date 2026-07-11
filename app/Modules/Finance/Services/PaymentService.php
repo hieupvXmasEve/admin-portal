@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Services;
 
 use App\Models\Student;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestReservationTarget;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
@@ -113,8 +114,12 @@ class PaymentService
      * @param  array  $allocations  Array of ['charge_id' => amount]
      * @return Collection<PaymentApplication>
      */
-    public function allocatePayment(int $paymentId, array $allocations, ?int $userId = null): Collection
-    {
+    public function allocatePayment(
+        int $paymentId,
+        array $allocations,
+        ?int $userId = null,
+        bool $allowHeldTargets = false,
+    ): Collection {
         $payment = Payment::findOrFail($paymentId);
         $createdAllocations = collect();
 
@@ -143,6 +148,14 @@ class PaymentService
                     ->first();
 
                 if (! $line) {
+                    continue;
+                }
+
+                if (! $allowHeldTargets && DngPaymentRequestReservationTarget::query()
+                    ->where('invoice_line_id', $line->id)
+                    ->whereHas('dngPaymentRequest', fn ($query) => $query->holdingCollection())
+                    ->lockForUpdate()
+                    ->exists()) {
                     continue;
                 }
 
@@ -209,11 +222,22 @@ class PaymentService
             $lines = $lines->reverse()->values();
         }
 
+        $heldLineIds = DngPaymentRequestReservationTarget::query()
+            ->whereIn('invoice_line_id', $lines->pluck('id'))
+            ->whereHas('dngPaymentRequest', fn ($query) => $query->holdingCollection())
+            ->pluck('invoice_line_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
         $allocations = [];
 
         foreach ($lines as $line) {
             if ($unappliedAmount <= 0) {
                 break;
+            }
+
+            if (in_array((int) $line->id, $heldLineIds, true)) {
+                continue;
             }
 
             $outstanding = $this->settlementService->getLineOutstandingAmount($line);
