@@ -197,12 +197,26 @@ class DngPaymentRequest extends Model
      */
     public function callbackMismatchReasons(array $payload): array
     {
-        $issues = [];
+        return [
+            ...$this->receiptAmountMismatchReasons($payload),
+            ...$this->receiptCorrelationMismatchReasons($payload),
+        ];
+    }
 
+    /** @param array<string, mixed> $payload @return array<int, string> */
+    public function receiptAmountMismatchReasons(array $payload): array
+    {
         $callbackAmount = (float) ($payload['Amount'] ?? 0);
-        if (abs($callbackAmount - (float) $this->amount) > 0.01) {
-            $issues[] = "Amount mismatch: local={$this->amount}, callback={$callbackAmount}";
-        }
+
+        return abs($callbackAmount - (float) $this->amount) > 0.01
+            ? ["Amount mismatch: local={$this->amount}, callback={$callbackAmount}"]
+            : [];
+    }
+
+    /** @param array<string, mixed> $payload @return array<int, string> */
+    public function receiptCorrelationMismatchReasons(array $payload): array
+    {
+        $issues = [];
 
         $callbackStudentCode = (string) ($payload['StudentId'] ?? '');
         if ($callbackStudentCode !== '' && $callbackStudentCode !== $this->student_code) {

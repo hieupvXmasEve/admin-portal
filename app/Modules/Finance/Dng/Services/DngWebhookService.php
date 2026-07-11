@@ -6,6 +6,7 @@ namespace App\Modules\Finance\Dng\Services;
 
 use App\Models\CourseRetakeRegistration;
 use App\Modules\Academic\Actions\AutoEnrollRetakeCourseAction;
+use App\Modules\Finance\Actions\CaptureDngProviderReceiptAction;
 use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
@@ -168,18 +169,24 @@ class DngWebhookService
 
         switch ($outcome['result']) {
             case 'cancelled':
-                $event->markSkipped('Request was superseded and cancelled before this callback arrived');
+                // Cancellation is terminal for collection state, not for provider cash.
+                // A verified late receipt remains attributable and must enter the
+                // canonical Payment ledger without reviving the request.
+                $this->captureProviderReceipt($request->fresh(), $payload, 'webhook', [
+                    'checksum' => 'valid',
+                ]);
+                $event->markSkipped('Captured verified receipt without reviving cancelled request');
 
                 return;
 
             case 'already_progressed':
-                $this->recoverPaidState($request->fresh());
+                $this->recoverPaidState($request->fresh(), $payload);
                 $event->markSkipped('Request already progressed beyond this event');
 
                 return;
 
             case 'equivalent':
-                $this->recoverPaidState($request->fresh());
+                $this->recoverPaidState($request->fresh(), $payload);
                 $event->markSkipped('Equivalent event already applied');
 
                 return;
@@ -198,9 +205,11 @@ class DngWebhookService
 
         // The Payment bridge is idempotent and always ensured (Call 2 arriving first
         // still needs the Payment created).
-        $this->ensurePaymentBridge($freshRequest);
+        $this->captureProviderReceipt($freshRequest, $payload, 'webhook', [
+            'checksum' => 'valid',
+        ]);
 
-        if ($outcome['first_settlement']) {
+        if ($outcome['first_settlement'] && $freshRequest->receiptAmountMismatchReasons($payload) === []) {
             // Mark linked installment as paid + dispatch next push (post-commit).
             // No-op if the DNG request has no linked installment (legacy / non-installment flow).
             $this->settleInstallmentAction->handle($freshRequest);
@@ -237,7 +246,7 @@ class DngWebhookService
         array $payload,
         DngWebhookEvent $event,
     ): bool {
-        $issues = $request->callbackMismatchReasons($payload);
+        $issues = $request->receiptCorrelationMismatchReasons($payload);
 
         if (! empty($issues)) {
             $reason = implode('; ', $issues);
@@ -309,6 +318,28 @@ class DngWebhookService
         }
     }
 
+    /** @param array<string, mixed> $payload @param array<string, mixed> $authenticity */
+    private function captureProviderReceipt(
+        DngPaymentRequest $request,
+        array $payload,
+        string $source,
+        array $authenticity,
+    ): void {
+        $amountIssues = $request->receiptAmountMismatchReasons($payload);
+
+        (new CaptureDngProviderReceiptAction($this->dngPaymentService))->handle($request, [
+            'amount' => $payload['Amount'] ?? $request->amount,
+            'payload' => $payload,
+            'source' => $source,
+            'authenticity' => $authenticity,
+            'payer_correlation' => ['status' => 'matched'],
+            'target_validation' => [
+                'status' => $amountIssues === [] ? 'matched' : 'amount_mismatch',
+                'issues' => $amountIssues,
+            ],
+        ]);
+    }
+
     /**
      * Recovery for a late/duplicate callback on an already-advanced request: ensure
      * BOTH the canonical Payment exists AND the linked installment is settled. A prior
@@ -317,10 +348,23 @@ class DngWebhookService
      * un-pushed forever. Both operations are idempotent (bridge guards on payment_id;
      * SettleInstallmentFromDngAction locks rows and skips already-paid installments).
      */
-    private function recoverPaidState(DngPaymentRequest $request): void
+    /** @param array<string, mixed>|null $payload */
+    private function recoverPaidState(DngPaymentRequest $request, ?array $payload = null): void
     {
-        $this->ensurePaymentBridge($request);
-        $this->settleInstallmentAction->handle($request);
+        if ($payload === null) {
+            $this->ensurePaymentBridge($request);
+            $this->settleInstallmentAction->handle($request);
+
+            return;
+        }
+
+        $this->captureProviderReceipt($request, $payload, 'webhook', [
+            'checksum' => 'valid',
+        ]);
+
+        if ($request->receiptAmountMismatchReasons($payload) === []) {
+            $this->settleInstallmentAction->handle($request);
+        }
     }
 
     /**

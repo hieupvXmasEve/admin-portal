@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Dng\Services;
 
+use App\Modules\Finance\Actions\CaptureDngProviderReceiptAction;
 use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use Illuminate\Support\Facades\DB;
@@ -123,12 +124,13 @@ class DngReconciliationService
             ]);
         }
 
-        $mismatchReasons = $request->callbackMismatchReasons([
+        $receiptPayload = [
             'Amount' => $txn['Amount'] ?? null,
             'StudentId' => $txn['StudentId'] ?? null,
             'CampusCode' => $campusCode,
             'ItemId' => $txn['ItemId'] ?? null,
-        ]);
+        ];
+        $mismatchReasons = $request->receiptCorrelationMismatchReasons($receiptPayload);
 
         if ($mismatchReasons !== []) {
             Log::warning('DNG reconciliation: payload mismatch', [
@@ -206,6 +208,7 @@ class DngReconciliationService
         });
 
         if ($outcome['result'] === 'cancelled') {
+            $this->captureProviderReceipt($request->fresh(), $txn);
             Log::info('DNG reconciliation: skipped cancelled request', [
                 'dng_payment_request_id' => $request->id,
                 'dng_payment_id' => $dngPaymentId,
@@ -242,10 +245,10 @@ class DngReconciliationService
                 DngPaymentRequest::STATUS_RECONCILED,
             ], true)) {
                 $fresh = $request->fresh();
-                if (! $fresh->hasBridgedPayment()) {
-                    $this->dngPaymentService->bridgeToPayment($fresh);
+                $this->captureProviderReceipt($fresh, $txn);
+                if ($fresh->receiptAmountMismatchReasons($txn) === []) {
+                    $this->settleInstallmentAction->handle($request->fresh());
                 }
-                $this->settleInstallmentAction->handle($request->fresh());
             }
 
             $summary['up_to_date']++;
@@ -257,11 +260,13 @@ class DngReconciliationService
         $fresh = $request->fresh();
 
         // Bridge to canonical Payment if not yet done
-        $this->dngPaymentService->bridgeToPayment($fresh);
+        $this->captureProviderReceipt($fresh, $txn);
 
         // Settle linked installment + dispatch next push (no-op if not installment-linked).
         // Idempotent: SettleInstallmentFromDngAction skips when installment is already paid.
-        $this->settleInstallmentAction->handle($request->fresh());
+        if ($fresh->receiptAmountMismatchReasons($txn) === []) {
+            $this->settleInstallmentAction->handle($request->fresh());
+        }
 
         $summary['backfilled']++;
 
@@ -290,5 +295,23 @@ class DngReconciliationService
             // FIN-18: cancel pushed to DNG is terminal (was missing → default 0).
             DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG => -2,
         ];
+    }
+
+    /** @param array<string, mixed> $transaction */
+    private function captureProviderReceipt(DngPaymentRequest $request, array $transaction): void
+    {
+        $amountIssues = $request->receiptAmountMismatchReasons($transaction);
+
+        (new CaptureDngProviderReceiptAction($this->dngPaymentService))->handle($request, [
+            'amount' => $transaction['Amount'] ?? $request->amount,
+            'payload' => $transaction,
+            'source' => 'daily_reconciliation',
+            'authenticity' => ['status' => 'provider_authenticated_query'],
+            'payer_correlation' => ['status' => 'matched'],
+            'target_validation' => [
+                'status' => $amountIssues === [] ? 'matched' : 'amount_mismatch',
+                'issues' => $amountIssues,
+            ],
+        ]);
     }
 }

@@ -53,7 +53,7 @@ function createReconciliationRequest(Student $student, string $dngPaymentId, flo
     ]);
 }
 
-it('skips reconciliation updates when the paid amount does not match local amount', function () {
+it('captures the provider receipt when the paid amount does not match local amount', function () {
     $request = createReconciliationRequest($this->student, 'PAY001', 5000000);
 
     $mockClient = Mockery::mock(DngClient::class);
@@ -69,22 +69,22 @@ it('skips reconciliation updates when the paid amount does not match local amoun
         ]);
 
     $mockPaymentService = Mockery::mock(DngPaymentService::class);
-    $mockPaymentService->shouldNotReceive('bridgeToPayment');
+    $mockPaymentService->shouldReceive('bridgeToPayment')->once();
 
     $service = new DngReconciliationService($mockClient, $mockPaymentService, app(SettleInstallmentFromDngAction::class));
 
     $summary = $service->reconcileDay('CAMPUS001', '2026-03-26 21:00:00');
 
     expect($summary)->toBe([
-        'backfilled' => 0,
+        'backfilled' => 1,
         'up_to_date' => 0,
         'orphans' => 0,
-        'errors' => 1,
+        'errors' => 0,
     ]);
 
     $request->refresh();
-    expect($request->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG)
-        ->and($request->paid_at)->toBeNull()
+    expect($request->status)->toBe(DngPaymentRequest::STATUS_PAID_UNINVOICED)
+        ->and($request->paid_at)->not->toBeNull()
         ->and($request->payment_id)->toBeNull();
 });
 
@@ -121,7 +121,7 @@ it('bridges paid requests during reconciliation when status is already up to dat
     ]);
 });
 
-it('skips bridging cancelled requests during reconciliation', function () {
+it('captures a receipt for cancelled requests without reviving reconciliation state', function () {
     $request = createReconciliationRequest($this->student, 'PAY001', 5000000);
     $request->update(['status' => DngPaymentRequest::STATUS_CANCELLED]);
 
@@ -138,7 +138,7 @@ it('skips bridging cancelled requests during reconciliation', function () {
         ]);
 
     $mockPaymentService = Mockery::mock(DngPaymentService::class);
-    $mockPaymentService->shouldNotReceive('bridgeToPayment');
+    $mockPaymentService->shouldReceive('bridgeToPayment')->once();
 
     $service = new DngReconciliationService($mockClient, $mockPaymentService, app(SettleInstallmentFromDngAction::class));
 
@@ -229,16 +229,16 @@ it('does not bind dng_payment_id to a fallback-matched request that fails the mi
         ]);
 
     $mockPaymentService = Mockery::mock(DngPaymentService::class);
-    $mockPaymentService->shouldNotReceive('bridgeToPayment');
+    $mockPaymentService->shouldReceive('bridgeToPayment')->once();
 
     $service = new DngReconciliationService($mockClient, $mockPaymentService, app(SettleInstallmentFromDngAction::class));
 
     $summary = $service->reconcileDay('CAMPUS001', '2026-03-26 21:25:00');
 
-    expect($summary['errors'])->toBe(1);
-    // Request must not be poisoned with the mismatched DNG row's PaymentId.
-    expect($request->fresh()->dng_payment_id)->toBeNull()
-        ->and($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+    expect($summary['errors'])->toBe(0);
+    // Exact ItemId correlation remains safe; the actual receipt is captured.
+    expect($request->fresh()->dng_payment_id)->toBe('PAY-RECON')
+        ->and($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_PAID_UNINVOICED);
 });
 
 it('does not bridge or settle a failed request during reconciliation (P1 cannot_transition)', function () {
@@ -307,10 +307,10 @@ it('does not downgrade a paid_invoiced request during reconciliation (race guard
     expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_PAID_INVOICED);
 });
 
-it('skips bridging cancel_pushed_to_dng requests during reconciliation (FIN-18)', function () {
+it('captures receipts for cancel_pushed_to_dng requests without reviving reconciliation state (FIN-18)', function () {
     // FIN-18: cancel_pushed_to_dng is terminal but was missing from statusOrder()
-    // (fell through to default 0), so a late reconciliation hit could revive/bridge
-    // a cancelled-at-DNG request. It must be skipped exactly like STATUS_CANCELLED.
+    // (fell through to default 0), so a late reconciliation hit could revive a
+    // cancelled-at-DNG request. Cash is captured, but the terminal state remains.
     $request = createReconciliationRequest($this->student, 'PAY001', 5000000);
     $request->update(['status' => DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG]);
 
@@ -327,7 +327,7 @@ it('skips bridging cancel_pushed_to_dng requests during reconciliation (FIN-18)'
         ]);
 
     $mockPaymentService = Mockery::mock(DngPaymentService::class);
-    $mockPaymentService->shouldNotReceive('bridgeToPayment');
+    $mockPaymentService->shouldReceive('bridgeToPayment')->once();
 
     $service = new DngReconciliationService($mockClient, $mockPaymentService, app(SettleInstallmentFromDngAction::class));
 

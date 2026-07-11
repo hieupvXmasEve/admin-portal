@@ -1,0 +1,46 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Finance\Actions;
+
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Services\DngPaymentService;
+use App\Modules\Finance\Models\Payment;
+
+/**
+ * Captures attributable provider cash once, separately from target allocation.
+ *
+ * The command is deliberately shared by webhook and reconciliation paths. Its
+ * caller supplies validation evidence; this command records the actual provider
+ * receipt and delegates capped allocation to the canonical DNG bridge.
+ */
+class CaptureDngProviderReceiptAction
+{
+    public function __construct(private readonly DngPaymentService $dngPaymentService) {}
+
+    /**
+     * @param  array{request: DngPaymentRequest, receipt: array{amount: numeric-string|float|int, payload: array<string, mixed>, source: string, authenticity: array<string, mixed>, payer_correlation: array<string, mixed>, target_validation: array<string, mixed>}}  $data
+     */
+    public static function run(array $data): ?Payment
+    {
+        return app(self::class)->handle($data['request'], $data['receipt']);
+    }
+
+    /**
+     * @param  array{amount: numeric-string|float|int, payload: array<string, mixed>, source: string, authenticity: array<string, mixed>, payer_correlation: array<string, mixed>, target_validation: array<string, mixed>}  $receipt
+     */
+    public function handle(DngPaymentRequest $request, array $receipt): ?Payment
+    {
+        $payment = $this->dngPaymentService->bridgeToPayment($request, $receipt);
+
+        if (($receipt['target_validation']['status'] ?? 'matched') !== 'matched') {
+            $request->fresh()?->update([
+                'error_message' => 'Provider receipt captured; target allocation requires review: '
+                    .implode('; ', $receipt['target_validation']['issues'] ?? []),
+            ]);
+        }
+
+        return $payment;
+    }
+}

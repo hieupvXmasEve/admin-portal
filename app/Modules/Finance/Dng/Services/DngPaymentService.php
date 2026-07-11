@@ -463,41 +463,63 @@ class DngPaymentService
      *
      * Guard: skip if payment_id already set (idempotent).
      */
-    public function bridgeToPayment(DngPaymentRequest $request): ?Payment
+    /**
+     * @param  array{amount?: numeric-string|float|int, payload?: array<string, mixed>, source?: string, authenticity?: array<string, mixed>, payer_correlation?: array<string, mixed>, target_validation?: array<string, mixed>}|null  $receipt
+     */
+    public function bridgeToPayment(DngPaymentRequest $request, ?array $receipt = null): ?Payment
     {
         if ($request->hasBridgedPayment()) {
             return $request->payment;
         }
 
-        return DB::transaction(function () use ($request) {
+        $payment = DB::transaction(function () use ($request, $receipt) {
             // Lock row to prevent concurrent bridge (webhook + reconciliation race)
             $request = DngPaymentRequest::lockForUpdate()->find($request->id);
             if ($request->hasBridgedPayment()) {
                 return $request->payment;
             }
 
+            $receiptAmount = $receipt['amount'] ?? $request->amount;
+            $providerReceipt = $receipt['payload'] ?? $request->last_callback_payload;
+            $providerPaymentId = is_array($providerReceipt)
+                ? $providerReceipt['PaymentId'] ?? null
+                : null;
+
             $payment = $this->paymentService->recordPayment([
                 'student_id' => $request->student_id,
-                'amount' => $request->amount,
+                'amount' => $receiptAmount,
                 'method' => Payment::METHOD_GATEWAY,
                 'source' => 'dng',
-                'external_ref' => $request->dng_payment_id,
+                'external_ref' => $providerPaymentId ?? $request->dng_payment_id,
                 'paid_at' => $request->paid_at ?? now(),
                 'status' => Payment::STATUS_COMPLETED,
-                'raw_payload' => $request->last_callback_payload,
+                'raw_payload' => [
+                    'dng_payment_request_id' => $request->id,
+                    'provider_receipt' => $providerReceipt,
+                    'receipt_source' => $receipt['source'] ?? 'legacy_bridge',
+                    'authenticity' => $receipt['authenticity'] ?? null,
+                    'payer_correlation' => $receipt['payer_correlation'] ?? null,
+                    'target_validation' => $receipt['target_validation'] ?? null,
+                ],
                 'received_by_user_id' => null,
             ]);
 
             $request->update(['payment_id' => $payment->id]);
 
-            // Allocation strategy (in priority order):
-            // 1. Pivot chargeLinks → multi-charge aggregate request; allocate per-charge amount exactly
-            // 2. finance_charge_id (single-charge legacy) → allocate full amount to that one charge
-            // 3. No link → oldest-first auto-allocate (tuition and other non-linked fee types)
+            return $payment;
+        });
+
+        $request = $request->fresh();
+        $allocations = collect();
+
+        try {
+            // Capture is committed before allocation. Allocation may legitimately
+            // find target drift; then the verified provider cash remains as Còn dư.
+            // PaymentService locks and caps every revalidated target by its current
+            // outstanding amount, so stale reservation amounts cannot over-apply.
             $chargeLinks = $request->chargeLinks()->with('financeCharge')->get();
 
             if ($chargeLinks->isNotEmpty()) {
-                $allocations = collect();
                 foreach ($chargeLinks as $link) {
                     $result = $this->paymentService->allocatePayment(
                         $payment->id,
@@ -510,21 +532,29 @@ class DngPaymentService
                 $allocations = $this->paymentService->allocatePayment(
                     $payment->id,
                     [$request->finance_charge_id => (float) $request->amount],
-                    allowHeldTargets: true,
                 );
             } else {
                 $allocations = $this->paymentService->autoAllocatePayment($payment->id);
             }
-
-            $this->publishAllocationNotification($request, $payment, $allocations);
-
-            Log::info('DNG payment bridged to canonical Payment', [
+        } catch (\Throwable $e) {
+            $request->update([
+                'error_message' => 'Provider receipt captured; target allocation requires review: '.$e->getMessage(),
+            ]);
+            Log::warning('DNG receipt captured but allocation requires review', [
                 'dng_payment_request_id' => $request->id,
                 'payment_id' => $payment->id,
-                'amount' => $request->amount,
+                'error' => $e->getMessage(),
             ]);
+        }
 
-            return $payment;
-        });
+        $this->publishAllocationNotification($request, $payment, $allocations);
+
+        Log::info('DNG payment bridged to canonical Payment', [
+            'dng_payment_request_id' => $request->id,
+            'payment_id' => $payment->id,
+            'amount' => $payment->amount,
+        ]);
+
+        return $payment;
     }
 }

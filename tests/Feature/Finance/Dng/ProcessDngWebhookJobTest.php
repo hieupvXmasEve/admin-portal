@@ -247,14 +247,14 @@ it('does not let a stale Call 1 downgrade a request already advanced by Call 2 (
         ->and($event1->error_message)->toContain('already progressed');
 });
 
-it('skips callback processing for cancelled requests', function () {
+it('captures verified callback cash for cancelled requests without reviving state', function () {
     $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY001', 5000000);
     $dngPaymentRequest->update(['status' => DngPaymentRequest::STATUS_CANCELLED]);
 
     $event = createWebhookEvent($dngPaymentRequest, DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE);
 
     $mockPaymentService = Mockery::mock(DngPaymentService::class);
-    $mockPaymentService->shouldNotReceive('bridgeToPayment');
+    $mockPaymentService->shouldReceive('bridgeToPayment')->once();
 
     app()->instance(DngPaymentService::class, $mockPaymentService);
 
@@ -270,7 +270,7 @@ it('skips callback processing for cancelled requests', function () {
         ->and($event->error_message)->toContain('cancelled');
 });
 
-it('marks event as mismatch when amount differs', function () {
+it('captures the actual provider receipt when amount differs', function () {
     $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY001', 5000000);
 
     // Create event with mismatched amount
@@ -284,13 +284,12 @@ it('marks event as mismatch when amount differs', function () {
     $job->handle(app(DngWebhookService::class));
 
     $event->refresh();
-    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_MISMATCH);
-    expect($event->error_message)->toContain('Amount mismatch');
-    expect($event->error_category)->toBe(DngWebhookEvent::ERROR_CATEGORY_MISMATCH);
+    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_PROCESSED);
 
-    // Payment request status should not change
+    // Receipt is recorded while target validation evidence preserves the drift.
     $dngPaymentRequest->refresh();
-    expect($dngPaymentRequest->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+    expect($dngPaymentRequest->status)->toBe(DngPaymentRequest::STATUS_PAID_UNINVOICED)
+        ->and($dngPaymentRequest->payment_id)->not->toBeNull();
 });
 
 it('marks event as mismatch when no matching payment request exists', function () {
@@ -659,10 +658,10 @@ it('does not bind dng_payment_id when the callback fails business validation (P1
     $event->refresh();
     $request->refresh();
 
-    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_MISMATCH)
-        ->and($event->error_message)->toContain('Amount mismatch');
-    // The request must NOT have been poisoned with the mismatched callback's PaymentId.
-    expect($request->dng_payment_id)->toBeNull();
+    expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_PROCESSED);
+    // Exact ItemId correlation binds the provider identity even when amount drifted.
+    expect($request->dng_payment_id)->toBe('PAY-NEW')
+        ->and($request->payment_id)->not->toBeNull();
 });
 
 it('does not bind fallback payment id before checksum passes', function () {
@@ -981,17 +980,17 @@ it('marks event as mismatch when campus differs even if checksum passes (FIN-32)
     expect($dngPaymentRequest->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
 });
 
-it('skips late callback for a cancel_pushed_to_dng request (FIN-18)', function () {
+it('captures late callback cash for a cancel_pushed_to_dng request without reviving state (FIN-18)', function () {
     // FIN-18: cancel_pushed_to_dng is terminal. A late settlement callback must be
-    // skipped, not processed — previously this status fell through statusOrder()'s
-    // default and could be advanced/bridged.
+    // captured without processing — previously this status fell through
+    // statusOrder()'s default and could be advanced.
     $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY001', 5000000);
     $dngPaymentRequest->update(['status' => DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG]);
 
     $event = createWebhookEvent($dngPaymentRequest, DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE);
 
     $mockPaymentService = Mockery::mock(DngPaymentService::class);
-    $mockPaymentService->shouldNotReceive('bridgeToPayment');
+    $mockPaymentService->shouldReceive('bridgeToPayment')->once();
     app()->instance(DngPaymentService::class, $mockPaymentService);
 
     $job = new ProcessDngWebhookJob($event->id);
