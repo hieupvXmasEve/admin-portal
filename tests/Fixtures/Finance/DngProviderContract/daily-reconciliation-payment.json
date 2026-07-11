@@ -1,0 +1,28 @@
+{
+  "sanitized": true,
+  "provider_evidence_status": "local_schema_only",
+  "scenario": "daily paid-transaction reconciliation result",
+  "request": {
+    "CampusCode": "CAMPUS-DEMO",
+    "Date": "2026-07-01",
+    "ClientCode": "DEMO_CLIENT",
+    "CheckSum": "SANITIZED_SIGNATURE"
+  },
+  "response": {
+    "Code": 200,
+    "Type": "Success",
+    "Message": "Accepted",
+    "data": [
+      {
+        "StudentId": "STUDENT-DEMO-001",
+        "CampusCode": "CAMPUS-DEMO",
+        "ItemId": "swinx-reservation-demo-001",
+        "FeeType": "HP",
+        "Amount": 1500000,
+        "PaymentId": "DNG-PAY-DEMO-001",
+        "TransactionId": "DNG-TXN-DEMO-001",
+        "PSPCode": "DEMO_PSP"
+      }
+    ]
+  }
+}

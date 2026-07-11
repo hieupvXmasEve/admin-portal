@@ -1,0 +1,32 @@
+{
+  "sanitized": true,
+  "provider_evidence_status": "confirmation_required",
+  "scenario": "student asks DNG for access to all selected fee types",
+  "request": {
+    "StudentCode": "STUDENT-DEMO-001",
+    "CampusCode": "CAMPUS-DEMO",
+    "FeeTypes": ["HP", "HL"],
+    "CheckSum": "SANITIZED_SIGNATURE"
+  },
+  "local_request_map": [
+    {
+      "fee_type": "HP",
+      "item_id": "swinx-reservation-demo-001",
+      "amount_vnd": 1500000
+    },
+    {
+      "fee_type": "HL",
+      "item_id": "swinx-reservation-demo-002",
+      "amount_vnd": 750000
+    }
+  ],
+  "response": {
+    "Code": 200,
+    "Type": "Success",
+    "Message": "Accepted",
+    "data": {
+      "PaymentUrl": "https://payments.example.test/dng/demo"
+    }
+  },
+  "required_verification": "This response has no transaction-to-ItemId mapping. Do not infer a split from FeeTypes or amount; obtain provider evidence before enabling a combined pay-all flow."
+}

@@ -1,0 +1,21 @@
+{
+  "sanitized": true,
+  "provider_evidence_status": "confirmation_required",
+  "scenario": "retry an ambiguous push for the same logical reservation",
+  "first_request": {
+    "StudentId": "STUDENT-DEMO-001",
+    "CampusCode": "CAMPUS-DEMO",
+    "Type": "HP",
+    "Amount": 1500000,
+    "ItemId": "swinx-reservation-demo-001"
+  },
+  "retry_request": {
+    "StudentId": "STUDENT-DEMO-001",
+    "CampusCode": "CAMPUS-DEMO",
+    "Type": "HP",
+    "Amount": 1500000,
+    "ItemId": "swinx-reservation-demo-001"
+  },
+  "required_local_outcome": "Reuse the same ItemId and reservation. Do not create another debt record until the first item has a provider-confirmed terminal outcome.",
+  "required_provider_evidence": "DNG response to the identical retry, including ItemId scope and whether it returns the original record or an idempotency result."
+}

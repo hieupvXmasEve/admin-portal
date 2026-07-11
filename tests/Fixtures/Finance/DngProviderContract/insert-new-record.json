@@ -1,0 +1,29 @@
+{
+  "sanitized": true,
+  "provider_evidence_status": "local_schema_only",
+  "scenario": "create a single DNG debt record",
+  "request": {
+    "ApiCode": "DEMO_API",
+    "StudentId": "STUDENT-DEMO-001",
+    "CampusCode": "CAMPUS-DEMO",
+    "Type": "HP",
+    "Amount": 1500000,
+    "ItemId": "swinx-reservation-demo-001",
+    "Login": "DEMO_LOGIN",
+    "CheckSum": "SANITIZED_SIGNATURE",
+    "StudentName": "Demo Student",
+    "Email": "student@example.test",
+    "EstimateTime": "2026-07-01T09:00:00+07:00",
+    "StudentAddress": "Demo address",
+    "CCCD": ""
+  },
+  "response": {
+    "Code": 200,
+    "Type": "Success",
+    "Message": "Accepted",
+    "data": {
+      "TransactionID": "DNG-TXN-DEMO-001",
+      "PaymentId": "DNG-PAY-DEMO-001"
+    }
+  }
+}

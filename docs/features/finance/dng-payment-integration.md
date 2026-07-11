@@ -1,6 +1,6 @@
 # DNG Payment Gateway Integration
 
-Last updated: 2026-06-14
+Last updated: 2026-07-11
 Status: Implementation complete. Webhook security/idempotency hardening delivered in
 S-005 — FIN-16 (checksum on every event incl. Call 1), FIN-17/DB-04 (payload_hash
 dedup + unique restored), FIN-18 (cancel_pushed_to_dng terminal ordering), FIN-15
@@ -12,6 +12,11 @@ Owner: Finance Module
 See also: `finance-module-review-2026-06-13.md` (findings FIN-15..19, FIN-32/33)
 and `docs/stories/E-finance-module-review-2026-06/S-005-dng-security-and-idempotency`.
 
+> This is a legacy-integration snapshot. For the provider guarantees required by
+> new Settlement Position collection work, use
+> [DNG Provider Contract Evidence](dng-provider-contract.md). Do not treat this
+> document's current adapter behavior as a provider SLA.
+
 ## Overview
 
 DNG is a Vietnamese payment gateway provider. Swinx integrates with DNG to:
@@ -22,10 +27,12 @@ DNG is a Vietnamese payment gateway provider. Swinx integrates with DNG to:
 4. Audit all DNG API interactions and webhook events
 5. Allow staff to cancel unpaid DNG requests from the admin audit page
 
-## Webhook Callback Protocol (provider source of truth)
+## Webhook Callback Protocol (observed legacy integration)
 
-> Authoritative description of how DNG calls back after a payment. This is the
-> reference for webhook checksum verification and settle-once idempotency.
+> This records the callback shape exercised by the legacy adapter and is the
+> reference for its checksum verification and settle-once idempotency. It does
+> not establish an external DNG SLA; see
+> [DNG Provider Contract Evidence](dng-provider-contract.md) for release gates.
 > Hardening of this flow is tracked in S-005 and findings FIN-15..19/32/33.
 
 ### Two-call settlement
@@ -49,15 +56,15 @@ not) collapse Call 1 and Call 2.
 
 ```json
 {
-  "StudentId": "FSC0664",
-  "StudentName": "Trương Ngọc Hân",
-  "PaymentId": "12345678",
-  "PSPCode": "BIDV",
+  "StudentId": "STUDENT-DEMO-001",
+  "StudentName": "Demo Student",
+  "PaymentId": "DNG-PAY-DEMO-001",
+  "PSPCode": "DEMO_PSP",
   "FeeType": "HP",
   "Amount": 10000.0,
-  "CampusCode": "FAN1HCM",
-  "ItemId": "HP0ISH4BdH0S",
-  "InvoiceSerialNumber": "1/001;K23TAA-00004142",
+  "CampusCode": "CAMPUS-DEMO",
+  "ItemId": "swinx-reservation-demo-001",
+  "InvoiceSerialNumber": "1/001;DEMO",
   "InvoiceDate": "2023-03-20T03:08:02",
   "CheckSum": "9kzQqcnhSboOl1qACVQR4dTYTqs%3d"
 }
@@ -236,8 +243,8 @@ Webhook receiver for DNG payment confirmations.
 Route: `POST /api/webhooks/dng/payment` (`routes/api.php`, name `api.webhooks.dng.payment`)
 Middleware: `throttle:60,1` only (public, no auth — checksum-validated in the pipeline)
 
-Expected payload and the two-call protocol are documented authoritatively in
-[Webhook Callback Protocol](#webhook-callback-protocol-provider-source-of-truth)
+Expected payload and the two-call protocol are documented in
+[Webhook Callback Protocol](#webhook-callback-protocol-observed-legacy-integration)
 above (real fields: `StudentId`, `PaymentId`, `FeeType`, `Amount`, `CampusCode`,
 `ItemId`, `InvoiceSerialNumber`, `InvoiceDate`, `CheckSum`). The earlier
 `Code/Type/student_code` example was a placeholder and did not match the live
@@ -321,7 +328,7 @@ Process:
    correlation key), falling back to `dng_payment_id`/`dng_transaction_id`.
 2. Validate checksum (HMAC-SHA1) using the incoming callback string, with the empty
    `InvoiceSerialNumber` segment on Call 1 — see
-   [Webhook Callback Protocol](#webhook-callback-protocol-provider-source-of-truth).
+   [Webhook Callback Protocol](#webhook-callback-protocol-observed-legacy-integration).
 3. Cross-validate amount/student/fee/campus/item; bind `dng_payment_id` only after
    validation passes, inside the locked transition.
 4. Transition status under a row lock (forward only): Call 1 → `paid_uninvoiced`,
@@ -361,7 +368,7 @@ Methods:
   `hash_equals`)
 
 The outgoing and incoming checksum strings are different — see
-[Webhook Callback Protocol](#webhook-callback-protocol-provider-source-of-truth).
+[Webhook Callback Protocol](#webhook-callback-protocol-observed-legacy-integration).
 
 Key: `DNG_HASH_KEY` env var.
 

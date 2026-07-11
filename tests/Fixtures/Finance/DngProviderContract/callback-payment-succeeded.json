@@ -1,0 +1,16 @@
+{
+  "sanitized": true,
+  "provider_evidence_status": "local_schema_only",
+  "scenario": "DNG payment-success callback before invoice issuance",
+  "payload": {
+    "StudentId": "STUDENT-DEMO-001",
+    "CampusCode": "CAMPUS-DEMO",
+    "ItemId": "swinx-reservation-demo-001",
+    "FeeType": "HP",
+    "Amount": 1500000,
+    "PaymentId": "DNG-PAY-DEMO-001",
+    "TransactionId": "DNG-TXN-DEMO-001",
+    "PSPCode": "DEMO_PSP",
+    "CheckSum": "SANITIZED_SIGNATURE"
+  }
+}

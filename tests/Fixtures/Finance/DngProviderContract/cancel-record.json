@@ -1,0 +1,20 @@
+{
+  "sanitized": true,
+  "provider_evidence_status": "confirmation_required",
+  "scenario": "submit the legacy cancellation-shaped request for a prior reservation",
+  "request": {
+    "StudentId": "STUDENT-DEMO-001",
+    "CampusCode": "CAMPUS-DEMO",
+    "Type": "HP",
+    "Amount": -1,
+    "ItemId": "swinx-reservation-demo-001",
+    "CheckSum": "SANITIZED_SIGNATURE"
+  },
+  "response": {
+    "Code": 200,
+    "Type": "Success",
+    "Message": "Accepted",
+    "data": null
+  },
+  "required_verification": "A 200 response is not terminal evidence. Verify the exact ItemId with a documented provider lookup or a retained staff-to-DNG confirmation before releasing the collection hold."
+}

@@ -27,7 +27,7 @@ Content-Type: application/json
 | Method       | `POST`                                                                |
 | Content-Type | `application/json`                                                    |
 | Auth         | Không yêu cầu token                                                   |
-| Xác thực     | Qua trường `CheckSum` ở callback lần 2 (khi có `InvoiceSerialNumber`) |
+| Xác thực     | Qua trường `CheckSum` ở cả hai callback; lần 1 dùng `InvoiceSerialNumber` rỗng |
 | Rate limit   | 60 request/phút                                                       |
 
 ---
@@ -56,7 +56,7 @@ Content-Type: application/json
 
 > **Lưu ý:** Khi `InvoiceSerialNumber` VÀ `InvoiceDate` đều có giá trị → hệ thống xác nhận đã xuất hóa đơn.
 
-> **Lưu ý:** Callback lần 1 thường **không có** `InvoiceSerialNumber`, nên hệ thống không enforce checksum ở lần này. Business validation vẫn kiểm tra `StudentId`, `FeeType`, `Amount`.
+> **Lưu ý:** Callback lần 1 thường **không có** `InvoiceSerialNumber`; hệ thống xác minh checksum với segment `InvoiceSerialNumber` rỗng. Business validation vẫn kiểm tra `StudentId`, `FeeType`, `Amount`.
 
 ### 3.3. Nguồn dữ liệu cho CheckSum
 
@@ -66,23 +66,23 @@ Khi tạo invoice trên DNG (gọi `InsertNewRecord`), bên tích hợp gửi:
 
 ```json
 {
-    "ApiCode": "HC_SWB",
-    "StudentId": "AUH121620",
-    "CampusCode": "FAUHN",
+    "ApiCode": "DEMO_API",
+    "StudentId": "STUDENT-DEMO-001",
+    "CampusCode": "CAMPUS-DEMO",
     "Type": "HP",
     "Amount": 10000,
-    "ItemId": "AUH121620_1774517167168",
-    "Login": "HC_SWB",
+    "ItemId": "swinx-reservation-demo-001",
+    "Login": "DEMO_LOGIN",
     "CheckSum": "...",
-    "StudentName": "PHẠM TIẾN ĐỒNG",
-    "Email": "phamdongdongpham12@gmail.com",
+    "StudentName": "Demo Student",
+    "Email": "student@example.test",
     "EstimateTime": "05/26",
-    "StudentAddress": "XÓM 10 THÔN VÂN ĐÌNH, VÂN ĐÌNH, ỨNG HÒA, HÀ NỘI",
-    "CCCD": "001206079828"
+    "StudentAddress": "Demo address",
+    "CCCD": ""
 }
 ```
 
-DNG lưu lại các trường: `StudentId` → `AUH121620`, `CampusCode` → `FAUHN`, `Type` (FeeType) → `HP`, `Amount` → `10000`, `ItemId` → `AUH121620_1774517167168`. **Hệ thống dùng dữ liệu push gốc này để verify callback**, không dùng `PaymentId` / `TransactionId` callback làm nguồn checksum.
+DNG lưu lại các trường: `StudentId` → `STUDENT-DEMO-001`, `CampusCode` → `CAMPUS-DEMO`, `Type` (FeeType) → `HP`, `Amount` → `10000`, `ItemId` → `swinx-reservation-demo-001`. **Hệ thống dùng dữ liệu push gốc này để verify callback**, không dùng `PaymentId` / `TransactionId` callback làm nguồn checksum.
 
 ### 3.4. Ví dụ payload callback
 
@@ -90,11 +90,11 @@ DNG lưu lại các trường: `StudentId` → `AUH121620`, `CampusCode` → `FA
 
 ```json
 {
-    "StudentId": "AUH121620",
-    "PaymentId": "AUH121620_1774517167168",
+    "StudentId": "STUDENT-DEMO-001",
+    "PaymentId": "DNG-PAY-DEMO-001",
     "Amount": 10000,
-    "CampusCode": "FAUHN",
-    "ItemId": "AUH121620_1774517167168",
+    "CampusCode": "CAMPUS-DEMO",
+    "ItemId": "swinx-reservation-demo-001",
     "FeeType": "HP",
     "CheckSum": "hAQwb/sc5rqnueDydS5C4vrQax4%3d"
 }
@@ -104,11 +104,11 @@ DNG lưu lại các trường: `StudentId` → `AUH121620`, `CampusCode` → `FA
 
 ```json
 {
-    "StudentId": "AUH121620",
-    "PaymentId": "AUH121620_1774517167168",
+    "StudentId": "STUDENT-DEMO-001",
+    "PaymentId": "DNG-PAY-DEMO-001",
     "Amount": 10000,
-    "CampusCode": "FAUHN",
-    "ItemId": "AUH121620_1774517167168",
+    "CampusCode": "CAMPUS-DEMO",
+    "ItemId": "swinx-reservation-demo-001",
     "FeeType": "HP",
     "CheckSum": "...",
     "InvoiceSerialNumber": "1/001;K23TF",
@@ -136,23 +136,23 @@ DNG lưu lại các trường: `StudentId` → `AUH121620`, `CampusCode` → `FA
     | `ClientCode`          | Được cung cấp riêng                                            | `"HC_ASIA"`              |
     | `Amount`              | `Amount` từ request `InsertNewRecord` gốc (`push_payload`)     | `"10000"` / `"10000.00"` |
     | `InvoiceSerialNumber` | Từ webhook payload (rỗng nếu chưa có hóa đơn)                  | `""` / `"1/001;K23TF"`   |
-    | `StudentId`           | `StudentId` từ request `InsertNewRecord` gốc (`push_payload`)  | `"AUH121620"`            |
+    | `StudentId`           | `StudentId` từ request `InsertNewRecord` gốc (`push_payload`)  | `"STUDENT-DEMO-001"`     |
     | `FeeType`             | `Type` từ request `InsertNewRecord` gốc (`push_payload`)       | `"HP"`                   |
     | `CampusCode`          | `CampusCode` từ request `InsertNewRecord` gốc (`push_payload`) | `"FAUHN"`                |
 
     Ví dụ (lần 1, chưa có hóa đơn):
 
     ```
-    "<AccessCode>HC_ASIA10000.00AUH121620HPFAUHN"
+    "<AccessCode>DEMO_CLIENT10000.00STUDENT-DEMO-001HPCAMPUS-DEMO"
     ```
 
     Ví dụ (lần 2, có hóa đơn):
 
     ```
-    "<AccessCode>HC_ASIA10000.001/001;K23TFAUH121620HPFAUHN"
+    "<AccessCode>DEMO_CLIENT10000.001/001;K23TFSTUDENT-DEMO-001HPCAMPUS-DEMO"
     ```
 
-    > **Lưu ý:** `Amount`, `StudentId`, `FeeType`, `CampusCode` được lấy từ payload gốc đã push sang DNG. `InvoiceSerialNumber` chỉ lấy từ callback lần 2. Callback lần 1 không có `InvoiceSerialNumber` nên checksum được bỏ qua để tránh false negative từ bên thứ 3.
+    > **Lưu ý:** `Amount`, `StudentId`, `FeeType`, `CampusCode` được lấy từ payload gốc đã push sang DNG. `InvoiceSerialNumber` lấy từ callback; khi callback lần 1 không có trường này, checksum dùng segment rỗng.
 
 2. **Tạo HMAC-SHA1** với secret key (được cung cấp riêng):
 
@@ -238,19 +238,19 @@ Secret key sẽ được cung cấp riêng qua kênh bảo mật. **Không chia 
 
 > Hệ thống hiện áp dụng mô hình **inbox-first**: callback tới đâu lưu raw payload tới đó vào `dng_webhook_events`, sau đó queue mới kiểm tra checksum, dedup nghiệp vụ, mismatch, và side effect.
 
-### 5.3. Checksum không hợp lệ (chỉ áp dụng callback có invoice)
+### 5.3. Checksum không hợp lệ
 
 Checksum không còn bị reject ngay tại HTTP layer. Callback vẫn được lưu vào inbox, sau đó worker async sẽ gán `processing_status = mismatch` và `error_category = checksum` nếu verify thất bại.
 
-- Callback lần 1 (không có `InvoiceSerialNumber`) → bỏ qua checksum
-- Callback lần 2 (có `InvoiceSerialNumber`) → enforce checksum
+- Callback lần 1 (không có `InvoiceSerialNumber`) → verify checksum với segment rỗng
+- Callback lần 2 (có `InvoiceSerialNumber`) → verify checksum với invoice serial
 
 ### 5.4. Payload thiếu trường / không map được request
 
 Callback vẫn được lưu trước để phục vụ forensic/debug. Sau đó worker sẽ phân loại:
 
 - `failed_terminal` nếu payload không đủ để resolve nghiệp vụ
-- `mismatch` nếu checksum (callback lần 2) hoặc business fields `StudentId`, `FeeType`, `Amount` không khớp
+- `mismatch` nếu checksum hoặc business fields `StudentId`, `FeeType`, `Amount` không khớp
 - `failed_retryable` nếu lỗi xử lý tạm thời
 
 ---
@@ -261,7 +261,7 @@ Callback vẫn được lưu trước để phục vụ forensic/debug. Sau đó
 | -------------------- | ----------- | ----------------------------------- |
 | Thành công           | 200         | Không cần retry                     |
 | Callback đã nhận     | 200         | Không cần retry HTTP layer          |
-| Checksum sai (lần 2) | 200         | Kiểm tra dữ liệu checksum async     |
+| Checksum sai         | 200         | Kiểm tra dữ liệu checksum async     |
 | Thiếu trường         | 200         | Kiểm tra bản ghi inbox và log xử lý |
 | Server error         | 500         | Retry sau 10s, tối đa 5 lần         |
 | Timeout (>30s)       | -           | Retry sau 30s, tối đa 5 lần         |
@@ -288,7 +288,7 @@ DNG                          Hệ thống SwinX
   │ <──────────────────────────────│
   │                                │── Queue xử lý async
   │                                │── Resolve local payment request (ưu tiên `ItemId + StudentId`)
-  │                                │── Bỏ qua Verify CheckSum
+  │                                │── Verify CheckSum với invoice serial rỗng
   │                                │── Verify `StudentId`, `FeeType`, `Amount`
   │                                │── Cập nhật trạng thái: paid_uninvoiced
  │                                │

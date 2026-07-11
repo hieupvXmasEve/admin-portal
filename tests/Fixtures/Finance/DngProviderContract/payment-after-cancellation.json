@@ -1,0 +1,28 @@
+{
+  "sanitized": true,
+  "provider_evidence_status": "confirmation_required",
+  "scenario": "a payment callback arrives after a cancellation-shaped request",
+  "cancellation": {
+    "request": {
+      "StudentId": "STUDENT-DEMO-001",
+      "CampusCode": "CAMPUS-DEMO",
+      "Type": "HP",
+      "Amount": -1,
+      "ItemId": "swinx-reservation-demo-001"
+    },
+    "provider_terminal_outcome": "unknown"
+  },
+  "paid_callback": {
+    "payload": {
+      "StudentId": "STUDENT-DEMO-001",
+      "CampusCode": "CAMPUS-DEMO",
+      "ItemId": "swinx-reservation-demo-001",
+      "FeeType": "HP",
+      "Amount": 1500000,
+      "PaymentId": "DNG-PAY-DEMO-001",
+      "TransactionId": "DNG-TXN-DEMO-001"
+    }
+  },
+  "required_local_outcome": "Capture attributable cash exactly once, retain the collection hold, then allocate safely or create a surplus/unmatched-receipt exception. Never discard the receipt because cancellation was requested.",
+  "required_provider_evidence": "DNG confirmation of whether payment can complete after the cancellation-shaped request and the terminal status reported for this ItemId."
+}
