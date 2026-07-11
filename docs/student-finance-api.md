@@ -579,7 +579,7 @@ POST /dng-requests/{id}/qr
 POST /dng-requests/{id}/installment
 ```
 
-Dùng khi student muốn thanh toán riêng 1 khoản (flow 7a). BE vẫn tự động gộp tất cả `fee_types` đang pending của student vào 1 link DNG.
+Dùng khi student muốn thanh toán riêng 1 khoản (flow 7a). BE chỉ gửi đúng `fee_type` của request đã chọn; không tự động mở rộng sang các fee type khác.
 
 **Response:**
 
@@ -605,7 +605,7 @@ POST /dng/qr
 POST /dng/installment
 ```
 
-Dùng khi student muốn thanh toán tất cả 1 lúc (flow 7b). Không cần request body — BE tự lấy tất cả `pushed_to_dng` requests và gộp `fee_types`.
+Dùng khi student muốn thanh toán tất cả 1 lúc (flow 7b). BE chọn toàn bộ active fee types cùng Billing Account. Flow chỉ được mở khi provider trả mapping exact từ transaction về từng local request/`ItemId`; nếu chưa có mapping, API fail closed với mã `DNG_PAYMENT_ACCESS_UNAVAILABLE` và portal hiển thị trạng thái trung lập.
 
 **Response:**
 
