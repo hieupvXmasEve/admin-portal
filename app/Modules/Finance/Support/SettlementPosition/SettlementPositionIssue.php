@@ -10,6 +10,8 @@ final readonly class SettlementPositionIssue
 
     public const MISSING_FINANCE_OBLIGATION = 'settlement_position.missing_finance_obligation';
 
+    public const MISSING_BILLING_ACCOUNT = 'settlement_position.missing_billing_account';
+
     public const PAYABLE_LINE_NOT_ACTIVE = 'settlement_position.payable_line_not_active';
 
     public const PAYABLE_LINE_NOT_COLLECTIBLE = 'settlement_position.payable_line_not_collectible';
@@ -39,6 +41,14 @@ final readonly class SettlementPositionIssue
     public const CREDIT_EXCEEDS_REMAINING = 'settlement_position.credit_exceeds_remaining';
 
     public const NEGATIVE_RAW_REMAINING = 'settlement_position.negative_raw_remaining';
+
+    public const MISMATCHED_BILLING_ACCOUNT = 'settlement_position.mismatched_billing_account';
+
+    public const AS_OF_NOT_EFFECTIVE = 'settlement_position.as_of_not_effective';
+
+    public const AS_OF_UNTIMESTAMPED_DISCOUNT_EVIDENCE = 'settlement_position.as_of_untimestamped_discount_evidence';
+
+    public const AS_OF_UNRELIABLE_PAYMENT_STATUS = 'settlement_position.as_of_unreliable_payment_status';
 
     /**
      * @param  array<string, int|string>  $evidence

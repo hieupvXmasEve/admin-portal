@@ -46,7 +46,7 @@ final readonly class Money
 
         $negative = str_starts_with($value, '-');
         $unsigned = $negative ? substr($value, 1) : $value;
-        [$whole, $fraction = ''] = array_pad(explode('.', $unsigned, 2), 2, '');
+        [$whole, $fraction] = array_pad(explode('.', $unsigned, 2), 2, '');
 
         if (strlen($fraction) > $scale) {
             throw new InvalidArgumentException('Money amount exceeds its supported scale.');

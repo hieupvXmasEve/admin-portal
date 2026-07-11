@@ -267,6 +267,8 @@ it('preserves raw over-discount and over-credit evidence as blocking issues', fu
         ->and($discountPosition->raw_evidence->remaining->amount)->toBe('-200000.00')
         ->and($discountPosition->hasIssue(SettlementPositionIssue::DISCOUNT_EXCEEDS_GROSS))->toBeTrue();
 
+    $discountInvoice->update(['status' => 'paid']);
+
     [, $creditLine, $creditInvoice] = createPayableSettlementLine('2000000.00');
     applyPositionCredit($creditLine, '2200000.00');
 
