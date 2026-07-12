@@ -15,6 +15,7 @@ use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Support\Reporting\CurrentSettlementPositionPresenter;
+use App\Modules\Finance\Support\Reporting\SettlementReportAsOfContext;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -101,4 +102,85 @@ it('exports current invoice rows from one canonical position instead of paid cac
         ->and($row[9])->toBe('partially_settled')
         ->and($row[11])->toBe('')
         ->and($row[12])->toContain('payable_line_id');
+});
+
+it('exports historical invoice rows with the requested as-of contract', function (): void {
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->create();
+    $student = Student::factory()->forCampus($campus)->create([
+        'intake' => 1,
+        'intake_mode' => 'sequential',
+        'intake_semester_id' => $semester->id,
+    ]);
+    $account = BillingAccount::query()->firstOrCreate(['student_id' => $student->id]);
+    $asOf = '2026-07-01T12:00:00+07:00';
+    $effectiveAt = '2026-06-30 12:00:00';
+    $invoice = StudentInvoice::query()->create([
+        'invoice_number' => 'INV-EXPORT-HISTORICAL',
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'status' => 'pending',
+        'due_date' => '2026-06-01',
+    ]);
+    $obligation = FinanceObligation::query()->create([
+        'billing_account_id' => $account->id,
+        'source_system' => 'test',
+        'source_kind' => 'historical-report-export',
+        'source_ref' => 'historical-export:'.uniqid('', true),
+        'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => '1000000.00',
+        'currency' => 'VND',
+        'pricing_rule_version' => 'historical-report-export',
+        'pricing_snapshot' => [],
+        'accepted_at' => $effectiveAt,
+    ]);
+    $charge = FinanceCharge::query()->create([
+        'finance_obligation_id' => $obligation->id,
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => '1000000.00',
+        'description' => 'Historical export charge',
+        'effective_at' => $effectiveAt,
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    $line = InvoiceLine::query()->create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $charge->id,
+        'amount_snapshot' => '1000000.00',
+        'description_snapshot' => 'Historical export line',
+        'status' => 'active',
+    ]);
+    $payment = Payment::query()->create([
+        'student_id' => $student->id,
+        'amount' => '250000.00',
+        'method' => Payment::METHOD_CASH,
+        'status' => Payment::STATUS_COMPLETED,
+        'paid_at' => '2026-07-02 12:00:00',
+    ]);
+    PaymentApplication::query()->create([
+        'payment_id' => $payment->id,
+        'invoice_line_id' => $line->id,
+        'amount' => '250000.00',
+        'entry_type' => 'application',
+        'applied_at' => '2026-07-02 12:00:00',
+    ]);
+
+    $export = new InvoiceExport(
+        ['semester_id' => $semester->id],
+        app(SettlementPositionReader::class),
+        app(CurrentSettlementPositionPresenter::class),
+        SettlementReportAsOfContext::fromInput($asOf, 'Asia/Ho_Chi_Minh'),
+    );
+    $invoice->load(['student', 'semester']);
+    $export->prepareRows([$invoice]);
+    $row = $export->map($invoice);
+
+    expect($row[6])->toBe('0.00')
+        ->and($row[8])->toBe('1000000.00')
+        ->and($row[14])->toBe('as_of')
+        ->and($row[15])->toContain('2026-07-01T12:00:00')
+        ->and($row[16])->toBe('Asia/Ho_Chi_Minh')
+        ->and($row[17])->toContain('finance_charges.effective_at');
 });

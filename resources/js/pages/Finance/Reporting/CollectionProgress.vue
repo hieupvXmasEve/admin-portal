@@ -5,13 +5,14 @@ import LookupRowActions from '@/components/finance/lookup/LookupRowActions.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useDataTable } from '@/composables/useDataTable';
 import type { PaginatedResponse } from '@/types';
 import { formatCurrency, getChargeTypeLabel } from '@/types/finance';
 import { financeRoutes } from '@/utils/routes';
-import { Clock, Wallet } from 'lucide-vue-next';
+import { Clock, Download, Wallet } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 type BalanceState = 'unpaid' | 'partially_paid' | 'paid' | 'overdue' | 'overpaid' | 'unapplied' | 'invalid';
@@ -99,6 +100,7 @@ interface CollectionProgressFilters {
     search: string;
     per_page: number;
     page: number;
+    as_of: string;
 }
 
 interface CollectionProgressPayload {
@@ -124,11 +126,29 @@ interface CollectionProgressPayload {
         student_statuses: FilterOption[];
         semester_id: number | null;
     };
-    meta: { semester_id: number | null };
+    meta: {
+        semester_id: number | null;
+        position_mode?: 'current' | 'as_of';
+        as_of_timestamp?: string | null;
+        as_of_timezone?: string;
+        business_effective_timestamp_rules?: string[];
+        legacy_evidence_policy?: string;
+        restatement_workflow?: string;
+        unapplied_cash_policy?: string | null;
+    };
     computed_at: string;
 }
 
 const props = defineProps<{ collection_progress: CollectionProgressPayload }>();
+
+const reportView = props.collection_progress.meta.position_mode === 'as_of' ? 'historical-as-of' : 'collection-progress';
+const isHistorical = reportView === 'historical-as-of';
+const asOfTimestamp = props.collection_progress.meta.as_of_timestamp ?? '';
+const historicalExportUrl = financeRoutes.invoices.export({
+    semester_id: props.collection_progress.meta.semester_id ?? undefined,
+    as_of: asOfTimestamp,
+    as_of_timezone: props.collection_progress.meta.as_of_timezone,
+});
 
 const filterProps = props.collection_progress.filters ?? {};
 const stringFilter = (value: unknown, fallback = 'all'): string => (typeof value === 'string' && value !== '' ? value : fallback);
@@ -149,9 +169,9 @@ const {
     setFilter,
     clearAllFilters,
 } = useDataTable<CollectionProgressFilters & { view: string }>({
-    baseUrl: financeRoutes.reporting.index({ view: 'collection-progress' }),
+    baseUrl: financeRoutes.reporting.index({ view: reportView }),
     initialFilters: {
-        view: 'collection-progress',
+        view: reportView,
         program_id: filterProps.program_id ?? 'all',
         intake_semester_id: filterProps.intake_semester_id ?? 'all',
         cohort: filterProps.cohort ?? 'all',
@@ -162,9 +182,10 @@ const {
         search: stringFilter(filterProps.search, ''),
         per_page: numberFilter(filterProps.per_page),
         page: numberFilter(filterProps.page, 1),
+        as_of: asOfTimestamp,
     },
     defaultValues: {
-        view: 'collection-progress',
+        view: reportView,
         program_id: 'all',
         intake_semester_id: 'all',
         cohort: 'all',
@@ -175,6 +196,7 @@ const {
         search: '',
         per_page: 20,
         page: 1,
+        as_of: asOfTimestamp,
     },
     only: ['collection_progress', 'computed_at', 'active_view'],
     immediateFields: ['program_id', 'intake_semester_id', 'cohort', 'fee_type', 'balance_state', 'aging_bucket', 'student_status'],
@@ -239,6 +261,31 @@ const lookupInvoiceUrl = (row: CollectionProgressRow): string | undefined => {
 
 <template>
     <div class="space-y-4">
+        <Card v-if="isHistorical" class="border-primary/30 bg-primary/5">
+            <CardHeader class="gap-2 space-y-0">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <CardTitle class="text-base">Historical / As-of snapshot</CardTitle>
+                        <CardDescription>
+                            Số liệu được chốt tại {{ asOfTimestamp ? new Date(asOfTimestamp).toLocaleString() : 'mốc đã chọn' }} ({{ collection_progress.meta.as_of_timezone }}). Sự kiện phát sinh sau mốc này không viết lại snapshot.
+                        </CardDescription>
+                    </div>
+                    <a :href="historicalExportUrl" target="_blank" rel="noreferrer">
+                        <Button variant="outline" size="sm"><Download class="mr-2 size-4" /> Export snapshot</Button>
+                    </a>
+                </div>
+                <details v-if="collection_progress.meta.business_effective_timestamp_rules" class="text-muted-foreground text-xs">
+                    <summary class="cursor-pointer font-medium">Business-effective timestamp rules</summary>
+                    <ul class="mt-2 list-disc space-y-1 pl-5">
+                        <li v-for="rule in collection_progress.meta.business_effective_timestamp_rules" :key="rule">{{ rule }}</li>
+                    </ul>
+                </details>
+                <p v-if="collection_progress.meta.unapplied_cash_policy" class="text-muted-foreground text-xs">
+                    {{ collection_progress.meta.unapplied_cash_policy }}
+                </p>
+            </CardHeader>
+        </Card>
+
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
             <Card v-for="card in summaryCards" :key="card.key">
                 <CardHeader class="pb-2">
@@ -309,6 +356,7 @@ const lookupInvoiceUrl = (row: CollectionProgressRow): string | undefined => {
             </CardHeader>
             <CardContent class="space-y-4">
                 <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <Input v-if="isHistorical" v-model="tableFilters.as_of" aria-label="As-of timestamp" placeholder="2026-07-01T12:00:00" @change="setFilter('as_of', tableFilters.as_of)" />
                     <DebouncedInput :model-value="tableFilters.search" placeholder="Tìm mã SV / tên..." @update:model-value="handleSearch" />
                     <Select :model-value="String(tableFilters.program_id)" @update:model-value="(value) => setFilter('program_id', value)">
                         <SelectTrigger><SelectValue placeholder="Chương trình" /></SelectTrigger>

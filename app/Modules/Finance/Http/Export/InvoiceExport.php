@@ -6,6 +6,7 @@ namespace App\Modules\Finance\Http\Export;
 
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Support\Reporting\CurrentSettlementPositionPresenter;
+use App\Modules\Finance\Support\Reporting\SettlementReportAsOfContext;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionScope;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
@@ -23,6 +24,7 @@ final class InvoiceExport implements FromQuery, WithHeadings, WithMapping
         private readonly array $filters,
         private readonly SettlementPositionReader $settlementPositionReader,
         private readonly CurrentSettlementPositionPresenter $positionPresenter,
+        private readonly ?SettlementReportAsOfContext $reportContext = null,
     ) {}
 
     public function query(): Builder
@@ -46,7 +48,10 @@ final class InvoiceExport implements FromQuery, WithHeadings, WithMapping
 
         if ($rows->isNotEmpty()) {
             $positions = $this->settlementPositionReader->batch(
-                $rows->map(fn (StudentInvoice $invoice): SettlementPositionScope => SettlementPositionScope::invoice((int) $invoice->id))->all(),
+                $rows->map(fn (StudentInvoice $invoice): SettlementPositionScope => SettlementPositionScope::invoice(
+                    (int) $invoice->id,
+                    $this->reportContext?->asOf(),
+                ))->all(),
             );
 
             foreach ($rows->values() as $index => $invoice) {
@@ -84,6 +89,10 @@ final class InvoiceExport implements FromQuery, WithHeadings, WithMapping
             'Issue Codes',
             'Payable Line Breakdown',
             'Due Date',
+            'Position Mode',
+            'As Of Timestamp',
+            'As Of Timezone',
+            'Business-Effective Timestamp Rules',
         ];
     }
 
@@ -94,6 +103,7 @@ final class InvoiceExport implements FromQuery, WithHeadings, WithMapping
         $valid = $position?->isValid() && $amounts !== null;
 
         $presented = $position === null ? null : $this->positionPresenter->present($position);
+        $context = $this->reportContext;
 
         return [
             $invoice->invoice_number,
@@ -113,6 +123,10 @@ final class InvoiceExport implements FromQuery, WithHeadings, WithMapping
             )),
             $presented === null ? '[]' : json_encode($presented['payable_line_breakdown'], JSON_THROW_ON_ERROR),
             $invoice->due_date?->format('Y-m-d'),
+            $context?->mode ?? SettlementReportAsOfContext::MODE_CURRENT,
+            $context?->asOf()?->toIso8601String(),
+            $context?->timezone ?? (string) config('app.timezone', 'UTC'),
+            $context === null ? 'Current committed ledger at captured settlement version.' : implode(' ', $context->payload()['business_effective_timestamp_rules']),
         ];
     }
 
@@ -128,7 +142,8 @@ final class InvoiceExport implements FromQuery, WithHeadings, WithMapping
         if ($amounts->remaining->minor_amount <= 1) {
             return 'paid';
         }
-        if ($invoice->due_date?->isPast()) {
+        $reportAt = $this->reportContext?->asOf() ?? now();
+        if ($invoice->due_date !== null && $invoice->due_date->lessThan($reportAt)) {
             return 'overdue';
         }
 

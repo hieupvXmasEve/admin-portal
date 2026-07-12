@@ -9,11 +9,11 @@ import DngLifecycle from '@/pages/Finance/Reporting/DngLifecycle.vue';
 import FeeMonitor from '@/pages/Finance/Reporting/FeeMonitor.vue';
 import { financeRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
-import { AlertCircle, BarChart3, Clock, Link2, ReceiptText } from 'lucide-vue-next';
+import { AlertCircle, BarChart3, Clock, History, Link2, ReceiptText } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface ReportingView {
-    key: 'fee-monitor' | 'collection-progress' | 'dng-lifecycle';
+    key: 'fee-monitor' | 'collection-progress' | 'historical-as-of' | 'dng-lifecycle';
     label: string;
     description: string;
     status: 'planned' | 'implemented';
@@ -35,6 +35,7 @@ const { selectedLabel } = useFinanceSemester();
 const icons = {
     'fee-monitor': ReceiptText,
     'collection-progress': BarChart3,
+    'historical-as-of': History,
     'dng-lifecycle': Link2,
 };
 
@@ -43,6 +44,7 @@ const activeView = computed(() => props.views.find((view) => view.key === props.
 const viewPropMap: Record<string, string> = {
     'fee-monitor': 'fee_monitor',
     'collection-progress': 'collection_progress',
+    'historical-as-of': 'collection_progress',
     'dng-lifecycle': 'dng_lifecycle',
 };
 
@@ -95,7 +97,7 @@ defineOptions({
         </div>
 
         <Tabs :model-value="props.active_view" @update:model-value="updateView">
-            <TabsList class="grid w-full grid-cols-1 sm:grid-cols-3">
+            <TabsList class="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                 <TabsTrigger v-for="view in props.views" :key="view.key" :value="view.key">
                     <component :is="icons[view.key]" class="size-4" />
                     {{ view.label }}
@@ -105,7 +107,7 @@ defineOptions({
             <TabsContent v-for="view in props.views" :key="view.key" :value="view.key" class="mt-4">
                 <FeeMonitor v-if="view.key === 'fee-monitor' && props.fee_monitor" :fee_monitor="props.fee_monitor as any" />
 
-                <CollectionProgress v-else-if="view.key === 'collection-progress' && props.collection_progress" :collection_progress="props.collection_progress as any" />
+                <CollectionProgress v-else-if="(view.key === 'collection-progress' || view.key === 'historical-as-of') && props.collection_progress" :collection_progress="props.collection_progress as any" />
 
                 <DngLifecycle v-else-if="view.key === 'dng-lifecycle' && props.dng_lifecycle" :dng_lifecycle="props.dng_lifecycle as any" />
 

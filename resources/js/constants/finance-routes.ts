@@ -4,6 +4,7 @@ export const FINANCE_ROUTE_NAMES = {
     CHARGES_INDEX: 'finance.charges.index',
     CHARGES_SHOW: 'finance.charges.show',
     INVOICES_INDEX: 'finance.invoices.index',
+    INVOICES_EXPORT: 'finance.invoices.export',
     INVOICES_SHOW: 'finance.invoices.show',
     // Pricing Operations (obligation v2 wave 1)
     PRICING_OPERATIONS_INDEX: 'finance.pricing-operations.index',

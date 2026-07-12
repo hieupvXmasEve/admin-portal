@@ -19,6 +19,7 @@ use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionRawEvidence;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionScope;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -44,9 +45,9 @@ final class ListCollectionProgressQuery
      * @param  array<string, mixed>  $filters
      * @return array{rows: LengthAwarePaginator, summary: array<string, mixed>, breakdowns: array<string, mixed>}
      */
-    public function handle(int $semesterId, array $filters = []): array
+    public function handle(int $semesterId, array $filters = [], ?CarbonImmutable $asOf = null): array
     {
-        $rows = $this->collectRows($semesterId, $filters);
+        $rows = $this->collectRows($semesterId, $filters, $asOf);
         $perPage = in_array((int) ($filters['per_page'] ?? 20), [20, 50, 100], true)
             ? (int) $filters['per_page']
             : 20;
@@ -69,15 +70,17 @@ final class ListCollectionProgressQuery
      * @param  array<string, mixed>  $filters
      * @return Collection<int, array<string, mixed>>
      */
-    public function collectRows(int $semesterId, array $filters = []): Collection
+    public function collectRows(int $semesterId, array $filters = [], ?CarbonImmutable $asOf = null): Collection
     {
         $campusId = app()->bound('campus') ? (int) app('campus')->id : null;
-        $invoices = $this->loadInvoices($semesterId, $campusId, $filters);
+        $invoices = $this->loadInvoices($semesterId, $campusId, $filters, $asOf);
         $byStudent = $invoices->groupBy('student_id');
-        $unappliedByStudent = $this->unappliedByStudent($byStudent->keys()->map(fn (mixed $id): int => (int) $id)->all());
-        $positionsByInvoice = $this->positionsForInvoices($invoices, $filters);
+        $unappliedByStudent = $asOf === null
+            ? $this->unappliedByStudent($byStudent->keys()->map(fn (mixed $id): int => (int) $id)->all())
+            : [];
+        $positionsByInvoice = $this->positionsForInvoices($invoices, $filters, $asOf);
 
-        $rows = $byStudent->map(function (Collection $studentInvoices, mixed $studentId) use ($semesterId, $unappliedByStudent, $positionsByInvoice): ?array {
+        $rows = $byStudent->map(function (Collection $studentInvoices, mixed $studentId) use ($semesterId, $unappliedByStudent, $positionsByInvoice, $asOf): ?array {
             $student = $studentInvoices->first()?->student;
             if (! $student instanceof Student) {
                 return null;
@@ -93,6 +96,7 @@ final class ListCollectionProgressQuery
                 $positions,
                 $semesterId,
                 (float) ($unappliedByStudent[(int) $studentId] ?? 0.0),
+                $asOf,
             );
         })->filter()->values();
 
@@ -103,12 +107,16 @@ final class ListCollectionProgressQuery
      * @param  array<string, mixed>  $filters
      * @return Collection<int, StudentInvoice>
      */
-    private function loadInvoices(int $semesterId, ?int $campusId, array $filters): Collection
-    {
+    private function loadInvoices(
+        int $semesterId,
+        ?int $campusId,
+        array $filters,
+        ?CarbonImmutable $asOf = null,
+    ): Collection {
         return StudentInvoice::query()
             ->with(['student.program', 'invoiceLines.charge'])
             ->where('semester_id', $semesterId)
-            ->whereNotIn('status', self::NON_BILLABLE_INVOICE_STATUSES)
+            ->when($asOf === null, fn (Builder $query) => $query->whereNotIn('status', self::NON_BILLABLE_INVOICE_STATUSES))
             ->when($campusId !== null, fn (Builder $query) => $query->whereHas(
                 'student',
                 fn (Builder $studentQuery) => $studentQuery->where('campus_id', $campusId),
@@ -133,7 +141,7 @@ final class ListCollectionProgressQuery
      * @param  array<string, mixed>  $filters
      * @return array<int, SettlementPosition>
      */
-    private function positionsForInvoices(Collection $invoices, array $filters): array
+    private function positionsForInvoices(Collection $invoices, array $filters, ?CarbonImmutable $asOf = null): array
     {
         $feeType = (string) ($filters['fee_type'] ?? 'all');
         $scopes = [];
@@ -147,12 +155,12 @@ final class ListCollectionProgressQuery
                     ->values()
                     ->all();
 
-                $scopes[] = SettlementPositionScope::payableLines($lineIds);
+                $scopes[] = SettlementPositionScope::payableLines($lineIds, $asOf);
 
                 continue;
             }
 
-            $scopes[] = SettlementPositionScope::invoice((int) $invoice->id);
+            $scopes[] = SettlementPositionScope::invoice((int) $invoice->id, $asOf);
         }
 
         if ($scopes === []) {
@@ -181,6 +189,7 @@ final class ListCollectionProgressQuery
         array $positions,
         int $semesterId,
         float $unapplied,
+        ?CarbonImmutable $asOf = null,
     ): array {
         $raw = $this->zeroMoneySet();
         $amounts = $this->zeroMoneySet();
@@ -224,8 +233,9 @@ final class ListCollectionProgressQuery
                 $focusInvoiceId = (int) $invoice->id;
             }
 
-            if ($invoice->due_date !== null && $invoice->due_date->isPast() && $remaining > Catalog::TOLERANCE) {
-                $maxDaysOverdue = max($maxDaysOverdue, (int) floor($invoice->due_date->diffInDays(now())));
+            $reportAt = $asOf ?? CarbonImmutable::now();
+            if ($invoice->due_date !== null && $invoice->due_date->lessThan($reportAt) && $remaining > Catalog::TOLERANCE) {
+                $maxDaysOverdue = max($maxDaysOverdue, (int) floor($invoice->due_date->diffInDays($reportAt)));
             }
 
             foreach ($position->payable_line_breakdown as $linePosition) {

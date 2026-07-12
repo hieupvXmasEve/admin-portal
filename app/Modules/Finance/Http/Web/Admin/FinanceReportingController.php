@@ -14,6 +14,7 @@ use App\Modules\Finance\Queries\Reporting\ListDngLifecycleQuery;
 use App\Modules\Finance\Queries\Reporting\ListFeeMonitorQuery;
 use App\Modules\Finance\Support\FinanceSemesterContextResolver;
 use App\Modules\Finance\Support\Reporting\FeeMonitorAcadRetGate;
+use App\Modules\Finance\Support\Reporting\SettlementReportAsOfContext;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -45,6 +46,13 @@ class FinanceReportingController extends Controller
             'status' => 'implemented',
             'obeys_semester' => false,
         ],
+        [
+            'key' => 'historical-as-of',
+            'label' => 'Historical / As-of',
+            'description' => 'Collection, aging, and close evidence at an explicit business-effective timestamp.',
+            'status' => 'implemented',
+            'obeys_semester' => true,
+        ],
     ];
 
     public function index(
@@ -69,6 +77,10 @@ class FinanceReportingController extends Controller
 
         if ($activeView === 'collection-progress') {
             $payload = array_merge($payload, $this->collectionProgressPayload($computedAt));
+        }
+
+        if ($activeView === 'historical-as-of') {
+            $payload = array_merge($payload, $this->historicalAsOfPayload($computedAt));
         }
 
         if ($activeView === 'dng-lifecycle') {
@@ -138,6 +150,31 @@ class FinanceReportingController extends Controller
      */
     private function collectionProgressPayload(string $computedAt): array
     {
+        return $this->collectionProgressPayloadAt($computedAt, null);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function historicalAsOfPayload(string $computedAt): array
+    {
+        $request = app(ListCollectionProgressRequest::class);
+        $validated = $request->validated();
+        $context = SettlementReportAsOfContext::fromInput(
+            isset($validated['as_of']) && $validated['as_of'] !== null
+                ? (string) $validated['as_of']
+                : now((string) ($validated['as_of_timezone'] ?? config('app.timezone', 'UTC')))->toIso8601String(),
+            isset($validated['as_of_timezone']) ? (string) $validated['as_of_timezone'] : null,
+        );
+
+        return $this->collectionProgressPayloadAt($computedAt, $context);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function collectionProgressPayloadAt(string $computedAt, ?SettlementReportAsOfContext $context): array
+    {
         $request = app(ListCollectionProgressRequest::class);
         $listQuery = app(ListCollectionProgressQuery::class);
 
@@ -157,7 +194,7 @@ class FinanceReportingController extends Controller
         $semesterId = $this->resolveSemesterId();
 
         $result = $semesterId
-            ? $listQuery->handle($semesterId, $filters)
+            ? $listQuery->handle($semesterId, $filters, $context?->asOf())
             : [
                 'rows' => new LengthAwarePaginator([], 0, 20, 1, ['path' => request()->url(), 'query' => request()->query()]),
                 'summary' => $this->emptyCollectionSummary(),
@@ -173,6 +210,32 @@ class FinanceReportingController extends Controller
                 'filter_options' => $semesterId ? $listQuery->filterOptions($semesterId) : $this->emptyCollectionFilterOptions(),
                 'meta' => [
                     'semester_id' => $semesterId,
+                    ...($context?->payload() ?? [
+                        'position_mode' => SettlementReportAsOfContext::MODE_CURRENT,
+                        'as_of_timestamp' => null,
+                        'as_of_timezone' => (string) config('app.timezone', 'UTC'),
+                        'unapplied_cash_policy' => null,
+                    ]),
+                    'consumer_inventory' => [
+                        [
+                            'consumer' => 'Collection Progress and aging',
+                            'source' => 'ListCollectionProgressQuery',
+                            'position_mode' => $context === null ? SettlementReportAsOfContext::MODE_CURRENT : SettlementReportAsOfContext::MODE_AS_OF,
+                            'status' => 'implemented',
+                        ],
+                        [
+                            'consumer' => 'Invoice Excel export',
+                            'source' => 'InvoiceExport',
+                            'position_mode' => 'current_or_as_of',
+                            'status' => 'implemented',
+                        ],
+                        [
+                            'consumer' => 'Period-close restatement',
+                            'source' => 'explicit workflow boundary',
+                            'position_mode' => 'signed_ledger_timeline',
+                            'status' => 'no_implicit_restatement',
+                        ],
+                    ],
                 ],
                 'computed_at' => $computedAt,
             ],

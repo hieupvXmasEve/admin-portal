@@ -527,6 +527,9 @@ export const financeRoutes = {
         invoices: () => route(FINANCE_ROUTE_NAMES.INVOICES_INDEX),
         invoiceDetail: (invoiceId: number) => route(FINANCE_ROUTE_NAMES.INVOICES_SHOW, { invoice: invoiceId }),
     },
+    invoices: {
+        export: (params?: Record<string, unknown>) => route(FINANCE_ROUTE_NAMES.INVOICES_EXPORT, params ?? {}),
+    },
     students: {
         overview: (studentId: number, focus?: string) => route(FINANCE_ROUTE_NAMES.STUDENT_OVERVIEW, focus ? { student: studentId, focus } : { student: studentId }),
     },

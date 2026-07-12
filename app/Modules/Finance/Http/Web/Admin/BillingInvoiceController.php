@@ -7,6 +7,7 @@ namespace App\Modules\Finance\Http\Web\Admin;
 use App\Http\Controllers\Controller;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use App\Modules\Finance\Http\Export\InvoiceExport;
+use App\Modules\Finance\Http\Requests\Lookup\ExportStudentInvoicesRequest;
 use App\Modules\Finance\Http\Requests\Lookup\FilterStudentInvoicesRequest;
 use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\InvoiceLine;
@@ -16,6 +17,7 @@ use App\Modules\Finance\Queries\Lookup\ListStudentInvoicesQuery;
 use App\Modules\Finance\Queries\Student360\GetStudentFinancePaymentHistoryQuery;
 use App\Modules\Finance\Support\FinanceSemesterContextResolver;
 use App\Modules\Finance\Support\Reporting\CurrentSettlementPositionPresenter;
+use App\Modules\Finance\Support\Reporting\SettlementReportAsOfContext;
 use App\Modules\Finance\Support\SettlementPosition\Money;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionAmounts;
@@ -301,7 +303,7 @@ class BillingInvoiceController extends Controller
         return back()->with('success', 'Invoice line voided successfully.');
     }
 
-    public function export(Request $request)
+    public function export(ExportStudentInvoicesRequest $request)
     {
         // Re-use logic or minimal logic for export
         // For now, simple export placeholder or real implementation if simple.
@@ -309,9 +311,13 @@ class BillingInvoiceController extends Controller
         // The requirement says "Export to Excel". I should probably create an export class.
 
         return Excel::download(new InvoiceExport(
-            $request->all(),
+            $request->validated(),
             $this->settlementPositionReader,
             app(CurrentSettlementPositionPresenter::class),
+            SettlementReportAsOfContext::fromInput(
+                $request->input('as_of'),
+                $request->input('as_of_timezone'),
+            ),
         ), 'invoices.xlsx');
     }
 }

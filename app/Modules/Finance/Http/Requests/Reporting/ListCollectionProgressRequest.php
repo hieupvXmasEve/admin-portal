@@ -30,6 +30,8 @@ class ListCollectionProgressRequest extends FormRequest
             'aging_bucket' => ['nullable', 'string', Rule::in(array_merge(['all'], CollectionProgressCatalog::agingBucketKeys()))],
             'student_status' => 'nullable|string|max:64',
             'search' => 'nullable|string|max:255',
+            'as_of' => 'nullable|date|max:64',
+            'as_of_timezone' => 'nullable|timezone',
             'per_page' => 'nullable|integer|in:20,50,100',
             'page' => 'nullable|integer|min:1',
         ];
