@@ -10,6 +10,8 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestReservationTarget;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
+use App\Modules\Finance\Dng\Support\DngCollectionCutover;
+use App\Modules\Finance\Dng\Support\DngReservationTargetFingerprint;
 use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Support\SettlementPosition\Money;
@@ -36,6 +38,7 @@ final class ReserveAndPushSingleFeeDngAction
         private readonly SettlementPositionReader $settlementPositionReader,
         private readonly DngCampusCodeResolver $campusCodeResolver,
         private readonly DngPaymentService $dngPaymentService,
+        private readonly ?DngCollectionCutover $cutover = null,
     ) {}
 
     /**
@@ -43,6 +46,7 @@ final class ReserveAndPushSingleFeeDngAction
      */
     public function handle(int $studentId, string $feeType, array $details): DngPaymentRequest
     {
+        ($this->cutover ?? new DngCollectionCutover)->assertCollectionAllowed();
         $reservation = $this->reserve($studentId, $feeType, $details);
 
         if ($reservation->status === DngPaymentRequest::STATUS_UNKNOWN_OUTCOME) {
@@ -254,7 +258,7 @@ final class ReserveAndPushSingleFeeDngAction
     /** @param list<array{invoice_line_id: int, finance_charge_id: int, collectible: string, identity: string}> $targets */
     private function fingerprint(array $targets): string
     {
-        return hash('sha256', json_encode($targets, JSON_THROW_ON_ERROR));
+        return DngReservationTargetFingerprint::make($targets);
     }
 
     private function slotKey(int $billingAccountId, string $campusCode, string $feeType): string

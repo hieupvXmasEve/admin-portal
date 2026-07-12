@@ -10,6 +10,7 @@ use App\Modules\Finance\Dng\Exceptions\StudentDngPaymentRequestNotFound;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
+use App\Modules\Finance\Dng\Support\DngCollectionCutover;
 use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Support\SettlementPosition\Money;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
@@ -24,6 +25,7 @@ final class CreateStudentDngPaymentAccessAction
         private readonly DngCampusCodeResolver $campusCodeResolver,
         private readonly DngPaymentService $dngPaymentService,
         private readonly SettlementPositionReader $settlementPositionReader,
+        private readonly ?DngCollectionCutover $cutover = null,
     ) {}
 
     /**
@@ -49,6 +51,10 @@ final class CreateStudentDngPaymentAccessAction
      */
     public function handle(Student $student, string $paymentMethod, ?int $dngRequestId = null): array
     {
+        if (! ($this->cutover ?? new DngCollectionCutover)->allowsNewCollection()) {
+            throw new StudentDngPaymentAccessUnavailable;
+        }
+
         if (! in_array($paymentMethod, self::PAYMENT_METHODS, true)) {
             throw new \InvalidArgumentException("Unsupported student DNG payment method [{$paymentMethod}].");
         }
