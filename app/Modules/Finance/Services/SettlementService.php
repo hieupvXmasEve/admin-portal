@@ -12,27 +12,39 @@ use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPositionIssue;
+use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use RuntimeException;
 
 class SettlementService
 {
     /** Tolerance for comparing cached invoice columns against derived balances. */
     public const CACHE_DRIFT_TOLERANCE = 0.01;
 
+    public function __construct(
+        private readonly SettlementPositionReader $settlementPositionReader,
+    ) {}
+
     /**
-     * Whether an invoice's cached columns disagree with its derived snapshot.
-     * Single source of the cache-drift formula shared by the audit graph query
-     * and the audit warning builder so they can never diverge.
+     * Whether an invoice's cached columns disagree with its canonical
+     * cash-only cache projection.
      */
     public function invoiceCacheDrifts(StudentInvoice $invoice): bool
     {
-        return $this->snapshotDriftsFromCache($invoice, $this->deriveInvoiceSnapshot($invoice));
+        try {
+            $snapshot = $this->deriveInvoiceCacheSnapshot($invoice);
+        } catch (RuntimeException) {
+            return true;
+        }
+
+        return $this->snapshotDriftsFromCache($invoice, $snapshot);
     }
 
     /**
-     * Same comparison as invoiceCacheDrifts() but against an already-computed
-     * snapshot, so callers that need the derived numbers do not derive twice.
+     * Compare cached columns against an already-computed cash-only snapshot,
+     * so callers that need the derived numbers do not derive twice.
      *
      * @param  array{net:float,paid:float}  $snapshot
      */
@@ -40,6 +52,46 @@ class SettlementService
     {
         return abs((float) $invoice->cached_paid_amount - (float) $snapshot['paid']) > self::CACHE_DRIFT_TOLERANCE
             || abs((float) $invoice->cached_total_amount - (float) $snapshot['net']) > self::CACHE_DRIFT_TOLERANCE;
+    }
+
+    /**
+     * Derive the rebuildable invoice cache projection from the canonical
+     * Settlement Position. The paid component is matched cash only; credit is
+     * retained for status/remaining semantics and is never folded into paid.
+     *
+     * @return array{gross:float,discount:float,credit:float,net:float,paid:float,remaining:float,status:string}
+     */
+    public function deriveInvoiceCacheSnapshot(StudentInvoice $invoice): array
+    {
+        $position = $this->settlementPositionReader->forInvoice((int) $invoice->id);
+
+        if ($position->isValid() && $position->amounts !== null) {
+            $gross = (float) $position->amounts->gross->amount;
+            $discount = (float) $position->amounts->discount->amount;
+            $cash = (float) $position->amounts->cash->amount;
+            $credit = (float) $position->amounts->credit->amount;
+            $net = max(0.0, $gross - $discount);
+            $remaining = (float) $position->amounts->remaining->amount;
+
+            return [
+                'gross' => $gross,
+                'discount' => $discount,
+                'credit' => $credit,
+                'net' => $net,
+                'paid' => $cash,
+                'remaining' => $remaining,
+                'status' => $this->invoiceStatusFromSettlement($invoice, $net, $cash, $credit, $remaining),
+            ];
+        }
+
+        $issueCodes = collect($position->issues)
+            ->map(fn (SettlementPositionIssue $issue): string => $issue->code)
+            ->implode(', ');
+
+        throw new RuntimeException(
+            "Cannot rebuild invoice #{$invoice->id} cache from an invalid Settlement Position"
+            .($issueCodes === '' ? '' : ": {$issueCodes}"),
+        );
     }
 
     public function deriveInvoiceSnapshot(StudentInvoice $invoice): array
@@ -204,7 +256,7 @@ class SettlementService
 
     public function recalculateInvoiceSnapshot(StudentInvoice $invoice): void
     {
-        $snapshot = $this->deriveInvoiceSnapshot($invoice);
+        $snapshot = $this->deriveInvoiceCacheSnapshot($invoice);
 
         $isPaid = $snapshot['status'] === 'paid' && $snapshot['paid'] > 0;
 
@@ -220,22 +272,38 @@ class SettlementService
             ? $invoice->status
             : $snapshot['status'];
 
-        // Cache columns predate the credit ledger. Fold credit into paid so
-        // readers that compute remaining as total − paid still see the fourth
-        // reduction source. Cash paid alone remains in the derived snapshot.
-        $cachedSettled = min(
-            (float) $snapshot['net'],
-            (float) $snapshot['paid'] + (float) ($snapshot['credit'] ?? 0),
-        );
-
         $invoice->forceFill([
             'cached_subtotal' => $snapshot['gross'],
             'cached_discount_total' => $snapshot['discount'],
             'cached_total_amount' => $snapshot['net'],
-            'cached_paid_amount' => $cachedSettled,
+            'cached_paid_amount' => $snapshot['paid'],
             'status' => $status,
             'cached_paid_at' => $cachedPaidAt,
         ])->save();
+    }
+
+    private function invoiceStatusFromSettlement(
+        StudentInvoice $invoice,
+        float $net,
+        float $cash,
+        float $credit,
+        float $remaining,
+    ): string {
+        $status = $invoice->status === 'draft' ? 'draft' : 'pending';
+
+        if ($net <= 0 || $remaining <= 0) {
+            return 'paid';
+        }
+
+        if ($cash > 0 || $credit > 0) {
+            return 'partial';
+        }
+
+        if ($invoice->due_date && $invoice->due_date->isPast()) {
+            return 'overdue';
+        }
+
+        return $status;
     }
 
     public function createPaymentApplication(

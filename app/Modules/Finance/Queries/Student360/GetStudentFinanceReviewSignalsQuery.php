@@ -180,9 +180,7 @@ class GetStudentFinanceReviewSignalsQuery
             ->orderByDesc('id')
             ->get()
             ->filter(function (StudentInvoice $invoice): bool {
-                $snapshot = $this->settlement->deriveInvoiceSnapshot($invoice);
-
-                return $this->settlement->snapshotDriftsFromCache($invoice, $snapshot);
+                return $this->settlement->invoiceCacheDrifts($invoice);
             })
             ->values();
 

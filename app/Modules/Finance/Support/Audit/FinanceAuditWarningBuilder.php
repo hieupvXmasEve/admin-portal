@@ -14,11 +14,11 @@ use App\Modules\Finance\Support\Integrity\FinanceIntegrityAuditor;
  *  (a) shared invariant findings via FinanceIntegrityAuditor::findForScope() —
  *      passed through verbatim, preserving kind ('invariant' for a violation,
  *      'invariant_error' for a check that failed to run);
- *  (b) cache-drift warnings, computed from SettlementService (canonical balance)
- *      vs the cached invoice columns.
+ *  (b) cache-drift warnings, computed from SettlementService's cash-only
+ *      projection vs the cached invoice columns.
  *
  * Cache drift uses SettlementService while INV-2 remains the command's DB-level
- * guard — the overlap is intentional (two separate truth layers).
+ * cash-only guard — the overlap is intentional (two separate truth layers).
  */
 class FinanceAuditWarningBuilder
 {
@@ -39,13 +39,13 @@ class FinanceAuditWarningBuilder
         // (a) Invariant findings — already Warning-shaped, kind preserved.
         $warnings = $this->auditor->findForScope($scope);
 
-        // (b) Cache drift against the canonical SettlementService balance.
+        // (b) Cache drift against the cash-only SettlementService projection.
         $driftIds = $this->driftingInvoiceIds($scope);
         if ($driftIds !== []) {
             $warnings[] = [
                 'code' => 'CACHE-DRIFT',
                 'severity' => 'HIGH',
-                'label' => 'Invoice cached balance drifts from SettlementService-derived balance',
+                'label' => 'Invoice cash-only paid cache drifts from Settlement Position',
                 'kind' => 'cache_drift',
                 'sample_ids' => $driftIds,
             ];

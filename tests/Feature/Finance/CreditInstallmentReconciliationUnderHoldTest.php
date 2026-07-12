@@ -81,6 +81,7 @@ it('reverses credit only after staff confirms the amount and due date of a new p
 
     expect($reversal->entry_type)->toBe(CreditApplication::ENTRY_REVERSAL)
         ->and((float) $reversal->amount)->toBe(-3_000_000.0)
+        ->and((float) $line->invoice()->firstOrFail()->fresh()->cached_paid_amount)->toBe(0.0)
         ->and((int) $account->fresh()->settlement_version)->toBe(1);
 });
 

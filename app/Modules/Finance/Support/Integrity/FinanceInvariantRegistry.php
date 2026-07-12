@@ -38,21 +38,23 @@ class FinanceInvariantRegistry
             new FinanceInvariant(
                 'INV-2',
                 'HIGH',
-                'student_invoices.cached_paid_amount cache drifts from live (active lines)',
+                'student_invoices.cached_paid_amount cash-only cache drifts from completed payment applications (active lines)',
                 'SELECT COUNT(*) c FROM (
                     SELECT si.id FROM student_invoices si
                     LEFT JOIN invoice_lines il ON il.invoice_id = si.id AND il.status = "active"
                     LEFT JOIN payment_applications pa ON pa.invoice_line_id = il.id
+                    LEFT JOIN payments p ON p.id = pa.payment_id
                     WHERE {scope}
                     GROUP BY si.id, si.cached_paid_amount
-                    HAVING ABS(si.cached_paid_amount - COALESCE(SUM(pa.amount),0)) > 0.01
+                    HAVING ABS(si.cached_paid_amount - COALESCE(SUM(CASE WHEN p.status = "completed" THEN pa.amount ELSE 0 END),0)) > 0.01
                 ) t',
                 'SELECT si.id FROM student_invoices si
                     LEFT JOIN invoice_lines il ON il.invoice_id = si.id AND il.status = "active"
                     LEFT JOIN payment_applications pa ON pa.invoice_line_id = il.id
+                    LEFT JOIN payments p ON p.id = pa.payment_id
                     WHERE {scope}
                     GROUP BY si.id, si.cached_paid_amount
-                    HAVING ABS(si.cached_paid_amount - COALESCE(SUM(pa.amount),0)) > 0.01 LIMIT 5',
+                    HAVING ABS(si.cached_paid_amount - COALESCE(SUM(CASE WHEN p.status = "completed" THEN pa.amount ELSE 0 END),0)) > 0.01 LIMIT 5',
                 'si.student_id IN ({ids})',
             ),
             new FinanceInvariant(

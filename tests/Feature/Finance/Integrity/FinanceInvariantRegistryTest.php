@@ -37,3 +37,14 @@ it('includes credit applications in the negative-balance invariant', function ()
         ->and($invariant->countSqlTemplate)->toContain('credit_applications')
         ->and($invariant->sampleSqlTemplate)->toContain('credit_applications');
 });
+
+it('defines INV-2 as a completed-cash-only cache parity check', function (): void {
+    $invariant = app(FinanceInvariantRegistry::class)->find('INV-2');
+
+    expect($invariant)->not->toBeNull()
+        ->and($invariant->label)->toContain('cash-only')
+        ->and($invariant->countSqlTemplate)->toContain('LEFT JOIN payments p')
+        ->and($invariant->countSqlTemplate)->toContain('p.status = "completed"')
+        ->and($invariant->countSqlTemplate)->not->toContain('credit_applications')
+        ->and($invariant->sampleSqlTemplate)->toContain('p.status = "completed"');
+});

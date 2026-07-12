@@ -246,7 +246,14 @@ class VoidFinanceChargeAction
                 ->contains(fn (InvoiceLine $line) => ($line->status ?? 'active') === 'active');
 
             if (! $hasActiveLines && $invoice->status !== 'cancelled') {
-                $invoice->update(['status' => 'cancelled']);
+                $invoice->forceFill([
+                    'cached_subtotal' => 0,
+                    'cached_discount_total' => 0,
+                    'cached_total_amount' => 0,
+                    'cached_paid_amount' => 0,
+                    'cached_paid_at' => null,
+                    'status' => 'cancelled',
+                ])->save();
             } else {
                 $this->settlementService->recalculateInvoiceSnapshot($invoice);
             }

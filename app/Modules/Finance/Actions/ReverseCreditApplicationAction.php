@@ -9,6 +9,7 @@ use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\CreditApplication;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,7 @@ final class ReverseCreditApplicationAction
         private readonly SettlementMutationGuard $settlementMutationGuard,
         private readonly ReconcileChargeInstallmentsAction $reconcileChargeInstallments,
         private readonly SettlementPositionReader $settlementPositionReader,
+        private readonly SettlementService $settlementService,
     ) {}
 
     /** @param list<array{installment_no:int,amount:float|string,due_date:string}>|null $confirmedPlan */
@@ -67,6 +69,7 @@ final class ReverseCreditApplicationAction
                     $this->createConfirmedPendingPlan($charge->id, $confirmedPlan ?? []);
                 }
                 $this->reconcileChargeInstallments->handle($charge);
+                $this->settlementService->recalculateInvoiceSnapshot($line->invoice()->firstOrFail());
 
                 return $reversal;
             });

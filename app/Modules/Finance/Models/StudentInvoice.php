@@ -44,7 +44,8 @@ class StudentInvoice extends Model
         'student_id',
         'billing_cycle_id',
         'semester_id',
-        // Cache columns (NT4/DB-14): rebuildable snapshot, written only by
+        // Cache columns (NT4/DB-14): rebuildable snapshot, with
+        // cached_paid_amount meaning matched cash only. Written only by
         // SettlementService::recalculateInvoiceSnapshot.
         'cached_subtotal',
         'cached_discount_total',

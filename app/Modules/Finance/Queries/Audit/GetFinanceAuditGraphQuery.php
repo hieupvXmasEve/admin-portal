@@ -213,7 +213,7 @@ class GetFinanceAuditGraphQuery
             $cachedTotal = (float) $invoice->cached_total_amount;
             $cachedPaid = (float) $invoice->cached_paid_amount;
 
-            $drift = $this->settlement->snapshotDriftsFromCache($invoice, $snapshot);
+            $drift = $this->settlement->invoiceCacheDrifts($invoice);
 
             return [
                 'invoice_id' => (int) $invoice->id,

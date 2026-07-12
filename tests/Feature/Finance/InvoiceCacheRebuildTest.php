@@ -7,7 +7,12 @@ use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Models\User;
+use App\Modules\Finance\Actions\VoidFinanceChargeAction;
+use App\Modules\Finance\Models\CreditApplication;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceCreditEntitlement;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
@@ -49,7 +54,21 @@ function makeCacheInvoice(): array
         'due_date' => now()->addDays(30),
     ]);
 
+    $obligation = FinanceObligation::create([
+        'source_system' => 'test',
+        'source_kind' => 'invoice-cache',
+        'source_ref' => 'invoice-cache:'.$student->id,
+        'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 10000000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'invoice-cache:test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+
     $charge = FinanceCharge::create([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
@@ -68,6 +87,31 @@ function makeCacheInvoice(): array
     ]);
 
     return [$invoice, $line, $student];
+}
+
+function applyCacheCredit(InvoiceLine $line, float $amount): CreditApplication
+{
+    $entitlement = FinanceCreditEntitlement::create([
+        'source_system' => 'test',
+        'source_kind' => 'invoice-cache-credit',
+        'source_ref' => 'invoice-cache-credit:'.$line->id,
+        'entitlement_type' => FinanceCharge::TYPE_DEFER_CREDIT,
+        'lifecycle_status' => FinanceCreditEntitlement::STATUS_APPROVED,
+        'allocation_status' => FinanceCreditEntitlement::ALLOCATION_PARTIALLY_APPLIED,
+        'amount' => $amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'invoice-cache:test',
+        'pricing_snapshot' => [],
+        'approved_at' => now(),
+    ]);
+
+    return CreditApplication::create([
+        'finance_credit_entitlement_id' => $entitlement->id,
+        'invoice_line_id' => $line->id,
+        'amount' => $amount,
+        'entry_type' => CreditApplication::ENTRY_APPLICATION,
+        'applied_at' => now(),
+    ]);
 }
 
 it('renames snapshot columns to cached_* and keeps legacy attribute names working', function () {
@@ -99,6 +143,94 @@ it('rebuilds cached_* from the ledger, correcting a drifted cache', function () 
 
     expect((float) $fresh->cached_total_amount)->toBe(10000000.0)
         ->and((float) $fresh->cached_paid_amount)->toBe(0.0);
+});
+
+it('stores matched cash only when credit also settles the invoice', function () {
+    [$invoice, $line, $student] = makeCacheInvoice();
+    $settlement = app(SettlementService::class);
+
+    $payment = Payment::create([
+        'student_id' => $student->id,
+        'amount' => 3000000,
+        'status' => Payment::STATUS_COMPLETED,
+        'paid_at' => now(),
+        'source' => 'manual',
+    ]);
+    $settlement->createPaymentApplication($payment, $line, 3000000, 'application');
+    applyCacheCredit($line, 7000000);
+    $settlement->recalculateInvoiceSnapshot($invoice->fresh());
+
+    $fresh = $invoice->fresh();
+    expect((float) $fresh->cached_paid_amount)->toBe(3000000.0)
+        ->and((float) $fresh->paid_amount)->toBe(3000000.0)
+        ->and($fresh->status)->toBe('paid')
+        ->and($fresh->cached_paid_at)->not->toBeNull();
+});
+
+it('does not create a cash paid timestamp for a credit-only settlement', function () {
+    [$invoice, $line] = makeCacheInvoice();
+    applyCacheCredit($line, 10000000);
+
+    app(SettlementService::class)->recalculateInvoiceSnapshot($invoice->fresh());
+
+    $fresh = $invoice->fresh();
+    expect((float) $fresh->cached_paid_amount)->toBe(0.0)
+        ->and($fresh->status)->toBe('paid')
+        ->and($fresh->cached_paid_at)->toBeNull();
+});
+
+it('clears the cash-only cache when a fully paid line is voided', function () {
+    [$invoice, $line, $student] = makeCacheInvoice();
+    $settlement = app(SettlementService::class);
+    $payment = Payment::create([
+        'student_id' => $student->id,
+        'amount' => 10000000,
+        'status' => Payment::STATUS_COMPLETED,
+        'paid_at' => now(),
+        'source' => 'manual',
+    ]);
+    $settlement->createPaymentApplication($payment, $line, 10000000, 'application');
+
+    app(VoidFinanceChargeAction::class)->handle(
+        (int) $line->charge_id,
+        'Paid line voided for cache parity test',
+        User::factory()->create()->id,
+        false,
+    );
+
+    $fresh = $invoice->fresh();
+    expect($fresh->status)->toBe('cancelled')
+        ->and((float) $fresh->cached_paid_amount)->toBe(0.0)
+        ->and((float) $fresh->cached_total_amount)->toBe(0.0)
+        ->and($fresh->cached_paid_at)->toBeNull();
+});
+
+it('dry-runs scoped cache rebuilds without writing and reports cash-only drift evidence', function () {
+    [$invoice] = makeCacheInvoice();
+    DB::table('student_invoices')->where('id', $invoice->id)->update([
+        'cached_total_amount' => 999999,
+        'cached_paid_amount' => 888888,
+    ]);
+
+    $this->artisan('finance:rebuild-invoice-snapshots', [
+        '--semester' => $invoice->semester_id,
+        '--dry-run' => true,
+    ])
+        ->expectsOutputToContain('Drifted: 1')
+        ->assertSuccessful();
+
+    expect((float) $invoice->fresh()->cached_paid_amount)->toBe(888888.0);
+
+    $this->artisan('finance:rebuild-invoice-snapshots', [
+        '--semester' => $invoice->semester_id,
+    ])->assertSuccessful();
+
+    $this->artisan('finance:rebuild-invoice-snapshots', [
+        '--semester' => $invoice->semester_id,
+        '--dry-run' => true,
+    ])
+        ->expectsOutputToContain('Drifted: 0')
+        ->assertSuccessful();
 });
 
 it('does not resurrect a cancelled invoice during rebuild (status is lifecycle, not cache)', function () {
