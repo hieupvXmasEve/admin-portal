@@ -10,11 +10,15 @@ use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
-use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Queries\Egc\PreviewEgcChargeGenerationQuery;
 use App\Modules\Finance\Queries\Major\PreviewMajorChargeGenerationQuery;
+use App\Modules\Finance\Support\Reporting\CurrentSettlementPositionPresenter;
 use App\Modules\Finance\Support\Reporting\FeeMonitorExpectedFeeCatalog;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPositionIssue;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPositionScope;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
+use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
@@ -26,13 +30,12 @@ class ListFeeMonitorQuery
     /** @var array<int, Student> */
     private array $studentIndex = [];
 
-    /** @var array<int, float> */
-    private array $paidAmountIndex = [];
-
     public function __construct(
         private readonly PreviewMajorChargeGenerationQuery $majorPreviewQuery,
         private readonly PreviewEgcChargeGenerationQuery $egcPreviewQuery,
         private readonly StudentChargeTimingResolver $timingResolver,
+        private readonly SettlementPositionReader $settlementPositionReader,
+        private readonly CurrentSettlementPositionPresenter $positionPresenter,
     ) {}
 
     /**
@@ -181,10 +184,9 @@ class ListFeeMonitorQuery
     {
         $this->chargeIndex = [];
         $this->studentIndex = [];
-        $this->paidAmountIndex = [];
 
         $charges = FinanceCharge::query()
-            ->with(['student.program'])
+            ->with(['student.program', 'invoiceLines'])
             ->where('semester_id', $semesterId)
             ->when($campusId !== null, fn ($query) => $query->whereHas(
                 'student',
@@ -536,6 +538,14 @@ class ListFeeMonitorQuery
             'amount' => $amount,
             'paid_amount' => 0.0,
             'outstanding_amount' => $amount,
+            'discount_amount' => null,
+            'credit_amount' => null,
+            'settlement_valid' => $charge === null ? null : false,
+            'settlement_state' => $charge === null ? null : SettlementPosition::STATE_INVALID,
+            'settlement_version' => null,
+            'settlement_issue_codes' => [],
+            'settlement_issues' => [],
+            'settlement_breakdown' => [],
             'finance_charge_id' => $charge?->id,
             'source_type' => $charge?->source_type,
             'source_id' => $charge?->source_id,
@@ -565,24 +575,65 @@ class ListFeeMonitorQuery
             return $rows;
         }
 
-        $paidByChargeId = PaymentApplication::query()
-            ->selectRaw('invoice_lines.charge_id as charge_id, SUM(payment_applications.amount) as paid_amount')
-            ->join('invoice_lines', 'invoice_lines.id', '=', 'payment_applications.invoice_line_id')
-            ->whereIn('invoice_lines.charge_id', $chargeIds)
-            ->groupBy('invoice_lines.charge_id')
-            ->pluck('paid_amount', 'charge_id');
+        $charges = FinanceCharge::query()->with('invoiceLines')->whereIn('id', $chargeIds)->get()->keyBy('id');
+        $scopes = [];
+        $chargeScopeKeys = [];
 
-        return $rows->map(function (array $row) use ($paidByChargeId): array {
+        foreach ($charges as $chargeId => $charge) {
+            $lineIds = $charge->invoiceLines->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all();
+            $chargeScopeKeys[] = (int) $chargeId;
+            $scopes[] = $lineIds === []
+                ? SettlementPositionScope::payableLine(0)
+                : SettlementPositionScope::payableLines($lineIds);
+        }
+
+        $positions = $this->settlementPositionReader->batch($scopes);
+        $positionByChargeId = [];
+        foreach ($chargeScopeKeys as $index => $chargeId) {
+            $positionByChargeId[$chargeId] = $positions[$index] ?? null;
+        }
+
+        return $rows->map(function (array $row) use ($positionByChargeId): array {
             $chargeId = $row['finance_charge_id'];
             if ($chargeId === null || $row['generation_state'] !== 'generated') {
                 return $row;
             }
 
-            $paidAmount = max(0.0, (float) ($paidByChargeId[$chargeId] ?? 0.0));
-            $amount = $row['amount'] !== null ? (float) $row['amount'] : null;
+            $position = $positionByChargeId[$chargeId] ?? null;
+            if (! $position instanceof SettlementPosition || ! $position->isValid() || $position->amounts === null) {
+                $row['amount'] = null;
+                $row['paid_amount'] = null;
+                $row['outstanding_amount'] = null;
+                $row['discount_amount'] = null;
+                $row['credit_amount'] = null;
+                $row['payment_state'] = 'invalid';
+                $row['settlement_valid'] = false;
+                $row['settlement_state'] = SettlementPosition::STATE_INVALID;
+                $row['settlement_version'] = $position?->snapshot_version;
+                $row['settlement_issue_codes'] = $position === null
+                    ? [SettlementPositionIssue::MISSING_PAYABLE_LINE]
+                    : array_values(array_unique(array_map(fn ($issue): string => $issue->code, $position->issues)));
+                $row['settlement_issues'] = $position === null ? [] : $this->positionPresenter->issues($position->issues);
+                $row['settlement_breakdown'] = $position === null ? [] : $this->positionPresenter->present($position);
+
+                return $row;
+            }
+
+            $amounts = $position->amounts;
+            $amount = (float) $amounts->gross->amount;
+            $paidAmount = (float) $amounts->cash->amount;
+            $row['amount'] = $amount;
             $row['paid_amount'] = $paidAmount;
-            $row['payment_state'] = $this->resolvePaymentState('generated', $amount, $paidAmount);
-            $row['outstanding_amount'] = $amount !== null ? max(0.0, $amount - $paidAmount) : null;
+            $row['outstanding_amount'] = (float) $amounts->remaining->amount;
+            $row['discount_amount'] = (float) $amounts->discount->amount;
+            $row['credit_amount'] = (float) $amounts->credit->amount;
+            $row['payment_state'] = $this->resolvePaymentState('generated', $amount, $paidAmount, (float) $amounts->remaining->amount);
+            $row['settlement_valid'] = true;
+            $row['settlement_state'] = $position->settlement_state;
+            $row['settlement_version'] = $position->snapshot_version;
+            $row['settlement_issue_codes'] = [];
+            $row['settlement_issues'] = [];
+            $row['settlement_breakdown'] = $this->positionPresenter->present($position);
 
             return $row;
         });
@@ -597,7 +648,7 @@ class ListFeeMonitorQuery
         return $charge->status === FinanceCharge::STATUS_VOID ? 'voided' : 'generated';
     }
 
-    private function resolvePaymentState(string $generationState, ?float $amount, float $paidAmount): ?string
+    private function resolvePaymentState(string $generationState, ?float $amount, float $paidAmount, ?float $remaining = null): ?string
     {
         if ($generationState !== 'generated' || $amount === null) {
             return null;
@@ -607,7 +658,7 @@ class ListFeeMonitorQuery
             return 'outstanding';
         }
 
-        if ($paidAmount + 0.01 >= $amount) {
+        if (($remaining ?? max(0.0, $amount - $paidAmount)) <= 0.01) {
             return 'paid';
         }
 

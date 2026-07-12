@@ -35,10 +35,14 @@ interface FeeMonitorRow {
     semester_id: number;
     generation_state: 'missing' | 'generated' | 'skipped' | 'voided' | 'blocked';
     generation_reason: string | null;
-    payment_state: 'paid' | 'partially_paid' | 'outstanding' | null;
+    payment_state: 'paid' | 'partially_paid' | 'outstanding' | 'invalid' | null;
     amount: number | null;
-    paid_amount: number;
+    paid_amount: number | null;
     outstanding_amount: number | null;
+    discount_amount: number | null;
+    credit_amount: number | null;
+    settlement_valid: boolean | null;
+    settlement_issue_codes: string[];
     finance_charge_id: number | null;
     batch_handoff: { label: string; fee_category: string; fee_type?: string } | null;
     drilldowns: {
@@ -56,6 +60,7 @@ interface FeeMonitorSummary {
     paid_count: number;
     partially_paid_count: number;
     outstanding_count: number;
+    invalid_count: number;
     total_count: number;
 }
 
@@ -184,6 +189,7 @@ const paymentStateLabel: Record<NonNullable<FeeMonitorRow['payment_state']>, str
     paid: 'Đã thanh toán',
     partially_paid: 'Thanh toán một phần',
     outstanding: 'Còn nợ',
+    invalid: 'Cần kiểm tra',
 };
 
 const summaryCards = computed(() => [
@@ -195,6 +201,7 @@ const summaryCards = computed(() => [
     { key: 'outstanding', label: 'Còn nợ', value: props.fee_monitor.summary.outstanding_count },
     { key: 'partially_paid', label: 'TT một phần', value: props.fee_monitor.summary.partially_paid_count },
     { key: 'paid', label: 'Đã thanh toán', value: props.fee_monitor.summary.paid_count },
+    { key: 'invalid', label: 'Cần kiểm tra', value: props.fee_monitor.summary.invalid_count },
 ]);
 
 const batchHandoffUrl = (row: FeeMonitorRow): string | null => {
@@ -365,6 +372,7 @@ const acadRetGateActive = computed(() => !props.fee_monitor.meta.acad_ret_gate.m
                                 <TableCell class="text-right">
                                     <div>{{ row.amount !== null ? formatCurrency(row.amount) : '—' }}</div>
                                     <div v-if="row.outstanding_amount !== null && row.outstanding_amount > 0" class="text-muted-foreground text-xs">Còn {{ formatCurrency(row.outstanding_amount) }}</div>
+                                    <div v-if="row.settlement_issue_codes.length > 0" class="text-destructive mt-1 text-xs">{{ row.settlement_issue_codes.join(', ') }}</div>
                                 </TableCell>
                                 <TableCell class="text-right">
                                     <div class="flex items-center justify-end gap-2">

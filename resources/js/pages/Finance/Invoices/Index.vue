@@ -29,9 +29,14 @@ interface InvoiceRow {
     student: { id: number; full_name: string; student_id: string };
     semester: { id: number; name: string };
     real_time_status: string;
-    total_amount: number;
-    paid_amount: number;
-    outstanding_balance: number;
+    total_amount: number | null;
+    paid_amount: number | null;
+    outstanding_balance: number | null;
+    gross_amount: number | null;
+    discount_amount: number | null;
+    credit_amount: number | null;
+    settlement_valid: boolean;
+    settlement_issue_codes: string[];
     due_date: string | null;
 }
 
@@ -101,6 +106,8 @@ function getStatusBadgeVariant(status: string): 'default' | 'destructive' | 'out
             return 'default';
         case 'zero_amount':
             return 'secondary';
+        case 'invalid':
+            return 'destructive';
         default:
             return 'outline';
     }
@@ -144,6 +151,7 @@ function getStatusBadgeVariant(status: string): 'default' | 'destructive' | 'out
                                 <SelectItem value="paid">Paid</SelectItem>
                                 <SelectItem value="overdue">Overdue</SelectItem>
                                 <SelectItem value="zero_amount">Zero Amount</SelectItem>
+                                <SelectItem value="invalid">Cần kiểm tra</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -162,11 +170,11 @@ function getStatusBadgeVariant(status: string): 'default' | 'destructive' | 'out
                                 </TableHead>
                                 <TableHead class="bg-background sticky top-0 z-10">Student</TableHead>
                                 <TableHead class="bg-background sticky top-0 z-10">Semester</TableHead>
-                                <TableHead class="bg-background sticky top-0 z-10 cursor-pointer text-right" @click="sortBy('cached_total_amount')">
+                                <TableHead class="bg-background sticky top-0 z-10 text-right">
                                     Total
                                     <ChevronsUpDown class="inline h-3 w-3" />
                                 </TableHead>
-                                <TableHead class="bg-background sticky top-0 z-10 cursor-pointer text-right" @click="sortBy('cached_paid_amount')">
+                                <TableHead class="bg-background sticky top-0 z-10 text-right">
                                     Paid
                                     <ChevronsUpDown class="inline h-3 w-3" />
                                 </TableHead>
@@ -190,9 +198,13 @@ function getStatusBadgeVariant(status: string): 'default' | 'destructive' | 'out
                                     <div class="text-muted-foreground text-xs tabular-nums">{{ invoice.student.student_id }}</div>
                                 </TableCell>
                                 <TableCell>{{ invoice.semester.name }}</TableCell>
-                                <TableCell class="text-right tabular-nums">{{ formatCurrency(invoice.total_amount) }}</TableCell>
-                                <TableCell class="text-right text-emerald-600 tabular-nums">{{ formatCurrency(invoice.paid_amount) }}</TableCell>
-                                <TableCell class="text-right font-medium tabular-nums">{{ formatCurrency(invoice.outstanding_balance) }}</TableCell>
+                                <TableCell class="text-right tabular-nums">{{ invoice.settlement_valid ? formatCurrency(invoice.total_amount ?? 0) : '—' }}</TableCell>
+                                <TableCell class="text-right text-emerald-600 tabular-nums">{{ invoice.settlement_valid ? formatCurrency(invoice.paid_amount ?? 0) : '—' }}</TableCell>
+                                <TableCell class="text-right font-medium tabular-nums">
+                                    <span v-if="invoice.settlement_valid">{{ formatCurrency(invoice.outstanding_balance ?? 0) }}</span>
+                                    <span v-else class="text-destructive text-xs">Cần kiểm tra</span>
+                                    <div v-if="!invoice.settlement_valid" class="text-destructive text-xs">{{ invoice.settlement_issue_codes.join(', ') }}</div>
+                                </TableCell>
                                 <TableCell>
                                     <Badge :variant="getStatusBadgeVariant(invoice.real_time_status)">
                                         {{ invoice.real_time_status.toUpperCase() }}

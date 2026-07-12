@@ -23,6 +23,7 @@ class GetFeeMonitorSummaryQuery
             'paid_count' => $this->countByPaymentState($rows, 'paid'),
             'partially_paid_count' => $this->countByPaymentState($rows, 'partially_paid'),
             'outstanding_count' => $this->countByPaymentState($rows, 'outstanding'),
+            'invalid_count' => $this->countByPaymentState($rows, 'invalid'),
             'total_count' => $rows->count(),
         ];
     }

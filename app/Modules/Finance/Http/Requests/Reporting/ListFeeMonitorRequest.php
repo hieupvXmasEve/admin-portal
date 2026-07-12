@@ -29,7 +29,7 @@ class ListFeeMonitorRequest extends FormRequest
             'cohort' => 'nullable',
             'expected_fee_type' => ['nullable', Rule::in(array_merge(['all'], $expectedSources))],
             'generation_state' => 'nullable|string|in:missing,generated,skipped,voided,blocked,all',
-            'payment_state' => 'nullable|string|in:paid,partially_paid,outstanding,all',
+            'payment_state' => 'nullable|string|in:paid,partially_paid,outstanding,invalid,all',
             'student_status' => 'nullable|string|max:64',
             'search' => 'nullable|string|max:255',
             'per_page' => 'nullable|integer|in:20,50,100',

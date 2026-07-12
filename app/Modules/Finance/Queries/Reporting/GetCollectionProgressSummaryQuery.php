@@ -27,8 +27,12 @@ class GetCollectionProgressSummaryQuery
 
         return [
             'student_count' => $rows->count(),
+            'invalid_count' => $rows->where('valid', false)->count(),
             'billed_total' => $billed,
             'paid_total' => $paid,
+            'gross_total' => round((float) $rows->sum(fn (array $row): float => (float) ($row['gross'] ?? 0)), 2),
+            'discount_total' => round((float) $rows->sum(fn (array $row): float => (float) ($row['discount'] ?? 0)), 2),
+            'credit_total' => round((float) $rows->sum(fn (array $row): float => (float) ($row['credit'] ?? 0)), 2),
             'outstanding_total' => round((float) $rows->sum('outstanding'), 2),
             'overdue_total' => round((float) $rows->sum('overdue'), 2),
             'overpaid_total' => round((float) $rows->sum('overpaid'), 2),
@@ -41,6 +45,11 @@ class GetCollectionProgressSummaryQuery
             'overpaid_count' => $rows->where('overpaid', '>', Catalog::TOLERANCE)->count(),
             'unapplied_count' => $rows->where('has_unapplied', true)->count(),
             'lifecycle_exception_count' => $rows->where('is_lifecycle_exception', true)->count(),
+            'invalid_issue_counts' => $rows
+                ->flatMap(fn (array $row): array => $row['settlement_issue_codes'] ?? [])
+                ->countBy()
+                ->sortKeys()
+                ->all(),
         ];
     }
 
@@ -126,6 +135,7 @@ class GetCollectionProgressSummaryQuery
                 'billed' => round((float) $group->sum('billed'), 2),
                 'paid' => round((float) $group->sum('paid'), 2),
                 'outstanding' => round((float) $group->sum('outstanding'), 2),
+                'invalid_count' => $group->where('valid', false)->count(),
             ])
             ->sortByDesc('outstanding')
             ->values()
@@ -147,6 +157,7 @@ class GetCollectionProgressSummaryQuery
                     'label' => $label,
                     'student_count' => $group->count(),
                     'outstanding' => round((float) $group->sum('outstanding'), 2),
+                    'invalid_count' => $group->where('valid', false)->count(),
                 ];
             })
             ->values()
@@ -189,12 +200,14 @@ class GetCollectionProgressSummaryQuery
                 'label' => 'Ngoại lệ vòng đời (SV không ở trạng thái thu phí)',
                 'student_count' => $flagged->count(),
                 'outstanding' => round((float) $flagged->sum('outstanding'), 2),
+                'invalid_count' => $flagged->where('valid', false)->count(),
             ],
             [
                 'key' => 'normal',
                 'label' => 'Trong phạm vi thu phí',
                 'student_count' => $normal->count(),
                 'outstanding' => round((float) $normal->sum('outstanding'), 2),
+                'invalid_count' => $normal->where('valid', false)->count(),
             ],
         ];
     }

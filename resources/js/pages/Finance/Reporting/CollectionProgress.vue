@@ -14,7 +14,7 @@ import { financeRoutes } from '@/utils/routes';
 import { Clock, Wallet } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
-type BalanceState = 'unpaid' | 'partially_paid' | 'paid' | 'overdue' | 'overpaid' | 'unapplied';
+type BalanceState = 'unpaid' | 'partially_paid' | 'paid' | 'overdue' | 'overpaid' | 'unapplied' | 'invalid';
 
 interface CollectionProgressStudent {
     id: number;
@@ -33,11 +33,15 @@ interface CollectionProgressRow {
     semester_id: number;
     invoice_count: number;
     fee_types: string[];
-    billed: number;
-    paid: number;
-    outstanding: number;
-    overdue: number;
-    overpaid: number;
+    valid: boolean;
+    gross: number | null;
+    discount: number | null;
+    credit: number | null;
+    billed: number | null;
+    paid: number | null;
+    outstanding: number | null;
+    overdue: number | null;
+    overpaid: number | null;
     unapplied: number;
     has_unapplied: boolean;
     collection_rate: number | null;
@@ -47,11 +51,13 @@ interface CollectionProgressRow {
     aging_bucket_label: string;
     max_days_overdue: number;
     is_lifecycle_exception: boolean;
+    settlement_issue_codes: string[];
     drilldowns: { student_360_focus: string | null; lookup_invoice_id: number | null };
 }
 
 interface CollectionProgressSummary {
     student_count: number;
+    invalid_count: number;
     billed_total: number;
     paid_total: number;
     outstanding_total: number;
@@ -180,7 +186,7 @@ const collectionRatePct = computed(() => (summary.value.collection_rate !== null
 
 const summaryCards = computed(() => [
     { key: 'billed', label: 'Tổng phát sinh', value: summary.value.billed_total, sub: `${summary.value.student_count} sinh viên` },
-    { key: 'paid', label: 'Đã thu', value: summary.value.paid_total, sub: collectionRatePct.value !== null ? `Tỷ lệ thu ${collectionRatePct.value}%` : null },
+    { key: 'paid', label: 'Đã thu (cash)', value: summary.value.paid_total, sub: collectionRatePct.value !== null ? `Tỷ lệ thu ${collectionRatePct.value}%` : null },
     { key: 'outstanding', label: 'Còn phải thu', value: summary.value.outstanding_total, sub: `${summary.value.unpaid_count + summary.value.partially_paid_count} SV còn nợ` },
     { key: 'overdue', label: 'Quá hạn', value: summary.value.overdue_total, sub: `${summary.value.overdue_count} SV quá hạn`, accent: 'text-red-600' },
     { key: 'overpaid', label: 'Thanh toán dư', value: summary.value.overpaid_total, sub: `${summary.value.overpaid_count} SV` },
@@ -192,6 +198,7 @@ const balanceStateVariant = (state: BalanceState): 'default' | 'secondary' | 'de
         case 'paid':
             return 'default';
         case 'overdue':
+        case 'invalid':
             return 'destructive';
         case 'partially_paid':
         case 'overpaid':
@@ -364,7 +371,7 @@ const lookupInvoiceUrl = (row: CollectionProgressRow): string | undefined => {
                                 <TableHead>Sinh viên</TableHead>
                                 <TableHead>Chương trình</TableHead>
                                 <TableHead>Tình trạng</TableHead>
-                                <TableHead class="text-right">Đã thu / Phát sinh</TableHead>
+                                <TableHead class="text-right">Cash / Phát sinh</TableHead>
                                 <TableHead class="text-right">Còn phải thu</TableHead>
                                 <TableHead class="text-right">Hành động</TableHead>
                             </TableRow>
@@ -388,6 +395,7 @@ const lookupInvoiceUrl = (row: CollectionProgressRow): string | undefined => {
                                 </TableCell>
                                 <TableCell>
                                     <Badge :variant="balanceStateVariant(row.balance_state)">{{ row.balance_state_label }}</Badge>
+                                    <div v-if="!row.valid" class="text-destructive mt-1 text-xs">{{ row.settlement_issue_codes.join(', ') }}</div>
                                     <div v-if="row.aging_bucket !== 'not_due'" class="text-muted-foreground mt-1 text-xs">{{ row.aging_bucket_label }}</div>
                                     <div v-if="row.has_unapplied" class="mt-1 inline-flex items-center gap-1 text-xs text-emerald-700">
                                         <Wallet class="size-3" />
@@ -395,12 +403,16 @@ const lookupInvoiceUrl = (row: CollectionProgressRow): string | undefined => {
                                     </div>
                                 </TableCell>
                                 <TableCell class="text-right">
-                                    <div class="font-medium">{{ formatCurrency(row.paid) }}</div>
-                                    <div class="text-muted-foreground text-xs">/ {{ formatCurrency(row.billed) }}</div>
+                                    <template v-if="row.valid">
+                                        <div class="font-medium">{{ formatCurrency(row.paid ?? 0) }}</div>
+                                        <div class="text-muted-foreground text-xs">/ {{ formatCurrency(row.billed ?? 0) }}</div>
+                                        <div class="text-muted-foreground text-xs">Giảm {{ formatCurrency(row.discount ?? 0) }} · Credit {{ formatCurrency(row.credit ?? 0) }}</div>
+                                    </template>
+                                    <span v-else class="text-destructive text-xs">Không hiển thị số tiền tin cậy</span>
                                 </TableCell>
                                 <TableCell class="text-right">
-                                    <div :class="row.outstanding > 0 ? 'font-medium' : 'text-muted-foreground'">{{ formatCurrency(row.outstanding) }}</div>
-                                    <div v-if="row.overdue > 0" class="text-xs text-red-600">Quá hạn {{ formatCurrency(row.overdue) }}</div>
+                                    <div v-if="row.valid" :class="(row.outstanding ?? 0) > 0 ? 'font-medium' : 'text-muted-foreground'">{{ formatCurrency(row.outstanding ?? 0) }}</div>
+                                    <div v-if="row.valid && (row.overdue ?? 0) > 0" class="text-xs text-red-600">Quá hạn {{ formatCurrency(row.overdue ?? 0) }}</div>
                                 </TableCell>
                                 <TableCell class="text-right">
                                     <LookupRowActions :student-id="row.student.id" :focus="row.drilldowns.student_360_focus ?? undefined" :detail-url="lookupInvoiceUrl(row)" />

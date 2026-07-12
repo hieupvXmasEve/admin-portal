@@ -15,6 +15,7 @@ use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Lookup\ListStudentInvoicesQuery;
 use App\Modules\Finance\Queries\Student360\GetStudentFinancePaymentHistoryQuery;
 use App\Modules\Finance\Support\FinanceSemesterContextResolver;
+use App\Modules\Finance\Support\Reporting\CurrentSettlementPositionPresenter;
 use App\Modules\Finance\Support\SettlementPosition\Money;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionAmounts;
@@ -307,6 +308,10 @@ class BillingInvoiceController extends Controller
         // We need an Export class. I will stub this out or skip if not in immediate scope of a simple file writer.
         // The requirement says "Export to Excel". I should probably create an export class.
 
-        return Excel::download(new InvoiceExport($request->all()), 'invoices.xlsx');
+        return Excel::download(new InvoiceExport(
+            $request->all(),
+            $this->settlementPositionReader,
+            app(CurrentSettlementPositionPresenter::class),
+        ), 'invoices.xlsx');
     }
 }

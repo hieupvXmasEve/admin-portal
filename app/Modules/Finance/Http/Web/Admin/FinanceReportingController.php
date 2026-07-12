@@ -188,6 +188,9 @@ class FinanceReportingController extends Controller
             'student_count' => 0,
             'billed_total' => 0.0,
             'paid_total' => 0.0,
+            'gross_total' => 0.0,
+            'discount_total' => 0.0,
+            'credit_total' => 0.0,
             'outstanding_total' => 0.0,
             'overdue_total' => 0.0,
             'overpaid_total' => 0.0,
@@ -200,6 +203,8 @@ class FinanceReportingController extends Controller
             'overpaid_count' => 0,
             'unapplied_count' => 0,
             'lifecycle_exception_count' => 0,
+            'invalid_count' => 0,
+            'invalid_issue_counts' => [],
         ];
     }
 
@@ -273,6 +278,7 @@ class FinanceReportingController extends Controller
                     'paid_count' => 0,
                     'partially_paid_count' => 0,
                     'outstanding_count' => 0,
+                    'invalid_count' => 0,
                     'total_count' => 0,
                 ],
             ];
@@ -289,6 +295,7 @@ class FinanceReportingController extends Controller
                     'paid_count' => 0,
                     'partially_paid_count' => 0,
                     'outstanding_count' => 0,
+                    'invalid_count' => 0,
                     'total_count' => 0,
                 ],
                 'filters' => $filters,

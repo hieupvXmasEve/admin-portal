@@ -31,6 +31,8 @@ final class CollectionProgressCatalog
 
     public const STATE_UNAPPLIED = 'unapplied';
 
+    public const STATE_INVALID = 'invalid';
+
     public const BUCKET_NOT_DUE = 'not_due';
 
     public const BUCKET_1_30 = 'd_1_30';
@@ -55,6 +57,7 @@ final class CollectionProgressCatalog
             self::STATE_OVERDUE => 'Quá hạn',
             self::STATE_OVERPAID => 'Thanh toán dư',
             self::STATE_UNAPPLIED => 'Tiền chưa áp dụng',
+            self::STATE_INVALID => 'Cần kiểm tra',
         ];
     }
 
