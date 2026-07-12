@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Student360;
 
-use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentSurplusDisposition;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
 
 class GetStudentFinancePaymentHistoryQuery
 {
     public function __construct(
         private readonly SettlementService $settlement,
+        private readonly StudentFinanceSettlementPositionReader $positionReader,
     ) {}
 
     /** @return list<array<string,mixed>> */
@@ -37,23 +38,29 @@ class GetStudentFinancePaymentHistoryQuery
             ->unique('payment_id')
             ->keyBy('payment_id');
 
-        $hasCurrentFeeObligations = $this->settlement
-            ->getOutstandingLinesForStudent($studentId, AutoAllocatePaymentsAction::DEFAULT_PRIORITY_ORDER)
-            ->isNotEmpty();
+        $position = $this->positionReader->current($studentId);
+        $positionValid = (bool) $position['valid'];
+        $hasCurrentFeeObligations = $positionValid
+            && ((float) ($position['remaining_collectible'] ?? 0) > 0);
 
         return $payments
             ->map(fn (Payment $payment): array => $this->row(
                 $payment,
                 $dngByPaymentId->get($payment->id),
                 $hasCurrentFeeObligations,
+                $positionValid,
             ))
             ->values()
             ->all();
     }
 
     /** @return array<string,mixed> */
-    private function row(Payment $payment, ?DngPaymentRequest $dng, bool $hasCurrentFeeObligations): array
-    {
+    private function row(
+        Payment $payment,
+        ?DngPaymentRequest $dng,
+        bool $hasCurrentFeeObligations,
+        bool $positionValid,
+    ): array {
         $amountPaid = $this->money((float) $payment->amount);
         $disposed = (float) PaymentSurplusDisposition::query()->where('payment_id', $payment->id)
             ->whereIn('type', [PaymentSurplusDisposition::TYPE_REFUND, PaymentSurplusDisposition::TYPE_RETAIN_FORFEIT])
@@ -75,15 +82,22 @@ class GetStudentFinancePaymentHistoryQuery
             'surplus_amount' => $surplus,
             'status' => $hasSurplus ? 'surplus' : 'settled',
             'status_label' => $hasSurplus ? 'Còn dư' : 'Đã thu hết',
-            'action' => $this->action($hasSurplus, $hasCurrentFeeObligations),
+            'action' => $this->action($hasSurplus, $hasCurrentFeeObligations, $positionValid),
         ];
     }
 
     /** @return array{can_allocate:bool,message:?string} */
-    private function action(bool $hasSurplus, bool $hasCurrentFeeObligations): array
+    private function action(bool $hasSurplus, bool $hasCurrentFeeObligations, bool $positionValid): array
     {
         if (! $hasSurplus) {
             return ['can_allocate' => false, 'message' => null];
+        }
+
+        if (! $positionValid) {
+            return [
+                'can_allocate' => false,
+                'message' => 'Số dư hiện chưa khả dụng.',
+            ];
         }
 
         if (! $hasCurrentFeeObligations) {

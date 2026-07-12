@@ -8,9 +8,9 @@ use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\Payment;
-use App\Modules\Finance\Queries\GetStudentBalanceQuery;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\LifecycleDueExceptionRowMapper;
+use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
 use Illuminate\Support\Collection;
 
 /**
@@ -26,8 +26,8 @@ class GetStudent360StatusCardsQuery
     ];
 
     public function __construct(
-        private GetStudentBalanceQuery $balanceQuery,
         private SettlementService $settlement,
+        private StudentFinanceSettlementPositionReader $positionReader,
     ) {}
 
     /** @return array<string,mixed> */
@@ -44,13 +44,19 @@ class GetStudent360StatusCardsQuery
     /** @return array<string,mixed> */
     private function balanceCard(int $studentId): array
     {
-        $balance = $this->balanceQuery->handle($studentId);
+        $position = $this->positionReader->current($studentId);
+        $valid = (bool) $position['valid'];
 
         return [
-            'balance' => $balance['balance'],
-            'unapplied_credit' => $balance['unapplied_credit'],
-            'has_unapplied' => $balance['unapplied_credit'] > 0,
-            'unapplied_payment_id' => $this->resolveUnappliedPaymentId($studentId),
+            'valid' => $valid,
+            'balance' => $valid ? $position['remaining_collectible'] : null,
+            'unapplied_cash' => $valid ? $position['unapplied_cash'] : null,
+            'unapplied_credit' => $valid ? $position['unapplied_cash'] : null,
+            'applied_credit' => $valid ? $position['credit_applied'] : null,
+            'has_unapplied' => $valid && ((float) ($position['unapplied_cash'] ?? 0) > 0),
+            'unapplied_payment_id' => $valid ? $this->resolveUnappliedPaymentId($studentId) : null,
+            'message' => $valid ? null : $position['student_message'],
+            'issues' => $position['issues'],
         ];
     }
 

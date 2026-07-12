@@ -483,7 +483,7 @@ it('does not show review signals when payment, installment, and invoice cache da
         ->assertInertia(fn ($page) => $page->where('review_signals', []));
 });
 
-it('offers allocation from a surplus payment only when current fee obligations exist', function () {
+it('fails closed for surplus allocation when current obligations are not canonical', function () {
     $user = grantFinanceOverview(['view_finance_student_overview']);
     $student = makeOverviewStudent($this->campus, $this->program, $this->semester);
 
@@ -528,8 +528,9 @@ it('offers allocation from a surplus payment only when current fee obligations e
             ->where('payment_history.0.id', $payment->id)
             ->where('payment_history.0.source_label', 'Import')
             ->where('payment_history.0.status_label', 'Còn dư')
-            ->where('payment_history.0.action.can_allocate', true)
-            ->where('payment_history.0.action.message', null));
+            ->where('status_cards.balance.valid', false)
+            ->where('payment_history.0.action.can_allocate', false)
+            ->where('payment_history.0.action.message', 'Số dư hiện chưa khả dụng.'));
 });
 
 it('does not make a paid DNG request actionable on the DNG card', function () {

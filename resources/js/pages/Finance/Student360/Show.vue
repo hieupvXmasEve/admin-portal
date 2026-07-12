@@ -67,6 +67,11 @@ const tuitionKpis = computed<Array<StudentFinanceOverviewKpi & { key: string; to
         tone: 'text-emerald-700 dark:text-emerald-300',
     },
     {
+        ...props.tuition_overview.kpis.credit_applied,
+        key: 'credit_applied',
+        tone: 'text-violet-700 dark:text-violet-300',
+    },
+    {
         ...props.tuition_overview.kpis.surplus,
         key: 'surplus',
         tone: props.tuition_overview.kpis.surplus.amount > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground',
@@ -154,7 +159,7 @@ onMounted(() => {
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div class="grid grid-cols-2 gap-3 md:grid-cols-5">
             <Card v-for="card in tuitionKpis" :key="card.key" :class="card.primary ? 'border-primary/40 bg-primary/5 shadow-sm' : ''">
                 <CardHeader class="pb-1">
                     <CardTitle class="text-xs font-medium" :class="card.primary ? 'text-primary' : 'text-muted-foreground'">
@@ -163,11 +168,15 @@ onMounted(() => {
                 </CardHeader>
                 <CardContent>
                     <p class="font-semibold tabular-nums" :class="[card.primary ? 'text-2xl md:text-3xl' : 'text-lg', card.tone]">
-                        {{ formatCurrency(card.amount) }}
+                        {{ card.amount === null ? 'Chưa khả dụng' : formatCurrency(card.amount) }}
                     </p>
                 </CardContent>
             </Card>
         </div>
+
+        <p v-if="!props.tuition_overview.settlement.valid" class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-200">
+            {{ props.tuition_overview.settlement.message ?? 'Cần kiểm tra' }}
+        </p>
 
         <p v-if="props.tuition_overview.surplus_message" class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-200">
             {{ props.tuition_overview.surplus_message }}

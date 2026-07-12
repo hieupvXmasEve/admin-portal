@@ -8,7 +8,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Modules\Finance\Http\Requests\Student360ShowRequest;
 use App\Modules\Finance\Queries\Audit\GetFinanceAuditGraphQuery;
-use App\Modules\Finance\Queries\GetStudentBalanceQuery;
 use App\Modules\Finance\Queries\Student360\GetStudent360LedgerQuery;
 use App\Modules\Finance\Queries\Student360\GetStudent360StatusCardsQuery;
 use App\Modules\Finance\Queries\Student360\GetStudentFinanceOverviewKpisQuery;
@@ -16,6 +15,7 @@ use App\Modules\Finance\Queries\Student360\GetStudentFinancePaymentHistoryQuery;
 use App\Modules\Finance\Queries\Student360\GetStudentFinanceReviewSignalsQuery;
 use App\Modules\Finance\Support\Audit\FinanceLedgerTimelineBuilder;
 use App\Modules\Finance\Support\LifecycleDueExceptionReasonResolver;
+use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -30,7 +30,7 @@ class FinanceStudentOverviewController extends Controller
     public function show(
         Student $student,
         Student360ShowRequest $request,
-        GetStudentBalanceQuery $balanceQuery,
+        StudentFinanceSettlementPositionReader $positionReader,
         GetFinanceAuditGraphQuery $graphQuery,
         FinanceLedgerTimelineBuilder $timelineBuilder,
         GetStudent360StatusCardsQuery $cardsQuery,
@@ -44,7 +44,7 @@ class FinanceStudentOverviewController extends Controller
         }
 
         $studentId = (int) $student->id;
-        $balance = $balanceQuery->handle($studentId); // student-level truth, all semesters
+        $position = $positionReader->current($studentId);
         $reason = LifecycleDueExceptionReasonResolver::resolve($student);
 
         $props = [
@@ -58,11 +58,15 @@ class FinanceStudentOverviewController extends Controller
                 'lifecycle_label' => $reason->label(),
             ],
             'balances' => [
-                'net_charges' => $balance['net_charges'],
-                'total_paid' => $balance['total_paid'],
-                'balance' => $balance['balance'],
-                'unapplied_credit' => $balance['unapplied_credit'],
-                'status' => $balance['status'],
+                'net_charges' => $position['net_due'],
+                'total_paid' => $position['cash_applied'],
+                'balance' => $position['remaining_collectible'],
+                'unapplied_credit' => $position['unapplied_cash'],
+                'credit_applied' => $position['credit_applied'],
+                'status' => $position['status'],
+                'valid' => $position['valid'],
+                'message' => $position['student_message'],
+                'issues' => $position['issues'],
             ],
             'tuition_overview' => $tuitionOverviewQuery->handle($studentId),
             'payment_history' => $paymentHistoryQuery->handle($studentId),

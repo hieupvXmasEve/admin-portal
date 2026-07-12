@@ -6,28 +6,20 @@ namespace App\Modules\Finance\Queries\Student360;
 
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\Payment;
-use App\Modules\Finance\Models\StudentInvoice;
-use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Models\PaymentSurplusDisposition;
+use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
 
 class GetStudentFinanceOverviewKpisQuery
 {
     public function __construct(
-        private SettlementService $settlement,
+        private readonly StudentFinanceSettlementPositionReader $positionReader,
     ) {}
 
     /** @return array<string,mixed> */
     public function handle(int $studentId): array
     {
-        $invoices = StudentInvoice::query()
-            ->where('student_id', $studentId)
-            ->with([
-                'invoiceLines.charge',
-                'invoiceLines.paymentApplications',
-                'invoiceLines.discountAllocations.invoiceDiscount',
-            ])
-            ->get();
-
-        $snapshots = $invoices->map(fn (StudentInvoice $invoice): array => $this->settlement->deriveInvoiceSnapshot($invoice));
+        $position = $this->positionReader->current($studentId);
+        $valid = (bool) $position['valid'];
         $payments = Payment::query()
             ->where('student_id', $studentId)
             ->where('status', Payment::STATUS_COMPLETED)
@@ -38,38 +30,66 @@ class GetStudentFinanceOverviewKpisQuery
         $surplusPayments = $payments
             ->map(fn (Payment $payment): array => [
                 'payment' => $payment,
-                'amount' => $this->money($this->settlement->getPaymentUnappliedAmount($payment)),
+                'amount' => $this->paymentSurplus($payment),
             ])
             ->filter(fn (array $row): bool => $row['amount'] > 0)
             ->values();
 
-        $surplus = $this->money((float) $surplusPayments->sum('amount'));
+        $surplus = $valid ? (float) ($position['unapplied_cash'] ?? 0) : null;
 
         return [
             'title' => 'Học phí sinh viên',
-            'kpis' => [
-                'collectible_due' => [
-                    'label' => 'Còn phải thu',
-                    'amount' => $this->money((float) $snapshots->sum('remaining')),
-                    'primary' => true,
-                ],
-                'total_paid' => [
-                    'label' => 'Tổng tiền đã nộp',
-                    'amount' => $this->money((float) $payments->sum(fn (Payment $payment): float => (float) $payment->amount)),
-                    'primary' => false,
-                ],
-                'collected' => [
-                    'label' => 'Đã thu',
-                    'amount' => $this->money((float) $snapshots->sum('paid')),
-                    'primary' => false,
-                ],
-                'surplus' => [
-                    'label' => 'Còn dư',
-                    'amount' => $surplus,
-                    'primary' => false,
-                ],
+            'settlement' => [
+                'valid' => $valid,
+                'state' => $position['settlement_state'],
+                'message' => $position['student_message'],
+                'issues' => $position['issues'],
             ],
-            'surplus_message' => $surplus > 0 ? $this->surplusMessage($surplusPayments->first()) : null,
+            'kpis' => [
+                'collectible_due' => $this->kpi(
+                    label: 'Còn phải thu',
+                    amount: $position['remaining_collectible'],
+                    primary: true,
+                    valid: $valid,
+                ),
+                'total_paid' => $this->kpi(
+                    label: 'Tổng tiền đã nộp',
+                    amount: $position['total_cash_received'],
+                    primary: false,
+                    valid: $valid,
+                ),
+                'collected' => $this->kpi(
+                    label: 'Đã thu',
+                    amount: $position['cash_applied'],
+                    primary: false,
+                    valid: $valid,
+                ),
+                'credit_applied' => $this->kpi(
+                    label: 'Đã áp dụng credit',
+                    amount: $position['credit_applied'],
+                    primary: false,
+                    valid: $valid,
+                ),
+                'surplus' => $this->kpi(
+                    label: 'Còn dư',
+                    amount: $surplus,
+                    primary: false,
+                    valid: $valid,
+                ),
+            ],
+            'surplus_message' => $surplus !== null && $surplus > 0
+                ? $this->surplusMessage($surplusPayments->first())
+                : null,
+        ];
+    }
+
+    /** @return array{label: string, amount: float|null, primary: bool} */
+    private function kpi(string $label, ?float $amount, bool $primary, bool $valid): array
+    {
+        return [
+            'label' => $label,
+            'amount' => $valid ? $amount : null,
+            'primary' => $primary,
         ];
     }
 
@@ -118,8 +138,17 @@ class GetStudentFinanceOverviewKpisQuery
         return number_format($amount, 0, ',', '.');
     }
 
-    private function money(float $amount): float
+    private function paymentSurplus(Payment $payment): float
     {
-        return round($amount, 2);
+        $applied = (float) $payment->applications()->sum('amount');
+        $disposed = (float) PaymentSurplusDisposition::query()
+            ->where('payment_id', $payment->id)
+            ->whereIn('type', [
+                PaymentSurplusDisposition::TYPE_REFUND,
+                PaymentSurplusDisposition::TYPE_RETAIN_FORFEIT,
+            ])
+            ->sum('amount');
+
+        return round(max(0, (float) $payment->amount - $applied - $disposed), 2);
     }
 }

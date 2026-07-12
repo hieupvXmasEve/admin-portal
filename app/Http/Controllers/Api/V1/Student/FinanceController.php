@@ -8,9 +8,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\Semester;
 use App\Modules\Finance\Models\FinanceCharge;
-use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
-use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -18,7 +17,7 @@ use Illuminate\Support\Facades\Log;
 class FinanceController extends Controller
 {
     public function __construct(
-        protected SettlementService $settlementService,
+        protected StudentFinanceSettlementPositionReader $positionReader,
     ) {}
 
     /**
@@ -29,12 +28,7 @@ class FinanceController extends Controller
         try {
             $student = $request->user();
 
-            // 1. Get global unapplied credit from COMPLETED payments
-            $globalUnapplied = Payment::query()
-                ->completed()
-                ->forStudent($student->id)
-                ->get()
-                ->sum('unapplied_amount');
+            $globalPosition = $this->positionReader->current((int) $student->id);
 
             $invoices = StudentInvoice::query()
                 ->with(['semester:id,code,name,start_date', 'invoiceLines.charge', 'invoiceLines.paymentApplications', 'invoiceLines.discountAllocations'])
@@ -51,25 +45,26 @@ class FinanceController extends Controller
                     continue;
                 }
 
-                $snapshots = $semesterInvoices->map(fn (StudentInvoice $invoice) => $this->settlementService->deriveInvoiceSnapshot($invoice));
-                $totalDue = (float) $snapshots->sum('net');
-                $totalPaid = (float) $snapshots->sum('paid');
-                $balance = $totalDue - $totalPaid;
+                $position = $this->positionReader->current((int) $student->id, (int) $semester->id);
+                $valid = (bool) $position['valid'];
+                $totalDue = $valid ? (float) $position['net_due'] : null;
+                $totalPaid = $valid ? (float) $position['cash_applied'] : null;
+                $balance = $valid ? (float) $position['remaining_collectible'] : null;
 
                 // Determine status
-                $status = 'unpaid';
-                if ($totalDue <= 0 && $totalPaid == 0) {
+                $status = 'unknown';
+                if ($valid && $totalDue <= 0 && $totalPaid == 0) {
                     // No effective due and no payment -> No Fee / Balanced
                     $status = 'no_fee';
                 } else {
-                    $diff = $totalDue - $totalPaid;
+                    $diff = $balance;
                     // Floating point comparison tolerance could be added if needed,
                     // but using simple logic for now.
-                    if (abs($diff) < 0.01) {
+                    if (abs((float) $diff) < 0.01) {
                         $status = 'paid';
-                    } elseif ($diff < 0) {
+                    } elseif ((float) $diff < 0) {
                         $status = 'overpaid';
-                    } elseif ($totalPaid > 0) {
+                    } elseif ((float) $totalPaid > 0) {
                         $status = 'partial';
                     } else {
                         $status = 'unpaid';
@@ -104,10 +99,14 @@ class FinanceController extends Controller
                     'semester_code' => $semester->code,
                     'semester_name' => $semester->name,
                     'start_date' => $semester->start_date,
-                    'due_amount' => (float) $totalDue,
-                    'paid_amount' => (float) $totalPaid,
-                    'balance' => (float) $balance,
+                    'due_amount' => $totalDue,
+                    'paid_amount' => $totalPaid,
+                    'balance' => $balance,
                     'status' => $status,
+                    'settlement_position' => [
+                        'valid' => $valid,
+                        'message' => $valid ? null : StudentFinanceSettlementPositionReader::STUDENT_UNAVAILABLE_MESSAGE,
+                    ],
                     'badges' => array_values(array_unique($badges)),
                 ];
             }
@@ -118,7 +117,11 @@ class FinanceController extends Controller
                 ->all();
 
             return ApiResponse::success([
-                'global_balance' => (float) $globalUnapplied,
+                'global_balance' => $globalPosition['valid'] ? $globalPosition['unapplied_cash'] : null,
+                'settlement_position' => [
+                    'valid' => (bool) $globalPosition['valid'],
+                    'message' => $globalPosition['valid'] ? null : StudentFinanceSettlementPositionReader::STUDENT_UNAVAILABLE_MESSAGE,
+                ],
                 'semesters' => $semestersData,
             ]);
 

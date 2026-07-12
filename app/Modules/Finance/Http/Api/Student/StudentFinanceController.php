@@ -18,6 +18,8 @@ use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\FinanceChargeService;
 use App\Modules\Finance\Services\PaymentService;
+use App\Modules\Finance\Support\SettlementPosition\Money;
+use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -26,7 +28,8 @@ class StudentFinanceController extends Controller
 {
     public function __construct(
         private FinanceChargeService $chargeService,
-        private PaymentService $paymentService
+        private PaymentService $paymentService,
+        private StudentFinanceSettlementPositionReader $positionReader,
     ) {}
 
     /**
@@ -34,7 +37,7 @@ class StudentFinanceController extends Controller
      */
     public function balance(Request $request): JsonResponse
     {
-        $student = $request->user('student');
+        $student = $request->user();
 
         if (! $student) {
             return ApiResponse::error('Unauthorized', [], 401);
@@ -45,7 +48,7 @@ class StudentFinanceController extends Controller
         ]);
 
         $semesterId = isset($validated['semester_id']) ? (int) $validated['semester_id'] : null;
-        $balance = $this->paymentService->getStudentBalance($student->id, $semesterId);
+        $balance = $this->studentBalance($this->positionReader->current($student->id, $semesterId));
 
         return ApiResponse::success([
             'balance' => $balance,
@@ -58,7 +61,7 @@ class StudentFinanceController extends Controller
      */
     public function charges(Request $request): JsonResponse
     {
-        $student = $request->user('student');
+        $student = $request->user();
 
         if (! $student) {
             return ApiResponse::error('Unauthorized', [], 401);
@@ -96,7 +99,7 @@ class StudentFinanceController extends Controller
      */
     public function payments(Request $request): JsonResponse
     {
-        $student = $request->user('student');
+        $student = $request->user();
 
         if (! $student) {
             return ApiResponse::error('Unauthorized', [], 401);
@@ -153,7 +156,7 @@ class StudentFinanceController extends Controller
      */
     public function paymentDetail(Request $request, int $paymentId): JsonResponse
     {
-        $student = $request->user('student');
+        $student = $request->user();
 
         if (! $student) {
             return ApiResponse::error('Unauthorized', [], 401);
@@ -225,7 +228,7 @@ class StudentFinanceController extends Controller
      */
     public function chargeDetail(Request $request, int $chargeId): JsonResponse
     {
-        $student = $request->user('student');
+        $student = $request->user();
 
         if (! $student) {
             return ApiResponse::error('Unauthorized', [], 401);
@@ -519,7 +522,7 @@ class StudentFinanceController extends Controller
      */
     public function invoices(Request $request): JsonResponse
     {
-        $student = $request->user('student');
+        $student = $request->user();
 
         if (! $student) {
             return ApiResponse::error('Unauthorized', [], 401);
@@ -605,13 +608,34 @@ class StudentFinanceController extends Controller
     {
         $student->loadMissing('campus');
 
-        return $request->student_id === $student->id
+        $metadataSafe = $request->student_id === $student->id
             && $request->billing_account_id !== null
             && $request->provider_rail === 'dng'
             && $request->campus_code === $student->campus?->getDngCode()
             && $request->student_code === $student->student_id
             && filled($request->item_id)
             && (float) $request->amount > 0;
+
+        if (! $metadataSafe) {
+            return false;
+        }
+
+        $targetLineIds = $request->reservationTargets()
+            ->pluck('invoice_line_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->values()
+            ->all();
+
+        if ($targetLineIds === []) {
+            return true;
+        }
+
+        $position = $this->positionReader->forPayableLines($targetLineIds);
+
+        return $position->isValid()
+            && $position->amounts !== null
+            && $position->amounts->remaining->minor_amount === Money::vnd((string) $request->amount)->minor_amount;
     }
 
     /**
@@ -619,7 +643,7 @@ class StudentFinanceController extends Controller
      */
     public function invoiceDetail(Request $request, int $invoiceId): JsonResponse
     {
-        $student = $request->user('student');
+        $student = $request->user();
 
         if (! $student) {
             return ApiResponse::error('Unauthorized', [], 401);
@@ -685,7 +709,7 @@ class StudentFinanceController extends Controller
      */
     public function overview(Request $request): JsonResponse
     {
-        $student = $request->user('student');
+        $student = $request->user();
 
         if (! $student) {
             return ApiResponse::error('Unauthorized', [], 401);
@@ -697,11 +721,13 @@ class StudentFinanceController extends Controller
 
         $semesterId = isset($validated['semester_id']) ? (int) $validated['semester_id'] : null;
 
-        // Balance summary
-        $balance = $this->paymentService->getStudentBalance($student->id, $semesterId);
+        // Balance summary comes from the Finance-owned current Settlement Position.
+        $position = $this->positionReader->current($student->id, $semesterId);
+        $balance = $this->studentBalance($position);
 
         // Pending charges
         $outstandingCharges = $this->paymentService->getOutstandingCharges($student->id, $semesterId);
+        $pendingCharges = $position['valid'] ? $outstandingCharges : collect();
 
         // Recent payments (latest 5)
         $recentPayments = Payment::where('student_id', $student->id)
@@ -752,9 +778,9 @@ class StudentFinanceController extends Controller
         return ApiResponse::success([
             'balance' => $balance,
             'pending_payments' => [
-                'count' => $outstandingCharges->count(),
-                'total_amount' => (float) $outstandingCharges->sum('balance'),
-                'items' => $outstandingCharges->take(5)->map(fn ($c) => [
+                'count' => $pendingCharges->count(),
+                'total_amount' => $position['remaining_collectible'] ?? null,
+                'items' => $pendingCharges->take(5)->map(fn ($c) => [
                     'id' => $c->id,
                     'description' => $c->description,
                     'balance' => (float) $c->balance,
@@ -773,6 +799,29 @@ class StudentFinanceController extends Controller
             ],
             'semester' => $semester ? ['id' => $semester->id, 'name' => $semester->name] : null,
         ]);
+    }
+
+    /** @param array<string, mixed> $position */
+    private function studentBalance(array $position): array
+    {
+        $valid = (bool) ($position['valid'] ?? false);
+
+        return [
+            'total_charges' => $valid ? $position['gross'] : null,
+            'total_credits' => $valid ? $position['discount'] : null,
+            'net_charges' => $valid ? $position['net_due'] : null,
+            'total_paid' => $valid ? $position['cash_applied'] : null,
+            'balance' => $valid ? $position['remaining_collectible'] : null,
+            'unapplied_credit' => $valid ? $position['unapplied_cash'] : null,
+            'applied_credit' => $valid ? $position['credit_applied'] : null,
+            'status' => $position['status'] ?? 'unknown',
+            'settlement_position' => [
+                'valid' => $valid,
+                'mode' => $position['position_mode'] ?? 'current',
+                'state' => $position['settlement_state'] ?? 'invalid',
+                'message' => $valid ? null : StudentFinanceSettlementPositionReader::STUDENT_UNAVAILABLE_MESSAGE,
+            ],
+        ];
     }
 
     /**

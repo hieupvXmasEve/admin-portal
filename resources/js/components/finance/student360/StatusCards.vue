@@ -36,8 +36,9 @@ const emit = defineEmits<{
                 <CardTitle class="text-xs font-medium">Số dư & phân bổ</CardTitle>
             </CardHeader>
             <CardContent class="space-y-2">
-                <p class="text-lg font-semibold tabular-nums">{{ formatCurrency(cards.balance.balance) }}</p>
-                <p v-if="cards.balance.has_unapplied" class="text-sm text-blue-700 dark:text-blue-300">Dư chưa khớp: {{ formatCurrency(cards.balance.unapplied_credit) }}</p>
+                <p v-if="cards.balance.valid" class="text-lg font-semibold tabular-nums">{{ formatCurrency(cards.balance.balance ?? 0) }}</p>
+                <p v-else class="text-muted-foreground text-sm">{{ cards.balance.message ?? 'Cần kiểm tra' }}</p>
+                <p v-if="cards.balance.valid && cards.balance.has_unapplied" class="text-sm text-blue-700 dark:text-blue-300">Dư chưa khớp: {{ formatCurrency(cards.balance.unapplied_cash ?? 0) }}</p>
                 <Button v-if="cards.balance.has_unapplied && actions.can_allocate" size="sm" variant="outline" @click="emit('allocate')"> Phân bổ ngay </Button>
             </CardContent>
         </Card>

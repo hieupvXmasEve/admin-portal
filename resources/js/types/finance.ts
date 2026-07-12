@@ -260,16 +260,20 @@ export interface Student360Identity {
 }
 
 export interface Student360Balances {
-    net_charges: number;
-    total_paid: number;
-    balance: number;
-    unapplied_credit: number;
+    net_charges: number | null;
+    total_paid: number | null;
+    balance: number | null;
+    unapplied_credit: number | null;
+    credit_applied: number | null;
     status: string;
+    valid: boolean;
+    message: string | null;
+    issues: Array<{ code: string; blocking: boolean; evidence: Record<string, number | string> }>;
 }
 
 export interface StudentFinanceOverviewKpi {
     label: string;
-    amount: number;
+    amount: number | null;
     primary: boolean;
 }
 
@@ -279,7 +283,14 @@ export interface StudentFinanceTuitionOverview {
         collectible_due: StudentFinanceOverviewKpi;
         total_paid: StudentFinanceOverviewKpi;
         collected: StudentFinanceOverviewKpi;
+        credit_applied: StudentFinanceOverviewKpi;
         surplus: StudentFinanceOverviewKpi;
+    };
+    settlement: {
+        valid: boolean;
+        state: string;
+        message: string | null;
+        issues: Array<{ code: string; blocking: boolean; evidence: Record<string, number | string> }>;
     };
     surplus_message: string | null;
 }
@@ -344,10 +355,15 @@ export interface DngCardRequest {
 
 export interface Student360StatusCards {
     balance: {
-        balance: number;
-        unapplied_credit: number;
+        valid: boolean;
+        balance: number | null;
+        unapplied_cash: number | null;
+        unapplied_credit: number | null;
+        applied_credit: number | null;
         has_unapplied: boolean;
         unapplied_payment_id: number | null;
+        message: string | null;
+        issues: Array<{ code: string; blocking: boolean; evidence: Record<string, number | string> }>;
     };
     dng: { has_active: boolean; request: DngCardRequest | null };
     installments: {
