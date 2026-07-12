@@ -26,6 +26,8 @@ interface KpiStats {
     total_credits: number;
     total_paid: number;
     total_balance: number;
+    total_receivable: number;
+    needs_review_count: number;
     defer_preserve_count: number;
     defer_forfeit_count: number;
     retake_unpaid_count: number;
@@ -40,17 +42,17 @@ interface StudentBillingSummary {
     status: string;
     stage: 'EGC' | 'Major' | 'Unknown';
     gc_current_level: string | null;
-    gross_billed: number;
-    total_discounts: number;
-    net_due: number;
-    cash_applied: number;
-    outstanding_amount: number;
+    gross_billed: number | null;
+    total_discounts: number | null;
+    net_due: number | null;
+    cash_applied: number | null;
+    outstanding_amount: number | null;
     unapplied_cash: number;
     breakdown: {
-        major: number;
-        egc: number;
-        retake: number;
-        discounts: number;
+        major: number | null;
+        egc: number | null;
+        retake: number | null;
+        discount: number | null;
     };
     flags: {
         has_retake: boolean;
@@ -67,6 +69,9 @@ interface StudentBillingSummary {
     }[];
     invoice_statuses: string[];
     invoice_status: string | null;
+    settlement_label: string;
+    needs_review: boolean;
+    settlement_issues: unknown[];
     invoice_number: string | null;
     invoice_id: number | null;
     due_date: string | null;
@@ -492,33 +497,39 @@ defineOptions({
 
                     <!-- Gross Column -->
                     <template #cell-gross_billed="{ row }">
-                        <div class="text-left font-medium text-red-600" :title="`Major: ${formatCurrency(row.original.breakdown.major)}\nEGC: ${formatCurrency(row.original.breakdown.egc)}\nRetake: ${formatCurrency(row.original.breakdown.retake)}`">
-                            {{ formatCurrency(row.original.gross_billed) }}
+                        <div
+                            v-if="!row.original.needs_review"
+                            class="text-left font-medium text-red-600"
+                            :title="`Major: ${row.original.breakdown.major === null ? '—' : formatCurrency(row.original.breakdown.major)}\nEGC: ${row.original.breakdown.egc === null ? '—' : formatCurrency(row.original.breakdown.egc)}\nRetake: ${row.original.breakdown.retake === null ? '—' : formatCurrency(row.original.breakdown.retake)}`"
+                        >
+                            {{ row.original.gross_billed === null ? '—' : formatCurrency(row.original.gross_billed) }}
                         </div>
+                        <div v-else class="text-amber-700">Cần kiểm tra</div>
                     </template>
 
                     <!-- Discounts Column -->
                     <template #cell-total_discounts="{ row }">
                         <div class="text-left font-medium text-sky-600">
-                            {{ formatCurrency(row.original.total_discounts) }}
+                            {{ row.original.total_discounts === null ? '—' : formatCurrency(row.original.total_discounts) }}
                         </div>
                     </template>
 
                     <!-- Cash Applied Column -->
                     <template #cell-cash_applied="{ row }">
                         <div class="text-left font-medium text-green-600">
-                            {{ formatCurrency(row.original.cash_applied) }}
+                            {{ row.original.cash_applied === null ? '—' : formatCurrency(row.original.cash_applied) }}
                         </div>
                     </template>
 
                     <!-- Outstanding Column -->
                     <template #cell-outstanding_amount="{ row }">
                         <div class="text-left font-medium">
-                            <span :class="row.original.outstanding_amount > 0 ? 'text-orange-600' : 'text-green-600'">
-                                {{ formatCurrency(row.original.outstanding_amount) }}
+                            <span v-if="row.original.needs_review" class="text-amber-700"> Cần kiểm tra </span>
+                            <span v-else :class="row.original.outstanding_amount !== null && row.original.outstanding_amount > 0 ? 'text-orange-600' : 'text-green-600'">
+                                {{ row.original.outstanding_amount === null ? '—' : formatCurrency(row.original.outstanding_amount) }}
                             </span>
                             <div v-if="row.original.unapplied_cash > 0" class="text-xs text-green-600" title="Unapplied Cash">+{{ formatCurrency(row.original.unapplied_cash) }} unapplied</div>
-                            <div v-if="row.original.net_due > 0" class="text-muted-foreground text-xs">Net due {{ formatCurrency(row.original.net_due) }}</div>
+                            <div v-if="row.original.net_due !== null && row.original.net_due > 0" class="text-muted-foreground text-xs">Net due {{ formatCurrency(row.original.net_due) }}</div>
                         </div>
                     </template>
 

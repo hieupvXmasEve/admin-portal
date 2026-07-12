@@ -6,16 +6,16 @@ namespace App\Modules\Finance\Queries\Operations;
 
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
-use App\Modules\Finance\Models\FinanceCharge;
-use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
-use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistPresenter;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistReader;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
-class ListSettlementWorklistQuery
+final class ListSettlementWorklistQuery
 {
     private const SORTABLE = [
         'student_code' => 'student_code',
@@ -27,9 +27,11 @@ class ListSettlementWorklistQuery
     ];
 
     public function __construct(
-        protected SettlementService $settlementService
+        private readonly SettlementPositionWorklistReader $positionReader,
+        private readonly SettlementPositionWorklistPresenter $positionPresenter,
     ) {}
 
+    /** @return array<string,mixed> */
     public function handle(Request $request): array
     {
         $validated = $request->validate([
@@ -53,8 +55,12 @@ class ListSettlementWorklistQuery
         $direction = ($validated['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
 
         $invoiceQuery = StudentInvoice::query()
-            ->with(['student', 'semester', 'invoiceLines.charge', 'invoiceLines.paymentApplications', 'invoiceLines.discountAllocations'])
-            ->whereNotIn('status', ['paid', 'cancelled'])
+            ->with([
+                'student',
+                'semester',
+                'invoiceLines' => fn ($query) => $query->where('status', 'active')->with('charge.financeObligation'),
+            ])
+            ->whereNotIn('status', ['cancelled'])
             ->orderBy('due_date');
 
         $campusId = app()->bound('campus') ? app('campus')->id : null;
@@ -64,9 +70,9 @@ class ListSettlementWorklistQuery
         }
 
         if ($search !== '') {
-            $invoiceQuery->where(function ($query) use ($search) {
+            $invoiceQuery->where(function ($query) use ($search): void {
                 $query->where('invoice_number', 'like', "%{$search}%")
-                    ->orWhereHas('student', function ($studentQuery) use ($search) {
+                    ->orWhereHas('student', function ($studentQuery) use ($search): void {
                         $studentQuery->where('student_id', 'like', "%{$search}%")
                             ->orWhere('full_name', 'like', "%{$search}%");
                     });
@@ -74,22 +80,32 @@ class ListSettlementWorklistQuery
         }
 
         if ($studentStatus !== '') {
-            $invoiceQuery->whereHas('student', function ($q) use ($studentStatus) {
-                $q->where('status', $studentStatus);
-            });
+            $invoiceQuery->whereHas('student', fn ($query) => $query->where('status', $studentStatus));
         }
 
         $invoices = $invoiceQuery->get();
+        $lineIdsByStudent = [];
+        $lineIdsByInvoice = [];
+        $lineIdsByStudentFeeType = [];
 
-        $invoices = $invoices
-            ->filter(function (StudentInvoice $invoice) {
-                $snapshot = $this->deriveInvoiceSnapshot($invoice);
+        foreach ($invoices as $invoice) {
+            $invoiceLines = $invoice->invoiceLines;
+            $lineIdsByInvoice[(int) $invoice->id] = $invoiceLines->pluck('id')->map(fn ($id): int => (int) $id)->all();
 
-                return $snapshot['total_amount'] > 0 && $snapshot['paid_amount'] < $snapshot['total_amount'];
-            })
-            ->values();
+            foreach ($invoiceLines as $line) {
+                $studentId = (int) $invoice->student_id;
+                $lineId = (int) $line->id;
+                $feeType = DngFeeTypeOptions::fromChargeType((string) ($line->charge?->charge_type ?? ''));
 
-        $studentIds = $invoices->pluck('student_id')->unique()->values();
+                $lineIdsByStudent[$studentId][] = $lineId;
+                $lineIdsByStudentFeeType[$studentId.'|'.$feeType][] = $lineId;
+            }
+        }
+
+        $positionsByStudent = $this->positionReader->forLineGroups($lineIdsByStudent);
+        $positionsByInvoice = $this->positionReader->forLineGroups($lineIdsByInvoice);
+        $positionsByStudentFeeType = $this->positionReader->forLineGroups($lineIdsByStudentFeeType);
+        $studentIds = collect(array_keys($lineIdsByStudent))->map(fn ($id): int => (int) $id)->values();
 
         $paymentsByStudent = Payment::query()
             ->with('applications')
@@ -102,18 +118,10 @@ class ListSettlementWorklistQuery
         $latestDngRequestsByStudent = DngPaymentRequest::query()
             ->whereIn('student_id', $studentIds)
             ->latest('created_at')
-            ->get([
-                'id',
-                'student_id',
-                'status',
-                'item_id',
-                'description',
-                'created_at',
-            ])
+            ->get(['id', 'student_id', 'status', 'item_id', 'description', 'created_at'])
             ->groupBy('student_id')
             ->map(fn (Collection $requests) => $requests->first());
 
-        // Batch query: latest awaitingPayment DNG per (student_id, fee_type) — 1 query, no N+1
         $activeDngByStudentAndFeeType = DngPaymentRequest::query()
             ->whereIn('student_id', $studentIds)
             ->awaitingPayment()
@@ -125,19 +133,25 @@ class ListSettlementWorklistQuery
 
         $students = $invoices
             ->groupBy('student_id')
-            ->map(function (Collection $studentInvoices, int $studentId) use ($paymentsByStudent, $latestDngRequestsByStudent, $activeDngByStudentAndFeeType) {
+            ->map(function (Collection $studentInvoices, int|string $studentId) use (
+                $positionsByStudent,
+                $positionsByInvoice,
+                $positionsByStudentFeeType,
+                $paymentsByStudent,
+                $latestDngRequestsByStudent,
+                $activeDngByStudentAndFeeType,
+            ): array {
+                $studentId = (int) $studentId;
                 $student = $studentInvoices->first()?->student;
+                $position = $positionsByStudent[$studentId] ?? null;
                 $payments = $paymentsByStudent->get($studentId, collect());
+                $unappliedBalance = $this->positionPresenter->unappliedCash($payments);
+                $positionSummary = $position instanceof SettlementPosition
+                    ? $this->positionPresenter->summarize($position, $unappliedBalance > 0)
+                    : $this->missingSummary();
+                $activeDue = $positionSummary['remaining'];
+                $actionable = $positionSummary['valid'] && $activeDue !== null && $activeDue > 0 && $unappliedBalance > 0;
                 $latestDngRequest = $latestDngRequestsByStudent->get($studentId);
-                $totalPayments = (float) $payments->sum('amount');
-                $allocatedAmount = (float) $payments->sum(fn (Payment $payment) => max(0, (float) $payment->applications->sum('amount')));
-                $unappliedBalance = max(0, $totalPayments - $allocatedAmount);
-                $activeDue = (float) $studentInvoices->sum(function (StudentInvoice $invoice) {
-                    $snapshot = $this->deriveInvoiceSnapshot($invoice);
-
-                    return max(0, $snapshot['total_amount'] - $snapshot['paid_amount']);
-                });
-                $overdueCount = $studentInvoices->filter(fn (StudentInvoice $invoice) => $invoice->due_date && $invoice->due_date->isPast())->count();
 
                 return [
                     'student_id' => $studentId,
@@ -145,13 +159,21 @@ class ListSettlementWorklistQuery
                     'student_name' => $student?->full_name,
                     'student_status' => $student?->status,
                     'invoice_count' => $studentInvoices->count(),
-                    'overdue_invoice_count' => $overdueCount,
+                    'overdue_invoice_count' => $studentInvoices->filter(fn (StudentInvoice $invoice): bool => $invoice->due_date?->isPast() ?? false)->count(),
                     'active_due' => $activeDue,
                     'unapplied_balance' => $unappliedBalance,
-                    'allocated_amount' => $allocatedAmount,
-                    'total_payments' => $totalPayments,
-                    'net_amount_to_collect' => max(0, $activeDue - $unappliedBalance),
-                    'actionable' => $activeDue > 0 && $unappliedBalance > 0,
+                    'allocated_amount' => (float) $payments->sum(fn (Payment $payment): float => (float) $payment->applications->sum('amount')),
+                    'total_payments' => (float) $payments->sum('amount'),
+                    'net_amount_to_collect' => $this->positionPresenter->netAmountToCollect($activeDue, $unappliedBalance),
+                    'actionable' => $actionable,
+                    'needs_review' => ! $positionSummary['valid'],
+                    'settlement_state' => $positionSummary['settlement_state'],
+                    'settlement_label' => $positionSummary['settlement_label'],
+                    'settlement_issues' => $positionSummary['issues'],
+                    'gross' => $positionSummary['gross'],
+                    'discount' => $positionSummary['discount'],
+                    'cash' => $positionSummary['cash'],
+                    'credit' => $positionSummary['credit'],
                     'latest_dng_request' => $latestDngRequest ? [
                         'id' => $latestDngRequest->id,
                         'status' => $latestDngRequest->status,
@@ -159,28 +181,38 @@ class ListSettlementWorklistQuery
                         'description' => $latestDngRequest->description,
                         'created_at' => $latestDngRequest->created_at?->toIso8601String(),
                     ] : null,
-                    'fee_type_breakdown' => $this->computeFeeTypeBreakdown($studentInvoices, $activeDngByStudentAndFeeType->get($studentId, collect())),
-                    'invoices' => $studentInvoices->map(function (StudentInvoice $invoice) {
-                        $snapshot = $this->deriveInvoiceSnapshot($invoice);
+                    'fee_type_breakdown' => $this->feeTypeBreakdown(
+                        $studentId,
+                        $positionsByStudentFeeType,
+                        $activeDngByStudentAndFeeType->get($studentId, collect()),
+                    ),
+                    'invoices' => $studentInvoices->map(function (StudentInvoice $invoice) use ($positionsByInvoice): array {
+                        $invoicePosition = $positionsByInvoice[(int) $invoice->id] ?? null;
+                        $summary = $invoicePosition instanceof SettlementPosition
+                            ? $this->positionPresenter->summarize($invoicePosition)
+                            : $this->missingSummary();
 
                         return [
                             'id' => $invoice->id,
                             'invoice_number' => $invoice->invoice_number,
                             'semester_id' => $invoice->semester_id,
                             'semester_name' => $invoice->semester?->name,
-                            'status' => $invoice->status,
+                            'status' => $summary['valid'] && $summary['remaining'] !== null && $summary['remaining'] <= 0 ? 'paid' : ($summary['valid'] ? $invoice->status : 'needs_review'),
+                            'settlement_state' => $summary['settlement_state'],
+                            'settlement_label' => $summary['settlement_label'],
+                            'settlement_issues' => $summary['issues'],
                             'due_date' => $invoice->due_date?->toDateString(),
-                            'total_amount' => $snapshot['total_amount'],
-                            'paid_amount' => $snapshot['paid_amount'],
-                            'remaining_amount' => max(0, $snapshot['total_amount'] - $snapshot['paid_amount']),
+                            'total_amount' => $summary['net'],
+                            'paid_amount' => $summary['cash'],
+                            'remaining_amount' => $summary['remaining'],
                         ];
                     })->values(),
                 ];
             })
-            ->filter(function (array $student) use ($readiness, $dngStatus) {
+            ->filter(function (array $student) use ($readiness, $dngStatus): bool {
                 $passReadiness = match ($readiness) {
                     'ready' => $student['actionable'],
-                    'no_cash' => ! $student['actionable'],
+                    'no_cash' => $student['needs_review'] === false && ! $student['actionable'],
                     default => true,
                 };
 
@@ -194,36 +226,41 @@ class ListSettlementWorklistQuery
             })
             ->values();
 
-        $students = $students->sort(function (array $left, array $right) use ($sort, $direction) {
+        $exceptions = $students->filter(fn (array $student): bool => $student['needs_review'])->values();
+        $students = $students
+            ->filter(fn (array $student): bool => $student['needs_review'] === false && $student['active_due'] !== null && $student['active_due'] > 0)
+            ->values();
+
+        $students = $students->sort(function (array $left, array $right) use ($sort, $direction): int {
             $leftRank = [
                 $left['actionable'] ? 1 : 0,
+                $left['needs_review'] ? 1 : 0,
                 $left['overdue_invoice_count'],
-                $left[$sort],
+                $left[$sort] ?? 0,
                 $left['student_code'],
             ];
             $rightRank = [
                 $right['actionable'] ? 1 : 0,
+                $right['needs_review'] ? 1 : 0,
                 $right['overdue_invoice_count'],
-                $right[$sort],
+                $right[$sort] ?? 0,
                 $right['student_code'],
             ];
 
-            return $direction === 'asc'
-                ? ($leftRank <=> $rightRank)
-                : ($rightRank <=> $leftRank);
+            return $direction === 'asc' ? ($leftRank <=> $rightRank) : ($rightRank <=> $leftRank);
         })->values();
 
         $summary = [
             'students_with_unpaid_invoices' => $students->count(),
             'ready_students' => $students->where('actionable', true)->count(),
-            'total_active_due' => (float) $students->sum('active_due'),
+            'needs_review_students' => $exceptions->count(),
+            'total_active_due' => (float) $students->where('needs_review', false)->sum('active_due'),
             'total_unapplied_balance' => (float) $students->sum('unapplied_balance'),
         ];
 
-        $students = $this->paginateCollection($students, $perPage, $page, $request->url(), $request->query());
-
         return [
-            'students' => $students,
+            'students' => $this->paginateCollection($students, $perPage, $page, $request->url(), $request->query()),
+            'exceptions' => $exceptions->all(),
             'summary' => $summary,
             'filters' => [
                 'search' => $search,
@@ -238,68 +275,57 @@ class ListSettlementWorklistQuery
         ];
     }
 
-    /**
-     * @param  Collection<int, StudentInvoice>  $studentInvoices
-     * @param  Collection<string, DngPaymentRequest>  $activeDngByFeeType  fee_type => latest awaitingPayment DNG
-     * @return array<int, array{fee_type: string, label: string, gross: float, discount: float, net_remaining: float, semester_id: int|null, active_dng: array{id: int, amount: float, status: string}|null}>
-     */
-    private function computeFeeTypeBreakdown(Collection $studentInvoices, Collection $activeDngByFeeType): array
+    /** @return array<string,mixed> */
+    private function missingSummary(): array
     {
-        $feeTypeLabelMap = collect(DngFeeTypeOptions::all())->pluck('label', 'value')->all();
+        return [
+            'valid' => false,
+            'settlement_state' => SettlementPosition::STATE_MISSING,
+            'settlement_label' => 'Cần kiểm tra',
+            'gross' => null,
+            'discount' => null,
+            'cash' => null,
+            'credit' => null,
+            'net' => null,
+            'remaining' => null,
+            'issues' => [[
+                'code' => 'settlement_position.missing_payable_line',
+                'severity' => 'blocking',
+                'blocking' => true,
+                'evidence' => [],
+                'finance_invariant_code' => null,
+            ]],
+        ];
+    }
 
-        // groups: fee_type => [gross, discount, paid, semester_id]
-        $groups = [];
-
-        foreach ($studentInvoices as $invoice) {
-            foreach ($invoice->invoiceLines as $line) {
-                if (! $this->isBillableActiveLine($line)) {
-                    continue;
-                }
-
-                $amountSnapshot = (float) $line->amount_snapshot;
-
-                // Only positive charge lines contribute to fee_type rows
-                if ($amountSnapshot <= 0) {
-                    continue;
-                }
-
-                $chargeType = $line->charge?->charge_type ?? '';
-                $feeType = DngFeeTypeOptions::fromChargeType($chargeType);
-
-                if (! isset($groups[$feeType])) {
-                    $groups[$feeType] = [
-                        'gross' => 0.0,
-                        'discount' => 0.0,
-                        'paid' => 0.0,
-                        'semester_id' => $invoice->semester_id,
-                    ];
-                }
-
-                $groups[$feeType]['gross'] += $amountSnapshot;
-                $groups[$feeType]['discount'] += (float) $line->discountAllocations->sum('amount');
-                $groups[$feeType]['paid'] += (float) $line->paymentApplications->sum('amount');
-            }
-        }
-
+    /** @return list<array<string,mixed>> */
+    private function feeTypeBreakdown(int $studentId, array $positions, Collection $activeDngByFeeType): array
+    {
+        $labels = collect(DngFeeTypeOptions::all())->pluck('label', 'value')->all();
+        $prefix = $studentId.'|';
         $result = [];
 
-        foreach ($groups as $feeType => $data) {
-            $netRemaining = max(0.0, $data['gross'] - $data['discount'] - $data['paid']);
+        foreach ($positions as $key => $position) {
+            if (! str_starts_with((string) $key, $prefix)) {
+                continue;
+            }
 
-            if ($netRemaining <= 0) {
+            $feeType = substr((string) $key, strlen($prefix));
+            $summary = $this->positionPresenter->summarize($position);
+
+            if (! $summary['valid'] || $summary['remaining'] === null || $summary['remaining'] <= 0) {
                 continue;
             }
 
             $activeDng = $activeDngByFeeType->get($feeType);
-
             $result[] = [
                 'fee_type' => $feeType,
-                'label' => $feeTypeLabelMap[$feeType] ?? $feeType,
-                'gross' => $data['gross'],
-                'discount' => $data['discount'],
-                'net_remaining' => $netRemaining,
-                'semester_id' => $data['semester_id'],
-                'active_dng' => $activeDng !== null ? [
+                'label' => $labels[$feeType] ?? $feeType,
+                'gross' => $summary['gross'],
+                'discount' => $summary['discount'],
+                'net_remaining' => $summary['remaining'],
+                'semester_id' => null,
+                'active_dng' => $activeDng ? [
                     'id' => $activeDng->id,
                     'amount' => (float) $activeDng->amount,
                     'status' => $activeDng->status,
@@ -312,37 +338,9 @@ class ListSettlementWorklistQuery
 
     private function paginateCollection(Collection $items, int $perPage, int $page, string $path, array $query): LengthAwarePaginator
     {
-        $total = $items->count();
-        $results = $items->forPage($page, $perPage)->values();
-
-        return (new LengthAwarePaginator($results, $total, $perPage, $page, [
+        return (new LengthAwarePaginator($items->forPage($page, $perPage)->values(), $items->count(), $perPage, $page, [
             'path' => $path,
             'query' => $query,
         ]))->withQueryString();
-    }
-
-    /**
-     * FIN-01: balance numbers come from the one canonical ledger calculation in
-     * SettlementService. This adapter only remaps the canonical keys to the
-     * worklist's local contract ({total_amount, paid_amount}); it must not
-     * re-derive or mix stale cache columns.
-     */
-    private function deriveInvoiceSnapshot(StudentInvoice $invoice): array
-    {
-        $snapshot = $this->settlementService->deriveInvoiceSnapshot($invoice);
-
-        return [
-            'total_amount' => $snapshot['net'],
-            'paid_amount' => $snapshot['paid'],
-        ];
-    }
-
-    private function isBillableActiveLine(InvoiceLine $line): bool
-    {
-        if (($line->status ?? 'active') !== 'active') {
-            return false;
-        }
-
-        return $line->charge === null || $line->charge->status === FinanceCharge::STATUS_ACTIVE;
     }
 }

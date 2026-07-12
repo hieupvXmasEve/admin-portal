@@ -11,11 +11,14 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistPresenter;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistReader;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Query the DNG worklist: students with active, unpaid charges of a given DNG fee type.
@@ -36,6 +39,11 @@ class ListDngWorklistQuery
         'balance' => 'balance',
         'charge_count' => 'charge_count',
     ];
+
+    public function __construct(
+        private readonly SettlementPositionWorklistReader $positionReader,
+        private readonly SettlementPositionWorklistPresenter $positionPresenter,
+    ) {}
 
     /**
      * @return array{
@@ -68,71 +76,111 @@ class ListDngWorklistQuery
 
         $chargeTypes = self::mapFeeTypeToChargeTypes($dngFeeType);
 
-        // ------------------------------------------------------------------
-        // Batch-aggregate charges per student using subqueries for balance.
-        // Avoids N+1 by computing paid/discount at the DB level.
-        // ------------------------------------------------------------------
         $campusFilter = app()->bound('campus') ? app('campus')->id : $campusId;
 
-        // Subquery: paid amount per charge (sum of payment_applications via invoice_lines)
-        $paidSubquery = DB::table('invoice_lines as il_p')
-            ->join('payment_applications as pa', 'pa.invoice_line_id', '=', 'il_p.id')
-            ->where('il_p.status', 'active')
-            ->selectRaw('il_p.charge_id, COALESCE(SUM(pa.amount), 0) as paid_amount')
-            ->groupBy('il_p.charge_id');
+        $lines = InvoiceLine::query()
+            ->with(['invoice.student.campus', 'invoice.semester', 'charge.financeObligation'])
+            ->where('invoice_lines.status', 'active')
+            ->whereHas('charge', function ($query) use ($chargeTypes): void {
+                $query->where('status', FinanceCharge::STATUS_ACTIVE)
+                    ->where('amount', '>', 0)
+                    ->whereIn('charge_type', $chargeTypes);
+            })
+            ->whereHas('invoice', function ($query) use ($campusFilter, $semesterId, $search): void {
+                $query->when($semesterId !== null, fn ($q) => $q->where('semester_id', $semesterId))
+                    ->when($campusFilter !== null, fn ($q) => $q->whereHas('student', fn ($sq) => $sq->where('campus_id', $campusFilter)))
+                    ->when($search !== '', fn ($q) => $q->whereHas('student', function ($sq) use ($search): void {
+                        $sq->where('student_id', 'like', "%{$search}%")
+                            ->orWhere('full_name', 'like', "%{$search}%");
+                    }));
+            })
+            ->get();
 
-        // Subquery: discount amount per charge (sum of discount_allocations via invoice_lines)
-        $discountSubquery = DB::table('invoice_lines as il_d')
-            ->join('discount_allocations as da', 'da.invoice_line_id', '=', 'il_d.id')
-            ->where('il_d.status', 'active')
-            ->selectRaw('il_d.charge_id, COALESCE(SUM(da.amount), 0) as discount_amount')
-            ->groupBy('il_d.charge_id');
+        $lineIdsByStudent = $lines->groupBy(fn (InvoiceLine $line): int => (int) $line->invoice->student_id)
+            ->map(fn (Collection $studentLines): array => $studentLines->pluck('id')->map(fn ($id): int => (int) $id)->all())
+            ->all();
+        $positionsByStudent = $this->positionReader->forLineGroups($lineIdsByStudent);
 
-        // Main query aggregated per student
-        $query = DB::table('finance_charges as fc')
-            ->join('students as s', 's.id', '=', 'fc.student_id')
-            ->join('campuses as c', 'c.id', '=', 's.campus_id')
-            ->leftJoinSub($paidSubquery, 'paid', 'paid.charge_id', '=', 'fc.id')
-            ->leftJoinSub($discountSubquery, 'disc', 'disc.charge_id', '=', 'fc.id')
-            ->where('fc.status', FinanceCharge::STATUS_ACTIVE)
-            ->where('fc.amount', '>', 0)
-            ->whereIn('fc.charge_type', $chargeTypes)
-            ->selectRaw(
-                's.id as student_id,
-                s.student_id as student_code,
-                s.full_name as student_name,
-                c.id as campus_id,
-                c.name as campus_name,
-                COUNT(fc.id) as charge_count,
-                SUM(fc.amount) as total_amount,
-                COALESCE(SUM(COALESCE(paid.paid_amount, 0)), 0) as total_paid,
-                COALESCE(SUM(COALESCE(disc.discount_amount, 0)), 0) as total_discount,
-                GREATEST(0,
-                    SUM(fc.amount)
-                    - COALESCE(SUM(COALESCE(paid.paid_amount, 0)), 0)
-                    - COALESCE(SUM(COALESCE(disc.discount_amount, 0)), 0)
-                ) as balance'
-            )
-            ->groupBy('s.id', 's.student_id', 's.full_name', 'c.id', 'c.name')
-            ->havingRaw('balance > 0');
+        $allStudentRows = $lines->groupBy(fn (InvoiceLine $line): int => (int) $line->invoice->student_id)
+            ->map(function (Collection $studentLines, int|string $studentId) use ($positionsByStudent): object {
+                $studentId = (int) $studentId;
+                $firstLine = $studentLines->first();
+                $student = $firstLine->invoice->student;
+                $position = $positionsByStudent[$studentId] ?? null;
+                $summary = $position instanceof SettlementPosition
+                    ? $this->positionPresenter->summarize($position)
+                    : $this->missingSummary();
 
-        if ($campusFilter !== null) {
-            $query->where('s.campus_id', $campusFilter);
+                return (object) [
+                    'student_id' => $studentId,
+                    'student_code' => $student?->student_id,
+                    'student_name' => $student?->full_name,
+                    'campus_id' => $student?->campus_id,
+                    'campus_name' => $student?->campus?->name,
+                    'charge_count' => $studentLines->pluck('charge_id')->filter()->unique()->count(),
+                    'total_amount' => $summary['net'],
+                    'total_paid' => $summary['cash'],
+                    'total_discount' => $summary['discount'],
+                    'balance' => $summary['remaining'],
+                    'settlement_state' => $summary['settlement_state'],
+                    'settlement_label' => $summary['settlement_label'],
+                    'settlement_issues' => $summary['issues'],
+                    'valid' => $summary['valid'],
+                    'needs_review' => ! $summary['valid'],
+                ];
+            })
+            ->filter(fn (object $row): bool => $row->needs_review || ($row->balance !== null && $row->balance > 0))
+            ->values();
+
+        $unlinkedCharges = FinanceCharge::query()
+            ->with(['student.campus'])
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->where('amount', '>', 0)
+            ->whereIn('charge_type', $chargeTypes)
+            ->whereDoesntHave('invoiceLines', fn ($query) => $query->where('status', 'active'))
+            ->when($campusFilter !== null, fn ($query) => $query->whereHas('student', fn ($q) => $q->where('campus_id', $campusFilter)))
+            ->when($semesterId !== null, fn ($query) => $query->where('semester_id', $semesterId))
+            ->when($search !== '', fn ($query) => $query->whereHas('student', function ($q) use ($search): void {
+                $q->where('student_id', 'like', "%{$search}%")
+                    ->orWhere('full_name', 'like', "%{$search}%");
+            }))
+            ->get();
+
+        foreach ($unlinkedCharges->groupBy('student_id') as $studentId => $charges) {
+            $firstCharge = $charges->first();
+            $student = $firstCharge->student;
+            $missingRow = (object) [
+                'student_id' => (int) $studentId,
+                'student_code' => $student?->student_id,
+                'student_name' => $student?->full_name,
+                'campus_id' => $student?->campus_id,
+                'campus_name' => $student?->campus?->name,
+                'charge_count' => $charges->count(),
+                'total_amount' => null,
+                'total_paid' => null,
+                'total_discount' => null,
+                'balance' => null,
+                'settlement_state' => SettlementPosition::STATE_MISSING,
+                'settlement_label' => 'Cần kiểm tra',
+                'settlement_issues' => [[
+                    'code' => 'settlement_position.missing_payable_line',
+                    'severity' => 'blocking',
+                    'blocking' => true,
+                    'evidence' => ['charge_count' => $charges->count()],
+                    'finance_invariant_code' => null,
+                ]],
+                'valid' => false,
+                'needs_review' => true,
+            ];
+            $existing = $allStudentRows->firstWhere('student_id', (int) $studentId);
+
+            if ($existing !== null) {
+                $allStudentRows = $allStudentRows->reject(fn (object $row): bool => $row->student_id === (int) $studentId)->push($missingRow);
+            } else {
+                $allStudentRows = $allStudentRows->push($missingRow);
+            }
         }
 
-        if ($semesterId !== null) {
-            $query->where('fc.semester_id', $semesterId);
-        }
-
-        if ($search !== '') {
-            $query->where(function ($q) use ($search) {
-                $q->where('s.student_id', 'like', "%{$search}%")
-                    ->orWhere('s.full_name', 'like', "%{$search}%");
-            });
-        }
-
-        // Fetch all student rows for summary + DNG status join
-        $allStudentRows = (clone $query)->get();
         if ($dngFeeType === 'HL') {
             $allStudentRows = $this->mergeApprovedSourcesWithoutCharge(
                 $allStudentRows,
@@ -144,6 +192,11 @@ class ListDngWorklistQuery
                 $this->loadApprovedExamResitSourceRows($campusFilter, $semesterId, $search),
             );
         }
+
+        $exceptions = $allStudentRows->filter(fn (object $row): bool => $row->needs_review)->values();
+        $allStudentRows = $allStudentRows
+            ->filter(fn (object $row): bool => $row->valid && $row->balance !== null && $row->balance > 0)
+            ->values();
 
         $studentIds = $allStudentRows->pluck('student_id')->unique()->values()->all();
 
@@ -177,23 +230,13 @@ class ListDngWorklistQuery
             ->groupBy('fc.student_id', 'fci.finance_charge_id')
             ->get();
 
-        // Resolve next-pending installment row (amount) per (charge).
-        $nextInstallmentRowIds = [];
-        foreach ($installmentStatsRows as $r) {
-            if ($r->next_no === null) {
-                continue;
-            }
-            $nextInstallmentRowIds[] = \DB::table('finance_charge_installments')
-                ->where('finance_charge_id', $r->finance_charge_id)
-                ->where('installment_no', $r->next_no)
-                ->value('id');
-        }
-        $nextInstallmentRowIds = array_filter($nextInstallmentRowIds);
-
         $nextInstallmentRows = FinanceChargeInstallment::query()
-            ->whereIn('id', $nextInstallmentRowIds)
+            ->whereIn('finance_charge_id', $installmentStatsRows->pluck('finance_charge_id')->all())
+            ->where('status', FinanceChargeInstallment::STATUS_PENDING)
+            ->orderBy('installment_no')
             ->get(['id', 'finance_charge_id', 'installment_no', 'amount', 'due_date'])
-            ->keyBy('finance_charge_id');
+            ->groupBy('finance_charge_id')
+            ->map(fn (Collection $rows) => $rows->first());
 
         // Aggregate per student.
         $byStudent = $installmentStatsRows->groupBy('student_id');
@@ -219,7 +262,7 @@ class ListDngWorklistQuery
             $hasSplitPlanByStudent[$studentId] = $hasSplit;
         }
 
-        // Attach DNG status to rows and filter
+        // Attach DNG status to rows and keep invalid positions out of push actions.
         $rows = $allStudentRows
             ->map(function ($row) use ($activeDngByStudent, $nextPushAmountByStudent, $pendingCountByStudent, $hasSplitPlanByStudent) {
                 $activeDng = $activeDngByStudent->get($row->student_id);
@@ -231,10 +274,10 @@ class ListDngWorklistQuery
                 ] : null;
 
                 // Installment-aware next-push amount. Fall back to balance if no installments exist.
-                $row->next_push_amount = isset($nextPushAmountByStudent[$row->student_id])
-                    && $nextPushAmountByStudent[$row->student_id] > 0
-                    ? $nextPushAmountByStudent[$row->student_id]
-                    : (float) $row->balance;
+                $row->next_push_amount = $this->positionPresenter->capCollectionAmount(
+                    $row->valid ? $row->balance : null,
+                    $nextPushAmountByStudent[$row->student_id] ?? null,
+                );
                 $row->pending_installment_count = $pendingCountByStudent[$row->student_id] ?? 0;
                 // True only when at least one charge has >1 installment planned (real split).
                 // Backfilled 1-installment charges of un-split students return false here.
@@ -246,12 +289,13 @@ class ListDngWorklistQuery
             ->when($dngStatus === 'has_active_dng', fn ($c) => $c->filter(fn ($r) => $r->active_dng !== null))
             ->values();
 
-        // Summary
+        // Summary uses only valid canonical positions; invalid scopes are review work.
         $summary = [
             'total_students' => $rows->count(),
-            'total_balance' => (float) $rows->sum('balance'),
+            'total_balance' => (float) $rows->where('valid', true)->sum('balance'),
             'students_with_active_dng' => $rows->filter(fn ($r) => $r->active_dng !== null)->count(),
             'students_without_dng' => $rows->filter(fn ($r) => $r->active_dng === null)->count(),
+            'needs_review_students' => $exceptions->count(),
         ];
 
         // Sort
@@ -293,10 +337,10 @@ class ListDngWorklistQuery
             $row->pending_registrations = $needsChargeByStudent->get($row->student_id, collect())->values()->all();
 
             // Cast numeric fields
-            $row->total_amount = (float) $row->total_amount;
-            $row->total_paid = (float) $row->total_paid;
-            $row->total_discount = (float) $row->total_discount;
-            $row->balance = (float) $row->balance;
+            $row->total_amount = $row->total_amount === null ? null : (float) $row->total_amount;
+            $row->total_paid = $row->total_paid === null ? null : (float) $row->total_paid;
+            $row->total_discount = $row->total_discount === null ? null : (float) $row->total_discount;
+            $row->balance = $row->balance === null ? null : (float) $row->balance;
             $row->charge_count = (int) $row->charge_count;
 
             return (array) $row;
@@ -323,6 +367,7 @@ class ListDngWorklistQuery
                 'direction' => $direction,
             ],
             'summary' => $summary,
+            'exceptions' => $exceptions->map(fn (object $row): array => (array) $row)->all(),
         ];
     }
 
@@ -358,60 +403,74 @@ class ListDngWorklistQuery
             return collect();
         }
 
-        $paidSubquery = DB::table('invoice_lines as il_p')
-            ->join('payment_applications as pa', 'pa.invoice_line_id', '=', 'il_p.id')
-            ->where('il_p.status', 'active')
-            ->selectRaw('il_p.charge_id, COALESCE(SUM(pa.amount), 0) as paid_amount')
-            ->groupBy('il_p.charge_id');
-
-        $discountSubquery = DB::table('invoice_lines as il_d')
-            ->join('discount_allocations as da', 'da.invoice_line_id', '=', 'il_d.id')
-            ->where('il_d.status', 'active')
-            ->selectRaw('il_d.charge_id, COALESCE(SUM(da.amount), 0) as discount_amount')
-            ->groupBy('il_d.charge_id');
-
-        $charges = DB::table('finance_charges as fc')
-            ->leftJoin('semesters as sem', 'sem.id', '=', 'fc.semester_id')
-            ->leftJoinSub($paidSubquery, 'paid', 'paid.charge_id', '=', 'fc.id')
-            ->leftJoinSub($discountSubquery, 'disc', 'disc.charge_id', '=', 'fc.id')
-            ->whereIn('fc.student_id', $studentIds)
-            ->where('fc.status', FinanceCharge::STATUS_ACTIVE)
-            ->where('fc.amount', '>', 0)
-            ->whereIn('fc.charge_type', $chargeTypes)
-            ->when($semesterId, fn ($q) => $q->where('fc.semester_id', $semesterId))
-            ->selectRaw(
-                'fc.id,
-                fc.student_id,
-                fc.charge_type,
-                fc.amount,
-                fc.description,
-                fc.semester_id,
-                sem.name as semester_name,
-                COALESCE(paid.paid_amount, 0) as paid,
-                COALESCE(disc.discount_amount, 0) as discount,
-                GREATEST(0,
-                    fc.amount
-                    - COALESCE(paid.paid_amount, 0)
-                    - COALESCE(disc.discount_amount, 0)
-                ) as balance'
-            )
-            ->orderBy('fc.created_at')
+        $lines = InvoiceLine::query()
+            ->with(['invoice.semester', 'charge.financeObligation'])
+            ->where('status', 'active')
+            ->whereIn('invoice_id', function ($query) use ($studentIds): void {
+                $query->select('id')->from('student_invoices')->whereIn('student_id', $studentIds);
+            })
+            ->whereHas('charge', function ($query) use ($chargeTypes, $semesterId): void {
+                $query->where('status', FinanceCharge::STATUS_ACTIVE)
+                    ->where('amount', '>', 0)
+                    ->whereIn('charge_type', $chargeTypes)
+                    ->when($semesterId !== null, fn ($q) => $q->where('semester_id', $semesterId));
+            })
             ->get();
 
-        return $charges
-            ->filter(fn ($c) => (float) $c->balance > 0)
-            ->groupBy('student_id')
-            ->map(fn ($group) => $group->map(fn ($c) => [
-                'id' => $c->id,
-                'charge_type' => $c->charge_type,
-                'amount' => (float) $c->amount,
-                'balance' => (float) $c->balance,
-                'paid' => (float) $c->paid,
-                'discount' => (float) $c->discount,
-                'description' => $c->description,
-                'semester' => $c->semester_name,
-                'semester_id' => $c->semester_id,
-            ]));
+        $lineIdsByLine = $lines->mapWithKeys(fn (InvoiceLine $line): array => [(string) $line->id => [(int) $line->id]])->all();
+        $positions = $this->positionReader->forLineGroups($lineIdsByLine);
+
+        return $lines
+            ->map(function (InvoiceLine $line) use ($positions): ?array {
+                $position = $positions[(string) $line->id] ?? null;
+                $summary = $position instanceof SettlementPosition
+                    ? $this->positionPresenter->summarize($position)
+                    : $this->missingSummary();
+
+                if (! $summary['valid'] || $summary['remaining'] === null || $summary['remaining'] <= 0) {
+                    return null;
+                }
+
+                return [
+                    'id' => $line->charge?->id,
+                    'charge_type' => $line->charge?->charge_type,
+                    'amount' => $summary['gross'],
+                    'balance' => $summary['remaining'],
+                    'paid' => $summary['cash'],
+                    'discount' => $summary['discount'],
+                    'description' => $line->description_snapshot ?: $line->charge?->description,
+                    'semester' => $line->invoice->semester?->name,
+                    'semester_id' => $line->invoice->semester_id,
+                    'settlement_state' => $summary['settlement_state'],
+                    'settlement_label' => $summary['settlement_label'],
+                ];
+            })
+            ->filter()
+            ->groupBy(fn (array $charge): int => (int) $lines->firstWhere('charge_id', $charge['id'])?->invoice?->student_id)
+            ->map(fn (Collection $group): Collection => $group->values());
+    }
+
+    /** @return array<string,mixed> */
+    private function missingSummary(): array
+    {
+        return [
+            'valid' => false,
+            'settlement_state' => SettlementPosition::STATE_MISSING,
+            'settlement_label' => 'Cần kiểm tra',
+            'gross' => null,
+            'discount' => null,
+            'cash' => null,
+            'credit' => null,
+            'net' => null,
+            'remaining' => null,
+            'issues' => [[
+                'code' => 'settlement_position.missing_payable_line',
+                'severity' => 'blocking',
+                'blocking' => true,
+                'evidence' => [],
+                'finance_invariant_code' => null,
+            ]],
+        ];
     }
 
     /**
@@ -478,10 +537,21 @@ class ListDngWorklistQuery
                     'campus_id' => $campus?->id,
                     'campus_name' => $campus?->name,
                     'charge_count' => 0,
-                    'total_amount' => $total,
+                    'total_amount' => null,
                     'total_paid' => 0.0,
                     'total_discount' => 0.0,
-                    'balance' => $total,
+                    'balance' => null,
+                    'settlement_state' => SettlementPosition::STATE_MISSING,
+                    'settlement_label' => 'Cần kiểm tra',
+                    'settlement_issues' => [[
+                        'code' => 'settlement_position.missing_payable_line',
+                        'severity' => 'blocking',
+                        'blocking' => true,
+                        'evidence' => [],
+                        'finance_invariant_code' => null,
+                    ]],
+                    'valid' => false,
+                    'needs_review' => true,
                 ];
             })
             ->values();
@@ -553,10 +623,21 @@ class ListDngWorklistQuery
                     'campus_id' => $campus?->id,
                     'campus_name' => $campus?->name,
                     'charge_count' => 0,
-                    'total_amount' => $total,
+                    'total_amount' => null,
                     'total_paid' => 0.0,
                     'total_discount' => 0.0,
-                    'balance' => $total,
+                    'balance' => null,
+                    'settlement_state' => SettlementPosition::STATE_MISSING,
+                    'settlement_label' => 'Cần kiểm tra',
+                    'settlement_issues' => [[
+                        'code' => 'settlement_position.missing_payable_line',
+                        'severity' => 'blocking',
+                        'blocking' => true,
+                        'evidence' => [],
+                        'finance_invariant_code' => null,
+                    ]],
+                    'valid' => false,
+                    'needs_review' => true,
                 ];
             })
             ->values();
@@ -575,8 +656,21 @@ class ListDngWorklistQuery
                 continue;
             }
 
-            $existing->total_amount = (float) $existing->total_amount + (float) $sourceRow->total_amount;
-            $existing->balance = (float) $existing->balance + (float) $sourceRow->balance;
+            $existing->total_amount = null;
+            $existing->balance = null;
+            $existing->total_paid = null;
+            $existing->total_discount = null;
+            $existing->valid = false;
+            $existing->needs_review = true;
+            $existing->settlement_state = SettlementPosition::STATE_INVALID;
+            $existing->settlement_label = 'Cần kiểm tra';
+            $existing->settlement_issues = [[
+                'code' => 'settlement_position.missing_payable_line',
+                'severity' => 'blocking',
+                'blocking' => true,
+                'evidence' => [],
+                'finance_invariant_code' => null,
+            ]];
         }
 
         return $merged->values();

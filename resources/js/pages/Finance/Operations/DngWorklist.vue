@@ -29,10 +29,10 @@ import { route } from 'ziggy-js';
 interface DngCharge {
     id: number;
     charge_type: string;
-    amount: number;
-    balance: number;
-    paid: number;
-    discount: number;
+    amount: number | null;
+    balance: number | null;
+    paid: number | null;
+    discount: number | null;
     description: string | null;
     semester: string | null;
     semester_id: number | null;
@@ -54,10 +54,14 @@ interface DngWorklistStudent {
     campus_id: number;
     campus_name: string;
     charge_count: number;
-    total_amount: number;
-    total_paid: number;
-    total_discount: number;
-    balance: number;
+    total_amount: number | null;
+    total_paid: number | null;
+    total_discount: number | null;
+    balance: number | null;
+    valid: boolean;
+    needs_review: boolean;
+    settlement_label: string;
+    settlement_issues: unknown[];
     next_push_amount: number;
     pending_installment_count: number;
     has_split_plan: boolean;
@@ -91,6 +95,7 @@ interface Props {
         total_balance: number;
         students_with_active_dng: number;
         students_without_dng: number;
+        needs_review_students: number;
     };
     feeTypeOptions: { value: string; label: string }[];
     semesters: { id: number; name: string; code: string }[];
@@ -120,31 +125,30 @@ const estimateTime = ref(`${String(now.getMonth() + 1).padStart(2, '0')}/${Strin
 // useDataTable for filtering/pagination
 // ---------------------------------------------------------------------------
 
-const { filters, hasActiveFilters, clearAllFilters, handleSearch, handlePaginationNavigate, handlePageSizeChange, setFilter } =
-    useDataTable<DngWorklistFilters>({
-        baseUrl: route('finance.operations.dng-worklist'),
-        initialFilters: {
-            dng_fee_type: props.filters.dng_fee_type ?? 'HP',
-            search: props.filters.search ?? '',
-            campus_id: props.filters.campus_id ?? null,
-            dng_status: props.filters.dng_status ?? 'all',
-            per_page: props.filters.per_page ?? 50,
-            sort: props.filters.sort ?? null,
-            direction: props.filters.direction ?? null,
-        },
-        defaultValues: {
-            dng_fee_type: 'HP',
-            search: '',
-            campus_id: null,
-            dng_status: 'all',
-            per_page: 50,
-            sort: null,
-            direction: null,
-        },
-        only: ['students', 'summary', 'filters'],
-        debounce: 300,
-        immediateFields: ['dng_fee_type', 'campus_id', 'dng_status'],
-    });
+const { filters, hasActiveFilters, clearAllFilters, handleSearch, handlePaginationNavigate, handlePageSizeChange, setFilter } = useDataTable<DngWorklistFilters>({
+    baseUrl: route('finance.operations.dng-worklist'),
+    initialFilters: {
+        dng_fee_type: props.filters.dng_fee_type ?? 'HP',
+        search: props.filters.search ?? '',
+        campus_id: props.filters.campus_id ?? null,
+        dng_status: props.filters.dng_status ?? 'all',
+        per_page: props.filters.per_page ?? 50,
+        sort: props.filters.sort ?? null,
+        direction: props.filters.direction ?? null,
+    },
+    defaultValues: {
+        dng_fee_type: 'HP',
+        search: '',
+        campus_id: null,
+        dng_status: 'all',
+        per_page: 50,
+        sort: null,
+        direction: null,
+    },
+    only: ['students', 'summary', 'filters'],
+    debounce: 300,
+    immediateFields: ['dng_fee_type', 'campus_id', 'dng_status'],
+});
 
 // ---------------------------------------------------------------------------
 // Push DNG form (Inertia useForm)
@@ -167,9 +171,7 @@ const pushForm = useForm({
 // Eligible = anything with a positive next-push amount (covers split + non-split).
 const eligibleStudents = computed(() => props.students.data.filter((s) => s.next_push_amount > 0));
 
-const isAllSelected = computed(
-    () => eligibleStudents.value.length > 0 && selectedIds.value.length === eligibleStudents.value.length,
-);
+const isAllSelected = computed(() => eligibleStudents.value.length > 0 && selectedIds.value.length === eligibleStudents.value.length);
 
 const selectedStudents = computed(() => eligibleStudents.value.filter((s) => selectedIds.value.includes(s.student_id)));
 
@@ -177,9 +179,7 @@ const hasStudentsWithActiveDng = computed(() => selectedStudents.value.some((s) 
 
 // Total to push = sum of next-push amounts (or admin overrides). Matches backend
 // CreateBatchDngFromChargesAction behavior so the UI total matches what will actually be sent.
-const totalSelectedAmount = computed(() =>
-    selectedStudents.value.reduce((sum, s) => sum + (amountOverrides.value[s.student_id] ?? s.next_push_amount), 0),
-);
+const totalSelectedAmount = computed(() => selectedStudents.value.reduce((sum, s) => sum + (amountOverrides.value[s.student_id] ?? s.next_push_amount), 0));
 
 // ---------------------------------------------------------------------------
 // Selection helpers
@@ -213,8 +213,7 @@ const toggleRow = (studentId: number) => {
 // Amount overrides
 // ---------------------------------------------------------------------------
 
-const getAmount = (student: DngWorklistStudent): number =>
-    amountOverrides.value[student.student_id] ?? student.next_push_amount;
+const getAmount = (student: DngWorklistStudent): number => amountOverrides.value[student.student_id] ?? student.next_push_amount;
 
 const setAmount = (student: DngWorklistStudent, val: string) => {
     const num = parseFloat(val);
@@ -282,8 +281,7 @@ const submitPush = () => {
 // Formatters
 // ---------------------------------------------------------------------------
 
-const formatCurrency = (val: number) =>
-    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(val);
+const formatCurrency = (val: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(val);
 
 const getDngStatusBadge = (student: DngWorklistStudent) => {
     if (!student.active_dng) {
@@ -294,9 +292,7 @@ const getDngStatusBadge = (student: DngWorklistStudent) => {
         // Compare against installment-aware next-push amount: a 2-installment plan
         // pushed at 10M is "Đã gửi" not "Cần cập nhật" even though balance=20M.
         const amountMatch = Math.abs(student.active_dng.amount - student.next_push_amount) < 1;
-        return amountMatch
-            ? { label: 'Đã gửi', class: 'border-green-200 bg-green-50 text-green-700' }
-            : { label: 'Cần cập nhật', class: 'border-orange-200 bg-orange-50 text-orange-700' };
+        return amountMatch ? { label: 'Đã gửi', class: 'border-green-200 bg-green-50 text-green-700' } : { label: 'Cần cập nhật', class: 'border-orange-200 bg-orange-50 text-orange-700' };
     }
     return { label: 'Pending', class: 'border-yellow-200 bg-yellow-50 text-yellow-700' };
 };
@@ -339,15 +335,10 @@ const dngStatusOptions = [
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight">DNG Worklist</h1>
                     <p class="text-muted-foreground text-sm">{{ selectedLabel }}</p>
-                    <p class="text-muted-foreground text-sm">
-                        Tạo yêu cầu thanh toán DNG từ khoản phí thực tế — tất cả DNG được liên kết đến charge nguồn.
-                    </p>
+                    <p class="text-muted-foreground text-sm">Tạo yêu cầu thanh toán DNG từ khoản phí thực tế — tất cả DNG được liên kết đến charge nguồn.</p>
                 </div>
             </div>
-            <Button
-                :disabled="selectedIds.length === 0"
-                @click="openPushDialog"
-            >
+            <Button :disabled="selectedIds.length === 0" @click="openPushDialog">
                 <Send class="mr-2 h-4 w-4" />
                 Push DNG ({{ selectedIds.length }})
                 <span v-if="selectedIds.length > 0" class="ml-2 opacity-75">· {{ formatCurrency(totalSelectedAmount) }}</span>
@@ -360,10 +351,7 @@ const dngStatusOptions = [
                 <div class="flex flex-wrap items-end gap-4">
                     <div class="min-w-[200px] space-y-1">
                         <Label class="text-muted-foreground text-xs font-medium uppercase">Loại phí DNG</Label>
-                        <Select
-                            :model-value="filters.dng_fee_type"
-                            @update:model-value="(v) => setFilter('dng_fee_type', v)"
-                        >
+                        <Select :model-value="filters.dng_fee_type" @update:model-value="(v) => setFilter('dng_fee_type', v)">
                             <SelectTrigger class="h-9">
                                 <SelectValue placeholder="Chọn loại phí" />
                             </SelectTrigger>
@@ -404,6 +392,12 @@ const dngStatusOptions = [
                     <CardTitle class="text-2xl text-amber-600">{{ props.summary.students_without_dng }}</CardTitle>
                 </CardHeader>
             </Card>
+            <Card>
+                <CardHeader class="pb-2">
+                    <CardDescription>Cần kiểm tra</CardDescription>
+                    <CardTitle class="text-2xl text-amber-600">{{ props.summary.needs_review_students }}</CardTitle>
+                </CardHeader>
+            </Card>
         </div>
 
         <!-- Student Table -->
@@ -412,21 +406,14 @@ const dngStatusOptions = [
                 <div class="flex items-center justify-between">
                     <CardTitle class="text-base">
                         Danh sách sinh viên
-                        <span class="text-muted-foreground ml-2 font-normal text-sm">
-                            ({{ students.total }} sinh viên · trang {{ students.current_page }}/{{ students.last_page }})
-                        </span>
+                        <span class="text-muted-foreground ml-2 text-sm font-normal"> ({{ students.total }} sinh viên · trang {{ students.current_page }}/{{ students.last_page }}) </span>
                     </CardTitle>
                 </div>
             </CardHeader>
             <CardContent class="space-y-4">
                 <!-- Filters -->
                 <FilterPanel :has-active-filters="hasActiveFilters" :columns="3" @clear="clearAllFilters">
-                    <FilterSearchInput
-                        :model-value="filters.search ?? ''"
-                        placeholder="Tìm sinh viên..."
-                        @update:model-value="(v) => setFilter('search', v)"
-                        @search="handleSearch"
-                    />
+                    <FilterSearchInput :model-value="filters.search ?? ''" placeholder="Tìm sinh viên..." @update:model-value="(v) => setFilter('search', v)" @search="handleSearch" />
                     <FilterSelect
                         :model-value="String(filters.campus_id ?? '')"
                         :options="props.campuses.map((c) => ({ value: String(c.id), label: c.name }))"
@@ -450,12 +437,7 @@ const dngStatusOptions = [
                     <TableHeader>
                         <TableRow>
                             <TableHead class="w-10">
-                                <Checkbox
-                                    :model-value="isAllSelected"
-                                    :disabled="eligibleStudents.length === 0"
-                                    aria-label="Chọn tất cả"
-                                    @update:model-value="toggleAll"
-                                />
+                                <Checkbox :model-value="isAllSelected" :disabled="eligibleStudents.length === 0" aria-label="Chọn tất cả" @update:model-value="toggleAll" />
                             </TableHead>
                             <TableHead class="w-8"></TableHead>
                             <TableHead>Sinh viên</TableHead>
@@ -470,20 +452,10 @@ const dngStatusOptions = [
                             <!-- Main row -->
                             <TableRow>
                                 <TableCell>
-                                    <Checkbox
-                                        :model-value="selectedIds.includes(student.student_id)"
-                                        :aria-label="`Chọn ${student.student_code}`"
-                                        @update:model-value="(checked) => toggle(student.student_id, checked)"
-                                    />
+                                    <Checkbox :model-value="selectedIds.includes(student.student_id)" :aria-label="`Chọn ${student.student_code}`" @update:model-value="(checked) => toggle(student.student_id, checked)" />
                                 </TableCell>
                                 <TableCell>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        class="h-6 w-6"
-                                        :aria-label="expandedRows.has(student.student_id) ? 'Thu gọn' : 'Mở rộng'"
-                                        @click="toggleRow(student.student_id)"
-                                    >
+                                    <Button variant="ghost" size="icon" class="h-6 w-6" :aria-label="expandedRows.has(student.student_id) ? 'Thu gọn' : 'Mở rộng'" @click="toggleRow(student.student_id)">
                                         <ChevronDown v-if="expandedRows.has(student.student_id)" class="h-3.5 w-3.5" />
                                         <ChevronRight v-else class="h-3.5 w-3.5" />
                                     </Button>
@@ -495,11 +467,7 @@ const dngStatusOptions = [
                                         <span v-if="student.campus_name" class="opacity-60">· {{ student.campus_name }}</span>
                                     </div>
                                     <!-- HL: needs charge creation indicator -->
-                                    <Badge
-                                        v-if="student.needs_charge_creation"
-                                        variant="outline"
-                                        class="mt-1 border-orange-200 bg-orange-50 text-xs text-orange-700"
-                                    >
+                                    <Badge v-if="student.needs_charge_creation" variant="outline" class="mt-1 border-orange-200 bg-orange-50 text-xs text-orange-700">
                                         <AlertTriangle class="mr-1 h-3 w-3" />
                                         Có đăng ký chưa có charge
                                     </Badge>
@@ -509,35 +477,19 @@ const dngStatusOptions = [
                                 </TableCell>
                                 <TableCell class="text-right font-medium text-red-600">
                                     {{ formatCurrency(student.next_push_amount) }}
-                                    <div
-                                        v-if="student.has_split_plan"
-                                        class="text-muted-foreground mt-0.5 text-[10px] font-normal"
-                                    >
-                                        Đợt tiếp theo · còn {{ student.pending_installment_count }} đợt
-                                    </div>
-                                    <div
-                                        v-if="student.has_split_plan && student.next_push_amount !== student.balance"
-                                        class="text-muted-foreground mt-0.5 text-[10px] font-normal"
-                                    >
-                                        Số dư tổng: {{ formatCurrency(student.balance) }}
+                                    <div v-if="student.has_split_plan" class="text-muted-foreground mt-0.5 text-[10px] font-normal">Đợt tiếp theo · còn {{ student.pending_installment_count }} đợt</div>
+                                    <div v-if="student.has_split_plan && student.next_push_amount !== student.balance" class="text-muted-foreground mt-0.5 text-[10px] font-normal">
+                                        Số dư tổng: {{ student.balance === null ? '—' : formatCurrency(student.balance) }}
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    <Input
-                                        type="number"
-                                        :model-value="getAmount(student)"
-                                        class="h-8 text-right"
-                                        min="1"
-                                        @input="(e) => setAmount(student, (e.target as HTMLInputElement).value)"
-                                    />
+                                    <Input type="number" :model-value="getAmount(student)" class="h-8 text-right" min="1" @input="(e) => setAmount(student, (e.target as HTMLInputElement).value)" />
                                 </TableCell>
                                 <TableCell>
                                     <Badge variant="outline" :class="getDngStatusBadge(student).class">
                                         {{ getDngStatusBadge(student).label }}
                                     </Badge>
-                                    <div v-if="student.active_dng" class="text-muted-foreground mt-0.5 text-xs">
-                                        #{{ student.active_dng.id }} · {{ formatCurrency(student.active_dng.amount) }}
-                                    </div>
+                                    <div v-if="student.active_dng" class="text-muted-foreground mt-0.5 text-xs">#{{ student.active_dng.id }} · {{ formatCurrency(student.active_dng.amount) }}</div>
                                 </TableCell>
                             </TableRow>
 
@@ -547,31 +499,19 @@ const dngStatusOptions = [
                                     <div class="space-y-1.5 px-12 py-3">
                                         <!-- Pending registrations (HL, needs charge creation) -->
                                         <div v-if="student.pending_registrations.length > 0" class="mb-2 space-y-1">
-                                            <p class="text-xs font-medium text-orange-700">
-                                                ⚠ Đăng ký học lại chưa có charge (sẽ tự tạo khi Push DNG):
-                                            </p>
-                                            <div
-                                                v-for="reg in student.pending_registrations"
-                                                :key="reg.id"
-                                                class="rounded-md border border-orange-200 bg-orange-50/50 px-3 py-1.5 text-xs"
-                                            >
+                                            <p class="text-xs font-medium text-orange-700">⚠ Đăng ký học lại chưa có charge (sẽ tự tạo khi Push DNG):</p>
+                                            <div v-for="reg in student.pending_registrations" :key="reg.id" class="rounded-md border border-orange-200 bg-orange-50/50 px-3 py-1.5 text-xs">
                                                 <span class="font-mono font-medium">{{ reg.unit_code }}</span>
                                                 <span class="ml-1 text-gray-700">{{ reg.unit_name }}</span>
-                                                <span v-if="reg.semester_name" class="text-muted-foreground ml-2 opacity-75">
-                                                    ({{ reg.semester_name }})
-                                                </span>
-                                                <span class="ml-auto float-right font-semibold text-orange-700">
+                                                <span v-if="reg.semester_name" class="text-muted-foreground ml-2 opacity-75"> ({{ reg.semester_name }}) </span>
+                                                <span class="float-right ml-auto font-semibold text-orange-700">
                                                     {{ formatCurrency(reg.retake_fee) }}
                                                 </span>
                                             </div>
                                         </div>
 
                                         <!-- Existing charges -->
-                                        <div
-                                            v-for="charge in student.charges"
-                                            :key="charge.id"
-                                            class="flex items-center justify-between rounded-md border bg-white px-3 py-2 text-xs"
-                                        >
+                                        <div v-for="charge in student.charges" :key="charge.id" class="flex items-center justify-between rounded-md border bg-white px-3 py-2 text-xs">
                                             <div class="space-y-0.5">
                                                 <div class="font-medium">{{ chargeTypeLabel(charge.charge_type) }}</div>
                                                 <div class="text-muted-foreground">
@@ -582,42 +522,32 @@ const dngStatusOptions = [
                                             <div class="flex items-center gap-4 text-right">
                                                 <div>
                                                     <div class="text-muted-foreground">Gốc</div>
-                                                    <div>{{ formatCurrency(charge.amount) }}</div>
+                                                    <div>{{ charge.amount === null ? '—' : formatCurrency(charge.amount) }}</div>
                                                 </div>
                                                 <div v-if="charge.paid > 0">
                                                     <div class="text-muted-foreground">Đã trả</div>
-                                                    <div class="text-green-600">{{ formatCurrency(charge.paid) }}</div>
+                                                    <div class="text-green-600">{{ charge.paid === null ? '—' : formatCurrency(charge.paid) }}</div>
                                                 </div>
                                                 <div>
                                                     <div class="text-muted-foreground">Số dư</div>
-                                                    <div class="font-semibold text-red-600">{{ formatCurrency(charge.balance) }}</div>
+                                                    <div class="font-semibold text-red-600">{{ charge.balance === null ? '—' : formatCurrency(charge.balance) }}</div>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <p v-if="student.charges.length === 0 && student.pending_registrations.length === 0" class="text-muted-foreground text-xs">
-                                            Không có charge nào.
-                                        </p>
+                                        <p v-if="student.charges.length === 0 && student.pending_registrations.length === 0" class="text-muted-foreground text-xs">Không có charge nào.</p>
                                     </div>
                                 </TableCell>
                             </TableRow>
                         </template>
 
                         <TableRow v-if="eligibleStudents.length === 0">
-                            <TableCell colspan="7" class="text-muted-foreground py-8 text-center">
-                                Không có sinh viên nào phù hợp với bộ lọc hiện tại.
-                            </TableCell>
+                            <TableCell colspan="7" class="text-muted-foreground py-8 text-center"> Không có sinh viên nào phù hợp với bộ lọc hiện tại. </TableCell>
                         </TableRow>
                     </TableBody>
                 </Table>
 
-                <DataPagination
-                    :pagination-data="students"
-                    item-name="sinh viên"
-                    :page-size-options="[25, 50, 100, 200]"
-                    @navigate="handlePaginationNavigate"
-                    @page-size-change="handlePageSizeChange"
-                />
+                <DataPagination :pagination-data="students" item-name="sinh viên" :page-size-options="[25, 50, 100, 200]" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
             </CardContent>
         </Card>
     </div>
@@ -627,42 +557,27 @@ const dngStatusOptions = [
         <DialogContent class="sm:max-w-lg">
             <DialogHeader>
                 <DialogTitle>Push DNG</DialogTitle>
-                <DialogDescription>
-                    Tạo yêu cầu thanh toán DNG cho {{ selectedIds.length }} sinh viên đã chọn.
-                    Tổng: {{ formatCurrency(totalSelectedAmount) }}
-                </DialogDescription>
+                <DialogDescription> Tạo yêu cầu thanh toán DNG cho {{ selectedIds.length }} sinh viên đã chọn. Tổng: {{ formatCurrency(totalSelectedAmount) }} </DialogDescription>
             </DialogHeader>
 
             <form class="space-y-4" @submit.prevent="submitPush">
                 <!-- Warning: will cancel existing DNG -->
                 <div v-if="hasStudentsWithActiveDng" class="flex items-start gap-2 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-700">
                     <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>
-                        Một số sinh viên đã có DNG đang chờ cùng loại phí. DNG cũ sẽ bị hủy tự động trước khi tạo mới.
-                    </span>
+                    <span> Một số sinh viên đã có DNG đang chờ cùng loại phí. DNG cũ sẽ bị hủy tự động trước khi tạo mới. </span>
                 </div>
 
                 <!-- Description -->
                 <div class="space-y-2">
-                    <Label for="push-description">
-                        Mô tả khoản phí <span class="text-red-500">*</span>
-                    </Label>
-                    <Input
-                        id="push-description"
-                        v-model="pushForm.description"
-                        placeholder="VD: Học phí kỳ 1 năm học 2025-2026"
-                        :class="{ 'border-red-400': pushForm.errors.description }"
-                    />
+                    <Label for="push-description"> Mô tả khoản phí <span class="text-red-500">*</span> </Label>
+                    <Input id="push-description" v-model="pushForm.description" placeholder="VD: Học phí kỳ 1 năm học 2025-2026" :class="{ 'border-red-400': pushForm.errors.description }" />
                     <p v-if="pushForm.errors.description" class="text-xs text-red-500">{{ pushForm.errors.description }}</p>
                 </div>
 
                 <!-- Due date -->
                 <div class="space-y-2">
                     <Label>Hạn thanh toán nội bộ <span class="text-red-500">*</span></Label>
-                    <DatePicker
-                        v-model="pushForm.due_date"
-                        placeholder="Chọn hạn thanh toán"
-                    />
+                    <DatePicker v-model="pushForm.due_date" placeholder="Chọn hạn thanh toán" />
                     <p v-if="pushForm.errors.due_date" class="text-xs text-red-500">{{ pushForm.errors.due_date }}</p>
                 </div>
 
@@ -714,10 +629,7 @@ const dngStatusOptions = [
 
                 <DialogFooter>
                     <Button type="button" variant="outline" @click="pushDialogOpen = false">Hủy</Button>
-                    <Button
-                        type="submit"
-                        :disabled="pushForm.processing || selectedIds.length === 0"
-                    >
+                    <Button type="submit" :disabled="pushForm.processing || selectedIds.length === 0">
                         <Send class="mr-2 h-4 w-4" />
                         Push {{ selectedIds.length }} sinh viên → DNG
                     </Button>

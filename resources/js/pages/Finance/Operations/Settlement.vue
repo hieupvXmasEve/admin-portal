@@ -14,12 +14,12 @@ import { usePermission } from '@/composables/usePermission';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { createColumns } from '@/lib/table-utils';
 import type { PaginatedResponse } from '@/types';
+import { financeRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { ArrowLeft, CheckCircle2, ExternalLink, X, Zap } from 'lucide-vue-next';
 import { h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
-import { financeRoutes } from '@/utils/routes';
 import { route } from 'ziggy-js';
 
 interface SettlementInvoice {
@@ -29,9 +29,10 @@ interface SettlementInvoice {
     semester_name: string | null;
     status: string;
     due_date: string | null;
-    total_amount: number;
-    paid_amount: number;
-    remaining_amount: number;
+    total_amount: number | null;
+    paid_amount: number | null;
+    remaining_amount: number | null;
+    settlement_label: string;
 }
 
 interface FeeTypeBreakdownEntry {
@@ -50,12 +51,15 @@ interface SettlementStudent {
     student_name: string;
     invoice_count: number;
     overdue_invoice_count: number;
-    active_due: number;
+    active_due: number | null;
     unapplied_balance: number;
     allocated_amount: number;
     total_payments: number;
-    net_amount_to_collect: number;
+    net_amount_to_collect: number | null;
     actionable: boolean;
+    needs_review: boolean;
+    settlement_label: string;
+    settlement_issues: unknown[];
     latest_dng_request: {
         id: number;
         status: string;
@@ -82,6 +86,7 @@ interface Props {
         ready_students: number;
         total_active_due: number;
         total_unapplied_balance: number;
+        needs_review_students: number;
     };
     filters?: {
         search?: string;
@@ -197,6 +202,10 @@ const applySettlement = (studentIds: number[]) => {
 };
 
 const getReadinessBadge = (student: SettlementStudent) => {
+    if (student.needs_review) {
+        return { label: 'Cần kiểm tra', class: 'border-amber-200 bg-amber-50 text-amber-700' };
+    }
+
     if (student.actionable) {
         return { label: 'Ready', class: 'bg-green-50 text-green-700 border-green-200' };
     }
@@ -249,7 +258,7 @@ const columns: ColumnDef<SettlementStudent>[] = createColumns<SettlementStudent>
         accessorKey: 'active_due',
         header: 'Active due',
         enableSorting: true,
-        cell: ({ row }) => h('div', { class: 'text-right font-medium' }, formatCurrency(row.original.active_due)),
+        cell: ({ row }) => h('div', { class: 'text-right font-medium' }, row.original.active_due === null ? '—' : formatCurrency(row.original.active_due)),
     },
     {
         accessorKey: 'unapplied_balance',
@@ -261,7 +270,12 @@ const columns: ColumnDef<SettlementStudent>[] = createColumns<SettlementStudent>
         accessorKey: 'net_amount_to_collect',
         header: 'Need collect',
         enableSorting: true,
-        cell: ({ row }) => h('div', { class: `text-right font-medium ${row.original.net_amount_to_collect > 0 ? 'text-red-600' : 'text-green-600'}` }, formatCurrency(row.original.net_amount_to_collect)),
+        cell: ({ row }) =>
+            h(
+                'div',
+                { class: `text-right font-medium ${row.original.net_amount_to_collect !== null && row.original.net_amount_to_collect > 0 ? 'text-red-600' : 'text-green-600'}` },
+                row.original.net_amount_to_collect === null ? '—' : formatCurrency(row.original.net_amount_to_collect),
+            ),
     },
     {
         id: 'invoices',
@@ -313,7 +327,7 @@ defineOptions({
             </div>
         </div>
 
-        <div class="grid gap-4 md:grid-cols-4">
+        <div class="grid gap-4 md:grid-cols-5">
             <Card>
                 <CardHeader class="pb-2">
                     <CardDescription>Students with unpaid invoices</CardDescription>
@@ -336,6 +350,12 @@ defineOptions({
                 <CardHeader class="pb-2">
                     <CardDescription>Total unapplied cash</CardDescription>
                     <CardTitle class="text-2xl text-blue-600">{{ formatCurrency(props.summary.total_unapplied_balance) }}</CardTitle>
+                </CardHeader>
+            </Card>
+            <Card>
+                <CardHeader class="pb-2">
+                    <CardDescription>Cần kiểm tra</CardDescription>
+                    <CardTitle class="text-2xl text-amber-600">{{ props.summary.needs_review_students }}</CardTitle>
                 </CardHeader>
             </Card>
         </div>
@@ -420,15 +440,17 @@ defineOptions({
                                 <div class="mt-3 grid grid-cols-3 gap-2 text-xs">
                                     <div>
                                         <div class="text-muted-foreground">Total</div>
-                                        <div class="font-medium">{{ formatCurrency(invoice.total_amount) }}</div>
+                                        <div class="font-medium">{{ invoice.total_amount === null ? '—' : formatCurrency(invoice.total_amount) }}</div>
                                     </div>
                                     <div>
                                         <div class="text-muted-foreground">Paid</div>
-                                        <div class="font-medium text-green-600">{{ formatCurrency(invoice.paid_amount) }}</div>
+                                        <div class="font-medium text-green-600">{{ invoice.paid_amount === null ? '—' : formatCurrency(invoice.paid_amount) }}</div>
                                     </div>
                                     <div>
                                         <div class="text-muted-foreground">Remaining</div>
-                                        <div class="font-medium" :class="invoice.remaining_amount > 0 ? 'text-red-600' : 'text-gray-500'">{{ formatCurrency(invoice.remaining_amount) }}</div>
+                                        <div class="font-medium" :class="invoice.remaining_amount !== null && invoice.remaining_amount > 0 ? 'text-red-600' : 'text-gray-500'">
+                                            {{ invoice.remaining_amount === null ? '—' : formatCurrency(invoice.remaining_amount) }}
+                                        </div>
                                     </div>
                                 </div>
                             </div>

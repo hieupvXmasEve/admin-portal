@@ -6,17 +6,22 @@ namespace App\Modules\Finance\Queries\Operations;
 
 use App\Models\DeferCase;
 use App\Models\Student;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
-use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPositionRawEvidence;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistPresenter;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistReader;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
-class GetBillingDashboardStudentsQuery
+final class GetBillingDashboardStudentsQuery
 {
     public function __construct(
-        protected SettlementService $settlementService,
+        private readonly SettlementPositionWorklistReader $positionReader,
+        private readonly SettlementPositionWorklistPresenter $positionPresenter,
     ) {}
 
     public function handle(?int $semesterId, array $filters = []): LengthAwarePaginator
@@ -50,29 +55,24 @@ class GetBillingDashboardStudentsQuery
             ->leftJoin('programs', 'students.program_id', '=', 'programs.id')
             ->where('students.intake_semester_id', '<=', $semesterId)
             ->when($campusId, fn ($q) => $q->where('students.campus_id', $campusId))
-            ->where(function (Builder $q) use ($semesterId) {
-                $q->whereHas('courseRegistrations', fn ($sq) => $sq->where('semester_id', $semesterId)->whereNotIn('registration_status', ['defer', 'dropped', 'withdrawn']));
-                $q->orWhereHas('deferCases', fn ($sq) => $sq->where('semester_id', $semesterId));
-                $q->orWhereHas('invoices', fn ($sq) => $sq->where('semester_id', $semesterId));
+            ->where(function (Builder $q) use ($semesterId): void {
+                $q->whereHas('courseRegistrations', fn ($sq) => $sq->where('semester_id', $semesterId)->whereNotIn('registration_status', ['defer', 'dropped', 'withdrawn']))
+                    ->orWhereHas('deferCases', fn ($sq) => $sq->where('semester_id', $semesterId))
+                    ->orWhereHas('invoices', fn ($sq) => $sq->where('semester_id', $semesterId));
             });
 
-        if (! empty($search)) {
-            $studentsQuery->where(function (Builder $query) use ($search) {
-                $query->where('students.full_name', 'like', '%'.$search.'%')
-                    ->orWhere('students.student_id', 'like', '%'.$search.'%');
-            });
+        if ($search !== '') {
+            $studentsQuery->where(fn (Builder $query) => $query
+                ->where('students.full_name', 'like', '%'.$search.'%')
+                ->orWhere('students.student_id', 'like', '%'.$search.'%'));
         }
 
         if ($stage !== 'all') {
-            if ($stage === 'egc') {
-                $studentsQuery->where('students.status', 'intake_pre_uni_gc');
-            } elseif ($stage === 'major') {
-                $studentsQuery->where('students.status', 'intake_course');
-            }
+            $studentsQuery->where('students.status', $stage === 'egc' ? 'intake_pre_uni_gc' : 'intake_course');
         }
 
         if ($defer !== 'all') {
-            $studentsQuery->whereExists(function ($query) use ($semesterId, $defer) {
+            $studentsQuery->whereExists(function ($query) use ($semesterId, $defer): void {
                 $query->selectRaw('1')
                     ->from('defer_cases')
                     ->whereColumn('defer_cases.student_id', 'students.id')
@@ -84,18 +84,16 @@ class GetBillingDashboardStudentsQuery
         }
 
         if ($retake !== 'all') {
-            $studentsQuery->whereHas('courseRegistrations', function ($query) use ($semesterId) {
-                $query->where('semester_id', $semesterId)->where('is_retake', true);
-            });
+            $studentsQuery->whereHas('courseRegistrations', fn ($query) => $query->where('semester_id', $semesterId)->where('is_retake', true));
         }
 
         $sort = $filters['sort'] ?? 'full_name';
         $direction = $filters['direction'] ?? 'asc';
         $students = $studentsQuery->with('intakeSemester:id,name')->get();
-        $studentIds = $students->pluck('id');
+        $studentIds = $students->pluck('id')->map(fn ($id): int => (int) $id);
 
         $semesterInvoices = StudentInvoice::query()
-            ->with(['invoiceLines.charge', 'invoiceLines.paymentApplications', 'invoiceLines.discountAllocations'])
+            ->with(['invoiceLines' => fn ($query) => $query->where('status', 'active')->with('charge.financeObligation')])
             ->where('semester_id', $semesterId)
             ->whereIn('student_id', $studentIds)
             ->orderByDesc('created_at')
@@ -103,11 +101,25 @@ class GetBillingDashboardStudentsQuery
             ->get()
             ->groupBy('student_id');
 
-        $invoiceSnapshots = $semesterInvoices
-            ->flatten(1)
-            ->mapWithKeys(fn (StudentInvoice $invoice) => [
-                $invoice->id => $this->settlementService->deriveInvoiceSnapshot($invoice),
-            ]);
+        $lineIdsByStudent = [];
+        $lineIdsByInvoice = [];
+        $lineIdsByStudentChargeType = [];
+
+        foreach ($semesterInvoices->flatten(1) as $invoice) {
+            $lineIdsByInvoice[(int) $invoice->id] = $invoice->invoiceLines->pluck('id')->map(fn ($id): int => (int) $id)->all();
+
+            foreach ($invoice->invoiceLines as $line) {
+                $studentId = (int) $invoice->student_id;
+                $lineId = (int) $line->id;
+                $chargeType = (string) ($line->charge?->charge_type ?? '');
+                $lineIdsByStudent[$studentId][] = $lineId;
+                $lineIdsByStudentChargeType[$studentId.'|'.$chargeType][] = $lineId;
+            }
+        }
+
+        $positionsByStudent = $this->positionReader->forLineGroups($lineIdsByStudent);
+        $positionsByInvoice = $this->positionReader->forLineGroups($lineIdsByInvoice);
+        $positionsByStudentChargeType = $this->positionReader->forLineGroups($lineIdsByStudentChargeType);
 
         $paymentsByStudent = Payment::query()
             ->with('applications')
@@ -116,42 +128,49 @@ class GetBillingDashboardStudentsQuery
             ->get()
             ->groupBy('student_id');
 
-        $mappedStudents = $students->map(function ($student) use ($semesterId, $semesterInvoices, $paymentsByStudent, $invoiceSnapshots, $status) {
+        $mappedStudents = $students->map(function (Student $student) use (
+            $semesterId,
+            $semesterInvoices,
+            $positionsByStudent,
+            $positionsByInvoice,
+            $positionsByStudentChargeType,
+            $paymentsByStudent,
+            $status,
+        ): ?array {
             $studentInvoices = $semesterInvoices->get($student->id, collect());
+            $position = $positionsByStudent[$student->id] ?? null;
+            $summary = $position instanceof SettlementPosition
+                ? $this->positionPresenter->summarize($position)
+                : $this->missingSummary();
             $payments = $paymentsByStudent->get($student->id, collect());
+            $unappliedCash = $this->positionPresenter->unappliedCash($payments);
+            $invoiceSummaries = $studentInvoices->mapWithKeys(function (StudentInvoice $invoice) use ($positionsByInvoice): array {
+                $invoicePosition = $positionsByInvoice[(int) $invoice->id] ?? null;
+                $invoiceSummary = $invoicePosition instanceof SettlementPosition
+                    ? $this->positionPresenter->summarize($invoicePosition)
+                    : $this->missingSummary();
 
-            $grossBilled = (float) $studentInvoices->sum(fn (StudentInvoice $invoice) => $invoiceSnapshots[$invoice->id]['gross']);
-            $discounts = (float) $studentInvoices->sum(fn (StudentInvoice $invoice) => $invoiceSnapshots[$invoice->id]['discount']);
-            $netDue = (float) $studentInvoices->sum(fn (StudentInvoice $invoice) => $invoiceSnapshots[$invoice->id]['net']);
-            $cashApplied = (float) $studentInvoices->sum(fn (StudentInvoice $invoice) => $invoiceSnapshots[$invoice->id]['paid']);
-            $remaining = max(0, $netDue - $cashApplied);
-            $totalPayments = (float) $payments->sum('amount');
-            $totalAppliedAcrossPayments = (float) $payments->sum(fn ($payment) => max(0, (float) $payment->applications->sum('amount')));
-            $unappliedCash = max(0, $totalPayments - $totalAppliedAcrossPayments);
-
-            $latestInvoice = $studentInvoices->first();
-            $flags = $this->getStudentBillingFlags($student->id, $semesterId);
-
-            if ($studentInvoices->isEmpty()) {
-                $flags['uncharged'] = true;
-            }
+                return [$invoice->id => [
+                    'summary' => $invoiceSummary,
+                    'status' => $this->invoiceStatus($invoice, $invoiceSummary),
+                ]];
+            });
 
             if ($status !== 'all') {
-                if ($status === 'no_invoice' && ! $studentInvoices->isEmpty()) {
+                if ($status === 'no_invoice' && $studentInvoices->isNotEmpty()) {
                     return null;
                 }
 
-                if ($status !== 'no_invoice' && ! $studentInvoices->contains(fn ($invoice) => ($invoiceSnapshots[$invoice->id]['status'] === $status) || ($status === 'unpaid' && in_array($invoiceSnapshots[$invoice->id]['status'], ['draft', 'pending', 'overdue'], true)))) {
+                if ($status !== 'no_invoice' && ! $invoiceSummaries->contains(fn (array $invoice) => $invoice['status'] === $status || ($status === 'unpaid' && in_array($invoice['status'], ['pending', 'overdue', 'partial'], true)))) {
                     return null;
                 }
             }
 
-            $stage = 'Unknown';
-            if ($student->status === 'intake_pre_uni_gc') {
-                $stage = 'EGC';
-            } elseif ($student->status === 'intake_course') {
-                $stage = 'Major';
-            }
+            $stage = match ($student->status) {
+                'intake_pre_uni_gc' => 'EGC',
+                'intake_course' => 'Major',
+                default => 'Unknown',
+            };
 
             return [
                 'id' => $student->id,
@@ -162,38 +181,152 @@ class GetBillingDashboardStudentsQuery
                 'stage' => $stage,
                 'gc_current_level' => $student->gc_current_level,
                 'status' => $student->status,
-                'gross_billed' => $grossBilled,
-                'total_discounts' => $discounts,
-                'net_due' => $netDue,
-                'cash_applied' => $cashApplied,
-                'outstanding_amount' => $remaining,
+                'gross_billed' => $summary['gross'],
+                'total_discounts' => $summary['discount'],
+                'net_due' => $summary['net'],
+                'cash_applied' => $summary['cash'],
+                'credit_applied' => $summary['credit'],
+                'outstanding_amount' => $summary['remaining'],
                 'unapplied_cash' => $unappliedCash,
-                'breakdown' => [
-                    'major' => (float) $studentInvoices->flatMap->invoiceLines->filter(fn ($line) => $line->charge?->charge_type === 'tuition_term')->sum('amount_snapshot'),
-                    'egc' => (float) $studentInvoices->flatMap->invoiceLines->filter(fn ($line) => $line->charge?->charge_type === 'egc_level_fee')->sum('amount_snapshot'),
-                    'retake' => (float) $studentInvoices->flatMap->invoiceLines->filter(fn ($line) => $line->charge?->charge_type === 'retake_fee')->sum('amount_snapshot'),
-                    'discounts' => $discounts,
-                ],
-                'flags' => $flags,
-                'invoices' => $studentInvoices->map(fn (StudentInvoice $invoice) => [
-                    'id' => $invoice->id,
-                    'invoice_number' => $invoice->invoice_number,
-                    'status' => $invoiceSnapshots[$invoice->id]['status'],
-                    'due_date' => $invoice->due_date?->toDateString(),
-                    'total_amount' => $invoiceSnapshots[$invoice->id]['net'],
-                    'paid_amount' => $invoiceSnapshots[$invoice->id]['paid'],
-                ])->values()->all(),
-                'invoice_statuses' => $studentInvoices->map(fn (StudentInvoice $invoice) => $invoiceSnapshots[$invoice->id]['status'])->unique()->values()->all(),
-                'invoice_status' => $latestInvoice ? $invoiceSnapshots[$latestInvoice->id]['status'] : null,
-                'invoice_number' => $latestInvoice?->invoice_number,
-                'invoice_id' => $latestInvoice?->id,
-                'due_date' => $latestInvoice?->due_date?->toDateString(),
+                'settlement_state' => $summary['settlement_state'],
+                'settlement_label' => $this->positionPresenter->summarize($position instanceof SettlementPosition ? $position : $this->missingPosition(), $unappliedCash > 0)['settlement_label'],
+                'settlement_issues' => $summary['issues'],
+                'needs_review' => ! $summary['valid'],
+                'breakdown' => $this->breakdown($student->id, $positionsByStudentChargeType),
+                'flags' => $this->getStudentBillingFlags($student->id, $semesterId),
+                'invoices' => $studentInvoices->map(function (StudentInvoice $invoice) use ($invoiceSummaries): array {
+                    $invoiceSummary = $invoiceSummaries[$invoice->id];
+
+                    return [
+                        'id' => $invoice->id,
+                        'invoice_number' => $invoice->invoice_number,
+                        'status' => $invoiceSummary['status'],
+                        'settlement_state' => $invoiceSummary['summary']['settlement_state'],
+                        'settlement_label' => $invoiceSummary['summary']['settlement_label'],
+                        'due_date' => $invoice->due_date?->toDateString(),
+                        'total_amount' => $invoiceSummary['summary']['net'],
+                        'paid_amount' => $invoiceSummary['summary']['cash'],
+                        'remaining_amount' => $invoiceSummary['summary']['remaining'],
+                    ];
+                })->values()->all(),
+                'invoice_statuses' => $invoiceSummaries->pluck('status')->unique()->values()->all(),
+                'invoice_status' => $invoiceSummaries->first()['status'] ?? null,
+                'invoice_number' => $studentInvoices->first()?->invoice_number,
+                'invoice_id' => $studentInvoices->first()?->id,
+                'due_date' => $studentInvoices->first()?->due_date?->toDateString(),
             ];
         })->filter()->values();
 
         $mappedStudents = $this->sortStudents($mappedStudents, $sort, $direction);
 
         return $this->paginateCollection($mappedStudents, $perPage, $page, $filters);
+    }
+
+    private function invoiceStatus(StudentInvoice $invoice, array $summary): string
+    {
+        if (! $summary['valid']) {
+            return 'needs_review';
+        }
+
+        if ($summary['remaining'] <= 0) {
+            return 'paid';
+        }
+
+        if ($invoice->due_date?->isPast()) {
+            return 'overdue';
+        }
+
+        return $summary['cash'] > 0 || $summary['credit'] > 0 || $summary['discount'] > 0 ? 'partial' : 'pending';
+    }
+
+    /** @return array{major:?float,egc:?float,retake:?float,discount:?float} */
+    private function breakdown(int $studentId, array $positions): array
+    {
+        return [
+            'major' => $this->chargeTypeAmount($studentId, FinanceCharge::TYPE_TUITION_TERM, $positions),
+            'egc' => $this->chargeTypeAmount($studentId, FinanceCharge::TYPE_EGC_LEVEL_FEE, $positions),
+            'retake' => $this->chargeTypeAmount($studentId, FinanceCharge::TYPE_RETAKE_FEE, $positions),
+            'discount' => $this->chargeTypeDiscount($studentId, $positions),
+        ];
+    }
+
+    private function chargeTypeAmount(int $studentId, string $chargeType, array $positions): ?float
+    {
+        if (! array_key_exists($studentId.'|'.$chargeType, $positions)) {
+            return 0.0;
+        }
+
+        $summary = $this->positionSummaryForKey($studentId.'|'.$chargeType, $positions);
+
+        return $summary['valid'] ? $summary['gross'] : null;
+    }
+
+    private function chargeTypeDiscount(int $studentId, array $positions): ?float
+    {
+        $discount = 0.0;
+        $found = false;
+
+        foreach ($positions as $key => $position) {
+            if (! str_starts_with((string) $key, $studentId.'|')) {
+                continue;
+            }
+
+            $summary = $this->positionPresenter->summarize($position);
+            if (! $summary['valid']) {
+                return null;
+            }
+            $discount += $summary['discount'];
+            $found = true;
+        }
+
+        return $found ? $discount : 0.0;
+    }
+
+    /** @return array<string,mixed> */
+    private function positionSummaryForKey(string $key, array $positions): array
+    {
+        foreach ($positions as $positionKey => $position) {
+            if ((string) $positionKey === $key) {
+                return $this->positionPresenter->summarize($position);
+            }
+        }
+
+        return $this->missingSummary();
+    }
+
+    /** @return array<string,mixed> */
+    private function missingSummary(): array
+    {
+        return [
+            'valid' => false,
+            'settlement_state' => SettlementPosition::STATE_MISSING,
+            'settlement_label' => 'Cần kiểm tra',
+            'gross' => null,
+            'discount' => null,
+            'cash' => null,
+            'credit' => null,
+            'net' => null,
+            'remaining' => null,
+            'issues' => [[
+                'code' => 'settlement_position.missing_payable_line',
+                'severity' => 'blocking',
+                'blocking' => true,
+                'evidence' => [],
+                'finance_invariant_code' => null,
+            ]],
+        ];
+    }
+
+    private function missingPosition(): SettlementPosition
+    {
+        return SettlementPosition::invalid(
+            scopeType: SettlementPosition::SCOPE_PAYABLE_LINE,
+            scopeId: 0,
+            payableLineId: null,
+            financeObligationId: null,
+            rawEvidence: SettlementPositionRawEvidence::empty(),
+            issues: [],
+        );
     }
 
     private function sortStudents(Collection $students, string $sort, string $direction): Collection
@@ -211,21 +344,16 @@ class GetBillingDashboardStudentsQuery
 
     private function paginateCollection(Collection $items, int $perPage, int $page, array $filters): LengthAwarePaginator
     {
-        $total = $items->count();
-        $results = $items->forPage($page, $perPage)->values();
-
-        return (new LengthAwarePaginator($results, $total, $perPage, $page, [
+        return (new LengthAwarePaginator($items->forPage($page, $perPage)->values(), $items->count(), $perPage, $page, [
             'path' => route('finance.operations.dashboard'),
             'query' => array_filter($filters, fn ($value) => $value !== null && $value !== ''),
         ]))->withQueryString();
     }
 
+    /** @return array<string,bool> */
     private function getStudentBillingFlags(int $studentId, ?int $semesterId): array
     {
-        $deferCase = DeferCase::where('student_id', $studentId)
-            ->where('semester_id', $semesterId)
-            ->first();
-
+        $deferCase = DeferCase::where('student_id', $studentId)->where('semester_id', $semesterId)->first();
         $hasRetake = \DB::table('course_registrations')
             ->where('student_id', $studentId)
             ->where('semester_id', $semesterId)

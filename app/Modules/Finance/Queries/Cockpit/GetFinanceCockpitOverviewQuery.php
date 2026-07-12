@@ -34,18 +34,19 @@ class GetFinanceCockpitOverviewQuery
     /** @return array<string,mixed> */
     public function handle(?int $semesterId, ?string $phaseOverride = null): array
     {
+        $stats = $this->dashboardStats->handle($semesterId);
+
         return [
-            'kpi' => $this->kpi($semesterId),
-            'queues' => $this->queues($semesterId),
+            'kpi' => $this->kpi($stats),
+            'queues' => $this->queues($semesterId, $stats),
             'phase' => FinanceCollectionPhase::infer($phaseOverride),
         ];
     }
 
     /** @return array<string,mixed> */
-    private function kpi(?int $semesterId): array
+    private function kpi(array $s): array
     {
-        $s = $this->dashboardStats->handle($semesterId);
-        $receivable = (float) $s['total_charges'] - (float) $s['total_credits'];
+        $receivable = (float) $s['total_receivable'];
         $collectedPct = $receivable > 0 ? round(((float) $s['total_paid'] / $receivable) * 100, 1) : 0.0;
 
         return [
@@ -57,7 +58,7 @@ class GetFinanceCockpitOverviewQuery
     }
 
     /** @return list<array<string,mixed>> */
-    private function queues(?int $semesterId): array
+    private function queues(?int $semesterId, array $stats): array
     {
         $webhook = DngWebhookEvent::query()
             ->whereIn('processing_status', [
@@ -83,6 +84,8 @@ class GetFinanceCockpitOverviewQuery
         return [
             $this->queue('webhook_errors', 'Webhook DNG lỗi', $webhookCount, false, 'campus',
                 'view_finance_dng_webhook_events', route('finance.dng.webhook-events.index'), $webhookCount > 0 ? 'critical' : 'normal'),
+            $this->queue('settlement_exceptions', 'Settlement cần kiểm tra', (int) $stats['needs_review_count'], true, 'semester',
+                'view_finance_operations_exceptions', route('finance.operations.exceptions'), (int) $stats['needs_review_count'] > 0 ? 'critical' : 'normal'),
             $this->queue('unallocated', 'Tiền chờ phân bổ', $readySettlementCount, false, 'campus',
                 'allocate_finance_payment', route('finance.operations.settlement.index', ['readiness' => 'ready']), $readySettlementCount > 0 ? 'action' : 'normal'),
             $this->queue('dng_due', 'DNG đến hạn', (int) $due['overdue_count'] + (int) $due['due_today_count'], true, 'semester',
