@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 use App\Modules\Finance\Support\Integrity\FinanceInvariantRegistry;
 
-it('exposes all 18 invariants with stable codes and a {scope} token', function () {
+it('exposes all 19 invariants with stable codes and a {scope} token', function () {
     $invariants = app(FinanceInvariantRegistry::class)->all();
 
     $codes = array_map(fn ($i) => $i->code, $invariants);
     expect($codes)->toBe([
         'INV-1', 'INV-2', 'INV-3', 'INV-4', 'INV-5', 'INV-6', 'INV-7', 'INV-8',
-        'INV-9', 'INV-10', 'INV-11', 'INV-12', 'INV-13', 'INV-14', 'INV-15', 'INV-16', 'INV-17', 'INV-18',
+        'INV-9', 'INV-10', 'INV-11', 'INV-12', 'INV-13', 'INV-14', 'INV-15', 'INV-16', 'INV-17', 'INV-18', 'INV-19',
     ]);
 
     foreach ($invariants as $invariant) {

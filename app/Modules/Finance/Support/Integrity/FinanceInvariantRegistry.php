@@ -312,6 +312,21 @@ class FinanceInvariantRegistry
                     ORDER BY si.id LIMIT 5',
                 'si.student_id IN ({ids})',
             ),
+            new FinanceInvariant(
+                'INV-19',
+                'CRITICAL',
+                'Active charge missing a canonical obligation',
+                'SELECT COUNT(*) c FROM finance_charges fc
+                    WHERE fc.status = "active"
+                      AND fc.finance_obligation_id IS NULL
+                      AND ({scope})',
+                'SELECT fc.id FROM finance_charges fc
+                    WHERE fc.status = "active"
+                      AND fc.finance_obligation_id IS NULL
+                      AND ({scope})
+                    ORDER BY fc.id LIMIT 5',
+                'fc.student_id IN ({ids})',
+            ),
         ];
     }
 

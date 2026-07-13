@@ -51,6 +51,11 @@ final class FinanceOwnedObligationSource
         return "legacy:bhyt:charge:{$chargeId}";
     }
 
+    public static function legacyRetakeFeeChargeRef(int $chargeId): string
+    {
+        return "legacy:retake_fee:charge:{$chargeId}";
+    }
+
     /**
      * Synthetic source_ref for legacy tuition_term charges that pre-date intake.
      * Stable per charge so backfill is idempotent under the source quad unique key
