@@ -1,5 +1,7 @@
 # Validation
 
+> **Historical evidence notice (2026-07-12):** Các count `INV-6` bên dưới được tạo theo định nghĩa cũ và không còn là lỗi dữ liệu. Chúng được giữ để audit lịch sử. Rule hiện tại: multi-invoice hợp lệ; `INV-6` retired; `INV-17` kiểm tra invoice/charge scope mismatch.
+
 ## Proof Strategy
 
 Prove that dirty-data blockers are zero before adding constraints, then prove the

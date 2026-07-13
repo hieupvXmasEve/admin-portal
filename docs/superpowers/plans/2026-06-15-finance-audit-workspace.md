@@ -1,5 +1,7 @@
 # Finance Audit Workspace (S-009 / FIN-REV-009) Implementation Plan
 
+> **Historical INV-6 notice (2026-07-12):** Tài liệu này ghi lại định nghĩa/kết quả audit cũ. Nhiều invoice cùng student/kỳ là hợp lệ theo kiến trúc hiện tại; không cleanup hoặc thêm unique `(student_id, semester_id)` chỉ vì multi-invoice. `INV-6` đã retired; `INV-17` kiểm tra invoice line tham chiếu charge sai student/kỳ.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a read-only, permission-safe Finance Audit Workspace with universal search that resolves any finance identifier to a student-scoped money **graph + signed ledger timeline + integrity warnings**, all derived from existing canonical sources (no new money math).

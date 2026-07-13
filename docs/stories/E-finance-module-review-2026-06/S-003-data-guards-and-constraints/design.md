@@ -1,5 +1,7 @@
 # Design
 
+> **Superseded rule notice (2026-07-12):** Phần INV-6/unique `(student_id, semester_id)` bên dưới là thiết kế lịch sử và không còn áp dụng. Nhiều invoice cùng kỳ là hợp lệ; `INV-17` hiện chặn invoice line tham chiếu charge sai student/kỳ.
+
 ## Domain Model
 
 Use invariant failures as the remediation queue:

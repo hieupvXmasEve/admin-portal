@@ -15,6 +15,7 @@ use App\Modules\Finance\Models\FinanceCreditEntitlement;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -177,6 +178,47 @@ it('does not create a cash paid timestamp for a credit-only settlement', functio
     expect((float) $fresh->cached_paid_amount)->toBe(0.0)
         ->and($fresh->status)->toBe('paid')
         ->and($fresh->cached_paid_at)->toBeNull();
+});
+
+it('preserves a draft invoice lifecycle when its due date is in the past', function () {
+    [$invoice] = makeCacheInvoice();
+    $invoice->forceFill([
+        'status' => 'draft',
+        'due_date' => now()->subDay(),
+    ])->save();
+
+    app(SettlementService::class)->recalculateInvoiceSnapshot($invoice->fresh());
+
+    expect($invoice->fresh()->status)->toBe('draft');
+});
+
+it('reconstructs a missing cash paid timestamp from application evidence', function () {
+    [$invoice, $line, $student] = makeCacheInvoice();
+    $historicalPaidAt = now()->subMonths(2)->startOfSecond();
+    $payment = Payment::query()->create([
+        'student_id' => $student->id,
+        'amount' => 10000000,
+        'status' => Payment::STATUS_COMPLETED,
+        'paid_at' => $historicalPaidAt,
+        'source' => 'manual',
+    ]);
+    PaymentApplication::query()->create([
+        'payment_id' => $payment->id,
+        'invoice_line_id' => $line->id,
+        'amount' => 10000000,
+        'entry_type' => 'application',
+        'applied_at' => $historicalPaidAt,
+    ]);
+    $invoice->forceFill([
+        'status' => 'partial',
+        'cached_paid_at' => null,
+    ])->save();
+
+    app(SettlementService::class)->recalculateInvoiceSnapshot($invoice->fresh());
+
+    $fresh = $invoice->fresh();
+    expect($fresh->status)->toBe('paid')
+        ->and($fresh->cached_paid_at?->equalTo($historicalPaidAt))->toBeTrue();
 });
 
 it('clears the cash-only cache when a fully paid line is voided', function () {

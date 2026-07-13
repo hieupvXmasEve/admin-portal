@@ -20,6 +20,7 @@ use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Actions\Operations\ApplyDeferFinancePolicyAction;
 use App\Modules\Finance\Actions\Operations\GenerateBatchChargesAction;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
@@ -45,17 +46,18 @@ uses(RefreshDatabase::class);
  *  - The student's preserved available cash is auto-allocated onto that new
  *    charge through the normal allocation path (AutoAllocatePaymentsAction).
  *  - Re-enrollment lineage rides course_registrations.original_registration_id.
- *  - finance:audit-invariants stays clean: one invoice per (student, semester),
- *    no synthetic credit/debt, the preserved cash — not new money — settles it.
+ *  - finance:audit-invariants stays clean: invoice lines remain in the correct
+ *    student/semester scope, with no synthetic credit/debt; preserved cash —
+ *    not new money — settles the return obligation.
  *
  * Modelling notes (kept faithful + invariant-safe):
  *  - Two real terms exist: the defer term S1 (past) and the return term S2
  *    (active). getTuitionTermData() counts semesters from intake_major to the
  *    target inclusive, so with exactly these two S1 => term 1, S2 => term 2.
  *  - Re-enrollment is cross-semester (the real flow: defer this term, return a
- *    future term). Same-semester regeneration is intentionally avoided: the
- *    PRESERVE void cancels S1's invoice, and a second invoice in S1 would trip
- *    INV-6 (duplicate invoice per student/semester).
+ *    future term). Same-semester regeneration is intentionally avoided because
+ *    this scenario models a real future-term return, not because multiple
+ *    invoices in one semester are forbidden.
  *  - The settled student stays 'intake_course' (a resumed/active student) so
  *    batch generation includes them for S2; M1's settlement never touches
  *    student.status.
@@ -193,7 +195,21 @@ function reEnrollArrangePreserved(Campus $campus, Program $program, CurriculumVe
     $student = reEnrollStudent($campus, $program, $cv, $deferSemester, $code);
     $originalReg = reEnrollRegistration($student->id, $deferSemester->id, 'registered');
 
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'finance_test',
+        'source_kind' => 'defer_reenrollment',
+        'source_ref' => 'defer-reenrollment:'.uniqid('', true),
+        'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 45_000_000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'defer-reenrollment:test',
+        'pricing_snapshot' => ['catalog_rule_version' => 'defer-reenrollment:test'],
+        'accepted_at' => now(),
+    ]);
+
     $originalCharge = app(CreateFinanceChargeAction::class)->handle([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $student->id,
         'semester_id' => $deferSemester->id,
         'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
@@ -225,7 +241,9 @@ function reEnrollArrangePreserved(Campus $campus, Program $program, CurriculumVe
         'changed_by_user_id' => $user->id,
     ]);
 
+    $student->update(['status' => 'deferred']);
     app(ApplyDeferFinancePolicyAction::class)->handle($case, $user->id);
+    $student->update(['status' => 'intake_course']);
 
     return [$student, $originalReg, $payment, $originalCharge->fresh()];
 }
@@ -336,7 +354,8 @@ it('settles the re-enrollment with preserved cash only — no new money, no synt
         ->and((float) Payment::where('student_id', $student->id)->sum('amount'))->toBe(45_000_000.0)
         // No defer adjustment charge (that is FORFEIT, not PRESERVE).
         ->and(FinanceCharge::where('student_id', $student->id)->where('charge_type', FinanceCharge::TYPE_ADJUSTMENT)->count())->toBe(0)
-        // One invoice per semester (defer term cancelled, return term active) — INV-6 safe.
+        // This scenario keeps one statement in each term; the architecture also
+        // permits additional invoices when separate fee streams require them.
         ->and(StudentInvoice::where('student_id', $student->id)->where('semester_id', $this->deferSemester->id)->count())->toBe(1)
         ->and(StudentInvoice::where('student_id', $student->id)->where('semester_id', $this->returnSemester->id)->count())->toBe(1)
         ->and(reEnrollInvariantOffending())->toBe(0);

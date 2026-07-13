@@ -1,5 +1,7 @@
 # Overview
 
+> **Superseded rule notice (2026-07-12):** Story này dùng giả định cũ “một invoice mỗi student/kỳ”. Kiến trúc hiện tại cho phép nhiều invoice theo fee stream; không thêm unique `(student_id, semester_id)` và không coi multi-invoice là dirty data. `INV-6` đã retired; scope integrity chuyển sang `INV-17`.
+
 ## Current Behavior
 
 Finance relies too heavily on application code for uniqueness, status validity,

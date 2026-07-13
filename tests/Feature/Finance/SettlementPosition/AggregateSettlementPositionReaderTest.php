@@ -165,6 +165,37 @@ it('invalidates an exact requested scope when any requested target is invalid', 
         ->and($position->hasIssue(SettlementPositionIssue::PAYABLE_LINE_NOT_COLLECTIBLE))->toBeTrue();
 });
 
+it('excludes void history from current business scopes but keeps exact target validation fail closed', function (): void {
+    $activeLine = createAggregatePayableLine($this->invoice, $this->billingAccount, '1000000.00');
+    $voidLine = createAggregatePayableLine($this->invoice, $this->billingAccount, '500000.00');
+    $voidedAt = now();
+
+    $voidLine->update([
+        'status' => 'void',
+        'voided_at' => $voidedAt,
+        'void_reason' => 'Historical line excluded from current business scope',
+    ]);
+    $voidLine->charge()->update([
+        'status' => FinanceCharge::STATUS_VOID,
+        'voided_at' => $voidedAt,
+        'void_reason' => 'Historical charge excluded from current business scope',
+    ]);
+
+    $reader = app(SettlementPositionReader::class);
+    $invoicePosition = $reader->forInvoice((int) $this->invoice->id);
+    $accountPosition = $reader->forBillingAccount((int) $this->billingAccount->id);
+    $exactPosition = $reader->forPayableLines([(int) $activeLine->id, (int) $voidLine->id]);
+
+    expect($invoicePosition->isValid())->toBeTrue()
+        ->and($invoicePosition->amounts->gross->amount)->toBe('1000000.00')
+        ->and($invoicePosition->payable_line_breakdown)->toHaveCount(1)
+        ->and($accountPosition->isValid())->toBeTrue()
+        ->and($accountPosition->amounts->gross->amount)->toBe('1000000.00')
+        ->and($accountPosition->payable_line_breakdown)->toHaveCount(1)
+        ->and($exactPosition->isValid())->toBeFalse()
+        ->and($exactPosition->hasIssue(SettlementPositionIssue::PAYABLE_LINE_NOT_ACTIVE))->toBeTrue();
+});
+
 it('does not rewrite an as-of position with payment evidence effective after the requested timestamp', function (): void {
     $snapshotAt = CarbonImmutable::parse('2026-07-01 12:00:00');
     $line = createAggregatePayableLine(

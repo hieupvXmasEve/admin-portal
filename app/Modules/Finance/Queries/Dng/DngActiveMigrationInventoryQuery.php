@@ -12,6 +12,7 @@ use App\Modules\Finance\Models\DngReceiptException;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Support\SettlementPosition\Money;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -36,10 +37,19 @@ final class DngActiveMigrationInventoryQuery
         DngPaymentRequest::STATUS_NEEDS_REVIEW,
     ];
 
+    private const PAID_ACTIVE_STATUSES = [
+        DngPaymentRequest::STATUS_PAID_UNINVOICED,
+        DngPaymentRequest::STATUS_PAID_INVOICED,
+        DngPaymentRequest::STATUS_RECONCILED,
+    ];
+
     /** @var array<int, array{targets: list<array<string, mixed>>, classifications: list<string>, billing_account_id: ?int, campus_code: ?string, provider_rail: ?string, fee_type: string}> */
     private array $inspections = [];
 
-    public function __construct(private readonly SettlementPositionReader $settlementPositionReader) {}
+    public function __construct(
+        private readonly SettlementPositionReader $settlementPositionReader,
+        private readonly StudentLifecycleStatusReader $studentLifecycleStatusReader,
+    ) {}
 
     public function handle(?int $limit = null): DngActiveMigrationReport
     {
@@ -56,8 +66,19 @@ final class DngActiveMigrationInventoryQuery
         }
 
         $query->orderBy('id')->chunkById(100, function (Collection $requests) use (&$records): void {
+            $studentStatuses = $this->studentLifecycleStatusReader->statusesFor(
+                $requests->pluck('student_id')
+                    ->map(static fn (int|string $studentId): int => (int) $studentId)
+                    ->unique()
+                    ->values()
+                    ->all(),
+            );
+
             foreach ($requests as $request) {
-                $inspection = $this->inspect($request);
+                $inspection = $this->inspect(
+                    $request,
+                    $studentStatuses[(int) $request->student_id] ?? null,
+                );
                 $this->inspections[$request->id] = $inspection;
                 $records[] = [
                     'id' => (int) $request->id,
@@ -106,7 +127,7 @@ final class DngActiveMigrationInventoryQuery
     }
 
     /** @return array{targets: list<array<string, mixed>>, classifications: list<string>, billing_account_id: ?int, campus_code: ?string, provider_rail: ?string, fee_type: string} */
-    private function inspect(DngPaymentRequest $request): array
+    private function inspect(DngPaymentRequest $request, ?string $studentLifecycleStatus): array
     {
         $classifications = [];
         $studentAccountIds = BillingAccount::query()
@@ -129,9 +150,22 @@ final class DngActiveMigrationInventoryQuery
         }
 
         $providerRail = $request->provider_rail ?: self::PROVIDER_RAIL;
-        $targets = $this->exactTargets($request);
+        $isPaidRequest = in_array($request->status, self::PAID_ACTIVE_STATUSES, true);
+        if (! $isPaidRequest
+            && in_array($studentLifecycleStatus, ['deferred', 'dropout', 'dropout_transfer'], true)) {
+            $classifications[] = 'student_lifecycle_conflict';
+        }
+        $targets = $this->exactTargets($request, $isPaidRequest);
+        if ($this->hasConflictingLegacyChargeLinks($request)) {
+            $classifications[] = 'unknown_link';
+        }
         if ($targets === []) {
             $classifications[] = 'unknown_link';
+        } elseif ($isPaidRequest) {
+            if ($request->payment !== null
+                && Money::vnd((string) $request->payment->amount)->minor_amount !== Money::vnd((string) $request->amount)->minor_amount) {
+                $classifications[] = 'amount_mismatch';
+            }
         } else {
             $position = $this->settlementPositionReader->forPayableLines(array_column($targets, 'invoice_line_id'));
             $positions = collect($position->payable_line_breakdown)->keyBy('payable_line_id');
@@ -199,7 +233,7 @@ final class DngActiveMigrationInventoryQuery
     }
 
     /** @return list<array{invoice_line_id: int, finance_charge_id: int, finance_charge_installment_id: ?int, target_identity: string, identity: string, collectible: string}> */
-    private function exactTargets(DngPaymentRequest $request): array
+    private function exactTargets(DngPaymentRequest $request, bool $includeHistoricalLines = false): array
     {
         $targets = $request->reservationTargets()->get();
         if ($targets->isNotEmpty()) {
@@ -234,7 +268,7 @@ final class DngActiveMigrationInventoryQuery
             ->keyBy('finance_charge_id');
         $lines = InvoiceLine::query()
             ->whereIn('charge_id', $chargeIds)
-            ->where('status', 'active')
+            ->when(! $includeHistoricalLines, fn ($query) => $query->where('status', 'active'))
             ->get()
             ->groupBy('charge_id');
 
@@ -261,6 +295,20 @@ final class DngActiveMigrationInventoryQuery
         }
 
         return $result;
+    }
+
+    private function hasConflictingLegacyChargeLinks(DngPaymentRequest $request): bool
+    {
+        if ($request->reservationTargets->isNotEmpty() || $request->finance_charge_id === null) {
+            return false;
+        }
+
+        $pivotChargeIds = $request->chargeLinks
+            ->pluck('finance_charge_id')
+            ->map(static fn (int|string $id): int => (int) $id);
+
+        return $pivotChargeIds->isNotEmpty()
+            && ! $pivotChargeIds->contains((int) $request->finance_charge_id);
     }
 
     /** @param list<array{id: int, status: string, classifications: list<string>, action: string, billing_account_id: ?int, target_line_ids: list<int>}> $records */
@@ -325,6 +373,9 @@ final class DngActiveMigrationInventoryQuery
     /** @param list<string> $classifications */
     private function actionFor(array $classifications): string
     {
+        if (in_array('student_lifecycle_conflict', $classifications, true)) {
+            return 'cancel_collection';
+        }
         if (in_array('paid_unbridged', $classifications, true)) {
             return 'paid_bridge';
         }

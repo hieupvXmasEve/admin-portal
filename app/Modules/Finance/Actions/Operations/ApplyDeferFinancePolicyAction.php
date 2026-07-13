@@ -6,15 +6,21 @@ namespace App\Modules\Finance\Actions\Operations;
 
 use App\Models\DeferCase;
 use App\Modules\Finance\Actions\AllocatePaymentAction;
+use App\Modules\Finance\Actions\CancelDngPaymentRequestAction;
 use App\Modules\Finance\Actions\CreateStaffDebitAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestReservationTarget;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Services\SettlementService;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -35,15 +41,15 @@ use Illuminate\Support\Facades\DB;
  * Settlement model ("void-and-release → re-consume"):
  *  1. Resolve obligations = active positive finance_charges for the student in
  *     the defer semester.
- *  2. Auto-safe gate (read-only, before any mutation):
- *       - live DNG on any obligation        → skipped: live_dng
+ *  2. Auto-safe gate and lifecycle collection closure:
+ *       - live unpaid DNG on an obligation  → cancel locally in Swinx
  *       - discount/scholarship on any line   → skipped: discount_present
  *       - no obligations                     → noop: no_charge
  *       - scope ≠ FULL or policy unsupported → skipped: out_of_scope
  *  3. Apply inside a single transaction so a partial failure rolls back whole.
  *
- * This action is built in isolation (M1): it is NOT wired into the runtime
- * defer flow and does not change charge generation (those are M3 / M2).
+ * The runtime Academic defer flow and historical defer backfill both reuse this
+ * action; it does not change charge generation.
  * Traceability: FORFEIT adjustment via intake source_ref defer_forfeit:{case_id};
  * void_reason on released obligations. Wave 7 no longer writes charge source_type.
  */
@@ -61,25 +67,37 @@ class ApplyDeferFinancePolicyAction
 
     public const REASON_FORFEIT_SETTLED = 'forfeit_settled';
 
-    public const REASON_LIVE_DNG = 'live_dng';
-
     public const REASON_DISCOUNT_PRESENT = 'discount_present';
 
     public const REASON_NO_CHARGE = 'no_charge';
 
     public const REASON_OUT_OF_SCOPE = 'out_of_scope';
 
+    public const REASON_STUDENT_LIFECYCLE_ACTIVE = 'student_lifecycle_active';
+
+    private const SETTLEABLE_LIFECYCLE_STATUSES = [
+        'deferred',
+        'dropout',
+        'dropout_transfer',
+        'pending_course_opening',
+    ];
+
     /** DNG request statuses that are still collectible at the provider. */
     private const LIVE_DNG_STATUSES = [
         DngPaymentRequest::STATUS_PENDING,
         DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+        DngPaymentRequest::STATUS_UNKNOWN_OUTCOME,
+        DngPaymentRequest::STATUS_NEEDS_REVIEW,
     ];
 
     public function __construct(
+        private readonly CancelDngPaymentRequestAction $cancelDngPaymentRequestAction,
         private readonly VoidFinanceChargeAction $voidAction,
         private readonly CreateStaffDebitAction $createStaffDebitAction,
         private readonly AllocatePaymentAction $allocateAction,
+        private readonly InvoiceGenerationService $invoiceGenerationService,
         private readonly SettlementService $settlementService,
+        private readonly StudentLifecycleStatusReader $studentLifecycleStatusReader,
     ) {}
 
     /**
@@ -92,40 +110,55 @@ class ApplyDeferFinancePolicyAction
      *     released: float,
      *     consumed: float,
      *     voided_charge_ids: array<int, int>,
+     *     cancelled_dng_request_ids: array<int, int>,
      *     adjustment_charge_id: int|null
      * }
      */
-    public function handle(DeferCase $case, ?int $userId = null): array
-    {
+    public function handle(
+        DeferCase $case,
+        ?int $userId = null,
+        ?string $reviewedDiscountDispositionReason = null,
+    ): array {
         $actorId = $userId ?? auth()->id();
+        $reviewedDiscountDispositionReason = trim((string) $reviewedDiscountDispositionReason);
 
         // Gate 1 — eligibility. Only FULL-scope PRESERVE/FORFEIT is in scope for M1.
         if (! $this->isInScope($case)) {
             return $this->result($case, self::STATUS_SKIPPED, self::REASON_OUT_OF_SCOPE);
         }
 
-        $obligations = $this->resolveObligations($case);
-
-        // Gate 2 — nothing to settle.
-        if ($obligations->isEmpty()) {
-            return $this->result($case, self::STATUS_NOOP, self::REASON_NO_CHARGE);
+        $studentLifecycleStatus = $this->studentLifecycleStatusReader
+            ->statusesFor([(int) $case->student_id])[(int) $case->student_id] ?? null;
+        if (! in_array($studentLifecycleStatus, self::SETTLEABLE_LIFECYCLE_STATUSES, true)) {
+            return $this->result($case, self::STATUS_SKIPPED, self::REASON_STUDENT_LIFECYCLE_ACTIVE);
         }
 
-        // Gate 3 — live DNG (read-only). A request still collectible at the
-        // provider must be cancelled through the DNG flow before any void.
-        if ($this->hasLiveDng($obligations)) {
-            return $this->result($case, self::STATUS_SKIPPED, self::REASON_LIVE_DNG);
-        }
+        return DB::transaction(function () use ($case, $actorId, $reviewedDiscountDispositionReason): array {
+            $obligations = $this->resolveObligations($case);
 
-        // Gate 4 — discount/scholarship on an obligation line (read-only). Mixing
-        // a discount into a defer settlement is ambiguous; route to review.
-        if ($this->hasDiscount($obligations)) {
-            return $this->result($case, self::STATUS_SKIPPED, self::REASON_DISCOUNT_PRESENT);
-        }
+            if ($obligations->isEmpty()) {
+                return $this->result($case, self::STATUS_NOOP, self::REASON_NO_CHARGE);
+            }
 
-        return DB::transaction(fn (): array => $case->fee_policy === DeferCase::POLICY_FORFEIT
-            ? $this->applyForfeit($case, $obligations, $actorId)
-            : $this->applyPreserve($case, $obligations, $actorId));
+            // Do not close collection unless the linked charges are also safe to
+            // void in this transaction. Discounted cases stay in review.
+            if ($this->hasDiscount($obligations)
+                && ! ($reviewedDiscountDispositionReason !== '' && $case->fee_policy === DeferCase::POLICY_FORFEIT)) {
+                return $this->result($case, self::STATUS_SKIPPED, self::REASON_DISCOUNT_PRESENT);
+            }
+
+            $cancelledDngRequestIds = $this->cancelLiveDngRequests($obligations);
+
+            return $case->fee_policy === DeferCase::POLICY_FORFEIT
+                ? $this->applyForfeit(
+                    $case,
+                    $obligations,
+                    $actorId,
+                    $cancelledDngRequestIds,
+                    $reviewedDiscountDispositionReason,
+                )
+                : $this->applyPreserve($case, $obligations, $actorId, $cancelledDngRequestIds);
+        });
     }
 
     /** FULL-scope, PRESERVE or FORFEIT only (PARTIAL / COURSES are later slices). */
@@ -169,24 +202,68 @@ class ApplyDeferFinancePolicyAction
                 });
             })
             ->orderBy('id')
+            ->lockForUpdate()
             ->get();
     }
 
     /**
-     * Whether any obligation has an installment awaiting payment that is linked
-     * to a live DNG request. Mirrors VoidFinanceChargeAction's own DNG guard so
-     * this read-only gate and the downstream void never disagree.
+     * Close all live unpaid DNG requests linked through any supported exact-link
+     * shape. This is a local admin lifecycle closure: no provider API is called.
      *
      * @param  Collection<int, FinanceCharge>  $obligations
+     * @return list<int>
      */
-    private function hasLiveDng(Collection $obligations): bool
+    private function cancelLiveDngRequests(Collection $obligations): array
     {
-        return FinanceChargeInstallment::query()
-            ->whereIn('finance_charge_id', $obligations->pluck('id'))
+        $chargeIds = $obligations->modelKeys();
+        $requestIds = FinanceChargeInstallment::query()
+            ->whereIn('finance_charge_id', $chargeIds)
             ->where('status', FinanceChargeInstallment::STATUS_AWAITING_PAYMENT)
             ->whereNotNull('dng_payment_request_id')
             ->whereHas('dngPaymentRequest', fn ($query) => $query->whereIn('status', self::LIVE_DNG_STATUSES))
-            ->exists();
+            ->pluck('dng_payment_request_id');
+
+        $requestIds = $requestIds->merge(DngPaymentRequest::query()
+            ->whereIn('status', self::LIVE_DNG_STATUSES)
+            ->whereIn('finance_charge_id', $chargeIds)
+            ->pluck('id'));
+
+        $requestIds = $requestIds->merge(DngPaymentRequestCharge::query()
+            ->whereIn('finance_charge_id', $chargeIds)
+            ->whereHas('dngPaymentRequest', fn ($requests) => $requests->whereIn('status', self::LIVE_DNG_STATUSES))
+            ->pluck('dng_payment_request_id'));
+
+        $lineIds = InvoiceLine::query()
+            ->whereIn('charge_id', $chargeIds)
+            ->pluck('id');
+
+        $requestIds = $requestIds->merge(DngPaymentRequestReservationTarget::query()
+            ->where(function ($targets) use ($chargeIds, $lineIds): void {
+                $targets->whereIn('invoice_line_id', $lineIds)
+                    ->orWhereHas(
+                        'financeChargeInstallment',
+                        fn ($installments) => $installments->whereIn('finance_charge_id', $chargeIds),
+                    );
+            })
+            ->whereHas('dngPaymentRequest', fn ($requests) => $requests->whereIn('status', self::LIVE_DNG_STATUSES))
+            ->pluck('dng_payment_request_id'))
+            ->filter()
+            ->map(static fn (int|string $requestId): int => (int) $requestId)
+            ->unique()
+            ->values();
+
+        $requests = DngPaymentRequest::query()
+            ->whereIn('id', $requestIds)
+            ->whereIn('status', self::LIVE_DNG_STATUSES)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($requests as $request) {
+            $this->cancelDngPaymentRequestAction->runLocallyForLifecycle($request);
+        }
+
+        return $requests->modelKeys();
     }
 
     /**
@@ -208,14 +285,19 @@ class ApplyDeferFinancePolicyAction
      *
      * @param  Collection<int, FinanceCharge>  $obligations
      */
-    private function applyPreserve(DeferCase $case, Collection $obligations, ?int $actorId): array
-    {
+    private function applyPreserve(
+        DeferCase $case,
+        Collection $obligations,
+        ?int $actorId,
+        array $cancelledDngRequestIds,
+    ): array {
         ['released' => $released, 'voided_charge_ids' => $voidedIds] = $this->voidObligations($case, $obligations, $actorId);
 
         return $this->result($case, self::STATUS_APPLIED, self::REASON_PRESERVE_SETTLED, [
             'released' => $released,
             'consumed' => 0.0,
             'voided_charge_ids' => $voidedIds,
+            'cancelled_dng_request_ids' => $cancelledDngRequestIds,
         ]);
     }
 
@@ -226,10 +308,22 @@ class ApplyDeferFinancePolicyAction
      *
      * @param  Collection<int, FinanceCharge>  $obligations
      */
-    private function applyForfeit(DeferCase $case, Collection $obligations, ?int $actorId): array
-    {
+    private function applyForfeit(
+        DeferCase $case,
+        Collection $obligations,
+        ?int $actorId,
+        array $cancelledDngRequestIds,
+        string $reviewedDiscountDispositionReason,
+    ): array {
+        $adjustmentInvoiceContext = $this->resolveAdjustmentInvoiceContext($obligations);
+
         ['released' => $released, 'voided_charge_ids' => $voidedIds, 'payment_ids' => $paymentIds]
-            = $this->voidObligations($case, $obligations, $actorId);
+            = $this->voidObligations(
+                $case,
+                $obligations,
+                $actorId,
+                $reviewedDiscountDispositionReason,
+            );
 
         $consumed = round($released, 2);
 
@@ -238,6 +332,7 @@ class ApplyDeferFinancePolicyAction
                 'released' => $released,
                 'consumed' => 0.0,
                 'voided_charge_ids' => $voidedIds,
+                'cancelled_dng_request_ids' => $cancelledDngRequestIds,
             ]);
         }
 
@@ -249,40 +344,42 @@ class ApplyDeferFinancePolicyAction
             'description' => "Defer forfeit settlement (case #{$case->id})",
             'source_kind' => CreateStaffDebitAction::SOURCE_KIND_DEFER_FORFEIT,
             'source_ref' => 'defer_forfeit:'.$case->id,
-            'invoice_id' => $this->resolveAdjustmentInvoiceId($case),
+            'invoice_id' => $this->prepareAdjustmentInvoice($adjustmentInvoiceContext['invoice_id']),
         ]);
 
         $adjustment = FinanceCharge::query()->findOrFail($result->finance_charge_id);
 
         $this->allocateReleasedCash($adjustment, $paymentIds, $consumed, $actorId);
+        $this->finalizeAdjustmentInvoice($adjustment, $adjustmentInvoiceContext['paid_at']);
 
         return $this->result($case, self::STATUS_APPLIED, self::REASON_FORFEIT_SETTLED, [
             'released' => $released,
             'consumed' => $consumed,
             'voided_charge_ids' => $voidedIds,
             'adjustment_charge_id' => (int) $adjustment->id,
+            'cancelled_dng_request_ids' => $cancelledDngRequestIds,
         ]);
     }
 
     /**
-     * Reuse the student's existing (student, semester) invoice for the
-     * adjustment charge.
+     * Reuse the invoice that carried the voided obligation for the adjustment
+     * charge, preserving one statement lineage for the defer settlement.
      *
      * Voiding the last active line of an obligation invoice cancels it, and
      * CreateFinanceChargeAction only reuses a *draft* invoice — so without this
-     * the adjustment would spawn a second invoice for the same (student,
-     * semester) and trip INV-6 (duplicate invoice). The defer settlement
-     * guarantees at most one such invoice (INV-6 holds pre-settlement), so the
-     * cancelled invoice is simply reopened to draft and reused; its derived
-     * status is recomputed once the adjustment line is attached and allocated.
+     * the adjustment would spawn a separate statement detached from the voided
+     * obligation's history. Multiple invoices per student/semester are valid;
+     * this reuse is about lifecycle cohesion, not invoice cardinality. The
+     * cancelled invoice is reopened to draft and its derived status is recomputed
+     * once the adjustment line is attached and allocated.
      */
-    private function resolveAdjustmentInvoiceId(DeferCase $case): ?int
+    private function prepareAdjustmentInvoice(?int $invoiceId): ?int
     {
-        $invoice = StudentInvoice::query()
-            ->where('student_id', $case->student_id)
-            ->where('semester_id', $case->semester_id)
-            ->orderBy('id')
-            ->first();
+        if ($invoiceId === null) {
+            return null;
+        }
+
+        $invoice = StudentInvoice::query()->lockForUpdate()->find($invoiceId);
 
         if ($invoice === null) {
             return null;
@@ -296,15 +393,65 @@ class ApplyDeferFinancePolicyAction
     }
 
     /**
+     * Capture one exact source statement before its payable lines are voided.
+     * Multiple invoices per semester are valid, so the adjustment must reuse an
+     * invoice that actually contains one of this settlement's obligations.
+     *
+     * @param  Collection<int, FinanceCharge>  $obligations
+     * @return array{invoice_id: int|null, paid_at: string|null}
+     */
+    private function resolveAdjustmentInvoiceContext(Collection $obligations): array
+    {
+        $invoice = StudentInvoice::query()
+            ->whereHas(
+                'invoiceLines',
+                fn ($lines) => $lines->whereIn('charge_id', $obligations->modelKeys()),
+            )
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->first(['id', 'status', 'cached_paid_at']);
+
+        if ($invoice === null) {
+            return ['invoice_id' => null, 'paid_at' => null];
+        }
+
+        return [
+            'invoice_id' => (int) $invoice->id,
+            'paid_at' => $invoice->status === 'paid' && $invoice->cached_paid_at !== null
+                ? $invoice->cached_paid_at->format('Y-m-d H:i:s')
+                : null,
+        ];
+    }
+
+    private function finalizeAdjustmentInvoice(FinanceCharge $adjustment, ?string $preservedPaidAt): void
+    {
+        $invoice = $adjustment->invoiceLines()
+            ->with('invoice')
+            ->firstOrFail()
+            ->invoice()
+            ->firstOrFail();
+
+        $this->invoiceGenerationService->closeInvoice($invoice);
+        $this->settlementService->recalculateInvoiceSnapshot($invoice->fresh(), $preservedPaidAt);
+    }
+
+    /**
      * Void every obligation with auto-reallocation disabled and tally released
      * paid cash plus the payments it came from.
      *
      * @param  Collection<int, FinanceCharge>  $obligations
      * @return array{released: float, voided_charge_ids: array<int, int>, payment_ids: array<int, int>}
      */
-    private function voidObligations(DeferCase $case, Collection $obligations, ?int $actorId): array
-    {
+    private function voidObligations(
+        DeferCase $case,
+        Collection $obligations,
+        ?int $actorId,
+        string $reviewedDiscountDispositionReason = '',
+    ): array {
         $reason = "Defer settlement: {$case->fee_policy} (case #{$case->id})";
+        if ($reviewedDiscountDispositionReason !== '') {
+            $reason .= '; reviewed discount disposition: '.$reviewedDiscountDispositionReason;
+        }
         $released = 0.0;
         $voidedIds = [];
         $paymentIds = [];
@@ -377,6 +524,7 @@ class ApplyDeferFinancePolicyAction
             'consumed' => 0.0,
             'voided_charge_ids' => [],
             'adjustment_charge_id' => null,
+            'cancelled_dng_request_ids' => [],
         ], $overrides);
     }
 }

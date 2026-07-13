@@ -14,8 +14,8 @@ uses(RefreshDatabase::class);
 require_once __DIR__.'/DataGuards/guard_fixtures.php';
 
 /**
- * S-003 dry-run export: surfaces INV-6 duplicate invoices and INV-11 duplicate
- * webhook payload hashes for human-reviewed cleanup, and never mutates data.
+ * Legacy-named dry-run export: inventories allowed multi-invoice groups and
+ * INV-11 duplicate webhook payload hashes, and never mutates data.
  */
 function seedDuplicateInvoiceGroup(): void
 {
@@ -33,33 +33,18 @@ function seedDuplicateInvoiceGroup(): void
     }
 }
 
-function seedDuplicatePayloadHashGroup(): void
-{
-    foreach ([1, 2] as $i) {
-        DB::table('dng_webhook_events')->insert([
-            'event_type' => 'payment_invoiced',
-            'payload_hash' => str_repeat('c', 64),
-            'payload' => '{"x":'.$i.'}',
-            'is_valid_checksum' => 1,
-            'processing_status' => 'processed',
-        ]);
-    }
-}
-
-it('reports duplicate groups and exits successfully', function () {
+it('reports allowed multi-invoice groups and exits successfully', function () {
     seedDuplicateInvoiceGroup();
-    seedDuplicatePayloadHashGroup();
 
     $this->artisan('finance:export-duplicate-finance-data')
         ->expectsOutputToContain('READ-ONLY')
-        ->expectsOutputToContain('INV-6')
+        ->expectsOutputToContain('allowed multi-invoice groups')
         ->expectsOutputToContain('INV-11')
         ->assertExitCode(0);
 });
 
 it('never mutates data (read-only)', function () {
     seedDuplicateInvoiceGroup();
-    seedDuplicatePayloadHashGroup();
 
     $invoicesBefore = DB::table('student_invoices')->count();
     $eventsBefore = DB::table('dng_webhook_events')->count();
@@ -138,11 +123,13 @@ it('surfaces pivot-linked DNG requests (finance_charge_id NULL) in the JSON repo
     $report = json_decode(file_get_contents($path), true);
     @unlink($path);
 
-    $invoiceArow = collect($report['duplicate_invoice_groups'])
+    $invoiceArow = collect($report['multi_invoice_groups'])
         ->flatMap(fn ($g) => $g['invoices'])
         ->firstWhere('invoice_id', $invoiceA->id);
 
     expect($invoiceArow)->not->toBeNull()
+        ->and($report['report_version'])->toBe(2)
+        ->and($report['duplicate_invoice_groups'])->toBe($report['multi_invoice_groups'])
         ->and($invoiceArow['dng_requests'])->toHaveCount(1)
         ->and($invoiceArow['dng_requests'][0]['dng_request_id'])->toBe($dngId)
         ->and($invoiceArow['dng_requests'][0]['link_source'])->toBe('pivot')

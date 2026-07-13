@@ -1,5 +1,7 @@
 # Exec Plan
 
+> **Superseded rule notice (2026-07-12):** Không thực hiện cleanup hoặc unique constraint chỉ vì một student có nhiều invoice trong cùng kỳ. Hạng mục DB-03/INV-6 theo nghĩa cũ đã bị loại khỏi kiến trúc hiện tại; `INV-17` bảo vệ student/semester scope của invoice line.
+
 ## Goal
 
 Clean known duplicate/idempotency data and add DB guards that match the Finance

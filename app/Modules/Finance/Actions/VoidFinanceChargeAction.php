@@ -30,9 +30,14 @@ class VoidFinanceChargeAction
      *
      * @return array{charge: FinanceCharge, released_allocations: int, released_amount: float, affected_payments: array, reallocated_allocations: int, reallocated_amount: float, cancelled_installments: int}
      */
-    public function handle(int $chargeId, string $reason, ?int $userId = null, bool $autoReallocate = true): array
-    {
-        return DB::transaction(function () use ($chargeId, $reason, $userId, $autoReallocate) {
+    public function handle(
+        int $chargeId,
+        string $reason,
+        ?int $userId = null,
+        bool $autoReallocate = true,
+        bool $recalculateInvoices = true,
+    ): array {
+        return DB::transaction(function () use ($chargeId, $reason, $userId, $autoReallocate, $recalculateInvoices) {
             $charge = FinanceCharge::findOrFail($chargeId);
             $actorId = $userId ?? auth()->id();
 
@@ -129,7 +134,9 @@ class VoidFinanceChargeAction
             $cancelledInstallments = $this->cancelChargeInstallments($charge);
 
             // 4. Recalculate affected invoice statuses
-            $this->recalculateAffectedInvoices($affectedInvoiceIds);
+            if ($recalculateInvoices) {
+                $this->recalculateAffectedInvoices($affectedInvoiceIds);
+            }
 
             // 5. Re-allocate newly released balances to the student's remaining unpaid invoices
             $reallocatedStats = $autoReallocate && $releasedInfo['amount'] > 0

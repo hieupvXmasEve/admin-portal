@@ -1,6 +1,9 @@
 # Finance Module — Review toàn diện
 
-Last updated: 2026-06-13
+> **Superseded rule notice (2026-07-12):** Các nhận định trong tài liệu này coi nhiều `student_invoices` cùng `(student_id, semester_id)` là INV-6/double-billing và đề xuất unique constraint đã lỗi thời. Kiến trúc hiện tại cho phép nhiều invoice theo fee stream. `INV-6` được retired để giữ lịch sử mã; `INV-17` kiểm tra invoice line gắn charge sai student/kỳ. Các số liệu INV-6 bên dưới được giữ như bằng chứng lịch sử, không còn là cleanup queue.
+
+Original review date: 2026-06-13
+Last updated: 2026-07-12
 Status: Review findings (chưa fix) — dùng để theo dõi & xử lý dần
 Owner: Finance Module
 Phương pháp: trace code thật (evidence-first), mọi phát hiện có `file:line`. Không phán đoán suông.

@@ -5,8 +5,10 @@ declare(strict_types=1);
 use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use App\Modules\Finance\Dng\Exceptions\DngCollectionCutoverBlocked;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Support\DngCollectionCutover;
 use App\Modules\Finance\Dng\Support\DngReservationTargetFingerprint;
 use App\Modules\Finance\Models\BillingAccount;
@@ -14,7 +16,9 @@ use App\Modules\Finance\Models\DngReceiptException;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Queries\Dng\DngActiveMigrationInventoryQuery;
+use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -149,6 +153,100 @@ it('backfills exact legacy links idempotently without calling DNG', function ():
 
     expect($request->fresh()->reservationTargets()->count())->toBe(1)
         ->and($target->fresh()->target_identity)->toBe('invoice_line:'.$line->id);
+});
+
+it('blocks cutover when a deferred student still has an unpaid live DNG request', function (): void {
+    $student = cutoverStudent();
+    $line = cutoverTarget($student);
+    $student->update(['status' => 'deferred']);
+    $request = legacyDngRequest($student, 'HP', DngPaymentRequest::STATUS_PUSHED_TO_DNG, [
+        'finance_charge_id' => $line->charge_id,
+    ]);
+
+    $report = app(DngActiveMigrationInventoryQuery::class)->handle();
+    $record = collect($report->records)->firstWhere('id', $request->id);
+
+    expect($record['classifications'])->toContain('student_lifecycle_conflict')
+        ->and($record['action'])->toBe('cancel_collection')
+        ->and($report->isSafeToCutover())->toBeFalse();
+});
+
+it('validates a paid request against bridged payment evidence instead of current remaining', function (): void {
+    $student = cutoverStudent();
+    $line = cutoverTarget($student);
+    $payment = Payment::query()->create([
+        'student_id' => $student->id,
+        'amount' => '1000000.00',
+        'method' => Payment::METHOD_GATEWAY,
+        'source' => 'dng',
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+    ]);
+    app(SettlementService::class)->createPaymentApplication($payment, $line, 1000000, 'application');
+    $request = legacyDngRequest($student, 'HL', DngPaymentRequest::STATUS_PAID_INVOICED, [
+        'finance_charge_id' => $line->charge_id,
+        'payment_id' => $payment->id,
+    ]);
+
+    $report = app(DngActiveMigrationInventoryQuery::class)->handle();
+    $record = collect($report->records)->firstWhere('id', $request->id);
+
+    expect($record['classifications'])->toBe(['exact_link'])
+        ->and($report->counts['amount_mismatch'] ?? 0)->toBe(0);
+});
+
+it('keeps an exact historical paid target after its charge is voided', function (): void {
+    $student = cutoverStudent();
+    $line = cutoverTarget($student);
+    $payment = Payment::query()->create([
+        'student_id' => $student->id,
+        'amount' => '1000000.00',
+        'method' => Payment::METHOD_GATEWAY,
+        'source' => 'dng',
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+    ]);
+    app(SettlementService::class)->createPaymentApplication($payment, $line, 1000000, 'application');
+    $request = legacyDngRequest($student, 'HL', DngPaymentRequest::STATUS_PAID_INVOICED, [
+        'finance_charge_id' => $line->charge_id,
+        'payment_id' => $payment->id,
+    ]);
+    app(VoidFinanceChargeAction::class)->handle($line->charge_id, 'Historical paid target voided', null, false);
+
+    $report = app(DngActiveMigrationInventoryQuery::class)->handle();
+    $record = collect($report->records)->firstWhere('id', $request->id);
+
+    expect($record['classifications'])->toBe(['exact_link'])
+        ->and($record['target_line_ids'])->toBe([$line->id]);
+});
+
+it('fails closed when paid request header and pivot identify different charges', function (): void {
+    $student = cutoverStudent();
+    $headerLine = cutoverTarget($student);
+    $pivotLine = cutoverTarget($student);
+    $payment = Payment::query()->create([
+        'student_id' => $student->id,
+        'amount' => '1000000.00',
+        'method' => Payment::METHOD_GATEWAY,
+        'source' => 'dng',
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+    ]);
+    app(SettlementService::class)->createPaymentApplication($payment, $headerLine, 1000000, 'application');
+    $request = legacyDngRequest($student, 'HL', DngPaymentRequest::STATUS_PAID_INVOICED, [
+        'finance_charge_id' => $headerLine->charge_id,
+        'payment_id' => $payment->id,
+    ]);
+    DngPaymentRequestCharge::query()->create([
+        'dng_payment_request_id' => $request->id,
+        'finance_charge_id' => $pivotLine->charge_id,
+        'amount' => '1000000.00',
+    ]);
+
+    $report = app(DngActiveMigrationInventoryQuery::class)->handle();
+    $record = collect($report->records)->firstWhere('id', $request->id);
+
+    expect($record['classifications'])->toContain('unknown_link');
 });
 
 it('fails closed for new DNG collection while still allowing receipt-side code paths', function (): void {

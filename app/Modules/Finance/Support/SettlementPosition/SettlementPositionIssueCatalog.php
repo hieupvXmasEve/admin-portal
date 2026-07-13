@@ -33,6 +33,8 @@ final class SettlementPositionIssueCatalog
         'INV-14' => 'settlement_position.finance_invariant.dng_header_breakdown_drift',
         'INV-15' => 'settlement_position.finance_invariant.dng_installment_breakdown_drift',
         'INV-16' => 'settlement_position.finance_invariant.active_signed_adjustment',
+        'INV-17' => 'settlement_position.finance_invariant.invoice_scope_mismatch',
+        'INV-18' => 'settlement_position.finance_invariant.active_line_on_void_charge',
     ];
 
     /**

@@ -1,5 +1,7 @@
 # Validation
 
+> **Historical INV-6 notice (2026-07-12):** Tài liệu này ghi lại định nghĩa/kết quả audit cũ. Nhiều invoice cùng student/kỳ là hợp lệ theo kiến trúc hiện tại; không cleanup hoặc thêm unique `(student_id, semester_id)` chỉ vì multi-invoice. `INV-6` đã retired; `INV-17` kiểm tra invoice line tham chiếu charge sai student/kỳ.
+
 ## Proof Strategy
 
 Prove that defer Finance behavior preserves existing ledger truth:
@@ -157,9 +159,9 @@ not a regression from this work.
 ### Slice 2 — money settlement (FULL-scope PRESERVE/FORFEIT) — M1–M4 done
 
 Decomposed into ordered child stories. M1–M4 implement the FULL-scope
-PRESERVE/FORFEIT path via TDD; COURSE-scope, legacy `fee_policy = PARTIAL`, and
-live-DNG/discount cases stay report-only (needs-review) until a later increment
-defines those rules.
+PRESERVE/FORFEIT path via TDD. COURSE-scope and legacy `fee_policy = PARTIAL`
+remain review-only. Lifecycle DNG is closed locally before void; discount cases
+remain fail-closed unless a caller supplies an explicit reviewed FORFEIT reason.
 
 - **M1** `FIN-REV-020-01` — `ApplyDeferFinancePolicyAction` (isolated settlement).
 - **M2** `FIN-REV-020-02` — defer-aware charge generation; preserve-skip removed.
@@ -208,6 +210,24 @@ migrate fresh. Not a code change.
 #### Still gated (later increment)
 
 COURSES-scope defer on a semester-level tuition charge (manual Finance review;
-no automatic split formula), legacy `fee_policy = PARTIAL` cleanup, live-DNG routing through
-`CancelDngPaymentRequestAction` before void, and discount/scholarship resolution
-during settlement.
+no automatic split formula), legacy `fee_policy = PARTIAL` cleanup, and
+discount/scholarship cases without an explicit reviewed disposition reason.
+
+#### Reviewed discount FORFEIT seam (2026-07-13)
+
+- Default discount behavior remains fail-closed with `discount_present`.
+- A confirmed FULL FORFEIT case may pass a non-empty
+  `reviewedDiscountDispositionReason`; the reason is persisted in source charge
+  and line `void_reason` evidence.
+- Released cash, not discounted gross, determines the adjustment amount. The
+  approved AUH116717 rehearsal released and consumed exactly `48M` from `57M`
+  gross less `9M` discount, including `12M` retake cash, with no invented debt.
+- The adjustment invoice is explicitly closed and recomputed after allocation;
+  a fully settled adjustment cannot remain stale `draft`.
+- Focused defer/integrity/snapshot regression: `49 passed / 303 assertions`;
+  Pint and `git diff --check` passed.
+- Historical defer replay is lifecycle-gated through the Academic-owned
+  `StudentLifecycleStatusReader`. A student who has returned to an active study
+  lifecycle is skipped as `student_lifecycle_active`; an old defer case cannot
+  void a currently valid consumed charge. Full defer regression after this guard:
+  `31 passed / 168 assertions`.

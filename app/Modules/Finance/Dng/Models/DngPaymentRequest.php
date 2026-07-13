@@ -33,7 +33,8 @@ class DngPaymentRequest extends Model
 
     /**
      * Request was cancelled by calling DNG API with amount = -1.
-     * Distinguishes from `cancelled` (local-only, never reached DNG).
+     * Distinguishes from `cancelled` (closed locally without a provider-side
+     * cancellation; the original request itself may already have reached DNG).
      */
     public const STATUS_CANCEL_PUSHED_TO_DNG = 'cancel_pushed_to_dng';
 
@@ -51,10 +52,10 @@ class DngPaymentRequest extends Model
         self::STATUS_PAID_INVOICED => [self::STATUS_RECONCILED],
         self::STATUS_RECONCILED => [],
         self::STATUS_FAILED => [self::STATUS_PENDING],
-        self::STATUS_UNKNOWN_OUTCOME => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_NEEDS_REVIEW],
+        self::STATUS_UNKNOWN_OUTCOME => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_NEEDS_REVIEW, self::STATUS_CANCELLED],
         // Review blocks new collection mutations, but it must never discard a
         // later verified provider receipt for an already-pushed request.
-        self::STATUS_NEEDS_REVIEW => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED],
+        self::STATUS_NEEDS_REVIEW => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_CANCELLED],
         self::STATUS_CANCELLED => [],
         self::STATUS_CANCEL_PUSHED_TO_DNG => [],
     ];

@@ -13,8 +13,11 @@ use App\Models\User;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Actions\Operations\ApplyDeferFinancePolicyAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestReservationTarget;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Services\InvoiceGenerationService;
@@ -29,9 +32,9 @@ uses(RefreshDatabase::class);
  *
  * ApplyDeferFinancePolicyAction settles a FULL-scope PRESERVE/FORFEIT defer
  * case using only existing ledger operations (void → release → re-consume).
- * It is built in isolation: no runtime wiring, no charge-generation change.
- * The auto-safe gate (live DNG / discount) must block with NO mutation, and
- * finance invariants must stay clean before and after.
+ * Lifecycle-linked DNG requests are cancelled locally before charges are voided;
+ * discounts remain a fail-closed review gate. Finance invariants must stay clean
+ * before and after.
  */
 beforeEach(function () {
     $this->campus = Campus::factory()->create();
@@ -89,7 +92,21 @@ function deferPolicyCase(
 /** Create an active positive tuition obligation for a student in a semester. */
 function deferObligation(int $studentId, int $semesterId, float $amount = 45_000_000): FinanceCharge
 {
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'finance_test',
+        'source_kind' => 'defer_policy',
+        'source_ref' => 'defer-policy:'.uniqid('', true),
+        'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'defer-policy:test',
+        'pricing_snapshot' => ['catalog_rule_version' => 'defer-policy:test'],
+        'accepted_at' => now(),
+    ]);
+
     return app(CreateFinanceChargeAction::class)->handle([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $studentId,
         'semester_id' => $semesterId,
         'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
@@ -148,7 +165,28 @@ it('PRESERVE paid voids the obligation and leaves the paid cash available with n
 it('FORFEIT paid voids the obligation, creates an adjustment equal to paid and fully allocates it with no residual debt', function () {
     [$student, $case] = deferPolicyCase($this->semester, $this->campus, $this->program, $this->user, 'FORF-PAID', DeferCase::POLICY_FORFEIT);
     $charge = deferObligation($student->id, $this->semester->id, 45_000_000);
+    $sourceInvoice = InvoiceLine::query()->where('charge_id', $charge->id)->firstOrFail()->invoice()->firstOrFail();
+    app(InvoiceGenerationService::class)->closeInvoice($sourceInvoice);
+
+    $this->travelTo(now()->subDays(10));
     $payment = payObligation($student, $charge, 45_000_000, $this->user);
+    $sourceInvoicePaidAt = $sourceInvoice->fresh()->cached_paid_at;
+    $payment->forceFill(['paid_at' => now()->subDay()])->save();
+    $signedApplicationsBefore = (float) $payment->applications()->sum('amount');
+    $dngItemId = 'ITEM-FORF-PAID-'.uniqid();
+    $dng = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => $student->student_id,
+        'fee_type' => 'HP',
+        'semester_id' => $this->semester->id,
+        'item_id' => $dngItemId,
+        'amount' => 45_000_000,
+        'status' => DngPaymentRequest::STATUS_PAID_INVOICED,
+        'payment_id' => $payment->id,
+        'paid_at' => $payment->paid_at,
+    ]);
+    $this->travelBack();
 
     $result = app(ApplyDeferFinancePolicyAction::class)->handle($case, $this->user->id);
 
@@ -160,6 +198,7 @@ it('FORFEIT paid voids the obligation, creates an adjustment equal to paid and f
         ->and($result['voided_charge_ids'])->toContain($charge->id);
 
     $adjustment = FinanceCharge::findOrFail($result['adjustment_charge_id']);
+    $adjustmentInvoice = $adjustment->invoiceLines()->firstOrFail()->invoice()->firstOrFail();
 
     expect($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID)
         ->and($adjustment->charge_type)->toBe(FinanceCharge::TYPE_ADJUSTMENT)
@@ -170,7 +209,15 @@ it('FORFEIT paid voids the obligation, creates an adjustment equal to paid and f
         // Consumed paid cash is re-allocated onto the adjustment — no residual debt.
         ->and(app(SettlementService::class)->getChargePaidAmount($adjustment->id))->toBe(45_000_000.0)
         ->and($adjustment->fresh()->balance)->toBe(0.0)
-        ->and($payment->fresh()->unapplied_amount)->toBe(0.0);
+        ->and($payment->fresh()->unapplied_amount)->toBe(0.0)
+        ->and((float) $payment->applications()->sum('amount'))->toBe($signedApplicationsBefore)
+        ->and($adjustmentInvoice->id)->toBe($sourceInvoice->id)
+        ->and($adjustmentInvoice->status)->toBe('paid')
+        ->and($adjustmentInvoice->cached_paid_at?->equalTo($sourceInvoicePaidAt))->toBeTrue()
+        ->and($adjustmentInvoice->cached_paid_at?->equalTo($payment->paid_at))->toBeFalse()
+        ->and($dng->fresh()->status)->toBe(DngPaymentRequest::STATUS_PAID_INVOICED)
+        ->and($dng->fresh()->payment_id)->toBe($payment->id)
+        ->and($dng->fresh()->item_id)->toBe($dngItemId);
 });
 
 it('FORFEIT unpaid voids the obligation and creates no adjustment and no debt', function () {
@@ -217,7 +264,7 @@ it('returns noop when the student has no obligation in the defer semester and mu
         ->and(FinanceCharge::count())->toBe(0);
 });
 
-it('skips with live_dng and mutates nothing when an obligation has a live DNG request', function () {
+it('cancels an installment-linked DNG locally before voiding a deferred obligation', function () {
     [$student, $case] = deferPolicyCase($this->semester, $this->campus, $this->program, $this->user, 'DNG-LIVE', DeferCase::POLICY_FORFEIT);
     $charge = deferObligation($student->id, $this->semester->id, 45_000_000);
 
@@ -242,11 +289,99 @@ it('skips with live_dng and mutates nothing when an obligation has a live DNG re
 
     $result = app(ApplyDeferFinancePolicyAction::class)->handle($case, $this->user->id);
 
-    expect($result['status'])->toBe('skipped')
-        ->and($result['reason'])->toBe('live_dng')
-        // No mutation: the obligation is still active.
-        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE)
+    expect($result['status'])->toBe('applied')
+        ->and($result['reason'])->toBe('forfeit_settled')
+        ->and($result['cancelled_dng_request_ids'])->toBe([$dng->id])
+        ->and($dng->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED)
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID)
         ->and(FinanceCharge::where('charge_type', FinanceCharge::TYPE_ADJUSTMENT)->count())->toBe(0);
+});
+
+it('cancels a pivot-linked DNG locally before voiding a deferred obligation', function () {
+    [$student, $case] = deferPolicyCase($this->semester, $this->campus, $this->program, $this->user, 'DNG-PIVOT', DeferCase::POLICY_FORFEIT);
+    $charge = deferObligation($student->id, $this->semester->id, 45_000_000);
+
+    $dng = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'DNG-PIVOT',
+        'fee_type' => 'HP',
+        'item_id' => 'ITEM-'.uniqid(),
+        'amount' => 45_000_000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+    ]);
+
+    DngPaymentRequestCharge::create([
+        'dng_payment_request_id' => $dng->id,
+        'finance_charge_id' => $charge->id,
+        'amount' => 45_000_000,
+    ]);
+
+    $pivotExists = DngPaymentRequestCharge::query()
+        ->where('finance_charge_id', $charge->id)
+        ->whereHas('dngPaymentRequest', fn ($requests) => $requests->where('status', DngPaymentRequest::STATUS_PUSHED_TO_DNG))
+        ->exists();
+    expect($pivotExists)->toBeTrue();
+
+    $result = app(ApplyDeferFinancePolicyAction::class)->handle($case, $this->user->id);
+
+    expect($result['status'])->toBe('applied')
+        ->and($result['cancelled_dng_request_ids'])->toBe([$dng->id])
+        ->and($dng->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED)
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID);
+});
+
+it('cancels a header-linked DNG locally before voiding a deferred obligation', function () {
+    [$student, $case] = deferPolicyCase($this->semester, $this->campus, $this->program, $this->user, 'DNG-HEADER', DeferCase::POLICY_FORFEIT);
+    $charge = deferObligation($student->id, $this->semester->id, 45_000_000);
+
+    $dng = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'DNG-HEADER',
+        'fee_type' => 'HP',
+        'item_id' => 'ITEM-'.uniqid(),
+        'amount' => 45_000_000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+        'finance_charge_id' => $charge->id,
+    ]);
+
+    $result = app(ApplyDeferFinancePolicyAction::class)->handle($case, $this->user->id);
+
+    expect($result['status'])->toBe('applied')
+        ->and($result['cancelled_dng_request_ids'])->toBe([$dng->id])
+        ->and($dng->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED)
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID);
+});
+
+it('cancels a reservation-target DNG locally before voiding a deferred obligation', function () {
+    [$student, $case] = deferPolicyCase($this->semester, $this->campus, $this->program, $this->user, 'DNG-TARGET', DeferCase::POLICY_FORFEIT);
+    $charge = deferObligation($student->id, $this->semester->id, 45_000_000);
+    $line = InvoiceLine::query()->where('charge_id', $charge->id)->firstOrFail();
+
+    $dng = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'DNG-TARGET',
+        'fee_type' => 'HP',
+        'item_id' => 'ITEM-'.uniqid(),
+        'amount' => 45_000_000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+    ]);
+
+    DngPaymentRequestReservationTarget::create([
+        'dng_payment_request_id' => $dng->id,
+        'invoice_line_id' => $line->id,
+        'captured_collectible' => 45_000_000,
+        'target_identity' => 'line:'.$line->id,
+    ]);
+
+    $result = app(ApplyDeferFinancePolicyAction::class)->handle($case, $this->user->id);
+
+    expect($result['status'])->toBe('applied')
+        ->and($result['cancelled_dng_request_ids'])->toBe([$dng->id])
+        ->and($dng->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED)
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID);
 });
 
 it('skips with discount_present and mutates nothing when an obligation line carries a discount', function () {
@@ -266,6 +401,35 @@ it('skips with discount_present and mutates nothing when an obligation line carr
         ->and(FinanceCharge::where('charge_type', FinanceCharge::TYPE_ADJUSTMENT)->count())->toBe(0);
 });
 
+it('applies an explicitly reviewed FORFEIT disposition using released cash net of discount', function () {
+    [$student, $case] = deferPolicyCase($this->semester, $this->campus, $this->program, $this->user, 'DISC-REVIEWED', DeferCase::POLICY_FORFEIT);
+    $charge = deferObligation($student->id, $this->semester->id, 45_000_000);
+    $invoice = InvoiceLine::where('charge_id', $charge->id)->firstOrFail()->invoice()->firstOrFail();
+    app(InvoiceGenerationService::class)->applyInvoiceDiscount(
+        $invoice, 'voucher', 9_000_000, 'tests', 'Reviewed voucher', 2, $this->user->id,
+    );
+    $payment = payObligation($student, $charge, 36_000_000, $this->user);
+
+    $result = app(ApplyDeferFinancePolicyAction::class)->handle(
+        $case,
+        $this->user->id,
+        reviewedDiscountDispositionReason: 'Approved forfeit of 36M verified cash after 9M discount release',
+    );
+
+    $adjustment = FinanceCharge::findOrFail($result['adjustment_charge_id']);
+
+    expect($result['status'])->toBe('applied')
+        ->and($result['released'])->toBe(36_000_000.0)
+        ->and($result['consumed'])->toBe(36_000_000.0)
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID)
+        ->and($charge->fresh()->void_reason)->toContain('Approved forfeit of 36M verified cash')
+        ->and((float) $adjustment->amount)->toBe(36_000_000.0)
+        ->and(app(SettlementService::class)->getChargePaidAmount($adjustment->id))->toBe(36_000_000.0)
+        ->and($adjustment->invoiceLines()->firstOrFail()->invoice()->firstOrFail()->status)->toBe('paid')
+        ->and($payment->fresh()->unapplied_amount)->toBe(0.0)
+        ->and(deferInvariantOffending())->toBe(0);
+});
+
 it('skips out_of_scope and mutates nothing for a non-FULL scope or non-PRESERVE/FORFEIT policy', function () {
     [$student, $case] = deferPolicyCase($this->semester, $this->campus, $this->program, $this->user, 'OOS', DeferCase::POLICY_PARTIAL);
     $charge = deferObligation($student->id, $this->semester->id, 45_000_000);
@@ -275,6 +439,20 @@ it('skips out_of_scope and mutates nothing for a non-FULL scope or non-PRESERVE/
     expect($result['status'])->toBe('skipped')
         ->and($result['reason'])->toBe('out_of_scope')
         ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE);
+});
+
+it('skips a historical defer case when the student has returned to an active lifecycle', function () {
+    [$student, $case] = deferPolicyCase($this->semester, $this->campus, $this->program, $this->user, 'ACTIVE-AGAIN', DeferCase::POLICY_FORFEIT);
+    $charge = deferObligation($student->id, $this->semester->id, 15_000_000);
+    payObligation($student, $charge, 15_000_000, $this->user);
+    $student->update(['status' => 'intake_course']);
+
+    $result = app(ApplyDeferFinancePolicyAction::class)->handle($case, $this->user->id);
+
+    expect($result['status'])->toBe('skipped')
+        ->and($result['reason'])->toBe('student_lifecycle_active')
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE)
+        ->and(FinanceCharge::where('charge_type', FinanceCharge::TYPE_ADJUSTMENT)->count())->toBe(0);
 });
 
 it('keeps finance invariants clean before and after a forfeit settlement', function () {

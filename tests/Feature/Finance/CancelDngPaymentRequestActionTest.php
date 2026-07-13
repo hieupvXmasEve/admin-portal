@@ -14,6 +14,7 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Models\DngReceiptException;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\Payment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -169,6 +170,50 @@ it('cancels a pushed_to_dng request — calls DNG API and transitions to cancel_
     app(CancelDngPaymentRequestAction::class)->run($request);
 
     expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG);
+});
+
+it('cancels a pushed request locally for a lifecycle closure without calling DNG', function () {
+    $client = Mockery::mock(DngClient::class);
+    $client->shouldNotReceive('buildInsertNewRecordPayload');
+    $client->shouldNotReceive('cancelRecord');
+    app()->instance(DngClient::class, $client);
+
+    $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+
+    app(CancelDngPaymentRequestAction::class)->runLocallyForLifecycle($request);
+
+    expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED)
+        ->and($request->fresh()->cancel_push_payload)->toBeNull()
+        ->and($request->fresh()->cancel_push_response)->toBeNull();
+});
+
+it('locally closes every unpaid review state for a terminal lifecycle', function (string $status) {
+    $request = makeDngRequest($this->ctx, $status);
+
+    app(CancelDngPaymentRequestAction::class)->runLocallyForLifecycle($request);
+
+    expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED);
+})->with([
+    DngPaymentRequest::STATUS_UNKNOWN_OUTCOME,
+    DngPaymentRequest::STATUS_NEEDS_REVIEW,
+]);
+
+it('refuses local lifecycle closure when canonical payment is already linked', function () {
+    $payment = Payment::query()->create([
+        'student_id' => $this->ctx['student']->id,
+        'amount' => 1_000_000,
+        'method' => Payment::METHOD_IMPORT,
+        'source' => 'test',
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+    ]);
+    $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+    $request->update(['payment_id' => $payment->id]);
+
+    expect(fn () => app(CancelDngPaymentRequestAction::class)->runLocallyForLifecycle($request))
+        ->toThrow(RuntimeException::class, 'canonical Payment');
+
+    expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
 });
 
 it('cancels a pushed_to_dng request — stores cancel payload and response for audit', function () {

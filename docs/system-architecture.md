@@ -1,13 +1,13 @@
 # System Architecture
 
-Last updated: 2026-06-29
+Last updated: 2026-07-12
 Owner: Platform Team
 Status: Current-state architecture map
 Source of truth: route files, middleware, module providers, runtime entrypoints
 
 ## 1) Architecture Overview
 
-Swinx is a Laravel 12 monolith with Vue 3 + Inertia frontend and mixed web/API surfaces.
+Swinx is a Laravel 13 monolith with Vue 3 + Inertia frontend and mixed web/API surfaces.
 
 High-level flow:
 
@@ -43,6 +43,7 @@ Client (Web SPA / API)
         - `invoice_discounts` — discount headers
         - `discount_allocations` — line-level discount allocation ledger
         - `student_invoices` snapshot columns (`subtotal`, `discount_total`, `total_amount`, `paid_amount`) as cache only
+        - multiple `student_invoices` may exist for one student/semester when separate fee streams issue distinct statements; `invoice_number` remains unique, and every invoice line's charge must match the invoice student + semester (`INV-17`)
         - `dng_payment_requests` — DNG gateway payment request audit
         - `dng_webhook_events` — DNG webhook event audit for payment confirmation
     - Services: `SettlementService`, `PaymentService`, `FinanceChargeService`, `DngClient`, `DngPaymentService`, `DngReconciliationService`, `DngWebhookService`, `DngChecksumService`
@@ -77,11 +78,14 @@ Client (Web SPA / API)
         - retake discounts only target later mapped retake blocks of the same level
         - `egc:backfill-blocks` rebuilds historical EGC blocks from registrations, repairs null `finance_charge_id`, and reports unmatched charges instead of inventing new blocks
     - DNG workflow: Staff → Payment Create form → Student selection → resolve `campuses.dng_code` → DNG API push (with checksum) → QR display → Webhook inbox capture (`dng_webhook_events`) → Async checksum/business validation → Payment record
+    - Defer/dropout cancellation order: close every linked unpaid DNG request locally as `cancelled`, then void linked charges/lines in the same admin settlement transaction. This lifecycle path does not call the DNG cancellation API; exact linkage may come from installment, request header, charge pivot, or reservation target. Original provider identity remains available so late verified receipts can still enter canonical Payment without reviving collection.
     - DNG replacement rule: for the same `student + fee_type`, only one unpaid DNG request should stay active; older unpaid requests move to `cancelled` after the replacement push succeeds
-    - Late webhook/reconciliation events for cancelled requests are skipped
+    - Late webhook/reconciliation events preserve cancelled collection state but still capture attributable verified cash into canonical Payment
     - Admin monitoring workflow: request audit list/detail remain campus-scoped; webhook audit list is cross-campus while webhook detail still validates campus access
     - Permissions: `create_finance_payments`, `view_finance_dng_payment_requests`, `view_finance_dng_webhook_events`
     - Legacy `payment_allocations` no longer used in runtime.
+    - Integrity-code evolution: the historical `INV-6` one-invoice-per-semester rule was retired on 2026-07-12 because it conflicts with valid fee-stream invoices. Its code remains reserved for audit-history compatibility; invoice/charge scope mismatches use `INV-17`.
+    - `INV-18` blocks an active invoice line whose parent charge is already void, preventing stale invoice lifecycle metadata from appearing clean.
 - Notification: `app/Modules/Notification` (V2 domain event + outbox architecture)
     - Actions: `PublishDomainEventAction`, `DispatchOutboxBatchAction`, `PersistIntentAction`, `SendManualNotificationV2Action`, `RetryDeliveryAction`, `RetryOutboxAction`, `HandleOutboxEventAction`
     - Channels: `EmailChannelAdapter`, `RealtimeChannelAdapter` (contracts: `ChannelAdapter`)

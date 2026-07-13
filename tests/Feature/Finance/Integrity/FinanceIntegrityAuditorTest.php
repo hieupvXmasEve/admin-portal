@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use App\Models\Semester;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Support\Integrity\FinanceAuditScope;
 use App\Modules\Finance\Support\Integrity\FinanceIntegrityAuditor;
 use App\Modules\Finance\Support\Integrity\FinanceInvariant;
@@ -22,6 +25,95 @@ it('summarize() global counts INV-1 over-allocation', function () {
 
     expect($summary['INV-1']['count'])->toBe(1)
         ->and($summary['INV-1']['error'])->toBeNull();
+});
+
+it('allows multiple invoices for one student and semester', function (): void {
+    $student = auditStudent();
+    $semester = Semester::factory()->create();
+
+    foreach (['INV-MULTI-A', 'INV-MULTI-B'] as $invoiceNumber) {
+        StudentInvoice::query()->create([
+            'invoice_number' => $invoiceNumber,
+            'student_id' => $student->id,
+            'semester_id' => $semester->id,
+            'status' => 'draft',
+            'due_date' => now()->addDays(30),
+        ]);
+    }
+
+    $invariant = app(FinanceInvariantRegistry::class)->find('INV-6');
+
+    expect(app(FinanceIntegrityAuditor::class)->count($invariant))->toBe(0);
+});
+
+it('flags an invoice line whose charge belongs to another student or semester', function (): void {
+    $invoiceStudent = auditStudent();
+    $chargeStudent = auditStudent();
+    $invoiceSemester = Semester::factory()->create();
+    $chargeSemester = Semester::factory()->create();
+    $invoice = StudentInvoice::query()->create([
+        'invoice_number' => 'INV-SCOPE-MISMATCH',
+        'student_id' => $invoiceStudent->id,
+        'semester_id' => $invoiceSemester->id,
+        'status' => 'pending',
+        'due_date' => now()->addDays(30),
+    ]);
+    $charge = FinanceCharge::query()->create([
+        'student_id' => $chargeStudent->id,
+        'semester_id' => $chargeSemester->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => 1000,
+        'description' => 'Mismatched audit fixture',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    InvoiceLine::query()->create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $charge->id,
+        'amount_snapshot' => 1000,
+        'description_snapshot' => 'Mismatched audit fixture',
+        'status' => 'active',
+    ]);
+
+    $invariant = app(FinanceInvariantRegistry::class)->find('INV-17');
+    $auditor = app(FinanceIntegrityAuditor::class);
+
+    expect($auditor->count($invariant))->toBe(1)
+        ->and($auditor->samples($invariant))->toBe([$invoice->id]);
+});
+
+it('flags an active invoice line whose charge is void', function (): void {
+    $student = auditStudent();
+    $semester = Semester::factory()->create();
+    $invoice = StudentInvoice::query()->create([
+        'invoice_number' => 'INV-ACTIVE-LINE-VOID-CHARGE',
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'status' => 'draft',
+        'due_date' => now()->addDays(30),
+    ]);
+    $charge = FinanceCharge::query()->create([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => 1000,
+        'description' => 'Voided charge with stale active line',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_VOID,
+    ]);
+    InvoiceLine::query()->create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $charge->id,
+        'amount_snapshot' => 1000,
+        'description_snapshot' => 'Voided charge with stale active line',
+        'status' => 'active',
+    ]);
+
+    $invariant = app(FinanceInvariantRegistry::class)->find('INV-18');
+    $auditor = app(FinanceIntegrityAuditor::class);
+
+    expect($auditor->count($invariant))->toBe(1)
+        ->and($auditor->samples($invariant))->toBe([$invoice->id]);
 });
 
 it('findForScope() returns INV-1 only for the offending student', function () {
@@ -45,8 +137,8 @@ it('findForScope() returns nothing for an empty scope rather than scanning globa
     expect(app(FinanceIntegrityAuditor::class)->findForScope(new FinanceAuditScope))->toBe([]);
 });
 
-it('runs every one of the 16 invariants cleanly, globally and scoped (no SQL errors)', function () {
-    // Guards all 16 ported SQL splices: a bad column or mis-spliced {scope}/{ids}
+it('runs every one of the 18 invariants cleanly, globally and scoped (no SQL errors)', function () {
+    // Guards all 18 ported SQL splices: a bad column or mis-spliced {scope}/{ids}
     // would throw here, catching regressions the token-only registry test cannot.
     $student = auditStudent();
     $registry = app(FinanceInvariantRegistry::class);

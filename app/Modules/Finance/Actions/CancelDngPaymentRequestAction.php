@@ -45,6 +45,42 @@ class CancelDngPaymentRequestAction
         $this->cancelPushedRequest($request);
     }
 
+    /**
+     * Close an unpaid request in Swinx for a terminal student lifecycle state.
+     *
+     * This intentionally does not call DNG. Late verified payment evidence is
+     * still captured without reviving the locally cancelled collection.
+     */
+    public function runLocallyForLifecycle(DngPaymentRequest $request): void
+    {
+        DB::transaction(function () use ($request): void {
+            $locked = DngPaymentRequest::query()->lockForUpdate()->findOrFail($request->id);
+
+            if ($locked->status === DngPaymentRequest::STATUS_CANCELLED) {
+                return;
+            }
+
+            if ($locked->payment_id !== null) {
+                throw new \RuntimeException(
+                    "Cannot locally close DNG payment request #{$request->id}: canonical Payment #{$locked->payment_id} is already linked."
+                );
+            }
+
+            if (! in_array($locked->status, [
+                DngPaymentRequest::STATUS_PENDING,
+                DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+                DngPaymentRequest::STATUS_UNKNOWN_OUTCOME,
+                DngPaymentRequest::STATUS_NEEDS_REVIEW,
+            ], true)) {
+                throw new \RuntimeException(
+                    "Cannot locally close DNG payment request #{$request->id} for lifecycle: current status '{$locked->status}' is not unpaid and cancellable."
+                );
+            }
+
+            $locked->transitionTo(DngPaymentRequest::STATUS_CANCELLED);
+        });
+    }
+
     private function cancelPushedRequest(DngPaymentRequest $request): void
     {
         $originalData = $this->originalData($request);

@@ -238,18 +238,19 @@ class BackfillLegacyScholarshipEntitlementsAction
             'approved_at' => now(),
         ]);
 
-        foreach ($carrierDiscounts as $discount) {
-            $discount->forceFill([
-                'finance_discount_entitlement_id' => $entitlement->id,
-            ])->save();
-        }
-
         $this->voidFinanceChargeAction->handle(
             chargeId: (int) $charge->id,
             reason: 'Converted to FinanceDiscountEntitlement (legacy scholarship_credit fee-specific backfill)',
             userId: null,
             autoReallocate: false,
+            recalculateInvoices: false,
         );
+
+        foreach ($carrierDiscounts as $discount) {
+            $discount->forceFill([
+                'finance_discount_entitlement_id' => $entitlement->id,
+            ])->saveQuietly();
+        }
 
         $this->refreshDiscountAllocationStatus($entitlement, $carrierDiscounts);
 
@@ -371,6 +372,7 @@ class BackfillLegacyScholarshipEntitlementsAction
             reason: 'Converted to FinanceCreditEntitlement (legacy scholarship_credit grant-like backfill)',
             userId: null,
             autoReallocate: false,
+            recalculateInvoices: false,
         );
 
         $remaining = $classification->amount;

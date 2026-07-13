@@ -179,12 +179,6 @@ class BackfillLegacyVoucherDiscountEntitlementsAction
             'approved_at' => now(),
         ]);
 
-        foreach ($carrierDiscounts as $discount) {
-            $discount->forceFill([
-                'finance_discount_entitlement_id' => $entitlement->id,
-            ])->save();
-        }
-
         // Void the duplicate negative line. Carrier discount allocations stay;
         // they are on positive tuition lines, not on the voucher credit line.
         $this->voidFinanceChargeAction->handle(
@@ -192,7 +186,18 @@ class BackfillLegacyVoucherDiscountEntitlementsAction
             reason: 'Converted to FinanceDiscountEntitlement (legacy voucher_credit backfill)',
             userId: null,
             autoReallocate: false,
+            recalculateInvoices: false,
         );
+
+        // Link carriers only after the duplicate line is no longer collectible.
+        // InvoiceDiscount's saved observer recalculates the invoice immediately;
+        // saving before the void would expose both legacy and canonical carriers
+        // to that recalculation inside this transaction.
+        foreach ($carrierDiscounts as $discount) {
+            $discount->forceFill([
+                'finance_discount_entitlement_id' => $entitlement->id,
+            ])->saveQuietly();
+        }
 
         $this->refreshAllocationStatus($entitlement, $carrierDiscounts);
 

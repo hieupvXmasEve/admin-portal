@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Support\Integrity;
 
 /**
- * Single source of truth for the finance integrity invariants (INV-1..INV-16).
+ * Single source of truth for the finance integrity invariants (INV-1..INV-18).
  *
  * Each invariant's SQL is the exact query used by the `finance:audit-invariants`
  * command, with a `{scope}` token spliced into the innermost WHERE so the same
@@ -104,15 +104,11 @@ class FinanceInvariantRegistry
             new FinanceInvariant(
                 'INV-6',
                 'CRITICAL',
-                'Duplicate invoice for same (student_id, semester_id)',
-                'SELECT COUNT(*) c FROM (
-                    SELECT student_id, semester_id FROM student_invoices
-                    WHERE {scope}
-                    GROUP BY student_id, semester_id HAVING COUNT(*) > 1
-                ) t',
-                'SELECT MIN(id) id FROM student_invoices
-                    WHERE {scope}
-                    GROUP BY student_id, semester_id HAVING COUNT(*) > 1 LIMIT 5',
+                'Retired: multiple invoices per student/semester are allowed',
+                'SELECT COUNT(*) c FROM student_invoices
+                    WHERE ({scope}) AND 1 = 0',
+                'SELECT id FROM student_invoices
+                    WHERE ({scope}) AND 1 = 0 LIMIT 5',
                 'student_id IN ({ids})',
             ),
             new FinanceInvariant(
@@ -279,6 +275,42 @@ class FinanceInvariantRegistry
                       AND fc.amount < 0
                       AND ({scope}) LIMIT 5',
                 'fc.student_id IN ({ids})',
+            ),
+            new FinanceInvariant(
+                'INV-17',
+                'CRITICAL',
+                'Invoice scope mismatch (line charge belongs to another student or semester)',
+                'SELECT COUNT(DISTINCT si.id) c FROM student_invoices si
+                    JOIN invoice_lines il ON il.invoice_id = si.id
+                    JOIN finance_charges fc ON fc.id = il.charge_id
+                    WHERE ({scope})
+                      AND (fc.student_id <> si.student_id OR NOT (fc.semester_id <=> si.semester_id))',
+                'SELECT DISTINCT si.id FROM student_invoices si
+                    JOIN invoice_lines il ON il.invoice_id = si.id
+                    JOIN finance_charges fc ON fc.id = il.charge_id
+                    WHERE ({scope})
+                      AND (fc.student_id <> si.student_id OR NOT (fc.semester_id <=> si.semester_id))
+                    ORDER BY si.id LIMIT 5',
+                'si.student_id IN ({ids})',
+            ),
+            new FinanceInvariant(
+                'INV-18',
+                'CRITICAL',
+                'Active invoice line on void charge',
+                'SELECT COUNT(DISTINCT si.id) c FROM student_invoices si
+                    JOIN invoice_lines il ON il.invoice_id = si.id
+                    JOIN finance_charges fc ON fc.id = il.charge_id
+                    WHERE il.status = "active"
+                      AND fc.status = "void"
+                      AND ({scope})',
+                'SELECT DISTINCT si.id FROM student_invoices si
+                    JOIN invoice_lines il ON il.invoice_id = si.id
+                    JOIN finance_charges fc ON fc.id = il.charge_id
+                    WHERE il.status = "active"
+                      AND fc.status = "void"
+                      AND ({scope})
+                    ORDER BY si.id LIMIT 5',
+                'si.student_id IN ({ids})',
             ),
         ];
     }

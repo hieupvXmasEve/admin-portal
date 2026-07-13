@@ -43,7 +43,7 @@
 - Scoped dry-run before rebuild: `37` scanned, `0` drifted, `0` invalid, `0` failed.
 - Scoped rebuild: `37` scanned, `37` rebuilt, `0` invalid, `0` failed.
 - Scoped dry-run after rebuild: `37` scanned, `0` drifted, `0` invalid, `0` failed.
-- Full `finance:audit-invariants --sample` still reports existing out-of-scope findings: `INV-2=1` (invoice `1471`), `INV-6=29`, `INV-13=1`. No full-dataset clean sign-off claimed.
+- Historical verification originally reported `INV-6=29` under the retired “one invoice per student/semester” definition. Current architecture permits multiple fee-stream invoices; INV-6 remains retired for stable-code history and new INV-17 checks invoice-line charge student/semester scope. The original `INV-2=1` and `INV-13=1` evidence remains historical to that run.
 - Human verification was pending at the time of this local rebuild note; see the completion entry below.
 
 ### 2026-07-12 — Human verification complete

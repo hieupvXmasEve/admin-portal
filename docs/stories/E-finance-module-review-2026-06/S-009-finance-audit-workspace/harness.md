@@ -1,5 +1,7 @@
 # Harness — Acceptance Evidence (S-009 Finance Audit Workspace)
 
+> **Historical INV-6 notice (2026-07-12):** Tài liệu này ghi lại định nghĩa/kết quả audit cũ. Nhiều invoice cùng student/kỳ là hợp lệ theo kiến trúc hiện tại; không cleanup hoặc thêm unique `(student_id, semester_id)` chỉ vì multi-invoice. `INV-6` đã retired; `INV-17` kiểm tra invoice line tham chiếu charge sai student/kỳ.
+
 Branch: `feat/s-009-finance-audit-workspace` (cut from `dev`). Implemented 2026-06-15
 following `docs/superpowers/plans/2026-06-15-finance-audit-workspace.md` (pre-execution
 review applied; see the plan's Revision log).

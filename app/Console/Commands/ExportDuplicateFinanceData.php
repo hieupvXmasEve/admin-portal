@@ -9,18 +9,17 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 
 /**
- * Read-only remediation export for the two dirty-data blockers that prevent the
- * S-003 unique constraints from being added safely:
+ * Read-only legacy inventory for Finance data review:
  *
- *   - INV-6 : duplicate student_invoices for the same (student_id, semester_id)
- *             -> blocks unique(student_id, semester_id) (DB-03)
+ *   - multiple student_invoices for the same (student_id, semester_id), which
+ *     are allowed by the current architecture and may represent distinct fees;
  *   - INV-11: duplicate dng_webhook_events.payload_hash
  *             -> blocks restore of unique(payload_hash) (DB-04)
  *
  * It NEVER mutates data. The console table is a compact triage view; the JSON
  * report (always written) carries the full row-level detail — invoice_line,
- * charge, payment_application, discount and DNG ids with amounts/statuses — so a
- * human can pick the canonical row and plan remediation safely.
+ * charge, payment_application, discount and DNG ids with amounts/statuses. A
+ * multi-invoice group is informational, not proof of duplicate billing.
  *
  * --limit only caps the DETAILED rows collected; the reported totals always
  * reflect the true number of duplicate groups in the dataset.
@@ -32,7 +31,7 @@ class ExportDuplicateFinanceData extends Command
         {--json= : Write the full structured report to this JSON path (default: storage/app/finance/s003-duplicate-export.json)}
         {--limit=0 : Cap the number of DETAILED groups collected per section (0 = all). Totals are unaffected.}';
 
-    protected $description = 'Read-only export of duplicate invoices (INV-6) and webhook payload hashes (INV-11) for human-reviewed cleanup';
+    protected $description = 'Read-only export of allowed multi-invoice groups and duplicate webhook payload hashes (INV-11)';
 
     public function handle(): int
     {
@@ -42,10 +41,10 @@ class ExportDuplicateFinanceData extends Command
         $this->info('📤 Duplicate finance data export (READ-ONLY — no rows are changed).');
         $this->line('');
 
-        $invoiceTotal = $this->countDuplicateInvoiceGroups();
+        $invoiceTotal = $this->countMultiInvoiceGroups();
         $payloadTotal = $this->countDuplicatePayloadHashGroups();
 
-        $invoiceGroups = $this->collectDuplicateInvoiceGroups($limit);
+        $invoiceGroups = $this->collectMultiInvoiceGroups($limit);
         $this->renderInvoiceGroups($invoiceGroups, $invoiceTotal);
 
         $this->line('');
@@ -54,17 +53,27 @@ class ExportDuplicateFinanceData extends Command
         $this->renderPayloadHashGroups($payloadGroups, $payloadTotal);
 
         $report = [
-            'generated_for' => 'S-003-data-guards-and-constraints',
+            'report_version' => 2,
+            'generated_for' => 'finance-multi-invoice-and-webhook-review',
             'read_only' => true,
             'limit_applied' => $limit,
             'totals' => [
+                'multi_invoice_groups_total' => $invoiceTotal,
+                'multi_invoice_groups_shown' => count($invoiceGroups),
+                // Deprecated v1 aliases retained for external/manual consumers.
                 'inv6_invoice_groups_total' => $invoiceTotal,
                 'inv6_invoice_groups_shown' => count($invoiceGroups),
                 'inv11_payload_hash_groups_total' => $payloadTotal,
                 'inv11_payload_hash_groups_shown' => count($payloadGroups),
             ],
+            'multi_invoice_groups' => $invoiceGroups,
             'duplicate_invoice_groups' => $invoiceGroups,
             'duplicate_payload_hash_groups' => $payloadGroups,
+            'deprecated_fields' => [
+                'totals.inv6_invoice_groups_total' => 'Use totals.multi_invoice_groups_total; same-semester invoices are allowed.',
+                'totals.inv6_invoice_groups_shown' => 'Use totals.multi_invoice_groups_shown; same-semester invoices are allowed.',
+                'duplicate_invoice_groups' => 'Use multi_invoice_groups; this alias will be removed in a future report version.',
+            ],
         ];
 
         $path = $this->option('json') ?: storage_path('app/finance/s003-duplicate-export.json');
@@ -74,7 +83,7 @@ class ExportDuplicateFinanceData extends Command
 
         $this->line('');
         $this->warn(sprintf(
-            'INV-6 groups: %d (showing %d) · INV-11 groups: %d (showing %d). Review canonical rows before any cleanup or unique constraint (DB-03/DB-04).',
+            'Allowed multi-invoice groups: %d (showing %d) · INV-11 groups: %d (showing %d). Multi-invoice rows are informational; review only for business-specific cleanup.',
             $invoiceTotal,
             count($invoiceGroups),
             $payloadTotal,
@@ -85,7 +94,7 @@ class ExportDuplicateFinanceData extends Command
         return self::SUCCESS;
     }
 
-    private function countDuplicateInvoiceGroups(): int
+    private function countMultiInvoiceGroups(): int
     {
         return DB::table('student_invoices')
             ->select('student_id', 'semester_id')
@@ -108,7 +117,7 @@ class ExportDuplicateFinanceData extends Command
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function collectDuplicateInvoiceGroups(int $limit): array
+    private function collectMultiInvoiceGroups(int $limit): array
     {
         $keys = DB::table('student_invoices')
             ->select('student_id', 'semester_id', DB::raw('COUNT(*) as invoice_count'))
@@ -314,7 +323,7 @@ class ExportDuplicateFinanceData extends Command
      */
     private function renderInvoiceGroups(array $groups, int $total): void
     {
-        $this->line("── INV-6: duplicate invoices (student_id, semester_id) — {$total} group(s) — blocks DB-03 unique");
+        $this->line("── INFO: allowed multi-invoice groups (student_id, semester_id) — {$total} group(s)");
         if ($groups === []) {
             $this->info('   ✅ none');
 

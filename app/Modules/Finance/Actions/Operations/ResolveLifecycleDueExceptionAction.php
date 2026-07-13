@@ -131,15 +131,8 @@ class ResolveLifecycleDueExceptionAction
 
         try {
             $review = DB::transaction(function () use ($request, $exceptionReason, $action, $reason, $userId, $impactPreview, $fromStatus, $dngStatusBefore, $existingReview, $requireVoidPermission): FinanceLifecycleDueExceptionReview {
-                // FIN-34: record the cancel/void *attempt* events INSIDE the same
-                // transaction as the status mutation. Previously they were written
-                // before the transaction opened, so if the DNG cancel API failed and
-                // the transaction rolled back, a committed "CancelRequested"
-                // transition survived that the review row never durably reached —
-                // audit and review state diverged and the attempt read as a completed
-                // transition. Recording them inside the transaction means they commit
-                // or roll back atomically with the state change; on rollback the catch
-                // block writes the paired CancelFailed/VoidFailed outcome instead.
+                // Record attempt events in the same transaction as local lifecycle
+                // closure so request and review history commit or roll back together.
                 $this->recordEventAction->run(
                     request: $request,
                     eventType: LifecycleDueExceptionReviewEventType::CancelRequested,
@@ -184,7 +177,7 @@ class ResolveLifecycleDueExceptionAction
                     ]
                 );
 
-                $this->cancelDngPaymentRequestAction->run($request->fresh());
+                $this->cancelDngPaymentRequestAction->runLocallyForLifecycle($request->fresh());
 
                 $review->update([
                     'status' => LifecycleDueExceptionReviewStatus::Resolved,

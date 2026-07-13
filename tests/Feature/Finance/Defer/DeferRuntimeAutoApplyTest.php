@@ -17,6 +17,7 @@ use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Services\SettlementService;
@@ -30,9 +31,9 @@ uses(RefreshDatabase::class);
  *
  * Recording a FULL-scope PRESERVE/FORFEIT academic defer (non-EGC) settles the
  * student's obligations automatically, inside the same transaction as case
- * creation, by reusing the M1 ApplyDeferFinancePolicyAction. Needs-review cases
- * (live DNG / discount / non-FULL scope) record the case + items but mutate no
- * money. Re-recording is idempotent. The backfill --apply-money flag settles
+ * creation, by reusing the M1 ApplyDeferFinancePolicyAction. Live unpaid DNG is
+ * closed locally before void; discount/non-FULL cases remain review-only.
+ * Re-recording is idempotent. The backfill --apply-money flag settles
  * historical auto-safe cases with the same action.
  *
  * Helpers are local + uniquely named so the file is self-contained when run in
@@ -114,7 +115,21 @@ function autoApplyRegistration(int $studentId, int $semesterId, string $status):
 
 function autoApplyObligation(int $studentId, int $semesterId, float $amount = 45_000_000): FinanceCharge
 {
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'finance_test',
+        'source_kind' => 'defer_runtime',
+        'source_ref' => 'defer-runtime:'.uniqid('', true),
+        'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'defer-runtime:test',
+        'pricing_snapshot' => ['catalog_rule_version' => 'defer-runtime:test'],
+        'accepted_at' => now(),
+    ]);
+
     return app(CreateFinanceChargeAction::class)->handle([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $studentId,
         'semester_id' => $semesterId,
         'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
@@ -204,7 +219,7 @@ it('settles a runtime FULL FORFEIT defer: voids the obligation, creates an adjus
         ->and(autoApplyInvariantOffending())->toBe(0);
 });
 
-it('records a needs-review runtime defer (live DNG) without mutating money', function () {
+it('locally cancels live DNG and settles the linked runtime defer', function () {
     $student = autoApplyCourseStudent($this->semester, $this->campus, $this->program, 'RT-DNG');
     autoApplyRegistration($student->id, $this->semester->id, 'registered');
     $charge = autoApplyObligation($student->id, $this->semester->id, 45_000_000);
@@ -231,8 +246,8 @@ it('records a needs-review runtime defer (live DNG) without mutating money', fun
 
     $deferCase = DeferCase::where('student_id', $student->id)->firstOrFail();
 
-    // Case + items recorded, but money untouched (left for the review queue).
-    expect($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE)
+    expect($dng->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED)
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID)
         ->and(FinanceCharge::where('charge_type', FinanceCharge::TYPE_ADJUSTMENT)->count())->toBe(0)
         ->and($deferCase->items()->count())->toBe(1)
         ->and(autoApplyInvariantOffending())->toBe(0);

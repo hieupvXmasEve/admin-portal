@@ -26,6 +26,9 @@
 - `./scripts/dev.sh artisan test --compact tests/Feature/Finance/Dng/FinanceDngCutoverCommandTest.php tests/Feature/Finance/Dng/ReserveAndPushSingleFeeDngActionTest.php tests/Feature/Finance/StudentFinanceDngAccessTest.php tests/Feature/Finance/Dng/DngPaymentServiceTest.php tests/Feature/Finance/Dng/CaptureDngProviderReceiptActionTest.php` — **25 passed (185 assertions)**.
 - `./scripts/dev.sh composer exec pint -- --dirty --format agent` — passed.
 - `finance:dng-cutover` is read-only by default; `--backfill` writes only exact reservation metadata/targets and is idempotent. It returns non-zero when inventory is incomplete, unsafe, limited, or has unresolved classifications.
+- Unpaid live DNG for a student whose lifecycle is `deferred`, `dropout`, or `dropout_transfer` is classified `student_lifecycle_conflict`, action `cancel_collection`, and blocks cutover even when the target linkage and amount are otherwise exact.
+- Finance reads those lifecycle statuses through the Academic-owned `StudentLifecycleStatusReader` shared contract, preserving the module boundary and batching one lookup per inventory chunk.
+- Lifecycle conflicts are repaired by local admin cancellation (`cancelled`) before linked charge void; the repair does not call DNG or require provider confirmation, and late verified receipts remain bridgeable.
 - `FINANCE_DNG_COLLECTION_MODE=off` blocks new collection, reservation, batch create, and student payment-access generation; receipt capture/bridge/reconciliation code paths do not use this guard.
 - `./scripts/dev.sh npm run type-check` — blocked by Node heap OOM (exit 134), with no changed frontend files.
 - `./scripts/dev.sh test` — exit 255 without diagnostics from the wrapper; focused DNG regression remains green.
@@ -38,6 +41,8 @@
 - Added action classifications for repair, cancel/reconcile, and paid bridge, plus unresolved/unknown receipt counts and provider-rail/campus/account/fee active-slot conflict detection.
 - Added the `legacy` / `cutover` / `off` collection mode. `cutover` blocks legacy create/batch paths; `off` is fail-closed for new collection while receipt capture remains available.
 - Review found no remaining standards blocker after moving inventory to a Query and backfill to an Action. Remaining handoff gates are provider lookup/manual evidence, seven consecutive same-snapshot shadow-clean days, portal pay-one/pay-all proof, production performance budgets, deployment compatibility, and a live zero-unresolved inventory.
+- 2026-07-13 correction: DNG `160` (`AUH16667`) and `233` (`AUH111841`) demonstrated why lifecycle classification is required: both were exact-link requests but belonged to deferred students. The earlier rehearsal-only fake provider evidence was removed; lifecycle closure is local admin state `cancelled` and needs no provider call.
+- Focused local-cancellation/defer/receipt/lifecycle/cutover/integrity regression: **101 passed / 575 assertions**; `INV-1..INV-18 = 0`, active DNG `212/212 exact_link`, unmatched receipt `0`, safe to cut over.
 
 ## Blocked by
 

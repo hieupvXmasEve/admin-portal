@@ -5,6 +5,106 @@ declare(strict_types=1);
 use App\Modules\Finance\Support\SettlementPosition\SettlementBypassAllowlist;
 
 /**
+ * @return list<array{start:int,end:int}>
+ */
+function settlementMutationGuardedCallbackRanges(string $contents): array
+{
+    $tokens = token_get_all($contents);
+    $positionedTokens = [];
+    $offset = 0;
+
+    foreach ($tokens as $token) {
+        $text = is_array($token) ? $token[1] : $token;
+        $positionedTokens[] = [
+            'id' => is_array($token) ? $token[0] : null,
+            'text' => $text,
+            'start' => $offset,
+        ];
+        $offset += strlen($text);
+    }
+
+    $ranges = [];
+    $tokenCount = count($positionedTokens);
+    for ($index = 0; $index < $tokenCount; $index++) {
+        if (($positionedTokens[$index]['id'] ?? null) !== T_STRING
+            || $positionedTokens[$index]['text'] !== 'settlementMutationGuard') {
+            continue;
+        }
+
+        $handleIndex = null;
+        for ($candidate = $index + 1; $candidate < min($index + 6, $tokenCount); $candidate++) {
+            if (($positionedTokens[$candidate]['id'] ?? null) === T_STRING
+                && $positionedTokens[$candidate]['text'] === 'handle') {
+                $handleIndex = $candidate;
+                break;
+            }
+        }
+
+        if ($handleIndex === null) {
+            continue;
+        }
+
+        $functionIndex = null;
+        for ($candidate = $handleIndex + 1; $candidate < $tokenCount; $candidate++) {
+            if (($positionedTokens[$candidate]['id'] ?? null) === T_FUNCTION) {
+                $functionIndex = $candidate;
+                break;
+            }
+
+            if ($positionedTokens[$candidate]['text'] === ';') {
+                break;
+            }
+        }
+
+        if ($functionIndex === null) {
+            continue;
+        }
+
+        $bodyStartIndex = null;
+        for ($candidate = $functionIndex + 1; $candidate < $tokenCount; $candidate++) {
+            if ($positionedTokens[$candidate]['text'] === '{') {
+                $bodyStartIndex = $candidate;
+                break;
+            }
+        }
+
+        if ($bodyStartIndex === null) {
+            continue;
+        }
+
+        $depth = 0;
+        for ($candidate = $bodyStartIndex; $candidate < $tokenCount; $candidate++) {
+            if ($positionedTokens[$candidate]['text'] === '{') {
+                $depth++;
+            } elseif ($positionedTokens[$candidate]['text'] === '}') {
+                $depth--;
+                if ($depth === 0) {
+                    $ranges[] = [
+                        'start' => $positionedTokens[$bodyStartIndex]['start'],
+                        'end' => $positionedTokens[$candidate]['start'],
+                    ];
+                    break;
+                }
+            }
+        }
+    }
+
+    return $ranges;
+}
+
+/** @param list<array{start:int,end:int}> $ranges */
+function settlementMutationOffsetIsGuarded(int $offset, array $ranges): bool
+{
+    foreach ($ranges as $range) {
+        if ($offset > $range['start'] && $offset < $range['end']) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * @return list<string>
  */
 function settlementBypassViolations(string $root): array
@@ -28,9 +128,16 @@ function settlementBypassViolations(string $root): array
         $path = $file->getPathname();
         $relativePath = 'app/'.str_replace(base_path('app').'/', '', $path);
         $contents = file_get_contents($path) ?: '';
+        $guardedRanges = settlementMutationGuardedCallbackRanges($contents);
 
         foreach ($patterns as $label => $pattern) {
-            if (preg_match($pattern, $contents) === 1 && ! isset($allowlist[$relativePath])) {
+            preg_match_all($pattern, $contents, $matches, PREG_OFFSET_CAPTURE);
+            $hasUnguardedMatch = collect($matches[0] ?? [])->contains(
+                static fn (array $match): bool => ! str_starts_with($label, 'direct money-')
+                    || ! settlementMutationOffsetIsGuarded((int) $match[1], $guardedRanges),
+            );
+
+            if ($hasUnguardedMatch && ! isset($allowlist[$relativePath])) {
                 $violations[] = "{$label}: {$relativePath}";
             }
         }
@@ -80,4 +187,24 @@ it('blocks new local settlement formulas and direct money-table writers', functi
     $violations = settlementBypassViolations(base_path('app'));
 
     expect($violations)->toBe([], "Settlement bypasses outside the reviewed allowlist:\n".implode("\n", $violations));
+});
+
+it('recognizes only writes inside the settlement mutation guard callback as guarded', function (): void {
+    $contents = <<<'PHP'
+<?php
+$this->settlementMutationGuard->handle($billingAccountId, function (): void {
+    CreditApplication::query()->create(['amount' => -1]);
+});
+CreditApplication::query()->create(['amount' => -2]);
+PHP;
+
+    $ranges = settlementMutationGuardedCallbackRanges($contents);
+    $guardedOffset = strpos($contents, "CreditApplication::query()->create(['amount' => -1])");
+    $unguardedOffset = strpos($contents, "CreditApplication::query()->create(['amount' => -2])");
+
+    expect($ranges)->toHaveCount(1)
+        ->and($guardedOffset)->not->toBeFalse()
+        ->and($unguardedOffset)->not->toBeFalse()
+        ->and(settlementMutationOffsetIsGuarded((int) $guardedOffset, $ranges))->toBeTrue()
+        ->and(settlementMutationOffsetIsGuarded((int) $unguardedOffset, $ranges))->toBeFalse();
 });

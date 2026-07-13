@@ -254,7 +254,7 @@ class SettlementService
      */
     private const TERMINAL_LIFECYCLE_STATUSES = ['cancelled', 'void'];
 
-    public function recalculateInvoiceSnapshot(StudentInvoice $invoice): void
+    public function recalculateInvoiceSnapshot(StudentInvoice $invoice, ?string $preservedPaidAt = null): void
     {
         $snapshot = $this->deriveInvoiceCacheSnapshot($invoice);
 
@@ -262,8 +262,11 @@ class SettlementService
 
         // DB-15: keep the first moment the invoice became paid, and clear the
         // cached timestamp the moment a reversal makes it no longer paid — never
-        // leave a stale paid_at on a reopened invoice.
-        $cachedPaidAt = $isPaid ? ($invoice->cached_paid_at ?? now()) : null;
+        // leave a stale paid_at on a reopened invoice. A historical rebuild must
+        // derive a missing timestamp from ledger evidence, never from wall time.
+        $cachedPaidAt = $isPaid && $preservedPaidAt !== null
+            ? $preservedPaidAt
+            : $this->resolveCachedPaidAt($invoice, $isPaid);
 
         // status is a lifecycle column, not cache: preserve terminal states so a
         // cache rebuild (or any recalc) never flips a cancelled/voided invoice
@@ -289,7 +292,9 @@ class SettlementService
         float $credit,
         float $remaining,
     ): string {
-        $status = $invoice->status === 'draft' ? 'draft' : 'pending';
+        if ($invoice->status === 'draft') {
+            return 'draft';
+        }
 
         if ($net <= 0 || $remaining <= 0) {
             return 'paid';
@@ -303,7 +308,32 @@ class SettlementService
             return 'overdue';
         }
 
-        return $status;
+        return 'pending';
+    }
+
+    private function resolveCachedPaidAt(StudentInvoice $invoice, bool $isPaid): ?string
+    {
+        if (! $isPaid) {
+            return null;
+        }
+
+        if ($invoice->cached_paid_at !== null) {
+            return $invoice->cached_paid_at->format('Y-m-d H:i:s');
+        }
+
+        $evidenceAt = PaymentApplication::query()
+            ->join('payments', 'payments.id', '=', 'payment_applications.payment_id')
+            ->join('invoice_lines', 'invoice_lines.id', '=', 'payment_applications.invoice_line_id')
+            ->join('finance_charges', 'finance_charges.id', '=', 'invoice_lines.charge_id')
+            ->where('invoice_lines.invoice_id', $invoice->id)
+            ->where('invoice_lines.status', 'active')
+            ->where('finance_charges.status', FinanceCharge::STATUS_ACTIVE)
+            ->where('payments.status', Payment::STATUS_COMPLETED)
+            ->where('payment_applications.amount', '>', 0)
+            ->selectRaw('MAX(COALESCE(payment_applications.applied_at, payments.paid_at, payment_applications.created_at)) as evidence_at')
+            ->value('evidence_at');
+
+        return is_string($evidenceAt) && $evidenceAt !== '' ? $evidenceAt : null;
     }
 
     public function createPaymentApplication(

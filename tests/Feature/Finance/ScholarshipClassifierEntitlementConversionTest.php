@@ -20,6 +20,8 @@ use App\Modules\Finance\Support\ScholarshipCarrierClassifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
+require_once __DIR__.'/Support/ledger_fixtures.php';
+
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
@@ -40,37 +42,12 @@ beforeEach(function (): void {
  */
 function seedTuitionDebitForScholarship(Student $student, Semester $semester, float $amount = 10_000_000): array
 {
-    $invoice = StudentInvoice::create([
-        'invoice_number' => 'INV-SCHOLAR-'.uniqid(),
-        'student_id' => $student->id,
-        'semester_id' => $semester->id,
-        'status' => 'pending',
-        'due_date' => now()->addDays(30),
-        'subtotal' => $amount,
-        'discount_total' => 0,
-        'total_amount' => $amount,
-        'paid_amount' => 0,
-    ]);
-
-    $charge = FinanceCharge::create([
-        'student_id' => $student->id,
-        'semester_id' => $semester->id,
-        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
-        'amount' => $amount,
-        'description' => 'Tuition',
-        'effective_at' => now(),
-        'status' => FinanceCharge::STATUS_ACTIVE,
-    ]);
-
-    $line = InvoiceLine::create([
-        'invoice_id' => $invoice->id,
-        'charge_id' => $charge->id,
-        'amount_snapshot' => $amount,
-        'description_snapshot' => 'Tuition',
-        'status' => 'active',
-    ]);
-
-    return [$invoice, $line, $charge];
+    return seedDebitLedgerViaIntake(
+        student: $student,
+        semester: $semester,
+        amount: $amount,
+        description: 'Tuition',
+    );
 }
 
 function seedLegacyScholarshipCredit(
@@ -115,7 +92,7 @@ function seedScholarshipDiscountCarrier(
     float $amount,
     ?int $referenceId = null,
 ): array {
-    $discount = InvoiceDiscount::query()->create([
+    $discount = new InvoiceDiscount([
         'invoice_id' => $invoice->id,
         'discount_type' => 'scholarship',
         'discount_source' => 'legacy_scholarship',
@@ -124,6 +101,7 @@ function seedScholarshipDiscountCarrier(
         'reference_id' => $referenceId,
         'status' => 'active',
     ]);
+    $discount->saveQuietly();
 
     $allocation = DiscountAllocation::query()->create([
         'invoice_discount_id' => $discount->id,

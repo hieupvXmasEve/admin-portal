@@ -14,7 +14,7 @@ Tách DNG Collection Request Cancellation khỏi obligation/charge/source cancel
 ## Acceptance criteria
 
 - [x] Cancel collection không void obligation, charge, payable line, installment plan hoặc source workflow.
-- [x] Unattempted reservation release cục bộ; pushed request chỉ terminal sau provider-confirmed cancellation.
+- [x] Unattempted reservation release cục bộ; generic pushed-request cancellation remains provider-confirmed. Authorized defer/dropout settlement is the explicit exception: close unpaid DNG locally as `cancelled`, preserve push identity/evidence, and continue capturing late verified receipts.
 - [x] Timeout/ambiguous cancellation trở thành Unknown Collection Outcome và tiếp tục giữ target/recollection block.
 - [x] Payment đến đồng thời hoặc sau cancellation vẫn tạo/khôi phục canonical Payment và chuyển request sang paid handling.
 - [x] Cancellation và payment evidence đều được bảo toàn, idempotent qua retry/webhook/reconciliation.

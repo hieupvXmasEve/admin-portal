@@ -29,6 +29,7 @@ final readonly class DngActiveMigrationReport
             && ($this->counts['campus_rail_conflict'] ?? 0) === 0
             && ($this->counts['slot_conflict'] ?? 0) === 0
             && ($this->counts['amount_mismatch'] ?? 0) === 0
+            && ($this->counts['student_lifecycle_conflict'] ?? 0) === 0
             && ($this->counts['unmatched_receipt'] ?? 0) === 0;
     }
 }

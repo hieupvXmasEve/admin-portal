@@ -18,7 +18,7 @@ use Throwable;
  * A correct dataset returns 0 for every invariant.
  *
  * This command performs SELECT queries only — it never mutates data.
- * The invariant catalog (INV-1..INV-16) lives in the shared
+ * The invariant catalog (INV-1..INV-18) lives in the shared
  * App\Modules\Finance\Support\Integrity\FinanceInvariantRegistry so the command
  * and the finance audit workspace cannot drift. A failing invariant SQL is
  * surfaced as ERROR (never swallowed into a clean 0).

@@ -441,12 +441,32 @@ final class CurrentPayableSettlementPositionReader implements SettlementPosition
                 default => false,
             };
 
-            if ($matchesScope) {
+            if ($matchesScope && $this->isCurrentBusinessScopeMember($scope, $line, $charge)) {
                 $matches[] = $context;
             }
         }
 
         return $matches;
+    }
+
+    private function isCurrentBusinessScopeMember(
+        SettlementPositionScope $scope,
+        InvoiceLine $line,
+        ?FinanceCharge $charge,
+    ): bool {
+        if ($scope->as_of !== null || ! in_array($scope->type, [
+            SettlementPosition::SCOPE_INVOICE,
+            SettlementPosition::SCOPE_BILLING_ACCOUNT,
+            SettlementPosition::SCOPE_FEE_TYPE,
+        ], true)) {
+            return true;
+        }
+
+        if ($line->status !== 'active') {
+            return false;
+        }
+
+        return ! $charge instanceof FinanceCharge || $charge->status === FinanceCharge::STATUS_ACTIVE;
     }
 
     /**
