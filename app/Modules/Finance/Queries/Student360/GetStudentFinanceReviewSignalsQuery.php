@@ -6,14 +6,16 @@ namespace App\Modules\Finance\Queries\Student360;
 
 use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
-use App\Modules\Finance\Models\PaymentApplication;
+use App\Modules\Finance\Models\PaymentSurplusDisposition;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class GetStudentFinanceReviewSignalsQuery
 {
@@ -52,9 +54,21 @@ class GetStudentFinanceReviewSignalsQuery
             ->orderByDesc('paid_at')
             ->orderByDesc('id')
             ->get();
+        $disposedByPayment = PaymentSurplusDisposition::query()
+            ->whereIn('payment_id', $payments->modelKeys())
+            ->whereIn('type', [
+                PaymentSurplusDisposition::TYPE_REFUND,
+                PaymentSurplusDisposition::TYPE_RETAIN_FORFEIT,
+            ])
+            ->selectRaw('payment_id, SUM(amount) as disposed_amount')
+            ->groupBy('payment_id')
+            ->pluck('disposed_amount', 'payment_id');
 
         $surplus = $this->money((float) $payments->sum(
-            fn (Payment $payment): float => $this->settlement->getPaymentUnappliedAmount($payment),
+            fn (Payment $payment): float => $this->remainingPaymentSurplus(
+                $payment,
+                (float) ($disposedByPayment[$payment->id] ?? 0),
+            ),
         ));
 
         if ($surplus <= 0) {
@@ -92,7 +106,7 @@ class GetStudentFinanceReviewSignalsQuery
             ])
             ->latest('id')
             ->get()
-            ->filter(fn (DngPaymentRequest $request): bool => $this->paidDngHasVoidedFee($request))
+            ->filter(fn (DngPaymentRequest $request): bool => $this->paidDngRequiresVoidedFeeReview($request))
             ->values();
 
         if ($requests->isEmpty()) {
@@ -113,18 +127,66 @@ class GetStudentFinanceReviewSignalsQuery
         ];
     }
 
-    private function paidDngHasVoidedFee(DngPaymentRequest $request): bool
+    private function paidDngRequiresVoidedFeeReview(DngPaymentRequest $request): bool
     {
-        if ($this->chargeIsVoided($request->financeCharge)) {
+        $voidedTargetChargeIds = collect([$request->financeCharge])
+            ->merge($request->chargeLinks->map(
+                fn (DngPaymentRequestCharge $link): ?FinanceCharge => $link->financeCharge,
+            ))
+            ->filter(fn (?FinanceCharge $charge): bool => $this->chargeIsVoided($charge))
+            ->map(fn (FinanceCharge $charge): int => (int) $charge->id)
+            ->unique()
+            ->values();
+        $payment = $request->payment;
+        $voidedLineApplicationGroups = $payment?->applications
+            ->groupBy('invoice_line_id')
+            ->filter(fn (Collection $applications): bool => $this->lineIsVoided(
+                $applications->first()?->invoiceLine,
+            )) ?? collect();
+
+        if ($voidedTargetChargeIds->isEmpty() && $voidedLineApplicationGroups->isEmpty()) {
+            return false;
+        }
+
+        if ($payment === null) {
             return true;
         }
 
-        if ($request->chargeLinks->contains(fn ($link): bool => $this->chargeIsVoided($link->financeCharge))) {
+        $relevantVoidedApplicationGroups = $voidedTargetChargeIds->isEmpty()
+            ? $voidedLineApplicationGroups
+            : $voidedLineApplicationGroups->filter(
+                fn (Collection $applications): bool => $voidedTargetChargeIds->contains(
+                    (int) $applications->first()?->invoiceLine?->charge_id,
+                ),
+            );
+        $coveredTargetChargeIds = $relevantVoidedApplicationGroups
+            ->map(fn (Collection $applications): int => (int) $applications->first()?->invoiceLine?->charge_id)
+            ->unique();
+
+        if ($relevantVoidedApplicationGroups->isEmpty()
+            || $voidedTargetChargeIds->diff($coveredTargetChargeIds)->isNotEmpty()
+            || $relevantVoidedApplicationGroups->contains(
+                fn (Collection $applications): bool => $this->money((float) $applications->sum('amount')) !== 0.0,
+            )) {
             return true;
         }
 
-        return $request->payment?->applications
-            ->contains(fn (PaymentApplication $application): bool => $this->lineIsVoided($application->invoiceLine)) ?? false;
+        return $this->remainingPaymentSurplus($payment) > 0;
+    }
+
+    private function remainingPaymentSurplus(Payment $payment, ?float $disposed = null): float
+    {
+        $disposed ??= (float) PaymentSurplusDisposition::query()
+            ->where('payment_id', $payment->id)
+            ->whereIn('type', [
+                PaymentSurplusDisposition::TYPE_REFUND,
+                PaymentSurplusDisposition::TYPE_RETAIN_FORFEIT,
+            ])
+            ->sum('amount');
+
+        return max(0, $this->money(
+            $this->settlement->getPaymentUnappliedAmount($payment) - $disposed,
+        ));
     }
 
     /** @return array<string,mixed>|null */

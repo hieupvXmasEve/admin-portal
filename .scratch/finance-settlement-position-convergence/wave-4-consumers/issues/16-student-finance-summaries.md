@@ -44,6 +44,19 @@ Chuyển Student 360 finance summaries, payment/action cards và student finance
 - Scope stayed within Student 360 current summaries/cards, student finance summary APIs, the student portal contract/rendering, and focused regression coverage. Parent PRD and sibling issue states were not changed.
 - Status remains `ready-for-human` because portal lint, the environment-wide test wrapper, and human staging verification remain unresolved.
 
+### 2026-07-13 — Resolved paid-DNG/voided-fee false positive
+
+- Browser QA on rehearsal student `AUH116717` exposed a false review signal after all `48M` had been reversed from void tuition/retake lines and fully reallocated to the approved FORFEIT adjustment. Current surplus and collectible were both `0`.
+- `GetStudentFinanceReviewSignalsQuery` now requires reversal evidence for the exact charge(s) targeted by that DNG, requires every relevant void-line application group to net to zero, and requires no remaining undisposed cash before clearing the warning. Missing Payment bridges, missing/mismatched reversal evidence, non-zero void-line nets, and real surplus remain reviewable.
+- Explicit refund/retain-forfeit dispositions are deducted consistently from both the generic surplus signal and the paid-DNG/voided-fee signal.
+- Focused boundary regression: `4 passed / 40 assertions`; adjacent Student 360 settlement/API regression: `8 passed / 85 assertions`; Pint and scoped `git diff --check` passed.
+- Before fixture repair, the latest `StudentOverviewShellTest` run had `14 passed / 5 failed`: five legacy fixtures lacked canonical currency evidence and failed closed with `settlement_position.missing_currency` before their assertions.
+- Final authenticated browser verification on rehearsal student `AUH116717` passed: surplus `0`, no current DNG work, no exception card, and no paid-DNG/voided-fee warning; browser console was clean.
+- Follow-up fixture repair materialized test payable charges through BillingAccount/FinanceObligation with canonical `VND` currency instead of weakening the production fail-closed guard. `StudentOverviewShellTest` now passes `19 tests / 347 assertions`; the full Student 360 directory passes `37 tests / 460 assertions`. This supersedes the `11 passed / 5 failed` fixture-gap result above.
+- Subsequent discovery repair removed a duplicate global Pest helper, so `pest --list-tests` now lists `1,979` tests successfully. The scoped post-UI regression gate passes `89 tests / 942 assertions`, including Student 360, legacy paid-PTL reconciliation, canonical fixture consumers, durable exam-resit cancellation expectations, and the materializer architecture guard.
+- The normal full suite still exhausts its `256 MB` PHP memory limit. A `1 GB` diagnostic run completed with `1,763 passed / 204 failed / 13,322 assertions`; failures include unrelated AI/Notification/Academic baseline issues plus broad legacy fixture/isolation debt. This is not a green full-suite gate and does not supersede the focused green evidence.
+- Status remains `ready-for-human`; portal lint, full-suite environment, and staging verification gates remain open.
+
 ## Blocked by
 
 - [02 — Tổng hợp Settlement Position theo business scope](../../wave-0-foundation/issues/02-aggregate-batch-as-of-settlement-position.md)

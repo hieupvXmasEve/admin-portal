@@ -8,16 +8,20 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
+use App\Modules\Finance\Models\PaymentSurplusDisposition;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use App\Services\PermissionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 
 use function Pest\Laravel\actingAs;
 
@@ -52,6 +56,33 @@ function makeOverviewStudent(Campus $campus, Program $program, Semester $semeste
         ->create();
 }
 
+function makeOverviewObligation(
+    Student $student,
+    float $amount,
+    string $chargeType = FinanceCharge::TYPE_TUITION_TERM,
+    string $chargeStatus = FinanceCharge::STATUS_ACTIVE,
+): FinanceObligation {
+    $billingAccount = BillingAccount::query()
+        ->where('student_id', $student->id)
+        ->firstOrFail();
+
+    return FinanceObligation::query()->create([
+        'billing_account_id' => $billingAccount->id,
+        'source_system' => 'test',
+        'source_kind' => 'student_360_overview',
+        'source_ref' => 'student-360-overview:'.uniqid('', true),
+        'obligation_type' => $chargeType,
+        'lifecycle_status' => $chargeStatus === FinanceCharge::STATUS_VOID
+            ? FinanceObligation::STATUS_VOIDED
+            : FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'student-360-overview:test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+}
+
 /**
  * @return array{charge: FinanceCharge, invoice: StudentInvoice, line: InvoiceLine}
  */
@@ -61,11 +92,14 @@ function makeOverviewCharge(
     float $amount = 10_000_000,
     string $chargeStatus = FinanceCharge::STATUS_ACTIVE,
     string $lineStatus = 'active',
+    string $chargeType = FinanceCharge::TYPE_TUITION_TERM,
 ): array {
+    $obligation = makeOverviewObligation($student, $amount, $chargeType, $chargeStatus);
     $charge = FinanceCharge::create([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
-        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'charge_type' => $chargeType,
         'amount' => $amount,
         'description' => 'Overview tuition',
         'effective_at' => now(),
@@ -120,6 +154,7 @@ it('shows staff-facing tuition KPIs and surplus source for a paid DNG released f
         $summer = Semester::factory()->create(['code' => 'SUMMER2026', 'name' => 'Summer 2026']);
 
         $springCharge = FinanceCharge::create([
+            'finance_obligation_id' => makeOverviewObligation($student, 15_000_000)->id,
             'student_id' => $student->id,
             'semester_id' => $this->semester->id,
             'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
@@ -156,6 +191,12 @@ it('shows staff-facing tuition KPIs and surplus source for a paid DNG released f
         app(SettlementService::class)->createPaymentApplication($springPayment, $springLine, 15_000_000, 'application', $user->id);
 
         $summerCharge = FinanceCharge::create([
+            'finance_obligation_id' => makeOverviewObligation(
+                $student,
+                30_000_000,
+                FinanceCharge::TYPE_EGC_LEVEL_FEE,
+                FinanceCharge::STATUS_VOID,
+            )->id,
             'student_id' => $student->id,
             'semester_id' => $summer->id,
             'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
@@ -274,6 +315,7 @@ it('surfaces in-page review signals for surplus, voided DNG fees, stale installm
         $summer = Semester::factory()->create(['code' => 'SUMMER2026', 'name' => 'Summer 2026']);
 
         $paidCharge = FinanceCharge::create([
+            'finance_obligation_id' => makeOverviewObligation($student, 15_000_000)->id,
             'student_id' => $student->id,
             'semester_id' => $this->semester->id,
             'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
@@ -328,6 +370,12 @@ it('surfaces in-page review signals for surplus, voided DNG fees, stale installm
         ])->save();
 
         $voidedCharge = FinanceCharge::create([
+            'finance_obligation_id' => makeOverviewObligation(
+                $student,
+                30_000_000,
+                FinanceCharge::TYPE_EGC_LEVEL_FEE,
+                FinanceCharge::STATUS_VOID,
+            )->id,
             'student_id' => $student->id,
             'semester_id' => $summer->id,
             'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
@@ -417,6 +465,272 @@ it('surfaces in-page review signals for surplus, voided DNG fees, stale installm
     } finally {
         CarbonImmutable::setTestNow();
     }
+});
+
+it('clears the paid DNG voided-fee signal only after cash is fully reallocated to a forfeit adjustment', function () {
+    $user = grantFinanceOverview(['view_finance_student_overview']);
+    $student = makeOverviewStudent($this->campus, $this->program, $this->semester);
+
+    $voided = makeOverviewCharge(
+        $student,
+        $this->semester,
+        15_000_000,
+        FinanceCharge::STATUS_VOID,
+        'void',
+    );
+    $adjustment = makeOverviewCharge(
+        $student,
+        $this->semester,
+        15_000_000,
+        chargeType: FinanceCharge::TYPE_ADJUSTMENT,
+    );
+
+    $payment = Payment::create([
+        'student_id' => $student->id,
+        'amount' => 15_000_000,
+        'method' => Payment::METHOD_GATEWAY,
+        'source' => 'dng',
+        'external_ref' => 'DNGPAY-FORFEIT',
+        'paid_at' => now()->subDay(),
+        'status' => Payment::STATUS_COMPLETED,
+        'received_by_user_id' => $user->id,
+    ]);
+    PaymentApplication::create([
+        'payment_id' => $payment->id,
+        'invoice_line_id' => $voided['line']->id,
+        'amount' => 15_000_000,
+        'entry_type' => 'application',
+        'applied_at' => now()->subDay(),
+        'created_by' => $user->id,
+    ]);
+    DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'CAMPUS001',
+        'student_code' => $student->student_id,
+        'fee_type' => 'HP',
+        'description' => 'Voided fee with approved FORFEIT disposition',
+        'semester_id' => $this->semester->id,
+        'due_date' => now()->addDays(7),
+        'item_id' => 'FORFEIT-001',
+        'amount' => 15_000_000,
+        'status' => DngPaymentRequest::STATUS_PAID_INVOICED,
+        'payment_id' => $payment->id,
+        'paid_at' => now()->subDay(),
+    ]);
+
+    actingAs($user)->get("/finance/students/{$student->id}")
+        ->assertInertia(fn ($page) => $page
+            ->where(
+                'review_signals',
+                fn ($signals): bool => collect($signals)
+                    ->contains('type', 'dng_paid_voided_fee'),
+            ));
+
+    PaymentApplication::create([
+        'payment_id' => $payment->id,
+        'invoice_line_id' => $voided['line']->id,
+        'amount' => -15_000_000,
+        'entry_type' => 'reversal',
+        'applied_at' => now(),
+        'created_by' => $user->id,
+        'source_ref_type' => 'finance_charge',
+        'source_ref_id' => $voided['charge']->id,
+    ]);
+    PaymentApplication::create([
+        'payment_id' => $payment->id,
+        'invoice_line_id' => $adjustment['line']->id,
+        'amount' => 15_000_000,
+        'entry_type' => 'application',
+        'applied_at' => now(),
+        'created_by' => $user->id,
+    ]);
+
+    actingAs($user)->get("/finance/students/{$student->id}")
+        ->assertInertia(fn ($page) => $page
+            ->where(
+                'review_signals',
+                fn ($signals): bool => collect($signals)
+                    ->doesntContain('type', 'dng_paid_voided_fee'),
+            ));
+});
+
+it('clears resolved DNG and surplus signals after an explicit forfeit disposition', function () {
+    $user = grantFinanceOverview(['view_finance_student_overview']);
+    $student = makeOverviewStudent($this->campus, $this->program, $this->semester);
+    $voided = makeOverviewCharge(
+        $student,
+        $this->semester,
+        15_000_000,
+        FinanceCharge::STATUS_VOID,
+        'void',
+    );
+    $payment = Payment::create([
+        'student_id' => $student->id,
+        'amount' => 15_000_000,
+        'method' => Payment::METHOD_GATEWAY,
+        'source' => 'dng',
+        'external_ref' => 'DNGPAY-DISPOSED',
+        'paid_at' => now()->subDay(),
+        'status' => Payment::STATUS_COMPLETED,
+        'received_by_user_id' => $user->id,
+    ]);
+    PaymentApplication::create([
+        'payment_id' => $payment->id,
+        'invoice_line_id' => $voided['line']->id,
+        'amount' => 15_000_000,
+        'entry_type' => 'application',
+        'applied_at' => now()->subDay(),
+        'created_by' => $user->id,
+    ]);
+    PaymentApplication::create([
+        'payment_id' => $payment->id,
+        'invoice_line_id' => $voided['line']->id,
+        'amount' => -15_000_000,
+        'entry_type' => 'reversal',
+        'applied_at' => now(),
+        'created_by' => $user->id,
+    ]);
+    DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'CAMPUS001',
+        'student_code' => $student->student_id,
+        'fee_type' => 'HP',
+        'description' => 'Voided fee with approved disposition',
+        'semester_id' => $this->semester->id,
+        'due_date' => now()->addDays(7),
+        'item_id' => 'DISPOSED-001',
+        'amount' => 15_000_000,
+        'status' => DngPaymentRequest::STATUS_PAID_INVOICED,
+        'payment_id' => $payment->id,
+        'paid_at' => now()->subDay(),
+    ]);
+    PaymentSurplusDisposition::create([
+        'payment_id' => $payment->id,
+        'idempotency_key' => (string) Str::uuid(),
+        'type' => PaymentSurplusDisposition::TYPE_RETAIN_FORFEIT,
+        'amount' => 15_000_000,
+        'policy_code' => 'DEFER_FORFEIT',
+        'reason' => 'Approved full forfeit',
+        'evidence' => [],
+        'audit_signature' => str_repeat('a', 64),
+        'approved_by' => $user->id,
+        'disposed_at' => now(),
+    ]);
+
+    actingAs($user)->get("/finance/students/{$student->id}")
+        ->assertInertia(fn ($page) => $page
+            ->where(
+                'review_signals',
+                fn ($signals): bool => collect($signals)
+                    ->whereIn('type', ['surplus', 'dng_paid_voided_fee'])
+                    ->isEmpty(),
+            ));
+});
+
+it('keeps the paid DNG voided-fee signal when the payment bridge evidence is missing', function () {
+    $user = grantFinanceOverview(['view_finance_student_overview']);
+    $student = makeOverviewStudent($this->campus, $this->program, $this->semester);
+    $voided = makeOverviewCharge(
+        $student,
+        $this->semester,
+        15_000_000,
+        FinanceCharge::STATUS_VOID,
+        'void',
+    );
+
+    DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'CAMPUS001',
+        'student_code' => $student->student_id,
+        'fee_type' => 'HP',
+        'description' => 'Paid DNG without canonical Payment bridge',
+        'semester_id' => $this->semester->id,
+        'finance_charge_id' => $voided['charge']->id,
+        'due_date' => now()->addDays(7),
+        'item_id' => 'UNBRIDGED-001',
+        'amount' => 15_000_000,
+        'status' => DngPaymentRequest::STATUS_PAID_INVOICED,
+        'paid_at' => now()->subDay(),
+    ]);
+
+    actingAs($user)->get("/finance/students/{$student->id}")
+        ->assertInertia(fn ($page) => $page
+            ->where(
+                'review_signals',
+                fn ($signals): bool => collect($signals)
+                    ->contains('type', 'dng_paid_voided_fee'),
+            ));
+});
+
+it('does not accept reversal evidence from a different voided charge', function () {
+    $user = grantFinanceOverview(['view_finance_student_overview']);
+    $student = makeOverviewStudent($this->campus, $this->program, $this->semester);
+    $dngTarget = makeOverviewCharge(
+        $student,
+        $this->semester,
+        15_000_000,
+        FinanceCharge::STATUS_VOID,
+        'void',
+    );
+    $unrelatedVoid = makeOverviewCharge(
+        $student,
+        $this->semester,
+        15_000_000,
+        FinanceCharge::STATUS_VOID,
+        'void',
+    );
+    $active = makeOverviewCharge($student, $this->semester, 15_000_000);
+    $payment = Payment::create([
+        'student_id' => $student->id,
+        'amount' => 15_000_000,
+        'method' => Payment::METHOD_GATEWAY,
+        'source' => 'dng',
+        'external_ref' => 'DNGPAY-WRONG-REVERSAL',
+        'paid_at' => now()->subDay(),
+        'status' => Payment::STATUS_COMPLETED,
+        'received_by_user_id' => $user->id,
+    ]);
+    foreach ([15_000_000, -15_000_000] as $amount) {
+        PaymentApplication::create([
+            'payment_id' => $payment->id,
+            'invoice_line_id' => $unrelatedVoid['line']->id,
+            'amount' => $amount,
+            'entry_type' => $amount > 0 ? 'application' : 'reversal',
+            'applied_at' => now(),
+            'created_by' => $user->id,
+        ]);
+    }
+    PaymentApplication::create([
+        'payment_id' => $payment->id,
+        'invoice_line_id' => $active['line']->id,
+        'amount' => 15_000_000,
+        'entry_type' => 'application',
+        'applied_at' => now(),
+        'created_by' => $user->id,
+    ]);
+    DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'CAMPUS001',
+        'student_code' => $student->student_id,
+        'fee_type' => 'HP',
+        'description' => 'DNG target lacks its own reversal evidence',
+        'semester_id' => $this->semester->id,
+        'finance_charge_id' => $dngTarget['charge']->id,
+        'due_date' => now()->addDays(7),
+        'item_id' => 'WRONG-REVERSAL-001',
+        'amount' => 15_000_000,
+        'status' => DngPaymentRequest::STATUS_PAID_INVOICED,
+        'payment_id' => $payment->id,
+        'paid_at' => now()->subDay(),
+    ]);
+
+    actingAs($user)->get("/finance/students/{$student->id}")
+        ->assertInertia(fn ($page) => $page
+            ->where(
+                'review_signals',
+                fn ($signals): bool => collect($signals)
+                    ->contains('type', 'dng_paid_voided_fee'),
+            ));
 });
 
 it('does not treat a single pending installment row as an installment plan', function () {

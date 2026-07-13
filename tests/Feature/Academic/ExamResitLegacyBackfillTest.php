@@ -22,7 +22,9 @@ use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Actions\Legacy\CreateLegacyExamResitChargeFromPaidPtlAction;
 use App\Modules\Finance\Actions\Legacy\ReconcileLegacyExamResitFeesAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -60,7 +62,7 @@ function resitUnit(array $overrides = []): Unit
     return Unit::factory()->create(array_merge(['code' => 'TEC002'], $overrides));
 }
 
-function failedGradeRecord(Unit $unit, array $overrides = []): AcademicRecord
+function legacyBackfillFailedGradeRecord(Unit $unit, array $overrides = []): AcademicRecord
 {
     $courseOffering = CourseOffering::factory()->create([
         'semester_id' => test()->semester->id,
@@ -90,11 +92,30 @@ function failedGradeRecord(Unit $unit, array $overrides = []): AcademicRecord
  */
 function legacyExamResitCharge(array $opts = []): FinanceCharge
 {
+    $amount = $opts['amount'] ?? 750_000;
+    $billingAccount = BillingAccount::query()
+        ->where('student_id', test()->student->id)
+        ->firstOrFail();
+    $obligation = FinanceObligation::query()->create([
+        'billing_account_id' => $billingAccount->id,
+        'source_system' => 'legacy',
+        'source_kind' => 'exam_resit_fee_import',
+        'source_ref' => 'legacy-exam-resit:'.uniqid('', true),
+        'obligation_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'legacy-exam-resit:test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+
     return app(CreateFinanceChargeAction::class)->handle([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => test()->student->id,
         'semester_id' => test()->semester->id,
         'charge_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
-        'amount' => $opts['amount'] ?? 750_000,
+        'amount' => $amount,
         'description' => $opts['description'] ?? 'Phí thi lại (legacy import)',
     ]);
 }
@@ -132,7 +153,7 @@ function paidPtlDngRequest(array $opts = []): DngPaymentRequest
 
 it('reconciles a paid legacy charge into a paid legacy-linked exam-resit attempt', function () {
     $unit = resitUnit();
-    $record = failedGradeRecord($unit);
+    $record = legacyBackfillFailedGradeRecord($unit);
     $charge = legacyExamResitCharge();
     payExamResitChargeFully($charge);
 
@@ -163,7 +184,7 @@ it('reconciles a paid legacy charge into a paid legacy-linked exam-resit attempt
 
 it('reconciles an unpaid legacy charge as charge_created (payment evidence derived)', function () {
     $unit = resitUnit();
-    failedGradeRecord($unit);
+    legacyBackfillFailedGradeRecord($unit);
     $charge = legacyExamResitCharge();
 
     $result = app(ReconcileLegacyExamResitFeesAction::class)->run();
@@ -194,7 +215,7 @@ it('reports an exception when the student has no eligible failed record', functi
 
 it('reports an exception when the only failed record is an attendance failure (resit-ineligible)', function () {
     $unit = resitUnit();
-    failedGradeRecord($unit, ['failure_reason' => AcademicRecord::FAILURE_ATTENDANCE_FAILED]);
+    legacyBackfillFailedGradeRecord($unit, ['failure_reason' => AcademicRecord::FAILURE_ATTENDANCE_FAILED]);
     $charge = legacyExamResitCharge();
 
     $result = app(ReconcileLegacyExamResitFeesAction::class)->run();
@@ -205,7 +226,7 @@ it('reports an exception when the only failed record is an attendance failure (r
 });
 
 it('reports an exception when failed records are not resit units (TEC001/TEC002)', function () {
-    failedGradeRecord(Unit::factory()->create(['code' => 'BUS101']));
+    legacyBackfillFailedGradeRecord(Unit::factory()->create(['code' => 'BUS101']));
     $charge = legacyExamResitCharge(['description' => 'Phí thi lại (no unit named)']);
 
     $result = app(ReconcileLegacyExamResitFeesAction::class)->run();
@@ -219,8 +240,8 @@ it('reports an exception when failed records are not resit units (TEC001/TEC002)
 
 it('disambiguates multiple eligible units by unit code in the charge description', function () {
     $target = Unit::factory()->create(['code' => 'TEC002']);
-    failedGradeRecord($target);
-    failedGradeRecord(Unit::factory()->create(['code' => 'TEC001']));
+    legacyBackfillFailedGradeRecord($target);
+    legacyBackfillFailedGradeRecord(Unit::factory()->create(['code' => 'TEC001']));
     $charge = legacyExamResitCharge(['description' => 'Phí thi lại: TEC002 - Technical Module 2']);
 
     $result = app(ReconcileLegacyExamResitFeesAction::class)->run();
@@ -245,7 +266,7 @@ it('does not touch charges already linked to an Academic exam-resit source', fun
 
 it('skips a voided legacy charge', function () {
     $unit = resitUnit();
-    failedGradeRecord($unit);
+    legacyBackfillFailedGradeRecord($unit);
     $charge = legacyExamResitCharge();
     $charge->void($this->user->id, 'cancelled');
 
@@ -257,7 +278,7 @@ it('skips a voided legacy charge', function () {
 
 it('writes nothing during a dry run', function () {
     $unit = resitUnit();
-    failedGradeRecord($unit);
+    legacyBackfillFailedGradeRecord($unit);
     $charge = legacyExamResitCharge();
 
     $result = app(ReconcileLegacyExamResitFeesAction::class)->run(dryRun: true);
@@ -271,7 +292,7 @@ it('writes nothing during a dry run', function () {
 
 it('is idempotent — a second run creates no further attempts', function () {
     $unit = resitUnit();
-    failedGradeRecord($unit);
+    legacyBackfillFailedGradeRecord($unit);
     legacyExamResitCharge();
 
     $first = app(ReconcileLegacyExamResitFeesAction::class)->run();
@@ -285,7 +306,7 @@ it('is idempotent — a second run creates no further attempts', function () {
 
 it('runs end-to-end through the artisan command', function () {
     $unit = resitUnit();
-    failedGradeRecord($unit);
+    legacyBackfillFailedGradeRecord($unit);
     $charge = legacyExamResitCharge();
 
     $this->artisan('academic:reconcile-legacy-exam-resit-fees')
@@ -296,7 +317,7 @@ it('runs end-to-end through the artisan command', function () {
 
 it('the artisan command --dry-run writes nothing', function () {
     $unit = resitUnit();
-    failedGradeRecord($unit);
+    legacyBackfillFailedGradeRecord($unit);
     legacyExamResitCharge();
 
     $this->artisan('academic:reconcile-legacy-exam-resit-fees', ['--dry-run' => true])
@@ -307,7 +328,7 @@ it('the artisan command --dry-run writes nothing', function () {
 
 it('reconciles a passed backfilled TEC002 record when the student already completed the resit', function () {
     $unit = resitUnit();
-    $record = failedGradeRecord($unit, [
+    $record = legacyBackfillFailedGradeRecord($unit, [
         'is_passed' => true,
         'completion_status' => 'completed',
     ]);
@@ -323,9 +344,9 @@ it('reconciles a passed backfilled TEC002 record when the student already comple
 });
 
 it('defaults to TEC002 when the student studied both resit units', function () {
-    failedGradeRecord(Unit::factory()->create(['code' => 'TEC001']));
+    legacyBackfillFailedGradeRecord(Unit::factory()->create(['code' => 'TEC001']));
     $tec002 = resitUnit();
-    $target = failedGradeRecord($tec002);
+    $target = legacyBackfillFailedGradeRecord($tec002);
     $charge = legacyExamResitCharge(['description' => 'Phí thi lại (no unit named)']);
 
     $result = app(ReconcileLegacyExamResitFeesAction::class)->run();
@@ -347,15 +368,20 @@ it('creates an exam_resit_fee charge from a paid PTL DNG request without a finan
 
     $dng->refresh();
     $charge = FinanceCharge::query()->findOrFail($dng->finance_charge_id);
+    $obligation = FinanceObligation::query()->findOrFail($charge->finance_obligation_id);
 
     expect($charge->charge_type)->toBe(FinanceCharge::TYPE_EXAM_RESIT_FEE)
         ->and($charge->description)->toBe('Exam Retake Fee: TEC002')
-        ->and((float) $charge->amount)->toBe(3_000_000.0);
+        ->and((float) $charge->amount)->toBe(3_000_000.0)
+        ->and($obligation->currency)->toBe('VND')
+        ->and($obligation->source_system)->toBe(CreateLegacyExamResitChargeFromPaidPtlAction::LEGACY_SOURCE_SYSTEM)
+        ->and($obligation->source_kind)->toBe(CreateLegacyExamResitChargeFromPaidPtlAction::LEGACY_SOURCE_KIND)
+        ->and($obligation->source_ref)->toBe("dng-payment-request:{$dng->id}");
 });
 
 it('reconciles a charge linked to paid PTL as paid even when FinanceCharge paid_amount is zero', function () {
     $unit = resitUnit();
-    failedGradeRecord($unit);
+    legacyBackfillFailedGradeRecord($unit);
     $dng = paidPtlDngRequest();
 
     app(CreateLegacyExamResitChargeFromPaidPtlAction::class)->run();
@@ -365,15 +391,19 @@ it('reconciles a charge linked to paid PTL as paid even when FinanceCharge paid_
     $result = app(ReconcileLegacyExamResitFeesAction::class)->run();
 
     $attempt = ExamResitAttempt::query()->where('finance_charge_id', $charge->id)->firstOrFail();
+    $obligation = FinanceObligation::query()->findOrFail($charge->finance_obligation_id);
 
     expect($result['reconciled'])->toBe(1)
         ->and($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_PAID)
-        ->and($attempt->paid_at)->not->toBeNull();
+        ->and($attempt->paid_at)->not->toBeNull()
+        ->and($obligation->source_system)->toBe('academic')
+        ->and($obligation->source_kind)->toBe('exam_resit_attempt')
+        ->and($obligation->source_ref)->toBe("exam-resit:{$attempt->id}");
 });
 
 it('creates charge and reconciles end-to-end through the artisan command for paid PTL without charge', function () {
     $unit = resitUnit();
-    failedGradeRecord($unit);
+    legacyBackfillFailedGradeRecord($unit);
     paidPtlDngRequest();
 
     $this->artisan('academic:reconcile-legacy-exam-resit-fees')
@@ -385,7 +415,12 @@ it('creates charge and reconciles end-to-end through the artisan command for pai
         ->where('status', FinanceCharge::STATUS_ACTIVE)
         ->sole();
 
-    expect(ExamResitAttempt::query()->where('finance_charge_id', $charge->id)->exists())->toBeTrue();
+    $attempt = ExamResitAttempt::query()->where('finance_charge_id', $charge->id)->sole();
+    $obligation = FinanceObligation::query()->findOrFail($charge->finance_obligation_id);
+
+    expect($obligation->source_system)->toBe('academic')
+        ->and($obligation->source_kind)->toBe('exam_resit_attempt')
+        ->and($obligation->source_ref)->toBe("exam-resit:{$attempt->id}");
 });
 
 it('backfills legacy exam-resit schedule with slot, session, invigilator, and scheduled attempt', function () {
@@ -456,7 +491,7 @@ it('completes legacy scheduled attempts from the current academic record score',
     ]);
 
     $unit = resitUnit();
-    $record = failedGradeRecord($unit, [
+    $record = legacyBackfillFailedGradeRecord($unit, [
         'final_percentage' => 72.5,
         'final_letter_grade' => 'B',
         'is_passed' => true,
@@ -499,7 +534,7 @@ it('excludes named student codes from legacy completion backfill', function () {
 
     $this->student->update(['student_id' => 'SKIPME001']);
     $unit = resitUnit();
-    failedGradeRecord($unit, ['final_percentage' => 55]);
+    legacyBackfillFailedGradeRecord($unit, ['final_percentage' => 55]);
     legacyApprovedAttempt($unit);
 
     app(BackfillLegacyExamResitScheduleAction::class)->run(

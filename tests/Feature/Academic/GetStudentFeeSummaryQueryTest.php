@@ -7,7 +7,9 @@ use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
@@ -55,7 +57,23 @@ it('builds fee summary from invoice discounts and payment applications only', fu
         'due_date' => now()->addDays(30)->toDateString(),
     ]);
 
+    $billingAccount = BillingAccount::query()->firstOrCreate(['student_id' => $student->id]);
+    $obligation = FinanceObligation::query()->create([
+        'billing_account_id' => $billingAccount->id,
+        'source_system' => 'test',
+        'source_kind' => 'academic_fee_summary',
+        'source_ref' => "student:{$student->id}:egc-level-1",
+        'obligation_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 15000000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'academic-fee-summary:test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+
     $charge = FinanceCharge::query()->create([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'billing_cycle_id' => null,

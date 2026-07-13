@@ -28,6 +28,7 @@ it('exposes the FIN-REV-012 balance-state vocabulary', function () {
         'overdue',
         'overpaid',
         'unapplied',
+        'invalid',
     ]);
 });
 

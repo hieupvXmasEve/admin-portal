@@ -28,9 +28,12 @@ use App\Modules\AI\Support\EntityCatalog;
 use App\Modules\AI\Support\StudentProfileSectionCatalog;
 use App\Modules\AI\Support\Tools\ToolDispatcher;
 use App\Modules\AI\Support\Tools\ToolRegistry;
+use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
@@ -223,14 +226,28 @@ beforeEach(function () {
         'updated_at' => now()->subDays(4),
     ]);
 
-    $charge = FinanceCharge::query()->create([
+    $billingAccount = BillingAccount::query()->firstOrCreate(['student_id' => $this->student->id]);
+    $obligation = FinanceObligation::query()->create([
+        'billing_account_id' => $billingAccount->id,
+        'source_system' => 'test',
+        'source_kind' => 'ai_student_profile',
+        'source_ref' => "student:{$this->student->id}:tuition-term",
+        'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 1200,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'ai-student-profile:test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+    $charge = app(CreateFinanceChargeAction::class)->handle([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $this->student->id,
         'semester_id' => $this->semester->id,
         'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
         'amount' => 1200,
         'description' => 'Tuition term charge',
         'effective_at' => now(),
-        'status' => FinanceCharge::STATUS_ACTIVE,
         'created_by_user_id' => $this->fullAccessUser->id,
     ]);
     FinanceChargeInstallment::factory()->paid()->create([
@@ -459,8 +476,8 @@ it('returns allowlisted student profile sections from an opaque entity reference
             'absent_count' => 1,
         ])
         ->and($payload['sections']['finance_summary']['balance'])->toMatchArray([
-            'status' => 'paid',
-            'balance' => 0.0,
+            'status' => 'outstanding',
+            'balance' => 1200.0,
         ])
         ->and($payload['sections']['finance_summary']['dng'])->toMatchArray([
             'has_active' => true,

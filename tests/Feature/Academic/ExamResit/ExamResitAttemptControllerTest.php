@@ -134,7 +134,7 @@ it('normalizes scalar filters from exam-resit list query params', function () {
             ->where('filters.per_page', 25));
 });
 
-it('cancels an attempt through the controller and flashes success', function () {
+it('queues finance cancellation through the controller and flashes success', function () {
     Queue::fake();
     $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
 
@@ -143,7 +143,7 @@ it('cancels an attempt through the controller and flashes success', function () 
         ->post(route('academic.exam-resit.cancel', $attempt->id), ['_token' => 'test-token', 'reason' => 'Sinh viên xin rút'])
         ->assertRedirect();
 
-    expect($attempt->fresh()->status)->toBe(ExamResitAttempt::STATUS_CANCELLED);
+    expect($attempt->fresh()->status)->toBe(ExamResitAttempt::STATUS_FINANCE_PENDING_CANCELLATION);
 });
 
 it('rejects paid cancellation without no-refund acknowledgement', function () {
@@ -185,7 +185,7 @@ it('rejects unpaid charge-created cancellation without fee confirmation', functi
         ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE);
 });
 
-it('cancels paid attempts through the controller when no-refund is acknowledged', function () {
+it('queues paid cancellation through the controller when no-refund is acknowledged', function () {
     Queue::fake();
     $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
     app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
@@ -205,11 +205,11 @@ it('cancels paid attempts through the controller when no-refund is acknowledged'
         ->assertRedirect();
 
     $attempt->refresh();
-    expect($attempt->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
+    expect($attempt->status)->toBe(ExamResitAttempt::STATUS_FINANCE_PENDING_CANCELLATION)
         ->and($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_PAID)
-        ->and($attempt->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_KEPT_PAID_NO_REFUND)
-        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID)
-        ->and($charge->fresh()->void_reason)->toBe('exam_resit_cancelled_paid_no_refund');
+        ->and($attempt->cancellation_fee_disposition)->toBeNull()
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE)
+        ->and($charge->fresh()->void_reason)->toBeNull();
 
     $payment = PaymentApplication::query()
         ->whereIn('invoice_line_id', $charge->invoiceLines()->pluck('id'))
@@ -220,10 +220,10 @@ it('cancels paid attempts through the controller when no-refund is acknowledged'
 
     expect(PaymentApplication::query()
         ->whereIn('invoice_line_id', $charge->invoiceLines()->pluck('id'))
-        ->sum('amount'))->toBe('0.00')
-        ->and($payment->unapplied_amount)->toBe(750000.0);
+        ->sum('amount'))->toBe('750000.00')
+        ->and($payment->unapplied_amount)->toBe(0.0);
 
-    expect(app(GetStudentBalanceQuery::class)->handle($this->student->id)['unapplied_credit'])->toBe(750000.0);
+    expect(app(GetStudentBalanceQuery::class)->handle($this->student->id)['unapplied_credit'])->toBe(0.0);
 });
 
 it('renders the create page with eligible students', function () {

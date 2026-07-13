@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Legacy;
 
-use App\Modules\Finance\Models\FinanceCharge;
-use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -23,6 +25,10 @@ class CreateLegacyExamResitChargeFromPaidPtlAction
 {
     private const PTL = 'PTL';
 
+    public const LEGACY_SOURCE_SYSTEM = 'legacy';
+
+    public const LEGACY_SOURCE_KIND = 'paid_ptl_dng';
+
     private const PAID_STATUSES = [
         DngPaymentRequest::STATUS_PAID_UNINVOICED,
         DngPaymentRequest::STATUS_PAID_INVOICED,
@@ -34,6 +40,7 @@ class CreateLegacyExamResitChargeFromPaidPtlAction
 
     public function __construct(
         private readonly CreateFinanceChargeAction $createChargeAction,
+        private readonly BillingAccountProvisioner $billingAccountProvisioner,
     ) {}
 
     /**
@@ -88,7 +95,29 @@ class CreateLegacyExamResitChargeFromPaidPtlAction
                     ];
                 }
 
+                $billingAccount = $this->billingAccountProvisioner->forStudent((int) $locked->student_id);
+                $obligation = FinanceObligation::query()->create([
+                    'billing_account_id' => $billingAccount->id,
+                    'source_system' => self::LEGACY_SOURCE_SYSTEM,
+                    'source_kind' => self::LEGACY_SOURCE_KIND,
+                    'source_ref' => "dng-payment-request:{$locked->id}",
+                    'obligation_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
+                    'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+                    'amount' => $locked->amount,
+                    'currency' => 'VND',
+                    'pricing_rule_version' => 'exam_resit_fee:legacy_paid_ptl',
+                    'pricing_snapshot' => [
+                        'legacy_backfill' => true,
+                        'source' => self::LEGACY_SOURCE_KIND,
+                        'dng_payment_request_id' => $locked->id,
+                        'dng_fee_type' => $locked->fee_type,
+                        'dng_status' => $locked->status,
+                    ],
+                    'accepted_at' => $locked->created_at ?? now(),
+                ]);
+
                 $charge = $this->createChargeAction->handle([
+                    'finance_obligation_id' => $obligation->id,
                     'student_id' => $locked->student_id,
                     'semester_id' => $locked->semester_id,
                     'charge_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,

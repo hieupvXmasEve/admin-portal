@@ -7,8 +7,10 @@ namespace App\Modules\Finance\Actions\Legacy;
 use App\Console\Commands\Academic\ReconcileLegacyExamResitFeesCommand;
 use App\Models\AcademicRecord;
 use App\Models\ExamResitAttempt;
-use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -315,6 +317,8 @@ class ReconcileLegacyExamResitFeesAction
                 'source_id' => $attempt->id,
             ]);
 
+            $this->repointObligationToAttempt($charge, $attempt);
+
             return [
                 'charge_id' => $charge->id,
                 'student_id' => $charge->student_id,
@@ -326,6 +330,21 @@ class ReconcileLegacyExamResitFeesAction
                 'paid_amount' => (float) $charge->paid_amount,
             ];
         });
+    }
+
+    private function repointObligationToAttempt(FinanceCharge $charge, ExamResitAttempt $attempt): void
+    {
+        if ($charge->finance_obligation_id === null) {
+            return;
+        }
+
+        FinanceObligation::query()
+            ->whereKey($charge->finance_obligation_id)
+            ->update([
+                'source_system' => AcademicFinanceObligationSource::SOURCE_SYSTEM,
+                'source_kind' => AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT,
+                'source_ref' => AcademicFinanceObligationSource::examResitAttemptRef($attempt),
+            ]);
     }
 
     /**
