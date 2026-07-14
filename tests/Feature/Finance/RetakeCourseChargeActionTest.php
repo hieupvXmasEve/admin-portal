@@ -9,11 +9,13 @@ use App\Models\CourseRetakeRegistration;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateRetakeCourseChargeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -81,11 +83,19 @@ it('materializes the retake obligation then reserves its exact canonical invoice
     $result = app(CreateRetakeCourseChargeAction::class)->handle(['registration_id' => $registration->id]);
     $request = DngPaymentRequest::query()->sole();
 
+    $chargeId = FinanceCharge::query()
+        ->where('finance_obligation_id', FinanceObligation::query()
+            ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+            ->where('source_kind', AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION)
+            ->where('source_ref', AcademicFinanceObligationSource::courseRetakeRegistrationRef($result))
+            ->where('obligation_type', AcademicFinanceObligationSource::RETAKE_FEE)
+            ->value('id'))
+        ->value('id');
+
     expect($result->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING)
-        ->and($result->finance_charge_id)->not->toBeNull()
         ->and($request->fee_type)->toBe('HL')
         ->and((float) $request->amount)->toBe(5_000_000.0)
-        ->and($request->reservationTargets->sole()->invoice_line_id)->toBe(InvoiceLine::query()->where('charge_id', $result->finance_charge_id)->sole()->id);
+        ->and($request->reservationTargets->sole()->invoice_line_id)->toBe(InvoiceLine::query()->where('charge_id', $chargeId)->sole()->id);
 });
 
 it('ignores an arbitrary retake amount and uses the catalog-derived canonical target', function (): void {

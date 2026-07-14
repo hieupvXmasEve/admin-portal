@@ -6,8 +6,7 @@ namespace App\Modules\Academic\Actions;
 
 use App\Models\ExamResitAttempt;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
-use App\Shared\Contracts\Finance\DTO\FinanceCancellationChargeState;
-use App\Shared\Contracts\Finance\FinanceCancellationChargeStateReader;
+use App\Modules\Academic\Support\AcademicObligationSettlement;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -82,9 +81,6 @@ class CancelExamResitAttemptAction
                 'payload' => [
                     'reason' => $data['reason'] ?? $attempt->cancellation_reason,
                     'acknowledge_no_refund' => (bool) ($data['acknowledge_no_refund'] ?? false),
-                    'legacy_finance_charge_id' => $attempt->finance_charge_id === null
-                        ? null
-                        : (int) $attempt->finance_charge_id,
                 ],
             ]);
 
@@ -108,28 +104,18 @@ class CancelExamResitAttemptAction
      */
     private function assertCancellationAcknowledgements(ExamResitAttempt $attempt, array $data): void
     {
-        $state = app(FinanceCancellationChargeStateReader::class)->forCharge(
-            $attempt->finance_charge_id === null ? null : (int) $attempt->finance_charge_id,
-        );
+        $settlement = app(AcademicObligationSettlement::class);
 
-        $this->assertAcknowledgementsAgainstState($state, $data);
-    }
+        $hasPaidEvidence = $settlement->hasExamResitPaidEvidence($attempt);
 
-    /**
-     * @param  array{
-     *   acknowledge_no_refund?: bool,
-     *   confirmation?: string|null,
-     * }  $data
-     */
-    private function assertAcknowledgementsAgainstState(FinanceCancellationChargeState $state, array $data): void
-    {
-        if ($state->requiresNoRefundAcknowledgement && ! (bool) ($data['acknowledge_no_refund'] ?? false)) {
+        if ($hasPaidEvidence && ! (bool) ($data['acknowledge_no_refund'] ?? false)) {
             throw new RuntimeException(
                 'Khoản phí đã thanh toán. Vui lòng xác nhận hủy nhưng giữ nguyên phí đã thu và không tạo hoàn phí.'
             );
         }
 
-        if ($state->requiresUnpaidVoidConfirmation
+        if (! $hasPaidEvidence
+            && $settlement->hasUnsettledExamResitObligation($attempt)
             && ($data['confirmation'] ?? null) !== self::CONFIRM_VOID_UNPAID_EXAM_RESIT_FEE) {
             throw new RuntimeException(
                 'Vui lòng xác nhận hủy khoản phí đang chờ thu trước khi hủy nguồn.'

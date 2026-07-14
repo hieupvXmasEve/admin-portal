@@ -12,6 +12,7 @@ use App\Modules\Finance\Actions\Operations\ResolveLifecycleDueExceptionAction;
 use App\Modules\Finance\Actions\Operations\SendDueItemParentRemindersAction;
 use App\Modules\Finance\Actions\Operations\SendDueItemRemindersAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Enums\LifecycleDueExceptionResolutionAction;
 use App\Modules\Finance\Enums\LifecycleDueExceptionReviewEventType;
 use App\Modules\Finance\Enums\LifecycleDueExceptionReviewStatus;
@@ -90,16 +91,20 @@ it('skips lifecycle exceptions in student and parent reminder actions', function
 
 it('acknowledges lifecycle exceptions without mutating DNG or charges', function () {
     $student = lifecycleExceptionStudent($this->campus, $this->program, $this->semester, 'ACK001');
-    $request = lifecycleExceptionDng($student, $this->semester, [
-        'finance_charge_id' => FinanceCharge::create([
-            'student_id' => $student->id,
-            'semester_id' => $this->semester->id,
-            'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
-            'amount' => 2000000,
-            'description' => 'Tuition',
-            'effective_at' => now(),
-            'status' => FinanceCharge::STATUS_ACTIVE,
-        ])->id,
+    $charge = FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $this->semester->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => 2000000,
+        'description' => 'Tuition',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    $request = lifecycleExceptionDng($student, $this->semester);
+    DngPaymentRequestCharge::create([
+        'dng_payment_request_id' => $request->id,
+        'finance_charge_id' => $charge->id,
+        'amount' => $charge->amount,
     ]);
 
     $result = app(AcknowledgeLifecycleDueExceptionAction::class)->run(
@@ -109,13 +114,11 @@ it('acknowledges lifecycle exceptions without mutating DNG or charges', function
     );
 
     $request->refresh();
-    $charge = FinanceCharge::find($request->finance_charge_id);
-
     expect($result['review']->status)->toBe(LifecycleDueExceptionReviewStatus::Acknowledged)
         ->and($result['review']->resolution_reason)->toBe('Reviewed defer policy')
         ->and($result['review']->resolved_by_user_id)->toBe($this->user->id)
         ->and($request->status)->toBe('pushed_to_dng')
-        ->and($charge?->status)->toBe(FinanceCharge::STATUS_ACTIVE);
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE);
 });
 
 it('refuses cancel_dng without create_finance_payments permission', function () {

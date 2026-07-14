@@ -117,7 +117,6 @@ final class LifecycleDueExceptionRowMapper
                 'status_label' => $student->status_label,
                 'status_color' => $student->status_color,
             ] : null,
-            'finance_charge_id' => $request->finance_charge_id,
             'linked_charges' => $linkedCharges,
             'payment_id' => $request->payment_id,
             'has_bridged_payment' => $request->hasBridgedPayment(),
@@ -151,16 +150,12 @@ final class LifecycleDueExceptionRowMapper
      */
     public static function resolveLinkedCharges(DngPaymentRequest $request): array
     {
-        $request->loadMissing(['chargeLinks.financeCharge', 'financeCharge']);
+        $request->loadMissing('chargeLinks.financeCharge');
 
         $charges = $request->chargeLinks
             ->map(fn ($link) => $link->financeCharge)
             ->filter()
             ->values();
-
-        if ($charges->isEmpty() && $request->financeCharge) {
-            $charges = collect([$request->financeCharge]);
-        }
 
         return $charges
             ->map(fn (FinanceCharge $charge) => [

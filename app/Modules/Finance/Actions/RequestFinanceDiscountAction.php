@@ -290,6 +290,16 @@ class RequestFinanceDiscountAction
                 'allocation_rule' => $allocationRule,
             ]);
 
+            // A newly approved discount can make an already-paid line
+            // temporarily overpaid. Release that exact surplus before reading
+            // the invoice snapshot again, which intentionally rejects an
+            // overpaid Settlement Position.
+            $this->settlementService->releaseLineOverpayment(
+                $line,
+                auth()->id(),
+                InvoiceDiscount::class,
+                $discount->id,
+            );
             $this->settlementService->recalculateInvoiceSnapshot($invoice);
 
             return $discount;

@@ -9,11 +9,14 @@ use App\Models\CourseRetakeRegistration;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CancelDngPaymentRequestAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Models\DngReceiptException;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\Payment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -40,7 +43,7 @@ function makeCancelTestStudent(): array
 }
 
 /**
- * Create a FinanceCharge linked to a source record.
+ * Create a FinanceCharge through the canonical source obligation.
  */
 function makeRetakeChargeLinked(array $context, string $regStatus = CourseRetakeRegistration::STATUS_PAYMENT_PENDING): array
 {
@@ -70,7 +73,21 @@ function makeRetakeChargeLinked(array $context, string $regStatus = CourseRetake
         'approved_at' => now(),
     ]);
 
+    $obligation = FinanceObligation::create([
+        'source_system' => AcademicFinanceObligationSource::SOURCE_SYSTEM,
+        'source_kind' => AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION,
+        'source_ref' => AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration),
+        'obligation_type' => AcademicFinanceObligationSource::RETAKE_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 5_000_000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => ['test' => true],
+        'accepted_at' => now(),
+    ]);
+
     $charge = FinanceCharge::create([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
@@ -78,11 +95,7 @@ function makeRetakeChargeLinked(array $context, string $regStatus = CourseRetake
         'description' => 'Retake fee',
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
-        'source_type' => CourseRetakeRegistration::class,
-        'source_id' => $registration->id,
     ]);
-
-    $registration->update(['finance_charge_id' => $charge->id]);
 
     return compact('registration', 'charge');
 }
@@ -94,7 +107,7 @@ function makeDngRequest(array $context, string $status, ?FinanceCharge $charge =
 {
     ['student' => $student] = $context;
 
-    return DngPaymentRequest::create([
+    $request = DngPaymentRequest::create([
         'student_id' => $student->id,
         'campus_code' => 'HCM',
         'student_code' => 'STU001',
@@ -102,7 +115,6 @@ function makeDngRequest(array $context, string $status, ?FinanceCharge $charge =
         'item_id' => 'ITEM-TEST-001',
         'amount' => 5000000,
         'status' => $status,
-        'finance_charge_id' => $charge?->id,
         'push_payload' => [
             'StudentName' => 'Test Student',
             'Email' => 'test@example.com',
@@ -111,6 +123,16 @@ function makeDngRequest(array $context, string $status, ?FinanceCharge $charge =
             'CCCD' => '000000000001',
         ],
     ]);
+
+    if ($charge !== null) {
+        DngPaymentRequestCharge::create([
+            'dng_payment_request_id' => $request->id,
+            'finance_charge_id' => $charge->id,
+            'amount' => $charge->amount,
+        ]);
+    }
+
+    return $request;
 }
 
 /**
@@ -159,7 +181,7 @@ it('cancels a pending request without voiding the directly linked charge or sour
     app(CancelDngPaymentRequestAction::class)->run($request);
 
     expect($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE)
-        ->and($charge->fresh()->source_id)->not->toBeNull();
+        ->and($request->fresh()->chargeLinks->sole()->finance_charge_id)->toBe($charge->id);
 });
 
 it('cancels a pushed_to_dng request — calls DNG API and transitions to cancel_pushed_to_dng', function () {

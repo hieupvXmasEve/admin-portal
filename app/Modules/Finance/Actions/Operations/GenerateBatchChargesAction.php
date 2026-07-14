@@ -332,7 +332,6 @@ class GenerateBatchChargesAction
                                     ];
 
                                     $voucherApp->update([
-                                        'finance_charge_id' => null,
                                         'invoice_id' => $invoice->id,
                                         'discount_amount' => $vAmount,
                                     ]);

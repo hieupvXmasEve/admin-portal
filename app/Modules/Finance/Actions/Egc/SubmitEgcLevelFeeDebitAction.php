@@ -28,6 +28,8 @@ class SubmitEgcLevelFeeDebitAction
 
     public const SOURCE_KIND_LEGACY_EGC = 'legacy_egc';
 
+    public const SOURCE_KIND_EGC_BLOCK = 'egc_block';
+
     public const GENERATION_MODE_FRESH = 'fresh';
 
     public const GENERATION_MODE_REISSUE = 'reissue';
@@ -51,6 +53,7 @@ class SubmitEgcLevelFeeDebitAction
      *     generation_mode?: string,
      *     relevel?: bool,
      *     carry_forward?: bool,
+     *     source_ref?: string,
      * }  $options
      */
     public function handle(
@@ -65,6 +68,7 @@ class SubmitEgcLevelFeeDebitAction
             self::SOURCE_KIND_BATCH_STUDIO,
             self::SOURCE_KIND_EGC_BATCH,
             self::SOURCE_KIND_LEGACY_EGC,
+            self::SOURCE_KIND_EGC_BLOCK,
         ], true)) {
             throw new RuntimeException("Unsupported egc_level_fee source_kind [{$sourceKind}].");
         }
@@ -98,7 +102,7 @@ class SubmitEgcLevelFeeDebitAction
         return $this->intake->request(new FinanceIntakeData(
             source_system: self::SOURCE_SYSTEM,
             source_kind: $sourceKind,
-            source_ref: $this->mintSourceRef($studentId, $semesterId, $levelNumber),
+            source_ref: $options['source_ref'] ?? $this->mintSourceRef($studentId, $semesterId, $levelNumber),
             financial_effect: FinancialEffect::Debit,
             obligation_type: FinanceCharge::TYPE_EGC_LEVEL_FEE,
             facts: $facts,

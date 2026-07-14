@@ -49,6 +49,7 @@ final class EgcBlockGenerationClassifier
 
     public function __construct(
         private readonly DeferChargeResolver $deferChargeResolver,
+        private readonly EgcBlockFinanceResolver $blockFinanceResolver,
     ) {}
 
     public function classify(Student $student, int $semesterId): EgcBlockGenerationState
@@ -73,10 +74,9 @@ final class EgcBlockGenerationClassifier
             return $this->blocked(self::ReasonInconsistentBlockShape, $blocks);
         }
 
-        $chargeIds = $blocks
-            ->pluck('finance_charge_id')
-            ->filter(fn (mixed $id): bool => is_numeric($id))
-            ->map(fn (mixed $id): int => (int) $id)
+        $chargesByBlock = $this->blockFinanceResolver->chargesFor($blocks);
+        $chargeIds = $chargesByBlock
+            ->pluck('id')
             ->values()
             ->all();
 
@@ -90,7 +90,7 @@ final class EgcBlockGenerationClassifier
         }
 
         $collectibleBlocks = $blocks
-            ->filter(fn (EgcBlock $block): bool => $this->isCollectible($block))
+            ->filter(fn (EgcBlock $block): bool => $this->isCollectible($chargesByBlock->get($block->id)))
             ->values();
 
         if ($collectibleBlocks->count() === $blocks->count()) {
@@ -104,12 +104,12 @@ final class EgcBlockGenerationClassifier
         }
 
         $reissueBlocks = $blocks
-            ->reject(fn (EgcBlock $block): bool => $this->isCollectible($block))
+            ->reject(fn (EgcBlock $block): bool => $this->isCollectible($chargesByBlock->get($block->id)))
             ->values();
 
         return new EgcBlockGenerationState(
             status: EgcBlockGenerationState::ReissueCandidate,
-            reason: $this->reissueReason($reissueBlocks),
+            reason: $this->reissueReason($reissueBlocks, $chargesByBlock),
             blocks: $blocks,
             reissueBlocks: $reissueBlocks,
             collectibleBlockCount: $collectibleBlocks->count(),
@@ -124,10 +124,6 @@ final class EgcBlockGenerationClassifier
         return EgcBlock::query()
             ->where('student_id', $studentId)
             ->where('semester_id', $semesterId)
-            ->with([
-                'financeCharge.invoiceLines.invoice',
-                'financeCharge.invoiceLines.paymentApplications',
-            ])
             ->orderBy('block_number')
             ->get();
     }
@@ -148,18 +144,19 @@ final class EgcBlockGenerationClassifier
             || $blockNumbers->all() !== $expectedBlockNumbers;
     }
 
-    private function isCollectible(EgcBlock $block): bool
+    private function isCollectible(?FinanceCharge $charge): bool
     {
-        $charge = $block->financeCharge;
-
         if (! $charge || $charge->status !== FinanceCharge::STATUS_ACTIVE) {
             return false;
         }
 
-        return $charge->invoiceLines->contains(
-            fn (InvoiceLine $line): bool => ($line->status ?? 'active') === 'active'
-                && ! in_array($line->invoice?->status, ['cancelled', 'void'], true)
-        );
+        return $charge->invoiceLines()
+            ->with(['invoice', 'paymentApplications'])
+            ->get()
+            ->contains(
+                fn (InvoiceLine $line): bool => ($line->status ?? 'active') === 'active'
+                    && ! in_array($line->invoice?->status, ['cancelled', 'void'], true)
+            );
     }
 
     /**
@@ -178,10 +175,9 @@ final class EgcBlockGenerationClassifier
             ->whereNotNull('dng_payment_request_id');
 
         return DngPaymentRequest::query()
-            ->where(function (Builder $query) use ($chargeIds, $pivotRequestIds, $installmentRequestIds): void {
+            ->where(function (Builder $query) use ($pivotRequestIds, $installmentRequestIds): void {
                 $query
-                    ->whereIn('finance_charge_id', $chargeIds)
-                    ->orWhereIn('id', $pivotRequestIds)
+                    ->whereIn('id', $pivotRequestIds)
                     ->orWhereIn('id', $installmentRequestIds);
             });
     }
@@ -219,13 +215,13 @@ final class EgcBlockGenerationClassifier
     /**
      * @param  Collection<int, EgcBlock>  $blocks
      */
-    private function reissueReason(Collection $blocks): string
+    private function reissueReason(Collection $blocks, Collection $chargesByBlock): string
     {
-        if ($blocks->contains(fn (EgcBlock $block): bool => $block->finance_charge_id === null || $block->financeCharge === null)) {
+        if ($blocks->contains(fn (EgcBlock $block): bool => $chargesByBlock->get($block->id) === null)) {
             return self::ReasonMissingCharge;
         }
 
-        if ($blocks->contains(fn (EgcBlock $block): bool => $block->financeCharge?->status === FinanceCharge::STATUS_VOID)) {
+        if ($blocks->contains(fn (EgcBlock $block): bool => $chargesByBlock->get($block->id)?->status === FinanceCharge::STATUS_VOID)) {
             return self::ReasonVoidedCharge;
         }
 

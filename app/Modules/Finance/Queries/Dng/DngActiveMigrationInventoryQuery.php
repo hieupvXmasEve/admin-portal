@@ -11,6 +11,7 @@ use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\DngReceiptException;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Support\SettlementPosition\Money;
 use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
@@ -156,9 +157,6 @@ final class DngActiveMigrationInventoryQuery
             $classifications[] = 'student_lifecycle_conflict';
         }
         $targets = $this->exactTargets($request, $isPaidRequest);
-        if ($this->hasConflictingLegacyChargeLinks($request)) {
-            $classifications[] = 'unknown_link';
-        }
         if ($targets === []) {
             $classifications[] = 'unknown_link';
         } elseif ($isPaidRequest) {
@@ -251,15 +249,15 @@ final class DngActiveMigrationInventoryQuery
             ])->all();
         }
 
-        $chargeIds = collect([$request->finance_charge_id])
-            ->merge($request->chargeLinks()->pluck('finance_charge_id'))
+        $chargeIds = $request->chargeLinks()
+            ->pluck('finance_charge_id')
             ->merge(FinanceChargeInstallment::query()->where('dng_payment_request_id', $request->id)->pluck('finance_charge_id'))
             ->filter()
             ->map(static fn (int|string $id): int => (int) $id)
             ->unique()
             ->values();
         if ($chargeIds->isEmpty()) {
-            return [];
+            return $includeHistoricalLines ? $this->paidPaymentTargets($request) : [];
         }
 
         $installmentByCharge = FinanceChargeInstallment::query()
@@ -297,18 +295,49 @@ final class DngActiveMigrationInventoryQuery
         return $result;
     }
 
-    private function hasConflictingLegacyChargeLinks(DngPaymentRequest $request): bool
+    /**
+     * A paid request with no DNG target/pivot still has exact historical Finance
+     * evidence when it is bridged to a Payment. Payment applications are ledger
+     * rows, including reversals on void lines; they are not an amount-based guess.
+     *
+     * @return list<array{invoice_line_id: int, finance_charge_id: int, finance_charge_installment_id: null, target_identity: string, identity: string, collectible: string}>
+     */
+    private function paidPaymentTargets(DngPaymentRequest $request): array
     {
-        if ($request->reservationTargets->isNotEmpty() || $request->finance_charge_id === null) {
-            return false;
+        if ($request->payment_id === null) {
+            return [];
         }
 
-        $pivotChargeIds = $request->chargeLinks
-            ->pluck('finance_charge_id')
-            ->map(static fn (int|string $id): int => (int) $id);
+        $lineIds = PaymentApplication::query()
+            ->where('payment_id', $request->payment_id)
+            ->pluck('invoice_line_id')
+            ->map(static fn (int|string $lineId): int => (int) $lineId)
+            ->filter(static fn (int $lineId): bool => $lineId > 0)
+            ->unique()
+            ->values();
+        if ($lineIds->isEmpty()) {
+            return [];
+        }
 
-        return $pivotChargeIds->isNotEmpty()
-            && ! $pivotChargeIds->contains((int) $request->finance_charge_id);
+        $chargeIdByLine = InvoiceLine::query()
+            ->whereIn('id', $lineIds)
+            ->pluck('charge_id', 'id');
+        if ($chargeIdByLine->count() !== $lineIds->count()) {
+            return [];
+        }
+
+        return $lineIds
+            ->map(static function (int $lineId) use ($chargeIdByLine, $request): array {
+                return [
+                    'invoice_line_id' => $lineId,
+                    'finance_charge_id' => (int) $chargeIdByLine->get($lineId),
+                    'finance_charge_installment_id' => null,
+                    'target_identity' => 'payment:'.$request->payment_id.':invoice_line:'.$lineId,
+                    'identity' => 'payment:'.$request->payment_id.':invoice_line:'.$lineId,
+                    'collectible' => '0.00',
+                ];
+            })
+            ->all();
     }
 
     /** @param list<array{id: int, status: string, classifications: list<string>, action: string, billing_account_id: ?int, target_line_ids: list<int>}> $records */

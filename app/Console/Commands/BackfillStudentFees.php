@@ -233,7 +233,6 @@ class BackfillStudentFees extends Command
 
                                     $voucherApp->update([
                                         'invoice_id' => $invoice->id,
-                                        'finance_charge_id' => $vCharge->id,
                                         'discount_amount' => $vAmount, // Save calculated amount
                                         'applied_at' => now(),
                                         'status' => 'applied',

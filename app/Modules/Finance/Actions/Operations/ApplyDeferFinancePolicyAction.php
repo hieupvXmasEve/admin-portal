@@ -223,11 +223,6 @@ class ApplyDeferFinancePolicyAction
             ->whereHas('dngPaymentRequest', fn ($query) => $query->whereIn('status', self::LIVE_DNG_STATUSES))
             ->pluck('dng_payment_request_id');
 
-        $requestIds = $requestIds->merge(DngPaymentRequest::query()
-            ->whereIn('status', self::LIVE_DNG_STATUSES)
-            ->whereIn('finance_charge_id', $chargeIds)
-            ->pluck('id'));
-
         $requestIds = $requestIds->merge(DngPaymentRequestCharge::query()
             ->whereIn('finance_charge_id', $chargeIds)
             ->whereHas('dngPaymentRequest', fn ($requests) => $requests->whereIn('status', self::LIVE_DNG_STATUSES))

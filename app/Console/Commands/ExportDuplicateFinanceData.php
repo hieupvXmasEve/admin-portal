@@ -217,37 +217,10 @@ class ExportDuplicateFinanceData extends Command
             ])->all();
     }
 
-    /**
-     * DNG requests linked to this invoice's charges through BOTH link styles:
-     *  - direct: dng_payment_requests.finance_charge_id (single-charge requests)
-     *  - pivot:  dng_payment_request_charges.finance_charge_id (aggregate/multi-
-     *            charge requests, whose dpr.finance_charge_id may be NULL)
-     *
-     * Missing the pivot path would falsely report DNG: 0 for aggregate requests
-     * and mislead a merge/consolidate decision.
-     *
-     * @return array<int, array<string, mixed>>
-     */
+    /** @return array<int, array<string, mixed>> */
     private function invoiceDngRequests(int $invoiceId): array
     {
         $byId = [];
-
-        $direct = DB::table('dng_payment_requests as dpr')
-            ->join('invoice_lines as il', 'il.charge_id', '=', 'dpr.finance_charge_id')
-            ->where('il.invoice_id', $invoiceId)
-            ->distinct()
-            ->get(['dpr.id', 'dpr.status', 'dpr.amount', 'dpr.fee_type']);
-
-        foreach ($direct as $r) {
-            $byId[$r->id] = [
-                'dng_request_id' => $r->id,
-                'status' => $r->status,
-                'amount' => (float) $r->amount,
-                'fee_type' => $r->fee_type,
-                'link_source' => 'direct',
-                'pivot_amount' => null,
-            ];
-        }
 
         $pivot = DB::table('dng_payment_request_charges as pc')
             ->join('invoice_lines as il', 'il.charge_id', '=', 'pc.finance_charge_id')
@@ -257,7 +230,6 @@ class ExportDuplicateFinanceData extends Command
 
         foreach ($pivot as $r) {
             if (isset($byId[$r->id])) {
-                $byId[$r->id]['link_source'] = $byId[$r->id]['link_source'] === 'pivot' ? 'pivot' : 'direct+pivot';
                 $byId[$r->id]['pivot_amount'] = (float) ($byId[$r->id]['pivot_amount'] ?? 0) + (float) $r->pivot_amount;
 
                 continue;

@@ -120,8 +120,6 @@ class ListDngLifecycleQuery
             ->with([
                 'student:id,student_id,full_name,status,campus_id',
                 'semester:id,name',
-                'financeCharge:id,semester_id',
-                'financeCharge.semester:id,name',
                 'chargeLinks:id,dng_payment_request_id,finance_charge_id',
                 'chargeLinks.financeCharge:id,semester_id',
                 'chargeLinks.financeCharge.semester:id,name',
@@ -238,7 +236,7 @@ class ListDngLifecycleQuery
     /**
      * The related-semester filter is computed over the full lineage in PHP, but
      * we can safely pre-narrow at the DB layer to requests that touch the chosen
-     * semester through any of their three lineage sources. The PHP pass then
+     * semester through any of their two lineage sources. The PHP pass then
      * applies the exact membership test.
      *
      * @param  Builder<DngPaymentRequest>  $query
@@ -248,7 +246,6 @@ class ListDngLifecycleQuery
     {
         return $query->where(function (Builder $inner) use ($semesterId): void {
             $inner->where('semester_id', $semesterId)
-                ->orWhereHas('financeCharge', fn (Builder $charge) => $charge->where('semester_id', $semesterId))
                 ->orWhereHas('chargeLinks.financeCharge', fn (Builder $charge) => $charge->where('semester_id', $semesterId));
         });
     }
@@ -410,7 +407,6 @@ class ListDngLifecycleQuery
         };
 
         $add($request->semester);
-        $add($request->financeCharge?->semester);
 
         foreach ($request->chargeLinks as $link) {
             $add($link->financeCharge?->semester);
@@ -522,8 +518,8 @@ class ListDngLifecycleQuery
     }
 
     /**
-     * Distinct semesters reachable through the campus's DNG requests, across all
-     * three lineage sources, ordered newest-first.
+     * Distinct semesters reachable through the campus's DNG requests, across
+     * request and allocation lineage sources, ordered newest-first.
      *
      * @return list<array{value: int, label: string}>
      */
@@ -533,9 +529,6 @@ class ListDngLifecycleQuery
             ->whereHas('student', fn (Builder $studentQuery) => $studentQuery->where('campus_id', $campusId));
 
         $direct = (clone $base)->whereNotNull('semester_id')->distinct()->pluck('semester_id');
-        $charge = (clone $base)->with('financeCharge:id,semester_id')->get(['id', 'finance_charge_id'])
-            ->map(fn (DngPaymentRequest $request) => $request->financeCharge?->semester_id)
-            ->filter();
         $linked = DngPaymentRequestCharge::query()
             ->whereHas('dngPaymentRequest.student', fn (Builder $studentQuery) => $studentQuery->where('campus_id', $campusId))
             ->with('financeCharge:id,semester_id')
@@ -543,7 +536,7 @@ class ListDngLifecycleQuery
             ->map(fn ($link) => $link->financeCharge?->semester_id)
             ->filter();
 
-        $ids = collect($direct)->merge($charge)->merge($linked)->map(fn ($id) => (int) $id)->unique()->values();
+        $ids = collect($direct)->merge($linked)->map(fn ($id) => (int) $id)->unique()->values();
 
         return Semester::query()
             ->whereIn('id', $ids)

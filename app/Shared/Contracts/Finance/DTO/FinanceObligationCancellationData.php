@@ -18,7 +18,6 @@ final readonly class FinanceObligationCancellationData
         public ?string $expected_unpaid_confirmation = null,
         public bool $require_paid_no_refund_acknowledgement = false,
         public bool $acknowledge_no_refund = false,
-        public ?int $legacy_finance_charge_id = null,
         public ?int $user_id = null,
     ) {}
 }

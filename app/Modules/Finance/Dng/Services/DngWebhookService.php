@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Dng\Services;
 
-use App\Models\CourseRetakeRegistration;
 use App\Modules\Academic\Actions\AutoEnrollRetakeCourseAction;
 use App\Modules\Finance\Actions\CaptureDngProviderReceiptAction;
 use App\Modules\Finance\Actions\RegisterDngReceiptExceptionAction;
@@ -344,8 +343,9 @@ class DngWebhookService
      */
     private function resumeFinanceCancellationForRequest(DngPaymentRequest $request): void
     {
-        $chargeIds = collect([(int) ($request->finance_charge_id ?? 0)])
-            ->merge($request->chargeLinks()->pluck('finance_charge_id')->map(fn ($id): int => (int) $id))
+        $chargeIds = $request->chargeLinks()
+            ->pluck('finance_charge_id')
+            ->map(fn ($id): int => (int) $id)
             ->filter(fn (int $id): bool => $id > 0)
             ->unique()
             ->values();
@@ -404,14 +404,7 @@ class DngWebhookService
         }
     }
 
-    /**
-     * Handle auto-enrollment for retake course registrations after payment confirmation.
-     *
-     * Resolution order:
-     * 1. chargeLinks pivot (aggregate request covering N charges — one per unit)
-     * 2. finance_charge_id (single-charge precise link — legacy single-unit requests)
-     * 3. Legacy fallback: latest active retake_fee charge (old requests before finance_charge_id column)
-     */
+    /** Handle auto-enrollment for retake course registrations after payment confirmation. */
     private function handleRetakeCourseAutoEnroll(DngPaymentRequest $request): void
     {
         try {
@@ -420,24 +413,9 @@ class DngWebhookService
                 return;
             }
 
-            // Priority 1: pivot chargeLinks — aggregate request covers multiple charges
             $chargeLinks = $request->chargeLinks()->get();
-            if ($chargeLinks->isNotEmpty()) {
-                foreach ($chargeLinks as $link) {
-                    $charge = FinanceCharge::find($link->finance_charge_id);
-                    if ($charge) {
-                        $registrationId = $this->resolveRetakeRegistrationId($charge);
-                        if ($registrationId !== null) {
-                            AutoEnrollRetakeCourseAction::handlePaymentConfirmed($registrationId);
-                        }
-                    }
-                }
-            } else {
-                // Priority 2: single precise charge link (single-unit DNG request)
-                $charge = $request->finance_charge_id
-                    ? FinanceCharge::find($request->finance_charge_id)
-                    : null;
-
+            foreach ($chargeLinks as $link) {
+                $charge = FinanceCharge::find($link->finance_charge_id);
                 if ($charge) {
                     $registrationId = $this->resolveRetakeRegistrationId($charge);
                     if ($registrationId !== null) {
@@ -452,7 +430,6 @@ class DngWebhookService
         } catch (\Throwable $e) {
             Log::warning('DNG webhook: retake course auto-enroll failed', [
                 'dng_payment_request_id' => $request->id,
-                'finance_charge_id' => $request->finance_charge_id,
                 'error' => $e->getMessage(),
             ]);
         }
@@ -476,7 +453,6 @@ class DngWebhookService
         } catch (\Throwable $e) {
             Log::warning('DNG webhook: exam resit payment sync failed', [
                 'dng_payment_request_id' => $request->id,
-                'finance_charge_id' => $request->finance_charge_id,
                 'error' => $e->getMessage(),
             ]);
         }
@@ -548,10 +524,6 @@ class DngWebhookService
 
     private function resolveRetakeRegistrationId(FinanceCharge $charge): ?int
     {
-        if ($charge->source_type === CourseRetakeRegistration::class && $charge->source_id) {
-            return (int) $charge->source_id;
-        }
-
         if ($charge->finance_obligation_id) {
             $obligation = FinanceObligation::query()->find($charge->finance_obligation_id);
             if ($obligation && $obligation->source_kind === 'course_retake_registration') {
@@ -562,10 +534,6 @@ class DngWebhookService
             }
         }
 
-        $registrationId = CourseRetakeRegistration::query()
-            ->where('finance_charge_id', $charge->id)
-            ->value('id');
-
-        return $registrationId !== null ? (int) $registrationId : null;
+        return null;
     }
 }

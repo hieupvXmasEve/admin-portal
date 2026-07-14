@@ -208,17 +208,7 @@ class ProcessFinanceCancellationOperationAction
             return $operation;
         }
 
-        $chargeId = $payload['finance_charge_id']
-            ?? $operation->source_payload['legacy_finance_charge_id']
-            ?? null;
-        if ($chargeId === null) {
-            $chargeId = $this->findCharge($operation)?->id;
-        }
-        if ($chargeId === null) {
-            return $operation;
-        }
-
-        $charge = FinanceCharge::query()->find((int) $chargeId);
+        $charge = $this->findCharge($operation);
         if (! $charge instanceof FinanceCharge) {
             return $operation;
         }
@@ -226,7 +216,9 @@ class ProcessFinanceCancellationOperationAction
         $paidRequests = $this->bridgePaidDngRequestsForChargeAction
             ->paidRequestsForCharge((int) $charge->id);
 
-        if ($paidRequests->isEmpty() && ! $charge->is_fully_paid) {
+        if ($paidRequests->isEmpty() && (
+            $charge->status !== FinanceCharge::STATUS_ACTIVE || ! $charge->is_fully_paid
+        )) {
             return $operation;
         }
 
@@ -405,17 +397,13 @@ class ProcessFinanceCancellationOperationAction
             DngPaymentRequest::STATUS_UNKNOWN_OUTCOME,
             DngPaymentRequest::STATUS_NEEDS_REVIEW,
         ];
-        $direct = DngPaymentRequest::query()
-            ->whereIn('status', $blockingStatuses)
-            ->where('finance_charge_id', $chargeId)
-            ->pluck('id');
         $pivot = DngPaymentRequestCharge::query()
             ->where('finance_charge_id', $chargeId)
             ->whereHas('dngPaymentRequest', fn ($query) => $query->whereIn('status', $blockingStatuses))
             ->pluck('dng_payment_request_id');
 
         return DngPaymentRequest::query()
-            ->whereIn('id', $direct->merge($pivot)->unique())
+            ->whereIn('id', $pivot)
             ->orderBy('id')
             ->get();
     }
@@ -432,14 +420,7 @@ class ProcessFinanceCancellationOperationAction
 
     private function findCharge(FinanceCancellationOperation $operation): ?FinanceCharge
     {
-        $charge = $this->findObligation($operation)?->financeCharge()->first();
-        if ($charge instanceof FinanceCharge) {
-            return $charge;
-        }
-
-        $legacyChargeId = $operation->source_payload['legacy_finance_charge_id'] ?? null;
-
-        return $legacyChargeId === null ? null : FinanceCharge::query()->find((int) $legacyChargeId);
+        return $this->findObligation($operation)?->financeCharge()->first();
     }
 
     private function createReplacementForRemainingTargets(

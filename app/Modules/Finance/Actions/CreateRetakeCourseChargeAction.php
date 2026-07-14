@@ -8,6 +8,7 @@ use App\Models\CourseRetakeRegistration;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
@@ -98,7 +99,7 @@ class CreateRetakeCourseChargeAction
                     ]);
                 }
 
-                $registration->transitionToPaymentPending((int) $chargeId, $userId);
+                $registration->transitionToPaymentPending($userId);
                 $registration->refresh();
             }
 
@@ -110,7 +111,23 @@ class CreateRetakeCourseChargeAction
                 ->lockForUpdate()
                 ->get();
 
-            $chargeIds = $pendingRegistrations->pluck('finance_charge_id')->filter()->map(fn ($id): int => (int) $id)->all();
+            $obligationIds = FinanceObligation::query()
+                ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+                ->where('source_kind', AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION)
+                ->where('obligation_type', AcademicFinanceObligationSource::RETAKE_FEE)
+                ->whereIn(
+                    'source_ref',
+                    $pendingRegistrations
+                        ->map(fn (CourseRetakeRegistration $item): string => AcademicFinanceObligationSource::courseRetakeRegistrationRef($item))
+                        ->all(),
+                )
+                ->pluck('id');
+            $chargeIds = FinanceCharge::query()
+                ->whereIn('finance_obligation_id', $obligationIds)
+                ->where('status', FinanceCharge::STATUS_ACTIVE)
+                ->pluck('id')
+                ->map(fn (int|string $id): int => (int) $id)
+                ->all();
             $lineIds = InvoiceLine::query()
                 ->whereIn('charge_id', $chargeIds)
                 ->where('status', 'active')

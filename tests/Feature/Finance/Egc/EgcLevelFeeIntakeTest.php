@@ -15,13 +15,21 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\FinancePricingCatalogItem;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\Exceptions\InvalidFinanceIntakePayload;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 
 uses(RefreshDatabase::class);
+
+/** @return Collection<int, FinanceCharge> keyed by EGC block id */
+function egcIntakeCharges(Collection $blocks): Collection
+{
+    return app(EgcBlockFinanceResolver::class)->chargesFor($blocks);
+}
 
 /**
  * @return array{student: Student, semester: Semester}
@@ -72,23 +80,17 @@ it('creates accepted obligations and materialized debit rows through Batch Studi
 
     expect($obligations)->toHaveCount(2);
 
-    $submit = app(SubmitEgcLevelFeeDebitAction::class);
-
     foreach ($obligations as $index => $obligation) {
         $level = 1 + $index;
         $charge = FinanceCharge::query()
             ->where('finance_obligation_id', $obligation->id)
             ->firstOrFail();
         $line = InvoiceLine::query()->where('charge_id', $charge->id)->firstOrFail();
-        $block = EgcBlock::query()
-            ->where('finance_charge_id', $charge->id)
-            ->firstOrFail();
+        $block = EgcBlock::query()->findOrFail((int) substr($obligation->source_ref, strlen('egc-block:')));
 
         expect($obligation->source_system)->toBe(SubmitEgcLevelFeeDebitAction::SOURCE_SYSTEM)
-            ->and($obligation->source_kind)->toBe(SubmitEgcLevelFeeDebitAction::SOURCE_KIND_BATCH_STUDIO)
-            ->and($obligation->source_ref)->toBe(
-                $submit->mintSourceRef($ctx['student']->id, $ctx['semester']->id, $level)
-            )
+            ->and($obligation->source_kind)->toBe(SubmitEgcLevelFeeDebitAction::SOURCE_KIND_EGC_BLOCK)
+            ->and($obligation->source_ref)->toBe(app(EgcBlockFinanceResolver::class)->sourceRef($block))
             ->and($obligation->lifecycle_status)->toBe(FinanceObligation::STATUS_ACCEPTED)
             ->and((float) $obligation->amount)->toBe(15_000_000.0)
             ->and($obligation->pricing_snapshot['pricing_source'])->toBe('egc_level_fee_resolver')
@@ -131,36 +133,6 @@ it('is idempotent for the same egc_level_fee source quad via intake', function (
         ->and(FinanceCharge::query()->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)->count())->toBe(1)
         ->and(InvoiceLine::query()->where('charge_id', $first->finance_charge_id)->count())->toBe(1);
 
-    // Generator skip path when blocks already exist with active charges
-    EgcBlock::factory()->state([
-        'student_id' => $ctx['student']->id,
-        'semester_id' => $ctx['semester']->id,
-        'block_number' => 1,
-        'level_number' => 1,
-        'result' => EgcBlock::RESULT_PENDING,
-        'finance_charge_id' => $first->finance_charge_id,
-    ])->create();
-    EgcBlock::factory()->state([
-        'student_id' => $ctx['student']->id,
-        'semester_id' => $ctx['semester']->id,
-        'block_number' => 2,
-        'level_number' => 2,
-        'result' => EgcBlock::RESULT_PENDING,
-        'finance_charge_id' => $first->finance_charge_id,
-    ])->create();
-
-    $results = GenerateEgcChargesAction::run([
-        'semester_id' => $ctx['semester']->id,
-        'students' => [[
-            'student_id' => $ctx['student']->id,
-            'block_count' => 2,
-            'current_level' => 1,
-        ]],
-    ]);
-
-    expect($results['created'])->toBe(0)
-        ->and($results['skipped'])->toBeGreaterThan(0)
-        ->and(FinanceCharge::query()->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)->count())->toBe(1);
 });
 
 it('reissues voided EGC block charges through intake without inventing new block numbers', function (): void {
@@ -182,7 +154,7 @@ it('reissues voided EGC block charges through intake without inventing new block
         ->where('semester_id', $ctx['semester']->id)
         ->orderBy('block_number')
         ->get();
-    $originalChargeIds = $originalBlocks->pluck('finance_charge_id')->all();
+    $originalChargeIds = egcIntakeCharges($originalBlocks)->pluck('id')->values()->all();
     $originalObligationIds = FinanceCharge::query()
         ->whereIn('id', $originalChargeIds)
         ->pluck('finance_obligation_id')
@@ -215,10 +187,10 @@ it('reissues voided EGC block charges through intake without inventing new block
         ->and($blocks)->toHaveCount(2)
         ->and($blocks->pluck('id')->all())->toBe($originalBlocks->pluck('id')->all())
         ->and($blocks->pluck('block_number')->all())->toBe([1, 2])
-        ->and($blocks->pluck('finance_charge_id')->intersect($originalChargeIds)->all())->toBe([]);
+        ->and(egcIntakeCharges($blocks)->pluck('id')->intersect($originalChargeIds)->all())->toBe([]);
 
     $newCharges = FinanceCharge::query()
-        ->whereIn('id', $blocks->pluck('finance_charge_id'))
+        ->whereIn('id', egcIntakeCharges($blocks)->pluck('id'))
         ->where('status', FinanceCharge::STATUS_ACTIVE)
         ->get();
 
@@ -264,8 +236,9 @@ it('does not silently recreate debt outside intake after carry-forward voids unu
 
     // Carry-forward adjacency: unused level is explicitly voided (staff action),
     // not silently reused. Debt may return only via intake rematerialization.
-    $unusedChargeId = (int) $blocks[1]->finance_charge_id;
-    $blocks[1]->update(['finance_charge_id' => null]);
+    $unusedCharge = app(EgcBlockFinanceResolver::class)->chargeFor($blocks[1]);
+    $unusedChargeId = (int) $unusedCharge->id;
+    $existingObligation = FinanceObligation::query()->findOrFail($unusedCharge->finance_obligation_id);
 
     app(VoidFinanceChargeAction::class)->handle(
         $unusedChargeId,
@@ -283,7 +256,8 @@ it('does not silently recreate debt outside intake after carry-forward voids unu
     $submit = app(SubmitEgcLevelFeeDebitAction::class);
     $levelNumber = (int) $blocks[1]->level_number;
     $result = $submit->handle($ctx['student']->id, $ctx['semester']->id, $levelNumber, [
-        'source_kind' => SubmitEgcLevelFeeDebitAction::SOURCE_KIND_BATCH_STUDIO,
+        'source_kind' => $existingObligation->source_kind,
+        'source_ref' => $existingObligation->source_ref,
         'due_date' => '2025-11-01',
         'generation_mode' => SubmitEgcLevelFeeDebitAction::GENERATION_MODE_REISSUE,
         'block_number' => (int) $blocks[1]->block_number,
@@ -300,9 +274,7 @@ it('does not silently recreate debt outside intake after carry-forward voids unu
         ->and($rematerialized->finance_obligation_id)->not->toBeNull()
         ->and(FinanceObligation::query()->where('obligation_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)->count())
         ->toBe($beforeObligations)
-        ->and($obligation->source_ref)->toBe(
-            $submit->mintSourceRef($ctx['student']->id, $ctx['semester']->id, $levelNumber)
-        )
+        ->and($obligation->source_ref)->toBe($existingObligation->source_ref)
         // No second obligation; voided projection replaced via intake only.
         ->and(FinanceCharge::query()
             ->where('finance_obligation_id', $obligation->id)
@@ -426,15 +398,10 @@ it('preserves retake fact on the pricing snapshot for retake-eligible levels', f
     $block = EgcBlock::query()
         ->where('student_id', $ctx['student']->id)
         ->where('semester_id', $ctx['semester']->id)
-        ->whereNotNull('finance_charge_id')
         ->firstOrFail();
 
     $obligation = FinanceObligation::query()
-        ->where('source_ref', app(SubmitEgcLevelFeeDebitAction::class)->mintSourceRef(
-            $ctx['student']->id,
-            $ctx['semester']->id,
-            (int) $block->level_number,
-        ))
+        ->where('source_ref', app(EgcBlockFinanceResolver::class)->sourceRef($block))
         ->firstOrFail();
 
     expect($block->is_retake)->toBeTrue()

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ExamResitAttempt extends AuditableModel
@@ -93,7 +92,6 @@ class ExamResitAttempt extends AuditableModel
         'completed_at',
         'hq_fee_status',
         'fee_amount',
-        'finance_charge_id',
         'charge_created_at',
         'charge_created_by_user_id',
         'paid_at',
@@ -204,19 +202,11 @@ class ExamResitAttempt extends AuditableModel
     }
 
     /**
-     * @deprecated Deprecated for target path (ADR-0026): new intakes leave this null; correlate via obligation source triple.
-     */
-    public function financeCharge(): BelongsTo
-    {
-        return $this->belongsTo(FinanceCharge::class);
-    }
-
-    /**
      * HQ links a Finance charge to this attempt. This is an HQ/Finance fee-status
      * transition only; the Academic lifecycle status (approved/scheduled/...) is
      * untouched because payment is a parallel HQ state, not an Academic step.
      */
-    public function transitionToChargeCreated(int $financeChargeId, int $userId): void
+    public function transitionToChargeCreated(int $userId): void
     {
         if ($this->hq_fee_status !== self::HQ_FEE_PENDING) {
             throw new \RuntimeException("Cannot create charge from hq_fee_status: {$this->hq_fee_status}");
@@ -224,7 +214,6 @@ class ExamResitAttempt extends AuditableModel
 
         $this->update([
             'hq_fee_status' => self::HQ_FEE_CHARGE_CREATED,
-            'finance_charge_id' => $financeChargeId,
             'charge_created_by_user_id' => $userId,
             'charge_created_at' => now(),
         ]);
@@ -238,7 +227,6 @@ class ExamResitAttempt extends AuditableModel
 
         $this->update([
             'hq_fee_status' => self::HQ_FEE_CHARGE_CREATED,
-            'finance_charge_id' => null,
             'charge_created_by_user_id' => $userId,
             'charge_created_at' => now(),
         ]);

@@ -97,11 +97,6 @@ class BridgePaidDngRequestsForChargeAction
      */
     private function linkedPaidRequestIds(int $chargeId): Collection
     {
-        $directIds = DngPaymentRequest::query()
-            ->where('finance_charge_id', $chargeId)
-            ->whereIn('status', self::PAID_DNG_STATUSES)
-            ->pluck('id');
-
         $pivotIds = DngPaymentRequestCharge::query()
             ->where('finance_charge_id', $chargeId)
             ->whereHas(
@@ -110,8 +105,7 @@ class BridgePaidDngRequestsForChargeAction
             )
             ->pluck('dng_payment_request_id');
 
-        return $directIds
-            ->merge($pivotIds)
+        return $pivotIds
             ->map(fn ($id): int => (int) $id)
             ->unique()
             ->values();

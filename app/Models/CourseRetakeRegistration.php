@@ -87,7 +87,6 @@ class CourseRetakeRegistration extends AuditableModel
         'last_reminded_at',
         'approved_by_user_id',
         'approved_at',
-        'finance_charge_id',
         'charge_created_by_user_id',
         'charge_created_at',
         'paid_at',
@@ -158,14 +157,6 @@ class CourseRetakeRegistration extends AuditableModel
         return $this->belongsTo(CourseRegistration::class);
     }
 
-    /**
-     * @deprecated Deprecated for target path (ADR-0026): new intakes leave this null; correlate via obligation source triple.
-     */
-    public function financeCharge(): BelongsTo
-    {
-        return $this->belongsTo(FinanceCharge::class);
-    }
-
     public function financeCharges(): MorphMany
     {
         return $this->morphMany(FinanceCharge::class, 'source');
@@ -190,7 +181,7 @@ class CourseRetakeRegistration extends AuditableModel
     // State Transitions
     // =====================
 
-    public function transitionToPaymentPending(int $financeChargeId, int $userId): void
+    public function transitionToPaymentPending(int $userId): void
     {
         if ($this->status !== self::STATUS_APPROVED) {
             throw new \RuntimeException(
@@ -201,7 +192,6 @@ class CourseRetakeRegistration extends AuditableModel
         $this->update([
             'status' => self::STATUS_PAYMENT_PENDING,
             'hq_fee_status' => self::HQ_FEE_CHARGE_CREATED,
-            'finance_charge_id' => $financeChargeId,
             'charge_created_by_user_id' => $userId,
             'charge_created_at' => now(),
         ]);
@@ -218,7 +208,6 @@ class CourseRetakeRegistration extends AuditableModel
         $this->update([
             'status' => self::STATUS_PAYMENT_PENDING,
             'hq_fee_status' => self::HQ_FEE_CHARGE_CREATED,
-            'finance_charge_id' => null,
             'charge_created_by_user_id' => $userId,
             'charge_created_at' => now(),
         ]);

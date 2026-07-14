@@ -102,8 +102,6 @@ function createPaidPendingRetakeContext(bool $withExistingCourseRegistration = f
         'description' => 'Retake fee',
         'created_by_user_id' => $user->id,
     ]);
-    $registration->update(['finance_charge_id' => $charge->id]);
-
     $payment = Payment::create([
         'student_id' => $student->id,
         'amount' => 5000000,

@@ -1,8 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
-use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,7 +20,6 @@ class VoucherApplication extends Model
         'applied_by_user_id',
         'base_amount',
         'discount_amount',
-        'finance_charge_id',
         'note',
     ];
 
@@ -67,13 +67,5 @@ class VoucherApplication extends Model
     public function appliedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'applied_by_user_id');
-    }
-
-    /**
-     * Get the finance charge associated with this application
-     */
-    public function financeCharge(): BelongsTo
-    {
-        return $this->belongsTo(FinanceCharge::class);
     }
 }

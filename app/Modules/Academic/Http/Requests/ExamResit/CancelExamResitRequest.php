@@ -51,7 +51,9 @@ class CancelExamResitRequest extends FormRequest
                 && ! $isPaid
                 && $settlement->hasUnsettledExamResitObligation($attempt);
 
-            if ($hasUnpaidCharge && $this->input('confirmation') !== ExamResitAttempt::CONFIRM_VOID_UNPAID_EXAM_RESIT_FEE) {
+            if (! $isPaid
+                && $hasUnpaidCharge
+                && $this->input('confirmation') !== ExamResitAttempt::CONFIRM_VOID_UNPAID_EXAM_RESIT_FEE) {
                 $validator->errors()->add(
                     'confirmation',
                     'Vui lòng xác nhận hủy khoản phí/DNG đang chờ thu trước khi hủy thi lại.'

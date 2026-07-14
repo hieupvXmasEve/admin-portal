@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,7 +21,6 @@ class EgcBlock extends Model
         'result',
         'attendance_rate',
         'is_retake',
-        'finance_charge_id',
         'retake_discount_id',
         'synced_at',
     ];
@@ -52,11 +50,6 @@ class EgcBlock extends Model
     public function semester(): BelongsTo
     {
         return $this->belongsTo(Semester::class);
-    }
-
-    public function financeCharge(): BelongsTo
-    {
-        return $this->belongsTo(FinanceCharge::class, 'finance_charge_id');
     }
 
     public function retakeDiscount(): BelongsTo

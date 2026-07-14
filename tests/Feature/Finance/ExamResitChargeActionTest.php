@@ -77,7 +77,6 @@ it('creates one exam_resit_fee charge linked to the attempt and transitions it t
         ->and($charge->source_type)->toBeNull()
         ->and($charge->finance_obligation_id)->not->toBeNull()
         ->and($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_CHARGE_CREATED)
-        ->and($attempt->finance_charge_id)->toBe($charge->id)
         ->and($attempt->charge_created_by_user_id)->toBe($this->user->id)
         ->and($attempt->charge_created_at)->not->toBeNull()
         ->and($attempt->status)->toBe(ExamResitAttempt::STATUS_APPROVED);
@@ -101,7 +100,7 @@ it('reuses an existing intake charge instead of creating a duplicate', function 
     $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
 
     app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
-    $firstChargeId = $attempt->fresh()->finance_charge_id;
+    $firstChargeId = activeExamResitChargeForAttempt($attempt)->id;
 
     // Force HQ status back so the action can run again (idempotent intake).
     ExamResitAttempt::query()->whereKey($attempt->id)->update([
@@ -117,7 +116,7 @@ it('reuses an existing intake charge instead of creating a duplicate', function 
         ->where('student_id', $this->student->id)
         ->where('status', FinanceCharge::STATUS_ACTIVE)
         ->count())->toBe(1)
-        ->and($attempt->finance_charge_id)->toBe($firstChargeId)
+        ->and(activeExamResitChargeForAttempt($attempt)->id)->toBe($firstChargeId)
         ->and($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_CHARGE_CREATED);
 });
 

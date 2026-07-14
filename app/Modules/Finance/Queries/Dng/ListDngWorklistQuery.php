@@ -488,7 +488,6 @@ class ListDngWorklistQuery
         $registrations = CourseRetakeRegistration::query()
             ->whereIn('student_id', $studentIds)
             ->where('status', CourseRetakeRegistration::STATUS_APPROVED)
-            ->whereNull('finance_charge_id')
             ->when($semesterId !== null, fn ($query) => $query->where('semester_id', $semesterId))
             ->with(['unit:id,code,name', 'semester:id,name'])
             ->get(['id', 'student_id', 'unit_id', 'semester_id', 'retake_fee', 'status'])
@@ -509,7 +508,6 @@ class ListDngWorklistQuery
         $registrations = CourseRetakeRegistration::query()
             ->with(['student:id,student_id,full_name,campus_id', 'student.campus:id,name', 'campus:id,name'])
             ->where('status', CourseRetakeRegistration::STATUS_APPROVED)
-            ->whereNull('finance_charge_id')
             ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
             ->when($semesterId !== null, fn ($query) => $query->where('semester_id', $semesterId))
             ->when($search !== '', function ($query) use ($search): void {
@@ -573,7 +571,6 @@ class ListDngWorklistQuery
             ->whereIn('student_id', $studentIds)
             ->where('status', ExamResitAttempt::STATUS_APPROVED)
             ->where('hq_fee_status', ExamResitAttempt::HQ_FEE_PENDING)
-            ->whereNull('finance_charge_id')
             ->when($semesterId !== null, fn ($query) => $query->where('charge_semester_id', $semesterId))
             ->with(['unit:id,code,name', 'chargeSemester:id,name'])
             ->get(['id', 'student_id', 'unit_id', 'charge_semester_id', 'fee_amount', 'status', 'hq_fee_status'])
@@ -595,7 +592,6 @@ class ListDngWorklistQuery
             ->with(['student:id,student_id,full_name,campus_id', 'student.campus:id,name', 'campus:id,name'])
             ->where('status', ExamResitAttempt::STATUS_APPROVED)
             ->where('hq_fee_status', ExamResitAttempt::HQ_FEE_PENDING)
-            ->whereNull('finance_charge_id')
             ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
             ->when($semesterId !== null, fn ($query) => $query->where('charge_semester_id', $semesterId))
             ->when($search !== '', function ($query) use ($search): void {

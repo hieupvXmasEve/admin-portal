@@ -9,6 +9,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -57,7 +58,7 @@ function makeReviewedCancelStudent(object $context): Student
 
 function makePendingDng(Student $student, ?int $chargeId = null): DngPaymentRequest
 {
-    return DngPaymentRequest::create([
+    $request = DngPaymentRequest::create([
         'student_id' => $student->id,
         'campus_code' => 'C1',
         'student_code' => $student->student_id,
@@ -66,8 +67,17 @@ function makePendingDng(Student $student, ?int $chargeId = null): DngPaymentRequ
         'status' => DngPaymentRequest::STATUS_PENDING,
         'item_id' => 'ITEM-'.$student->id,
         'due_date' => now()->addDays(10),
-        'finance_charge_id' => $chargeId,
     ]);
+
+    if ($chargeId !== null) {
+        DngPaymentRequestCharge::create([
+            'dng_payment_request_id' => $request->id,
+            'finance_charge_id' => $chargeId,
+            'amount' => $request->amount,
+        ]);
+    }
+
+    return $request;
 }
 
 it('returns cancel impact with blocking reasons', function () {

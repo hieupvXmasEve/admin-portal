@@ -14,10 +14,12 @@ use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceCreditEntitlement;
 use App\Modules\Finance\Models\FinanceDiscountEntitlement;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Egc\ListEgcRetakeAdjustmentsQuery;
+use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 
@@ -60,11 +62,25 @@ function makeChargeWithInvoice(Student $student, Semester $semester, int $level 
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'finance',
+        'source_kind' => 'test_egc_charge',
+        'source_ref' => 'test-egc-charge:'.$charge->id,
+        'obligation_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $charge->amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+    $charge->update(['finance_obligation_id' => $obligation->id]);
 
     $invoice = StudentInvoice::create([
         'invoice_number' => 'TEST-'.rand(1000, 9999),
         'student_id' => $student->id,
         'semester_id' => $semester->id,
+        'currency' => 'VND',
         'status' => 'draft',
         'due_date' => now()->addDays(30),
     ]);
@@ -81,7 +97,19 @@ function makeChargeWithInvoice(Student $student, Semester $semester, int $level 
 
 function attachChargeToBlock(EgcBlock $block, FinanceCharge $charge): EgcBlock
 {
-    $block->update(['finance_charge_id' => $charge->id]);
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'finance',
+        'source_kind' => 'egc_block',
+        'source_ref' => app(EgcBlockFinanceResolver::class)->sourceRef($block),
+        'obligation_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $charge->amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test:egc_block',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+    $charge->update(['finance_obligation_id' => $obligation->id]);
 
     return $block->fresh();
 }
@@ -108,7 +136,10 @@ it('applies retake discount to current-semester charge', function () {
     expect($discount->discount_type)->toBe('egc_retake');
     expect($discount->finance_discount_entitlement_id)->not->toBeNull();
     expect($block->fresh()->retake_discount_id)->toBe($discount->id);
-    expect(EgcRetakeDiscountLink::where('target_finance_charge_id', $targetCharge->id)->exists())->toBeTrue();
+    expect(EgcRetakeDiscountLink::where(
+        'target_invoice_line_id',
+        InvoiceLine::query()->where('charge_id', $targetCharge->id)->value('id'),
+    )->exists())->toBeTrue();
     expect(FinanceDiscountEntitlement::query()->whereKey($discount->finance_discount_entitlement_id)->exists())->toBeTrue();
     expect(DiscountAllocation::query()->where('invoice_discount_id', $discount->id)->count())->toBe(1);
     expect(CreditApplication::query()->count())->toBe(0);
@@ -301,7 +332,7 @@ it('prevents double discount on same target charge', function () {
     EgcRetakeDiscountLink::create([
         'invoice_discount_id' => $existingDiscount->id,
         'source_egc_block_id' => $block1->id,
-        'target_finance_charge_id' => $targetCharge->id,
+        'target_invoice_line_id' => $invoiceLine->id,
     ]);
 
     expect(fn () => ApplyEgcRetakeDiscountAction::run($block1->id, $targetCharge->id))
@@ -357,6 +388,7 @@ it('applies major entry credit to transitioned student', function () {
         'invoice_number' => 'TEST-'.rand(1000, 9999),
         'student_id' => $student->id,
         'semester_id' => $semester->id,
+        'currency' => 'VND',
         'status' => 'draft',
         'due_date' => now()->addDays(30),
     ]);
@@ -371,6 +403,19 @@ it('applies major entry credit to transitioned student', function () {
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'finance',
+        'source_kind' => 'test_major_entry_debit',
+        'source_ref' => 'test-major-entry-debit:'.$debit->id,
+        'obligation_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $debit->amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+    $debit->update(['finance_obligation_id' => $obligation->id]);
     InvoiceLine::create([
         'invoice_id' => $invoice->id,
         'charge_id' => $debit->id,
@@ -413,6 +458,7 @@ it('prevents double-apply of major entry credit', function () {
         'invoice_number' => 'TEST-'.rand(1000, 9999),
         'student_id' => $student->id,
         'semester_id' => $semester->id,
+        'currency' => 'VND',
         'status' => 'draft',
         'due_date' => now()->addDays(30),
     ]);
@@ -426,6 +472,19 @@ it('prevents double-apply of major entry credit', function () {
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'finance',
+        'source_kind' => 'test_major_entry_debit',
+        'source_ref' => 'test-major-entry-debit:'.$debit->id,
+        'obligation_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $debit->amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+    $debit->update(['finance_obligation_id' => $obligation->id]);
     InvoiceLine::create([
         'invoice_id' => $invoice->id,
         'charge_id' => $debit->id,

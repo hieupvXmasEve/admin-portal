@@ -11,6 +11,7 @@ use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Modules\Finance\Support\EgcRetakeTargetResolver;
 use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
@@ -133,12 +134,12 @@ class ApplyEgcRetakeDiscountAction
                 throw new RuntimeException('EGC retake discount is not linked to a FinanceDiscountEntitlement.');
             }
 
-            // Create audit link (DB-level guard against double discount on same charge)
+            // Finance-owned invoice line is the exact audit target and guards double discount.
             try {
                 EgcRetakeDiscountLink::create([
                     'invoice_discount_id' => $discount->id,
                     'source_egc_block_id' => $block->id,
-                    'target_finance_charge_id' => $targetCharge->id,
+                    'target_invoice_line_id' => $invoiceLine->id,
                 ]);
             } catch (UniqueConstraintViolationException) {
                 throw ValidationException::withMessages([
@@ -170,8 +171,11 @@ class ApplyEgcRetakeDiscountAction
 
     private static function isValidTargetCharge(EgcBlock $sourceBlock, FinanceCharge $targetCharge): bool
     {
-        return EgcRetakeTargetResolver::targetBlocksFor($sourceBlock)
-            ->contains(fn (EgcBlock $targetBlock): bool => (int) $targetBlock->finance_charge_id === (int) $targetCharge->id
+        $targetBlocks = EgcRetakeTargetResolver::targetBlocksFor($sourceBlock);
+        $chargesByBlock = app(EgcBlockFinanceResolver::class)->chargesFor($targetBlocks);
+
+        return $targetBlocks
+            ->contains(fn (EgcBlock $targetBlock): bool => (int) $chargesByBlock->get($targetBlock->id)?->id === (int) $targetCharge->id
                 && (int) $targetBlock->level_number === (int) $sourceBlock->level_number
                 && (bool) $targetBlock->is_retake);
     }

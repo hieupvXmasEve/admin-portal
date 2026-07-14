@@ -255,9 +255,9 @@ class BackfillLegacyVoucherDiscountEntitlementsAction
                 $linkQuery->whereNull('finance_discount_entitlement_id');
             });
 
-        $voucherApp = VoucherApplication::query()
-            ->where('finance_charge_id', $charge->id)
-            ->first();
+        $voucherApp = $charge->source_type === VoucherApplication::class
+            ? VoucherApplication::query()->find($charge->source_id)
+            : null;
 
         if ($voucherApp instanceof VoucherApplication) {
             $byReference = (clone $query)

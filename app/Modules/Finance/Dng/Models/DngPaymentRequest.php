@@ -7,7 +7,6 @@ namespace App\Modules\Finance\Dng\Models;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Models\BillingAccount;
-use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\Payment;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -90,7 +89,6 @@ class DngPaymentRequest extends Model
         'last_callback_payload',
         'error_message',
         'last_reminder_at',
-        'finance_charge_id',
         'cancel_push_payload',
         'cancel_push_response',
     ];
@@ -134,14 +132,6 @@ class DngPaymentRequest extends Model
     public function semester(): BelongsTo
     {
         return $this->belongsTo(Semester::class);
-    }
-
-    /**
-     * The FinanceCharge this DNG request covers (nullable for non-charge requests).
-     */
-    public function financeCharge(): BelongsTo
-    {
-        return $this->belongsTo(FinanceCharge::class);
     }
 
     public function webhookEvents(): HasMany

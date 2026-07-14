@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Services;
 
+use App\Modules\Finance\Models\CreditApplication;
 use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceDiscount;
@@ -313,10 +314,11 @@ class SettlementService
         ?int $userId = null,
         ?string $sourceRefType = null,
         ?int $sourceRefId = null,
+        bool $recalculateInvoice = true,
     ): PaymentApplication {
         $billingAccountId = $this->billingAccountProvisioner->forStudent((int) $payment->student_id)->id;
 
-        return $this->settlementMutationGuard->handle($billingAccountId, function () use ($payment, $line, $amount, $entryType, $userId, $sourceRefType, $sourceRefId): PaymentApplication {
+        return $this->settlementMutationGuard->handle($billingAccountId, function () use ($payment, $line, $amount, $entryType, $userId, $sourceRefType, $sourceRefId, $recalculateInvoice): PaymentApplication {
             $signedAmount = $entryType === 'reversal'
                 ? -abs($amount)
                 : abs($amount);
@@ -332,7 +334,9 @@ class SettlementService
                 'created_by' => $userId,
             ]);
 
-            $this->recalculateInvoiceSnapshot($line->invoice()->firstOrFail());
+            if ($recalculateInvoice) {
+                $this->recalculateInvoiceSnapshot($line->invoice()->firstOrFail());
+            }
 
             return $application;
         });
@@ -368,11 +372,16 @@ class SettlementService
                 $userId,
                 $sourceRefType,
                 $sourceRefId,
+                recalculateInvoice: false,
             );
 
             $releasedAmount += $amount;
             $releasedCount++;
             $paymentIds[] = (int) $payment->id;
+        }
+
+        if ($releasedCount > 0) {
+            $this->recalculateInvoiceSnapshot($line->invoice()->firstOrFail());
         }
 
         return [
@@ -544,7 +553,27 @@ class SettlementService
 
     public function releaseLineOverpayment(InvoiceLine $line, ?int $userId = null, ?string $sourceRefType = null, ?int $sourceRefId = null): array
     {
-        $excess = $this->getLinePaidAmount($line) - $this->getLineNetDue($line);
+        // This method is called immediately after a payable line is reduced.
+        // At that point its current Settlement Position is intentionally
+        // negative, so the normal validated reader correctly refuses it. Use
+        // the exact raw settlement graph to calculate only the excess that
+        // must be released; the subsequent reversal restores a valid position.
+        $cash = (float) PaymentApplication::query()
+            ->join('payments', 'payments.id', '=', 'payment_applications.payment_id')
+            ->where('payment_applications.invoice_line_id', $line->id)
+            ->where('payments.status', Payment::STATUS_COMPLETED)
+            ->sum('payment_applications.amount');
+        $discount = (float) DiscountAllocation::query()
+            ->join('invoice_discounts', 'invoice_discounts.id', '=', 'discount_allocations.invoice_discount_id')
+            ->where('discount_allocations.invoice_line_id', $line->id)
+            ->where('invoice_discounts.status', '!=', 'reversed')
+            ->sum('discount_allocations.amount');
+        $credit = (float) CreditApplication::query()
+            ->join('finance_credit_entitlements', 'finance_credit_entitlements.id', '=', 'credit_applications.finance_credit_entitlement_id')
+            ->where('credit_applications.invoice_line_id', $line->id)
+            ->where('finance_credit_entitlements.lifecycle_status', 'approved')
+            ->sum('credit_applications.amount');
+        $excess = $cash - max(0.0, (float) $line->amount_snapshot - $discount - $credit);
 
         if ($excess <= 0) {
             return [
@@ -587,12 +616,17 @@ class SettlementService
                 $userId,
                 $sourceRefType,
                 $sourceRefId,
+                recalculateInvoice: false,
             );
 
             $excess -= $releaseAmount;
             $releasedAmount += $releaseAmount;
             $releasedCount++;
             $paymentIds[] = (int) $payment->id;
+        }
+
+        if ($releasedCount > 0) {
+            $this->recalculateInvoiceSnapshot($line->invoice()->firstOrFail());
         }
 
         return [

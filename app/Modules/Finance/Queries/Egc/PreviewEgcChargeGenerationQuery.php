@@ -7,6 +7,7 @@ namespace App\Modules\Finance\Queries\Egc;
 use App\Models\EgcBlock;
 use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Modules\Finance\Support\EgcBlockGenerationClassifier;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -218,10 +219,12 @@ class PreviewEgcChargeGenerationQuery
             ->where('status', FinanceCharge::STATUS_ACTIVE)
             ->count();
 
-        $deferredBlocks = EgcBlock::where('student_id', $student->id)
+        $semesterBlocks = EgcBlock::where('student_id', $student->id)
             ->where('semester_id', $semesterId)
-            ->whereNull('finance_charge_id')
             ->get();
+        $chargesByBlock = app(EgcBlockFinanceResolver::class)->chargesFor($semesterBlocks);
+        $deferredBlocks = $semesterBlocks
+            ->filter(fn (EgcBlock $block): bool => $chargesByBlock->get($block->id) === null);
 
         $deferredCount = $deferredBlocks->count();
         $levelsRemaining = max(0, $totalLevels - $effectiveStartLevel);
@@ -330,7 +333,7 @@ class PreviewEgcChargeGenerationQuery
 
     /**
      * @param  Collection<int, EgcBlock>  $blocks
-     * @return array<int, array{block_number: int, level_number: int, finance_charge_id: int|null}>
+     * @return array<int, array{block_number: int, level_number: int, finance_source_ref: string}>
      */
     private function egcBlockRows(Collection $blocks): array
     {
@@ -339,7 +342,7 @@ class PreviewEgcChargeGenerationQuery
             ->map(fn (EgcBlock $block): array => [
                 'block_number' => (int) $block->block_number,
                 'level_number' => (int) $block->level_number,
-                'finance_charge_id' => $block->finance_charge_id !== null ? (int) $block->finance_charge_id : null,
+                'finance_source_ref' => app(EgcBlockFinanceResolver::class)->sourceRef($block),
             ])
             ->all();
     }

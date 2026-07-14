@@ -67,8 +67,6 @@ it('allows CreateFinanceChargeAction usage only from the debit materializer path
         'CreateFinanceChargeAction.php',
         // Sole production materializer entry (intake debit path).
         'RequestFinanceDebitAction.php',
-        // One-shot legacy repair; does not invent new product generators.
-        'CreateLegacyExamResitChargeFromPaidPtlAction.php',
     ]);
 
     expect($violations)->toBe(

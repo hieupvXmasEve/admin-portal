@@ -6,7 +6,6 @@ namespace App\Modules\Finance\Actions;
 
 use App\Models\CourseRetakeRegistration;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
-use App\Modules\Finance\Models\FinanceCharge;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
@@ -69,32 +68,15 @@ class CreateRetakeCourseChargeSimpleAction
                 ],
             ));
 
-            $chargeId = $result->finance_charge_id
-                ?? $this->chargeIdFromObligation($result->finance_obligation_id);
-
-            if ($chargeId === null) {
+            if ($result->finance_obligation_id === null || $result->finance_charge_id === null) {
                 throw ValidationException::withMessages([
                     'registration_id' => ['Finance intake did not materialize a retake charge.'],
                 ]);
             }
 
-            $registration->transitionToPaymentPending($chargeId, auth()->id());
+            $registration->transitionToPaymentPending((int) auth()->id());
 
             return $registration->fresh();
         });
-    }
-
-    private function chargeIdFromObligation(?int $obligationId): ?int
-    {
-        if ($obligationId === null) {
-            return null;
-        }
-
-        $charge = FinanceCharge::query()
-            ->where('finance_obligation_id', $obligationId)
-            ->where('status', FinanceCharge::STATUS_ACTIVE)
-            ->first();
-
-        return $charge?->id;
     }
 }

@@ -121,7 +121,6 @@ it('creates an auto-approved exam resit source and materializes its finance obli
     expect($attempt->attempt_number)->toBeNull();
     expect($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_CHARGE_CREATED);
     expect((float) $attempt->fee_amount)->toBe(750000.0);
-    expect($attempt->finance_charge_id)->toBeNull();
     expect($attempt->policy_snapshot['max_attempts'])->toBe(1);
     expect($attempt->policy_snapshot['exam_resit_fee'])->toBe(750000);
     expect($attempt->policy_snapshot['late_payment_grace_days'])->toBe(14);

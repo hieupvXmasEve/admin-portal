@@ -10,7 +10,6 @@ use App\Models\CourseRetakeRegistration;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
-use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -61,31 +60,19 @@ it('transitions from approved to payment_pending', function () {
     $reg = createRetakeRegistration('approved');
     $user = User::factory()->create();
 
-    $charge = FinanceCharge::create([
-        'student_id' => $reg->student_id,
-        'semester_id' => $reg->semester_id,
-        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
-        'amount' => 5000000,
-        'description' => 'Retake fee test',
-        'effective_at' => now(),
-        'status' => FinanceCharge::STATUS_ACTIVE,
-        'source_type' => CourseRetakeRegistration::class,
-        'source_id' => $reg->id,
-    ]);
-
-    $reg->transitionToPaymentPending($charge->id, $user->id);
+    $reg->transitionToPaymentPending($user->id);
 
     $reg->refresh();
     expect($reg->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
-    expect($reg->finance_charge_id)->toBe($charge->id);
     expect($reg->charge_created_by_user_id)->toBe($user->id);
     expect($reg->charge_created_at)->not->toBeNull();
 });
 
 it('throws when transitioning to payment_pending from non-approved status', function () {
     $reg = createRetakeRegistration('payment_pending');
+    $user = User::factory()->create();
 
-    $reg->transitionToPaymentPending(99999, 1);
+    $reg->transitionToPaymentPending($user->id);
 })->throws(RuntimeException::class, 'Cannot transition to payment_pending from status: payment_pending');
 
 it('transitions from payment_pending to paid', function () {

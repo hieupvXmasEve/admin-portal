@@ -99,11 +99,24 @@ function scheduledExamResitSessionForAttempt(ExamResitAttempt $attempt): ExamRes
     ]);
 }
 
+function examResitCancellationChargeForAttempt(ExamResitAttempt $attempt): FinanceCharge
+{
+    $obligationId = FinanceObligation::query()
+        ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+        ->where('source_kind', AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT)
+        ->where('source_ref', AcademicFinanceObligationSource::examResitAttemptRef($attempt))
+        ->where('obligation_type', AcademicFinanceObligationSource::EXAM_RESIT_FEE)
+        ->value('id');
+
+    return FinanceCharge::query()
+        ->where('finance_obligation_id', $obligationId)
+        ->firstOrFail();
+}
+
 function makeExamResitDng(
     Student $student,
     FinanceCharge $charge,
     string $status = DngPaymentRequest::STATUS_PENDING,
-    bool $viaPivot = false,
 ): DngPaymentRequest {
     $dng = DngPaymentRequest::create([
         'student_id' => $student->id,
@@ -113,19 +126,16 @@ function makeExamResitDng(
         'description' => 'Exam resit fee',
         'semester_id' => $charge->semester_id,
         'due_date' => now()->addDays(5),
-        'item_id' => 'PTL-'.$charge->id.'-'.($viaPivot ? 'P' : 'D'),
+        'item_id' => 'PTL-'.$charge->id,
         'amount' => $charge->amount,
         'status' => $status,
-        'finance_charge_id' => $viaPivot ? null : $charge->id,
     ]);
 
-    if ($viaPivot) {
-        DngPaymentRequestCharge::create([
-            'dng_payment_request_id' => $dng->id,
-            'finance_charge_id' => $charge->id,
-            'amount' => $charge->amount,
-        ]);
-    }
+    DngPaymentRequestCharge::create([
+        'dng_payment_request_id' => $dng->id,
+        'finance_charge_id' => $charge->id,
+        'amount' => $charge->amount,
+    ]);
 
     return $dng;
 }
@@ -265,9 +275,9 @@ it('voids only the linked finance charge and linked awaiting dng when cancelling
     $attempt->refresh();
 
     expect($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_CHARGE_CREATED);
-    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
-    $directDng = makeExamResitDng($this->student, $charge);
-    $pivotDng = makeExamResitDng($this->student, $charge, viaPivot: true);
+    $charge = examResitCancellationChargeForAttempt($attempt);
+    $firstDng = makeExamResitDng($this->student, $charge);
+    $secondDng = makeExamResitDng($this->student, $charge);
 
     $otherCharge = FinanceCharge::create([
         'student_id' => $this->student->id,
@@ -295,8 +305,8 @@ it('voids only the linked finance charge and linked awaiting dng when cancelling
         ->and($attempt->cancellation_notice_sent_at)->not->toBeNull();
 
     expect($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID);
-    expect($directDng->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED)
-        ->and($pivotDng->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED)
+    expect($firstDng->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED)
+        ->and($secondDng->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED)
         ->and($unrelatedDng->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
 });
 
@@ -328,7 +338,7 @@ it('requires no-refund acknowledgement before cancelling a paid attempt', functi
     $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
     app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
     $attempt->refresh();
-    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+    $charge = examResitCancellationChargeForAttempt($attempt);
     payExamResitChargeFully($charge);
     $attempt->transitionToPaid();
 
@@ -340,7 +350,7 @@ it('bridges linked paid dng evidence before cancelling a charge_created attempt'
     $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
     app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
     $attempt->refresh();
-    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+    $charge = examResitCancellationChargeForAttempt($attempt);
 
     expect($charge->is_fully_paid)->toBeFalse();
 
@@ -382,7 +392,7 @@ it('cancels a paid scheduled attempt and releases the paid fee to unapplied cred
     $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
     app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
     $attempt->refresh();
-    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+    $charge = examResitCancellationChargeForAttempt($attempt);
     payExamResitChargeFully($charge);
     $attempt->transitionToPaid();
     $session = scheduledExamResitSessionForAttempt($attempt);
@@ -407,7 +417,6 @@ it('cancels a paid scheduled attempt and releases the paid fee to unapplied cred
     expect($attempt->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
         ->and($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_PAID)
         ->and($attempt->paid_at)->not->toBeNull()
-        ->and($attempt->finance_charge_id)->toBe($charge->id)
         ->and($attempt->exam_resit_session_id)->toBeNull()
         ->and($attempt->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_KEPT_PAID_NO_REFUND)
         ->and($attempt->cancellation_notice_sent_at)->not->toBeNull()
@@ -437,7 +446,7 @@ it('refreshes session candidate count from non-cancelled attempts after cancelli
     ]);
     app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
     $attempt->refresh();
-    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+    $charge = examResitCancellationChargeForAttempt($attempt);
     payExamResitChargeFully($charge);
     $attempt->transitionToPaid();
     $session = scheduledExamResitSessionForAttempt($attempt);

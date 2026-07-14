@@ -434,31 +434,19 @@ final class BillingExceptionCollector
             ->from('course_retake_registrations')
             ->whereColumn('course_retake_registrations.course_registration_id', 'course_registrations.id')
             ->where('course_retake_registrations.status', '!=', CourseRetakeRegistration::STATUS_CANCELLED)
-            ->where(function ($linkedChargeQuery) use ($semesterId): void {
-                $linkedChargeQuery
-                    ->whereExists(function ($chargeQuery) use ($semesterId): void {
-                        $chargeQuery->select(DB::raw(1))
-                            ->from('finance_charges')
-                            ->whereColumn('finance_charges.id', 'course_retake_registrations.finance_charge_id')
-                            ->where('finance_charges.charge_type', FinanceCharge::TYPE_RETAKE_FEE)
-                            ->where('finance_charges.status', FinanceCharge::STATUS_ACTIVE);
+            ->whereExists(function ($chargeQuery) use ($semesterId): void {
+                $chargeQuery->select(DB::raw(1))
+                    ->from('finance_charges')
+                    ->join('finance_obligations', 'finance_obligations.id', '=', 'finance_charges.finance_obligation_id')
+                    ->where('finance_charges.charge_type', FinanceCharge::TYPE_RETAKE_FEE)
+                    ->where('finance_charges.status', FinanceCharge::STATUS_ACTIVE)
+                    ->where('finance_obligations.source_system', 'academic')
+                    ->where('finance_obligations.source_kind', 'course_retake_registration')
+                    ->whereRaw("finance_obligations.source_ref = CONCAT('retake:', course_retake_registrations.id)");
 
-                        if ($semesterId) {
-                            $chargeQuery->where('finance_charges.semester_id', $semesterId);
-                        }
-                    })
-                    ->orWhereExists(function ($chargeQuery) use ($semesterId): void {
-                        $chargeQuery->select(DB::raw(1))
-                            ->from('finance_charges')
-                            ->where('finance_charges.source_type', CourseRetakeRegistration::class)
-                            ->whereColumn('finance_charges.source_id', 'course_retake_registrations.id')
-                            ->where('finance_charges.charge_type', FinanceCharge::TYPE_RETAKE_FEE)
-                            ->where('finance_charges.status', FinanceCharge::STATUS_ACTIVE);
-
-                        if ($semesterId) {
-                            $chargeQuery->where('finance_charges.semester_id', $semesterId);
-                        }
-                    });
+                if ($semesterId) {
+                    $chargeQuery->where('finance_charges.semester_id', $semesterId);
+                }
             });
     }
 

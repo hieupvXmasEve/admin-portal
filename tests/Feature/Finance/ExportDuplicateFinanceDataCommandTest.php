@@ -61,7 +61,7 @@ it('reports clean when there are no duplicates', function () {
         ->assertExitCode(0);
 });
 
-it('surfaces pivot-linked DNG requests (finance_charge_id NULL) in the JSON report', function () {
+it('surfaces pivot-linked DNG requests in the JSON report', function () {
     $student = makeGuardStudent();
     $semester = Semester::factory()->create();
 
@@ -99,7 +99,7 @@ it('surfaces pivot-linked DNG requests (finance_charge_id NULL) in the JSON repo
         'status' => 'active',
     ]);
 
-    // Aggregate DNG request: finance_charge_id is NULL, linkage only via pivot.
+    // Aggregate DNG request: linkage is only via the canonical pivot.
     $dngId = DB::table('dng_payment_requests')->insertGetId([
         'student_id' => $student->id,
         'campus_code' => 'AUH',
@@ -108,7 +108,6 @@ it('surfaces pivot-linked DNG requests (finance_charge_id NULL) in the JSON repo
         'item_id' => 'ITEM-PIVOT-1',
         'amount' => 15_000_000,
         'status' => 'pushed_to_dng',
-        'finance_charge_id' => null,
     ]);
     DB::table('dng_payment_request_charges')->insert([
         'dng_payment_request_id' => $dngId,

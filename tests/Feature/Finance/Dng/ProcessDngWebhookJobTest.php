@@ -11,6 +11,7 @@ use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Dng\Jobs\ProcessDngWebhookJob;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
@@ -20,6 +21,7 @@ use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Dng\Services\DngWebhookService;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\Payment;
 use App\Services\FinanceService\PaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -86,6 +88,33 @@ function createDngPaymentRequest(Student $student, string $dngPaymentId, float $
             'Amount' => 5000000,
             'ItemId' => 'ITEM001',
         ],
+    ]);
+}
+
+function processRetakeCharge(CourseRetakeRegistration $registration, int $amount, string $description): FinanceCharge
+{
+    $obligation = FinanceObligation::create([
+        'source_system' => AcademicFinanceObligationSource::SOURCE_SYSTEM,
+        'source_kind' => AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION,
+        'source_ref' => AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration),
+        'obligation_type' => AcademicFinanceObligationSource::RETAKE_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => ['test' => true],
+        'accepted_at' => now(),
+    ]);
+
+    return FinanceCharge::create([
+        'finance_obligation_id' => $obligation->id,
+        'student_id' => $registration->student_id,
+        'semester_id' => $registration->semester_id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => $amount,
+        'description' => $description,
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
 }
 
@@ -1130,7 +1159,7 @@ it('resolves the webhook to the correct campus when ItemId and StudentId collide
 });
 
 // =====================
-// Retake auto-enroll via finance_charge_id
+// Retake auto-enroll via canonical Finance obligations
 // =====================
 
 it('does not link a retake registration from an HL webhook until the charge is settled', function () {
@@ -1184,18 +1213,7 @@ it('does not link a retake registration from an HL webhook until the charge is s
         'approved_by_user_id' => $user->id,
         'approved_at' => now(),
     ]);
-    $chargeA = FinanceCharge::create([
-        'student_id' => $student->id,
-        'semester_id' => $semester->id,
-        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
-        'amount' => 5000000,
-        'description' => 'Retake A',
-        'effective_at' => now(),
-        'status' => FinanceCharge::STATUS_ACTIVE,
-        'source_type' => CourseRetakeRegistration::class,
-        'source_id' => $regA->id,
-    ]);
-    $regA->update(['finance_charge_id' => $chargeA->id]);
+    $chargeA = processRetakeCharge($regA, 5_000_000, 'Retake A');
 
     // Registration B — newer, should NOT be enrolled by this payment
     $regB = CourseRetakeRegistration::create([
@@ -1211,18 +1229,7 @@ it('does not link a retake registration from an HL webhook until the charge is s
         'approved_by_user_id' => $user->id,
         'approved_at' => now(),
     ]);
-    $chargeB = FinanceCharge::create([
-        'student_id' => $student->id,
-        'semester_id' => $semester->id,
-        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
-        'amount' => 7000000,
-        'description' => 'Retake B',
-        'effective_at' => now()->addSecond(), // newer
-        'status' => FinanceCharge::STATUS_ACTIVE,
-        'source_type' => CourseRetakeRegistration::class,
-        'source_id' => $regB->id,
-    ]);
-    $regB->update(['finance_charge_id' => $chargeB->id]);
+    $chargeB = processRetakeCharge($regB, 7_000_000, 'Retake B');
 
     // DNG request linked explicitly to chargeA (the one being paid)
     $dngRequest = DngPaymentRequest::create([
@@ -1234,7 +1241,11 @@ it('does not link a retake registration from an HL webhook until the charge is s
         'amount' => 5000000,
         'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
         'dng_payment_id' => 'PAY-RETAKE-A',
+    ]);
+    DngPaymentRequestCharge::create([
+        'dng_payment_request_id' => $dngRequest->id,
         'finance_charge_id' => $chargeA->id,
+        'amount' => $chargeA->amount,
     ]);
 
     $payload = [
@@ -1401,25 +1412,11 @@ it('does not link aggregate retake registrations from an HL webhook until the ch
         'approved_at' => now(),
     ]);
 
-    // One FinanceCharge per registration
-    $chargeA = FinanceCharge::create([
-        'student_id' => $student->id, 'semester_id' => $semester->id,
-        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
-        'amount' => 5000000, 'description' => 'Retake A',
-        'effective_at' => now(), 'status' => FinanceCharge::STATUS_ACTIVE,
-        'source_type' => CourseRetakeRegistration::class, 'source_id' => $regA->id,
-    ]);
-    $chargeB = FinanceCharge::create([
-        'student_id' => $student->id, 'semester_id' => $semester->id,
-        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
-        'amount' => 7000000, 'description' => 'Retake B',
-        'effective_at' => now(), 'status' => FinanceCharge::STATUS_ACTIVE,
-        'source_type' => CourseRetakeRegistration::class, 'source_id' => $regB->id,
-    ]);
-    $regA->update(['finance_charge_id' => $chargeA->id]);
-    $regB->update(['finance_charge_id' => $chargeB->id]);
+    // One FinanceCharge per registration through canonical obligations.
+    $chargeA = processRetakeCharge($regA, 5_000_000, 'Retake A');
+    $chargeB = processRetakeCharge($regB, 7_000_000, 'Retake B');
 
-    // Aggregate DNG request — finance_charge_id is NULL; links are via pivot
+    // Aggregate DNG request — links are via the canonical pivot.
     $dngRequest = DngPaymentRequest::create([
         'student_id' => $student->id,
         'campus_code' => 'CAMPUS001',
@@ -1429,7 +1426,6 @@ it('does not link aggregate retake registrations from an HL webhook until the ch
         'amount' => 12000000, // 5M + 7M
         'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
         'dng_payment_id' => 'PAY-AGG-001',
-        'finance_charge_id' => null,
     ]);
 
     // Insert pivot rows

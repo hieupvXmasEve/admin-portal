@@ -76,8 +76,8 @@ class AllocatePaymentAction
             );
         });
 
-        app(RetakeRegistrationPaymentSyncer::class)->runForChargeIds([$charge->id]);
-        app(ExamResitAttemptPaymentSyncer::class)->runForChargeIds([$charge->id]);
+        app(RetakeRegistrationPaymentSyncer::class)->runForStudent((int) $charge->student_id);
+        app(ExamResitAttemptPaymentSyncer::class)->runForStudent((int) $charge->student_id);
 
         return $application;
     }

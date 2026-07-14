@@ -43,7 +43,7 @@ class CaptureDngProviderReceiptAction
         } elseif (($receipt['target_validation']['status'] ?? 'matched') !== 'matched') {
             $exceptionType = 'amount_mismatch';
         } elseif ($payment !== null
-            && ($request->reservationTargets()->exists() || $request->chargeLinks()->exists() || $request->finance_charge_id !== null)
+            && ($request->reservationTargets()->exists() || $request->chargeLinks()->exists())
             && $payment->fresh()->unapplied_amount > 0.01) {
             $exceptionType = 'target_drift';
             $issues[] = 'Current target collectible is lower than the verified provider receipt.';

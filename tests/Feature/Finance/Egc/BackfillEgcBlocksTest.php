@@ -10,8 +10,10 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -40,6 +42,37 @@ function makeBackfillCourseOffering(int $semesterId, int $unitId): CourseOfferin
     unset($attributes['drop_deadline'], $attributes['withdrawal_deadline']);
 
     return CourseOffering::query()->create($attributes);
+}
+
+function giveBackfillChargeCanonicalObligation(FinanceCharge $charge): FinanceCharge
+{
+    $obligation = FinanceObligation::query()->firstOrCreate([
+        'source_system' => 'finance',
+        'source_kind' => 'legacy_egc_charge',
+        'source_ref' => 'legacy-egc-charge:'.$charge->id,
+        'obligation_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+    ], [
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $charge->amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test:legacy_egc_charge',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+
+    $charge->update(['finance_obligation_id' => $obligation->id]);
+
+    return $charge->fresh();
+}
+
+function attachBackfillCharge(EgcBlock $block, FinanceCharge $charge): EgcBlock
+{
+    app(EgcBlockFinanceResolver::class)->bindExistingCharge(
+        $block,
+        giveBackfillChargeCanonicalObligation($charge),
+    );
+
+    return $block->fresh();
 }
 
 it('prefers actual level charge matches during backfill and rewrites fallback charge descriptions', function () {
@@ -102,6 +135,8 @@ it('prefers actual level charge matches during backfill and rewrites fallback ch
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
+    $levelTwoCharge = giveBackfillChargeCanonicalObligation($levelTwoCharge);
+    $predictedLevelThreeCharge = giveBackfillChargeCanonicalObligation($predictedLevelThreeCharge);
 
     InvoiceLine::create([
         'invoice_id' => $invoice->id,
@@ -118,8 +153,9 @@ it('prefers actual level charge matches during backfill and rewrites fallback ch
         ->get();
 
     expect($blocks)->toHaveCount(2);
-    expect($blocks[0]->finance_charge_id)->toBe($levelTwoCharge->id);
-    expect($blocks[1]->finance_charge_id)->toBe($predictedLevelThreeCharge->id);
+    $chargesByBlock = app(EgcBlockFinanceResolver::class)->chargesFor($blocks);
+    expect($chargesByBlock->get($blocks[0]->id)?->id)->toBe($levelTwoCharge->id);
+    expect($chargesByBlock->get($blocks[1]->id)?->id)->toBe($predictedLevelThreeCharge->id);
 
     expect($predictedLevelThreeCharge->fresh()->description)->toBe('EGC Level 2 Fee');
     expect(InvoiceLine::where('charge_id', $predictedLevelThreeCharge->id)->value('description_snapshot'))
@@ -177,6 +213,8 @@ it('backfills egc blocks for transitioned intake_course students with active egc
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
+    $charge1 = giveBackfillChargeCanonicalObligation($charge1);
+    $charge2 = giveBackfillChargeCanonicalObligation($charge2);
 
     foreach ([$charge1, $charge2] as $charge) {
         InvoiceLine::create([
@@ -196,7 +234,8 @@ it('backfills egc blocks for transitioned intake_course students with active egc
 
     expect($blocks)->toHaveCount(2);
     expect($blocks->pluck('level_number')->all())->toBe([3, 4]);
-    expect($blocks->pluck('finance_charge_id')->all())->toBe([$charge1->id, $charge2->id]);
+    expect(app(EgcBlockFinanceResolver::class)->chargesFor($blocks)->pluck('id')->values()->all())
+        ->toBe([$charge1->id, $charge2->id]);
 });
 
 it('does not create extra egc block from unmatched active charge when charges exceed registrations', function () {
@@ -245,6 +284,8 @@ it('does not create extra egc block from unmatched active charge when charges ex
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
+    $charge1 = giveBackfillChargeCanonicalObligation($charge1);
+    $charge2 = giveBackfillChargeCanonicalObligation($charge2);
 
     foreach ([$charge1, $charge2] as $charge) {
         InvoiceLine::create([
@@ -264,7 +305,8 @@ it('does not create extra egc block from unmatched active charge when charges ex
 
     expect($blocks)->toHaveCount(1);
     expect($blocks->pluck('level_number')->all())->toBe([2]);
-    expect($blocks->pluck('finance_charge_id')->all())->toBe([$charge1->id]);
+    expect(app(EgcBlockFinanceResolver::class)->chargesFor($blocks)->pluck('id')->values()->all())
+        ->toBe([$charge1->id]);
     expect(FinanceCharge::query()->find($charge2->id))->not->toBeNull();
 });
 
@@ -312,6 +354,7 @@ it('backfills fall2025 egc blocks for deferred students with historical registra
             'effective_at' => now(),
             'status' => FinanceCharge::STATUS_ACTIVE,
         ]);
+        $charge = giveBackfillChargeCanonicalObligation($charge);
 
         InvoiceLine::create([
             'invoice_id' => $invoice1->id,
@@ -337,7 +380,7 @@ it('backfills fall2025 egc blocks for deferred students with historical registra
 
     expect($semester1Blocks)->toHaveCount(2);
     expect($semester1Blocks->pluck('level_number')->all())->toBe([2, 3]);
-    expect($semester1Blocks->pluck('finance_charge_id')->filter()->count())->toBe(2);
+    expect(app(EgcBlockFinanceResolver::class)->chargesFor($semester1Blocks))->toHaveCount(2);
     expect($semester2Blocks)->toHaveCount(1);
     expect($semester2Blocks->first()?->level_number)->toBe(3);
 });
@@ -410,23 +453,23 @@ it('creates missing semester invoice and charges for existing null-charge egc bl
         ]);
     }
 
-    EgcBlock::create([
+    $semesterOneBlockOne = EgcBlock::create([
         'student_id' => $student->id,
         'semester_id' => $semester1->id,
         'block_number' => 1,
         'level_number' => 2,
         'result' => EgcBlock::RESULT_PENDING,
-        'finance_charge_id' => $charge1->id,
     ]);
+    attachBackfillCharge($semesterOneBlockOne, $charge1);
 
-    EgcBlock::create([
+    $semesterOneBlockTwo = EgcBlock::create([
         'student_id' => $student->id,
         'semester_id' => $semester1->id,
         'block_number' => 2,
         'level_number' => 3,
         'result' => EgcBlock::RESULT_PENDING,
-        'finance_charge_id' => $charge2->id,
     ]);
+    attachBackfillCharge($semesterOneBlockTwo, $charge2);
 
     EgcBlock::create([
         'student_id' => $student->id,
@@ -434,7 +477,6 @@ it('creates missing semester invoice and charges for existing null-charge egc bl
         'block_number' => 1,
         'level_number' => 4,
         'result' => EgcBlock::RESULT_PENDING,
-        'finance_charge_id' => null,
     ]);
 
     EgcBlock::create([
@@ -443,7 +485,6 @@ it('creates missing semester invoice and charges for existing null-charge egc bl
         'block_number' => 2,
         'level_number' => 5,
         'result' => EgcBlock::RESULT_PENDING,
-        'finance_charge_id' => null,
     ]);
 
     $this->artisan('egc:backfill-blocks')->assertExitCode(0);
@@ -464,7 +505,7 @@ it('creates missing semester invoice and charges for existing null-charge egc bl
     expect(StudentInvoice::query()->where('student_id', $student->id)->where('semester_id', $semester2->id)->exists())->toBeTrue();
     expect($semester2Charges)->toHaveCount(2);
     expect($semester2Charges->pluck('description')->all())->toBe(['EGC Level 4 Fee', 'EGC Level 5 Fee']);
-    expect($semester2Blocks->pluck('finance_charge_id')->filter()->count())->toBe(2);
+    expect(app(EgcBlockFinanceResolver::class)->chargesFor($semester2Blocks))->toHaveCount(2);
 });
 
 it('creates missing charge on existing semester invoice for a null-charge egc block', function () {
@@ -552,6 +593,9 @@ it('creates missing charge on existing semester invoice for a null-charge egc bl
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
+    $charge1 = giveBackfillChargeCanonicalObligation($charge1);
+    $charge2 = giveBackfillChargeCanonicalObligation($charge2);
+    $charge3 = giveBackfillChargeCanonicalObligation($charge3);
 
     InvoiceLine::create([
         'invoice_id' => $invoice2->id,
@@ -560,32 +604,32 @@ it('creates missing charge on existing semester invoice for a null-charge egc bl
         'description_snapshot' => $charge3->description,
     ]);
 
-    EgcBlock::create([
+    $semesterOneBlockOne = EgcBlock::create([
         'student_id' => $student->id,
         'semester_id' => $semester1->id,
         'block_number' => 1,
         'level_number' => 2,
         'result' => EgcBlock::RESULT_PENDING,
-        'finance_charge_id' => $charge1->id,
     ]);
+    attachBackfillCharge($semesterOneBlockOne, $charge1);
 
-    EgcBlock::create([
+    $semesterOneBlockTwo = EgcBlock::create([
         'student_id' => $student->id,
         'semester_id' => $semester1->id,
         'block_number' => 2,
         'level_number' => 3,
         'result' => EgcBlock::RESULT_PENDING,
-        'finance_charge_id' => $charge2->id,
     ]);
+    attachBackfillCharge($semesterOneBlockTwo, $charge2);
 
-    EgcBlock::create([
+    $semesterTwoBlockOne = EgcBlock::create([
         'student_id' => $student->id,
         'semester_id' => $semester2->id,
         'block_number' => 1,
         'level_number' => 4,
         'result' => EgcBlock::RESULT_PENDING,
-        'finance_charge_id' => $charge3->id,
     ]);
+    attachBackfillCharge($semesterTwoBlockOne, $charge3);
 
     EgcBlock::create([
         'student_id' => $student->id,
@@ -593,7 +637,6 @@ it('creates missing charge on existing semester invoice for a null-charge egc bl
         'block_number' => 2,
         'level_number' => 5,
         'result' => EgcBlock::RESULT_PENDING,
-        'finance_charge_id' => null,
     ]);
 
     $this->artisan('egc:backfill-blocks')->assertExitCode(0);
@@ -604,7 +647,7 @@ it('creates missing charge on existing semester invoice for a null-charge egc bl
         ->where('block_number', 2)
         ->firstOrFail();
 
-    $newCharge = FinanceCharge::query()->find($block->finance_charge_id);
+    $newCharge = app(EgcBlockFinanceResolver::class)->chargeFor($block);
 
     expect($newCharge)->not->toBeNull();
     expect($newCharge?->description)->toBe('EGC Level 5 Fee');

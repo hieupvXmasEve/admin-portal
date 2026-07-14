@@ -45,16 +45,6 @@ class BuildDngCancelImpactQuery
             ->filter()
             ->values();
 
-        if ($pivotCharges->isNotEmpty()) {
-            return $pivotCharges;
-        }
-
-        if ($request->finance_charge_id !== null) {
-            $charge = FinanceCharge::find($request->finance_charge_id);
-
-            return $charge ? collect([$charge]) : collect();
-        }
-
-        return collect();
+        return $pivotCharges;
     }
 }

@@ -212,7 +212,6 @@ class CreateBatchDngFromChargesAction
                 CourseRetakeRegistration::HQ_FEE_PENDING,
                 CourseRetakeRegistration::HQ_FEE_CHARGE_CREATED,
             ])
-            ->whereNull('finance_charge_id')
             ->lockForUpdate()
             ->get();
 
@@ -248,7 +247,6 @@ class CreateBatchDngFromChargesAction
                 ExamResitAttempt::HQ_FEE_PENDING,
                 ExamResitAttempt::HQ_FEE_CHARGE_CREATED,
             ])
-            ->whereNull('finance_charge_id')
             ->lockForUpdate()
             ->get();
 

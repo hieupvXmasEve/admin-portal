@@ -8,9 +8,11 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
 use App\Modules\Academic\Actions\SyncPaidExamResitAttemptsAction;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\AllocatePaymentAction;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
@@ -44,9 +46,23 @@ function chargedExamResitAttempt(): ExamResitAttempt
     return $attempt->fresh();
 }
 
+function examResitChargeForAttempt(ExamResitAttempt $attempt): FinanceCharge
+{
+    $obligationId = FinanceObligation::query()
+        ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+        ->where('source_kind', AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT)
+        ->where('source_ref', AcademicFinanceObligationSource::examResitAttemptRef($attempt))
+        ->where('obligation_type', AcademicFinanceObligationSource::EXAM_RESIT_FEE)
+        ->value('id');
+
+    return FinanceCharge::query()
+        ->where('finance_obligation_id', $obligationId)
+        ->firstOrFail();
+}
+
 it('marks a fully paid exam-resit attempt as paid from Finance evidence', function () {
     $attempt = chargedExamResitAttempt();
-    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+    $charge = examResitChargeForAttempt($attempt);
     payExamResitChargeFully($charge);
 
     $result = app(SyncPaidExamResitAttemptsAction::class)->runForStudent($this->student->id);
@@ -76,7 +92,7 @@ it('skips an attempt whose charge is not fully paid', function () {
 
 it('skips an attempt whose charge has been voided even if a payment exists', function () {
     $attempt = chargedExamResitAttempt();
-    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+    $charge = examResitChargeForAttempt($attempt);
     payExamResitChargeFully($charge);
     $charge->void($this->user->id, 'cancelled');
 
@@ -88,12 +104,12 @@ it('skips an attempt whose charge has been voided even if a payment exists', fun
         ->and($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_CHARGE_CREATED);
 });
 
-it('targets paid attempts by charge id', function () {
+it('targets paid attempts by student through canonical settlement evidence', function () {
     $attempt = chargedExamResitAttempt();
-    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+    $charge = examResitChargeForAttempt($attempt);
     payExamResitChargeFully($charge);
 
-    $result = app(ExamResitAttemptPaymentSyncer::class)->runForChargeIds([$charge->id]);
+    $result = app(ExamResitAttemptPaymentSyncer::class)->runForStudent($this->student->id);
 
     $attempt->refresh();
 
@@ -103,7 +119,7 @@ it('targets paid attempts by charge id', function () {
 
 it('flips the attempt to paid automatically when a payment is allocated to its charge', function () {
     $attempt = chargedExamResitAttempt();
-    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+    $charge = examResitChargeForAttempt($attempt);
     $line = InvoiceLine::where('charge_id', $charge->id)->where('status', 'active')->firstOrFail();
 
     $payment = Payment::create([
@@ -126,7 +142,7 @@ it('flips the attempt to paid automatically when a payment is allocated to its c
 
 it('does not mutate the attempt during a dry run', function () {
     $attempt = chargedExamResitAttempt();
-    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+    $charge = examResitChargeForAttempt($attempt);
     payExamResitChargeFully($charge);
 
     $result = app(SyncPaidExamResitAttemptsAction::class)->runForStudent($this->student->id, dryRun: true);

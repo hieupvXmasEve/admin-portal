@@ -25,7 +25,7 @@ class CancelFinanceObligationAction implements FinanceObligationCancellationCont
     {
         return DB::transaction(function () use ($data): FinanceObligationCancellationResult {
             $obligation = $this->findObligation($data);
-            $charge = $this->findCharge($obligation, $data);
+            $charge = $this->findCharge($obligation);
 
             $hasPaidDng = $this->bridgePaidDngRequestsForChargeAction->hasPaidDngForCharge($charge);
             if ($hasPaidDng && $charge !== null && ! $charge->is_fully_paid) {
@@ -92,22 +92,9 @@ class CancelFinanceObligationAction implements FinanceObligationCancellationCont
             ->first();
     }
 
-    private function findCharge(?FinanceObligation $obligation, FinanceObligationCancellationData $data): ?FinanceCharge
+    private function findCharge(?FinanceObligation $obligation): ?FinanceCharge
     {
-        $charge = $obligation?->financeCharge()
-            ->lockForUpdate()
-            ->first();
-
-        if ($charge instanceof FinanceCharge) {
-            return $charge;
-        }
-
-        if ($data->legacy_finance_charge_id === null) {
-            return null;
-        }
-
-        return FinanceCharge::query()
-            ->whereKey($data->legacy_finance_charge_id)
+        return $obligation?->financeCharge()
             ->lockForUpdate()
             ->first();
     }
@@ -167,18 +154,12 @@ class CancelFinanceObligationAction implements FinanceObligationCancellationCont
 
     private function cancelAwaitingDngRequestsForCharge(int $chargeId): int
     {
-        $directIds = DngPaymentRequest::query()
-            ->awaitingPayment()
-            ->where('finance_charge_id', $chargeId)
-            ->pluck('id');
-
         $pivotIds = DngPaymentRequestCharge::query()
             ->where('finance_charge_id', $chargeId)
             ->whereHas('dngPaymentRequest', fn ($query) => $query->awaitingPayment())
             ->pluck('dng_payment_request_id');
 
-        $requestIds = $directIds
-            ->merge($pivotIds)
+        $requestIds = $pivotIds
             ->unique()
             ->values();
 

@@ -84,7 +84,6 @@ function createPaidRetakeDngForCharge(CourseRetakeRegistration $registration, Fi
         'status' => DngPaymentRequest::STATUS_PAID_UNINVOICED,
         'dng_payment_id' => 'DNG-HL-PAID-'.$charge->id,
         'paid_at' => now(),
-        'finance_charge_id' => null,
     ]);
 
     DngPaymentRequestCharge::create([
@@ -94,6 +93,20 @@ function createPaidRetakeDngForCharge(CourseRetakeRegistration $registration, Fi
     ]);
 
     return $dng;
+}
+
+function retakeCancellationChargeForRegistration(CourseRetakeRegistration $registration): FinanceCharge
+{
+    $obligationId = FinanceObligation::query()
+        ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+        ->where('source_kind', AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION)
+        ->where('source_ref', AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration))
+        ->where('obligation_type', AcademicFinanceObligationSource::RETAKE_FEE)
+        ->value('id');
+
+    return FinanceCharge::query()
+        ->where('finance_obligation_id', $obligationId)
+        ->firstOrFail();
 }
 
 function deliverAcademicFinanceCancellationHandoffs(): void
@@ -221,22 +234,14 @@ it('cancels a target-path retake registration through the finance cancellation o
 it('cancels a payment_pending registration and voids charge after finance completion', function () {
     Queue::fake();
     $reg = createCancelTestRegistration('approved');
-    $charge = FinanceCharge::create([
-        'student_id' => $reg->student_id,
-        'semester_id' => $reg->semester_id,
+    app(CreateRetakeCourseChargeSimpleAction::class)->handle([
+        'registration_id' => $reg->id,
         'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
-        'amount' => 5000000,
+        'amount' => 5_000_000,
         'description' => 'Retake fee',
-        'effective_at' => now(),
-        'status' => FinanceCharge::STATUS_ACTIVE,
-        'source_type' => CourseRetakeRegistration::class,
-        'source_id' => $reg->id,
     ]);
-
-    $reg->update([
-        'status' => CourseRetakeRegistration::STATUS_PAYMENT_PENDING,
-        'finance_charge_id' => $charge->id,
-    ]);
+    $reg->refresh();
+    $charge = retakeCancellationChargeForRegistration($reg);
 
     $result = CancelRetakeCourseRegistrationAction::run([
         'registration_id' => $reg->id,
@@ -261,7 +266,7 @@ it('bridges linked paid dng evidence before cancelling a payment_pending registr
         'description' => 'Retake fee',
     ]);
     $reg->refresh();
-    $charge = FinanceCharge::findOrFail($reg->finance_charge_id);
+    $charge = retakeCancellationChargeForRegistration($reg);
     $paidDng = createPaidRetakeDngForCharge($reg, $charge);
 
     expect($charge->is_fully_paid)->toBeFalse();

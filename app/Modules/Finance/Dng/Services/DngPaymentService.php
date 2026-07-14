@@ -274,11 +274,6 @@ class DngPaymentService
                     );
                     $allocations = $allocations->merge($result);
                 }
-            } elseif ($request->finance_charge_id) {
-                $allocations = $this->paymentService->allocatePayment(
-                    $payment->id,
-                    [$request->finance_charge_id => (float) $request->amount],
-                );
             } else {
                 $allocations = $this->paymentService->autoAllocatePayment($payment->id);
             }

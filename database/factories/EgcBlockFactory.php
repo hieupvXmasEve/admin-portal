@@ -26,7 +26,6 @@ class EgcBlockFactory extends Factory
             'result' => EgcBlock::RESULT_PENDING,
             'attendance_rate' => null,
             'is_retake' => false,
-            'finance_charge_id' => null,
             'retake_discount_id' => null,
             'synced_at' => null,
         ];

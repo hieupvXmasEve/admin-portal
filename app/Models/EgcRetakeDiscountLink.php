@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceDiscount;
+use App\Modules\Finance\Models\InvoiceLine;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -14,7 +14,7 @@ class EgcRetakeDiscountLink extends Model
     protected $fillable = [
         'invoice_discount_id',
         'source_egc_block_id',
-        'target_finance_charge_id',
+        'target_invoice_line_id',
     ];
 
     public function invoiceDiscount(): BelongsTo
@@ -27,8 +27,8 @@ class EgcRetakeDiscountLink extends Model
         return $this->belongsTo(EgcBlock::class, 'source_egc_block_id');
     }
 
-    public function targetFinanceCharge(): BelongsTo
+    public function targetInvoiceLine(): BelongsTo
     {
-        return $this->belongsTo(FinanceCharge::class, 'target_finance_charge_id');
+        return $this->belongsTo(InvoiceLine::class, 'target_invoice_line_id');
     }
 }

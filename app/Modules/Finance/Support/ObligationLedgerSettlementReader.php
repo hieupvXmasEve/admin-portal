@@ -238,15 +238,6 @@ class ObligationLedgerSettlementReader implements ObligationSettlementReader
             return false;
         }
 
-        $direct = DngPaymentRequest::query()
-            ->whereIn('finance_charge_id', $chargeIds)
-            ->whereIn('status', self::PAID_DNG_STATUSES)
-            ->exists();
-
-        if ($direct) {
-            return true;
-        }
-
         return DngPaymentRequestCharge::query()
             ->whereIn('finance_charge_id', $chargeIds)
             ->whereHas('dngPaymentRequest', fn ($q) => $q->whereIn('status', self::PAID_DNG_STATUSES))

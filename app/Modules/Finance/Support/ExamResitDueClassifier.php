@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Support;
 
 use App\Models\ExamResitAttempt;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use Carbon\CarbonInterface;
 
 /**
@@ -127,7 +129,13 @@ class ExamResitDueClassifier
             return true;
         }
 
-        $charge = $attempt->financeCharge;
+        $charge = FinanceCharge::query()
+            ->where('finance_obligation_id', FinanceObligation::query()
+                ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+                ->where('source_kind', AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT)
+                ->where('source_ref', AcademicFinanceObligationSource::examResitAttemptRef($attempt))
+                ->value('id'))
+            ->first();
 
         return $charge !== null
             && $charge->status === FinanceCharge::STATUS_ACTIVE

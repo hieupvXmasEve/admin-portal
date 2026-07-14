@@ -12,6 +12,7 @@ use App\Models\Student;
 use App\Models\Unit;
 use App\Modules\Finance\Actions\Egc\GenerateEgcChargesAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
@@ -19,7 +20,9 @@ use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Egc\PreviewEgcChargeGenerationQuery;
+use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
@@ -43,15 +46,12 @@ function makeEgcChargeStudent(array $state = []): Student
  */
 function voidGeneratedEgcChargeIds(Student $student, Semester $semester): array
 {
-    $chargeIds = EgcBlock::query()
+    $blocks = EgcBlock::query()
         ->where('student_id', $student->id)
         ->where('semester_id', $semester->id)
         ->orderBy('block_number')
-        ->pluck('finance_charge_id')
-        ->filter()
-        ->map(fn (mixed $id): int => (int) $id)
-        ->values()
-        ->all();
+        ->get();
+    $chargeIds = egcBlockCharges($blocks)->pluck('id')->map(fn (int $id): int => $id)->values()->all();
 
     FinanceCharge::query()
         ->whereIn('id', $chargeIds)
@@ -61,6 +61,20 @@ function voidGeneratedEgcChargeIds(Student $student, Semester $semester): array
         ->update(['status' => 'void', 'voided_at' => now(), 'void_reason' => 'Regression setup']);
 
     return $chargeIds;
+}
+
+/** @return Collection<int, FinanceCharge> keyed by EGC block id */
+function egcBlockCharges(Collection $blocks): Collection
+{
+    return app(EgcBlockFinanceResolver::class)->chargesFor($blocks);
+}
+
+/** @return Collection<int, EgcBlock> */
+function egcBlocksWithCharges(Collection $blocks): Collection
+{
+    $chargesByBlock = egcBlockCharges($blocks);
+
+    return $blocks->filter(fn (EgcBlock $block): bool => $chargesByBlock->has($block->id));
 }
 
 function makeInProgressAcademicRecord(Student $student, Semester $semester, int $level): AcademicRecord
@@ -164,8 +178,9 @@ it('generates 1 block and creates a deferred block for next semester', function 
     ]);
 
     // Should have 1 block with charge + 1 deferred block with no charge
-    expect(EgcBlock::where('student_id', $student->id)->whereNotNull('finance_charge_id')->count())->toBe(1);
-    expect(EgcBlock::where('student_id', $student->id)->whereNull('finance_charge_id')->count())->toBe(1);
+    $blocks = EgcBlock::where('student_id', $student->id)->get();
+    expect(egcBlocksWithCharges($blocks))->toHaveCount(1);
+    expect($blocks->count() - egcBlocksWithCharges($blocks)->count())->toBe(1);
     expect(FinanceCharge::where('student_id', $student->id)->count())->toBe(1);
 });
 
@@ -208,8 +223,9 @@ it('does not create deferred block at the total level boundary', function () {
         ]],
     ]);
 
-    expect(EgcBlock::where('student_id', $student->id)->whereNotNull('finance_charge_id')->count())->toBe(1);
-    expect(EgcBlock::where('student_id', $student->id)->whereNull('finance_charge_id')->count())->toBe(0);
+    $blocks = EgcBlock::where('student_id', $student->id)->get();
+    expect(egcBlocksWithCharges($blocks))->toHaveCount(1);
+    expect($blocks->count() - egcBlocksWithCharges($blocks)->count())->toBe(0);
     expect(FinanceCharge::where('student_id', $student->id)->count())->toBe(1);
 });
 
@@ -264,16 +280,15 @@ it('sets is_retake = true when prior block failed with attendance >= 80%', funct
         ]],
     ]);
 
-    $retakeBlock = EgcBlock::where('student_id', $student->id)
+    $retakeBlock = egcBlocksWithCharges(EgcBlock::where('student_id', $student->id)
         ->where('semester_id', $semester2->id)
-        ->whereNotNull('finance_charge_id')
-        ->first();
+        ->get())->first();
 
     expect($retakeBlock)->not->toBeNull();
     expect($retakeBlock->is_retake)->toBeTrue();
 
     // Finance charge is still full price
-    $charge = FinanceCharge::find($retakeBlock->finance_charge_id);
+    $charge = app(EgcBlockFinanceResolver::class)->chargeFor($retakeBlock);
     expect((int) $charge->amount)->toBe(15_000_000);
 });
 
@@ -320,10 +335,9 @@ it('sets is_retake = false when entitlement already consumed', function () {
         ]],
     ]);
 
-    $block = EgcBlock::where('student_id', $student->id)
+    $block = egcBlocksWithCharges(EgcBlock::where('student_id', $student->id)
         ->where('semester_id', $semester2->id)
-        ->whereNotNull('finance_charge_id')
-        ->first();
+        ->get())->first();
 
     expect($block->is_retake)->toBeFalse();
 });
@@ -352,10 +366,9 @@ it('sets is_retake = false when attendance < 80%', function () {
         ]],
     ]);
 
-    $block = EgcBlock::where('student_id', $student->id)
+    $block = egcBlocksWithCharges(EgcBlock::where('student_id', $student->id)
         ->where('semester_id', $semester2->id)
-        ->whereNotNull('finance_charge_id')
-        ->first();
+        ->get())->first();
 
     expect($block->is_retake)->toBeFalse();
 });
@@ -407,7 +420,7 @@ it('reissues voided same semester EGC block charges without creating later block
         ->where('semester_id', $semester->id)
         ->orderBy('block_number')
         ->get();
-    $originalChargeIds = $originalBlocks->pluck('finance_charge_id')->all();
+    $originalChargeIds = egcBlockCharges($originalBlocks)->pluck('id')->values()->all();
 
     voidGeneratedEgcChargeIds($student, $semester);
 
@@ -431,10 +444,10 @@ it('reissues voided same semester EGC block charges without creating later block
         ->and($blocks)->toHaveCount(2)
         ->and($blocks->pluck('id')->all())->toBe($originalBlocks->pluck('id')->all())
         ->and($blocks->pluck('block_number')->all())->toBe([1, 2])
-        ->and($blocks->pluck('finance_charge_id')->intersect($originalChargeIds)->all())->toBe([]);
+        ->and(egcBlockCharges($blocks)->pluck('id')->intersect($originalChargeIds)->all())->toBe([]);
 
     expect(FinanceCharge::query()
-        ->whereIn('id', $blocks->pluck('finance_charge_id'))
+        ->whereIn('id', egcBlockCharges($blocks)->pluck('id'))
         ->where('status', FinanceCharge::STATUS_ACTIVE)
         ->count())->toBe(2);
 });
@@ -455,7 +468,7 @@ it('blocks reissue when a live DNG request is linked to a voided EGC block charg
 
     $chargeIds = voidGeneratedEgcChargeIds($student, $semester);
 
-    DngPaymentRequest::create([
+    $request = DngPaymentRequest::create([
         'student_id' => $student->id,
         'campus_code' => (string) DB::table('campuses')->where('id', $student->campus_id)->value('code'),
         'student_code' => $student->student_id,
@@ -466,7 +479,11 @@ it('blocks reissue when a live DNG request is linked to a voided EGC block charg
         'item_id' => 'EGC-LIVE-'.$student->id.'-'.$chargeIds[0],
         'amount' => 15_000_000,
         'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+    ]);
+    DngPaymentRequestCharge::create([
+        'dng_payment_request_id' => $request->id,
         'finance_charge_id' => $chargeIds[0],
+        'amount' => 15_000_000,
     ]);
 
     $results = GenerateEgcChargesAction::run([

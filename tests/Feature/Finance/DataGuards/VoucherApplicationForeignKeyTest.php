@@ -6,19 +6,19 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\VoucherApplication;
 use App\Models\VoucherDefinition;
-use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
 
 require_once __DIR__.'/guard_fixtures.php';
 
 /**
- * DB-08 / FIN-14: voucher_applications.invoice_id and finance_charge_id are now
- * real foreign keys with ON DELETE SET NULL.
+ * voucher_applications keeps its invoice FK, but no longer persists a direct
+ * Finance charge pointer. Finance owns the historical voucher source identity.
  */
 function fkGuardVoucherDefinition(): VoucherDefinition
 {
@@ -60,14 +60,8 @@ it('rejects a voucher application pointing at a non-existent invoice', function 
     ))->toThrow(QueryException::class);
 });
 
-it('rejects a voucher application pointing at a non-existent finance charge', function () {
-    $student = makeGuardStudent();
-    $semester = Semester::factory()->create();
-    $voucher = fkGuardVoucherDefinition();
-
-    expect(fn () => DB::table('voucher_applications')->insert(
-        fkGuardBaseRow($student, $semester, $voucher) + ['finance_charge_id' => 999_999]
-    ))->toThrow(QueryException::class);
+it('does not retain a direct finance charge pointer', function () {
+    expect(Schema::hasColumn('voucher_applications', 'finance_charge_id'))->toBeFalse();
 });
 
 it('nulls invoice_id when the referenced invoice is deleted', function () {
@@ -90,28 +84,4 @@ it('nulls invoice_id when the referenced invoice is deleted', function () {
     $invoice->delete();
 
     expect($application->fresh()->invoice_id)->toBeNull();
-});
-
-it('nulls finance_charge_id when the referenced charge is deleted', function () {
-    $student = makeGuardStudent();
-    $semester = Semester::factory()->create();
-    $voucher = fkGuardVoucherDefinition();
-
-    $charge = FinanceCharge::create([
-        'student_id' => $student->id,
-        'semester_id' => $semester->id,
-        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
-        'amount' => 10_000_000,
-        'description' => 'fk guard',
-        'effective_at' => now(),
-        'status' => 'active',
-    ]);
-
-    $application = VoucherApplication::query()->create(
-        fkGuardBaseRow($student, $semester, $voucher) + ['finance_charge_id' => $charge->id]
-    );
-
-    $charge->delete();
-
-    expect($application->fresh()->finance_charge_id)->toBeNull();
 });

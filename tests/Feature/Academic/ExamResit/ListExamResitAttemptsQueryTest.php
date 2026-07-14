@@ -12,9 +12,12 @@ use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Queries\ListExamResitAttemptsQuery;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -159,8 +162,13 @@ it('filters by derived operation_state', function () {
 it('treats linked paid dng evidence as paid in the cancellation context before bridge', function () {
     $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
     app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
-    $attempt->refresh();
-    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+    $charge = FinanceCharge::query()
+        ->where('finance_obligation_id', FinanceObligation::query()
+            ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+            ->where('source_kind', AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT)
+            ->where('source_ref', AcademicFinanceObligationSource::examResitAttemptRef($attempt))
+            ->value('id'))
+        ->firstOrFail();
 
     $dng = DngPaymentRequest::create([
         'student_id' => $this->student->id,
@@ -175,7 +183,11 @@ it('treats linked paid dng evidence as paid in the cancellation context before b
         'status' => DngPaymentRequest::STATUS_PAID_INVOICED,
         'dng_payment_id' => 'DNG-PTL-LIST-'.$charge->id,
         'paid_at' => now(),
+    ]);
+    DngPaymentRequestCharge::create([
+        'dng_payment_request_id' => $dng->id,
         'finance_charge_id' => $charge->id,
+        'amount' => $charge->amount,
     ]);
 
     $result = listExamResit();

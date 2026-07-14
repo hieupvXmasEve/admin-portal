@@ -10,6 +10,7 @@ use App\Modules\Finance\Actions\Egc\SubmitEgcLevelFeeDebitAction;
 use App\Modules\Finance\Actions\Egc\SyncEgcBlockResultsAction;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -100,7 +101,7 @@ class BackfillEgcBlocks extends Command
      *
      * Rules:
      * - Level comes from course_registration → unit.level when available
-     * - Existing egc_blocks missing finance_charge_id get repaired in place
+     * - Existing egc_blocks missing canonical Finance evidence get repaired in place
      * - Active charges without matching registrations are reported, not turned into new blocks
      * - Max 2 blocks per semester
      * - Same level twice in a semester → second block is is_retake=true
@@ -154,12 +155,12 @@ class BackfillEgcBlocks extends Command
                     if ($charge === null) {
                         $charge = $isDryRun
                             ? null
-                            : $this->createMissingChargeForBlock($student, (int) $semesterId, $levelNumber);
+                            : $this->createMissingChargeForBlock($existingBlock);
                     }
 
-                    if ($charge !== null && $existingBlock->finance_charge_id !== $charge->id) {
+                    if ($charge !== null) {
                         if (! $isDryRun) {
-                            $existingBlock->update(['finance_charge_id' => $charge->id]);
+                            app(EgcBlockFinanceResolver::class)->bindExistingCharge($existingBlock, $charge);
                             $this->syncChargeDescriptionToLevel($charge, $levelNumber);
                         }
 
@@ -169,22 +170,20 @@ class BackfillEgcBlocks extends Command
                     continue;
                 }
 
-                if ($charge === null && ! $isDryRun) {
-                    $charge = $this->createMissingChargeForBlock($student, (int) $semesterId, $levelNumber);
-                }
-
                 if (! $isDryRun) {
-                    EgcBlock::create([
+                    $block = EgcBlock::create([
                         'student_id' => $studentId,
                         'semester_id' => $semesterId,
                         'block_number' => $blockNumber,
                         'level_number' => $levelNumber,
                         'result' => EgcBlock::RESULT_PENDING,
                         'is_retake' => $isRetake,
-                        'finance_charge_id' => $charge?->id,
                     ]);
 
+                    $charge ??= $this->createMissingChargeForBlock($block);
+
                     if ($charge !== null) {
+                        app(EgcBlockFinanceResolver::class)->bindExistingCharge($block, $charge);
                         $this->syncChargeDescriptionToLevel($charge, $levelNumber);
                     }
                 }
@@ -244,7 +243,9 @@ class BackfillEgcBlocks extends Command
         $this->newLine();
         $this->info('=== Backfill Verification ===');
         $this->line('Total egc_blocks:              '.EgcBlock::count());
-        $this->line('Blocks with no finance_charge: '.EgcBlock::whereNull('finance_charge_id')->count());
+        $blocks = EgcBlock::query()->get(['id']);
+        $linkedBlockCount = app(EgcBlockFinanceResolver::class)->chargesFor($blocks)->count();
+        $this->line('Blocks with no canonical Finance charge: '.($blocks->count() - $linkedBlockCount));
         $this->line('Blocks with is_retake = true:  '.EgcBlock::where('is_retake', true)->count());
         $this->line('Blocks with result = fail:     '.EgcBlock::where('result', EgcBlock::RESULT_FAIL)->count());
     }
@@ -321,12 +322,14 @@ class BackfillEgcBlocks extends Command
             ];
         }
 
-        $existingNullChargeBlocks = EgcBlock::query()
+        $existingBlocks = EgcBlock::query()
             ->where('student_id', $student->id)
             ->where('semester_id', $semesterId)
-            ->whereNull('finance_charge_id')
             ->orderBy('block_number')
             ->get();
+        $chargesByBlock = app(EgcBlockFinanceResolver::class)->chargesFor($existingBlocks);
+        $existingNullChargeBlocks = $existingBlocks
+            ->reject(fn (EgcBlock $block): bool => $chargesByBlock->has($block->id));
 
         foreach ($existingNullChargeBlocks as $block) {
             if (count($rows) >= 2) {
@@ -343,14 +346,14 @@ class BackfillEgcBlocks extends Command
         return array_slice($rows, 0, 2);
     }
 
-    private function createMissingChargeForBlock(Student $student, int $semesterId, int $levelNumber): FinanceCharge
+    private function createMissingChargeForBlock(EgcBlock $block): FinanceCharge
     {
         $existingCharge = FinanceCharge::query()
-            ->where('student_id', $student->id)
-            ->where('semester_id', $semesterId)
+            ->where('student_id', $block->student_id)
+            ->where('semester_id', $block->semester_id)
             ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
             ->where('status', FinanceCharge::STATUS_ACTIVE)
-            ->where('description', "EGC Level {$levelNumber} Fee")
+            ->where('description', "EGC Level {$block->level_number} Fee")
             ->first();
 
         if ($existingCharge !== null) {
@@ -359,12 +362,13 @@ class BackfillEgcBlocks extends Command
 
         // Wave 7: materialize via intake (no FinanceCharge::create).
         $result = app(SubmitEgcLevelFeeDebitAction::class)->handle(
-            (int) $student->id,
-            $semesterId,
-            $levelNumber,
+            (int) $block->student_id,
+            (int) $block->semester_id,
+            (int) $block->level_number,
             [
-                'source_kind' => SubmitEgcLevelFeeDebitAction::SOURCE_KIND_LEGACY_EGC,
-                'description' => "EGC Level {$levelNumber} Fee",
+                'source_kind' => SubmitEgcLevelFeeDebitAction::SOURCE_KIND_EGC_BLOCK,
+                'source_ref' => app(EgcBlockFinanceResolver::class)->sourceRef($block),
+                'description' => "EGC Level {$block->level_number} Fee",
                 'generation_mode' => SubmitEgcLevelFeeDebitAction::GENERATION_MODE_BATCH,
             ],
         );

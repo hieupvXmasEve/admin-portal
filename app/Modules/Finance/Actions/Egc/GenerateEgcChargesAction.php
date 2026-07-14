@@ -7,6 +7,7 @@ namespace App\Modules\Finance\Actions\Egc;
 use App\Models\EgcBlock;
 use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Modules\Finance\Support\EgcBlockGenerationClassifier;
 use App\Modules\Finance\Support\EgcBlockGenerationState;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
@@ -140,7 +141,7 @@ class GenerateEgcChargesAction
                 continue;
             }
 
-            $charge = self::createChargeViaIntake(
+            self::createChargeViaIntake(
                 $studentId,
                 $semesterId,
                 $dueDate,
@@ -150,9 +151,9 @@ class GenerateEgcChargesAction
                     'block_number' => (int) $block->block_number,
                     'is_retake' => (bool) $block->is_retake,
                 ],
+                $block,
             );
             $block->update([
-                'finance_charge_id' => $charge->id,
                 'result' => EgcBlock::RESULT_PENDING,
             ]);
 
@@ -175,11 +176,11 @@ class GenerateEgcChargesAction
     ): void {
         $deferredBlocks = EgcBlock::where('student_id', $studentId)
             ->where('semester_id', $semesterId)
-            ->whereNull('finance_charge_id')
-            ->get();
+            ->get()
+            ->filter(fn (EgcBlock $block): bool => app(EgcBlockFinanceResolver::class)->chargeFor($block) === null);
 
         foreach ($deferredBlocks as $block) {
-            $charge = self::createChargeViaIntake(
+            self::createChargeViaIntake(
                 $studentId,
                 $semesterId,
                 $dueDate,
@@ -189,8 +190,8 @@ class GenerateEgcChargesAction
                     'block_number' => (int) $block->block_number,
                     'is_retake' => (bool) $block->is_retake,
                 ],
+                $block,
             );
-            $block->update(['finance_charge_id' => $charge->id]);
             $results['created']++;
         }
 
@@ -225,7 +226,16 @@ class GenerateEgcChargesAction
             $isRetake = self::isRetakeEligible($studentId, $levelNumber);
 
             try {
-                $charge = self::createChargeViaIntake(
+                $block = EgcBlock::create([
+                    'student_id' => $studentId,
+                    'semester_id' => $semesterId,
+                    'block_number' => $blockNumber,
+                    'level_number' => $levelNumber,
+                    'result' => EgcBlock::RESULT_PENDING,
+                    'is_retake' => $isRetake,
+                ]);
+
+                self::createChargeViaIntake(
                     $studentId,
                     $semesterId,
                     $dueDate,
@@ -235,17 +245,8 @@ class GenerateEgcChargesAction
                         'block_number' => $blockNumber,
                         'is_retake' => $isRetake,
                     ],
+                    $block,
                 );
-
-                EgcBlock::create([
-                    'student_id' => $studentId,
-                    'semester_id' => $semesterId,
-                    'block_number' => $blockNumber,
-                    'level_number' => $levelNumber,
-                    'result' => EgcBlock::RESULT_PENDING,
-                    'is_retake' => $isRetake,
-                    'finance_charge_id' => $charge->id,
-                ]);
 
                 $results['created']++;
             } catch (UniqueConstraintViolationException) {
@@ -266,7 +267,6 @@ class GenerateEgcChargesAction
                         'level_number' => $deferredLevel,
                         'result' => EgcBlock::RESULT_PENDING,
                         'is_retake' => false,
-                        'finance_charge_id' => null,
                     ]);
                 } catch (UniqueConstraintViolationException) {
                     // already deferred, skip
@@ -319,18 +319,22 @@ class GenerateEgcChargesAction
         string $dueDate,
         int $levelNumber,
         array $options,
+        ?EgcBlock $block = null,
     ): FinanceCharge {
         $result = app(SubmitEgcLevelFeeDebitAction::class)->handle(
             $studentId,
             $semesterId,
             $levelNumber,
             [
-                'source_kind' => SubmitEgcLevelFeeDebitAction::SOURCE_KIND_BATCH_STUDIO,
+                'source_kind' => $block === null
+                    ? SubmitEgcLevelFeeDebitAction::SOURCE_KIND_BATCH_STUDIO
+                    : SubmitEgcLevelFeeDebitAction::SOURCE_KIND_EGC_BLOCK,
                 'due_date' => $dueDate,
                 'description' => "EGC Level {$levelNumber} Fee",
                 'generation_mode' => $options['generation_mode'],
                 'block_number' => $options['block_number'] ?? null,
                 'is_retake' => (bool) ($options['is_retake'] ?? false),
+                'source_ref' => $block === null ? null : app(EgcBlockFinanceResolver::class)->sourceRef($block),
             ],
         );
 

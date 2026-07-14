@@ -23,15 +23,14 @@ final class EgcRetakeTargetResolver
         $query = EgcBlock::query()
             ->where('student_id', $sourceBlock->student_id)
             ->where('result', EgcBlock::RESULT_PENDING)
-            ->whereNotNull('finance_charge_id')
             ->whereKeyNot($sourceBlock->id);
 
         if ((int) $sourceBlock->block_number === 1) {
-            return $query
+            return self::chargeable($query
                 ->where('semester_id', $sourceBlock->semester_id)
                 ->where('block_number', 2)
                 ->orderBy('id')
-                ->get();
+                ->get());
         }
 
         if ((int) $sourceBlock->block_number !== 2) {
@@ -43,11 +42,11 @@ final class EgcRetakeTargetResolver
             return EgcBlock::query()->whereRaw('1 = 0')->get();
         }
 
-        return $query
+        return self::chargeable($query
             ->where('semester_id', $nextSemesterId)
             ->where('block_number', 1)
             ->orderBy('id')
-            ->get();
+            ->get());
     }
 
     private static function nextSemesterId(EgcBlock $sourceBlock): ?int
@@ -66,5 +65,15 @@ final class EgcRetakeTargetResolver
             ->value('id');
 
         return $nextId !== null ? (int) $nextId : null;
+    }
+
+    /** @param Collection<int, EgcBlock> $blocks @return Collection<int, EgcBlock> */
+    private static function chargeable(Collection $blocks): Collection
+    {
+        $chargesByBlock = app(EgcBlockFinanceResolver::class)->chargesFor($blocks);
+
+        return $blocks
+            ->filter(fn (EgcBlock $block): bool => $chargesByBlock->has($block->id))
+            ->values();
     }
 }

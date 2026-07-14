@@ -7,10 +7,12 @@ use App\Models\ExamResitSession;
 use App\Models\ExamRoomSlot;
 use App\Models\Room;
 use App\Models\Student;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
@@ -68,9 +70,15 @@ function createExamResitChargeFor(ExamResitAttempt $attempt): FinanceCharge
 {
     ensureExamResitPricingCatalog((float) ($attempt->fee_amount ?: 750_000));
 
-    $updated = app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
+    app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
 
-    return FinanceCharge::findOrFail($updated->finance_charge_id);
+    return FinanceCharge::query()
+        ->where('finance_obligation_id', FinanceObligation::query()
+            ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+            ->where('source_kind', AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT)
+            ->where('source_ref', AcademicFinanceObligationSource::examResitAttemptRef($attempt))
+            ->value('id'))
+        ->firstOrFail();
 }
 
 /**
@@ -100,7 +108,7 @@ function ensureExamResitPricingCatalog(float $amount = 750_000): void
 
 /**
  * Create an active pushed DNG request that collects an exam-resit charge,
- * linked both via the convenience finance_charge_id and the charge pivot.
+ * linked through the canonical DNG charge pivot.
  *
  * @param  array<string, mixed>  $overrides
  */
@@ -119,7 +127,6 @@ function createPushedDngForExamResitCharge(FinanceCharge $charge, array $overrid
         'item_id' => 'PTL-ITEM-'.$charge->id,
         'amount' => $charge->amount,
         'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
-        'finance_charge_id' => $charge->id,
     ], $overrides));
 
     DngPaymentRequestCharge::create([

@@ -11,8 +11,10 @@ use App\Models\Student;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\User;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Queries\GetStudentBalanceQuery;
 use App\Services\PermissionService;
@@ -99,6 +101,17 @@ function gradeFailedRecordForController(): AcademicRecord
     ]);
 }
 
+function controllerExamResitCharge(ExamResitAttempt $attempt): FinanceCharge
+{
+    $obligationId = FinanceObligation::query()
+        ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+        ->where('source_kind', AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT)
+        ->where('source_ref', AcademicFinanceObligationSource::examResitAttemptRef($attempt))
+        ->value('id');
+
+    return FinanceCharge::query()->where('finance_obligation_id', $obligationId)->firstOrFail();
+}
+
 it('renders the exam-resit worklist with scalar filter defaults', function () {
     actingAs($this->user)
         ->withSession(['current_campus_id' => $this->campus->id])
@@ -150,8 +163,7 @@ it('rejects paid cancellation without no-refund acknowledgement', function () {
     $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
     app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
     $attempt->refresh();
-
-    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+    $charge = controllerExamResitCharge($attempt);
     payExamResitChargeFully($charge);
     $attempt->transitionToPaid();
 
@@ -171,7 +183,7 @@ it('rejects unpaid charge-created cancellation without fee confirmation', functi
     $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
     app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
     $attempt->refresh();
-    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+    $charge = controllerExamResitCharge($attempt);
 
     actingAs($this->user)
         ->withSession(['current_campus_id' => $this->campus->id, '_token' => 'test-token'])
@@ -190,8 +202,7 @@ it('queues paid cancellation through the controller when no-refund is acknowledg
     $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
     app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
     $attempt->refresh();
-
-    $charge = FinanceCharge::findOrFail($attempt->finance_charge_id);
+    $charge = controllerExamResitCharge($attempt);
     payExamResitChargeFully($charge);
     $attempt->transitionToPaid();
 

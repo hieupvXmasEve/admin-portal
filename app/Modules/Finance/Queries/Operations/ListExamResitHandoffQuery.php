@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Operations;
 
 use App\Models\ExamResitAttempt;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Support\ExamResitDngLinkResolver;
 use App\Modules\Finance\Support\ExamResitDueClassification;
 use App\Modules\Finance\Support\ExamResitDueClassifier;
@@ -42,18 +44,23 @@ class ListExamResitHandoffQuery
 
         $candidates = $this->candidateQuery($campusId, $semesterId, $search, $today, $now)->get();
 
-        $chargeIds = $candidates
-            ->pluck('finance_charge_id')
-            ->filter()
-            ->map(fn ($value) => (int) $value)
-            ->values()
-            ->all();
+        $chargeIdsByAttempt = FinanceCharge::query()
+            ->join('finance_obligations', 'finance_obligations.id', '=', 'finance_charges.finance_obligation_id')
+            ->where('finance_obligations.source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+            ->where('finance_obligations.source_kind', AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT)
+            ->whereIn(
+                'finance_obligations.source_ref',
+                $candidates->map(AcademicFinanceObligationSource::examResitAttemptRef(...)),
+            )
+            ->pluck('finance_charges.id', 'finance_obligations.source_ref')
+            ->mapWithKeys(fn (int $chargeId, string $sourceRef): array => [
+                (int) substr($sourceRef, strlen('exam-resit:')) => $chargeId,
+            ]);
 
-        $withActiveDng = array_flip($this->linkResolver->chargeIdsWithActivePushedDng($chargeIds));
+        $withActiveDng = array_flip($this->linkResolver->chargeIdsWithActivePushedDng($chargeIdsByAttempt->values()->all()));
 
         $rows = $candidates
-            ->reject(fn (ExamResitAttempt $attempt) => $attempt->finance_charge_id !== null
-                && isset($withActiveDng[(int) $attempt->finance_charge_id]))
+            ->reject(fn (ExamResitAttempt $attempt) => isset($withActiveDng[$chargeIdsByAttempt->get($attempt->id)]))
             ->map(fn (ExamResitAttempt $attempt) => [
                 'attempt' => $attempt,
                 'classification' => $this->classifier->classify($attempt, hasActivePushedDng: false, now: $now),
@@ -71,7 +78,6 @@ class ListExamResitHandoffQuery
             ->with([
                 'student:id,student_id,full_name,email,status',
                 'unit:id,code,name',
-                'financeCharge',
                 'session:id,exam_room_slot_id,unit_id,status',
                 'session.roomSlot:id,room_id,exam_date,start_time,end_time',
                 'session.roomSlot.room:id,name,code',

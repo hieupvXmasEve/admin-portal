@@ -49,12 +49,7 @@ class CancelRetakeCourseRegistrationAction
                 'unpaid_void_reason' => 'retake_course_cancelled',
                 'paid_void_reason' => 'retake_course_cancelled_paid_no_refund',
                 'actor_user_id' => $userId === null ? null : (int) $userId,
-                'payload' => [
-                    'reason' => $data['reason'],
-                    'legacy_finance_charge_id' => $registration->finance_charge_id === null
-                        ? null
-                        : (int) $registration->finance_charge_id,
-                ],
+                'payload' => ['reason' => $data['reason']],
             ]);
 
             return $registration->fresh() ?? $registration;

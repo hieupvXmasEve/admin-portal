@@ -80,8 +80,10 @@ function cutoverTarget(Student $student, string $amount = '1000000.00'): Invoice
 function legacyDngRequest(Student $student, string $feeType, string $status, array $overrides = []): DngPaymentRequest
 {
     $campusCode = $student->campus->getDngCode();
+    $chargeId = $overrides['finance_charge_id'] ?? null;
+    unset($overrides['finance_charge_id']);
 
-    return DngPaymentRequest::query()->create(array_merge([
+    $request = DngPaymentRequest::query()->create(array_merge([
         'student_id' => $student->id,
         'campus_code' => $campusCode,
         'student_code' => $student->student_id,
@@ -90,6 +92,16 @@ function legacyDngRequest(Student $student, string $feeType, string $status, arr
         'amount' => '1000000.00',
         'status' => $status,
     ], $overrides));
+
+    if (is_int($chargeId)) {
+        DngPaymentRequestCharge::query()->create([
+            'dng_payment_request_id' => $request->id,
+            'finance_charge_id' => $chargeId,
+            'amount' => $request->amount,
+        ]);
+    }
+
+    return $request;
 }
 
 it('inventories active requests without guessing links or writing data', function (): void {
@@ -220,10 +232,9 @@ it('keeps an exact historical paid target after its charge is voided', function 
         ->and($record['target_line_ids'])->toBe([$line->id]);
 });
 
-it('fails closed when paid request header and pivot identify different charges', function (): void {
+it('keeps exact allocation rows as the only paid-request linkage', function (): void {
     $student = cutoverStudent();
-    $headerLine = cutoverTarget($student);
-    $pivotLine = cutoverTarget($student);
+    $line = cutoverTarget($student);
     $payment = Payment::query()->create([
         'student_id' => $student->id,
         'amount' => '1000000.00',
@@ -232,21 +243,40 @@ it('fails closed when paid request header and pivot identify different charges',
         'paid_at' => now(),
         'status' => Payment::STATUS_COMPLETED,
     ]);
-    app(SettlementService::class)->createPaymentApplication($payment, $headerLine, 1000000, 'application');
+    app(SettlementService::class)->createPaymentApplication($payment, $line, 1000000, 'application');
     $request = legacyDngRequest($student, 'HL', DngPaymentRequest::STATUS_PAID_INVOICED, [
-        'finance_charge_id' => $headerLine->charge_id,
+        'finance_charge_id' => $line->charge_id,
         'payment_id' => $payment->id,
-    ]);
-    DngPaymentRequestCharge::query()->create([
-        'dng_payment_request_id' => $request->id,
-        'finance_charge_id' => $pivotLine->charge_id,
-        'amount' => '1000000.00',
     ]);
 
     $report = app(DngActiveMigrationInventoryQuery::class)->handle();
     $record = collect($report->records)->firstWhere('id', $request->id);
 
-    expect($record['classifications'])->toContain('unknown_link');
+    expect($record['classifications'])->toBe(['exact_link'])
+        ->and($record['target_line_ids'])->toBe([$line->id]);
+});
+
+it('uses payment applications as historical evidence when a paid DNG request has no target link', function (): void {
+    $student = cutoverStudent();
+    $line = cutoverTarget($student);
+    $payment = Payment::query()->create([
+        'student_id' => $student->id,
+        'amount' => '1000000.00',
+        'method' => Payment::METHOD_GATEWAY,
+        'source' => 'dng',
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+    ]);
+    app(SettlementService::class)->createPaymentApplication($payment, $line, 1000000, 'application');
+    $request = legacyDngRequest($student, 'HL', DngPaymentRequest::STATUS_PAID_INVOICED, [
+        'payment_id' => $payment->id,
+    ]);
+
+    $report = app(DngActiveMigrationInventoryQuery::class)->handle();
+    $record = collect($report->records)->firstWhere('id', $request->id);
+
+    expect($record['classifications'])->toBe(['exact_link'])
+        ->and($record['target_line_ids'])->toBe([$line->id]);
 });
 
 it('fails closed for new DNG collection while still allowing receipt-side code paths', function (): void {

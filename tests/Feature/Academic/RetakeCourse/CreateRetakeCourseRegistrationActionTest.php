@@ -15,7 +15,9 @@ use App\Models\UnitPrerequisiteGroup;
 use App\Models\User;
 use App\Modules\Academic\Actions\CancelRetakeCourseRegistrationAction;
 use App\Modules\Academic\Actions\CreateRetakeCourseRegistrationAction;
+use App\Modules\Academic\Actions\DispatchAcademicFinanceCancellationHandoffAction;
 use App\Modules\Academic\Queries\ListRetakeCourseEligibleStudentsQuery;
+use App\Modules\Academic\Models\AcademicFinanceCancellationHandoff;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\ProcessFinanceCancellationOperationAction;
 use App\Modules\Finance\Jobs\DispatchFinanceCancellationCompletionJob;
@@ -107,7 +109,6 @@ it('creates an auto-approved retake source and materializes its finance obligati
     expect($result->charge_semester_id)->toBe($this->semester->id);
     expect($result->approved_by_user_id)->toBe($this->user->id);
     expect($result->approved_at)->not->toBeNull();
-    expect($result->finance_charge_id)->toBeNull();
 
     $obligation = FinanceObligation::query()
         ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
@@ -175,7 +176,6 @@ it('allows staff-created retake source before class placement', function () {
 
     expect($result->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
     expect($result->course_offering_id)->toBeNull();
-    expect($result->finance_charge_id)->toBeNull();
 });
 
 it('keeps failed records eligible even when no class is open yet', function () {
@@ -261,6 +261,12 @@ it('allows registration after previous one was cancelled', function () {
         'reason' => 'Test cancellation',
     ]);
 
+    $handoff = AcademicFinanceCancellationHandoff::query()
+        ->where('source_kind', AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION)
+        ->where('source_ref', AcademicFinanceObligationSource::courseRetakeRegistrationRef($first))
+        ->firstOrFail();
+    DispatchAcademicFinanceCancellationHandoffAction::run(['handoff_id' => $handoff->id]);
+
     $operation = FinanceCancellationOperation::query()
         ->where('source_kind', AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION)
         ->where('source_ref', AcademicFinanceObligationSource::courseRetakeRegistrationRef($first))
@@ -285,12 +291,15 @@ it('allows registration after previous one was cancelled', function () {
     ]);
 
     expect($second->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
-    expect($second->finance_charge_id)->toBeNull();
-
-    $charges = FinanceCharge::where('student_id', $this->student->id)
-        ->where('source_type', CourseRetakeRegistration::class)
-        ->get();
-    expect($charges)->toHaveCount(0);
+    $secondObligation = FinanceObligation::query()
+        ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+        ->where('source_kind', AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION)
+        ->where('source_ref', AcademicFinanceObligationSource::courseRetakeRegistrationRef($second))
+        ->where('obligation_type', FinanceCharge::TYPE_RETAKE_FEE)
+        ->firstOrFail();
+    expect(FinanceCharge::query()
+        ->where('finance_obligation_id', $secondObligation->id)
+        ->exists())->toBeTrue();
 });
 
 it('rejects registration when unit has zero retake_fee', function () {

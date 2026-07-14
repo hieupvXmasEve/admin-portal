@@ -6,7 +6,6 @@ namespace App\Modules\Finance\Actions;
 
 use App\Models\ExamResitAttempt;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
-use App\Modules\Finance\Models\FinanceCharge;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
@@ -74,19 +73,13 @@ class CreateExamResitChargeSimpleAction
                 facts: $facts,
             ));
 
-            $chargeId = $result->finance_charge_id
-                ?? FinanceCharge::query()
-                    ->where('finance_obligation_id', $result->finance_obligation_id)
-                    ->where('status', FinanceCharge::STATUS_ACTIVE)
-                    ->value('id');
-
-            if ($chargeId === null) {
+            if ($result->finance_obligation_id === null || $result->finance_charge_id === null) {
                 throw ValidationException::withMessages([
                     'attempt_id' => ['Finance intake did not materialize an exam resit charge.'],
                 ]);
             }
 
-            $attempt->transitionToChargeCreated((int) $chargeId, (int) auth()->id());
+            $attempt->transitionToChargeCreated((int) auth()->id());
 
             return $attempt->fresh();
         });

@@ -13,6 +13,7 @@ use App\Modules\Academic\Queries\ListRetakeCourseRegistrationsQuery;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
@@ -82,8 +83,6 @@ function createRetakeListRegistration(bool $paid, ?Campus $campus = null): array
         'description' => 'Retake fee',
         'created_by_user_id' => $user->id,
     ]);
-    $registration->update(['finance_charge_id' => $charge->id]);
-
     if ($paid) {
         $payment = Payment::create([
             'student_id' => $student->id,
@@ -106,7 +105,7 @@ function createRetakeListRegistration(bool $paid, ?Campus $campus = null): array
         );
     }
 
-    return compact('campus', 'registration');
+    return compact('campus', 'registration', 'charge');
 }
 
 it('filters paid waiting class by derived payment state, not raw retake status', function () {
@@ -142,8 +141,7 @@ it('keeps summary counts independent from the selected operation filter', functi
 });
 
 it('treats linked paid dng evidence as paid before ledger bridge', function () {
-    ['campus' => $campus, 'registration' => $registration] = createRetakeListRegistration(paid: false);
-    $charge = FinanceCharge::findOrFail($registration->finance_charge_id);
+    ['campus' => $campus, 'registration' => $registration, 'charge' => $charge] = createRetakeListRegistration(paid: false);
 
     $dng = DngPaymentRequest::create([
         'student_id' => $registration->student_id,
@@ -158,7 +156,11 @@ it('treats linked paid dng evidence as paid before ledger bridge', function () {
         'status' => DngPaymentRequest::STATUS_PAID_UNINVOICED,
         'dng_payment_id' => 'DNG-HL-LIST-'.$charge->id,
         'paid_at' => now(),
+    ]);
+    DngPaymentRequestCharge::create([
+        'dng_payment_request_id' => $dng->id,
         'finance_charge_id' => $charge->id,
+        'amount' => $charge->amount,
     ]);
 
     $result = app(ListRetakeCourseRegistrationsQuery::class)->handle([

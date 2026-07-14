@@ -10,10 +10,4 @@ interface ExamResitAttemptPaymentSyncer
      * @return array{checked:int,eligible:int,synced:int,skipped:int,failed:int,details:array<int,array<string,mixed>>}
      */
     public function runForStudent(int $studentId, bool $dryRun = false): array;
-
-    /**
-     * @param  array<int>  $chargeIds
-     * @return array{checked:int,eligible:int,synced:int,skipped:int,failed:int,details:array<int,array<string,mixed>>}
-     */
-    public function runForChargeIds(array $chargeIds, bool $dryRun = false): array;
 }

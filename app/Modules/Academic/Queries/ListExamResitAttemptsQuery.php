@@ -155,7 +155,6 @@ class ListExamResitAttemptsQuery
             'completed_at' => $attempt->completed_at,
             'created_at' => $attempt->created_at,
             'hq_fee_status' => $attempt->hq_fee_status,
-            'finance_charge_id' => $attempt->finance_charge_id,
             'cancellation_fee_disposition' => $attempt->cancellation_fee_disposition,
             'cancellation_notice_sent_at' => $attempt->cancellation_notice_sent_at,
             'cancellation_notice_error' => $attempt->cancellation_notice_error,

@@ -48,25 +48,6 @@ class SyncPaidRetakeRegistrationsAction implements RetakeRegistrationPaymentSync
     }
 
     /**
-     * @param  array<int>  $chargeIds
-     * @return array{checked:int,eligible:int,synced:int,waiting_for_class:int,skipped:int,failed:int,details:array<int,array<string,mixed>>}
-     */
-    public function runForChargeIds(array $chargeIds, bool $dryRun = false): array
-    {
-        $chargeIds = array_values(array_unique(array_filter(array_map('intval', $chargeIds))));
-
-        if ($chargeIds === []) {
-            return $this->emptyResult();
-        }
-
-        // Legacy bridge: pre-cutover rows still store finance_charge_id.
-        return $this->runQuery(
-            CourseRetakeRegistration::query()->whereIn('finance_charge_id', $chargeIds),
-            $dryRun,
-        );
-    }
-
-    /**
      * @return array{checked:int,eligible:int,synced:int,waiting_for_class:int,skipped:int,failed:int,details:array<int,array<string,mixed>>}
      */
     private function runQuery(Builder $query, bool $dryRun): array

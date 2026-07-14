@@ -52,25 +52,6 @@ class SyncPaidExamResitAttemptsAction implements ExamResitAttemptPaymentSyncer
     }
 
     /**
-     * @param  array<int>  $chargeIds
-     * @return array{checked:int,eligible:int,synced:int,skipped:int,failed:int,details:array<int,array<string,mixed>>}
-     */
-    public function runForChargeIds(array $chargeIds, bool $dryRun = false): array
-    {
-        $chargeIds = array_values(array_unique(array_filter(array_map('intval', $chargeIds))));
-
-        if ($chargeIds === []) {
-            return $this->emptyResult();
-        }
-
-        // Legacy bridge: still accept finance_charge_id matches for pre-cutover rows.
-        return $this->runQuery(
-            ExamResitAttempt::query()->whereIn('finance_charge_id', $chargeIds),
-            $dryRun,
-        );
-    }
-
-    /**
      * @return array{checked:int,eligible:int,synced:int,skipped:int,failed:int,details:array<int,array<string,mixed>>}
      */
     private function runQuery(Builder $query, bool $dryRun): array

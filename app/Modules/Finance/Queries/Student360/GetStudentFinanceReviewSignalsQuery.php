@@ -129,10 +129,9 @@ class GetStudentFinanceReviewSignalsQuery
 
     private function paidDngRequiresVoidedFeeReview(DngPaymentRequest $request): bool
     {
-        $voidedTargetChargeIds = collect([$request->financeCharge])
-            ->merge($request->chargeLinks->map(
-                fn (DngPaymentRequestCharge $link): ?FinanceCharge => $link->financeCharge,
-            ))
+        $voidedTargetChargeIds = $request->chargeLinks->map(
+            fn (DngPaymentRequestCharge $link): ?FinanceCharge => $link->financeCharge,
+        )
             ->filter(fn (?FinanceCharge $charge): bool => $this->chargeIsVoided($charge))
             ->map(fn (FinanceCharge $charge): int => (int) $charge->id)
             ->unique()

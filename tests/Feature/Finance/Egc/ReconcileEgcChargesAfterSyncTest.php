@@ -17,12 +17,14 @@ use App\Modules\Finance\Actions\Egc\ReconcileEgcChargesAfterSyncAction;
 use App\Modules\Finance\Actions\Egc\SyncEgcBlockResultsAction;
 use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Egc\ListEgcRetakeAdjustmentsQuery;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -79,11 +81,25 @@ function makeReconcileChargeWithInvoice(Student $student, Semester $semester, in
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'finance',
+        'source_kind' => 'test_egc_charge',
+        'source_ref' => 'test-egc-charge:'.$charge->id,
+        'obligation_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+    $charge->update(['finance_obligation_id' => $obligation->id]);
 
     $invoice = StudentInvoice::query()->create([
         'invoice_number' => 'EGC-REC-'.uniqid(),
         'student_id' => $student->id,
         'semester_id' => $semester->id,
+        'currency' => 'VND',
         'status' => 'draft',
         'due_date' => now()->addDays(30),
     ]);
@@ -113,7 +129,19 @@ function makeReconcileBlock(Student $student, Semester $semester, int $blockNumb
 
 function attachReconcileCharge(EgcBlock $block, FinanceCharge $charge): EgcBlock
 {
-    $block->update(['finance_charge_id' => $charge->id]);
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'finance',
+        'source_kind' => 'egc_block',
+        'source_ref' => app(EgcBlockFinanceResolver::class)->sourceRef($block),
+        'obligation_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $charge->amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test:egc_block',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+    $charge->update(['finance_obligation_id' => $obligation->id]);
 
     return $block->fresh();
 }
@@ -193,7 +221,7 @@ it('relevels only the immediate next-semester block and auto-applies retake disc
         ->and($secondTargetLine->fresh()->description_snapshot)->toBe('EGC Level 5 Fee');
 
     expect($sourceBlock->fresh()->retake_discount_id)->not->toBeNull()
-        ->and(EgcRetakeDiscountLink::query()->where('target_finance_charge_id', $firstTargetCharge->id)->exists())->toBeTrue()
+        ->and(EgcRetakeDiscountLink::query()->where('target_invoice_line_id', $firstTargetLine->id)->exists())->toBeTrue()
         ->and(DiscountAllocation::query()->sum('amount'))->toBe('7500000.00')
         ->and((float) PaymentApplication::query()->where('invoice_line_id', $firstTargetLine->id)->sum('amount'))->toBe(7_500_000.0);
 

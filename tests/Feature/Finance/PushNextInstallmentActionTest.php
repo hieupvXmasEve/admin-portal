@@ -168,8 +168,7 @@ it('pushes the next pending installment to DNG and links the record', function (
     $dng = DngPaymentRequest::query()->find($installment->dng_payment_request_id);
     expect($dng)->not->toBeNull();
     expect((float) $dng->amount)->toBe(7_500_000.0);
-    expect($dng->finance_charge_id)->toBeNull()
-        ->and($dng->chargeLinks->sole()->finance_charge_id)->toBe($fix['charge']->id)
+    expect($dng->chargeLinks->sole()->finance_charge_id)->toBe($fix['charge']->id)
         ->and($dng->chargeLinks->sole()->finance_charge_installment_id)->toBe($installment->id);
 });
 

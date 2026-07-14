@@ -15,10 +15,12 @@ use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceCreditEntitlement;
 use App\Modules\Finance\Models\FinanceDiscountEntitlement;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -57,11 +59,25 @@ function makeEgcLevelChargeWithInvoice(Student $student, Semester $semester, int
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'finance',
+        'source_kind' => 'test_egc_charge',
+        'source_ref' => 'test-egc-charge:'.$charge->id,
+        'obligation_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+    $charge->update(['finance_obligation_id' => $obligation->id]);
 
     $invoice = StudentInvoice::create([
         'invoice_number' => 'EGC-ENT-'.uniqid(),
         'student_id' => $student->id,
         'semester_id' => $semester->id,
+        'currency' => 'VND',
         'status' => 'pending',
         'due_date' => now()->addDays(30),
         'subtotal' => $amount,
@@ -83,7 +99,11 @@ function makeEgcLevelChargeWithInvoice(Student $student, Semester $semester, int
 
 function attachEgcChargeToBlock(EgcBlock $block, FinanceCharge $charge): EgcBlock
 {
-    $block->update(['finance_charge_id' => $charge->id]);
+    $charge->financeObligation->update([
+        'source_system' => 'finance',
+        'source_kind' => 'egc_block',
+        'source_ref' => app(EgcBlockFinanceResolver::class)->sourceRef($block),
+    ]);
 
     return $block->fresh();
 }
@@ -130,7 +150,7 @@ it('creates an EGC retake discount entitlement and targets the mapped retake lin
         ->and($allocation->invoice_line_id)->toBe($targetLine->id)
         ->and($allocation->allocation_rule)->toBe('egc_retake_target')
         ->and((float) $allocation->amount)->toBe(7_500_000.0)
-        ->and(EgcRetakeDiscountLink::where('target_finance_charge_id', $targetCharge->id)->exists())->toBeTrue()
+        ->and(EgcRetakeDiscountLink::where('target_invoice_line_id', $targetLine->id)->exists())->toBeTrue()
         ->and($sourceBlock->fresh()->retake_discount_id)->toBe($discount->id)
         ->and(CreditApplication::query()->count())->toBe(0)
         ->and(FinanceCharge::query()->where('amount', '<', 0)->count())->toBe(0);

@@ -11,6 +11,7 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
 use App\Modules\Finance\Support\EgcRetakeTargetResolver;
 use Illuminate\Support\Facades\DB;
@@ -37,13 +38,14 @@ class ReconcileEgcChargesAfterSyncAction
         $sourceBlocks = EgcBlock::query()
             ->where('semester_id', $semesterId)
             ->where('result', EgcBlock::RESULT_FAIL)
-            ->whereNotNull('finance_charge_id')
             ->whereNull('retake_discount_id')
             ->when($studentIds !== null, fn ($query) => $query->whereIn('student_id', $studentIds))
             ->with('student:id,gc_total_levels,student_id,status')
             ->orderBy('student_id')
             ->orderBy('block_number')
             ->get();
+        $sourceCharges = app(EgcBlockFinanceResolver::class)->chargesFor($sourceBlocks);
+        $sourceBlocks = $sourceBlocks->filter(fn (EgcBlock $block): bool => $sourceCharges->has($block->id));
 
         $summary['students_considered'] = $sourceBlocks->pluck('student_id')->unique()->count();
         $reconciledStudentIds = [];
@@ -94,8 +96,11 @@ class ReconcileEgcChargesAfterSyncAction
                     );
 
                     if ($retakeTarget instanceof EgcBlock && $sourceBlock->fresh()->retake_discount_id === null) {
-                        ApplyEgcRetakeDiscountAction::run((int) $sourceBlock->id, (int) $retakeTarget->finance_charge_id);
-                        $innerSummary['discounts_applied']++;
+                        $targetCharge = app(EgcBlockFinanceResolver::class)->chargeFor($retakeTarget);
+                        if ($targetCharge instanceof FinanceCharge) {
+                            ApplyEgcRetakeDiscountAction::run((int) $sourceBlock->id, (int) $targetCharge->id);
+                            $innerSummary['discounts_applied']++;
+                        }
                     }
                 }
 
@@ -118,7 +123,10 @@ class ReconcileEgcChargesAfterSyncAction
 
     private static function relevelTargetBlock(EgcBlock $targetBlock, int $expectedLevel, bool $isRetake): int
     {
-        $charge = FinanceCharge::query()->findOrFail($targetBlock->finance_charge_id);
+        $charge = app(EgcBlockFinanceResolver::class)->chargeFor($targetBlock);
+        if (! $charge instanceof FinanceCharge) {
+            throw new \RuntimeException('EGC target block has no canonical Finance charge.');
+        }
         $line = self::activeInvoiceLineFor($charge);
         $amount = app(EgcLevelFeeResolver::class)->resolve($expectedLevel);
         $description = "EGC Level {$expectedLevel} Fee";
@@ -168,7 +176,7 @@ class ReconcileEgcChargesAfterSyncAction
                 return 'target_block_not_pending';
             }
 
-            $charge = $targetBlock->financeCharge;
+            $charge = app(EgcBlockFinanceResolver::class)->chargeFor($targetBlock);
             if (! $charge instanceof FinanceCharge || $charge->status !== FinanceCharge::STATUS_ACTIVE) {
                 return 'target_charge_not_active';
             }
@@ -187,7 +195,7 @@ class ReconcileEgcChargesAfterSyncAction
                 return 'target_invoice_not_reconcilable';
             }
 
-            if (EgcRetakeDiscountLink::query()->where('target_finance_charge_id', $charge->id)->exists()) {
+            if (EgcRetakeDiscountLink::query()->whereIn('target_invoice_line_id', $activeLines->pluck('id'))->exists()) {
                 return 'target_charge_already_used_for_retake_discount';
             }
 
@@ -201,8 +209,7 @@ class ReconcileEgcChargesAfterSyncAction
 
     private static function targetBlocksFor(EgcBlock $sourceBlock)
     {
-        return EgcRetakeTargetResolver::targetBlocksFor($sourceBlock)
-            ->load(['financeCharge.invoiceLines.invoice']);
+        return EgcRetakeTargetResolver::targetBlocksFor($sourceBlock);
     }
 
     private static function activeInvoiceLineFor(FinanceCharge $charge): InvoiceLine

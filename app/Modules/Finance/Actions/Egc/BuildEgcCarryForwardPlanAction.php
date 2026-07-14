@@ -9,6 +9,7 @@ use App\Models\EgcBlock;
 use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use Illuminate\Support\Collection;
 
 class BuildEgcCarryForwardPlanAction
@@ -51,9 +52,10 @@ class BuildEgcCarryForwardPlanAction
                 ])->values())
             : collect();
 
+        $chargesByBlock = app(EgcBlockFinanceResolver::class)->chargesFor($student->egcProgress);
         $consumedBlocks = $student->egcProgress
-            ->filter(function ($block) use ($registrationsBySemester) {
-                if ($block->finance_charge_id === null) {
+            ->filter(function ($block) use ($registrationsBySemester, $chargesByBlock) {
+                if (! $chargesByBlock->has($block->id)) {
                     return false;
                 }
 
@@ -67,9 +69,9 @@ class BuildEgcCarryForwardPlanAction
             ->values();
 
         $consumedChargeIds = $consumedBlocks
-            ->pluck('finance_charge_id')
+            ->map(fn (EgcBlock $block): ?int => $chargesByBlock->get($block->id)?->id)
             ->filter()
-            ->map(fn ($id) => (int) $id)
+            ->values()
             ->all();
 
         $activeCharges = $student->financeCharges
@@ -166,7 +168,7 @@ class BuildEgcCarryForwardPlanAction
                 'semester_name' => $block->semester?->name,
                 'block_number' => $block->block_number,
                 'level_number' => $block->level_number,
-                'finance_charge_id' => $block->finance_charge_id,
+                'finance_source_ref' => app(EgcBlockFinanceResolver::class)->sourceRef($block),
             ])->values()->all(),
         ];
     }
