@@ -82,10 +82,10 @@ So Phase 2 (data contract) is largely migrated. The remaining work is the
   **unique** index (`app/Models/FinanceCharge.php:111-116,258-274`;
   `2026_06_17_100000:42-43`). Voiding nulls the key (releases the slot). This is
   the reusable active-source uniqueness guard — **no new global constraint needed**.
-- `retake_fee` creation pattern to mirror: `lockForUpdate(source)` →
-  app-level idempotency SELECT → `CreateFinanceChargeAction` → `DngPaymentService::createAndPush()`
-  (`CreateRetakeCourseChargeAction.php:44-161`). PAID derived from
-  `SettlementService` (`getChargePaidAmount`, `deriveInvoiceSnapshot`); never a checkbox.
+- Current `retake_fee` creation pattern: the Academic source calls the Finance
+  Intake Contract, which materializes the canonical obligation and charge; DNG
+  creation is a separate guarded-reservation flow. PAID derives from canonical
+  settlement evidence; never a checkbox.
 - **Gaps for `exam_resit_fee`:** no Finance action creates it; `ExamResitAttempt.finance_charge_id`/
   `hq_fee_status` never populated; no paid syncer (the retake syncer only handles
   `CourseRetakeRegistration`); batch DNG path handles only `HL`/`retake_fee`

@@ -1,6 +1,6 @@
 # Swinx — Full Codebase Discovery Report
 
-**Date:** 2026-05-12
+**Date:** 2026-05-12 (Finance source-pointer correction verified 2026-07-15)
 **Branch:** dev
 **Method:** Standalone discovery. Read-only inspection of `app/`, `resources/`, `routes/`, `database/`, `tests/`, `config/`, `docs/`, root configs, and Docker scaffolding. Cross-referenced existing `docs/system-architecture.md`, `docs/project-overview-pdr.md`, `docs/codebase-summary.md`, `docs/code-standards.md`, and `AGENTS.md`.
 **Scope:** Whole repository — depth **high**.
@@ -205,7 +205,7 @@ Channels: `EmailChannelAdapter`, `RealtimeChannelAdapter`, `RenderedEmailChannel
 Canonical tables: `payments`, `payment_applications` (line-level cash, replaces legacy `payment_allocations`), `invoice_lines` (with `status` active/void), `invoice_discounts`, `discount_allocations` (line-level discount truth), `student_invoices` (snapshot cache only).
 
 Services: `SettlementService`, `PaymentService`, `FinanceChargeService`, `InvoiceGenerationService`, `DeferCaseService`, `DeferChargeResolver`.
-Actions: `AllocatePaymentAction`, `AutoAllocatePaymentsAction`, `VoidFinanceChargeAction`, `CreateFinanceChargeAction`, `CreateRetakeCourseChargeAction`.
+Actions: `AllocatePaymentAction`, `AutoAllocatePaymentsAction`, `VoidFinanceChargeAction`, `CreateFinanceChargeAction`, `RequestFinanceDebitAction`.
 EGC sub-system: `egc_blocks`, `egc_retake_discount_links`, plus `SyncEgcBlockResultsAction`, `ApplyEgcRetakeDiscountAction`, `ApplyEgcCarryForwardAction`, `BuildEgcCarryForwardPlanAction`, `GenerateEgcChargesAction`, paired Query classes, and Support `StudentChargeTimingResolver`.
 **DNG gateway** (`app/Modules/Finance/Dng/`): own Http/Jobs/Models/Services/Support, webhook inbox-first flow, HMAC checksum, replacement rule for unpaid requests, reconciliation job every 15 min.
 

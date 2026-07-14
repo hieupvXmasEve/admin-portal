@@ -12,7 +12,7 @@
 
 - [x] **T5: Cancel Action** — Tạo `App\Modules\Academic\Actions\CancelRetakeCourseRegistrationAction`. Check status cancellable (approved/payment_pending), void charge nếu có, cancel DNG nếu có, set cancelled.
 
-- [x] **T6: Finance Charge Action** — Tạo `App\Modules\Finance\Actions\CreateRetakeCourseChargeAction`. Validate case ở approved, tạo FinanceCharge (TYPE_RETAKE_FEE, source = CTR), tạo DNG request qua DngPaymentService, transition case sang payment_pending.
+- [x] **T6: Finance Charge Action** — Historical implementation created `App\Modules\Finance\Actions\CreateRetakeCourseChargeAction`. Retired on 2026-07-15 and superseded by the Finance Intake Contract plus guarded DNG reservation flow.
 
 - [x] **T7: Auto-Enroll on Payment** — Hook vào `DngWebhookService`: khi payment confirmed cho charge có source_type = CourseRetakeRegistration → tạo CourseRegistration (is_retake=true), increment enrollment, transition case paid → enrolled.
 

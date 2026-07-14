@@ -1,9 +1,9 @@
 # Codebase Summary
 
-Last updated: 2026-06-29
+Last updated: 2026-07-15
 Owner: Platform Team
 Status: Current-state snapshot
-Primary source: `repomix-output.xml` (generated 2026-03-02 / updated for runtime code through commit 8651e0f4)
+Primary source: `repomix-output.xml` (generated 2026-03-02 / updated for runtime code through commit 8651e0f4); Finance source-pointer corrections were manually verified against current runtime code on 2026-07-15.
 
 ## 1) Snapshot Method
 
@@ -85,7 +85,7 @@ Current counts:
         - `/finance/egc/carry-forward`
         - `/finance/egc/generate-charges`
     - Campus scope: current EGC ops pages now read only students in `session('current_campus_id')`
-    - Carry-forward truth: `egc_blocks.finance_charge_id` + block `result`
+    - Carry-forward truth: EGC block `result` plus the canonical FinanceObligation source triple for the block
         - mapped block with `result != pending` => consumed
         - unused active paid EGC charges can be released to unapplied balance without auto-reallocation
     - Retake truth: target charge must belong to a later mapped retake block for the same student + level

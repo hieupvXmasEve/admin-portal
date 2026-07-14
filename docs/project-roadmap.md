@@ -1,6 +1,6 @@
 # Project Roadmap
 
-Last updated: 2026-04-21  
+Last updated: 2026-07-15
 Owner: Platform Team  
 Status: Active execution baseline  
 Horizon: next 2-3 quarters
@@ -24,11 +24,14 @@ Horizon: next 2-3 quarters
     - disabled CI workflows
     - deployment/script/security drift
 
-Recent activity through 2026-04-21:
+Recent activity through 2026-07-15:
 
+- 2026-07-15: Finance source-pointer retirement baseline restored
+    - EGC Finance evidence now resolves through the canonical `FinanceObligation` source triple; EGC blocks retain no direct charge pointer
+    - Retired retake-to-DNG action and source-pointer tests removed; the supported intake and guarded reservation responsibilities remain covered at their canonical seams
 - 2026-04-21: EGC finance operations baseline expanded
     - New EGC ops pages now cover block result review, retake adjustments, and unused EGC carry-forward
-    - EGC carry-forward uses `egc_blocks` + `finance_charge_id` as consume truth and releases unused paid EGC balance back to unapplied cash without auto-reallocation
+    - EGC carry-forward then used EGC block results plus direct charge mapping as consume truth and released unused paid EGC balance back to unapplied cash without auto-reallocation
     - Retake target selection now requires a later retake block charge for the same student/level
     - EGC ops list pages are now campus-scoped by `current_campus_id` session context:
         - `/finance/egc/block-results`

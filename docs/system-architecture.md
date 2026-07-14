@@ -1,6 +1,6 @@
 # System Architecture
 
-Last updated: 2026-07-12
+Last updated: 2026-07-15
 Owner: Platform Team
 Status: Current-state architecture map
 Source of truth: route files, middleware, module providers, runtime entrypoints
@@ -72,7 +72,7 @@ Client (Web SPA / API)
         - current ops list pages are locked to `session('current_campus_id')`
         - no campus picker is exposed on the current EGC pages
     - EGC data truth:
-        - `egc_blocks` tracks per-semester block order, level, result, retake flag, and mapped `finance_charge_id`
+        - `egc_blocks` tracks per-semester block order, level, result, and retake flag; its Finance evidence resolves through the canonical `FinanceObligation` source triple
         - `egc_retake_discount_links` binds failed source block -> target charge -> discount header
         - carry-forward releases unused paid EGC charges back to unapplied balance by voiding unused charges without immediate auto-allocation
         - retake discounts only target later mapped retake blocks of the same level

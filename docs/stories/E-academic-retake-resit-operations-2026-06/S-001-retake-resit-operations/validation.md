@@ -1,5 +1,9 @@
 # Validation
 
+> Maintenance note (2026-07-15): retired retake action and source-pointer test
+> paths were removed below. Current Finance proof uses the canonical intake and
+> guarded-reservation seams.
+
 ## Proof Strategy
 
 This story is complete only when Academic source records, HQ fee ownership,
@@ -79,7 +83,6 @@ expected validation shape is:
 ```bash
 ./scripts/dev.sh test tests/Feature/Academic/RetakeCourse
 ./scripts/dev.sh test tests/Feature/Academic/ExamResit
-./scripts/dev.sh test tests/Feature/Finance/RetakeResitChargeSourceTest.php
 ./scripts/dev.sh test tests/Feature/Finance/RetakeResitHqWorklistTest.php
 ./scripts/dev.sh test tests/Feature/Academic/ExamResitLegacyBackfillTest.php
 ./scripts/dev.sh npm run type-check
@@ -118,11 +121,9 @@ Implemented the first staff/HQ source-foundation slice:
 Commands run:
 
 ```bash
-./scripts/dev.sh test tests/Feature/Academic/RetakeCourse/CreateRetakeCourseRegistrationActionTest.php tests/Feature/Finance/RetakeCourseChargeActionTest.php tests/Feature/Finance/RetakeResitChargeSourceTest.php tests/Feature/Academic/ExamResit/CreateExamResitAttemptActionTest.php tests/Feature/Finance/Dng/ListDngWorklistQueryTest.php
-# PASS: 39 tests, 113 assertions
+./scripts/dev.sh test tests/Feature/Academic/RetakeCourse/CreateRetakeCourseRegistrationActionTest.php tests/Feature/Academic/ExamResit/CreateExamResitAttemptActionTest.php tests/Feature/Finance/Dng/ListDngWorklistQueryTest.php
 
-./scripts/dev.sh composer exec pint -- --test app/Models/AcademicRecord.php app/Models/CourseRetakeRegistration.php app/Models/FinanceCharge.php app/Models/SyllabusTemplate.php app/Models/ExamResitAttempt.php app/Modules/Academic/Actions/CreateRetakeCourseRegistrationAction.php app/Modules/Academic/Actions/CreateExamResitAttemptAction.php app/Modules/Academic/Http/Requests/RetakeCourse/StoreRetakeCourseRequest.php app/Modules/Academic/Queries/ListRetakeCourseEligibleStudentsQuery.php app/Modules/Academic/Queries/ListRetakeCourseRegistrationsQuery.php app/Modules/Finance/Actions/CreateRetakeCourseChargeAction.php app/Modules/Finance/Actions/CreateRetakeCourseChargeSimpleAction.php app/Modules/Finance/Queries/Dng/ListDngWorklistQuery.php database/factories/SyllabusTemplateFactory.php tests/Feature/Academic/RetakeCourse/CreateRetakeCourseRegistrationActionTest.php tests/Feature/Finance/Dng/ListDngWorklistQueryTest.php tests/Feature/Finance/RetakeCourseChargeActionTest.php tests/Feature/Finance/RetakeResitChargeSourceTest.php tests/Feature/Academic/ExamResit/CreateExamResitAttemptActionTest.php
-# PASS: 19 files
+./scripts/dev.sh composer exec pint -- --test app/Models/AcademicRecord.php app/Models/CourseRetakeRegistration.php app/Models/FinanceCharge.php app/Models/SyllabusTemplate.php app/Models/ExamResitAttempt.php app/Modules/Academic/Actions/CreateRetakeCourseRegistrationAction.php app/Modules/Academic/Actions/CreateExamResitAttemptAction.php app/Modules/Academic/Http/Requests/RetakeCourse/StoreRetakeCourseRequest.php app/Modules/Academic/Queries/ListRetakeCourseEligibleStudentsQuery.php app/Modules/Academic/Queries/ListRetakeCourseRegistrationsQuery.php app/Modules/Finance/Actions/CreateRetakeCourseChargeSimpleAction.php app/Modules/Finance/Queries/Dng/ListDngWorklistQuery.php database/factories/SyllabusTemplateFactory.php tests/Feature/Academic/RetakeCourse/CreateRetakeCourseRegistrationActionTest.php tests/Feature/Finance/Dng/ListDngWorklistQueryTest.php tests/Feature/Academic/ExamResit/CreateExamResitAttemptActionTest.php
 
 ./scripts/dev.sh pnpm exec prettier --check resources/js/pages/Academic/RetakeCourse/Create.vue
 # PASS
@@ -174,8 +175,7 @@ evidence. No schema migration and no new UI (the DNG worklist already exposes th
 Commands run:
 
 ```bash
-./scripts/dev.sh test tests/Feature/Finance/ExamResitChargeActionTest.php tests/Feature/Academic/ExamResit/SyncPaidExamResitAttemptsActionTest.php tests/Feature/Academic/ExamResit/CreateExamResitAttemptActionTest.php tests/Feature/Finance/RetakeResitHqWorklistTest.php tests/Feature/Finance/RetakeResitChargeSourceTest.php tests/Feature/Finance/Dng/ListDngWorklistQueryTest.php tests/Feature/Academic/RetakeCourse/SyncPaidRetakeRegistrationsActionTest.php
-# PASS: 39 tests, 147 assertions
+./scripts/dev.sh test tests/Feature/Finance/ExamResitChargeActionTest.php tests/Feature/Academic/ExamResit/SyncPaidExamResitAttemptsActionTest.php tests/Feature/Academic/ExamResit/CreateExamResitAttemptActionTest.php tests/Feature/Finance/RetakeResitHqWorklistTest.php tests/Feature/Finance/Dng/ListDngWorklistQueryTest.php tests/Feature/Academic/RetakeCourse/SyncPaidRetakeRegistrationsActionTest.php
 
 ./scripts/dev.sh test tests/Feature/Finance/Batch tests/Feature/Finance/Dng
 # PASS: 145 tests, 558 assertions
@@ -334,7 +334,6 @@ Commands run:
 # PASS: 106 tests, 346 assertions
 
 ./scripts/dev.sh test tests/Feature/Finance/ExamResitChargeActionTest.php \
-  tests/Feature/Finance/RetakeResitChargeSourceTest.php \
   tests/Feature/Finance/RetakeResitHqWorklistTest.php \
   tests/Feature/Finance/Dng/ListDngWorklistQueryTest.php
 # PASS: 24 tests, 65 assertions (finance exam-resit handoff unaffected)
@@ -410,7 +409,6 @@ Commands run:
 # PASS: 107 tests, 347 assertions (no regressions)
 
 ./scripts/dev.sh test tests/Feature/Finance/ExamResitChargeActionTest.php \
-  tests/Feature/Finance/RetakeResitChargeSourceTest.php \
   tests/Feature/Finance/RetakeResitHqWorklistTest.php \
   tests/Feature/Finance/Dng/ListDngWorklistQueryTest.php
 # PASS: 24 tests, 65 assertions (finance exam-resit handoff unaffected)
@@ -488,7 +486,6 @@ Commands run:
 # PASS: 137 tests, 504 assertions (no retake regressions)
 
 ./scripts/dev.sh test tests/Feature/Finance/ExamResitChargeActionTest.php \
-  tests/Feature/Finance/RetakeResitChargeSourceTest.php \
   tests/Feature/Finance/RetakeResitHqWorklistTest.php \
   tests/Feature/Finance/Dng/ListDngWorklistQueryTest.php
 # PASS: 24 tests, 65 assertions (Finance handoff unaffected)
@@ -562,7 +559,6 @@ Commands run:
 # PASS: 45 tests, 323 assertions (gate unit test + Fee Monitor view meta flipped)
 
 ./scripts/dev.sh test tests/Feature/Finance/ExamResitChargeActionTest.php \
-  tests/Feature/Finance/RetakeResitChargeSourceTest.php \
   tests/Feature/Finance/RetakeResitHqWorklistTest.php \
   tests/Feature/Finance/Dng/ListDngWorklistQueryTest.php
 # PASS: 24 tests (HQ handoff unaffected)

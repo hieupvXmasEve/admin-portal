@@ -1,6 +1,6 @@
 # Student Academic and Finance Schema Map
 
-Last updated: 2026-07-07
+Last updated: 2026-07-15
 Owner: Platform Team
 Status: Current-state schema map
 Source of truth: dev DB `asia` schema, Eloquent model relations, and current Finance/Academic architecture docs
@@ -211,7 +211,6 @@ erDiagram
 
     STUDENTS ||--o{ EGC_BLOCKS : student_id
     SEMESTERS ||--o{ EGC_BLOCKS : semester_id
-    FINANCE_CHARGES ||--o{ EGC_BLOCKS : finance_charge_id
     INVOICE_DISCOUNTS ||--o{ EGC_BLOCKS : retake_discount_id
     EGC_BLOCKS ||--o{ EGC_RETAKE_DISCOUNT_LINKS : source_egc_block_id
     FINANCE_CHARGES ||--o{ EGC_RETAKE_DISCOUNT_LINKS : target_finance_charge_id
@@ -252,7 +251,6 @@ erDiagram
         tinyint block_number
         tinyint level_number
         enum result
-        bigint finance_charge_id FK
         bigint retake_discount_id FK
     }
 ```
@@ -264,7 +262,7 @@ erDiagram
 | `exam_resit_sessions` | Scheduled resit session. | No direct money truth. | `unit_id`, `semester_id`, `campus_id`, room slot, scheduled/cancelled actor fields. |
 | `defer_cases` | Finance policy created from an Academic defer action. | May create a `finance_charges` credit through polymorphic source (`source_type = App\\Models\\DeferCase`). | 1-1 with `student_action_logs`, plus `student_id`, `semester_id`, `applies_until_semester_id`, `applied_semester_id`. |
 | `defer_case_items` | Course-level defer details. | May influence preserved/forfeit fee handling. | `course_registration_id -> course_registrations.id`. |
-| `egc_blocks` | EGC block result tracking and charge mapping. | Optional `finance_charge_id`, optional `retake_discount_id`. | `student_id`, `semester_id`, block/level/result/attendance. |
+| `egc_blocks` | EGC block result tracking. | No direct Finance foreign key; Finance evidence resolves through the matching `FinanceObligation` source triple. Optional `retake_discount_id`. | `student_id`, `semester_id`, block/level/result/attendance. |
 | `egc_retake_discount_links` | Links failed source EGC block to discount on a later target charge. | `invoice_discount_id`, unique `target_finance_charge_id`. | `source_egc_block_id`. |
 
 ## Finance Settlement and DNG Schema
@@ -451,7 +449,6 @@ students
 course_retake_registrations -> finance_charges -> invoice_lines -> student_invoices
 exam_resit_attempts -> finance_charges -> invoice_lines -> student_invoices
 defer_cases -> finance_charges(source_type/source_id) -> invoice_lines
-egc_blocks -> finance_charges
+egc_blocks -> finance_obligations(source triple) -> finance_charges
 egc_retake_discount_links -> invoice_discounts -> discount_allocations
 ```
-
