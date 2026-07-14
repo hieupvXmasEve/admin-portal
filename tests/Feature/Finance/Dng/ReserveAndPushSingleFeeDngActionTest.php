@@ -129,6 +129,22 @@ it('uses the same guarded reservation for the HP fee family', function (): void 
         ->and($reservation->reservationTargets->pluck('invoice_line_id')->all())->toBe([$line->id]);
 });
 
+it('uses guarded canonical targets for every remaining supported fee family', function (string $feeType, string $chargeType): void {
+    $line = reservationPayableLine($this->invoice, $this->billingAccount, '2000000.00', $chargeType);
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
+
+    $reservation = guardedReservationAction($service)->handle($this->student->id, $feeType, guardedReservationDetails($this->semester));
+
+    expect($reservation->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG)
+        ->and($reservation->fee_type)->toBe($feeType)
+        ->and($reservation->reservationTargets->pluck('invoice_line_id')->all())->toBe([$line->id]);
+})->with([
+    'exam resit' => ['PTL', FinanceCharge::TYPE_EXAM_RESIT_FEE],
+    'health insurance' => ['BHYT', FinanceCharge::TYPE_BHYT],
+    'other supported fee' => ['KHAC', FinanceCharge::TYPE_MANUAL_FEE],
+]);
+
 it('reuses a deterministic ItemId for a retry of the same pending reservation', function (): void {
     reservationPayableLine($this->invoice, $this->billingAccount);
     $service = Mockery::mock(DngPaymentService::class);

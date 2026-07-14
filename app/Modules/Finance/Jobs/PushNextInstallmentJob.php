@@ -18,7 +18,7 @@ use Throwable;
  * Wraps PushNextInstallmentAction with retry policy.
  *
  * Retry: 3 attempts total, exponential backoff: 60s → 300s → 900s (1m / 5m / 15m).
- * The DngPaymentService::createAndPush already records last_push_error and
+ * PushNextInstallmentAction records last_push_error and
  * push_attempt_count on each failure, so the installment row reflects current state.
  *
  * After final failure, the job's failed() callback fires the InstallmentPushFailed
@@ -57,6 +57,7 @@ class PushNextInstallmentJob implements ShouldQueue
                 Log::info('PushNextInstallmentJob: no pending installment left', [
                     'finance_charge_id' => $this->financeChargeId,
                 ]);
+
                 // Charge fully settled — Batch D will fire ChargeFullySettled event here.
                 return;
             }
@@ -85,7 +86,7 @@ class PushNextInstallmentJob implements ShouldQueue
         ]);
 
         // Notify admin listeners. The installment row already has last_push_error
-        // + push_attempt_count set by DngPaymentService::createAndPush, so admin UI
+        // + push_attempt_count set by PushNextInstallmentAction, so admin UI
         // can show the error and manual-retry button.
         InstallmentPushFailed::dispatch($this->financeChargeId, $exception->getMessage());
     }
