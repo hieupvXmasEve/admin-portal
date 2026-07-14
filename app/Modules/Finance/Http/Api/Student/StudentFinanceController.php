@@ -6,22 +6,20 @@ namespace App\Modules\Finance\Http\Api\Student;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
-use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Actions\CreateStudentDngPaymentAccessAction;
 use App\Modules\Finance\Dng\Exceptions\StudentDngPaymentAccessUnavailable;
 use App\Modules\Finance\Dng\Exceptions\StudentDngPaymentRequestNotFound;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Http\Requests\StudentFinance\ListStudentFinanceChargesRequest;
+use App\Modules\Finance\Http\Requests\StudentFinance\ListStudentFinanceInvoicesRequest;
+use App\Modules\Finance\Http\Requests\StudentFinance\StudentFinanceBalanceRequest;
+use App\Modules\Finance\Http\Requests\StudentFinance\StudentFinanceOverviewRequest;
 use App\Modules\Finance\Models\BillingAccount;
-use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\Payment;
-use App\Modules\Finance\Models\StudentInvoice;
-use App\Modules\Finance\Services\FinanceChargeService;
+use App\Modules\Finance\Queries\GetStudentFinancePresentationQuery;
 use App\Modules\Finance\Services\PaymentService;
 use App\Modules\Finance\Support\SettlementPosition\Money;
-use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
-use App\Modules\Finance\Support\SettlementPosition\SettlementPositionScope;
-use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,16 +28,15 @@ use Illuminate\Support\Collection;
 class StudentFinanceController extends Controller
 {
     public function __construct(
-        private FinanceChargeService $chargeService,
         private PaymentService $paymentService,
-        private StudentFinanceSettlementPositionReader $positionReader,
         private SettlementPositionReader $settlementPositionReader,
+        private GetStudentFinancePresentationQuery $studentFinance,
     ) {}
 
     /**
      * Get student balance summary.
      */
-    public function balance(Request $request): JsonResponse
+    public function balance(StudentFinanceBalanceRequest $request): JsonResponse
     {
         $student = $request->user();
 
@@ -47,23 +44,16 @@ class StudentFinanceController extends Controller
             return ApiResponse::error('Unauthorized', [], 401);
         }
 
-        $validated = $request->validate([
-            'semester_id' => 'nullable|integer|exists:semesters,id',
-        ]);
-
-        $semesterId = isset($validated['semester_id']) ? (int) $validated['semester_id'] : null;
-        $balance = $this->studentBalance($this->positionReader->current($student->id, $semesterId));
-
         return ApiResponse::success([
-            'balance' => $balance,
-            'semester_id' => $semesterId,
+            'balance' => $this->studentFinance->balanceFor((int) $student->id, $request->semesterId()),
+            'semester_id' => $request->semesterId(),
         ]);
     }
 
     /**
      * Get student charges.
      */
-    public function charges(Request $request): JsonResponse
+    public function charges(ListStudentFinanceChargesRequest $request): JsonResponse
     {
         $student = $request->user();
 
@@ -71,29 +61,11 @@ class StudentFinanceController extends Controller
             return ApiResponse::error('Unauthorized', [], 401);
         }
 
-        $validated = $request->validate([
-            'semester_id' => 'nullable|integer|exists:semesters,id',
-        ]);
-
-        $semesterId = isset($validated['semester_id']) ? (int) $validated['semester_id'] : null;
-        $charges = $this->chargeService->getStudentCharges($student->id, $semesterId);
-
-        // Eager-load installments so the student app can render the per-installment
-        // table without an extra round-trip.
-        $charges->loadMissing('installments');
-
-        $charges->loadMissing('invoiceLines');
-        $chargeRows = $this->chargeRows($charges);
-
-        // Filter unpaid charges only — accepts ?unpaid=true|1
-        if ($request->boolean('unpaid')) {
-            $chargeRows = $chargeRows->filter(fn (array $charge): bool => ! $charge['is_fully_paid'])->values();
-        }
-
-        return ApiResponse::success([
-            'charges' => $chargeRows,
-            'summary' => $this->chargeService->getChargeSummary($student->id, $semesterId),
-        ]);
+        return ApiResponse::success($this->studentFinance->charges(
+            (int) $student->id,
+            $request->semesterId(),
+            $request->boolean('unpaid'),
+        ));
     }
 
     /**
@@ -236,16 +208,11 @@ class StudentFinanceController extends Controller
             return ApiResponse::error('Unauthorized', [], 401);
         }
 
-        $charge = FinanceCharge::where('id', $chargeId)
-            ->where('student_id', $student->id)
-            ->with(['semester', 'invoiceLines.paymentApplications.payment'])
-            ->first();
+        $charge = $this->studentFinance->charge((int) $student->id, $chargeId);
 
         if (! $charge) {
             return ApiResponse::error('Charge not found', [], 404);
         }
-
-        $charge->append(['is_charge', 'is_credit', 'paid_amount', 'balance', 'is_fully_paid']);
 
         return ApiResponse::success([
             'charge' => $charge,
@@ -522,7 +489,7 @@ class StudentFinanceController extends Controller
     /**
      * List student's invoices.
      */
-    public function invoices(Request $request): JsonResponse
+    public function invoices(ListStudentFinanceInvoicesRequest $request): JsonResponse
     {
         $student = $request->user();
 
@@ -530,49 +497,11 @@ class StudentFinanceController extends Controller
             return ApiResponse::error('Unauthorized', [], 401);
         }
 
-        $validated = $request->validate([
-            'semester_id' => 'nullable|integer|exists:semesters,id',
-            'status' => 'nullable|string|in:draft,pending,paid,overdue,cancelled,open,zero_amount,issued',
-        ]);
-
-        $query = StudentInvoice::where('student_id', $student->id)
-            ->with('semester')
-            ->withCount('invoiceLines')
-            ->orderBy('created_at', 'desc');
-
-        if (! empty($validated['semester_id'])) {
-            $query->where('semester_id', $validated['semester_id']);
-        }
-
-        $invoices = $query->get();
-        $positions = $this->invoicePositions($invoices);
-        $rows = $invoices->values()->map(function (StudentInvoice $invoice, int $index) use ($positions): array {
-            return $this->invoiceListRow($invoice, $positions[$index] ?? null);
-        });
-
-        if (! empty($validated['status'])) {
-            $rows = $rows->filter(fn (array $row): bool => $row['status'] === $validated['status'])->values();
-        }
-
-        $summaryPosition = $this->positionReader->current(
+        return ApiResponse::success($this->studentFinance->invoices(
             (int) $student->id,
-            isset($validated['semester_id']) ? (int) $validated['semester_id'] : null,
-        );
-        $summaryValid = (bool) $summaryPosition['valid'];
-
-        return ApiResponse::success([
-            'invoices' => $rows,
-            'summary' => [
-                'total_invoiced' => $summaryValid ? $summaryPosition['net_due'] : null,
-                'total_paid' => $summaryValid ? $summaryPosition['cash_applied'] : null,
-                'total_credit_applied' => $summaryValid ? $summaryPosition['credit_applied'] : null,
-                'total_outstanding' => $summaryValid ? $summaryPosition['remaining_collectible'] : null,
-                'settlement_position' => [
-                    'valid' => $summaryValid,
-                    'message' => $summaryValid ? null : StudentFinanceSettlementPositionReader::STUDENT_UNAVAILABLE_MESSAGE,
-                ],
-            ],
-        ]);
+            $request->semesterId(),
+            $request->validated('status'),
+        ));
     }
 
     private function createStudentDngPaymentAccess(
@@ -650,78 +579,19 @@ class StudentFinanceController extends Controller
             return ApiResponse::error('Unauthorized', [], 401);
         }
 
-        $invoice = StudentInvoice::where('id', $invoiceId)
-            ->where('student_id', $student->id)
-            ->with([
-                'semester',
-                'invoiceLines.charge',
-                'invoiceLines.paymentApplications.payment',
-                'discounts',
-            ])
-            ->first();
+        $invoice = $this->studentFinance->invoice((int) $student->id, $invoiceId);
 
         if (! $invoice) {
             return ApiResponse::error('Invoice not found', [], 404);
         }
 
-        $position = $this->settlementPositionReader->forInvoice((int) $invoice->id);
-        $valid = $position->isValid() && $position->amounts !== null;
-        $linePositions = collect($position->payable_line_breakdown)
-            ->keyBy(fn (SettlementPosition $linePosition): int => (int) $linePosition->payable_line_id);
-
-        $lines = $invoice->invoiceLines->map(function ($line) use ($linePositions, $valid) {
-            $linePosition = $linePositions->get((int) $line->id);
-            $lineValid = $valid && $linePosition?->isValid() && $linePosition->amounts !== null;
-            $amounts = $linePosition?->amounts;
-
-            return [
-                'id' => $line->id,
-                'description' => $line->description_snapshot,
-                'amount' => $lineValid ? (float) $amounts->gross->amount : null,
-                'charge_type' => $line->charge?->charge_type,
-                'discount_amount' => $lineValid ? (float) $amounts->discount->amount : null,
-                'paid_amount' => $lineValid ? (float) $amounts->cash->amount : null,
-                'credit_amount' => $lineValid ? (float) $amounts->credit->amount : null,
-                'remaining_amount' => $lineValid ? (float) $amounts->remaining->amount : null,
-                'is_fully_paid' => $lineValid && $amounts->remaining->isZero(),
-                'payments' => $line->paymentApplications->map(fn ($app) => [
-                    'payment_id' => $app->payment_id,
-                    'amount' => (float) $app->amount,
-                    'method' => $app->payment?->method,
-                    'paid_at' => $app->payment?->paid_at?->toIso8601String(),
-                ]),
-            ];
-        });
-
-        $discounts = $invoice->discounts->map(fn ($d) => [
-            'id' => $d->id,
-            'description' => $d->description,
-            'amount' => (float) $d->amount,
-        ]);
-
-        return ApiResponse::success([
-            'id' => $invoice->id,
-            'invoice_number' => $invoice->invoice_number,
-            'semester' => $invoice->semester ? ['id' => $invoice->semester->id, 'name' => $invoice->semester->name] : null,
-            'subtotal' => $valid ? (float) $position->amounts->gross->amount : null,
-            'discount_total' => $valid ? (float) $position->amounts->discount->amount : null,
-            'total_amount' => $valid ? (float) $position->amounts->netDue()->amount : null,
-            'paid_amount' => $valid ? (float) $position->amounts->cash->amount : null,
-            'credit_amount' => $valid ? (float) $position->amounts->credit->amount : null,
-            'remaining' => $valid ? (float) $position->amounts->remaining->amount : null,
-            'status' => $this->invoiceStatus($invoice, $position),
-            'due_date' => $invoice->due_date?->toDateString(),
-            'paid_at' => $invoice->paid_at?->toIso8601String(),
-            'lines' => $lines,
-            'discounts' => $discounts,
-            'settlement_position' => $this->settlementMetadata($position),
-        ]);
+        return ApiResponse::success($invoice);
     }
 
     /**
      * Get financial overview dashboard for student.
      */
-    public function overview(Request $request): JsonResponse
+    public function overview(StudentFinanceOverviewRequest $request): JsonResponse
     {
         $student = $request->user();
 
@@ -729,244 +599,7 @@ class StudentFinanceController extends Controller
             return ApiResponse::error('Unauthorized', [], 401);
         }
 
-        $validated = $request->validate([
-            'semester_id' => 'nullable|integer|exists:semesters,id',
-        ]);
-
-        $semesterId = isset($validated['semester_id']) ? (int) $validated['semester_id'] : null;
-
-        // Balance summary comes from the Finance-owned current Settlement Position.
-        $position = $this->positionReader->current($student->id, $semesterId);
-        $balance = $this->studentBalance($position);
-
-        // Pending charges
-        $outstandingCharges = $this->paymentService->getOutstandingCharges($student->id, $semesterId);
-        $pendingCharges = $position['valid'] ? $outstandingCharges : collect();
-
-        // Recent payments (latest 5)
-        $recentPayments = Payment::where('student_id', $student->id)
-            ->orderBy('paid_at', 'desc')
-            ->limit(5)
-            ->get(['id', 'amount', 'method', 'paid_at']);
-
-        // Invoice summary counts
-        $invoices = $position['valid']
-            ? StudentInvoice::where('student_id', $student->id)
-                ->when($semesterId, fn ($q) => $q->where('semester_id', $semesterId))
-                ->with(['invoiceLines.paymentApplications', 'invoiceLines.discountAllocations'])
-                ->get()
-            : collect();
-
-        $unpaidInvoices = $invoices->filter(fn ($inv) => in_array($inv->real_time_status, ['open', 'overdue'], true));
-
-        $invoiceCounts = [
-            'total' => $invoices->count(),
-            'paid' => $invoices->filter(fn ($inv) => $inv->real_time_status === 'paid')->count(),
-            'pending' => $unpaidInvoices->filter(fn ($inv) => $inv->real_time_status === 'open')->count(),
-            'overdue' => $unpaidInvoices->filter(fn ($inv) => $inv->real_time_status === 'overdue')->count(),
-            'nearest_due_date' => $unpaidInvoices
-                ->filter(fn ($inv) => $inv->due_date !== null)
-                ->sortBy('due_date')
-                ->first()?->due_date?->toDateString(),
-        ];
-
-        // DNG pending
-        $dngPendingStatuses = [
-            DngPaymentRequest::STATUS_PENDING,
-            DngPaymentRequest::STATUS_PUSHED_TO_DNG,
-        ];
-
-        $billingAccountId = BillingAccount::query()
-            ->where('student_id', $student->id)
-            ->value('id');
-
-        $dngPending = DngPaymentRequest::where('student_id', $student->id)
-            ->where('billing_account_id', $billingAccountId)
-            ->whereIn('status', $dngPendingStatuses)
-            ->get(['amount']);
-
-        // Resolve semester for response
-        $semester = null;
-        if ($semesterId) {
-            $semester = Semester::find($semesterId, ['id', 'name']);
-        }
-
-        return ApiResponse::success([
-            'balance' => $balance,
-            'pending_payments' => [
-                'count' => $pendingCharges->count(),
-                'total_amount' => $position['remaining_collectible'] ?? null,
-                'items' => $pendingCharges->take(5)->map(fn ($c) => [
-                    'id' => $c->id,
-                    'description' => $c->description,
-                    'balance' => (float) $c->balance,
-                ])->values(),
-            ],
-            'recent_payments' => $recentPayments->map(fn ($p) => [
-                'id' => $p->id,
-                'amount' => (float) $p->amount,
-                'method' => $p->method,
-                'paid_at' => $p->paid_at?->toIso8601String(),
-            ]),
-            'invoices_summary' => $invoiceCounts,
-            'dng_pending' => [
-                'count' => $dngPending->count(),
-                'total_amount' => (float) $dngPending->sum('amount'),
-            ],
-            'semester' => $semester ? ['id' => $semester->id, 'name' => $semester->name] : null,
-        ]);
-    }
-
-    /** @param array<string, mixed> $position */
-    private function studentBalance(array $position): array
-    {
-        $valid = (bool) ($position['valid'] ?? false);
-
-        return [
-            'total_charges' => $valid ? $position['gross'] : null,
-            'total_credits' => $valid ? $position['discount'] : null,
-            'net_charges' => $valid ? $position['net_due'] : null,
-            'total_paid' => $valid ? $position['cash_applied'] : null,
-            'balance' => $valid ? $position['remaining_collectible'] : null,
-            'unapplied_credit' => $valid ? $position['unapplied_cash'] : null,
-            'applied_credit' => $valid ? $position['credit_applied'] : null,
-            'status' => $position['status'] ?? 'unknown',
-            'settlement_position' => [
-                'valid' => $valid,
-                'mode' => $position['position_mode'] ?? 'current',
-                'state' => $position['settlement_state'] ?? 'invalid',
-                'message' => $valid ? null : StudentFinanceSettlementPositionReader::STUDENT_UNAVAILABLE_MESSAGE,
-            ],
-        ];
-    }
-
-    /**
-     * @param  Collection<int, StudentInvoice>  $invoices
-     * @return list<SettlementPosition>
-     */
-    private function invoicePositions(Collection $invoices): array
-    {
-        if ($invoices->isEmpty()) {
-            return [];
-        }
-
-        return $this->settlementPositionReader->batch(
-            $invoices->map(
-                static fn (StudentInvoice $invoice): SettlementPositionScope => SettlementPositionScope::invoice((int) $invoice->id),
-            )->all(),
-        );
-    }
-
-    /** @return array<string, mixed> */
-    private function invoiceListRow(StudentInvoice $invoice, ?SettlementPosition $position): array
-    {
-        $valid = $position?->isValid() && $position->amounts !== null;
-        $amounts = $position?->amounts;
-
-        return [
-            'id' => (int) $invoice->id,
-            'invoice_number' => (string) $invoice->invoice_number,
-            'semester' => $invoice->semester === null ? null : [
-                'id' => (int) $invoice->semester->id,
-                'name' => (string) $invoice->semester->name,
-            ],
-            'subtotal' => $valid ? (float) $amounts->gross->amount : null,
-            'discount_total' => $valid ? (float) $amounts->discount->amount : null,
-            'total_amount' => $valid ? (float) $amounts->netDue()->amount : null,
-            'paid_amount' => $valid ? (float) $amounts->cash->amount : null,
-            'credit_amount' => $valid ? (float) $amounts->credit->amount : null,
-            'remaining' => $valid ? (float) $amounts->remaining->amount : null,
-            'status' => $this->invoiceStatus($invoice, $position),
-            'due_date' => $invoice->due_date?->toDateString(),
-            'paid_at' => $invoice->paid_at?->toIso8601String(),
-            'line_count' => (int) $invoice->invoice_lines_count,
-            'settlement_position' => $position === null ? [
-                'valid' => false,
-                'mode' => SettlementPosition::MODE_CURRENT,
-                'state' => SettlementPosition::STATE_MISSING,
-                'message' => StudentFinanceSettlementPositionReader::STUDENT_UNAVAILABLE_MESSAGE,
-            ] : $this->settlementMetadata($position),
-        ];
-    }
-
-    private function invoiceStatus(StudentInvoice $invoice, ?SettlementPosition $position): string
-    {
-        if (in_array($invoice->status, ['draft', 'cancelled'], true)) {
-            return (string) $invoice->status;
-        }
-
-        if (! $position?->isValid() || $position->amounts === null) {
-            return SettlementPosition::STATE_INVALID;
-        }
-
-        if ($position->amounts->gross->isZero()) {
-            return 'zero_amount';
-        }
-
-        if ($position->amounts->remaining->isZero()) {
-            return 'paid';
-        }
-
-        return $invoice->due_date?->isPast() ? 'overdue' : 'open';
-    }
-
-    /** @param Collection<int, FinanceCharge> $charges */
-    private function chargeRows(Collection $charges): Collection
-    {
-        $lineIds = $charges->flatMap(fn (FinanceCharge $charge) => $charge->invoiceLines->pluck('id'))
-            ->map(static fn (mixed $id): int => (int) $id)
-            ->unique()
-            ->values();
-        $positions = $lineIds->isEmpty()
-            ? []
-            : $this->settlementPositionReader->batch(
-                $lineIds->map(static fn (int $id): SettlementPositionScope => SettlementPositionScope::payableLine($id))->all(),
-            );
-        $positionsByLine = collect($positions)->keyBy(static fn (SettlementPosition $position): int => (int) $position->payable_line_id);
-
-        return $charges->map(function (FinanceCharge $charge) use ($positionsByLine): array {
-            $linePositions = $charge->invoiceLines
-                ->map(fn ($line) => $positionsByLine->get((int) $line->id))
-                ->filter();
-            $valid = $linePositions->isNotEmpty()
-                && $linePositions->every(static fn (SettlementPosition $position): bool => $position->isValid() && $position->amounts !== null);
-
-            return [
-                'id' => (int) $charge->id,
-                'description' => (string) $charge->description,
-                'charge_type' => (string) $charge->charge_type,
-                'amount' => $valid ? (float) $linePositions->sum(static fn (SettlementPosition $position): float => (float) $position->amounts->gross->amount) : null,
-                'is_charge' => (bool) $charge->is_charge,
-                'is_credit' => (bool) $charge->is_credit,
-                'paid_amount' => $valid ? (float) $linePositions->sum(static fn (SettlementPosition $position): float => (float) $position->amounts->cash->amount) : null,
-                'discount_amount' => $valid ? (float) $linePositions->sum(static fn (SettlementPosition $position): float => (float) $position->amounts->discount->amount) : null,
-                'credit_amount' => $valid ? (float) $linePositions->sum(static fn (SettlementPosition $position): float => (float) $position->amounts->credit->amount) : null,
-                'balance' => $valid ? (float) $linePositions->sum(static fn (SettlementPosition $position): float => (float) $position->amounts->remaining->amount) : null,
-                'is_fully_paid' => $valid && $linePositions->every(static fn (SettlementPosition $position): bool => $position->amounts->remaining->isZero()),
-                'installments' => $charge->installments,
-                'settlement_position' => [
-                    'valid' => $valid,
-                    'mode' => SettlementPosition::MODE_CURRENT,
-                    'state' => $valid
-                        ? $linePositions->first()->settlement_state
-                        : SettlementPosition::STATE_INVALID,
-                    'message' => $valid ? null : StudentFinanceSettlementPositionReader::STUDENT_UNAVAILABLE_MESSAGE,
-                ],
-            ];
-        })->values();
-    }
-
-    /** @return array{valid:bool,mode:string,state:string,message:?string} */
-    private function settlementMetadata(SettlementPosition $position): array
-    {
-        return [
-            'valid' => $position->isValid(),
-            'mode' => $position->position_mode,
-            'state' => $position->settlement_state,
-            'message' => $position->isValid()
-                ? null
-                : StudentFinanceSettlementPositionReader::STUDENT_UNAVAILABLE_MESSAGE,
-        ];
+        return ApiResponse::success($this->studentFinance->handle((int) $student->id, $request->semesterId()));
     }
 
     /**
