@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Modules\Finance\Support\SettlementPosition\SettlementBypassAllowlist;
-
 /**
  * @return list<array{start:int,end:int}>
  */
@@ -110,7 +108,6 @@ function settlementMutationOffsetIsGuarded(int $offset, array $ranges): bool
 function settlementBypassViolations(string $root): array
 {
     $violations = [];
-    $allowlist = SettlementBypassAllowlist::entries();
     $patterns = [
         'local settlement formula' => '/(?:amount_snapshot|fc\.amount|finance_charges\.amount|total_amount)\s*-\s*(?:.*(?:paid|payment|discount|credit))/i',
         'direct money-model writer' => '/\b(?:FinanceCharge|InvoiceLine|InvoiceDiscount|DiscountAllocation|Payment|PaymentApplication|CreditApplication|FinanceChargeInstallment)::(?:(?:query\(\)|where|find|findOrFail|first|firstOrFail|lockForUpdate|orderBy|whereIn|whereKey)\s*\([^;]*?\)\s*->\s*)*(?:create|update|upsert|insert|delete|firstOrCreate|updateOrCreate|firstOrNew)\s*\(/s',
@@ -138,7 +135,9 @@ function settlementBypassViolations(string $root): array
                 static fn (array $match): bool => ! settlementMutationOffsetIsGuarded((int) $match[1], $guardedRanges),
             );
 
-            if ($hasUnguardedMatch && ! isset($allowlist[$relativePath])) {
+            $hasLocalFormula = $label === 'local settlement formula' && ($matches[0] ?? []) !== [];
+
+            if ($hasLocalFormula || $hasUnguardedMatch) {
                 $violations[] = "{$label}: {$relativePath}";
             }
         }
@@ -149,37 +148,10 @@ function settlementBypassViolations(string $root): array
     return $violations;
 }
 
-it('requires every legacy settlement bypass to declare an owner and removal wave', function (): void {
-    $expectedPaths = [
-        'app/Console/Commands/BackfillEgcBlocks.php',
-        'app/Console/Commands/MigrateScholarshipDiscountsToInvoiceDiscounts.php',
-        'app/Console/Commands/MigrateVoucherDiscountsToInvoiceDiscounts.php',
-        'app/Console/Commands/BackfillStudentFees.php',
-        'app/Console/Commands/BackfillVoidedChargeInstallments.php',
-        'app/Modules/Finance/Actions/BackfillLegacyDeferCreditEntitlementsAction.php',
-        'app/Modules/Finance/Actions/BackfillLegacyEgcExemptCreditEntitlementsAction.php',
-        'app/Modules/Finance/Actions/BackfillLegacyScholarshipEntitlementsAction.php',
-        'app/Modules/Finance/Actions/CloseKnownLegacyDataExceptionsAction.php',
-    ];
-
-    $actualPaths = array_keys(SettlementBypassAllowlist::entries());
-    sort($actualPaths);
-    sort($expectedPaths);
-
-    expect($actualPaths)->toBe($expectedPaths);
-
-    foreach (SettlementBypassAllowlist::entries() as $path => $entry) {
-        expect($path)->toStartWith('app/')
-            ->and($entry['owner'])->not->toBe('')
-            ->and($entry['remove_by_wave'])->toMatch('/^wave-[0-6]$/')
-            ->and(file_exists(base_path($path)))->toBeTrue();
-    }
-});
-
-it('blocks new local settlement formulas and direct money-table writers', function (): void {
+it('blocks every local settlement formula and direct protected-table writer', function (): void {
     $violations = settlementBypassViolations(base_path('app'));
 
-    expect($violations)->toBe([], "Settlement bypasses outside the reviewed allowlist:\n".implode("\n", $violations));
+    expect($violations)->toBe([], "Settlement bypasses must run through SettlementMutationGuard:\n".implode("\n", $violations));
 });
 
 it('recognizes only writes inside the settlement mutation guard callback as guarded', function (): void {

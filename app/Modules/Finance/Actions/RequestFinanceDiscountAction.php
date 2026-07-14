@@ -258,10 +258,7 @@ class RequestFinanceDiscountAction
 
             $amount = (float) $entitlement->amount;
 
-            $lineCapacity = max(
-                0.0,
-                (float) $line->amount_snapshot - $this->settlementService->getLineDiscountAmount($line)
-            );
+            $lineCapacity = $this->settlementService->getLineNetDue($line);
             $allocateAmount = min($amount, $lineCapacity);
 
             if ($allocateAmount <= 0) {

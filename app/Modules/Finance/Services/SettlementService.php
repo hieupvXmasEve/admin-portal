@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Services;
 
-use App\Modules\Finance\Models\CreditApplication;
 use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceDiscount;
@@ -491,7 +490,7 @@ class SettlementService
         });
     }
 
-    public function synchronizeDiscountAllocations(InvoiceDiscount $discount): void
+    public function synchronizeDiscountAllocations(InvoiceDiscount $discount, bool $recalculateInvoice = true): void
     {
         $invoice = $discount->invoice()->first();
 
@@ -501,7 +500,7 @@ class SettlementService
 
         $billingAccountId = $this->billingAccountIdForInvoice($invoice);
 
-        $this->settlementMutationGuard->handle($billingAccountId, function () use ($discount, $invoice): void {
+        $this->settlementMutationGuard->handle($billingAccountId, function () use ($discount, $invoice, $recalculateInvoice): void {
             $eligibleLines = InvoiceLine::query()
                 ->where('invoice_id', $invoice->id)
                 ->where('status', 'active')
@@ -511,7 +510,9 @@ class SettlementService
                 ->get();
 
             if ($eligibleLines->isEmpty()) {
-                $this->recalculateInvoiceSnapshot($invoice);
+                if ($recalculateInvoice) {
+                    $this->recalculateInvoiceSnapshot($invoice);
+                }
 
                 return;
             }
@@ -527,8 +528,7 @@ class SettlementService
                     break;
                 }
 
-                $lineCurrentDiscount = $this->getLineDiscountAmount($line);
-                $lineCapacity = max(0, (float) $line->amount_snapshot - $lineCurrentDiscount);
+                $lineCapacity = $this->getLineNetDue($line);
 
                 if ($lineCapacity <= 0) {
                     continue;
@@ -547,7 +547,9 @@ class SettlementService
                 $remaining -= $allocateAmount;
             }
 
-            $this->recalculateInvoiceSnapshot($invoice);
+            if ($recalculateInvoice) {
+                $this->recalculateInvoiceSnapshot($invoice);
+            }
         });
     }
 
@@ -555,25 +557,11 @@ class SettlementService
     {
         // This method is called immediately after a payable line is reduced.
         // At that point its current Settlement Position is intentionally
-        // negative, so the normal validated reader correctly refuses it. Use
-        // the exact raw settlement graph to calculate only the excess that
-        // must be released; the subsequent reversal restores a valid position.
-        $cash = (float) PaymentApplication::query()
-            ->join('payments', 'payments.id', '=', 'payment_applications.payment_id')
-            ->where('payment_applications.invoice_line_id', $line->id)
-            ->where('payments.status', Payment::STATUS_COMPLETED)
-            ->sum('payment_applications.amount');
-        $discount = (float) DiscountAllocation::query()
-            ->join('invoice_discounts', 'invoice_discounts.id', '=', 'discount_allocations.invoice_discount_id')
-            ->where('discount_allocations.invoice_line_id', $line->id)
-            ->where('invoice_discounts.status', '!=', 'reversed')
-            ->sum('discount_allocations.amount');
-        $credit = (float) CreditApplication::query()
-            ->join('finance_credit_entitlements', 'finance_credit_entitlements.id', '=', 'credit_applications.finance_credit_entitlement_id')
-            ->where('credit_applications.invoice_line_id', $line->id)
-            ->where('finance_credit_entitlements.lifecycle_status', 'approved')
-            ->sum('credit_applications.amount');
-        $excess = $cash - max(0.0, (float) $line->amount_snapshot - $discount - $credit);
+        // negative, so the normal validated reader correctly refuses it. Its
+        // raw canonical evidence still records the exact surplus that must be
+        // released; the subsequent reversal restores a valid position.
+        $position = $this->settlementPositionReader->forPayableLine((int) $line->id);
+        $excess = max(0, -(float) $position->raw_evidence->remaining->amount);
 
         if ($excess <= 0) {
             return [

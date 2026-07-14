@@ -106,7 +106,7 @@ class VoidFinanceChargeAction
                         $discount = InvoiceDiscount::query()->find($discountId);
 
                         if ($discount) {
-                            $this->settlementService->synchronizeDiscountAllocations($discount);
+                            $this->settlementService->synchronizeDiscountAllocations($discount, recalculateInvoice: false);
                         }
                     }
 

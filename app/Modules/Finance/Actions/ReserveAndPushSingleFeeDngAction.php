@@ -10,7 +10,6 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestReservationTarget;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
-use App\Modules\Finance\Dng\Support\DngCollectionCutover;
 use App\Modules\Finance\Dng\Support\DngReservationTargetFingerprint;
 use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
@@ -36,7 +35,6 @@ final class ReserveAndPushSingleFeeDngAction
         private readonly SettlementPositionReader $settlementPositionReader,
         private readonly DngCampusCodeResolver $campusCodeResolver,
         private readonly DngPaymentService $dngPaymentService,
-        private readonly ?DngCollectionCutover $cutover = null,
     ) {}
 
     /**
@@ -44,7 +42,6 @@ final class ReserveAndPushSingleFeeDngAction
      */
     public function handle(int $studentId, string $feeType, array $details, ?array $invoiceLineIds = null, array $targetAmounts = [], array $installmentIdsByLine = []): DngPaymentRequest
     {
-        ($this->cutover ?? new DngCollectionCutover)->assertCollectionAllowed();
         $reservation = $this->reserve($studentId, $feeType, $details, $invoiceLineIds, $targetAmounts, $installmentIdsByLine);
 
         if ($reservation->status === DngPaymentRequest::STATUS_UNKNOWN_OUTCOME) {

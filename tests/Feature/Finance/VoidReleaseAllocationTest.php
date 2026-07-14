@@ -13,6 +13,7 @@ use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
@@ -67,18 +68,37 @@ function createCompletedPayment(Student $student, float $amount): Payment
     ]);
 }
 
+function createCanonicalEgcCharge(string $description): FinanceCharge
+{
+    $obligation = FinanceObligation::query()->create([
+        'billing_account_id' => null,
+        'source_system' => 'finance-test',
+        'source_kind' => 'void-release-allocation',
+        'source_ref' => 'egc:'.uniqid('', true),
+        'obligation_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 15_000_000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'egc:test',
+        'pricing_snapshot' => ['catalog_rule_version' => 'egc:test'],
+        'accepted_at' => now(),
+    ]);
+
+    return app(CreateFinanceChargeAction::class)->handle([
+        'finance_obligation_id' => $obligation->id,
+        'student_id' => test()->student->id,
+        'semester_id' => test()->semester->id,
+        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'amount' => 15_000_000,
+        'description' => $description,
+    ]);
+}
+
 it('void charge inserts reversal payment applications and restores unapplied balance', function () {
-    $createAction = app(CreateFinanceChargeAction::class);
     $settlementService = app(SettlementService::class);
     $voidAction = app(VoidFinanceChargeAction::class);
 
-    $charge = $createAction->handle([
-        'student_id' => $this->student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-        'amount' => 15000000,
-        'description' => 'EGC Level 4',
-    ]);
+    $charge = createCanonicalEgcCharge('EGC Level 4');
 
     $line = InvoiceLine::where('charge_id', $charge->id)->firstOrFail();
     $payment = createCompletedPayment($this->student, 15000000);
@@ -99,27 +119,14 @@ it('void charge inserts reversal payment applications and restores unapplied bal
 });
 
 it('void charge keeps invoice and recalculates snapshot from active lines', function () {
-    $createAction = app(CreateFinanceChargeAction::class);
     $settlementService = app(SettlementService::class);
     $voidAction = app(VoidFinanceChargeAction::class);
 
-    $charge1 = $createAction->handle([
-        'student_id' => $this->student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-        'amount' => 15000000,
-        'description' => 'EGC Level 4',
-    ]);
-
-    $charge2 = $createAction->handle([
-        'student_id' => $this->student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-        'amount' => 15000000,
-        'description' => 'EGC Level 5',
-    ]);
+    $charge1 = createCanonicalEgcCharge('EGC Level 4');
+    $charge2 = createCanonicalEgcCharge('EGC Level 5');
 
     $invoice = StudentInvoice::firstOrFail();
+    $invoice->update(['status' => 'pending']);
     $payment = createCompletedPayment($this->student, 30000000);
 
     $line1 = InvoiceLine::where('charge_id', $charge1->id)->firstOrFail();
@@ -142,24 +149,10 @@ it('void charge keeps invoice and recalculates snapshot from active lines', func
 });
 
 it('auto allocate writes payment applications only', function () {
-    $createAction = app(CreateFinanceChargeAction::class);
     $autoAllocateAction = app(AutoAllocatePaymentsAction::class);
 
-    $egc1 = $createAction->handle([
-        'student_id' => $this->student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-        'amount' => 15000000,
-        'description' => 'EGC Level 4',
-    ]);
-
-    $egc2 = $createAction->handle([
-        'student_id' => $this->student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-        'amount' => 15000000,
-        'description' => 'EGC Level 5',
-    ]);
+    createCanonicalEgcCharge('EGC Level 4');
+    createCanonicalEgcCharge('EGC Level 5');
 
     $payment = createCompletedPayment($this->student, 30000000);
 
@@ -175,24 +168,10 @@ it('auto allocate writes payment applications only', function () {
 });
 
 it('invoice discount allocation updates invoice totals without negative finance charges', function () {
-    $createAction = app(CreateFinanceChargeAction::class);
     $invoiceService = app(InvoiceGenerationService::class);
 
-    $charge1 = $createAction->handle([
-        'student_id' => $this->student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-        'amount' => 15000000,
-        'description' => 'EGC Level 4',
-    ]);
-
-    $charge2 = $createAction->handle([
-        'student_id' => $this->student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-        'amount' => 15000000,
-        'description' => 'EGC Level 5',
-    ]);
+    $charge1 = createCanonicalEgcCharge('EGC Level 4');
+    $charge2 = createCanonicalEgcCharge('EGC Level 5');
 
     $invoice = StudentInvoice::firstOrFail();
 
@@ -223,26 +202,12 @@ it('invoice discount allocation updates invoice totals without negative finance 
 });
 
 it('void charge reassigns discount and releases excess payment from surviving line', function () {
-    $createAction = app(CreateFinanceChargeAction::class);
     $invoiceService = app(InvoiceGenerationService::class);
     $settlementService = app(SettlementService::class);
     $voidAction = app(VoidFinanceChargeAction::class);
 
-    $charge1 = $createAction->handle([
-        'student_id' => $this->student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-        'amount' => 15000000,
-        'description' => 'EGC Level 4',
-    ]);
-
-    $charge2 = $createAction->handle([
-        'student_id' => $this->student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
-        'amount' => 15000000,
-        'description' => 'EGC Level 5',
-    ]);
+    $charge1 = createCanonicalEgcCharge('EGC Level 4');
+    $charge2 = createCanonicalEgcCharge('EGC Level 5');
 
     $invoice = StudentInvoice::firstOrFail();
     $invoiceService->applyInvoiceDiscount($invoice, 'voucher', 5000000, 'tests', 'Voucher test', 1, $this->user->id);

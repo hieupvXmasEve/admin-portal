@@ -8,7 +8,6 @@ use App\Models\CourseRetakeRegistration;
 use App\Models\ExamResitAttempt;
 use App\Models\Student;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
-use App\Modules\Finance\Dng\Support\DngCollectionCutover;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\FinanceObligation;
@@ -38,7 +37,6 @@ class CreateBatchDngFromChargesAction
 {
     public function __construct(
         protected ?ReserveAndPushSingleFeeDngAction $guardedReservationAction = null,
-        protected ?DngCollectionCutover $cutover = null,
     ) {}
 
     /**
@@ -54,7 +52,6 @@ class CreateBatchDngFromChargesAction
      */
     public function handle(array $data): array
     {
-        ($this->cutover ?? new DngCollectionCutover)->assertCollectionAllowed();
         $studentIds = $data['student_ids'];
         $dngFeeType = $data['dng_fee_type'];
         $dueDate = $data['due_date'];

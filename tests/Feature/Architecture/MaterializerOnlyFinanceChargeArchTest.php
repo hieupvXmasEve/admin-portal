@@ -85,6 +85,26 @@ it('keeps Academic free of Finance money model imports (boundary arch)', functio
     expect($violations)->toBeEmpty('Academic must not import Finance\\Models.');
 });
 
+it('keeps source models free of Finance ledger pointers', function () {
+    $sourceModelRoots = [
+        dirname(__DIR__, 3).'/app/Models',
+        dirname(__DIR__, 3).'/app/Modules/Academic/Models',
+    ];
+    $violations = [];
+
+    foreach ($sourceModelRoots as $root) {
+        $violations = array_merge(
+            $violations,
+            scanPhpFilesForPattern($root, '/[\'\"]finance_(?:charge|obligation)_id[\'\"]/'),
+        );
+    }
+
+    expect($violations)->toBe(
+        [],
+        "Source models must not store Finance ledger pointers:\n".implode("\n", $violations),
+    );
+});
+
 it('does not auto-create FinanceCharge rows from DNG push actions', function () {
     $dngRoots = [
         dirname(__DIR__, 3).'/app/Modules/Finance/Actions/CreateBatchDngFromChargesAction.php',
@@ -110,5 +130,19 @@ it('does not auto-create FinanceCharge rows from DNG push actions', function () 
     expect($violations)->toBe(
         [],
         "DNG paths must not create FinanceCharge rows:\n".implode("\n", $violations)
+    );
+});
+
+it('allows DNG payment-request creation only at canonical reservation or cancellation replacement seams', function () {
+    $appRoot = dirname(__DIR__, 3).'/app';
+    $pattern = '/DngPaymentRequest::(?:query\(\)->)?(?:create|firstOrCreate)\s*\(/';
+    $violations = scanPhpFilesForPattern($appRoot, $pattern, [
+        'ReserveAndPushSingleFeeDngAction.php',
+        'ProcessFinanceCancellationOperationAction.php',
+    ]);
+
+    expect($violations)->toBe(
+        [],
+        "DNG payment requests must use the canonical reservation or cancellation replacement seam:\n".implode("\n", $violations),
     );
 });

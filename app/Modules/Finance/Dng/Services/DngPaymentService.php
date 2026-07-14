@@ -6,7 +6,6 @@ namespace App\Modules\Finance\Dng\Services;
 
 use App\Models\Department;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
-use App\Modules\Finance\Dng\Support\DngCollectionCutover;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Services\PaymentService;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
@@ -23,7 +22,6 @@ class DngPaymentService
         protected DngClient $dngClient,
         protected PaymentService $paymentService,
         protected PublishDomainEventAction $publishDomainEventAction,
-        protected ?DngCollectionCutover $cutover = null,
     ) {}
 
     /**
@@ -37,7 +35,6 @@ class DngPaymentService
      */
     public function pushReserved(array $chargeData): array
     {
-        $this->cutover()->assertCollectionAllowed();
         $payload = $this->dngClient->buildInsertNewRecordPayload($chargeData);
 
         return $this->dngClient->insertNewRecord($chargeData, $payload);
@@ -51,8 +48,6 @@ class DngPaymentService
      */
     public function createQrAccess(DngPaymentRequest $request, array $feeTypes): array
     {
-        $this->cutover()->assertCollectionAllowed();
-
         return $this->dngClient->createVirtualAccountByFeeType([
             'student_code' => $request->student_code,
             'campus_code' => $request->campus_code,
@@ -68,18 +63,11 @@ class DngPaymentService
      */
     public function createInstallmentAccess(DngPaymentRequest $request, array $feeTypes): array
     {
-        $this->cutover()->assertCollectionAllowed();
-
         return $this->dngClient->createFoxpayPaymentByFeeType([
             'student_code' => $request->student_code,
             'campus_code' => $request->campus_code,
             'fee_types' => $feeTypes,
         ]);
-    }
-
-    private function cutover(): DngCollectionCutover
-    {
-        return $this->cutover ??= new DngCollectionCutover;
     }
 
     /**
