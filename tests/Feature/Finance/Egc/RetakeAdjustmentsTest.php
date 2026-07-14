@@ -20,6 +20,7 @@ use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Egc\ListEgcRetakeAdjustmentsQuery;
 use App\Modules\Finance\Support\EgcBlockFinanceResolver;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 
@@ -427,12 +428,12 @@ it('applies major entry credit to transitioned student', function () {
     $entitlement = ApplyEgcMajorEntryCreditAction::run($student->id, $semester->id);
 
     expect($entitlement)->toBeInstanceOf(FinanceCreditEntitlement::class)
-        ->and($entitlement->entitlement_type)->toBe(FinanceCharge::TYPE_EGC_EXEMPT_CREDIT)
+        ->and($entitlement->entitlement_type)->toBe(FinanceEntitlementType::EgcExemptCredit)
         ->and((float) $entitlement->amount)->toBe(15_000_000.0)
         ->and(CreditApplication::query()->where('finance_credit_entitlement_id', $entitlement->id)->count())->toBe(1)
         ->and(
             FinanceCharge::query()
-                ->where('charge_type', FinanceCharge::TYPE_EGC_EXEMPT_CREDIT)
+                ->where('charge_type', FinanceEntitlementType::EgcExemptCredit)
                 ->count()
         )->toBe(0)
         ->and(

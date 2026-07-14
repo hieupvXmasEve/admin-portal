@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
@@ -28,20 +29,23 @@ function dbEnumValues(string $table, string $column): array
     return array_map(static fn (string $v): string => str_replace("''", "'", $v), $matches[1]);
 }
 
-it('keeps FinanceCharge::CHARGE_TYPES in sync with the charge_type DB enum', function () {
+it('keeps active and historical charge type registries in sync with the charge_type DB enum', function () {
     $dbValues = dbEnumValues('finance_charges', 'charge_type');
 
     sort($dbValues);
-    $modelValues = FinanceCharge::CHARGE_TYPES;
+    $modelValues = [
+        ...FinanceCharge::CHARGE_TYPES,
+        ...FinanceEntitlementType::HISTORICAL_CHARGE_TYPES,
+    ];
     sort($modelValues);
 
     expect($modelValues)->toBe($dbValues);
 });
 
-it('includes the previously-missing course_fee and bhyt charge types', function () {
+it('includes bhyt but excludes the retired course_fee charge type', function () {
     expect(FinanceCharge::CHARGE_TYPES)
-        ->toContain(FinanceCharge::TYPE_COURSE_FEE)
-        ->toContain(FinanceCharge::TYPE_BHYT);
+        ->toContain(FinanceCharge::TYPE_BHYT)
+        ->not->toContain('course_fee');
 });
 
 it('only marks invoice statuses that exist in the DB enum as non-reusable', function () {
@@ -51,7 +55,7 @@ it('only marks invoice statuses that exist in the DB enum as non-reusable', func
         ->each->toBeIn($dbValues);
 });
 
-it('keeps CREDIT_CHARGE_TYPES a subset of CHARGE_TYPES', function () {
-    expect(FinanceCharge::CREDIT_CHARGE_TYPES)
-        ->each->toBeIn(FinanceCharge::CHARGE_TYPES);
+it('keeps historical credit identifiers outside the active charge registry', function () {
+    expect(FinanceEntitlementType::HISTORICAL_CHARGE_TYPES)
+        ->each->not->toBeIn(FinanceCharge::CHARGE_TYPES);
 });

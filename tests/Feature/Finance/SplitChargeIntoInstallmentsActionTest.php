@@ -15,6 +15,7 @@ use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -221,7 +222,7 @@ it('throws when trying to split a credit charge (amount <= 0)', function () {
     $credit = FinanceCharge::create([
         'student_id' => $student->id,
         'semester_id' => $semester->id,
-        'charge_type' => FinanceCharge::TYPE_SCHOLARSHIP_CREDIT,
+        'charge_type' => FinanceEntitlementType::ScholarshipCredit,
         'amount' => -5_000_000,
         'description' => 'Scholarship',
         'effective_at' => now(),

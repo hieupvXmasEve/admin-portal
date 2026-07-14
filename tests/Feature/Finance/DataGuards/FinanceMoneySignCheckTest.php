@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Semester;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -75,10 +76,10 @@ it('rejects each credit type stored with a positive amount (sign flip)', functio
         signGuardCharge($type, 5_000_000)
     ))->toThrow(QueryException::class);
 })->with([
-    FinanceCharge::TYPE_SCHOLARSHIP_CREDIT,
-    FinanceCharge::TYPE_VOUCHER_CREDIT,
-    FinanceCharge::TYPE_DEFER_CREDIT,
-    FinanceCharge::TYPE_EGC_EXEMPT_CREDIT,
+    FinanceEntitlementType::ScholarshipCredit,
+    FinanceEntitlementType::VoucherCredit,
+    FinanceEntitlementType::DeferCredit,
+    FinanceEntitlementType::EgcExemptCredit,
 ]);
 
 it('rejects each debit type stored with a negative amount (sign flip)', function (string $type) {
@@ -98,8 +99,20 @@ it('accepts correctly-signed charges including zero (debit >= 0, credit <= 0, ad
 })->with([
     [FinanceCharge::TYPE_TUITION_TERM, 15_000_000.0],
     [FinanceCharge::TYPE_TUITION_TERM, 0.0],             // zero-debt invoice — allowed
-    [FinanceCharge::TYPE_SCHOLARSHIP_CREDIT, -4_500_000.0],
-    [FinanceCharge::TYPE_SCHOLARSHIP_CREDIT, 0.0],       // zero credit — allowed
+    [FinanceEntitlementType::ScholarshipCredit, -4_500_000.0],
+    [FinanceEntitlementType::ScholarshipCredit, 0.0],       // zero credit — allowed
     [FinanceCharge::TYPE_ADJUSTMENT, -123.0],            // adjustment unconstrained
     [FinanceCharge::TYPE_ADJUSTMENT, 123.0],
 ]);
+
+it('keeps a correctly-signed historical void credit row readable', function () {
+    $row = signGuardCharge(FinanceEntitlementType::DeferCredit, -125_000);
+    $row['status'] = FinanceCharge::STATUS_VOID;
+
+    DB::table('finance_charges')->insert($row);
+
+    expect(DB::table('finance_charges')
+        ->where('charge_type', FinanceEntitlementType::DeferCredit)
+        ->where('status', FinanceCharge::STATUS_VOID)
+        ->value('amount'))->toBe('-125000.00');
+});

@@ -21,6 +21,7 @@ use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\EgcBlockFinanceResolver;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -177,7 +178,7 @@ it('creates an EGC exempt credit entitlement and applications without a negative
         ->where('finance_credit_entitlement_id', $entitlement->id)
         ->get();
 
-    expect($entitlement->entitlement_type)->toBe(FinanceCharge::TYPE_EGC_EXEMPT_CREDIT)
+    expect($entitlement->entitlement_type)->toBe(FinanceEntitlementType::EgcExemptCredit)
         ->and($entitlement->lifecycle_status)->toBe(FinanceCreditEntitlement::STATUS_APPROVED)
         ->and($entitlement->allocation_status)->toBe(FinanceCreditEntitlement::ALLOCATION_FULLY_APPLIED)
         ->and((float) $entitlement->amount)->toBe(15_000_000.0)
@@ -190,7 +191,7 @@ it('creates an EGC exempt credit entitlement and applications without a negative
         ->and(InvoiceDiscount::query()->count())->toBe(0)
         ->and(
             FinanceCharge::query()
-                ->where('charge_type', FinanceCharge::TYPE_EGC_EXEMPT_CREDIT)
+                ->where('charge_type', FinanceEntitlementType::EgcExemptCredit)
                 ->count()
         )->toBe(0)
         ->and(FinanceCharge::query()->where('amount', '<', 0)->count())->toBe(0);

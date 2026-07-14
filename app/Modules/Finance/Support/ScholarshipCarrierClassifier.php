@@ -9,6 +9,7 @@ use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use Illuminate\Support\Collection;
 
 /**
@@ -26,7 +27,7 @@ final class ScholarshipCarrierClassifier
 
     public function classify(FinanceCharge $charge): ScholarshipCarrierClassification
     {
-        if ($charge->charge_type !== FinanceCharge::TYPE_SCHOLARSHIP_CREDIT) {
+        if ($charge->charge_type !== FinanceEntitlementType::ScholarshipCredit) {
             return new ScholarshipCarrierClassification(
                 carrier: ScholarshipCarrierClassification::CARRIER_SKIPPED,
                 reason: ScholarshipCarrierClassification::REASON_WRONG_CHARGE_TYPE,

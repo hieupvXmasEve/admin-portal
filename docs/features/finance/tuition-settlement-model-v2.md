@@ -348,6 +348,14 @@ Phase 4:
 - drop old `payment_allocations` and `invoice_items` from active schema
 - stop generating negative `finance_charges` for voucher or scholarship
 
+### Post-canonical restore contract
+
+After canonical Finance backfill, a supported restore begins only from a
+database backup taken after that backfill. The running application contains no
+command that upgrades an older business-data snapshot. To recover an older
+snapshot, restore it with the matching pre-cleanup release before returning to
+the current release.
+
 ## Guardrails
 
 - Never store student available cash as the primary balance field

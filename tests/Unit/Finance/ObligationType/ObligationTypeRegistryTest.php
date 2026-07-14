@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
 use App\Modules\Finance\Support\Reporting\FeeMonitorExpectedFeeCatalog as Catalog;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 
-it('registers every FinanceCharge::CHARGE_TYPES value', function () {
+it('registers every active FinanceCharge::CHARGE_TYPES value', function () {
     foreach (FinanceCharge::CHARGE_TYPES as $chargeType) {
         expect(ObligationTypeRegistry::has($chargeType))->toBeTrue(
             "Missing registry entry for charge_type [{$chargeType}]."
@@ -24,10 +25,10 @@ it('registers the planned egc_retake discount entitlement type', function () {
         ->and($definition->isTrackedByFeeMonitor())->toBeFalse();
 });
 
-it('assigns financial effects consistent with CREDIT_CHARGE_TYPES and planned discounts', function () {
-    foreach (FinanceCharge::CREDIT_CHARGE_TYPES as $creditType) {
+it('assigns financial effects consistent with entitlement types and planned discounts', function () {
+    foreach (FinanceEntitlementType::HISTORICAL_CHARGE_TYPES as $creditType) {
         // voucher_credit is a discount entitlement target; others are credit.
-        if ($creditType === FinanceCharge::TYPE_VOUCHER_CREDIT) {
+        if ($creditType === FinanceEntitlementType::VoucherCredit) {
             expect(ObligationTypeRegistry::get($creditType)->financialEffect)
                 ->toBe(FinancialEffect::Discount);
 
@@ -46,8 +47,6 @@ it('keeps DngFeeTypeOptions::fromChargeType identical to known auto-map codes', 
     $expected = [
         FinanceCharge::TYPE_TUITION_TERM => 'HP',
         FinanceCharge::TYPE_EGC_LEVEL_FEE => 'HP',
-        // course_fee formally retired (wave 6) — no active DNG auto-map.
-        FinanceCharge::TYPE_COURSE_FEE => 'KHAC',
         FinanceCharge::TYPE_RETAKE_FEE => 'HL',
         FinanceCharge::TYPE_EXAM_RESIT_FEE => 'PTL',
         FinanceCharge::TYPE_BHYT => 'BHYT',
@@ -55,8 +54,8 @@ it('keeps DngFeeTypeOptions::fromChargeType identical to known auto-map codes', 
         FinanceCharge::TYPE_ADJUSTMENT => 'KHAC',
         // admission_fee historically falls through to KHAC (PRE is manual-only).
         FinanceCharge::TYPE_ADMISSION_FEE => 'KHAC',
-        // credits: callers filter amount > 0; code still returns KHAC fallback.
-        FinanceCharge::TYPE_DEFER_CREDIT => 'KHAC',
+        // Entitlements are never DNG payables and fall through to KHAC.
+        FinanceEntitlementType::DeferCredit => 'KHAC',
         'unknown_future_type' => 'KHAC',
     ];
 
@@ -66,15 +65,8 @@ it('keeps DngFeeTypeOptions::fromChargeType identical to known auto-map codes', 
     }
 });
 
-it('marks course_fee as formally retired and excludes it from active DNG reverse maps', function () {
-    $definition = ObligationTypeRegistry::get(FinanceCharge::TYPE_COURSE_FEE);
-
-    expect($definition->isRetired())->toBeTrue()
-        ->and($definition->dngCollectionCode)->toBeNull()
-        ->and($definition->allowedSourceKinds)->toBe([])
-        ->and($definition->isTrackedByFeeMonitor())->toBeFalse()
-        ->and(ObligationTypeRegistry::chargeTypesForDngCollectionCode('HP'))
-        ->not->toContain(FinanceCharge::TYPE_COURSE_FEE)
+it('excludes course_fee from the registry and active DNG reverse maps', function () {
+    expect(ObligationTypeRegistry::has('course_fee'))->toBeFalse()
         ->and(ObligationTypeRegistry::chargeTypesForDngCollectionCode('HP'))
         ->toEqualCanonicalizing([
             FinanceCharge::TYPE_TUITION_TERM,

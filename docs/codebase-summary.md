@@ -89,12 +89,9 @@ Current counts:
         - mapped block with `result != pending` => consumed
         - unused active paid EGC charges can be released to unapplied balance without auto-reallocation
     - Retake truth: target charge must belong to a later mapped retake block for the same student + level
-    - Backfill command behavior:
-        - `egc:backfill-blocks` now includes historical/deferred/dropout students with EGC registrations or active EGC charges
-        - missing `finance_charge_id` on existing blocks is repaired in place
-        - unmatched active EGC charges are reported, not converted into new blocks
+    - Canonical EGC block history is the supported data truth; no runtime command backfills or repairs historical blocks.
 - Finance operations include student-centric Settlement Worklist at `finance/operations/settlement`; legacy `payments/auto-allocate` UI redirects there.
-- Finance generation/migration flows include backfill commands for voucher and scholarship headers + `discount_allocations`. Zero-amount tuition terms no longer create invoices.
+- Finance generation writes current entitlement and allocation records directly; no runtime command upgrades legacy voucher or scholarship business data. Zero-amount tuition terms no longer create invoices.
 - DNG payment gateway integration (2026-03-26, updated 2026-04-16):
     - Tables: `dng_payment_requests` (audit), `dng_webhook_events` (webhook audit)
     - Controllers: `DngPaymentController` (API), `DngWebhookController` (webhook receiver)

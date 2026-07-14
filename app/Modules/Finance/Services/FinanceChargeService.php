@@ -11,6 +11,7 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceCreditEntitlement;
 use App\Modules\Finance\Queries\GetStudentChargesQuery;
 use App\Modules\Finance\Queries\GetStudentChargeSummaryQuery;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
@@ -221,13 +222,13 @@ class FinanceChargeService
             ->where('source_system', 'finance')
             ->where('source_kind', 'defer_settlement')
             ->where('source_ref', $sourceRef)
-            ->where('entitlement_type', FinanceCharge::TYPE_DEFER_CREDIT)
+            ->where('entitlement_type', FinanceEntitlementType::DeferCredit)
             ->exists();
 
         if (! $hasCredit) {
             // Legacy negative-row path (pre wave 7).
             $hasCredit = FinanceCharge::query()
-                ->where('charge_type', FinanceCharge::TYPE_DEFER_CREDIT)
+                ->where('charge_type', FinanceEntitlementType::DeferCredit)
                 ->where('source_type', FinanceCharge::class)
                 ->where('source_id', $charge->id)
                 ->exists();
@@ -272,7 +273,7 @@ class FinanceChargeService
                 ->where('source_system', 'finance')
                 ->where('source_kind', 'defer_settlement')
                 ->where('source_ref', $sourceRef)
-                ->where('entitlement_type', FinanceCharge::TYPE_DEFER_CREDIT)
+                ->where('entitlement_type', FinanceEntitlementType::DeferCredit)
                 ->exists();
 
             if ($exists) {
@@ -301,7 +302,7 @@ class FinanceChargeService
                 source_kind: 'defer_settlement',
                 source_ref: $sourceRef,
                 financial_effect: FinancialEffect::Credit,
-                obligation_type: FinanceCharge::TYPE_DEFER_CREDIT,
+                obligation_type: FinanceEntitlementType::DeferCredit,
                 facts: $facts,
             ));
         }

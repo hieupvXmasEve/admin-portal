@@ -32,8 +32,7 @@ use Illuminate\Support\Facades\Log;
  * - BHYT (wave 2): every pushed payable must already be linked to a
  *   FinanceObligation; unlinked legacy charges are blocked until backfill.
  * - HP (wave 3 tuition_term + wave 5 egc_level_fee): every pushed payable must
- *   already be linked to a FinanceObligation. course_fee is formally retired
- *   (wave 6) and is excluded from the HP reverse charge-type map.
+ *   already be linked to a FinanceObligation.
  */
 class CreateBatchDngFromChargesAction
 {

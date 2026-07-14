@@ -55,20 +55,9 @@ class FinanceCharge extends Model
 
     public const TYPE_EXAM_RESIT_FEE = 'exam_resit_fee';
 
-    /** Formally retired (wave 6 audit). Kept for DB enum/CHECK parity only. */
-    public const TYPE_COURSE_FEE = 'course_fee';
-
     public const TYPE_MANUAL_FEE = 'manual_fee';
 
     public const TYPE_ADMISSION_FEE = 'admission_fee';
-
-    public const TYPE_DEFER_CREDIT = 'defer_credit';
-
-    public const TYPE_EGC_EXEMPT_CREDIT = 'egc_exempt_credit';
-
-    public const TYPE_SCHOLARSHIP_CREDIT = 'scholarship_credit';
-
-    public const TYPE_VOUCHER_CREDIT = 'voucher_credit';
 
     public const TYPE_ADJUSTMENT = 'adjustment';
 
@@ -78,36 +67,16 @@ class FinanceCharge extends Model
 
     public const STATUS_VOID = 'void';
 
-    // FIN-25: keep this list in lockstep with the finance_charges.charge_type DB
-    // enum. course_fee and bhyt are valid DB values and were missing here.
+    // Keep this list in lockstep with active finance_charges.charge_type DB values.
     public const CHARGE_TYPES = [
         self::TYPE_TUITION_TERM,
         self::TYPE_EGC_LEVEL_FEE,
         self::TYPE_RETAKE_FEE,
         self::TYPE_EXAM_RESIT_FEE,
-        self::TYPE_COURSE_FEE,
         self::TYPE_MANUAL_FEE,
         self::TYPE_ADMISSION_FEE,
-        self::TYPE_DEFER_CREDIT,
-        self::TYPE_EGC_EXEMPT_CREDIT,
-        self::TYPE_SCHOLARSHIP_CREDIT,
-        self::TYPE_VOUCHER_CREDIT,
         self::TYPE_ADJUSTMENT,
         self::TYPE_BHYT,
-    ];
-
-    /**
-     * Historical credit charge_types (negative ledger rows). New credit flows use
-     * FinanceCreditEntitlement / FinanceDiscountEntitlement (ADR-0030 / wave 7).
-     * Kept for money-sign CHECK parity and voided historical rows only.
-     *
-     * @var array<int, string>
-     */
-    public const CREDIT_CHARGE_TYPES = [
-        self::TYPE_DEFER_CREDIT,
-        self::TYPE_EGC_EXEMPT_CREDIT,
-        self::TYPE_SCHOLARSHIP_CREDIT,
-        self::TYPE_VOUCHER_CREDIT,
     ];
 
     // =====================

@@ -15,6 +15,7 @@ use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Student360\GetStudentFinanceOverviewKpisQuery;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -112,7 +113,7 @@ it('uses canonical cash, credit, remaining, and unapplied-cash semantics for Stu
         'source_system' => 'test',
         'source_kind' => 'student_position_summary',
         'source_ref' => 'credit:'.uniqid('', true),
-        'entitlement_type' => FinanceCharge::TYPE_DEFER_CREDIT,
+        'entitlement_type' => FinanceEntitlementType::DeferCredit,
         'lifecycle_status' => FinanceCreditEntitlement::STATUS_APPROVED,
         'allocation_status' => FinanceCreditEntitlement::ALLOCATION_PARTIALLY_APPLIED,
         'amount' => 2_000_000,

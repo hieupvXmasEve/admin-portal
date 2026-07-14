@@ -12,6 +12,7 @@ use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -54,7 +55,7 @@ it('rejects negative charges instead of creating credit memo payments', function
     expect(fn () => $action->handle([
         'student_id' => $this->student->id,
         'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_EGC_EXEMPT_CREDIT,
+        'charge_type' => FinanceEntitlementType::EgcExemptCredit,
         'amount' => -5000000,
         'description' => 'EGC refund',
     ]))->toThrow(InvalidArgumentException::class, 'debit obligations only');
@@ -69,7 +70,7 @@ it('does not assign a negative charge to an invoice', function () {
     expect(fn () => $action->handle([
         'student_id' => $this->student->id,
         'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_SCHOLARSHIP_CREDIT,
+        'charge_type' => FinanceEntitlementType::ScholarshipCredit,
         'amount' => -4500000,
         'description' => 'Scholarship discount',
     ]))->toThrow(InvalidArgumentException::class, 'debit obligations only');

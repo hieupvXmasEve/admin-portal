@@ -12,11 +12,11 @@ use App\Modules\Finance\Models\FinanceCreditEntitlement;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -79,7 +79,7 @@ it('creates a defer credit entitlement and applications without a negative charg
         source_kind: 'defer_settlement',
         source_ref: 'defer-case:1',
         financial_effect: FinancialEffect::Credit,
-        obligation_type: FinanceCharge::TYPE_DEFER_CREDIT,
+        obligation_type: FinanceEntitlementType::DeferCredit,
         facts: [
             'student_id' => $this->student->id,
             'semester_id' => $this->semester->id,
@@ -97,7 +97,7 @@ it('creates a defer credit entitlement and applications without a negative charg
     expect($result->finance_credit_entitlement_id)->toBe($entitlement->id)
         ->and($result->finance_charge_id)->toBeNull()
         ->and($result->finance_obligation_id)->toBeNull()
-        ->and($entitlement->entitlement_type)->toBe(FinanceCharge::TYPE_DEFER_CREDIT)
+        ->and($entitlement->entitlement_type)->toBe(FinanceEntitlementType::DeferCredit)
         ->and($entitlement->lifecycle_status)->toBe(FinanceCreditEntitlement::STATUS_APPROVED)
         ->and($entitlement->allocation_status)->toBe(FinanceCreditEntitlement::ALLOCATION_FULLY_APPLIED)
         ->and((float) $entitlement->amount)->toBe(3_000_000.0)
@@ -106,7 +106,7 @@ it('creates a defer credit entitlement and applications without a negative charg
         ->and($applications->first()->invoice_line_id)->toBe($line->id)
         ->and(
             FinanceCharge::query()
-                ->where('charge_type', FinanceCharge::TYPE_DEFER_CREDIT)
+                ->where('charge_type', FinanceEntitlementType::DeferCredit)
                 ->count()
         )->toBe(0)
         ->and(
@@ -133,7 +133,7 @@ it('is idempotent for the same defer credit source quad', function (): void {
         source_kind: 'defer_settlement',
         source_ref: 'defer-case:idempotent',
         financial_effect: FinancialEffect::Credit,
-        obligation_type: FinanceCharge::TYPE_DEFER_CREDIT,
+        obligation_type: FinanceEntitlementType::DeferCredit,
         facts: [
             'student_id' => $this->student->id,
             'semester_id' => $this->semester->id,
@@ -148,71 +148,5 @@ it('is idempotent for the same defer credit source quad', function (): void {
 
     expect($second->finance_credit_entitlement_id)->toBe($first->finance_credit_entitlement_id)
         ->and(FinanceCreditEntitlement::query()->count())->toBe(1)
-        ->and(CreditApplication::query()->count())->toBe(1);
-});
-
-it('converts legacy defer_credit negative rows with unchanged remaining settlement', function (): void {
-    [$invoice, $debitLine] = seedTuitionDebit($this->student, $this->semester, 10_000_000);
-
-    // Legacy shape: negative defer_credit charge + invoice line. Sign CHECK forbids
-    // new writes; disable for seed only.
-    DB::statement('SET SESSION check_constraint_checks = OFF');
-    try {
-        $creditCharge = FinanceCharge::create([
-            'student_id' => $this->student->id,
-            'semester_id' => $this->semester->id,
-            'charge_type' => FinanceCharge::TYPE_DEFER_CREDIT,
-            'amount' => -3_000_000,
-            'description' => 'Legacy defer credit',
-            'effective_at' => now(),
-            'status' => FinanceCharge::STATUS_ACTIVE,
-        ]);
-    } finally {
-        DB::statement('SET SESSION check_constraint_checks = ON');
-    }
-
-    InvoiceLine::create([
-        'invoice_id' => $invoice->id,
-        'charge_id' => $creditCharge->id,
-        'amount_snapshot' => -3_000_000,
-        'description_snapshot' => 'Legacy defer credit',
-        'status' => 'active',
-    ]);
-
-    $settlement = app(SettlementService::class);
-    $pre = $settlement->deriveInvoiceSnapshot($invoice->fresh());
-
-    expect((float) $pre['discount'])->toBe(3_000_000.0)
-        ->and((float) $pre['remaining'])->toBe(7_000_000.0);
-
-    $this->artisan('finance:backfill-legacy-defer-credit-entitlements')
-        ->assertSuccessful();
-
-    $entitlement = FinanceCreditEntitlement::query()->firstOrFail();
-    $creditCharge->refresh();
-    $post = $settlement->deriveInvoiceSnapshot($invoice->fresh());
-
-    expect($creditCharge->status)->toBe(FinanceCharge::STATUS_VOID)
-        ->and($entitlement->entitlement_type)->toBe(FinanceCharge::TYPE_DEFER_CREDIT)
-        ->and((float) $entitlement->amount)->toBe(3_000_000.0)
-        ->and(CreditApplication::query()->where('finance_credit_entitlement_id', $entitlement->id)->count())->toBe(1)
-        ->and((float) CreditApplication::query()->sum('amount'))->toBe(3_000_000.0)
-        ->and((float) $post['credit'])->toBe(3_000_000.0)
-        ->and((float) $post['remaining'])->toBe((float) $pre['remaining'])
-        ->and((float) $post['remaining'])->toBe(7_000_000.0)
-        ->and(
-            InvoiceLine::query()
-                ->where('charge_id', $creditCharge->id)
-                ->where('status', 'active')
-                ->count()
-        )->toBe(0)
-        // No double reduction: discount fallback gone, credit applications carry it.
-        ->and((float) $post['discount'])->toBe(0.0);
-
-    // Re-run is idempotent.
-    $this->artisan('finance:backfill-legacy-defer-credit-entitlements')
-        ->assertSuccessful();
-
-    expect(FinanceCreditEntitlement::query()->count())->toBe(1)
         ->and(CreditApplication::query()->count())->toBe(1);
 });

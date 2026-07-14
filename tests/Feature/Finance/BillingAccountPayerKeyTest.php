@@ -6,7 +6,6 @@ use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
-use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
@@ -58,65 +57,6 @@ it('auto-provisions exactly one billing account when a student is created', func
     $again = app(BillingAccountProvisioner::class)->forStudent((int) $student->id);
     expect($again->id)->toBe($accounts->first()->id)
         ->and(BillingAccount::query()->where('student_id', $student->id)->count())->toBe(1);
-});
-
-it('backfills billing accounts for existing students and obligations from charge evidence', function (): void {
-    // Simulate pre-wave students/obligations: create with events, then strip accounts.
-    $studentA = Student::factory()->forCampus($this->campus)->create([
-        'status' => 'intake_course',
-        'intake' => 2024,
-        'intake_semester_id' => $this->semester->id,
-    ]);
-    $studentB = Student::factory()->forCampus($this->campus)->create([
-        'status' => 'intake_course',
-        'intake' => 2024,
-        'intake_semester_id' => $this->semester->id,
-    ]);
-
-    BillingAccount::query()->delete();
-
-    $obligation = FinanceObligation::query()->create([
-        'billing_account_id' => null,
-        'source_system' => 'academic',
-        'source_kind' => 'course_retake_registration',
-        'source_ref' => 'retake:backfill-payer',
-        'obligation_type' => FinanceCharge::TYPE_RETAKE_FEE,
-        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
-        'amount' => 1_500_000,
-        'currency' => 'VND',
-        'pricing_rule_version' => 'retake_fee:legacy_backfill',
-        'pricing_snapshot' => ['provenance' => 'legacy_backfill'],
-        'accepted_at' => now(),
-    ]);
-
-    app(CreateFinanceChargeAction::class)->handle([
-        'finance_obligation_id' => $obligation->id,
-        'student_id' => $studentA->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
-        'amount' => 1_500_000,
-        'description' => 'Legacy charge for payer backfill',
-        'created_by_user_id' => $this->user->id,
-    ]);
-
-    $this->artisan('finance:backfill-billing-accounts')
-        ->assertSuccessful();
-
-    expect(BillingAccount::query()->where('student_id', $studentA->id)->count())->toBe(1)
-        ->and(BillingAccount::query()->where('student_id', $studentB->id)->count())->toBe(1);
-
-    $obligation->refresh();
-    $accountA = BillingAccount::query()->where('student_id', $studentA->id)->firstOrFail();
-
-    expect($obligation->billing_account_id)->toBe($accountA->id);
-
-    // Idempotent re-run — still one account per student, same obligation link.
-    $this->artisan('finance:backfill-billing-accounts')
-        ->assertSuccessful();
-
-    expect(BillingAccount::query()->where('student_id', $studentA->id)->count())->toBe(1)
-        ->and(BillingAccount::query()->where('student_id', $studentB->id)->count())->toBe(1)
-        ->and($obligation->fresh()->billing_account_id)->toBe($accountA->id);
 });
 
 it('stores billing account on new debit intake and materializes a student-keyed charge', function (): void {

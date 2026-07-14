@@ -164,61 +164,6 @@ it('skips duplicate active BHYT without creating a second obligation', function 
 
 // ─── Legacy backfill ────────────────────────────────────────────────────────
 
-it('backfills active and voided legacy BHYT charges with legacy_backfill provenance and is idempotent', function (): void {
-    $student = makeBhytStudent($this->campus, $this->semester, 'BHYT2001');
-    $active = makeBhytLegacyCharge($student, $this->semester, 564_000, FinanceCharge::STATUS_ACTIVE);
-    $voided = makeBhytLegacyCharge($student, $this->semester, 500_000, FinanceCharge::STATUS_VOID);
-
-    // Untouched other debit type
-    $tuition = FinanceCharge::query()->create([
-        'student_id' => $student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
-        'amount' => 10_000_000,
-        'description' => 'Tuition',
-        'effective_at' => now(),
-        'status' => FinanceCharge::STATUS_ACTIVE,
-    ]);
-
-    $this->artisan('finance:backfill-legacy-bhyt-obligations')
-        ->expectsOutputToContain('created 2')
-        ->assertExitCode(0);
-
-    $activeObligation = FinanceObligation::query()
-        ->where('source_ref', FinanceOwnedObligationSource::legacyBhytChargeRef($active->id))
-        ->firstOrFail();
-    $voidedObligation = FinanceObligation::query()
-        ->where('source_ref', FinanceOwnedObligationSource::legacyBhytChargeRef($voided->id))
-        ->firstOrFail();
-
-    expect(FinanceObligation::query()->count())->toBe(2)
-        ->and($activeObligation->source_system)->toBe(FinanceOwnedObligationSource::SOURCE_SYSTEM)
-        ->and($activeObligation->source_kind)->toBe(FinanceOwnedObligationSource::NON_ACADEMIC_BATCH)
-        ->and($activeObligation->obligation_type)->toBe(FinanceCharge::TYPE_BHYT)
-        ->and($activeObligation->lifecycle_status)->toBe(FinanceObligation::STATUS_ACCEPTED)
-        ->and((float) $activeObligation->amount)->toBe(564_000.0)
-        ->and($activeObligation->pricing_rule_version)->toBe('bhyt:legacy_backfill')
-        ->and($activeObligation->pricing_snapshot['provenance'])->toBe('legacy_backfill')
-        ->and($activeObligation->pricing_snapshot['legacy_charge_id'])->toBe($active->id)
-        ->and($activeObligation->billing_account_id)->not->toBeNull()
-        ->and($voidedObligation->lifecycle_status)->toBe(FinanceObligation::STATUS_VOIDED)
-        ->and((float) $voidedObligation->amount)->toBe(500_000.0)
-        ->and($voidedObligation->pricing_snapshot['provenance'])->toBe('legacy_backfill')
-        ->and($active->fresh()->finance_obligation_id)->toBe($activeObligation->id)
-        ->and($voided->fresh()->finance_obligation_id)->toBe($voidedObligation->id)
-        ->and($tuition->fresh()->finance_obligation_id)->toBeNull();
-
-    $this->artisan('finance:backfill-legacy-bhyt-obligations')
-        ->expectsOutputToContain('already linked 2')
-        ->assertExitCode(0);
-
-    expect(FinanceObligation::query()->count())->toBe(2)
-        ->and($active->fresh()->finance_obligation_id)->toBe($activeObligation->id)
-        ->and($voided->fresh()->finance_obligation_id)->toBe($voidedObligation->id);
-});
-
-// ─── DNG guard ──────────────────────────────────────────────────────────────
-
 it('BHYT fee_type: blocks push when charge has no finance obligation instead of creating debt', function (): void {
     $student = makeBhytStudent($this->campus, $this->semester, 'BHYT3001');
     $orphan = makeBhytLegacyCharge($student, $this->semester, 564_000);

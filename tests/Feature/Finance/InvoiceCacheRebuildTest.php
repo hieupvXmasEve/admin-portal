@@ -18,6 +18,7 @@ use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -96,7 +97,7 @@ function applyCacheCredit(InvoiceLine $line, float $amount): CreditApplication
         'source_system' => 'test',
         'source_kind' => 'invoice-cache-credit',
         'source_ref' => 'invoice-cache-credit:'.$line->id,
-        'entitlement_type' => FinanceCharge::TYPE_DEFER_CREDIT,
+        'entitlement_type' => FinanceEntitlementType::DeferCredit,
         'lifecycle_status' => FinanceCreditEntitlement::STATUS_APPROVED,
         'allocation_status' => FinanceCreditEntitlement::ALLOCATION_PARTIALLY_APPLIED,
         'amount' => $amount,

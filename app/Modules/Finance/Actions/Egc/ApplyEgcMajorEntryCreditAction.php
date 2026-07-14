@@ -8,6 +8,7 @@ use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceCreditEntitlement;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
@@ -59,7 +60,7 @@ class ApplyEgcMajorEntryCreditAction
                 ->where('source_system', self::SOURCE_SYSTEM)
                 ->where('source_kind', self::SOURCE_KIND)
                 ->where('source_ref', self::mintSourceRef($studentId, $semesterId))
-                ->where('entitlement_type', FinanceCharge::TYPE_EGC_EXEMPT_CREDIT)
+                ->where('entitlement_type', FinanceEntitlementType::EgcExemptCredit)
                 ->first();
 
             if ($existingEntitlement instanceof FinanceCreditEntitlement) {
@@ -70,7 +71,7 @@ class ApplyEgcMajorEntryCreditAction
 
             $existingLegacyCharge = FinanceCharge::where('student_id', $studentId)
                 ->where('semester_id', $semesterId)
-                ->where('charge_type', FinanceCharge::TYPE_EGC_EXEMPT_CREDIT)
+                ->where('charge_type', FinanceEntitlementType::EgcExemptCredit)
                 ->where('status', FinanceCharge::STATUS_ACTIVE)
                 ->first();
 
@@ -85,7 +86,7 @@ class ApplyEgcMajorEntryCreditAction
                 source_kind: self::SOURCE_KIND,
                 source_ref: self::mintSourceRef($studentId, $semesterId),
                 financial_effect: FinancialEffect::Credit,
-                obligation_type: FinanceCharge::TYPE_EGC_EXEMPT_CREDIT,
+                obligation_type: FinanceEntitlementType::EgcExemptCredit,
                 facts: [
                     'student_id' => $studentId,
                     'semester_id' => $semesterId,

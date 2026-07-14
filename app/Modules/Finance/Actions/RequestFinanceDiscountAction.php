@@ -13,6 +13,7 @@ use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Modules\Finance\Support\FinancePricingCatalog;
 use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
 use App\Modules\Finance\Support\SettlementMutationGuard;
@@ -359,7 +360,7 @@ class RequestFinanceDiscountAction
     private function discountTypeForEntitlement(string $entitlementType): string
     {
         return match ($entitlementType) {
-            FinanceCharge::TYPE_VOUCHER_CREDIT => 'voucher',
+            FinanceEntitlementType::VoucherCredit => 'voucher',
             ObligationTypeRegistry::TYPE_EGC_RETAKE => 'egc_retake',
             default => throw new RuntimeException(
                 "Discount intake for entitlement type [{$entitlementType}] is not supported yet."

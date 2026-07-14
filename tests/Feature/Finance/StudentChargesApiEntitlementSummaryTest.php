@@ -19,6 +19,7 @@ use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\FinanceChargeService;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -105,7 +106,7 @@ it('includes discount and credit entitlement carriers in charges summary without
         'source_system' => 'finance',
         'source_kind' => 'voucher_application',
         'source_ref' => 'voucher-app:summary-1',
-        'entitlement_type' => FinanceCharge::TYPE_VOUCHER_CREDIT,
+        'entitlement_type' => FinanceEntitlementType::VoucherCredit,
         'lifecycle_status' => FinanceDiscountEntitlement::STATUS_APPROVED,
         'allocation_status' => FinanceDiscountEntitlement::ALLOCATION_FULLY_ALLOCATED,
         'amount' => 2_000_000,
@@ -139,7 +140,7 @@ it('includes discount and credit entitlement carriers in charges summary without
         'source_system' => 'finance',
         'source_kind' => 'defer_settlement',
         'source_ref' => 'defer-case:summary-1',
-        'entitlement_type' => FinanceCharge::TYPE_DEFER_CREDIT,
+        'entitlement_type' => FinanceEntitlementType::DeferCredit,
         'lifecycle_status' => FinanceCreditEntitlement::STATUS_APPROVED,
         'allocation_status' => FinanceCreditEntitlement::ALLOCATION_FULLY_APPLIED,
         'amount' => 3_000_000,
@@ -176,7 +177,7 @@ it('does not count legacy negative charge lines after wave-7 backstop retirement
     $creditCharge = FinanceCharge::query()->create([
         'student_id' => $this->student->id,
         'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_DEFER_CREDIT,
+        'charge_type' => FinanceEntitlementType::DeferCredit,
         'amount' => -1_500_000,
         'description' => 'Legacy defer credit',
         'effective_at' => now(),
@@ -211,7 +212,7 @@ it('counts full credit applications even when payments would clamp settlement re
         'source_system' => 'finance',
         'source_kind' => 'defer_settlement',
         'source_ref' => 'defer-case:summary-paid',
-        'entitlement_type' => FinanceCharge::TYPE_DEFER_CREDIT,
+        'entitlement_type' => FinanceEntitlementType::DeferCredit,
         'lifecycle_status' => FinanceCreditEntitlement::STATUS_APPROVED,
         'allocation_status' => FinanceCreditEntitlement::ALLOCATION_FULLY_APPLIED,
         'amount' => 3_000_000,
@@ -280,7 +281,7 @@ it('does not double-count when both discount allocation and legacy negative line
     $negative = FinanceCharge::query()->create([
         'student_id' => $this->student->id,
         'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_VOUCHER_CREDIT,
+        'charge_type' => FinanceEntitlementType::VoucherCredit,
         'amount' => -2_000_000,
         'description' => 'Legacy voucher negative',
         'effective_at' => now(),

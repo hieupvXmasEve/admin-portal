@@ -7,6 +7,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
@@ -90,7 +91,7 @@ it('credit intake does not materialize a negative FinanceCharge row', function (
         source_kind: 'defer_settlement',
         source_ref: 'guard-credit:'.Str::ulid()->toBase32(),
         financial_effect: FinancialEffect::Credit,
-        obligation_type: FinanceCharge::TYPE_DEFER_CREDIT,
+        obligation_type: FinanceEntitlementType::DeferCredit,
         facts: [
             'student_id' => $student->id,
             'semester_id' => $semester->id,
@@ -107,7 +108,7 @@ it('credit intake does not materialize a negative FinanceCharge row', function (
     )->toBe(0)
         ->and(
             FinanceCharge::query()
-                ->where('charge_type', FinanceCharge::TYPE_DEFER_CREDIT)
+                ->where('charge_type', FinanceEntitlementType::DeferCredit)
                 ->count()
         )->toBe(0);
 });

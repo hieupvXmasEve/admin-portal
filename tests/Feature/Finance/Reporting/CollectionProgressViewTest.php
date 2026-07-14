@@ -18,6 +18,7 @@ use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Reporting\ListCollectionProgressQuery;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -294,7 +295,7 @@ it('keeps gross, discount, cash, credit, and remaining separate at the same curr
         'source_system' => 'test',
         'source_kind' => 'reporting-test',
         'source_ref' => 'reporting-credit:'.uniqid('', true),
-        'entitlement_type' => FinanceCharge::TYPE_DEFER_CREDIT,
+        'entitlement_type' => FinanceEntitlementType::DeferCredit,
         'lifecycle_status' => FinanceCreditEntitlement::STATUS_APPROVED,
         'allocation_status' => FinanceCreditEntitlement::ALLOCATION_PARTIALLY_APPLIED,
         'amount' => 200_000,

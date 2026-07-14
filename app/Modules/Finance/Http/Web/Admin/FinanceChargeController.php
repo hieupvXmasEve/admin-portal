@@ -21,6 +21,7 @@ use App\Modules\Finance\Http\Requests\Lookup\FilterFinanceChargesRequest;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Queries\Lookup\ListFinanceChargesQuery;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Modules\Finance\Support\FinanceSemesterContextResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -266,8 +267,8 @@ class FinanceChargeController extends Controller
         }
 
         return match ($type) {
-            FinanceCharge::TYPE_DEFER_CREDIT => 'Lệ phí bảo lưu',
-            FinanceCharge::TYPE_EGC_EXEMPT_CREDIT => 'GC: Miễn trừ phí egc',
+            FinanceEntitlementType::DeferCredit => 'Lệ phí bảo lưu',
+            FinanceEntitlementType::EgcExemptCredit => 'GC: Miễn trừ phí egc',
             FinanceCharge::TYPE_ADJUSTMENT => 'Điều chỉnh',
             default => ucwords(str_replace('_', ' ', $type)),
         };

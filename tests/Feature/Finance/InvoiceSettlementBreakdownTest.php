@@ -20,6 +20,7 @@ use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\PaymentSurplusDisposition;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 
@@ -157,7 +158,7 @@ function applyInvoiceSettlementCredit(InvoiceLine $line, string $amount, string 
         'source_system' => 'test',
         'source_kind' => 'invoice_settlement_breakdown',
         'source_ref' => 'invoice-settlement-credit:'.uniqid('', true),
-        'entitlement_type' => FinanceCharge::TYPE_DEFER_CREDIT,
+        'entitlement_type' => FinanceEntitlementType::DeferCredit,
         'lifecycle_status' => FinanceCreditEntitlement::STATUS_APPROVED,
         'allocation_status' => FinanceCreditEntitlement::ALLOCATION_PARTIALLY_APPLIED,
         'amount' => $amount,

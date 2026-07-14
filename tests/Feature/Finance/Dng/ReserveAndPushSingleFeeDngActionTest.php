@@ -15,6 +15,7 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
@@ -196,7 +197,7 @@ it('blocks a concurrent credit application during the unlocked DNG provider call
             source_kind: 'credit_dng_race',
             source_ref: uniqid('credit-dng:', true),
             financial_effect: FinancialEffect::Credit,
-            obligation_type: FinanceCharge::TYPE_DEFER_CREDIT,
+            obligation_type: FinanceEntitlementType::DeferCredit,
             facts: [
                 'student_id' => $this->student->id,
                 'semester_id' => $this->semester->id,

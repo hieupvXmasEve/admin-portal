@@ -6,7 +6,6 @@ use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
-use App\Modules\Finance\Actions\BackfillLegacyVoucherDiscountEntitlementsAction;
 use App\Modules\Finance\Models\CreditApplication;
 use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
@@ -15,11 +14,11 @@ use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 
 require_once __DIR__.'/Support/ledger_fixtures.php';
 
@@ -59,7 +58,7 @@ it('creates a voucher discount entitlement and allocations without a negative ch
         source_kind: 'voucher_application',
         source_ref: 'voucher-app:1',
         financial_effect: FinancialEffect::Discount,
-        obligation_type: FinanceCharge::TYPE_VOUCHER_CREDIT,
+        obligation_type: FinanceEntitlementType::VoucherCredit,
         facts: [
             'student_id' => $this->student->id,
             'semester_id' => $this->semester->id,
@@ -84,7 +83,7 @@ it('creates a voucher discount entitlement and allocations without a negative ch
         ->and($result->finance_credit_entitlement_id)->toBeNull()
         ->and($result->credit_application_ids)->toBe([])
         ->and($result->invoice_discount_ids)->toBe([(int) $discount->id])
-        ->and($entitlement->entitlement_type)->toBe(FinanceCharge::TYPE_VOUCHER_CREDIT)
+        ->and($entitlement->entitlement_type)->toBe(FinanceEntitlementType::VoucherCredit)
         ->and($entitlement->lifecycle_status)->toBe(FinanceDiscountEntitlement::STATUS_APPROVED)
         ->and($entitlement->allocation_status)->toBe(FinanceDiscountEntitlement::ALLOCATION_FULLY_ALLOCATED)
         ->and((float) $entitlement->amount)->toBe(2_000_000.0)
@@ -96,7 +95,7 @@ it('creates a voucher discount entitlement and allocations without a negative ch
         ->and(CreditApplication::query()->count())->toBe(0)
         ->and(
             FinanceCharge::query()
-                ->where('charge_type', FinanceCharge::TYPE_VOUCHER_CREDIT)
+                ->where('charge_type', FinanceEntitlementType::VoucherCredit)
                 ->count()
         )->toBe(0)
         ->and(
@@ -123,7 +122,7 @@ it('is idempotent for the same voucher discount source quad', function (): void 
         source_kind: 'voucher_application',
         source_ref: 'voucher-app:idempotent',
         financial_effect: FinancialEffect::Discount,
-        obligation_type: FinanceCharge::TYPE_VOUCHER_CREDIT,
+        obligation_type: FinanceEntitlementType::VoucherCredit,
         facts: [
             'student_id' => $this->student->id,
             'semester_id' => $this->semester->id,
@@ -141,212 +140,4 @@ it('is idempotent for the same voucher discount source quad', function (): void 
         ->and(InvoiceDiscount::query()->count())->toBe(1)
         ->and(DiscountAllocation::query()->count())->toBe(1)
         ->and(CreditApplication::query()->count())->toBe(0);
-});
-
-it('converts legacy voucher_credit rows with discount carriers without double reduction', function (): void {
-    [$invoice, $debitLine] = seedTuitionDebitForVoucher($this->student, $this->semester, 10_000_000);
-
-    // Settlement truth already lives on the discount carrier.
-    $discount = InvoiceDiscount::query()->create([
-        'invoice_id' => $invoice->id,
-        'discount_type' => 'voucher',
-        'discount_source' => 'legacy_voucher',
-        'description' => 'Legacy voucher discount',
-        'amount' => 2_500_000,
-        'reference_id' => 99,
-        'status' => 'active',
-    ]);
-
-    DiscountAllocation::query()->create([
-        'invoice_discount_id' => $discount->id,
-        'invoice_line_id' => $debitLine->id,
-        'amount' => 2_500_000,
-        'entry_type' => 'allocation',
-        'allocation_rule' => 'oldest_line_first',
-    ]);
-
-    // Duplicate legacy representation: negative voucher_credit charge + line.
-    DB::statement('SET SESSION check_constraint_checks = OFF');
-    try {
-        $creditCharge = FinanceCharge::create([
-            'student_id' => $this->student->id,
-            'semester_id' => $this->semester->id,
-            'charge_type' => FinanceCharge::TYPE_VOUCHER_CREDIT,
-            'amount' => -2_500_000,
-            'description' => 'Legacy voucher credit',
-            'effective_at' => now(),
-            'status' => FinanceCharge::STATUS_ACTIVE,
-        ]);
-    } finally {
-        DB::statement('SET SESSION check_constraint_checks = ON');
-    }
-
-    InvoiceLine::create([
-        'invoice_id' => $invoice->id,
-        'charge_id' => $creditCharge->id,
-        'amount_snapshot' => -2_500_000,
-        'description_snapshot' => 'Legacy voucher credit',
-        'status' => 'active',
-    ]);
-
-    $settlement = app(SettlementService::class);
-    $pre = $settlement->deriveInvoiceSnapshot($invoice->fresh());
-
-    expect((float) $pre['discount'])->toBe(2_500_000.0)
-        ->and((float) $pre['credit'])->toBe(0.0)
-        ->and((float) $pre['remaining'])->toBe(7_500_000.0);
-
-    $result = app(BackfillLegacyVoucherDiscountEntitlementsAction::class)->run();
-
-    expect($result['converted'])->toBe(1)
-        ->and($result['mismatches'])->toBe(0);
-
-    $entitlement = FinanceDiscountEntitlement::query()->firstOrFail();
-    $creditCharge->refresh();
-    $discount->refresh();
-    $post = $settlement->deriveInvoiceSnapshot($invoice->fresh());
-
-    expect($creditCharge->status)->toBe(FinanceCharge::STATUS_VOID)
-        ->and($entitlement->entitlement_type)->toBe(FinanceCharge::TYPE_VOUCHER_CREDIT)
-        ->and((float) $entitlement->amount)->toBe(2_500_000.0)
-        ->and($discount->finance_discount_entitlement_id)->toBe($entitlement->id)
-        ->and($entitlement->allocation_status)->toBe(FinanceDiscountEntitlement::ALLOCATION_FULLY_ALLOCATED)
-        // No credit applications for the converted voucher reduction.
-        ->and(CreditApplication::query()->count())->toBe(0)
-        ->and((float) $post['discount'])->toBe(2_500_000.0)
-        ->and((float) $post['credit'])->toBe(0.0)
-        ->and((float) $post['remaining'])->toBe((float) $pre['remaining'])
-        ->and((float) $post['remaining'])->toBe(7_500_000.0)
-        ->and(
-            InvoiceLine::query()
-                ->where('charge_id', $creditCharge->id)
-                ->where('status', 'active')
-                ->count()
-        )->toBe(0);
-
-    // Re-run is idempotent.
-    $this->artisan('finance:backfill-legacy-voucher-discount-entitlements')
-        ->assertSuccessful();
-
-    expect(FinanceDiscountEntitlement::query()->count())->toBe(1)
-        ->and(CreditApplication::query()->count())->toBe(0)
-        ->and(InvoiceDiscount::query()->where('finance_discount_entitlement_id', $entitlement->id)->count())->toBe(1);
-});
-
-it('converts a voucher without recalculating through another active legacy reduction on the invoice', function (): void {
-    [$invoice, $debitLine] = seedTuitionDebitForVoucher($this->student, $this->semester, 10_000_000);
-
-    $voucherDiscount = InvoiceDiscount::query()->create([
-        'invoice_id' => $invoice->id,
-        'discount_type' => 'voucher',
-        'discount_source' => 'legacy_voucher',
-        'description' => 'Legacy voucher discount',
-        'amount' => 2_500_000,
-        'reference_id' => 99,
-        'status' => 'active',
-    ]);
-    $scholarshipDiscount = InvoiceDiscount::query()->create([
-        'invoice_id' => $invoice->id,
-        'discount_type' => 'scholarship',
-        'discount_source' => 'legacy_scholarship',
-        'description' => 'Legacy scholarship discount',
-        'amount' => 1_000_000,
-        'reference_id' => 100,
-        'status' => 'active',
-    ]);
-
-    foreach ([[$voucherDiscount, 2_500_000], [$scholarshipDiscount, 1_000_000]] as [$discount, $amount]) {
-        DiscountAllocation::query()->create([
-            'invoice_discount_id' => $discount->id,
-            'invoice_line_id' => $debitLine->id,
-            'amount' => $amount,
-            'entry_type' => 'allocation',
-            'allocation_rule' => 'oldest_line_first',
-        ]);
-    }
-
-    DB::statement('SET SESSION check_constraint_checks = OFF');
-    try {
-        $voucherCharge = FinanceCharge::query()->create([
-            'student_id' => $this->student->id,
-            'semester_id' => $this->semester->id,
-            'charge_type' => FinanceCharge::TYPE_VOUCHER_CREDIT,
-            'amount' => -2_500_000,
-            'description' => 'Legacy voucher credit',
-            'effective_at' => now(),
-            'status' => FinanceCharge::STATUS_ACTIVE,
-        ]);
-        $scholarshipCharge = FinanceCharge::query()->create([
-            'student_id' => $this->student->id,
-            'semester_id' => $this->semester->id,
-            'charge_type' => FinanceCharge::TYPE_SCHOLARSHIP_CREDIT,
-            'amount' => -1_000_000,
-            'description' => 'Legacy scholarship credit',
-            'effective_at' => now(),
-            'status' => FinanceCharge::STATUS_ACTIVE,
-        ]);
-    } finally {
-        DB::statement('SET SESSION check_constraint_checks = ON');
-    }
-
-    foreach ([[$voucherCharge, -2_500_000], [$scholarshipCharge, -1_000_000]] as [$charge, $amount]) {
-        InvoiceLine::query()->create([
-            'invoice_id' => $invoice->id,
-            'charge_id' => $charge->id,
-            'amount_snapshot' => $amount,
-            'description_snapshot' => $charge->description,
-            'status' => 'active',
-        ]);
-    }
-
-    $cachedBefore = $invoice->fresh()->only([
-        'cached_subtotal',
-        'cached_discount_total',
-        'cached_total_amount',
-        'cached_paid_amount',
-        'status',
-    ]);
-
-    $result = app(BackfillLegacyVoucherDiscountEntitlementsAction::class)->run();
-
-    expect($result['converted'])->toBe(1)
-        ->and($result['mismatches'])->toBe(0)
-        ->and($voucherCharge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID)
-        ->and($scholarshipCharge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE)
-        ->and($voucherDiscount->fresh()->finance_discount_entitlement_id)->not->toBeNull()
-        ->and($scholarshipDiscount->fresh()->finance_discount_entitlement_id)->toBeNull()
-        ->and($invoice->fresh()->only(array_keys($cachedBefore)))->toBe($cachedBefore);
-});
-
-it('skips legacy voucher_credit rows without a discount allocation carrier', function (): void {
-    [$invoice] = seedTuitionDebitForVoucher($this->student, $this->semester, 10_000_000);
-
-    DB::statement('SET SESSION check_constraint_checks = OFF');
-    try {
-        $creditCharge = FinanceCharge::create([
-            'student_id' => $this->student->id,
-            'semester_id' => $this->semester->id,
-            'charge_type' => FinanceCharge::TYPE_VOUCHER_CREDIT,
-            'amount' => -1_000_000,
-            'description' => 'Orphan legacy voucher credit',
-            'effective_at' => now(),
-            'status' => FinanceCharge::STATUS_ACTIVE,
-        ]);
-    } finally {
-        DB::statement('SET SESSION check_constraint_checks = ON');
-    }
-
-    InvoiceLine::create([
-        'invoice_id' => $invoice->id,
-        'charge_id' => $creditCharge->id,
-        'amount_snapshot' => -1_000_000,
-        'description_snapshot' => 'Orphan legacy voucher credit',
-        'status' => 'active',
-    ]);
-
-    $this->artisan('finance:backfill-legacy-voucher-discount-entitlements')
-        ->assertSuccessful();
-
-    expect(FinanceDiscountEntitlement::query()->count())->toBe(0)
-        ->and($creditCharge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE);
 });

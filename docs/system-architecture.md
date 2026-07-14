@@ -76,7 +76,7 @@ Client (Web SPA / API)
         - `egc_retake_discount_links` binds failed source block -> target charge -> discount header
         - carry-forward releases unused paid EGC charges back to unapplied balance by voiding unused charges without immediate auto-allocation
         - retake discounts only target later mapped retake blocks of the same level
-        - `egc:backfill-blocks` rebuilds historical EGC blocks from registrations, repairs null `finance_charge_id`, and reports unmatched charges instead of inventing new blocks
+        - canonical EGC block history is retained as the post-backfill data truth; no runtime command reconstructs or repairs historical blocks
     - DNG workflow: Staff → Payment Create form → Student selection → resolve `campuses.dng_code` → DNG API push (with checksum) → QR display → Webhook inbox capture (`dng_webhook_events`) → Async checksum/business validation → Payment record
     - Defer/dropout cancellation order: close every linked unpaid DNG request locally as `cancelled`, then void linked charges/lines in the same admin settlement transaction. This lifecycle path does not call the DNG cancellation API; exact linkage may come from installment, request header, charge pivot, or reservation target. Original provider identity remains available so late verified receipts can still enter canonical Payment without reviving collection.
     - DNG replacement rule: for the same `student + fee_type`, only one unpaid DNG request should stay active; older unpaid requests move to `cancelled` after the replacement push succeeds

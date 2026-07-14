@@ -10,6 +10,7 @@ use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\Exceptions\InvalidFinanceIntakePayload;
@@ -149,7 +150,7 @@ it('routes discount intake for registered voucher_credit entitlement type', func
         source_kind: 'voucher_application',
         source_ref: 'router-open-check',
         financial_effect: FinancialEffect::Discount,
-        obligation_type: FinanceCharge::TYPE_VOUCHER_CREDIT,
+        obligation_type: FinanceEntitlementType::VoucherCredit,
         facts: [
             'student_id' => $this->student->id,
             'semester_id' => $this->semester->id,

@@ -17,6 +17,7 @@ use App\Modules\Finance\Models\FinanceCreditEntitlement;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
@@ -47,7 +48,7 @@ it('preserves approved credit and skips a live DNG-held target while incrementin
 
     $result = app(FinanceIntakeContract::class)->requestCredit(new FinanceIntakeData(
         source_system: 'test', source_kind: 'held_credit', source_ref: 'held:'.uniqid(),
-        financial_effect: FinancialEffect::Credit, obligation_type: FinanceCharge::TYPE_DEFER_CREDIT,
+        financial_effect: FinancialEffect::Credit, obligation_type: FinanceEntitlementType::DeferCredit,
         facts: ['student_id' => $student->id, 'semester_id' => $semester->id, 'amount' => 3_000_000, 'invoice_line_id' => $line->id],
     ));
 
@@ -59,7 +60,7 @@ it('preserves approved credit and skips a live DNG-held target while incrementin
 
 it('requires a staff-confirmed collection plan before reversing credit with no pending capacity', function (): void {
     [, , $account, $charge, $line] = heldCreditTarget();
-    $entitlement = FinanceCreditEntitlement::query()->create(['billing_account_id' => $account->id, 'source_system' => 'test', 'source_kind' => 'reversal', 'source_ref' => uniqid(), 'entitlement_type' => FinanceCharge::TYPE_DEFER_CREDIT, 'lifecycle_status' => FinanceCreditEntitlement::STATUS_APPROVED, 'allocation_status' => FinanceCreditEntitlement::ALLOCATION_FULLY_APPLIED, 'amount' => 3_000_000, 'currency' => 'VND', 'pricing_rule_version' => 'test', 'pricing_snapshot' => [], 'approved_at' => now()]);
+    $entitlement = FinanceCreditEntitlement::query()->create(['billing_account_id' => $account->id, 'source_system' => 'test', 'source_kind' => 'reversal', 'source_ref' => uniqid(), 'entitlement_type' => FinanceEntitlementType::DeferCredit, 'lifecycle_status' => FinanceCreditEntitlement::STATUS_APPROVED, 'allocation_status' => FinanceCreditEntitlement::ALLOCATION_FULLY_APPLIED, 'amount' => 3_000_000, 'currency' => 'VND', 'pricing_rule_version' => 'test', 'pricing_snapshot' => [], 'approved_at' => now()]);
     $application = CreditApplication::query()->create(['finance_credit_entitlement_id' => $entitlement->id, 'invoice_line_id' => $line->id, 'amount' => 3_000_000, 'entry_type' => CreditApplication::ENTRY_APPLICATION, 'applied_at' => now()]);
 
     expect(fn () => app(ReverseCreditApplicationAction::class)->handle($application->id))
@@ -70,7 +71,7 @@ it('requires a staff-confirmed collection plan before reversing credit with no p
 it('reverses credit only after staff confirms the amount and due date of a new plan', function (): void {
     [, , $account, $charge, $line] = heldCreditTarget();
     DngPaymentRequest::query()->firstOrFail()->update(['status' => DngPaymentRequest::STATUS_FAILED]);
-    $entitlement = FinanceCreditEntitlement::query()->create(['billing_account_id' => $account->id, 'source_system' => 'test', 'source_kind' => 'confirmed-reversal', 'source_ref' => uniqid(), 'entitlement_type' => FinanceCharge::TYPE_DEFER_CREDIT, 'lifecycle_status' => FinanceCreditEntitlement::STATUS_APPROVED, 'allocation_status' => FinanceCreditEntitlement::ALLOCATION_FULLY_APPLIED, 'amount' => 3_000_000, 'currency' => 'VND', 'pricing_rule_version' => 'test', 'pricing_snapshot' => [], 'approved_at' => now()]);
+    $entitlement = FinanceCreditEntitlement::query()->create(['billing_account_id' => $account->id, 'source_system' => 'test', 'source_kind' => 'confirmed-reversal', 'source_ref' => uniqid(), 'entitlement_type' => FinanceEntitlementType::DeferCredit, 'lifecycle_status' => FinanceCreditEntitlement::STATUS_APPROVED, 'allocation_status' => FinanceCreditEntitlement::ALLOCATION_FULLY_APPLIED, 'amount' => 3_000_000, 'currency' => 'VND', 'pricing_rule_version' => 'test', 'pricing_snapshot' => [], 'approved_at' => now()]);
     $application = CreditApplication::query()->create(['finance_credit_entitlement_id' => $entitlement->id, 'invoice_line_id' => $line->id, 'amount' => 3_000_000, 'entry_type' => CreditApplication::ENTRY_APPLICATION, 'applied_at' => now()]);
 
     $reversal = app(ReverseCreditApplicationAction::class)->handle($application->id, [[
@@ -97,7 +98,7 @@ it('marks the linked pushed DNG request for review when committed installments e
     $entitlement = FinanceCreditEntitlement::query()->create([
         'billing_account_id' => $account->id,
         'source_system' => 'test', 'source_kind' => 'committed-over-collect', 'source_ref' => uniqid(),
-        'entitlement_type' => FinanceCharge::TYPE_DEFER_CREDIT, 'lifecycle_status' => FinanceCreditEntitlement::STATUS_APPROVED,
+        'entitlement_type' => FinanceEntitlementType::DeferCredit, 'lifecycle_status' => FinanceCreditEntitlement::STATUS_APPROVED,
         'allocation_status' => FinanceCreditEntitlement::ALLOCATION_FULLY_APPLIED, 'amount' => 2_000_000,
         'currency' => 'VND', 'pricing_rule_version' => 'test', 'pricing_snapshot' => [], 'approved_at' => now(),
     ]);

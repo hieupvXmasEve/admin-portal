@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Modules\Finance\Actions\Operations\GenerateNonAcademicChargesAction;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Modules\Finance\Support\FinanceOwnedObligationSource;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -174,8 +175,8 @@ it('does not create scholarship or voucher credit charges (D3)', function () {
 
     $creditCount = FinanceCharge::where('student_id', $s1->id)
         ->whereIn('charge_type', [
-            FinanceCharge::TYPE_SCHOLARSHIP_CREDIT,
-            FinanceCharge::TYPE_VOUCHER_CREDIT,
+            FinanceEntitlementType::ScholarshipCredit,
+            FinanceEntitlementType::VoucherCredit,
         ])
         ->count();
 

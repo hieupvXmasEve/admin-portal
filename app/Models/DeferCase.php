@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -93,7 +94,7 @@ class DeferCase extends Model
     {
         return $this->hasOne(FinanceCharge::class, 'source_id')
             ->where('source_type', self::class)
-            ->where('charge_type', FinanceCharge::TYPE_DEFER_CREDIT);
+            ->where('charge_type', FinanceEntitlementType::DeferCredit);
     }
 
     // =====================

@@ -9,6 +9,7 @@ use App\Http\Responses\ApiResponse;
 use App\Models\Semester;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -80,13 +81,13 @@ class FinanceController extends Controller
                 if ($chargeTypes->contains(FinanceCharge::TYPE_RETAKE_FEE)) {
                     $badges[] = 'Retake';
                 }
-                if ($chargeTypes->contains(FinanceCharge::TYPE_SCHOLARSHIP_CREDIT)) {
+                if ($chargeTypes->contains(FinanceEntitlementType::ScholarshipCredit)) {
                     $badges[] = 'Scholarship';
                 }
-                if ($chargeTypes->contains(FinanceCharge::TYPE_VOUCHER_CREDIT)) {
+                if ($chargeTypes->contains(FinanceEntitlementType::VoucherCredit)) {
                     $badges[] = 'Voucher';
                 }
-                if ($chargeTypes->contains(FinanceCharge::TYPE_DEFER_CREDIT)) {
+                if ($chargeTypes->contains(FinanceEntitlementType::DeferCredit)) {
                     $badges[] = 'Defer';
                 }
                 // Major check: standard tuition

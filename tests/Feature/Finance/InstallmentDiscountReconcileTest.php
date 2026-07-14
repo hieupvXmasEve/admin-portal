@@ -20,6 +20,7 @@ use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\InvoiceGenerationService;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -187,7 +188,7 @@ it('reconciles only pending installments from canonical remaining after credit i
     $line = InvoiceLine::query()->where('charge_id', $charge->id)->firstOrFail();
     $entitlement = FinanceCreditEntitlement::query()->create([
         'source_system' => 'test', 'source_kind' => 'credit', 'source_ref' => uniqid(),
-        'entitlement_type' => FinanceCharge::TYPE_DEFER_CREDIT, 'lifecycle_status' => FinanceCreditEntitlement::STATUS_APPROVED,
+        'entitlement_type' => FinanceEntitlementType::DeferCredit, 'lifecycle_status' => FinanceCreditEntitlement::STATUS_APPROVED,
         'allocation_status' => FinanceCreditEntitlement::ALLOCATION_FULLY_APPLIED, 'amount' => 5_000_000,
         'currency' => 'VND', 'pricing_rule_version' => 'test', 'pricing_snapshot' => [], 'approved_at' => now(),
     ]);

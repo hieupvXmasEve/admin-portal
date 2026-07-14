@@ -7,6 +7,7 @@ namespace App\Modules\Finance\Support\ObligationType;
 use App\Modules\Finance\Enums\CancellationPolicy;
 use App\Modules\Finance\Enums\PricingStrategy;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use InvalidArgumentException;
 
@@ -67,7 +68,7 @@ final class ObligationTypeRegistry
     }
 
     /**
-     * Types that may appear as finance_charges.charge_type (debit + legacy credit/discount rows).
+     * Active types that may appear as finance_charges.charge_type.
      *
      * @return list<string>
      */
@@ -75,7 +76,7 @@ final class ObligationTypeRegistry
     {
         return array_values(array_filter(
             self::types(),
-            static fn (string $type): bool => $type !== self::TYPE_EGC_RETAKE,
+            static fn (string $type): bool => self::get($type)->isDebit(),
         ));
     }
 
@@ -108,7 +109,7 @@ final class ObligationTypeRegistry
     /**
      * Reverse of dngCollectionCodeFor for debit charge types that auto-map to a code.
      * Manual-only DNG codes (PRE, THHB, F1, GC) have no reverse charge-type set.
-     * Retired types are excluded so worklist / batch DNG never target them.
+     * Entitlement types are excluded so worklist / batch DNG never target them.
      *
      * @return list<string>
      */
@@ -232,22 +233,6 @@ final class ObligationTypeRegistry
                 feeMonitorMandatory: true,
                 feeMonitorMissingInference: true,
             ),
-            // Wave 6 audit: formally retired — zero generators, zero rows on sample,
-            // not on manual create form. Historical enum/CHECK kept until wave 7.
-            // allowedSourceKinds empty: no intake source kind may mint this type.
-            new ObligationTypeDefinition(
-                type: FinanceCharge::TYPE_COURSE_FEE,
-                financialEffect: FinancialEffect::Debit,
-                allowedSourceKinds: [],
-                pricingStrategy: PricingStrategy::GeneratorAmount,
-                // No active DNG reverse-map; fromChargeType falls to KHAC.
-                dngCollectionCode: null,
-                supportsInstallments: false,
-                cancellationPolicy: CancellationPolicy::Retired,
-                permission: null,
-                label: 'Phí môn học (đã ngừng)',
-                retired: true,
-            ),
             new ObligationTypeDefinition(
                 type: FinanceCharge::TYPE_BHYT,
                 financialEffect: FinancialEffect::Debit,
@@ -305,9 +290,9 @@ final class ObligationTypeRegistry
                 label: 'Điều chỉnh',
             ),
 
-            // ── Legacy credit charge_types (wave 4 → FinanceCreditEntitlement) ──
+            // ── Credit entitlements (never active charge creation types) ──
             new ObligationTypeDefinition(
-                type: FinanceCharge::TYPE_DEFER_CREDIT,
+                type: FinanceEntitlementType::DeferCredit,
                 financialEffect: FinancialEffect::Credit,
                 allowedSourceKinds: ['defer_settlement'],
                 pricingStrategy: PricingStrategy::PolicyComputed,
@@ -318,7 +303,7 @@ final class ObligationTypeRegistry
                 label: 'Tín dụng bảo lưu',
             ),
             new ObligationTypeDefinition(
-                type: FinanceCharge::TYPE_EGC_EXEMPT_CREDIT,
+                type: FinanceEntitlementType::EgcExemptCredit,
                 financialEffect: FinancialEffect::Credit,
                 allowedSourceKinds: ['egc_exemption', 'egc_major_entry_credit', 'legacy_egc_exempt_credit'],
                 pricingStrategy: PricingStrategy::PolicyComputed,
@@ -331,7 +316,7 @@ final class ObligationTypeRegistry
             // scholarship_credit is dual-nature (grant credit vs fee-specific discount);
             // wave 4 classifier splits carriers. Registry primary effect is Credit (grant-like default).
             new ObligationTypeDefinition(
-                type: FinanceCharge::TYPE_SCHOLARSHIP_CREDIT,
+                type: FinanceEntitlementType::ScholarshipCredit,
                 financialEffect: FinancialEffect::Credit,
                 allowedSourceKinds: ['scholarship_application', 'scholarship_award'],
                 pricingStrategy: PricingStrategy::PolicyComputed,
@@ -342,9 +327,9 @@ final class ObligationTypeRegistry
                 label: 'Tín dụng / chiết khấu học bổng',
             ),
 
-            // ── Legacy discount-as-negative-charge (wave 4 → FinanceDiscountEntitlement) ──
+            // ── Discount entitlements (never active charge creation types) ──
             new ObligationTypeDefinition(
-                type: FinanceCharge::TYPE_VOUCHER_CREDIT,
+                type: FinanceEntitlementType::VoucherCredit,
                 financialEffect: FinancialEffect::Discount,
                 allowedSourceKinds: ['voucher_application'],
                 pricingStrategy: PricingStrategy::PolicyComputed,
