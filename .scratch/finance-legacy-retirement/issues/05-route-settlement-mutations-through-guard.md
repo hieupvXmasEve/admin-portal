@@ -1,6 +1,6 @@
 # 05 — Route settlement mutations through the guard
 
-Status: ready-for-human
+Status: completed
 
 ## Parent
 
