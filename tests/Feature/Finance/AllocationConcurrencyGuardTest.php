@@ -8,8 +8,10 @@ use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
@@ -62,8 +64,23 @@ function makeAllocationStudent(int $chargeCount, float $chargeAmount): array
     ]);
 
     $charges = [];
+    $billingAccount = BillingAccount::query()->where('student_id', $student->id)->firstOrFail();
     foreach (range(1, $chargeCount) as $i) {
+        $obligation = FinanceObligation::query()->create([
+            'billing_account_id' => $billingAccount->id,
+            'source_system' => 'test',
+            'source_kind' => 'allocation_concurrency',
+            'source_ref' => "allocation-concurrency:{$student->id}:{$i}",
+            'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+            'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+            'amount' => $chargeAmount,
+            'currency' => 'VND',
+            'pricing_rule_version' => 'test',
+            'pricing_snapshot' => [],
+            'accepted_at' => now(),
+        ]);
         $charge = FinanceCharge::create([
+            'finance_obligation_id' => $obligation->id,
             'student_id' => $student->id,
             'semester_id' => $semester->id,
             'charge_type' => FinanceCharge::TYPE_TUITION_TERM,

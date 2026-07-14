@@ -7,8 +7,10 @@ use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
@@ -54,7 +56,23 @@ it('derives invoice status and related finance reads from line-level settlement 
         'paid_amount' => 0,
     ]);
 
+    $billingAccount = BillingAccount::query()->firstOrCreate(['student_id' => $student->id]);
+    $obligation = FinanceObligation::query()->create([
+        'billing_account_id' => $billingAccount->id,
+        'source_system' => 'test',
+        'source_kind' => 'derived_snapshot',
+        'source_ref' => 'derived-snapshot:'.$student->id,
+        'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 10_000_000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+
     $charge = FinanceCharge::create([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'charge_type' => FinanceCharge::TYPE_TUITION_TERM,

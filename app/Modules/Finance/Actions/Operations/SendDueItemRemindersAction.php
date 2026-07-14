@@ -57,7 +57,6 @@ class SendDueItemRemindersAction
                 }
 
                 $student = $dngRequest->student;
-                $balance = (float) $dngRequest->amount;
 
                 if (LifecycleDueItemPredicate::isLifecycleException($student)) {
                     \Log::info('Skipping DNG reminder - lifecycle exception', [
@@ -83,6 +82,25 @@ class SendDueItemRemindersAction
                         'student_id' => $student->id,
                     ]);
                     $skippedNoStudentEmailCount++;
+
+                    continue;
+                }
+
+                $balanceContext = $installmentResolver->currentBalance($dngRequest);
+                if ($balanceContext['amount'] === null) {
+                    \Log::warning('Skipping DNG reminder - Settlement Position requires review', [
+                        'dng_request_id' => $id,
+                        'student_id' => $student->id,
+                        'settlement_position_issue_codes' => $balanceContext['issue_codes'],
+                    ]);
+                    $failedCount++;
+
+                    continue;
+                }
+
+                $balance = $balanceContext['amount'];
+                if ($balance <= 0) {
+                    $skippedNoDebtCount++;
 
                     continue;
                 }

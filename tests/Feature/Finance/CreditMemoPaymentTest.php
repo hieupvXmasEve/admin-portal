@@ -48,40 +48,32 @@ beforeEach(function () {
     app()->singleton(PermissionService::class, fn () => $permissionService);
 });
 
-it('no longer creates credit memo payments for any charge', function () {
+it('rejects negative charges instead of creating credit memo payments', function () {
     $action = app(CreateFinanceChargeAction::class);
 
-    $action->handle([
+    expect(fn () => $action->handle([
         'student_id' => $this->student->id,
         'semester_id' => $this->semester->id,
         'charge_type' => FinanceCharge::TYPE_EGC_EXEMPT_CREDIT,
         'amount' => -5000000,
         'description' => 'EGC refund',
-    ]);
-
-    $action->handle([
-        'student_id' => $this->student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
-        'amount' => 10000000,
-        'description' => 'Tuition fee',
-    ]);
+    ]))->toThrow(InvalidArgumentException::class, 'debit obligations only');
 
     expect(Payment::where('source', 'credit_memo')->count())->toBe(0);
-    expect(InvoiceLine::count())->toBe(2);
+    expect(InvoiceLine::count())->toBe(0);
 });
 
-it('negative charge is assigned to invoice like positive charge', function () {
+it('does not assign a negative charge to an invoice', function () {
     $action = app(CreateFinanceChargeAction::class);
 
-    $charge = $action->handle([
+    expect(fn () => $action->handle([
         'student_id' => $this->student->id,
         'semester_id' => $this->semester->id,
         'charge_type' => FinanceCharge::TYPE_SCHOLARSHIP_CREDIT,
         'amount' => -4500000,
         'description' => 'Scholarship discount',
-    ]);
+    ]))->toThrow(InvalidArgumentException::class, 'debit obligations only');
 
-    expect((float) $charge->amount)->toBe(-4500000.0);
-    expect(InvoiceLine::where('charge_id', $charge->id)->count())->toBe(1);
+    expect(FinanceCharge::query()->count())->toBe(0);
+    expect(InvoiceLine::count())->toBe(0);
 });

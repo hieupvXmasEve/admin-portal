@@ -8,6 +8,8 @@ final readonly class ObligationSettlementResult
 {
     public const STATE_MISSING_FINANCE_OBLIGATION = 'missing_finance_obligation';
 
+    public const STATE_INVALID_SETTLEMENT_POSITION = 'invalid_settlement_position';
+
     public const STATE_UNPAID = 'unpaid';
 
     public const STATE_PARTIALLY_PAID = 'partially_paid';
@@ -29,6 +31,8 @@ final readonly class ObligationSettlementResult
         public float $paid,
         public float $discount,
         public float $outstanding,
+        /** @var list<string> */
+        public array $settlement_position_issue_codes = [],
     ) {}
 
     public static function missing(
@@ -48,6 +52,32 @@ final readonly class ObligationSettlementResult
             paid: 0.0,
             discount: 0.0,
             outstanding: 0.0,
+        );
+    }
+
+    /**
+     * @param  list<string>  $issueCodes
+     */
+    public static function invalid(
+        string $sourceSystem,
+        string $sourceKind,
+        string $sourceRef,
+        string $obligationType,
+        ?int $financeObligationId,
+        array $issueCodes,
+    ): self {
+        return new self(
+            source_system: $sourceSystem,
+            source_kind: $sourceKind,
+            source_ref: $sourceRef,
+            obligation_type: $obligationType,
+            finance_obligation_id: $financeObligationId,
+            settlement_state: self::STATE_INVALID_SETTLEMENT_POSITION,
+            payable: 0.0,
+            paid: 0.0,
+            discount: 0.0,
+            outstanding: 0.0,
+            settlement_position_issue_codes: $issueCodes,
         );
     }
 

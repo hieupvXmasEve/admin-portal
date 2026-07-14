@@ -8,6 +8,7 @@ use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Models\BillingAccount;
+use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceDiscount;
@@ -92,13 +93,21 @@ it('builds fee summary from invoice discounts and payment applications only', fu
         'status' => 'active',
     ]);
 
-    InvoiceDiscount::query()->create([
+    $discount = InvoiceDiscount::query()->create([
         'invoice_id' => $invoice->id,
         'discount_type' => 'voucher',
         'discount_source' => 'App\\Models\\VoucherApplication',
         'description' => 'Voucher Applied (VC-001)',
         'amount' => 5000000,
         'reference_id' => 1,
+    ]);
+
+    DiscountAllocation::query()->create([
+        'invoice_discount_id' => $discount->id,
+        'invoice_line_id' => $line->id,
+        'amount' => 5000000,
+        'entry_type' => 'allocation',
+        'allocation_rule' => 'test',
     ]);
 
     $payment = Payment::query()->create([

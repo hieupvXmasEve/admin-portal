@@ -9,7 +9,9 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
@@ -60,6 +62,7 @@ function createUnpaidInvoice(Student $student, Semester $semester, string $invoi
     ]);
 
     $charge = FinanceCharge::query()->create([
+        'finance_obligation_id' => createSettlementObligation($student, FinanceCharge::TYPE_EGC_LEVEL_FEE, $amount, $invoiceNumber)->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'billing_cycle_id' => null,
@@ -79,6 +82,25 @@ function createUnpaidInvoice(Student $student, Semester $semester, string $invoi
     ]);
 
     return [$invoice, $charge, $line];
+}
+
+function createSettlementObligation(Student $student, string $type, float $amount, string $sourceRef): FinanceObligation
+{
+    $billingAccount = BillingAccount::query()->where('student_id', $student->id)->firstOrFail();
+
+    return FinanceObligation::query()->create([
+        'billing_account_id' => $billingAccount->id,
+        'source_system' => 'test',
+        'source_kind' => 'settlement_worklist',
+        'source_ref' => 'settlement-worklist:'.$sourceRef,
+        'obligation_type' => $type,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
 }
 
 it('lists unpaid students with readiness based on unapplied cash', function () {
@@ -144,6 +166,7 @@ it('excludes invoice lines whose linked charges are void from active due totals'
     [$invoice] = createUnpaidInvoice($student, $semester, 'INV-VOID-CHECK', 15000000);
 
     $voidCharge = FinanceCharge::query()->create([
+        'finance_obligation_id' => createSettlementObligation($student, FinanceCharge::TYPE_EGC_LEVEL_FEE, 10000000, 'voided-line')->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'billing_cycle_id' => null,
@@ -159,7 +182,7 @@ it('excludes invoice lines whose linked charges are void from active due totals'
         'charge_id' => $voidCharge->id,
         'amount_snapshot' => 10000000,
         'description_snapshot' => 'Voided EGC Fee',
-        'status' => 'active',
+        'status' => 'void',
     ]);
 
     $result = app(ListSettlementWorklistQuery::class)->handle(Request::create('/finance/operations/settlement', 'GET'));
@@ -236,7 +259,7 @@ it('lists settlement students in paginated form and applies for selected student
         ->and($lineTwo->paymentApplications()->count())->toBe(0);
 });
 
-it('applies payments oldest invoice first then oldest line within invoice', function () {
+it('honors fee-type priority before invoice and line chronology', function () {
     [$student, $semester] = createSettlementStudent('AUS-ORDER');
 
     $oldInvoice = StudentInvoice::query()->create([
@@ -270,6 +293,7 @@ it('applies payments oldest invoice first then oldest line within invoice', func
     ]);
 
     $chargeOne = FinanceCharge::query()->create([
+        'finance_obligation_id' => createSettlementObligation($student, FinanceCharge::TYPE_EGC_LEVEL_FEE, 10000000, 'order-one')->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'billing_cycle_id' => null,
@@ -281,6 +305,7 @@ it('applies payments oldest invoice first then oldest line within invoice', func
     ]);
 
     $chargeTwo = FinanceCharge::query()->create([
+        'finance_obligation_id' => createSettlementObligation($student, FinanceCharge::TYPE_MANUAL_FEE, 10000000, 'order-two')->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'billing_cycle_id' => null,
@@ -292,6 +317,7 @@ it('applies payments oldest invoice first then oldest line within invoice', func
     ]);
 
     $chargeThree = FinanceCharge::query()->create([
+        'finance_obligation_id' => createSettlementObligation($student, FinanceCharge::TYPE_EGC_LEVEL_FEE, 10000000, 'order-three')->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'billing_cycle_id' => null,
@@ -345,7 +371,7 @@ it('applies payments oldest invoice first then oldest line within invoice', func
 
     expect($stats['allocations_created'])->toBe(3)
         ->and((float) $lineOne->fresh()->paymentApplications()->sum('amount'))->toBe(10000000.0)
-        ->and((float) $lineTwo->fresh()->paymentApplications()->sum('amount'))->toBe(10000000.0)
-        ->and((float) $lineThree->fresh()->paymentApplications()->sum('amount'))->toBe(5000000.0)
+        ->and((float) $lineTwo->fresh()->paymentApplications()->sum('amount'))->toBe(5000000.0)
+        ->and((float) $lineThree->fresh()->paymentApplications()->sum('amount'))->toBe(10000000.0)
         ->and($payment->fresh()->unapplied_amount)->toBe(0.0);
 });

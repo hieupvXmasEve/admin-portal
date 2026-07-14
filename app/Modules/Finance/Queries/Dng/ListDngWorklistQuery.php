@@ -23,8 +23,7 @@ use Illuminate\Support\Collection;
 /**
  * Query the DNG worklist: students with active, unpaid charges of a given DNG fee type.
  *
- * Balance is computed in a single batched query (no N+1) by joining aggregated
- * payment_applications and discount_allocations subqueries at the invoice_lines level.
+ * Balance comes from grouped, batched Settlement Position reads (no N+1).
  *
  * For fee_type = HL/PTL, also surfaces approved Academic sources that have
  * neither a legacy charge link nor a visible payable yet. The legacy

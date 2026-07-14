@@ -110,7 +110,7 @@ final class ListStudentInvoicesQuery
             'gross_amount' => $gross,
             'discount_amount' => $discount,
             'credit_amount' => $credit,
-            'total_amount' => $valid ? round($gross - $discount, 2) : null,
+            'total_amount' => $valid ? (float) $amounts->netDue()->amount : null,
             'paid_amount' => $cash,
             'outstanding_balance' => $remaining,
             'due_date' => $invoice->due_date?->toIso8601String(),

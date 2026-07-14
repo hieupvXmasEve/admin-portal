@@ -37,6 +37,12 @@ class CreateFinanceChargeAction
      */
     public function handle(array $data): FinanceCharge
     {
+        if ((float) $data['amount'] <= 0) {
+            throw new \InvalidArgumentException(
+                'CreateFinanceChargeAction materializes debit obligations only; use a discount or credit entitlement for reductions.',
+            );
+        }
+
         return DB::transaction(function () use ($data) {
             // Materialize the debit read-model row. source_type/source_id are
             // intentionally never written (wave 7 retirement).

@@ -352,8 +352,10 @@ it('keeps gross, discount, cash, credit, and remaining separate at the same curr
     ]))->assertOk();
     $voidedRow = cpRows($voided)->firstWhere('student.student_code', 'CP-MIXED');
 
-    expect($voidedRow['valid'])->toBeFalse()
-        ->and($voidedRow['settlement_issue_codes'])->toContain('settlement_position.payable_line_not_active');
+    expect($voidedRow['valid'])->toBeTrue()
+        ->and($voidedRow['gross'])->toEqual(0.0)
+        ->and($voidedRow['outstanding'])->toEqual(0.0)
+        ->and($voidedRow['settlement_issue_codes'])->toBe([]);
 });
 
 it('keeps an invalid current position visible with stable issue codes', function () {

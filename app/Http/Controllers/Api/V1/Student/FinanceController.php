@@ -148,6 +148,9 @@ class FinanceController extends Controller
                 return ApiResponse::notFound('Semester not found');
             }
 
+            $position = $this->positionReader->current((int) $student->id, $semesterId);
+            $positionValid = (bool) $position['valid'];
+
             // Get charges details
             $charges = FinanceCharge::query()
                 ->forStudent($student->id)
@@ -203,11 +206,6 @@ class FinanceController extends Controller
                 ];
             })->values();
 
-            // Summary for this semester
-            $totalDue = $lines->sum('amount');
-            $totalPaid = $groupedPayments->sum('amount');
-            $balance = $totalDue - $totalPaid;
-
             return ApiResponse::success([
                 'semester' => [
                     'id' => $semester->id,
@@ -217,9 +215,15 @@ class FinanceController extends Controller
                 'charges' => $lines,
                 'payments' => $groupedPayments,
                 'summary' => [
-                    'due_amount' => (float) $totalDue,
-                    'paid_amount' => (float) $totalPaid,
-                    'balance' => (float) $balance,
+                    'due_amount' => $positionValid ? $position['net_due'] : null,
+                    'paid_amount' => $positionValid ? $position['cash_applied'] : null,
+                    'credit_amount' => $positionValid ? $position['credit_applied'] : null,
+                    'balance' => $positionValid ? $position['remaining_collectible'] : null,
+                    'settlement_position' => [
+                        'valid' => $positionValid,
+                        'message' => $positionValid ? null : StudentFinanceSettlementPositionReader::STUDENT_UNAVAILABLE_MESSAGE,
+                        'issues' => $position['issues'],
+                    ],
                 ],
             ]);
 

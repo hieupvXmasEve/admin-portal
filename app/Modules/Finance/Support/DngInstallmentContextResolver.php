@@ -7,6 +7,8 @@ namespace App\Modules\Finance\Support;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Shared\Contracts\Finance\SettlementPositionReader;
 
 /**
  * Resolve installment metadata for a DNG payment request that was pushed
@@ -16,6 +18,10 @@ use App\Modules\Finance\Models\FinanceChargeInstallment;
  */
 class DngInstallmentContextResolver
 {
+    public function __construct(
+        private readonly SettlementPositionReader $settlementPositionReader,
+    ) {}
+
     /**
      * @return array{
      *   installment_no: int,
@@ -43,18 +49,60 @@ class DngInstallmentContextResolver
             ->where('finance_charge_id', $charge->id)
             ->count();
 
-        $paidSum = (float) FinanceChargeInstallment::query()
-            ->where('finance_charge_id', $charge->id)
-            ->where('status', FinanceChargeInstallment::STATUS_PAID)
-            ->sum('amount');
+        $lineIds = InvoiceLine::query()
+            ->where('charge_id', $charge->id)
+            ->where('status', 'active')
+            ->pluck('id')
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->all();
+        $position = $this->settlementPositionReader->forPayableLines($lineIds);
 
-        $remaining = max(0.0, (float) $charge->amount - $paidSum);
+        if (! $position->isValid() || $position->amounts === null) {
+            return null;
+        }
 
         return [
             'installment_no' => (int) $installment->installment_no,
             'installment_total' => $totalInstallments,
             'installment_amount_formatted' => number_format((float) $installment->amount, 0, ',', '.'),
-            'remaining_balance_formatted' => number_format($remaining, 0, ',', '.'),
+            'remaining_balance_formatted' => number_format((float) $position->amounts->remaining->amount, 0, ',', '.'),
+        ];
+    }
+
+    /**
+     * @return array{amount: ?float, issue_codes: list<string>}
+     */
+    public function currentBalance(DngPaymentRequest $dngRequest): array
+    {
+        $lineIds = $dngRequest->reservationTargets()
+            ->pluck('invoice_line_id')
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->filter(static fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($lineIds === []) {
+            return [
+                'amount' => null,
+                'issue_codes' => ['settlement_position.missing_payable_line'],
+            ];
+        }
+
+        $position = $this->settlementPositionReader->forPayableLines($lineIds);
+        if (! $position->isValid() || $position->amounts === null) {
+            return [
+                'amount' => null,
+                'issue_codes' => array_values(array_unique(array_map(
+                    static fn ($issue): string => $issue->code,
+                    $position->issues,
+                ))),
+            ];
+        }
+
+        return [
+            'amount' => (float) $position->amounts->remaining->amount,
+            'issue_codes' => [],
         ];
     }
 }

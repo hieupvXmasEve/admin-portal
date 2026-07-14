@@ -4,107 +4,71 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries;
 
-use App\Modules\Finance\Models\FinanceCharge;
-use App\Modules\Finance\Models\InvoiceLine;
-use App\Modules\Finance\Models\StudentInvoice;
-use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
 
 /**
- * Student charges API summary totals (total_charges / total_credits / net_amount).
+ * Canonical summary for the student charges API.
  *
- * ADR-0030 / wave 7: total_credits and net_amount read discount allocations +
- * credit applications only. Negative charge lines are not part of the active
- * debit read model.
+ * The field names are retained for portal compatibility. Every monetary value
+ * originates from the current Settlement Position; reductions remain split so
+ * the UI does not present credit application as cash paid.
  */
 class GetStudentChargeSummaryQuery
 {
     public function __construct(
-        protected SettlementService $settlementService,
+        private readonly StudentFinanceSettlementPositionReader $positionReader,
     ) {}
 
-    /**
-     * @return array{total_charges: float, total_credits: float, net_amount: float}
-     */
+    /** @return array<string, bool|float|null|string|array> */
     public function handle(int $studentId, ?int $semesterId = null): array
     {
-        $totalCharges = $this->totalCharges($studentId, $semesterId);
-        $totalCredits = $this->totalCredits($studentId, $semesterId);
+        $position = $this->positionReader->current($studentId, $semesterId);
+
+        if (! $position['valid']) {
+            return [
+                'total_charges' => null,
+                'total_credits' => null,
+                'net_amount' => null,
+                'cash_amount' => null,
+                'credit_amount' => null,
+                'remaining_amount' => null,
+                'settlement_position' => [
+                    'valid' => false,
+                    'state' => $position['settlement_state'],
+                    'message' => StudentFinanceSettlementPositionReader::STUDENT_UNAVAILABLE_MESSAGE,
+                    'issues' => $position['issues'],
+                ],
+            ];
+        }
 
         return [
-            'total_charges' => $totalCharges,
-            'total_credits' => $totalCredits,
-            'net_amount' => $totalCharges - $totalCredits,
+            'total_charges' => $position['gross'],
+            'total_credits' => $position['discount'] + $position['credit_applied'],
+            'net_amount' => $position['net_due'],
+            'cash_amount' => $position['cash_applied'],
+            'credit_amount' => $position['credit_applied'],
+            'remaining_amount' => $position['remaining_collectible'],
+            'settlement_position' => [
+                'valid' => true,
+                'state' => $position['settlement_state'],
+                'message' => null,
+                'issues' => [],
+            ],
         ];
     }
 
     public function totalCharges(int $studentId, ?int $semesterId = null): float
     {
-        $query = FinanceCharge::query()
-            ->where('student_id', $studentId)
-            ->where('status', FinanceCharge::STATUS_ACTIVE)
-            ->where('amount', '>', 0);
-
-        if ($semesterId !== null) {
-            $query->where('semester_id', $semesterId);
-        }
-
-        return (float) $query->sum('amount');
+        return (float) ($this->handle($studentId, $semesterId)['total_charges'] ?? 0);
     }
 
     public function totalCredits(int $studentId, ?int $semesterId = null): float
     {
-        $invoiceQuery = StudentInvoice::query()
-            ->where('student_id', $studentId);
-
-        if ($semesterId !== null) {
-            $invoiceQuery->where('semester_id', $semesterId);
-        }
-
-        $invoices = $invoiceQuery
-            ->with([
-                'invoiceLines.charge',
-                'invoiceLines.discountAllocations.invoiceDiscount',
-                'invoiceLines.creditApplications',
-            ])
-            ->get();
-
-        return (float) $invoices->sum(
-            fn (StudentInvoice $invoice): float => $this->invoiceReductionTotal($invoice)
-        );
+        return (float) ($this->handle($studentId, $semesterId)['total_credits'] ?? 0);
     }
 
     public function netAmount(int $studentId, ?int $semesterId = null): float
     {
-        return $this->totalCharges($studentId, $semesterId) - $this->totalCredits($studentId, $semesterId);
-    }
-
-    /**
-     * Carrier reductions for one invoice: discount allocations + credit applications.
-     *
-     * Uses SettlementService line helpers so reversed discounts and signed credit
-     * applications match settlement truth, but does NOT apply the payment residual
-     * clamp from deriveInvoiceSnapshot (charges summary is "giảm trừ", not remaining).
-     */
-    private function invoiceReductionTotal(StudentInvoice $invoice): float
-    {
-        $activeLines = $invoice->invoiceLines
-            ->filter(function (InvoiceLine $line): bool {
-                if (($line->status ?? 'active') !== 'active') {
-                    return false;
-                }
-
-                return $line->charge === null || $line->charge->status === FinanceCharge::STATUS_ACTIVE;
-            })
-            ->values();
-
-        $discount = (float) $activeLines->sum(
-            fn (InvoiceLine $line): float => $this->settlementService->getLineDiscountAmount($line)
-        );
-
-        $credit = (float) $activeLines->sum(
-            fn (InvoiceLine $line): float => $this->settlementService->getLineCreditAmount($line)
-        );
-
-        return $discount + $credit;
+        return (float) ($this->handle($studentId, $semesterId)['net_amount'] ?? 0);
     }
 }

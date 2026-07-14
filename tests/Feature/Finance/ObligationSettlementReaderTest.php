@@ -137,6 +137,17 @@ it('returns missing_finance_obligation for absent source instead of cleared', fu
         ->and($settlement->outstanding)->toBe(0.0);
 });
 
+it('fails closed when an accepted obligation has no payable line', function (): void {
+    [, , $line] = createSettlementObligation();
+    $line->delete();
+
+    $settlement = readSettlement();
+
+    expect($settlement->settlement_state)->toBe(ObligationSettlementResult::STATE_INVALID_SETTLEMENT_POSITION)
+        ->and($settlement->isSettled())->toBeFalse()
+        ->and($settlement->settlement_position_issue_codes)->toContain('settlement_position.missing_payable_line');
+});
+
 it('derives unpaid settlement from active invoice lines and ignores stale invoice cache', function (): void {
     [, , , $invoice] = createSettlementObligation(1_000_000);
 
@@ -190,16 +201,17 @@ it('ignores applications backed only by pending payments', function (): void {
         ->and($settlement->outstanding)->toBe(1_000_000.0);
 });
 
-it('derives overpaid settlement when completed applications exceed net payable', function (): void {
+it('fails closed with canonical review evidence when completed applications exceed net payable', function (): void {
     [, , $line] = createSettlementObligation(1_000_000);
 
     applySettlementPayment($line, 1_200_000);
 
     $settlement = readSettlement();
 
-    expect($settlement->settlement_state)->toBe(ObligationSettlementResult::STATE_OVERPAID)
-        ->and($settlement->isSettled())->toBeTrue()
-        ->and($settlement->paid)->toBe(1_200_000.0)
+    expect($settlement->settlement_state)->toBe(ObligationSettlementResult::STATE_INVALID_SETTLEMENT_POSITION)
+        ->and($settlement->isSettled())->toBeFalse()
+        ->and($settlement->settlement_position_issue_codes)->toContain('settlement_position.cash_exceeds_net_due')
+        ->and($settlement->paid)->toBe(0.0)
         ->and($settlement->outstanding)->toBe(0.0);
 });
 
@@ -217,14 +229,15 @@ it('derives settled_by_discount_or_credit when allocations cover the payable', f
         ->and($settlement->outstanding)->toBe(0.0);
 });
 
-it('ignores allocations whose discount header is reversed', function (): void {
+it('fails closed when a reversed discount leaves settlement residue', function (): void {
     [, , $line, $invoice] = createSettlementObligation(1_000_000);
 
     applySettlementDiscount($invoice, $line, 1_000_000, 'reversed');
 
     $settlement = readSettlement();
 
-    expect($settlement->settlement_state)->toBe(ObligationSettlementResult::STATE_UNPAID)
+    expect($settlement->settlement_state)->toBe(ObligationSettlementResult::STATE_INVALID_SETTLEMENT_POSITION)
+        ->and($settlement->settlement_position_issue_codes)->toContain('settlement_position.reversed_discount_residue')
         ->and($settlement->discount)->toBe(0.0)
-        ->and($settlement->outstanding)->toBe(1_000_000.0);
+        ->and($settlement->outstanding)->toBe(0.0);
 });

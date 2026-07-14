@@ -63,7 +63,7 @@ final class SettlementPositionWorklistPresenter
             'discount' => (float) $amounts->discount->amount,
             'cash' => $cash,
             'credit' => (float) $amounts->credit->amount,
-            'net' => (float) $amounts->gross->subtract($amounts->discount)->amount,
+            'net' => (float) $amounts->netDue()->amount,
             'remaining' => $remaining,
             'issues' => [],
         ];

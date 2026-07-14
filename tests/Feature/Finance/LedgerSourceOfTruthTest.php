@@ -8,8 +8,10 @@ use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
@@ -195,7 +197,7 @@ it('preview auto-allocate zero-amount detection uses the canonical net', functio
         ->and($preview['summary']['invoices_to_update'] === 0 || $canonicalNet > 0)->toBeTrue();
 });
 
-it('does not treat active negative lines as discount after wave-7 retirement', function () {
+it('fails closed when a legacy active negative line is present after wave-7 retirement', function () {
     $student = Student::factory()->forCampus($this->campus)->create([
         'status' => 'intake_course',
         'intake' => 1,
@@ -210,7 +212,23 @@ it('does not treat active negative lines as discount after wave-7 retirement', f
         'due_date' => now()->addDays(30),
     ]);
 
+    $billingAccount = BillingAccount::query()->where('student_id', $student->id)->firstOrFail();
+    $obligation = FinanceObligation::query()->create([
+        'billing_account_id' => $billingAccount->id,
+        'source_system' => 'test',
+        'source_kind' => 'ledger_source_of_truth',
+        'source_ref' => 'ledger-source:'.$student->id,
+        'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 10_000_000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+
     $debit = FinanceCharge::create([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $student->id,
         'semester_id' => $this->semester->id,
         'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
@@ -252,9 +270,6 @@ it('does not treat active negative lines as discount after wave-7 retirement', f
         'status' => 'active',
     ]);
 
-    $snapshot = app(SettlementService::class)->deriveInvoiceSnapshot($invoice->fresh());
-
-    expect((float) $snapshot['gross'])->toBe(10000000.0)
-        ->and((float) $snapshot['discount'])->toBe(0.0)
-        ->and((float) $snapshot['net'])->toBe(10000000.0);
+    expect(fn () => app(SettlementService::class)->deriveInvoiceSnapshot($invoice->fresh()))
+        ->toThrow(RuntimeException::class, 'settlement_position.payable_line_not_collectible');
 });

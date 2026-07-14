@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Api\V1\Student;
 
+use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
+use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Collection;
 
 class StudentInvoiceResource extends JsonResource
 {
@@ -16,18 +19,24 @@ class StudentInvoiceResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $lineItems = $this->whenLoaded('invoiceLines', fn () => $this->transformInvoiceLines());
+        $position = app(SettlementPositionReader::class)->forInvoice((int) $this->id);
+        $valid = $position->isValid() && $position->amounts !== null;
+        $amounts = $position->amounts;
+        $linePositions = collect($position->payable_line_breakdown)
+            ->keyBy(fn (SettlementPosition $line): int => (int) $line->payable_line_id);
+        $lineItems = $this->whenLoaded('invoiceLines', fn () => $this->transformInvoiceLines($linePositions, $valid));
 
         return [
             'id' => $this->id,
             'invoice_number' => $this->invoice_number,
-            'subtotal' => (float) $this->subtotal,
-            'discount_total' => (float) $this->discount_total,
-            'total_amount' => (float) $this->total_amount,
-            'paid_amount' => (float) $this->paid_amount,
-            'outstanding_balance' => (float) $this->outstanding_balance,
-            'status' => $this->status,
-            'real_time_status' => $this->real_time_status,
+            'subtotal' => $valid ? (float) $amounts->gross->amount : null,
+            'discount_total' => $valid ? (float) $amounts->discount->amount : null,
+            'total_amount' => $valid ? (float) $amounts->netDue()->amount : null,
+            'paid_amount' => $valid ? (float) $amounts->cash->amount : null,
+            'credit_amount' => $valid ? (float) $amounts->credit->amount : null,
+            'outstanding_balance' => $valid ? (float) $amounts->remaining->amount : null,
+            'status' => $valid ? $this->status : SettlementPosition::STATE_INVALID,
+            'real_time_status' => $valid ? $this->real_time_status : SettlementPosition::STATE_INVALID,
             'due_date' => $this->due_date?->format('Y-m-d'),
             'formatted_due_date' => $this->due_date?->format('d/m/Y'),
             'paid_at' => $this->paid_at?->toISOString(),
@@ -62,19 +71,21 @@ class StudentInvoiceResource extends JsonResource
             }),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
+            'settlement_position' => [
+                'valid' => $valid,
+                'mode' => $position->position_mode,
+                'state' => $position->settlement_state,
+            ],
         ];
     }
 
-    private function transformInvoiceLines(): array
+    /** @param Collection<int, SettlementPosition> $linePositions */
+    private function transformInvoiceLines(Collection $linePositions, bool $invoiceValid): array
     {
-        return $this->invoiceLines->map(function ($line) {
-            $discountAmount = max(0, (float) $line->discountAllocations->sum('amount'));
-            $netAmount = max(0, (float) $line->amount_snapshot - $discountAmount);
-            $paidAmount = min(
-                $netAmount,
-                max(0, (float) $line->paymentApplications->sum('amount'))
-            );
-            $remainingAmount = max(0, $netAmount - $paidAmount);
+        return $this->invoiceLines->map(function ($line) use ($linePositions, $invoiceValid) {
+            $position = $linePositions->get((int) $line->id);
+            $valid = $invoiceValid && $position?->isValid() && $position->amounts !== null;
+            $amounts = $position?->amounts;
 
             return [
                 'id' => $line->id,
@@ -83,14 +94,15 @@ class StudentInvoiceResource extends JsonResource
                 'charge_type' => $line->charge?->charge_type,
                 'description' => $line->description_snapshot,
                 'quantity' => 1,
-                'unit_price' => (float) $line->amount_snapshot,
-                'total_price' => (float) $line->amount_snapshot,
-                'discount_amount' => $discountAmount,
-                'paid_amount' => $paidAmount,
-                'remaining_amount' => $remainingAmount,
+                'unit_price' => $valid ? (float) $amounts->gross->amount : null,
+                'total_price' => $valid ? (float) $amounts->gross->amount : null,
+                'discount_amount' => $valid ? (float) $amounts->discount->amount : null,
+                'paid_amount' => $valid ? (float) $amounts->cash->amount : null,
+                'credit_amount' => $valid ? (float) $amounts->credit->amount : null,
+                'remaining_amount' => $valid ? (float) $amounts->remaining->amount : null,
                 'status' => $line->status,
-                'is_fully_paid' => $remainingAmount <= 0,
-                'is_partially_paid' => $paidAmount > 0 && $remainingAmount > 0,
+                'is_fully_paid' => $valid && $amounts->remaining->isZero(),
+                'is_partially_paid' => $valid && $amounts->cash->isPositive() && $amounts->remaining->isPositive(),
             ];
         })->values()->all();
     }

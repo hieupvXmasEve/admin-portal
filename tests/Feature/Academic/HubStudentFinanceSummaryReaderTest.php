@@ -10,7 +10,9 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentScholarshipAward;
 use App\Models\StudentWallet;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
@@ -66,7 +68,23 @@ it('returns a read-only fees, gold, and scholarships summary through the Finance
         'due_date' => now()->addDays(30)->toDateString(),
     ]);
 
+    $billingAccount = BillingAccount::query()->where('student_id', $student->id)->firstOrFail();
+    $obligation = FinanceObligation::query()->create([
+        'billing_account_id' => $billingAccount->id,
+        'source_system' => 'test',
+        'source_kind' => 'hub_finance_summary',
+        'source_ref' => 'hub-finance-summary:'.$student->id,
+        'obligation_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 15000000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+
     $charge = FinanceCharge::query()->create([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'billing_cycle_id' => null,

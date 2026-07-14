@@ -11,6 +11,10 @@ use App\Models\Student;
 use App\Models\User;
 use App\Modules\Finance\Actions\Operations\SendDueItemParentRemindersAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
 use App\Services\EmailService;
 use App\Shared\Support\Enums\UserType;
@@ -56,6 +60,47 @@ it('sends parent reminder for a DNG request and updates last_reminder_at', funct
         'due_date' => now()->addDays(5),
         'amount' => 3000000,
         'status' => 'pushed_to_dng',
+    ]);
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'test',
+        'source_kind' => 'parent_due_item_reminder',
+        'source_ref' => 'parent-due-item-reminder:'.uniqid('', true),
+        'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 3_000_000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+    $charge = FinanceCharge::query()->create([
+        'finance_obligation_id' => $obligation->id,
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => 3_000_000,
+        'description' => 'Parent DNG tuition fee',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    $invoice = StudentInvoice::query()->create([
+        'invoice_number' => 'DUE-PARENT-DNG-001',
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'status' => 'pending',
+        'due_date' => now()->addDays(5),
+    ]);
+    $line = InvoiceLine::query()->create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $charge->id,
+        'amount_snapshot' => 3_000_000,
+        'description_snapshot' => 'Parent DNG tuition fee',
+        'status' => 'active',
+    ]);
+    $dngRequest->reservationTargets()->create([
+        'invoice_line_id' => $line->id,
+        'captured_collectible' => 3_000_000,
+        'target_identity' => 'invoice_line:'.$line->id,
     ]);
 
     $parentUser = User::factory()->create([

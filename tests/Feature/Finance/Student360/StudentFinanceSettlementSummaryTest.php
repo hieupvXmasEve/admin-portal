@@ -141,6 +141,16 @@ it('uses canonical cash, credit, remaining, and unapplied-cash semantics for Stu
         ->and($kpis['kpis']['collected']['amount'])->toBe(4_000_000.0)
         ->and($kpis['kpis']['credit_applied']['amount'])->toBe(2_000_000.0)
         ->and($kpis['kpis']['surplus']['amount'])->toBe(3_000_000.0);
+
+    Sanctum::actingAs($student);
+
+    $this->getJson('/api/v1/student/finance/invoices')
+        ->assertOk()
+        ->assertJsonPath('data.invoices.0.subtotal', 10_000_000)
+        ->assertJsonPath('data.invoices.0.paid_amount', 4_000_000)
+        ->assertJsonPath('data.invoices.0.credit_amount', 2_000_000)
+        ->assertJsonPath('data.invoices.0.remaining', 4_000_000)
+        ->assertJsonPath('data.invoices.0.settlement_position.valid', true);
 });
 
 it('fails closed with neutral money output when legacy payable evidence is not materialized', function (): void {

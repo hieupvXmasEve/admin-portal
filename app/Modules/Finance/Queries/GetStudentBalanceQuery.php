@@ -4,80 +4,38 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries;
 
-use App\Modules\Finance\Models\Payment;
-use App\Modules\Finance\Models\StudentInvoice;
-use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
 
-class GetStudentBalanceQuery
+final class GetStudentBalanceQuery
 {
     public function __construct(
-        protected SettlementService $settlementService,
+        private readonly StudentFinanceSettlementPositionReader $positionReader,
     ) {}
 
     /**
-     * Get student balance summary.
+     * Legacy-shaped adapter for internal callers. Its amounts are deliberately
+     * copied from the Finance-owned Settlement Position summary so Academic,
+     * AI, and older presentation code cannot re-create a second balance rule.
+     *
+     * @return array{total_charges:float|null,total_credits:float|null,net_charges:float|null,total_paid:float|null,balance:float|null,unapplied_credit:float|null,applied_credit:float|null,status:string,valid:bool,issues:list<array{code:string,blocking:bool,evidence:array<string,int|string>}>}
      */
     public function handle(int $studentId, ?int $semesterId = null): array
     {
-        $invoiceQuery = StudentInvoice::query()
-            ->where('student_id', $studentId);
-
-        if ($semesterId) {
-            $invoiceQuery->where('semester_id', $semesterId);
-        }
-
-        $invoices = $invoiceQuery
-            ->with(['invoiceLines.charge', 'invoiceLines.paymentApplications', 'invoiceLines.discountAllocations'])
-            ->get();
-
-        $snapshots = $invoices->map(fn (StudentInvoice $invoice) => $this->settlementService->deriveInvoiceSnapshot($invoice));
-
-        $totalCharges = (float) $snapshots->sum('gross');
-        $totalCredits = (float) $snapshots->sum('discount');
-        $netCharges = (float) $snapshots->sum('net');
-        $totalPaid = (float) $snapshots->sum('paid');
-
-        // Get unapplied credit from payments
-        $unappliedCredit = $this->getUnappliedCredits($studentId);
-
-        $balance = $netCharges - $totalPaid;
+        $position = $this->positionReader->current($studentId, $semesterId);
+        $valid = (bool) $position['valid'];
 
         return [
-            'total_charges' => $totalCharges,
-            'total_credits' => $totalCredits,
-            'net_charges' => $netCharges,
-            'total_paid' => $totalPaid,
-            'balance' => $balance,
-            'unapplied_credit' => $unappliedCredit,
-            'status' => $this->determineBalanceStatus($balance),
+            'total_charges' => $valid ? $position['gross'] : null,
+            'total_credits' => $valid ? $position['discount'] : null,
+            'net_charges' => $valid ? $position['net_due'] : null,
+            'total_paid' => $valid ? $position['cash_applied'] : null,
+            'balance' => $valid ? $position['remaining_collectible'] : null,
+            // Retained key: this is unapplied cash, not a reduction ledger.
+            'unapplied_credit' => $valid ? $position['unapplied_cash'] : null,
+            'applied_credit' => $valid ? $position['credit_applied'] : null,
+            'status' => (string) $position['status'],
+            'valid' => $valid,
+            'issues' => $position['issues'],
         ];
-    }
-
-    /**
-     * Get unapplied credits (payment amounts not yet allocated).
-     */
-    protected function getUnappliedCredits(int $studentId): float
-    {
-        $payments = Payment::where('student_id', $studentId)
-            ->where('status', Payment::STATUS_COMPLETED)
-            ->get();
-
-        return $payments->sum(function ($payment) {
-            return max(0, $payment->unapplied_amount);
-        });
-    }
-
-    /**
-     * Determine balance status.
-     */
-    protected function determineBalanceStatus(float $balance): string
-    {
-        if ($balance === 0.0) {
-            return 'paid';
-        } elseif ($balance > 0) {
-            return 'outstanding';
-        } else {
-            return 'overpaid';
-        }
     }
 }

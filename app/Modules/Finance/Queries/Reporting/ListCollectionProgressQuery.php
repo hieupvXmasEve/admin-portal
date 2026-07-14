@@ -16,6 +16,7 @@ use App\Modules\Finance\Support\Reporting\CollectionProgressCatalog as Catalog;
 use App\Modules\Finance\Support\Reporting\CurrentSettlementPositionPresenter;
 use App\Modules\Finance\Support\SettlementPosition\Money;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPositionAmounts;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionRawEvidence;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionScope;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
@@ -250,7 +251,7 @@ final class ListCollectionProgressQuery
                 $feeTypes[$type]['discount'] += (float) $lineAmounts->discount->amount;
                 $feeTypes[$type]['cash'] += (float) $lineAmounts->cash->amount;
                 $feeTypes[$type]['credit'] += (float) $lineAmounts->credit->amount;
-                $feeTypes[$type]['billed'] += (float) $lineAmounts->gross->subtract($lineAmounts->discount)->amount;
+                $feeTypes[$type]['billed'] += (float) $lineAmounts->netDue()->amount;
                 $feeTypes[$type]['paid'] += (float) $lineAmounts->cash->amount;
                 $feeTypes[$type]['outstanding'] += (float) $lineAmounts->remaining->amount;
             }
@@ -262,7 +263,7 @@ final class ListCollectionProgressQuery
         $cash = $this->numeric($amounts['cash']);
         $credit = $this->numeric($amounts['credit']);
         $remaining = $this->numeric($amounts['remaining']);
-        $billed = $isValid ? round($gross - $discount, 2) : null;
+        $billed = $isValid ? $this->numeric($this->netDue($amounts)) : null;
         $paid = $isValid ? $cash : null;
         $outstanding = $isValid ? $remaining : null;
         $overdue = $isValid && $remaining > Catalog::TOLERANCE && $maxDaysOverdue > 0 ? $remaining : ($isValid ? 0.0 : null);
@@ -364,6 +365,18 @@ final class ListCollectionProgressQuery
     private function numeric(Money $money): float
     {
         return (float) $money->amount;
+    }
+
+    /** @param array{gross:Money,discount:Money,cash:Money,credit:Money,remaining:Money} $amounts */
+    private function netDue(array $amounts): Money
+    {
+        return (new SettlementPositionAmounts(
+            gross: $amounts['gross'],
+            discount: $amounts['discount'],
+            cash: $amounts['cash'],
+            credit: $amounts['credit'],
+            remaining: $amounts['remaining'],
+        ))->netDue();
     }
 
     /** @param array<string, array<string, float>> $sets */

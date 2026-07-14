@@ -13,6 +13,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
@@ -46,15 +47,32 @@ function makeWorklistStudent(string $code, Campus $campus, Semester $semester): 
 
 function makeActiveCharge(Student $student, Semester $semester, string $chargeType, float $amount): FinanceCharge
 {
-    return FinanceCharge::create([
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'test',
+        'source_kind' => 'dng_worklist',
+        'source_ref' => "dng-worklist:{$student->id}:{$chargeType}:".uniqid('', true),
+        'obligation_type' => $chargeType,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+    $charge = FinanceCharge::create([
         'student_id' => $student->id,
         'semester_id' => $semester->id,
+        'finance_obligation_id' => $obligation->id,
         'charge_type' => $chargeType,
         'amount' => $amount,
         'description' => "Charge {$chargeType}",
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
+
+    attachInvoiceLine(makeInvoice($student, $semester), $charge, $amount);
+
+    return $charge;
 }
 
 function attachInvoiceLine(StudentInvoice $invoice, FinanceCharge $charge, float $amount): InvoiceLine
@@ -139,8 +157,7 @@ it('returns students with active HP charges and positive balance', function () {
 it('excludes students whose charges are fully paid', function () {
     $student = makeWorklistStudent('PAID001', $this->campus, $this->semester);
     $charge = makeActiveCharge($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, 5_000_000);
-    $invoice = makeInvoice($student, $this->semester);
-    $line = attachInvoiceLine($invoice, $charge, 5_000_000);
+    $line = InvoiceLine::query()->where('charge_id', $charge->id)->firstOrFail();
     applyPayment($line, 5_000_000);
 
     $result = runWorklist(['dng_fee_type' => 'HP']);
@@ -148,11 +165,10 @@ it('excludes students whose charges are fully paid', function () {
     expect($result['students']->total())->toBe(0);
 });
 
-it('calculates balance correctly: amount minus paid and discount', function () {
+it('returns the canonical remaining balance after a partial payment', function () {
     $student = makeWorklistStudent('BAL001', $this->campus, $this->semester);
     $charge = makeActiveCharge($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, 10_000_000);
-    $invoice = makeInvoice($student, $this->semester);
-    $line = attachInvoiceLine($invoice, $charge, 10_000_000);
+    $line = InvoiceLine::query()->where('charge_id', $charge->id)->firstOrFail();
 
     // Apply partial payment
     applyPayment($line, 3_000_000);
@@ -243,13 +259,13 @@ it('surfaces approved retake registrations without charges in the HL worklist', 
     ]);
 
     $result = runWorklist(['dng_fee_type' => 'HL']);
-    $row = collect($result['students']->items())->first();
+    $row = collect($result['exceptions'])->first();
 
     expect($row['student_code'])->toBe('HL-SOURCE');
     expect($row['charge_count'])->toBe(0);
-    expect($row['balance'])->toBe(1_500_000.0);
-    expect($row['needs_charge_creation'])->toBeTrue();
-    expect($row['pending_registrations'][0]['id'])->toBe($registration->id);
+    expect($row['balance'])->toBeNull();
+    expect($row['needs_review'])->toBeTrue();
+    expect($row['settlement_issues'][0]['code'])->toBe('settlement_position.missing_payable_line');
 });
 
 it('maps fee_type PTL to exam_resit_fee only', function () {

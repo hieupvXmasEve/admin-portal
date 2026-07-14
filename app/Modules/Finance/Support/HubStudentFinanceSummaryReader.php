@@ -25,7 +25,7 @@ class HubStudentFinanceSummaryReader implements HubStudentFinanceSummaryReaderCo
 
     /**
      * @return array{
-     *     fees: array{net_charges: float, total_paid: float, outstanding: float, unapplied_credit: float, status: string},
+     *     fees: array{net_charges: float|null, total_paid: float|null, outstanding: float|null, unapplied_credit: float|null, status: string, settlement_position: array<string, mixed>},
      *     gold: array{balance: int},
      *     scholarships: array<int, array{code: string, name: string|null, type: string|null, amount: float, awarded_at: string|null}>
      * }
@@ -40,19 +40,23 @@ class HubStudentFinanceSummaryReader implements HubStudentFinanceSummaryReaderCo
     }
 
     /**
-     * @return array{net_charges: float, total_paid: float, outstanding: float, unapplied_credit: float, status: string}
+     * @return array{net_charges: float|null, total_paid: float|null, outstanding: float|null, unapplied_credit: float|null, status: string, settlement_position: array<string, mixed>}
      */
     private function feeSummary(int $studentId): array
     {
         $balance = $this->balanceQuery->handle($studentId);
+        $valid = (bool) ($balance['valid'] ?? false);
 
         return [
-            'net_charges' => (float) ($balance['net_charges'] ?? 0),
-            'total_paid' => (float) ($balance['total_paid'] ?? 0),
-            // Outstanding is the positive balance still owed; overpaid students show 0.
-            'outstanding' => max(0.0, (float) ($balance['balance'] ?? 0)),
-            'unapplied_credit' => (float) ($balance['unapplied_credit'] ?? 0),
+            'net_charges' => $valid ? $balance['net_charges'] : null,
+            'total_paid' => $valid ? $balance['total_paid'] : null,
+            'outstanding' => $valid ? $balance['balance'] : null,
+            'unapplied_credit' => $valid ? $balance['unapplied_credit'] : null,
             'status' => (string) ($balance['status'] ?? 'unknown'),
+            'settlement_position' => [
+                'valid' => $valid,
+                'issues' => $balance['issues'] ?? [],
+            ],
         ];
     }
 

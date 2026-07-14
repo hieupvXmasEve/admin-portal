@@ -117,10 +117,24 @@ class CreateBatchDngFromChargesAction
             $this->assertNoMissingExamResitObligations($student, $semesterId);
         }
 
+        $charges = FinanceCharge::query()
+            ->where('student_id', $studentId)
+            ->whereIn('charge_type', $chargeTypes)
+            ->where('semester_id', $semesterId)
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->get(['id', 'finance_obligation_id']);
+        if ($charges->isEmpty()) {
+            throw new \RuntimeException('Không tìm thấy khoản phí có thể thu cho loại DNG này.');
+        }
+        if ($charges->contains(fn (FinanceCharge $charge): bool => $charge->finance_obligation_id === null)) {
+            throw new \RuntimeException('missing_finance_obligation: DNG cannot collect an unmaterialized Finance charge.');
+        }
+
         // All batch requests reserve canonical payable-line targets before the
         // provider call. Partial collection is derived only from a pending
         // installment; callers cannot supply an amount.
         $lines = InvoiceLine::query()
+            ->with('charge:id,finance_obligation_id')
             ->where('status', 'active')
             ->whereHas('charge', function ($query) use ($studentId, $chargeTypes, $semesterId): void {
                 $query->where('student_id', $studentId)
@@ -129,6 +143,9 @@ class CreateBatchDngFromChargesAction
                     ->where('status', FinanceCharge::STATUS_ACTIVE);
             })
             ->get();
+        if ($lines->isEmpty()) {
+            throw new \RuntimeException('Settlement Position has no supported payable lines for this DNG fee type.');
+        }
         $installments = FinanceChargeInstallment::query()
             ->whereIn('finance_charge_id', $lines->pluck('charge_id'))
             ->where('status', FinanceChargeInstallment::STATUS_PENDING)

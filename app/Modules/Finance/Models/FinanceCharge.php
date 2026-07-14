@@ -217,7 +217,7 @@ class FinanceCharge extends Model
 
     public function getPaidAmountAttribute(): float
     {
-        return app(SettlementService::class)->getChargePaidAmount($this->id);
+        return $this->settlementComponents()['cash'];
     }
 
     /**
@@ -225,22 +225,33 @@ class FinanceCharge extends Model
      */
     public function getDiscountAmountAttribute(): float
     {
-        return app(SettlementService::class)->getChargeDiscountAmount($this->id);
+        return $this->settlementComponents()['discount'];
     }
 
     public function getBalanceAttribute(): float
     {
-        if ($this->amount <= 0) {
-            return 0; // Credits don't have balance
-        }
-
-        // Subtract both cash payments and discount allocations (scholarship/voucher)
-        return max(0, (float) $this->amount - $this->paid_amount - $this->discount_amount);
+        return $this->settlementComponents()['remaining'];
     }
 
     public function getIsFullyPaidAttribute(): bool
     {
         return $this->balance <= 0;
+    }
+
+    public function getCreditAmountAttribute(): float
+    {
+        return $this->settlementComponents()['credit'];
+    }
+
+    /**
+     * Presentation-only adapter for legacy model consumers. Authoritative
+     * amounts still come from one canonical Settlement Position read.
+     *
+     * @return array{gross:float,discount:float,cash:float,credit:float,remaining:float}
+     */
+    private function settlementComponents(): array
+    {
+        return app(SettlementService::class)->getChargeSettlementComponents((int) $this->id);
     }
 
     // =====================

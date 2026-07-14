@@ -4,22 +4,32 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries;
 
-use App\Shared\Contracts\Finance\StudentFeeSummaryReader;
+use App\Models\Semester;
+use App\Models\Student;
+use App\Models\StudentScholarshipAward;
+use App\Models\TuitionPlan;
+use App\Models\TuitionPlanTerm;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
-use App\Models\Semester;
-use App\Models\Student;
 use App\Modules\Finance\Models\StudentInvoice;
-use App\Models\StudentScholarshipAward;
-use App\Models\TuitionPlan;
-use App\Models\TuitionPlanTerm;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPositionScope;
+use App\Shared\Contracts\Finance\SettlementPositionReader;
+use App\Shared\Contracts\Finance\StudentFeeSummaryReader;
 use Illuminate\Support\Collection;
 
 class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
 {
+    /** @var Collection<int, array<string, float|bool|array<int, string>>> */
+    private Collection $invoiceSnapshots;
+
+    public function __construct(
+        private readonly SettlementPositionReader $settlementPositionReader,
+    ) {}
+
     public function execute(int $studentId): array
     {
         $student = Student::query()
@@ -49,6 +59,8 @@ class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
             ->orderBy('due_date')
             ->get();
 
+        $this->invoiceSnapshots = $this->invoiceSnapshots($invoices);
+
         $charges = FinanceCharge::query()
             ->where('student_id', $student->id)
             ->where('status', FinanceCharge::STATUS_ACTIVE)
@@ -67,15 +79,24 @@ class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
             ->get();
 
         $billingBySemester = $this->buildBillingBySemester($invoices);
-        $checklist = $this->buildTuitionPlanChecklist($student, $tuitionPlan, $charges, $invoices);
+        $checklist = $this->buildTuitionPlanChecklist(
+            $student,
+            $tuitionPlan,
+            $charges,
+            $invoices,
+            $this->chargeSnapshots($charges),
+        );
 
-        $totalCharged = (float) $invoices->sum(fn (StudentInvoice $invoice) => $this->deriveInvoiceSnapshot($invoice)['subtotal']);
-        $totalDiscount = (float) $invoices->sum(fn (StudentInvoice $invoice) => $this->deriveInvoiceSnapshot($invoice)['discount']);
-        $totalAllocated = (float) $payments->sum(fn (Payment $payment) => $this->sumNetPaymentApplications($payment->applications));
-        $netDue = (float) $invoices->sum(fn (StudentInvoice $invoice) => $this->deriveInvoiceSnapshot($invoice)['total']);
-        $outstanding = max(0, $netDue - $totalAllocated);
-        $totalPayments = (float) $payments->sum('amount');
-        $totalUnapplied = max(0, $totalPayments - $totalAllocated);
+        $snapshots = $this->invoiceSnapshots->values();
+        $valid = $snapshots->every(static fn (array $snapshot): bool => $snapshot['valid'] === true);
+        $totalCharged = $valid ? (float) $snapshots->sum('subtotal') : null;
+        $totalDiscount = $valid ? (float) $snapshots->sum('discount') : null;
+        $totalAllocated = $valid ? (float) $snapshots->sum('paid') : null;
+        $totalCreditApplied = $valid ? (float) $snapshots->sum('credit') : null;
+        $netDue = $valid ? (float) $snapshots->sum('total') : null;
+        $outstanding = $valid ? (float) $snapshots->sum('remaining') : null;
+        $totalPayments = $valid ? (float) $payments->sum('amount') : null;
+        $totalUnapplied = $valid ? max(0, $totalPayments - $totalAllocated) : null;
 
         return [
             'student_info' => [
@@ -90,12 +111,17 @@ class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
                 'active_due' => $netDue,
                 'total_paid' => $totalPayments,
                 'total_allocated' => $totalAllocated,
+                'total_credit_applied' => $totalCreditApplied,
                 'outstanding' => $outstanding,
                 'unapplied_balance' => $totalUnapplied,
-                'remaining' => max(0, $netDue - $totalPayments),
-                'net_amount_to_collect' => max(0, $outstanding - $totalUnapplied),
+                'remaining' => $outstanding,
+                'net_amount_to_collect' => $outstanding,
                 'payment_count' => $payments->count(),
-                'progress' => $netDue > 0 ? min(100, max(0, ($totalAllocated / $netDue) * 100)) : 0,
+                'progress' => $valid && $netDue > 0 ? min(100, max(0, ($totalAllocated / $netDue) * 100)) : null,
+                'settlement_position' => [
+                    'valid' => $valid,
+                    'issues' => $valid ? [] : $snapshots->flatMap(static fn (array $snapshot): array => $snapshot['issues'])->unique()->values()->all(),
+                ],
             ],
             'payments' => $this->buildPaymentHistory($payments),
             'statement_events' => $this->buildStatementEvents($payments, $invoices),
@@ -117,18 +143,21 @@ class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
 
             $totals = $semesterInvoices->reduce(function (array $carry, StudentInvoice $invoice) {
                 $snapshot = $this->deriveInvoiceSnapshot($invoice);
-                $carry['total'] += $snapshot['total'];
-                $carry['paid'] += $snapshot['paid'];
+                $carry['valid'] = $carry['valid'] && $snapshot['valid'];
+                $carry['total'] += $snapshot['total'] ?? 0;
+                $carry['paid'] += $snapshot['paid'] ?? 0;
+                $carry['credit'] += $snapshot['credit'] ?? 0;
+                $carry['remaining'] += $snapshot['remaining'] ?? 0;
 
                 return $carry;
-            }, ['total' => 0.0, 'paid' => 0.0]);
+            }, ['valid' => true, 'total' => 0.0, 'paid' => 0.0, 'credit' => 0.0, 'remaining' => 0.0]);
 
-            $remaining = max(0, $totals['total'] - $totals['paid']);
+            $remaining = $totals['valid'] ? $totals['remaining'] : null;
 
-            $status = 'paid';
+            $status = $totals['valid'] ? 'paid' : 'review_required';
             if ($semesterInvoices->isEmpty()) {
                 $status = 'no_invoices';
-            } elseif ($remaining > 0) {
+            } elseif ($remaining !== null && $remaining > 0) {
                 $hasOverdue = $semesterInvoices->contains(function (StudentInvoice $invoice) {
                     $snapshot = $this->deriveInvoiceSnapshot($invoice);
 
@@ -146,6 +175,7 @@ class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
                 'totals' => [
                     'total' => $totals['total'],
                     'paid' => $totals['paid'],
+                    'credit' => $totals['credit'],
                     'remaining' => $remaining,
                 ],
                 'invoices' => $semesterInvoices->map(fn (StudentInvoice $invoice) => $this->mapInvoiceSummary($invoice))->values(),
@@ -165,6 +195,7 @@ class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
             'status' => $invoice->status,
             'total' => $snapshot['total'],
             'paid' => $snapshot['paid'],
+            'credit' => $snapshot['credit'],
             'remaining' => $snapshot['remaining'],
             'final_payable' => $snapshot['total'],
             'cash_applied' => $snapshot['paid'],
@@ -283,7 +314,8 @@ class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
         return $applications;
     }
 
-    private function buildTuitionPlanChecklist(Student $student, ?TuitionPlan $tuitionPlan, Collection $charges, Collection $invoices): ?array
+    /** @param Collection<int, array<string, float|bool|array<int, string>|null>> $chargeSnapshots */
+    private function buildTuitionPlanChecklist(Student $student, ?TuitionPlan $tuitionPlan, Collection $charges, Collection $invoices, Collection $chargeSnapshots): ?array
     {
         if (! $tuitionPlan) {
             return null;
@@ -307,7 +339,7 @@ class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
 
         // Build items from actual generated charges
         $generatedItems = $tuitionCharges->map(function (FinanceCharge $charge) use (
-            $planTermsById, $planTermsByNumber, $intakeMajorSemester, $invoices, $scholarshipAward, &$usedPlanTermIds
+            $planTermsById, $planTermsByNumber, $intakeMajorSemester, $invoices, $chargeSnapshots, &$usedPlanTermIds
         ) {
             // Resolve linked plan term: prefer explicit source link, fallback to term_number inference
             $linkedTerm = null;
@@ -325,28 +357,19 @@ class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
                 $usedPlanTermIds[] = $linkedTerm->id;
             }
 
-            // Discount: from actual invoice discounts, fallback to scholarship estimate
-            $linkedInvoiceIds = $charge->invoiceLines->pluck('invoice_id')->filter()->unique();
-            $discountAmount = (float) $invoices
-                ->whereIn('id', $linkedInvoiceIds)
-                ->sum(fn (StudentInvoice $invoice) => $this->deriveInvoiceSnapshot($invoice)['discount']);
-
-            $isEstimatedDiscount = false;
-            if ($discountAmount === 0.0 && $scholarshipAward?->scholarshipDefinition) {
-                $scholarship = $scholarshipAward->scholarshipDefinition;
-                $discountAmount = $scholarship->type === 'percentage'
-                    ? ((float) $charge->amount * $scholarship->amount) / 100
-                    : (float) $scholarship->amount;
-                $isEstimatedDiscount = $discountAmount > 0;
-            }
-
-            $chargeLines = $charge->invoiceLines->filter(fn (InvoiceLine $line) => ($line->status ?? 'active') === 'active');
-            $paidAmount = (float) $chargeLines->sum(fn (InvoiceLine $line) => $this->sumNetPaymentApplications($line->paymentApplications));
-            $amountDue = max(0, (float) $charge->amount - $discountAmount);
+            $snapshot = $chargeSnapshots->get((int) $charge->id);
+            $valid = $snapshot['valid'] ?? false;
+            $gross = $valid ? $snapshot['gross'] : null;
+            $discountAmount = $valid ? $snapshot['discount'] : null;
+            $amountDue = $valid ? $snapshot['net_due'] : null;
+            $paidAmount = $valid ? $snapshot['cash'] : null;
+            $creditAmount = $valid ? $snapshot['credit'] : null;
+            $remaining = $valid ? $snapshot['remaining'] : null;
 
             $paymentStatus = match (true) {
-                $amountDue <= 0, $paidAmount >= $amountDue => 'paid',
-                $paidAmount > 0 => 'partial',
+                ! $valid => 'review_required',
+                $remaining <= 0 => 'paid',
+                $paidAmount > 0 || $creditAmount > 0 => 'partial',
                 default => 'unpaid',
             };
 
@@ -366,14 +389,20 @@ class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
                 'term_number' => $linkedTerm?->term_number,
                 'semester_id' => $charge->semester_id,
                 'semester_name' => $charge->semester?->name,
-                'required_amount' => (float) $charge->amount,
+                'required_amount' => $gross,
                 'discount_amount' => $discountAmount,
-                'is_estimated_discount' => $isEstimatedDiscount,
+                'credit_amount' => $creditAmount,
+                'remaining_amount' => $remaining,
+                'is_estimated_discount' => false,
                 'amount_due' => $amountDue,
                 'paid_amount' => $paidAmount,
                 'generated' => true,
                 'charge_id' => $charge->id,
                 'payment_status' => $paymentStatus,
+                'settlement_position' => [
+                    'valid' => $valid,
+                    'issues' => $snapshot['issues'] ?? ['missing_charge_position'],
+                ],
                 'invoices' => $linkedInvoiceDetails,
             ];
         })->values();
@@ -627,36 +656,78 @@ class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
     {
         // Cancelled invoices contribute nothing to the fee summary
         if ($invoice->status === 'cancelled') {
-            return ['subtotal' => 0.0, 'discount' => 0.0, 'total' => 0.0, 'paid' => 0.0, 'remaining' => 0.0];
+            return ['valid' => true, 'issues' => [], 'subtotal' => 0.0, 'discount' => 0.0, 'total' => 0.0, 'paid' => 0.0, 'credit' => 0.0, 'remaining' => 0.0];
         }
 
-        $subtotal = max(
-            (float) $invoice->subtotal,
-            (float) $invoice->invoiceLines
-                ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line) && (float) $line->amount_snapshot > 0)
-                ->sum('amount_snapshot')
+        return $this->invoiceSnapshots->get((int) $invoice->id, [
+            'valid' => false,
+            'issues' => ['missing_invoice_position'],
+            'subtotal' => null,
+            'discount' => null,
+            'total' => null,
+            'paid' => null,
+            'credit' => null,
+            'remaining' => null,
+        ]);
+    }
+
+    /** @return Collection<int, array<string, float|bool|array<int, string>>> */
+    private function invoiceSnapshots(Collection $invoices): Collection
+    {
+        $positions = $this->settlementPositionReader->batch(
+            $invoices->map(static fn (StudentInvoice $invoice) => SettlementPositionScope::invoice((int) $invoice->id))->all(),
         );
 
-        $discount = max(
-            (float) $invoice->discount_total,
-            (float) $invoice->discounts
-                ->filter(fn ($discount) => ($discount->status ?? 'active') === 'active')
-                ->sum('amount')
-        );
+        return $invoices->values()->mapWithKeys(function (StudentInvoice $invoice, int $index) use ($positions): array {
+            $position = $positions[$index] ?? null;
+            $valid = $position?->isValid() && $position->amounts !== null;
+            $amounts = $position?->amounts;
 
-        $paid = (float) $invoice->invoiceLines
-            ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line))
-            ->sum(fn (InvoiceLine $line) => $this->sumNetPaymentApplications($line->paymentApplications));
+            return [(int) $invoice->id => [
+                'valid' => $valid,
+                'issues' => $valid ? [] : array_map(static fn ($issue): string => $issue->code, $position?->issues ?? []),
+                'subtotal' => $valid ? (float) $amounts->gross->amount : null,
+                'discount' => $valid ? (float) $amounts->discount->amount : null,
+                'total' => $valid ? (float) $amounts->netDue()->amount : null,
+                'paid' => $valid ? (float) $amounts->cash->amount : null,
+                'credit' => $valid ? (float) $amounts->credit->amount : null,
+                'remaining' => $valid ? (float) $amounts->remaining->amount : null,
+            ]];
+        });
+    }
 
-        $total = max(0, $subtotal - $discount);
+    /** @return Collection<int, array<string, float|bool|array<int, string>|null>> */
+    private function chargeSnapshots(Collection $charges): Collection
+    {
+        $lineIds = $charges->flatMap(fn (FinanceCharge $charge) => $charge->invoiceLines->pluck('id'))
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values();
+        $positions = $lineIds->isEmpty()
+            ? []
+            : $this->settlementPositionReader->batch(
+                $lineIds->map(static fn (int $id): SettlementPositionScope => SettlementPositionScope::payableLine($id))->all(),
+            );
+        $positionsByLine = collect($positions)->keyBy(static fn (SettlementPosition $position): int => (int) $position->payable_line_id);
 
-        return [
-            'subtotal' => $subtotal,
-            'discount' => $discount,
-            'total' => $total,
-            'paid' => min($paid, $total),
-            'remaining' => max(0, $total - $paid),
-        ];
+        return $charges->mapWithKeys(function (FinanceCharge $charge) use ($positionsByLine): array {
+            $linePositions = $charge->invoiceLines
+                ->map(fn (InvoiceLine $line) => $positionsByLine->get((int) $line->id))
+                ->filter();
+            $valid = $linePositions->isNotEmpty()
+                && $linePositions->every(static fn (SettlementPosition $position): bool => $position->isValid() && $position->amounts !== null);
+
+            return [(int) $charge->id => [
+                'valid' => $valid,
+                'issues' => $valid ? [] : ['invalid_charge_position'],
+                'gross' => $valid ? (float) $linePositions->sum(static fn (SettlementPosition $position): float => (float) $position->amounts->gross->amount) : null,
+                'discount' => $valid ? (float) $linePositions->sum(static fn (SettlementPosition $position): float => (float) $position->amounts->discount->amount) : null,
+                'net_due' => $valid ? (float) $linePositions->sum(static fn (SettlementPosition $position): float => (float) $position->amounts->netDue()->amount) : null,
+                'cash' => $valid ? (float) $linePositions->sum(static fn (SettlementPosition $position): float => (float) $position->amounts->cash->amount) : null,
+                'credit' => $valid ? (float) $linePositions->sum(static fn (SettlementPosition $position): float => (float) $position->amounts->credit->amount) : null,
+                'remaining' => $valid ? (float) $linePositions->sum(static fn (SettlementPosition $position): float => (float) $position->amounts->remaining->amount) : null,
+            ]];
+        });
     }
 
     private function sumNetPaymentApplications(Collection $applications): float

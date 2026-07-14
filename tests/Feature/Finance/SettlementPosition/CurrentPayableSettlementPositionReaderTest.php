@@ -22,6 +22,7 @@ use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionIssue;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use RuntimeException;
 
 uses(RefreshDatabase::class);
 
@@ -241,11 +242,10 @@ it('preserves raw overpayment evidence and invalidates instead of the legacy cla
     applyPositionCash($line, '1200000.00');
 
     $position = app(SettlementPositionReader::class)->forPayableLine((int) $line->id);
-    $legacySnapshot = app(SettlementService::class)->deriveInvoiceSnapshot($invoice->fresh());
+    expect(fn () => app(SettlementService::class)->deriveInvoiceSnapshot($invoice->fresh()))
+        ->toThrow(RuntimeException::class, 'settlement_position.cash_exceeds_net_due');
 
-    expect($legacySnapshot['paid'])->toBe(1_000_000.0)
-        ->and($legacySnapshot['remaining'])->toBe(0.0)
-        ->and($position->isValid())->toBeFalse()
+    expect($position->isValid())->toBeFalse()
         ->and($position->amounts)->toBeNull()
         ->and($position->raw_evidence->cash->amount)->toBe('1200000.00')
         ->and($position->raw_evidence->remaining->amount)->toBe('-200000.00')
@@ -258,11 +258,10 @@ it('preserves raw over-discount and over-credit evidence as blocking issues', fu
     applyPositionDiscount($discountInvoice, $discountLine, '1200000.00');
 
     $discountPosition = app(SettlementPositionReader::class)->forPayableLine((int) $discountLine->id);
-    $legacyDiscountSnapshot = app(SettlementService::class)->deriveInvoiceSnapshot($discountInvoice->fresh());
+    expect(fn () => app(SettlementService::class)->deriveInvoiceSnapshot($discountInvoice->fresh()))
+        ->toThrow(RuntimeException::class, 'settlement_position.discount_exceeds_gross');
 
-    expect($legacyDiscountSnapshot['net'])->toBe(0.0)
-        ->and($legacyDiscountSnapshot['remaining'])->toBe(0.0)
-        ->and($discountPosition->isValid())->toBeFalse()
+    expect($discountPosition->isValid())->toBeFalse()
         ->and($discountPosition->raw_evidence->discount->amount)->toBe('1200000.00')
         ->and($discountPosition->raw_evidence->remaining->amount)->toBe('-200000.00')
         ->and($discountPosition->hasIssue(SettlementPositionIssue::DISCOUNT_EXCEEDS_GROSS))->toBeTrue();
@@ -273,11 +272,10 @@ it('preserves raw over-discount and over-credit evidence as blocking issues', fu
     applyPositionCredit($creditLine, '2200000.00');
 
     $creditPosition = app(SettlementPositionReader::class)->forPayableLine((int) $creditLine->id);
-    $legacyCreditSnapshot = app(SettlementService::class)->deriveInvoiceSnapshot($creditInvoice->fresh());
+    expect(fn () => app(SettlementService::class)->deriveInvoiceSnapshot($creditInvoice->fresh()))
+        ->toThrow(RuntimeException::class, 'settlement_position.credit_exceeds_remaining');
 
-    expect($legacyCreditSnapshot['credit'])->toBe(2_000_000.0)
-        ->and($legacyCreditSnapshot['remaining'])->toBe(0.0)
-        ->and($creditPosition->isValid())->toBeFalse()
+    expect($creditPosition->isValid())->toBeFalse()
         ->and($creditPosition->raw_evidence->credit->amount)->toBe('2200000.00')
         ->and($creditPosition->raw_evidence->remaining->amount)->toBe('-200000.00')
         ->and($creditPosition->hasIssue(SettlementPositionIssue::CREDIT_EXCEEDS_REMAINING))->toBeTrue();

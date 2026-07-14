@@ -136,9 +136,7 @@ final class StudentFinanceSettlementPositionReader
             'settlement_state' => $position->settlement_state,
             'gross' => $valid ? (float) $amounts->gross->amount : null,
             'discount' => $valid ? (float) $amounts->discount->amount : null,
-            'net_due' => $valid
-                ? round((float) $amounts->gross->amount - (float) $amounts->discount->amount, 2)
-                : null,
+            'net_due' => $valid ? (float) $amounts->netDue()->amount : null,
             'cash_applied' => $valid ? (float) $amounts->cash->amount : null,
             'credit_applied' => $valid ? (float) $amounts->credit->amount : null,
             'remaining_collectible' => $valid ? (float) $amounts->remaining->amount : null,

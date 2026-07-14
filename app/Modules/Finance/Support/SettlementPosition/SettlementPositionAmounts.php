@@ -13,4 +13,13 @@ final readonly class SettlementPositionAmounts
         public Money $credit,
         public Money $remaining,
     ) {}
+
+    /**
+     * Net due is derived inside the canonical money contract, never by a
+     * presentation consumer from cached or independently aggregated fields.
+     */
+    public function netDue(): Money
+    {
+        return $this->gross->subtract($this->discount);
+    }
 }

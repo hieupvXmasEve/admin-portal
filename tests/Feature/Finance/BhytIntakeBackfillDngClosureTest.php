@@ -6,9 +6,9 @@ use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
-use App\Modules\Finance\Actions\CancelDngPaymentRequestAction;
 use App\Modules\Finance\Actions\CreateBatchDngFromChargesAction;
 use App\Modules\Finance\Actions\Operations\GenerateNonAcademicChargesAction;
+use App\Modules\Finance\Actions\ReserveAndPushSingleFeeDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
@@ -16,6 +16,7 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Support\FinanceOwnedObligationSource;
+use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -71,34 +72,25 @@ function makeBhytBatchDngAction(bool $dngFails = false): CreateBatchDngFromCharg
     $dngPaymentServiceMock = Mockery::mock(DngPaymentService::class);
 
     if ($dngFails) {
-        $dngPaymentServiceMock->shouldReceive('createAndPush')
+        $dngPaymentServiceMock->shouldReceive('pushReserved')
             ->andThrow(new RuntimeException('DNG API failed'));
     } else {
-        $dngPaymentServiceMock->shouldReceive('createAndPush')
-            ->andReturnUsing(function (Student $student, array $data) {
-                return DngPaymentRequest::create([
-                    'student_id' => $student->id,
-                    'campus_code' => $data['campus_code'],
-                    'student_code' => $data['student_code'],
-                    'fee_type' => $data['fee_type'],
-                    'item_id' => $data['item_id'],
-                    'amount' => $data['amount'],
-                    'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
-                    'description' => $data['description'] ?? null,
-                    'semester_id' => $data['semester_id'] ?? null,
-                    'due_date' => $data['due_date'] ?? null,
-                ]);
-            });
+        $dngPaymentServiceMock->shouldReceive('pushReserved')->andReturn([
+            'Code' => 200,
+            'Type' => 'success',
+            'Message' => 'ok',
+            'data' => ['TransactionID' => 'BHYT-TEST-TRANSACTION', 'PaymentId' => 'BHYT-TEST-PAYMENT'],
+        ]);
     }
 
     $campusResolverMock = Mockery::mock(DngCampusCodeResolver::class);
     $campusResolverMock->shouldReceive('requireForStudent')->andReturn('FAUHN');
 
-    return new CreateBatchDngFromChargesAction(
-        $dngPaymentServiceMock,
+    return new CreateBatchDngFromChargesAction(new ReserveAndPushSingleFeeDngAction(
+        app(SettlementPositionReader::class),
         $campusResolverMock,
-        app(CancelDngPaymentRequestAction::class),
-    );
+        $dngPaymentServiceMock,
+    ));
 }
 
 // ─── Intake cutover ─────────────────────────────────────────────────────────

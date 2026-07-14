@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Modules\Finance\Actions\Operations\SendDueItemRemindersAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
@@ -38,9 +39,22 @@ function makeDueItemStudent(Campus $campus, Program $program, Semester $semester
         ->create();
 }
 
-function addDueItemInvoiceLine(StudentInvoice $invoice, Student $student, Semester $semester, float $amount, string $description): void
+function addDueItemInvoiceLine(StudentInvoice $invoice, Student $student, Semester $semester, float $amount, string $description): InvoiceLine
 {
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'test',
+        'source_kind' => 'due_item_reminder',
+        'source_ref' => 'due-item-reminder:'.uniqid('', true),
+        'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
     $charge = FinanceCharge::create([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
@@ -50,7 +64,7 @@ function addDueItemInvoiceLine(StudentInvoice $invoice, Student $student, Semest
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
 
-    InvoiceLine::create([
+    return InvoiceLine::create([
         'invoice_id' => $invoice->id,
         'charge_id' => $charge->id,
         'amount_snapshot' => $amount,
@@ -78,18 +92,31 @@ it('sends reminder for a DNG payment request branch and updates last_reminder_at
         'amount' => 2000000,
         'status' => 'pushed_to_dng',
     ]);
+    $invoice = StudentInvoice::create([
+        'invoice_number' => 'DUE-DNG-001',
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'status' => 'pending',
+        'due_date' => now()->addDays(5),
+    ]);
+    $line = addDueItemInvoiceLine($invoice, $student, $semester, 2_000_000, 'DNG tuition fee');
+    $dngRequest->reservationTargets()->create([
+        'invoice_line_id' => $line->id,
+        'captured_collectible' => 2_000_000,
+        'target_identity' => 'invoice_line:'.$line->id,
+    ]);
 
     // Seed a NotificationEmailTemplate so the DbEmailContentProvider can resolve campus_id
     config(['notifications.use_db_templates' => true]);
     NotificationEmailTemplate::updateOrCreate(
         ['campus_id' => $campus->id, 'type_key' => 'payment_reminder'],
-        ['subject' => 'Reminder {{student_name}}', 'body_html' => '<p>Dear {{student_name}}</p>'],
+        ['subject' => 'Reminder {{balance_formatted}}', 'body_html' => '<p>Dear {{student_name}}</p>'],
     );
 
     $emailService = Mockery::mock(EmailService::class);
     $emailService->shouldReceive('sendSingleEmail')
         ->once()
-        ->withArgs(fn (...$args) => $args[0] === 'dng.student@example.com')
+        ->withArgs(fn (...$args) => $args[0] === 'dng.student@example.com' && $args[1] === 'Reminder 2.000.000')
         ->andReturn(Mockery::mock(EmailLog::class));
     app()->instance(EmailService::class, $emailService);
 
@@ -101,6 +128,37 @@ it('sends reminder for a DNG payment request branch and updates last_reminder_at
         ->and($result['failed_count'])->toBe(0);
 
     expect($dngRequest->fresh()->last_reminder_at)->not->toBeNull();
+});
+
+it('does not send a DNG reminder without canonical reservation targets', function () {
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $program = Program::factory()->create();
+    $student = makeDueItemStudent($campus, $program, $semester, 'DNG-NO-TARGET');
+    $dngRequest = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'TEST',
+        'student_code' => $student->student_id,
+        'item_id' => 'DNG-NO-TARGET',
+        'fee_type' => 'tuition',
+        'description' => 'Legacy DNG without targets',
+        'semester_id' => $semester->id,
+        'due_date' => now()->addDays(5),
+        'amount' => 2_000_000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+    ]);
+
+    $emailService = Mockery::mock(EmailService::class);
+    $emailService->shouldNotReceive('sendSingleEmail');
+    app()->instance(EmailService::class, $emailService);
+
+    $result = SendDueItemRemindersAction::run([
+        'item_ids' => ['dng_request:'.$dngRequest->id],
+    ]);
+
+    expect($result['sent_count'])->toBe(0)
+        ->and($result['failed_count'])->toBe(1)
+        ->and($dngRequest->fresh()->last_reminder_at)->toBeNull();
 });
 
 it('sends reminder for an invoice branch with outstanding balance and updates last_reminder_at', function () {

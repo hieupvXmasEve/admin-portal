@@ -648,7 +648,7 @@ class ListFeeMonitorQuery
         return $charge->status === FinanceCharge::STATUS_VOID ? 'voided' : 'generated';
     }
 
-    private function resolvePaymentState(string $generationState, ?float $amount, float $paidAmount, ?float $remaining = null): ?string
+    private function resolvePaymentState(string $generationState, ?float $amount, float $paidAmount, float $remaining): ?string
     {
         if ($generationState !== 'generated' || $amount === null) {
             return null;
@@ -658,7 +658,7 @@ class ListFeeMonitorQuery
             return 'outstanding';
         }
 
-        if (($remaining ?? max(0.0, $amount - $paidAmount)) <= 0.01) {
+        if ($remaining <= 0.01) {
             return 'paid';
         }
 

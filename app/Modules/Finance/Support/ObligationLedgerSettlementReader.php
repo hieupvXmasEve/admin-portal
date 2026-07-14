@@ -10,10 +10,12 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
-use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPositionIssue;
 use App\Shared\Contracts\Finance\DTO\ObligationSettlementResult;
 use App\Shared\Contracts\Finance\ObligationSettlementReader;
-use Illuminate\Support\Facades\DB;
+use App\Shared\Contracts\Finance\SettlementPositionReader;
 
 class ObligationLedgerSettlementReader implements ObligationSettlementReader
 {
@@ -22,6 +24,10 @@ class ObligationLedgerSettlementReader implements ObligationSettlementReader
         DngPaymentRequest::STATUS_PAID_INVOICED,
         DngPaymentRequest::STATUS_RECONCILED,
     ];
+
+    public function __construct(
+        private readonly SettlementPositionReader $settlementPositionReader,
+    ) {}
 
     public function getSettlement(
         string $sourceSystem,
@@ -37,17 +43,13 @@ class ObligationLedgerSettlementReader implements ObligationSettlementReader
             ->first();
 
         if ($obligation instanceof FinanceObligation) {
-            return $this->settlementFromChargeScope(
+            return $this->settlementFromPosition(
                 sourceSystem: $sourceSystem,
                 sourceKind: $sourceKind,
                 sourceRef: $sourceRef,
                 obligationType: $obligationType,
                 financeObligationId: (int) $obligation->id,
-                chargeIds: FinanceCharge::query()
-                    ->where('finance_obligation_id', $obligation->id)
-                    ->where('status', FinanceCharge::STATUS_ACTIVE)
-                    ->pluck('id')
-                    ->all(),
+                position: $this->settlementPositionReader->forFinanceObligation((int) $obligation->id),
             );
         }
 
@@ -57,13 +59,31 @@ class ObligationLedgerSettlementReader implements ObligationSettlementReader
             return ObligationSettlementResult::missing($sourceSystem, $sourceKind, $sourceRef, $obligationType);
         }
 
-        return $this->settlementFromChargeScope(
+        $lineIds = InvoiceLine::query()
+            ->whereIn('charge_id', $legacyChargeIds)
+            ->where('status', 'active')
+            ->pluck('id')
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->all();
+
+        if ($lineIds === []) {
+            return ObligationSettlementResult::invalid(
+                $sourceSystem,
+                $sourceKind,
+                $sourceRef,
+                $obligationType,
+                null,
+                [SettlementPositionIssue::MISSING_PAYABLE_LINE],
+            );
+        }
+
+        return $this->settlementFromPosition(
             sourceSystem: $sourceSystem,
             sourceKind: $sourceKind,
             sourceRef: $sourceRef,
             obligationType: $obligationType,
             financeObligationId: null,
-            chargeIds: $legacyChargeIds,
+            position: $this->settlementPositionReader->forPayableLines($lineIds),
         );
     }
 
@@ -95,65 +115,29 @@ class ObligationLedgerSettlementReader implements ObligationSettlementReader
         ));
     }
 
-    /**
-     * @param  list<int>  $chargeIds
-     */
-    private function settlementFromChargeScope(
+    private function settlementFromPosition(
         string $sourceSystem,
         string $sourceKind,
         string $sourceRef,
         string $obligationType,
         ?int $financeObligationId,
-        array $chargeIds,
+        SettlementPosition $position,
     ): ObligationSettlementResult {
-        $chargeIds = array_values(array_unique(array_filter(array_map('intval', $chargeIds))));
-
-        if ($chargeIds === []) {
-            return ObligationSettlementResult::missing($sourceSystem, $sourceKind, $sourceRef, $obligationType);
+        if (! $position->isValid() || $position->amounts === null) {
+            return ObligationSettlementResult::invalid(
+                $sourceSystem,
+                $sourceKind,
+                $sourceRef,
+                $obligationType,
+                $financeObligationId,
+                array_values(array_unique(array_map(
+                    static fn ($issue): string => $issue->code,
+                    $position->issues,
+                ))),
+            );
         }
 
-        $lineIds = DB::table('invoice_lines as il')
-            ->whereIn('il.charge_id', $chargeIds)
-            ->where('il.status', 'active')
-            ->pluck('il.id');
-
-        $payable = (float) DB::table('invoice_lines as il')
-            ->whereIn('il.charge_id', $chargeIds)
-            ->where('il.status', 'active')
-            ->selectRaw('COALESCE(SUM(CASE WHEN il.amount_snapshot > 0 THEN il.amount_snapshot ELSE 0 END), 0) as payable')
-            ->value('payable');
-
-        $paid = 0.0;
-        $discount = 0.0;
-        $credit = 0.0;
-
-        if ($lineIds->isNotEmpty()) {
-            $paid = (float) DB::table('payment_applications as pa')
-                ->join('payments as p', 'p.id', '=', 'pa.payment_id')
-                ->whereIn('pa.invoice_line_id', $lineIds)
-                ->where('p.status', Payment::STATUS_COMPLETED)
-                ->sum('pa.amount');
-
-            $discount = (float) DB::table('discount_allocations as da')
-                ->leftJoin('invoice_discounts as idc', 'idc.id', '=', 'da.invoice_discount_id')
-                ->whereIn('da.invoice_line_id', $lineIds)
-                ->where(function ($query): void {
-                    $query->whereNull('idc.id')
-                        ->orWhere('idc.status', '!=', 'reversed');
-                })
-                ->sum('da.amount');
-
-            $credit = (float) DB::table('credit_applications as ca')
-                ->whereIn('ca.invoice_line_id', $lineIds)
-                ->sum('ca.amount');
-        }
-
-        $payable = max(0.0, $payable);
-        $paid = max(0.0, $paid);
-        $discount = max(0.0, $discount);
-        $credit = max(0.0, $credit);
-        $netPayable = max(0.0, $payable - $discount);
-        $outstanding = max(0.0, $netPayable - $paid - $credit);
+        $amounts = $position->amounts;
 
         return new ObligationSettlementResult(
             source_system: $sourceSystem,
@@ -161,11 +145,11 @@ class ObligationLedgerSettlementReader implements ObligationSettlementReader
             source_ref: $sourceRef,
             obligation_type: $obligationType,
             finance_obligation_id: $financeObligationId,
-            settlement_state: $this->deriveState($payable, $paid, $discount, $credit, $netPayable, $outstanding),
-            payable: $payable,
-            paid: $paid,
-            discount: $discount,
-            outstanding: $outstanding,
+            settlement_state: $this->settlementState($position),
+            payable: (float) $amounts->gross->amount,
+            paid: (float) $amounts->cash->amount,
+            discount: (float) $amounts->discount->amount,
+            outstanding: (float) $amounts->remaining->amount,
         );
     }
 
@@ -269,31 +253,14 @@ class ObligationLedgerSettlementReader implements ObligationSettlementReader
             ->exists();
     }
 
-    private function deriveState(
-        float $payable,
-        float $paid,
-        float $discount,
-        float $credit,
-        float $netPayable,
-        float $outstanding,
-    ): string {
-        if ($paid > $netPayable) {
-            return ObligationSettlementResult::STATE_OVERPAID;
-        }
-
-        // Fully reduced by discount and/or credit applications with no cash.
-        if ($payable > 0.0 && $outstanding <= 0.0 && $paid <= 0.0 && ($discount + $credit) > 0.0) {
-            return ObligationSettlementResult::STATE_SETTLED_BY_DISCOUNT_OR_CREDIT;
-        }
-
-        if ($payable > 0.0 && $outstanding <= 0.0 && $paid > 0.0) {
-            return ObligationSettlementResult::STATE_PAID;
-        }
-
-        if ($paid > 0.0 || $credit > 0.0) {
-            return ObligationSettlementResult::STATE_PARTIALLY_PAID;
-        }
-
-        return ObligationSettlementResult::STATE_UNPAID;
+    private function settlementState(SettlementPosition $position): string
+    {
+        return match ($position->settlement_state) {
+            SettlementPosition::STATE_UNPAID => ObligationSettlementResult::STATE_UNPAID,
+            SettlementPosition::STATE_PARTIALLY_SETTLED => ObligationSettlementResult::STATE_PARTIALLY_PAID,
+            SettlementPosition::STATE_SETTLED_BY_CASH => ObligationSettlementResult::STATE_PAID,
+            SettlementPosition::STATE_SETTLED_BY_REDUCTION => ObligationSettlementResult::STATE_SETTLED_BY_DISCOUNT_OR_CREDIT,
+            default => ObligationSettlementResult::STATE_INVALID_SETTLEMENT_POSITION,
+        };
     }
 }

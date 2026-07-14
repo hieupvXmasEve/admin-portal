@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Services;
 
-use App\Modules\Finance\Models\CreditApplication;
 use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceDiscount;
@@ -12,6 +11,7 @@ use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionIssue;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Database\Eloquent\Builder;
@@ -66,12 +66,13 @@ class SettlementService
         $position = $this->settlementPositionReader->forInvoice((int) $invoice->id);
 
         if ($position->isValid() && $position->amounts !== null) {
-            $gross = (float) $position->amounts->gross->amount;
-            $discount = (float) $position->amounts->discount->amount;
-            $cash = (float) $position->amounts->cash->amount;
-            $credit = (float) $position->amounts->credit->amount;
-            $net = max(0.0, $gross - $discount);
-            $remaining = (float) $position->amounts->remaining->amount;
+            $amounts = $position->amounts;
+            $gross = (float) $amounts->gross->amount;
+            $discount = (float) $amounts->discount->amount;
+            $cash = (float) $amounts->cash->amount;
+            $credit = (float) $amounts->credit->amount;
+            $net = (float) $amounts->netDue()->amount;
+            $remaining = (float) $amounts->remaining->amount;
 
             return [
                 'gross' => $gross,
@@ -96,70 +97,7 @@ class SettlementService
 
     public function deriveInvoiceSnapshot(StudentInvoice $invoice): array
     {
-        $invoice->loadMissing([
-            'invoiceLines.charge',
-            'invoiceLines.paymentApplications',
-            'invoiceLines.discountAllocations.invoiceDiscount',
-            'invoiceLines.creditApplications',
-        ]);
-
-        $activeLines = $invoice->invoiceLines
-            ->filter(fn (InvoiceLine $line) => $this->isBillableActiveLine($line))
-            ->values();
-
-        $gross = (float) $activeLines
-            ->where('amount_snapshot', '>', 0)
-            ->sum('amount_snapshot');
-
-        // FIN-02 defensive backstop: the ledger is signed, so a released discount
-        // already nets via its negative row. This additionally excludes any
-        // allocation whose parent discount is reversed, so a future path that
-        // flips status without writing the offsetting row cannot inflate balance.
-        $discount = (float) $activeLines
-            ->sum(fn (InvoiceLine $line) => max(0, (float) $line->discountAllocations
-                ->reject(fn (DiscountAllocation $allocation) => $this->isReversedDiscountAllocation($allocation))
-                ->sum('amount')));
-
-        // ADR-0030 fourth reduction source: credit applications reduce outstanding
-        // like payments (payment-like), not like discounts (fee reduction).
-        // Signed sum: applications positive, reversals negative.
-        // Use 0.0 (not 0) with max() so the result stays float — PHP max(0, 0.0)
-        // returns int 0, which breaks strict float comparisons later.
-        $credit = max(0.0, (float) $activeLines
-            ->sum(fn (InvoiceLine $line) => (float) $line->creditApplications->sum('amount')));
-
-        // Wave 7 / ADR-0030: negative charge lines are historical artifacts only.
-        // Reductions live in discount_allocations + credit_applications. The
-        // legacy "net negative amount_snapshot as discount" backstop is retired.
-
-        $net = max(0.0, $gross - $discount);
-
-        $paid = max(0.0, (float) $activeLines
-            ->sum(fn (InvoiceLine $line) => max(0.0, (float) $line->paymentApplications->sum('amount'))));
-
-        $paid = min($paid, $net);
-        $credit = min($credit, max(0.0, $net - $paid));
-        $remaining = max(0.0, $net - $paid - $credit);
-
-        $status = $invoice->status === 'draft' ? 'draft' : 'pending';
-
-        if ($net <= 0 || $remaining <= 0) {
-            $status = 'paid';
-        } elseif ($paid > 0 || $credit > 0) {
-            $status = 'partial';
-        } elseif ($invoice->due_date && $invoice->due_date->isPast()) {
-            $status = 'overdue';
-        }
-
-        return [
-            'gross' => $gross,
-            'discount' => $discount,
-            'credit' => $credit,
-            'net' => $net,
-            'paid' => $paid,
-            'remaining' => $remaining,
-            'status' => $status,
-        ];
+        return $this->deriveInvoiceCacheSnapshot($invoice);
     }
 
     public function getPaymentAllocatedAmount(Payment $payment): float
@@ -176,17 +114,7 @@ class SettlementService
 
     public function getChargePaidAmount(int $chargeId): float
     {
-        $lineIds = InvoiceLine::query()
-            ->where('charge_id', $chargeId)
-            ->pluck('id');
-
-        if ($lineIds->isEmpty()) {
-            return 0.0;
-        }
-
-        return max(0, (float) PaymentApplication::query()
-            ->whereIn('invoice_line_id', $lineIds)
-            ->sum('amount'));
+        return $this->getChargeSettlementComponents($chargeId)['cash'];
     }
 
     /**
@@ -194,36 +122,33 @@ class SettlementService
      */
     public function getChargeDiscountAmount(int $chargeId): float
     {
-        $lineIds = InvoiceLine::query()
-            ->where('charge_id', $chargeId)
-            ->pluck('id');
+        return $this->getChargeSettlementComponents($chargeId)['discount'];
+    }
 
-        if ($lineIds->isEmpty()) {
-            return 0.0;
-        }
+    /**
+     * @return array{gross:float,discount:float,cash:float,credit:float,remaining:float}
+     */
+    public function getChargeSettlementComponents(int $chargeId): array
+    {
+        $amounts = $this->chargePosition($chargeId)->amounts;
 
-        return max(0, (float) DiscountAllocation::query()
-            ->whereIn('invoice_line_id', $lineIds)
-            ->where(fn ($query) => $this->excludeReversedDiscountAllocations($query))
-            ->sum('amount'));
+        return [
+            'gross' => (float) $amounts->gross->amount,
+            'discount' => (float) $amounts->discount->amount,
+            'cash' => (float) $amounts->cash->amount,
+            'credit' => (float) $amounts->credit->amount,
+            'remaining' => (float) $amounts->remaining->amount,
+        ];
     }
 
     public function getLineDiscountAmount(InvoiceLine $line): float
     {
-        // FIN-02: keep this consistent with deriveInvoiceSnapshot's discount
-        // backstop — a reversed discount must not reduce line outstanding, or
-        // allocation would stop early while the invoice still shows the balance.
-        return max(0, (float) DiscountAllocation::query()
-            ->where('invoice_line_id', $line->id)
-            ->where(fn ($query) => $this->excludeReversedDiscountAllocations($query))
-            ->sum('amount'));
+        return (float) $this->linePosition($line)->amounts->discount->amount;
     }
 
     public function getLinePaidAmount(InvoiceLine $line): float
     {
-        return max(0, (float) PaymentApplication::query()
-            ->where('invoice_line_id', $line->id)
-            ->sum('amount'));
+        return (float) $this->linePosition($line)->amounts->cash->amount;
     }
 
     /**
@@ -232,19 +157,55 @@ class SettlementService
      */
     public function getLineCreditAmount(InvoiceLine $line): float
     {
-        return max(0, (float) CreditApplication::query()
-            ->where('invoice_line_id', $line->id)
-            ->sum('amount'));
+        return (float) $this->linePosition($line)->amounts->credit->amount;
     }
 
     public function getLineNetDue(InvoiceLine $line): float
     {
-        return max(0, (float) $line->amount_snapshot - $this->getLineDiscountAmount($line));
+        return (float) $this->linePosition($line)->amounts->netDue()->amount;
     }
 
     public function getLineOutstandingAmount(InvoiceLine $line): float
     {
-        return max(0, $this->getLineNetDue($line) - $this->getLinePaidAmount($line) - $this->getLineCreditAmount($line));
+        return (float) $this->linePosition($line)->amounts->remaining->amount;
+    }
+
+    private function linePosition(InvoiceLine $line): SettlementPosition
+    {
+        return $this->requireValidPosition(
+            $this->settlementPositionReader->forPayableLine((int) $line->id),
+            "invoice line #{$line->id}",
+        );
+    }
+
+    private function chargePosition(int $chargeId): SettlementPosition
+    {
+        $lineIds = InvoiceLine::query()
+            ->where('charge_id', $chargeId)
+            ->pluck('id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->all();
+
+        return $this->requireValidPosition(
+            $this->settlementPositionReader->forPayableLines($lineIds),
+            "charge #{$chargeId}",
+        );
+    }
+
+    private function requireValidPosition(SettlementPosition $position, string $subject): SettlementPosition
+    {
+        if ($position->isValid() && $position->amounts !== null) {
+            return $position;
+        }
+
+        $issueCodes = collect($position->issues)
+            ->map(static fn (SettlementPositionIssue $issue): string => $issue->code)
+            ->implode(', ');
+
+        throw new RuntimeException(
+            "Cannot read canonical settlement for {$subject}"
+            .($issueCodes === '' ? '' : ": {$issueCodes}"),
+        );
     }
 
     /**

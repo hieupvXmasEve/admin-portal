@@ -123,7 +123,7 @@ class PaymentService
         $payment = Payment::findOrFail($paymentId);
         $createdAllocations = collect();
 
-        DB::transaction(function () use ($payment, $allocations, $userId, &$createdAllocations) {
+        DB::transaction(function () use ($payment, $allocations, $userId, $allowHeldTargets, &$createdAllocations) {
             // FIN-11/DB-09: lock the payment row and recompute the unapplied
             // amount inside the transaction. Concurrent allocators (DNG webhook
             // bridge + batch auto-allocate) serialize on this lock, so the same
