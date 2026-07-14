@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions;
 
-use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
-use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Events\InstallmentPushed;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\InvoiceLine;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -33,11 +32,6 @@ use Illuminate\Support\Facades\Log;
  */
 class PushNextInstallmentAction
 {
-    public function __construct(
-        protected DngPaymentService $dngPaymentService,
-        protected DngCampusCodeResolver $campusCodeResolver,
-    ) {}
-
     public function handle(int $chargeId, ?int $explicitInstallmentId = null): ?FinanceChargeInstallment
     {
         // Lock the charge row to serialize concurrent pushes (webhook + manual).
@@ -60,34 +54,41 @@ class PushNextInstallmentAction
             );
         }
 
+        $line = InvoiceLine::query()
+            ->where('charge_id', $charge->id)
+            ->where('status', 'active')
+            ->orderBy('id')
+            ->firstOrFail();
         $dngFeeType = $this->mapFeeType($charge->charge_type);
-        $campusCode = $this->campusCodeResolver->requireForStudent($student);
+        try {
+            $reservation = app(ReserveAndPushSingleFeeDngAction::class)->handle(
+                $student->id,
+                $dngFeeType,
+                [
+                    'description' => $charge->description.' (Đợt '.$installment->installment_no.')',
+                    'semester_id' => $charge->semester_id,
+                    'due_date' => $installment->due_date->toDateString(),
+                    'estimate_time' => $installment->due_date->format('m/y'),
+                ],
+                [(int) $line->id],
+                [(int) $line->id => (string) $installment->amount],
+                [(int) $line->id => (int) $installment->id],
+            );
+        } catch (\Throwable $exception) {
+            $installment->update([
+                'last_push_error' => $exception->getMessage(),
+                'last_push_attempted_at' => now(),
+                'push_attempt_count' => $installment->push_attempt_count + 1,
+            ]);
 
-        $chargeData = [
-            'campus_code' => $campusCode,
-            'student_code' => $student->student_id,
-            'fee_type' => $dngFeeType,
-            'type' => $dngFeeType,
-            'description' => $charge->description.' (Đợt '.$installment->installment_no.')',
-            'semester_id' => $charge->semester_id,
-            'due_date' => $installment->due_date->toDateString(),
-            'item_id' => $this->buildItemId($student->student_id, $dngFeeType, $installment),
-            'amount' => (float) $installment->amount,
-            'student_name' => $student->full_name,
-            'email' => $student->email ?? '',
-            // DNG estimate_time format is MM/YY (e.g. "09/26"), NOT ISO date.
-            // Matches CreateBatchDngFromChargesAction worklist input convention.
-            'estimate_time' => $installment->due_date->format('m/y'),
-            'student_address' => $student->current_address_line ?? $student->address ?? '',
-            'cccd' => $student->national_id ?? null,
-            'finance_charge_id' => $charge->id,
-            'installment_id' => $installment->id,
-        ];
-
-        // createAndPush will update installment.dng_payment_request_id + status=awaiting_payment
-        // atomically with the DNG record commit. On failure it records last_push_error and
-        // increments push_attempt_count, then re-throws.
-        $this->dngPaymentService->createAndPush($student, $chargeData);
+            throw $exception;
+        }
+        $installment->update([
+            'dng_payment_request_id' => $reservation->id,
+            'status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
+            'last_push_error' => null,
+            'last_push_attempted_at' => now(),
+        ]);
 
         Log::info('Installment pushed to DNG', [
             'finance_charge_id' => $charge->id,
@@ -140,32 +141,16 @@ class PushNextInstallmentAction
             ->first();
     }
 
-    /**
-     * Map FinanceCharge.charge_type to DNG fee_type. Conservative for Phase 1:
-     * tuition_term -> HP. Other types use the charge_type uppercased; the DNG
-     * provider has its own validation so unsupported types will fail at push.
-     */
+    /** Map the charge type through the supported provider collection family. */
     private function mapFeeType(string $chargeType): string
     {
         return match ($chargeType) {
-            FinanceCharge::TYPE_TUITION_TERM => 'HP',
-            default => strtoupper($chargeType),
+            FinanceCharge::TYPE_TUITION_TERM,
+            FinanceCharge::TYPE_EGC_LEVEL_FEE => 'HP',
+            FinanceCharge::TYPE_RETAKE_FEE => 'HL',
+            FinanceCharge::TYPE_EXAM_RESIT_FEE => 'PTL',
+            FinanceCharge::TYPE_BHYT => 'BHYT',
+            default => throw new \InvalidArgumentException("Unsupported DNG charge type {$chargeType}."),
         };
-    }
-
-    /**
-     * Deterministic item_id that distinguishes installments of the same charge.
-     * DNG uniqueness is per (item_id, student_code), so installments need
-     * different item_ids to coexist as separate awaiting rows (sequentially).
-     */
-    private function buildItemId(string $studentCode, string $dngFeeType, FinanceChargeInstallment $installment): string
-    {
-        return sprintf(
-            '%s_%s_inst%d_%s',
-            $studentCode,
-            strtolower($dngFeeType),
-            $installment->installment_no,
-            now()->format('YmdHis'),
-        );
     }
 }

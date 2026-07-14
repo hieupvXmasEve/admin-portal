@@ -13,7 +13,9 @@ use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Dng\Support\DngCollectionCutover;
 use App\Modules\Finance\Dng\Support\DngReservationTargetFingerprint;
 use App\Modules\Finance\Models\BillingAccount;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Queries\Dng\ListDngWorklistQuery;
 use App\Modules\Finance\Support\SettlementPosition\Money;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
@@ -30,10 +32,6 @@ final class ReserveAndPushSingleFeeDngAction
 {
     private const PROVIDER_RAIL = 'dng';
 
-    private const FEE_TYPE_TO_CHARGE_TYPE = [
-        'HL' => 'retake_fee',
-    ];
-
     public function __construct(
         private readonly SettlementPositionReader $settlementPositionReader,
         private readonly DngCampusCodeResolver $campusCodeResolver,
@@ -44,10 +42,10 @@ final class ReserveAndPushSingleFeeDngAction
     /**
      * @param  array{description: string, semester_id: int, due_date: string, estimate_time: string}  $details
      */
-    public function handle(int $studentId, string $feeType, array $details): DngPaymentRequest
+    public function handle(int $studentId, string $feeType, array $details, ?array $invoiceLineIds = null, array $targetAmounts = [], array $installmentIdsByLine = []): DngPaymentRequest
     {
         ($this->cutover ?? new DngCollectionCutover)->assertCollectionAllowed();
-        $reservation = $this->reserve($studentId, $feeType, $details);
+        $reservation = $this->reserve($studentId, $feeType, $details, $invoiceLineIds, $targetAmounts, $installmentIdsByLine);
 
         if ($reservation->status === DngPaymentRequest::STATUS_UNKNOWN_OUTCOME) {
             throw new \RuntimeException("DNG reservation #{$reservation->id} has an unknown provider outcome and must be reconciled before retry.");
@@ -84,14 +82,14 @@ final class ReserveAndPushSingleFeeDngAction
     /**
      * @param  array{description: string, semester_id: int, due_date: string, estimate_time: string}  $details
      */
-    private function reserve(int $studentId, string $feeType, array $details): DngPaymentRequest
+    private function reserve(int $studentId, string $feeType, array $details, ?array $requestedLineIds, array $targetAmounts, array $installmentIdsByLine): DngPaymentRequest
     {
-        $chargeType = self::FEE_TYPE_TO_CHARGE_TYPE[$feeType] ?? null;
-        if ($chargeType === null) {
-            throw new \InvalidArgumentException("Guarded DNG reservation is not enabled for fee type {$feeType}.");
+        $chargeTypes = ListDngWorklistQuery::mapFeeTypeToChargeTypes($feeType);
+        if ($chargeTypes === []) {
+            throw new \InvalidArgumentException("DNG fee type {$feeType} has no supported Finance charge types.");
         }
 
-        return DB::transaction(function () use ($studentId, $feeType, $chargeType, $details): DngPaymentRequest {
+        return DB::transaction(function () use ($studentId, $feeType, $chargeTypes, $details, $requestedLineIds, $targetAmounts, $installmentIdsByLine): DngPaymentRequest {
             $student = Student::query()->lockForUpdate()->findOrFail($studentId);
             $billingAccount = BillingAccount::query()
                 ->where('student_id', $student->id)
@@ -115,12 +113,29 @@ final class ReserveAndPushSingleFeeDngAction
                 return $existing;
             }
 
-            $position = $this->settlementPositionReader->forFeeType((int) $billingAccount->id, $chargeType);
+            $targetLineIds = InvoiceLine::query()
+                ->where('status', 'active')
+                ->whereHas('charge', function ($query) use ($studentId, $chargeTypes, $details): void {
+                    $query->where('student_id', $studentId)
+                        ->whereIn('charge_type', $chargeTypes)
+                        ->where('semester_id', $details['semester_id'])
+                        ->where('status', FinanceCharge::STATUS_ACTIVE);
+                })
+                ->when($requestedLineIds !== null, fn ($query) => $query->whereIn('id', $requestedLineIds))
+                ->orderBy('id')
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->all();
+            if ($targetLineIds === []) {
+                throw new \RuntimeException('Settlement Position has no supported payable lines for this DNG fee type.');
+            }
+
+            $position = $this->settlementPositionReader->forPayableLines($targetLineIds);
             if (! $position->isValid() || $position->amounts === null || ! $position->amounts->remaining->isPositive()) {
                 throw new \RuntimeException('Settlement Position is invalid, held, or has no collectible amount.');
             }
 
-            $targets = $this->collectibleTargets($position);
+            $targets = $this->collectibleTargets($position, $targetAmounts);
             if ($targets === []) {
                 throw new \RuntimeException('Settlement Position has no exact collectible targets.');
             }
@@ -131,7 +146,7 @@ final class ReserveAndPushSingleFeeDngAction
             if (! $position->isValid() || $position->amounts === null || ! $position->amounts->remaining->isPositive()) {
                 throw new \RuntimeException('Settlement Position changed while reserving DNG targets.');
             }
-            $targets = $this->collectibleTargets($position);
+            $targets = $this->collectibleTargets($position, $targetAmounts);
 
             $targetFingerprint = $this->fingerprint($targets);
             $sequence = DngPaymentRequest::query()
@@ -172,11 +187,13 @@ final class ReserveAndPushSingleFeeDngAction
                     'invoice_line_id' => $target['invoice_line_id'],
                     'captured_collectible' => $target['collectible'],
                     'target_identity' => $target['identity'],
+                    'finance_charge_installment_id' => $installmentIdsByLine[$target['invoice_line_id']] ?? null,
                 ]);
                 DngPaymentRequestCharge::query()->create([
                     'dng_payment_request_id' => $reservation->id,
                     'finance_charge_id' => $target['finance_charge_id'],
                     'amount' => $target['collectible'],
+                    'finance_charge_installment_id' => $installmentIdsByLine[$target['invoice_line_id']] ?? null,
                 ]);
             }
 
@@ -198,7 +215,27 @@ final class ReserveAndPushSingleFeeDngAction
             $targetIds = $reservation->reservationTargets()->pluck('invoice_line_id')->map(fn ($id): int => (int) $id)->all();
             InvoiceLine::query()->whereIn('id', $targetIds)->lockForUpdate()->get();
             $position = $this->settlementPositionReader->forPayableLines($targetIds);
-            $targets = $position->isValid() ? $this->collectibleTargets($position) : [];
+            $currentTargets = $position->isValid() ? $this->collectibleTargets($position) : [];
+            $currentByLine = collect($currentTargets)->keyBy('invoice_line_id');
+            $targets = $reservation->reservationTargets()
+                ->orderBy('invoice_line_id')
+                ->get()
+                ->map(function (DngPaymentRequestReservationTarget $target) use ($currentByLine): ?array {
+                    $current = $currentByLine->get((int) $target->invoice_line_id);
+                    if ($current === null || Money::vnd((string) $target->captured_collectible)->isGreaterThan(Money::vnd($current['collectible']))) {
+                        return null;
+                    }
+
+                    return [
+                        'invoice_line_id' => (int) $target->invoice_line_id,
+                        'finance_charge_id' => (int) $current['finance_charge_id'],
+                        'collectible' => (string) $target->captured_collectible,
+                        'identity' => (string) $target->target_identity,
+                    ];
+                })
+                ->filter()
+                ->values()
+                ->all();
 
             if ($targets === [] || $this->fingerprint($targets) !== $reservation->target_fingerprint) {
                 $reservation->update([
@@ -226,7 +263,7 @@ final class ReserveAndPushSingleFeeDngAction
     /**
      * @return list<array{invoice_line_id: int, finance_charge_id: int, collectible: string, identity: string}>
      */
-    private function collectibleTargets(SettlementPosition $position): array
+    private function collectibleTargets(SettlementPosition $position, array $targetAmounts = []): array
     {
         $lineIds = collect($position->payable_line_breakdown)
             ->filter(fn (SettlementPosition $line): bool => $line->amounts !== null && $line->amounts->remaining->isPositive())
@@ -237,17 +274,31 @@ final class ReserveAndPushSingleFeeDngAction
         return collect($position->payable_line_breakdown)
             ->filter(fn (SettlementPosition $line): bool => $line->amounts !== null && $line->amounts->remaining->isPositive())
             ->sortBy('payable_line_id')
-            ->map(function (SettlementPosition $line) use ($lines): array {
+            ->map(function (SettlementPosition $line) use ($lines, $targetAmounts): array {
                 $invoiceLineId = (int) $line->payable_line_id;
                 $invoiceLine = $lines->get($invoiceLineId);
                 if ($invoiceLine === null || $invoiceLine->charge_id === null) {
                     throw new \RuntimeException("Payable line #{$invoiceLineId} cannot be reserved without a FinanceCharge.");
                 }
 
+                $collectible = $line->amounts->remaining;
+                if (isset($targetAmounts[$invoiceLineId])) {
+                    $requested = Money::vnd((string) $targetAmounts[$invoiceLineId]);
+                    if (! $requested->isPositive()) {
+                        throw new \RuntimeException("DNG target for payable line #{$invoiceLineId} must be positive.");
+                    }
+                    if ($requested->isGreaterThan($collectible)) {
+                        throw new \RuntimeException("Payable line #{$invoiceLineId} no longer covers its installment target.");
+                    }
+                    if ($collectible->isGreaterThan($requested)) {
+                        $collectible = $requested;
+                    }
+                }
+
                 return [
                     'invoice_line_id' => $invoiceLineId,
                     'finance_charge_id' => (int) $invoiceLine->charge_id,
-                    'collectible' => $line->amounts->remaining->amount,
+                    'collectible' => $collectible->amount,
                     'identity' => "invoice_line:{$invoiceLineId}",
                 ];
             })

@@ -16,7 +16,7 @@ class CommitBatchDngRequest extends FormRequest
 
     /**
      * semester_id + dng_fee_type come from the trusted token scope (not the client).
-     * due_date / description / estimate_time / amount_overrides are operator commit-time inputs.
+     * due_date / description / estimate_time are operator commit-time inputs.
      *
      * @return array<string, mixed>
      */
@@ -29,8 +29,6 @@ class CommitBatchDngRequest extends FormRequest
             'preview_token' => 'required|string',
             'selected_keys' => 'required|array|min:1|max:100',
             'selected_keys.*' => 'required|string',
-            'amount_overrides' => 'nullable|array',
-            'amount_overrides.*' => 'numeric|min:1',
             'acknowledged' => 'nullable|boolean',
         ];
     }

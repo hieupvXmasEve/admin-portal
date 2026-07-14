@@ -159,7 +159,6 @@ class BatchStudioController extends Controller
             'semester_id' => $semesterId,
             'description' => (string) $request->input('description'),
             'estimate_time' => (string) $request->input('estimate_time'),
-            'amount_overrides' => $request->input('amount_overrides'),
         ]);
 
         return Inertia::flash('batch_result', [

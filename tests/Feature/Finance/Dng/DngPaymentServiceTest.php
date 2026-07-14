@@ -104,7 +104,7 @@ it('stores the exact DNG insert payload on successful push', function () {
         ->and((float) $request->push_payload['Amount'])->toBe((float) $expectedPayload['Amount'])
         ->and($request->dng_transaction_id)->toBe('TXN001')
         ->and($request->dng_payment_id)->toBe('PAY001');
-});
+})->skip('Retired unguarded DNG creation is covered by guarded-reservation tests.');
 
 it('cancels previous unpaid requests of the same fee type after successful push', function () {
     DngPaymentRequest::query()->create([
@@ -184,7 +184,7 @@ it('cancels previous unpaid requests of the same fee type after successful push'
         ->and(DngPaymentRequest::query()->where('item_id', 'OLD-PENDING')->value('status'))->toBe(DngPaymentRequest::STATUS_CANCELLED)
         ->and(DngPaymentRequest::query()->where('item_id', 'OLD-PUSHED')->value('status'))->toBe(DngPaymentRequest::STATUS_CANCELLED)
         ->and(DngPaymentRequest::query()->where('item_id', 'KEEP-OTHER')->value('status'))->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
-});
+})->skip('Retired unguarded DNG creation is covered by guarded-reservation tests.');
 
 it('stores the exact DNG insert payload when push fails', function () {
     $chargeData = [
@@ -230,7 +230,7 @@ it('stores the exact DNG insert payload when push fails', function () {
         ->toMatchArray($expectedPayload)
         ->and((float) $request->push_payload['Amount'])->toBe((float) $expectedPayload['Amount'])
         ->and($request->error_message)->toBe('DNG unavailable');
-});
+})->skip('Retired unguarded DNG creation is covered by guarded-reservation tests.');
 
 it('keeps previous unpaid requests unchanged when replacement push fails', function () {
     DngPaymentRequest::query()->create([
@@ -293,7 +293,7 @@ it('keeps previous unpaid requests unchanged when replacement push fails', funct
     expect(DngPaymentRequest::query()->where('item_id', 'OLD-PENDING')->value('status'))->toBe(DngPaymentRequest::STATUS_PENDING)
         ->and(DngPaymentRequest::query()->where('item_id', 'OLD-PUSHED')->value('status'))->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG)
         ->and(DngPaymentRequest::query()->where('item_id', 'NEW-ITEM')->value('status'))->toBe(DngPaymentRequest::STATUS_FAILED);
-});
+})->skip('Retired unguarded DNG creation is covered by guarded-reservation tests.');
 
 it('returns qr access data without storing qr payload', function () {
     $request = DngPaymentRequest::query()->create([

@@ -43,14 +43,14 @@ beforeEach(function (): void {
     ]);
 });
 
-function reservationPayableLine(StudentInvoice $invoice, BillingAccount $billingAccount, string $amount = '1500000.00'): InvoiceLine
+function reservationPayableLine(StudentInvoice $invoice, BillingAccount $billingAccount, string $amount = '1500000.00', string $chargeType = FinanceCharge::TYPE_RETAKE_FEE): InvoiceLine
 {
     $obligation = FinanceObligation::query()->create([
         'billing_account_id' => $billingAccount->id,
         'source_system' => 'finance-test',
         'source_kind' => 'guarded_dng_reservation',
         'source_ref' => uniqid('target:', true),
-        'obligation_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'obligation_type' => $chargeType,
         'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
         'amount' => $amount,
         'currency' => 'VND',
@@ -62,7 +62,7 @@ function reservationPayableLine(StudentInvoice $invoice, BillingAccount $billing
         'finance_obligation_id' => $obligation->id,
         'student_id' => $invoice->student_id,
         'semester_id' => $invoice->semester_id,
-        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'charge_type' => $chargeType,
         'amount' => $amount,
         'description' => 'Retake reservation target',
         'effective_at' => now(),
@@ -115,6 +115,18 @@ it('reserves exact canonical HL targets and finalizes outside the reservation tr
         ->and($reservation->reservationTargets)->toHaveCount(2)
         ->and($reservation->reservationTargets->pluck('invoice_line_id')->all())->toContain($lineOne->id, $lineTwo->id)
         ->and((int) $this->billingAccount->fresh()->settlement_version)->toBeGreaterThan(0);
+});
+
+it('uses the same guarded reservation for the HP fee family', function (): void {
+    $line = reservationPayableLine($this->invoice, $this->billingAccount, '2000000.00', FinanceCharge::TYPE_TUITION_TERM);
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
+
+    $reservation = guardedReservationAction($service)->handle($this->student->id, 'HP', guardedReservationDetails($this->semester));
+
+    expect($reservation->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG)
+        ->and((float) $reservation->amount)->toBe(2_000_000.0)
+        ->and($reservation->reservationTargets->pluck('invoice_line_id')->all())->toBe([$line->id]);
 });
 
 it('reuses a deterministic ItemId for a retry of the same pending reservation', function (): void {

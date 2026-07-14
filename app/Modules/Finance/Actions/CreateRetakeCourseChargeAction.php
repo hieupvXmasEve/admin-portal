@@ -6,26 +6,20 @@ namespace App\Modules\Finance\Actions;
 
 use App\Models\CourseRetakeRegistration;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
-use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
-use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
-use App\Modules\Finance\Dng\Services\DngPaymentService;
-use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Models\InvoiceLine;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class CreateRetakeCourseChargeAction
 {
     public function __construct(
         protected FinanceIntakeContract $intake,
-        protected DngPaymentService $dngPaymentService,
-        protected DngCampusCodeResolver $dngCampusCodeResolver,
+        protected ReserveAndPushSingleFeeDngAction $reserveAndPushDng,
     ) {}
 
     /**
@@ -46,7 +40,7 @@ class CreateRetakeCourseChargeAction
      */
     public function handle(array $data): CourseRetakeRegistration
     {
-        return DB::transaction(function () use ($data) {
+        $reservationInput = DB::transaction(function () use ($data): array {
             // Lock and validate the triggering registration
             $registration = CourseRetakeRegistration::lockForUpdate()->findOrFail($data['registration_id']);
 
@@ -116,64 +110,26 @@ class CreateRetakeCourseChargeAction
                 ->lockForUpdate()
                 ->get();
 
-            // Resolve finance_charge_id for each registration
-            /** @var Collection<int, array{registration: CourseRetakeRegistration, charge: FinanceCharge}> */
-            $chargeItems = $pendingRegistrations
-                ->filter(fn (CourseRetakeRegistration $r) => $r->finance_charge_id !== null)
-                ->map(function (CourseRetakeRegistration $r) {
-                    $charge = FinanceCharge::find($r->finance_charge_id);
+            $chargeIds = $pendingRegistrations->pluck('finance_charge_id')->filter()->map(fn ($id): int => (int) $id)->all();
+            $lineIds = InvoiceLine::query()
+                ->whereIn('charge_id', $chargeIds)
+                ->where('status', 'active')
+                ->orderBy('id')
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->all();
 
-                    return $charge ? ['registration' => $r, 'charge' => $charge] : null;
-                })
-                ->filter()
-                ->values();
-
-            if ($chargeItems->isEmpty()) {
+            if ($lineIds === []) {
                 throw ValidationException::withMessages([
-                    'registration_id' => ['Không tìm thấy khoản phí hợp lệ để tạo DNG.'],
+                    'registration_id' => ['Không tìm thấy payable line hợp lệ để tạo DNG.'],
                 ]);
             }
-
-            $campusCode = $this->dngCampusCodeResolver->requireForStudent($student);
-            $dngFeeType = DngFeeTypeOptions::fromChargeType(FinanceCharge::TYPE_RETAKE_FEE);
-
-            // Aggregate total amount across all pending charges
-            $totalAmount = $chargeItems->sum(fn ($item) => (float) $item['charge']->amount);
 
             // Build description listing all units
-            $unitCodes = $chargeItems
-                ->map(fn ($item) => $item['registration']->unit?->code ?? "#{$item['registration']->unit_id}")
+            $unitCodes = $pendingRegistrations
+                ->map(fn (CourseRetakeRegistration $item) => $item->unit?->code ?? "#{$item->unit_id}")
                 ->join(', ');
             $description = "Phí học lại: {$unitCodes}";
-
-            // Create a single aggregate DNG payment request
-            $dngRequest = $this->dngPaymentService->createAndPush($student, [
-                'campus_code' => $campusCode,
-                'student_code' => $student->student_id,
-                'fee_type' => $dngFeeType,
-                'description' => $description,
-                'semester_id' => $registration->semester_id,
-                'due_date' => $paymentDeadline,
-                'item_id' => Str::uuid()->toString(),
-                'amount' => $totalAmount,
-                'type' => $dngFeeType,
-                'student_name' => $student->full_name,
-                'email' => $student->email ?? '',
-                'estimate_time' => $paymentDeadline ?? now()->addDays(30)->format('Y-m-d'),
-                'student_address' => $student->address ?? $student->current_address_line ?? 'N/A',
-                'cccd' => $student->national_id ?? '',
-                // finance_charge_id left null — multi-charge link is via chargeLinks pivot
-                'finance_charge_id' => null,
-            ]);
-
-            // Insert pivot rows: one per charge, recording the exact amount per charge
-            foreach ($chargeItems as $item) {
-                DngPaymentRequestCharge::create([
-                    'dng_payment_request_id' => $dngRequest->id,
-                    'finance_charge_id' => $item['charge']->id,
-                    'amount' => $item['charge']->amount,
-                ]);
-            }
 
             // Update payment deadline on all covered registrations
             if ($paymentDeadline) {
@@ -182,8 +138,31 @@ class CreateRetakeCourseChargeAction
                 );
             }
 
-            return $registration->fresh();
+            return [
+                'registration_id' => (int) $registration->id,
+                'student_id' => (int) $registration->student_id,
+                'line_ids' => $lineIds,
+                'description' => $description,
+                'semester_id' => (int) ($registration->charge_semester_id ?? $registration->semester_id),
+                'due_date' => $paymentDeadline ?? now()->addDays(30)->toDateString(),
+            ];
         });
+
+        // The reservation commits before its provider call; no registration or
+        // intake transaction remains open while DNG is contacted.
+        $this->reserveAndPushDng->handle(
+            $reservationInput['student_id'],
+            'HL',
+            [
+                'description' => $reservationInput['description'],
+                'semester_id' => $reservationInput['semester_id'],
+                'due_date' => $reservationInput['due_date'],
+                'estimate_time' => now()->format('m/y'),
+            ],
+            $reservationInput['line_ids'],
+        );
+
+        return CourseRetakeRegistration::query()->findOrFail($reservationInput['registration_id']);
     }
 
     private function findActiveIntakeCharge(CourseRetakeRegistration $registration): ?FinanceCharge

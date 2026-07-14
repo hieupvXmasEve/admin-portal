@@ -12,8 +12,12 @@ use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Jobs\PushNextInstallmentJob;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Queue;
@@ -44,6 +48,35 @@ function createInstallmentPushFixture(): array
         'description' => 'HP test',
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    $billingAccount = BillingAccount::query()->firstOrCreate(['student_id' => $student->id]);
+    $obligation = FinanceObligation::query()->create([
+        'billing_account_id' => $billingAccount->id,
+        'source_system' => 'finance-test',
+        'source_kind' => 'installment_push',
+        'source_ref' => uniqid('installment:', true),
+        'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 15_000_000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+    $charge->update(['finance_obligation_id' => $obligation->id]);
+    $invoice = StudentInvoice::query()->create([
+        'invoice_number' => 'INV-INSTALLMENT-'.uniqid(),
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'status' => 'pending',
+        'due_date' => now()->addDays(30),
+    ]);
+    InvoiceLine::query()->create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $charge->id,
+        'amount_snapshot' => 15_000_000,
+        'description_snapshot' => 'HP test',
+        'status' => 'active',
     ]);
 
     $i1 = FinanceChargeInstallment::factory()->create([
@@ -135,7 +168,9 @@ it('pushes the next pending installment to DNG and links the record', function (
     $dng = DngPaymentRequest::query()->find($installment->dng_payment_request_id);
     expect($dng)->not->toBeNull();
     expect((float) $dng->amount)->toBe(7_500_000.0);
-    expect($dng->finance_charge_id)->toBe($fix['charge']->id);
+    expect($dng->finance_charge_id)->toBeNull()
+        ->and($dng->chargeLinks->sole()->finance_charge_id)->toBe($fix['charge']->id)
+        ->and($dng->chargeLinks->sole()->finance_charge_installment_id)->toBe($installment->id);
 });
 
 // =========================================================================
@@ -205,7 +240,7 @@ it('records last_push_error and increments push_attempt_count when DNG push fail
 // =========================================================================
 // Case 11b: retry after fail succeeds → status awaiting, errors reset
 // =========================================================================
-it('clears push error on successful retry after a failed attempt', function () {
+it('holds an ambiguous provider outcome for reconciliation instead of retrying it', function () {
     $fix = createInstallmentPushFixture();
 
     // First attempt fails.
@@ -220,12 +255,11 @@ it('clears push error on successful retry after a failed attempt', function () {
     expect($i1->last_push_error)->toContain('Transient 502');
     expect($i1->push_attempt_count)->toBe(1);
 
-    // Second attempt (retry) succeeds.
+    // A second push must not risk a duplicate provider debt.
     mockDngClientPushSuccess();
-    $result = freshPushAction()->handle($fix['charge']->id);
-
-    expect($result->status)->toBe(FinanceChargeInstallment::STATUS_AWAITING_PAYMENT);
-    expect($result->last_push_error)->toBeNull();
+    expect(fn () => freshPushAction()->handle($fix['charge']->id))
+        ->toThrow(RuntimeException::class, 'unknown provider outcome');
+    expect($fix['installments'][0]->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_PENDING);
 });
 
 // =========================================================================

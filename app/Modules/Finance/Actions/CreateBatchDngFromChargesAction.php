@@ -8,17 +8,12 @@ use App\Models\CourseRetakeRegistration;
 use App\Models\ExamResitAttempt;
 use App\Models\Student;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
-use App\Modules\Finance\Dng\Models\DngPaymentRequest;
-use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
-use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
-use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Dng\Support\DngCollectionCutover;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Queries\Dng\ListDngWorklistQuery;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -41,9 +36,6 @@ use Illuminate\Support\Facades\Log;
 class CreateBatchDngFromChargesAction
 {
     public function __construct(
-        protected DngPaymentService $dngPaymentService,
-        protected DngCampusCodeResolver $campusCodeResolver,
-        protected CancelDngPaymentRequestAction $cancelDngAction,
         protected ?ReserveAndPushSingleFeeDngAction $guardedReservationAction = null,
         protected ?DngCollectionCutover $cutover = null,
     ) {}
@@ -56,7 +48,6 @@ class CreateBatchDngFromChargesAction
      *     semester_id: int,
      *     description: string,
      *     estimate_time: string,
-     *     amount_overrides: array<int, float>|null,
      * }  $data
      * @return array{created: int, failed: int, cancelled_old: int, errors: string[]}
      */
@@ -69,7 +60,6 @@ class CreateBatchDngFromChargesAction
         $semesterId = (int) $data['semester_id'];
         $description = $data['description'];
         $estimateTime = $data['estimate_time'];
-        $amountOverrides = $data['amount_overrides'] ?? [];
         $chargeTypes = ListDngWorklistQuery::mapFeeTypeToChargeTypes($dngFeeType);
 
         $created = 0;
@@ -87,7 +77,6 @@ class CreateBatchDngFromChargesAction
                     dueDate: $dueDate,
                     description: $description,
                     estimateTime: $estimateTime,
-                    amountOverride: $amountOverrides[(int) $studentId] ?? null,
                 );
 
                 $created++;
@@ -119,189 +108,60 @@ class CreateBatchDngFromChargesAction
         string $dueDate,
         string $description,
         string $estimateTime,
-        ?float $amountOverride,
     ): array {
+        $student = Student::query()->findOrFail($studentId);
         if ($dngFeeType === 'HL') {
-            $student = Student::query()->findOrFail($studentId);
             $this->assertNoMissingRetakeObligations($student, $semesterId);
-            $reservation = $this->guardedReservationAction ?? app(ReserveAndPushSingleFeeDngAction::class);
-            $reservation->handle($studentId, $dngFeeType, [
-                'description' => $description,
-                'semester_id' => $semesterId,
-                'due_date' => $dueDate,
-                'estimate_time' => $estimateTime,
-            ]);
-
-            return ['cancelled_old' => 0];
+        }
+        if ($dngFeeType === 'PTL') {
+            $this->assertNoMissingExamResitObligations($student, $semesterId);
         }
 
-        $cancelledOld = 0;
-
-        return DB::transaction(function () use (
-            $studentId,
-            $dngFeeType,
-            $chargeTypes,
-            $semesterId,
-            $dueDate,
-            $description,
-            $estimateTime,
-            $amountOverride,
-            &$cancelledOld,
-        ) {
-            // Lock student row to prevent concurrent pushes
-            $student = Student::lockForUpdate()->findOrFail($studentId);
-
-            if ($dngFeeType === 'HL') {
-                $this->assertNoMissingRetakeObligations($student, $semesterId);
+        // All batch requests reserve canonical payable-line targets before the
+        // provider call. Partial collection is derived only from a pending
+        // installment; callers cannot supply an amount.
+        $lines = InvoiceLine::query()
+            ->where('status', 'active')
+            ->whereHas('charge', function ($query) use ($studentId, $chargeTypes, $semesterId): void {
+                $query->where('student_id', $studentId)
+                    ->whereIn('charge_type', $chargeTypes)
+                    ->where('semester_id', $semesterId)
+                    ->where('status', FinanceCharge::STATUS_ACTIVE);
+            })
+            ->get();
+        $installments = FinanceChargeInstallment::query()
+            ->whereIn('finance_charge_id', $lines->pluck('charge_id'))
+            ->where('status', FinanceChargeInstallment::STATUS_PENDING)
+            ->orderBy('finance_charge_id')
+            ->orderBy('installment_no')
+            ->get()
+            ->keyBy('finance_charge_id');
+        $targetAmounts = [];
+        $installmentIdsByLine = [];
+        foreach ($lines as $line) {
+            $installment = $installments->get($line->charge_id);
+            if ($installment !== null) {
+                $targetAmounts[(int) $line->id] = (string) $installment->amount;
+                $installmentIdsByLine[(int) $line->id] = (int) $installment->id;
             }
+        }
 
-            if ($dngFeeType === 'PTL') {
-                $this->assertNoMissingExamResitObligations($student, $semesterId);
-            }
+        $reservation = ($this->guardedReservationAction ?? app(ReserveAndPushSingleFeeDngAction::class))->handle($studentId, $dngFeeType, [
+            'description' => $description,
+            'semester_id' => $semesterId,
+            'due_date' => $dueDate,
+            'estimate_time' => $estimateTime,
+        ], $lines->pluck('id')->map(fn ($id): int => (int) $id)->all(), $targetAmounts, $installmentIdsByLine);
+        if ($installmentIdsByLine !== []) {
+            FinanceChargeInstallment::query()->whereIn('id', $installmentIdsByLine)->update([
+                'dng_payment_request_id' => $reservation->id,
+                'status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
+                'last_push_error' => null,
+                'last_push_attempted_at' => now(),
+            ]);
+        }
 
-            // Load active charges with positive balance
-            $charges = $this->loadChargesWithBalance($studentId, $chargeTypes, $semesterId);
-
-            if ($charges->isEmpty()) {
-                throw new \RuntimeException('Không tìm thấy khoản phí nào có số dư > 0');
-            }
-
-            // Wave-2 BHYT: DNG may only push existing payables that already have
-            // a FinanceObligation. Never invent BHYT debt at push time.
-            if ($dngFeeType === 'BHYT') {
-                $this->assertChargesHaveFinanceObligations($charges, $dngFeeType);
-            }
-
-            // Wave-3 tuition_term + wave-5 egc_level_fee: HP reverse map is only
-            // active cut-over types (course_fee formally retired, wave 6).
-            if ($dngFeeType === 'HP') {
-                $this->assertChargesHaveFinanceObligations($charges, 'HP');
-            }
-
-            // Installment-aware total: for each charge, take its next PENDING installment.
-            // For charges without installments (legacy / never backfilled), fall back to balance.
-            // Admin's amountOverride bypasses installment-awareness entirely (explicit override).
-            $nextInstallmentByCharge = FinanceChargeInstallment::query()
-                ->whereIn('finance_charge_id', $charges->pluck('id'))
-                ->where('status', FinanceChargeInstallment::STATUS_PENDING)
-                ->orderBy('finance_charge_id')
-                ->orderBy('installment_no')
-                ->get()
-                ->groupBy('finance_charge_id')
-                ->map(fn ($group) => $group->first()); // lowest installment_no per charge
-
-            // Always compute installment-aware total + collect candidate IDs first.
-            // Even when admin sets amount_override, we still link installments IF the
-            // override happens to equal the auto-computed sum (typical case: UI populated
-            // the field with our default and admin clicked Push). Only when override
-            // genuinely differs do we skip linkage (treat as ad-hoc DNG; admin takes
-            // manual reconciliation responsibility).
-            $installmentIds = [];
-            $installmentAwareTotal = 0.0;
-
-            foreach ($charges as $charge) {
-                $nextInst = $nextInstallmentByCharge[$charge->id] ?? null;
-
-                if ($nextInst !== null) {
-                    $installmentAwareTotal += (float) $nextInst->amount;
-                    $installmentIds[] = $nextInst->id;
-                } else {
-                    // Backward-compat: no installment row → use charge balance.
-                    $installmentAwareTotal += (float) $charge->balance;
-                }
-            }
-
-            // Decimal-safe equality check (1 VND tolerance for float rounding).
-            $adHocOverride = $amountOverride !== null
-                && $amountOverride > 0
-                && abs($amountOverride - $installmentAwareTotal) >= 1.0;
-
-            if ($adHocOverride) {
-                // Admin pushed a genuinely-different amount → skip installment
-                // linkage so the settle webhook won't mark installments paid by
-                // mistake; pivots fall back to balance-proportional (admin owns
-                // reconciliation).
-                Log::warning('CreateBatchDngFromChargesAction: amount override differs from installment plan; skipping installment linkage', [
-                    'student_id' => $studentId,
-                    'override' => $amountOverride,
-                    'auto_sum' => $installmentAwareTotal,
-                ]);
-
-                $totalAmount = $amountOverride;
-                $installmentIds = [];
-            } else {
-                // Truth mode: the request amount IS the exact sum of the per-charge
-                // amounts we will collect (next installment, or balance for un-split
-                // charges). Using the computed sum — not a near-equal override —
-                // keeps pivot reconciliation exact (FIN-10b).
-                $totalAmount = $installmentAwareTotal;
-            }
-
-            if ($totalAmount <= 0) {
-                throw new \RuntimeException('Tổng số dư bằng 0, không thể tạo DNG');
-            }
-
-            // Cancel existing active DNG for same fee_type + student
-            $existingDng = DngPaymentRequest::query()
-                ->where('student_id', $studentId)
-                ->where('fee_type', $dngFeeType)
-                ->awaitingPayment()
-                ->lockForUpdate()
-                ->first();
-
-            if ($existingDng !== null) {
-                // Wrap in nested transaction to allow rollback of cancel independently
-                try {
-                    $this->cancelDngAction->run($existingDng);
-                    $cancelledOld++;
-                } catch (\Throwable $e) {
-                    Log::warning('Could not cancel old DNG before creating new one', [
-                        'dng_id' => $existingDng->id,
-                        'student_id' => $studentId,
-                        'error' => $e->getMessage(),
-                    ]);
-                    // Continue anyway — DngPaymentService::createAndPush will detect duplicate
-                }
-            }
-
-            // Resolve DNG campus code
-            $campusCode = $this->campusCodeResolver->requireForStudent($student);
-
-            // Build DNG charge data
-            $chargeData = [
-                'campus_code' => $campusCode,
-                'student_code' => $student->student_id,
-                'fee_type' => $dngFeeType,
-                'type' => $dngFeeType,
-                'description' => $description,
-                'semester_id' => $semesterId,
-                'due_date' => $dueDate,
-                'item_id' => $this->buildItemId($student->student_id, $dngFeeType),
-                'amount' => $totalAmount,
-                'student_name' => $student->full_name,
-                'email' => $student->email ?? '',
-                'estimate_time' => $estimateTime,
-                'student_address' => $student->current_address_line ?? $student->address ?? '',
-                'cccd' => $student->national_id ?? null,
-                'finance_charge_id' => null, // pivot used instead
-                'installment_ids' => $installmentIds, // empty array when legacy / amount override
-            ];
-
-            // Push DNG via DngPaymentService (creates record + calls DNG API)
-            $dngRequest = $this->dngPaymentService->createAndPush($student, $chargeData);
-
-            // Create pivot rows. In truth mode each pivot mirrors the installment
-            // being collected; ad-hoc override falls back to balance-proportional.
-            $this->createChargePivots(
-                $dngRequest->id,
-                $charges,
-                $totalAmount,
-                $nextInstallmentByCharge,
-                linkInstallments: ! $adHocOverride,
-            );
-
-            return ['cancelled_old' => $cancelledOld];
-        });
+        return ['cancelled_old' => 0];
     }
 
     /**
@@ -390,191 +250,5 @@ class CreateBatchDngFromChargesAction
             ->where('source_ref', $sourceRef)
             ->where('obligation_type', $obligationType)
             ->exists();
-    }
-
-    /**
-     * Fail fast when any payable selected for DNG push has no accepted FinanceObligation.
-     * Used for cut-over types (BHYT, HP) so DNG cannot collect orphan or voided-obligation charges.
-     *
-     * @param  Collection<int, object{id: int, amount: float, balance: float, finance_obligation_id?: int|null}>  $charges
-     */
-    private function assertChargesHaveFinanceObligations(
-        Collection $charges,
-        string $dngFeeType,
-    ): void {
-        $chargeIds = $charges->pluck('id')->map(fn ($id) => (int) $id)->all();
-
-        if ($chargeIds === []) {
-            return;
-        }
-
-        $invalidIds = FinanceCharge::query()
-            ->whereIn('id', $chargeIds)
-            ->where(function ($inner): void {
-                $inner->whereNull('finance_obligation_id')
-                    ->orWhereDoesntHave('financeObligation', function ($obligationQuery): void {
-                        $obligationQuery->where('lifecycle_status', FinanceObligation::STATUS_ACCEPTED);
-                    });
-            })
-            ->orderBy('id')
-            ->pluck('id')
-            ->all();
-
-        if ($invalidIds === []) {
-            return;
-        }
-
-        $repairHint = match ($dngFeeType) {
-            'HP' => 'Run finance:backfill-legacy-tuition-term-obligations / finance:backfill-legacy-egc-level-fee-obligations or re-generate via intake.',
-            'BHYT' => 'Run finance:backfill-legacy-bhyt-obligations or re-generate via intake.',
-            default => 'Re-generate via intake or run the type-specific legacy backfill.',
-        };
-
-        throw new \RuntimeException(
-            'missing_finance_obligation: '.$dngFeeType.' charge(s) #'
-            .implode(', #', $invalidIds)
-            .' have no accepted Finance obligation. '.$repairHint
-        );
-    }
-
-    /**
-     * Load active charges with positive balance for a student.
-     * Uses in-memory balance computation (safe for small sets per student).
-     *
-     * @param  array<int, string>  $chargeTypes
-     * @return Collection<int, object{id: int, amount: float, balance: float}>
-     */
-    private function loadChargesWithBalance(int $studentId, array $chargeTypes, int $semesterId): Collection
-    {
-        $paidSubquery = DB::table('invoice_lines as il_p')
-            ->join('payment_applications as pa', 'pa.invoice_line_id', '=', 'il_p.id')
-            ->where('il_p.status', 'active')
-            ->selectRaw('il_p.charge_id, COALESCE(SUM(pa.amount), 0) as paid_amount')
-            ->groupBy('il_p.charge_id');
-
-        $discountSubquery = DB::table('invoice_lines as il_d')
-            ->join('discount_allocations as da', 'da.invoice_line_id', '=', 'il_d.id')
-            ->where('il_d.status', 'active')
-            ->selectRaw('il_d.charge_id, COALESCE(SUM(da.amount), 0) as discount_amount')
-            ->groupBy('il_d.charge_id');
-
-        return DB::table('finance_charges as fc')
-            ->leftJoinSub($paidSubquery, 'paid', 'paid.charge_id', '=', 'fc.id')
-            ->leftJoinSub($discountSubquery, 'disc', 'disc.charge_id', '=', 'fc.id')
-            ->where('fc.student_id', $studentId)
-            ->where('fc.status', FinanceCharge::STATUS_ACTIVE)
-            ->where('fc.amount', '>', 0)
-            ->whereIn('fc.charge_type', $chargeTypes)
-            ->where('fc.semester_id', $semesterId)
-            ->selectRaw(
-                'fc.id,
-                fc.amount,
-                GREATEST(0,
-                    fc.amount
-                    - COALESCE(paid.paid_amount, 0)
-                    - COALESCE(disc.discount_amount, 0)
-                ) as balance'
-            )
-            ->get()
-            ->filter(fn ($row) => (float) $row->balance > 0);
-    }
-
-    /**
-     * Create dng_payment_request_charges pivot rows.
-     * If amount was overridden, distribute proportionally to charge balances.
-     *
-     * @param  Collection<int, object{id: int, amount: float, balance: float}>  $charges
-     */
-    /**
-     * Create dng_payment_request_charges allocation rows for one DNG request.
-     *
-     * Truth mode (linkInstallments): each pivot reflects the installment being
-     * collected for that charge (or the charge balance for un-split charges), and
-     * carries finance_charge_installment_id. The per-charge amounts already sum to
-     * $totalAmount, so the pivot total reconciles to the request exactly and to the
-     * linked installment amounts (FIN-10b). A pivot is NOT a balance-proportional
-     * slice of the student's debt.
-     *
-     * Ad-hoc override mode: no installment plan to honour — distribute $totalAmount
-     * proportionally to balance in integer cents with the remainder on the last
-     * pivot so Σ pivot == request amount exactly (FIN-10), and leave the installment
-     * link null.
-     *
-     * @param  Collection<int, object{id: int, amount: float, balance: float}>  $charges
-     * @param  Collection<int|string, FinanceChargeInstallment>  $nextInstallmentByCharge
-     */
-    private function createChargePivots(
-        int $dngRequestId,
-        Collection $charges,
-        float $totalAmount,
-        Collection $nextInstallmentByCharge,
-        bool $linkInstallments,
-    ): void {
-        if ($linkInstallments) {
-            foreach ($charges as $charge) {
-                $nextInst = $nextInstallmentByCharge[$charge->id] ?? null;
-                $amount = $nextInst !== null ? (float) $nextInst->amount : (float) $charge->balance;
-
-                DngPaymentRequestCharge::create([
-                    'dng_payment_request_id' => $dngRequestId,
-                    'finance_charge_id' => $charge->id,
-                    'finance_charge_installment_id' => $nextInst?->id,
-                    'amount' => number_format($this->toCents($amount) / 100, 2, '.', ''),
-                ]);
-            }
-
-            return;
-        }
-
-        $chargesList = $charges->values();
-        $count = $chargesList->count();
-
-        $totalCents = $this->toCents($totalAmount);
-        $totalBalanceCents = $chargesList
-            ->sum(fn ($charge) => $this->toCents((float) $charge->balance));
-
-        $allocatedCents = 0;
-
-        foreach ($chargesList as $index => $charge) {
-            $isLast = $index === $count - 1;
-            $chargeBalanceCents = $this->toCents((float) $charge->balance);
-
-            if ($isLast) {
-                $pivotCents = $totalCents - $allocatedCents;
-            } elseif ($totalBalanceCents > 0) {
-                $pivotCents = (int) floor($totalCents * ($chargeBalanceCents / $totalBalanceCents));
-            } else {
-                $pivotCents = $chargeBalanceCents;
-            }
-
-            $allocatedCents += $pivotCents;
-
-            DngPaymentRequestCharge::create([
-                'dng_payment_request_id' => $dngRequestId,
-                'finance_charge_id' => $charge->id,
-                'finance_charge_installment_id' => null,
-                'amount' => number_format($pivotCents / 100, 2, '.', ''),
-            ]);
-        }
-    }
-
-    private function toCents(float $amount): int
-    {
-        return (int) round($amount * 100);
-    }
-
-    /**
-     * Build a unique item_id for DNG (student_code + fee_type + timestamp).
-     *
-     * FIN-33: a bare YmdHis suffix collided when two pushes for the same student
-     * + fee_type happened within the same second, which breaks webhook resolution
-     * (item_id is a reconciliation key). Append a random suffix so same-second
-     * pushes stay distinct. Stays well within the varchar(100) column.
-     */
-    private function buildItemId(string $studentCode, string $feeType): string
-    {
-        $random = str_pad((string) random_int(0, 999_999), 6, '0', STR_PAD_LEFT);
-
-        return $studentCode.'_'.strtolower($feeType).'_'.now()->format('YmdHis').$random;
     }
 }

@@ -17,7 +17,7 @@ import type { BatchResult } from '@/types/finance';
 import { financeRoutes } from '@/utils/routes';
 import { Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft, CalendarIcon, Send } from 'lucide-vue-next';
-import { computed, reactive, ref } from 'vue';
+import { computed, ref } from 'vue';
 
 interface DngPrefill {
     dng_fee_type: string;
@@ -32,8 +32,6 @@ const props = defineProps<{
 }>();
 
 const { selectedId: semesterId, labelFor: semesterLabelFor } = useFinanceSemester();
-
-const amountOverrides = reactive<Record<string, number>>({});
 
 const now = new Date();
 const estimateTimePickerOpen = ref(false);
@@ -68,7 +66,6 @@ const wizard = useBatchStudio({
         due_date: wizard.setup.due_date,
         description: wizard.setup.description,
         estimate_time: wizard.setup.estimate_time,
-        amount_overrides: Object.keys(amountOverrides).length ? { ...amountOverrides } : undefined,
     }),
     onCommitError: (errors) => {
         if (errors.due_date || errors.description || errors.estimate_time) {
@@ -112,21 +109,6 @@ const nextDisabled = computed(() => wizard.step.value === 3 && needsAck.value &&
 
 const rerunCancelsCount = computed(() => wizard.lines.value.filter((l) => l.display.warning_codes?.includes('rerun_cancels_old_dng')).length);
 
-const overrideDriftCount = computed(() => {
-    let count = 0;
-    for (const line of wizard.lines.value) {
-        if (!wizard.selected.value.has(line.key)) continue;
-        const studentId = line.key.split(':')[2];
-        const override = amountOverrides[studentId];
-        if (override === undefined) continue;
-        const total = line.display.installment_aware_total ?? line.display.net;
-        if (Math.abs(override - total) >= 1) count++;
-    }
-    return count;
-});
-
-const hasOverrideDrift = computed(() => overrideDriftCount.value > 0);
-
 const fieldError = (field: 'due_date' | 'description' | 'estimate_time'): string | undefined =>
     setupErrors.value[field] ?? (wizard.form.errors[field] as string | undefined);
 
@@ -157,7 +139,6 @@ function onNext() {
 
 function restart() {
     wizard.step.value = 1;
-    Object.keys(amountOverrides).forEach((k) => delete amountOverrides[k]);
 }
 
 function retryFailedSubset() {
@@ -311,11 +292,6 @@ function retryFailedSubset() {
                                 <div><span class="text-muted-foreground">Hạn thanh toán:</span> {{ wizard.setup.due_date }}</div>
                                 <div><span class="text-muted-foreground">Thời hạn DNG:</span> {{ wizard.setup.estimate_time }}</div>
                             </div>
-                            <Alert v-if="hasOverrideDrift" variant="destructive">
-                                <AlertDescription>
-                                    Số tiền ghi đè lệch tổng tính được (≥1 VND) ở {{ overrideDriftCount }} SV → khoản này thành <strong>ad-hoc</strong>, <strong>bỏ liên kết đợt</strong> và phải <strong>đối soát thủ công</strong>.
-                                </AlertDescription>
-                            </Alert>
                             <Alert v-if="rerunCancelsCount > 0" variant="destructive">
                                 <AlertDescription> {{ rerunCancelsCount }} SV đã có DNG đang chờ — chạy lại sẽ <strong>hủy DNG cũ</strong> rồi tạo mới. </AlertDescription>
                             </Alert>

@@ -2,459 +2,135 @@
 
 declare(strict_types=1);
 
-use App\Models\AcademicRecord;
 use App\Models\Campus;
-use App\Models\CourseOffering;
-use App\Models\CourseRetakeRegistration;
-use App\Models\CurriculumVersion;
-use App\Models\ExamResitAttempt;
-use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\User;
-use App\Modules\Finance\Actions\CancelDngPaymentRequestAction;
 use App\Modules\Finance\Actions\CreateBatchDngFromChargesAction;
-use App\Modules\Finance\Actions\Egc\SubmitEgcLevelFeeDebitAction;
-use App\Modules\Finance\Actions\Major\SubmitTuitionTermDebitAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
-use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\FinanceObligation;
-use App\Modules\Finance\Support\FinanceOwnedObligationSource;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function makeBatchStudent(string $code, Campus $campus, Semester $semester): Student
+function batchDngStudent(Campus $campus, Semester $semester): Student
 {
-    $program = Program::factory()->create();
-    $cv = CurriculumVersion::factory()->forProgram($program)->withEffectiveSemester($semester)->create();
-
-    return Student::factory()
-        ->forCampus($campus)
-        ->forProgram($program)
-        ->state([
-            'student_id' => $code,
-            'full_name' => "Student {$code}",
-            'email' => strtolower($code).'@example.com',
-            'curriculum_version_id' => $cv->id,
-            'intake_semester_id' => $semester->id,
-            'intake' => 1,
-            'intake_mode' => 'sequential',
-        ])
-        ->create();
+    return Student::factory()->forCampus($campus)->create([
+        'intake' => 2024,
+        'intake_semester_id' => $semester->id,
+        'status' => 'intake_course',
+    ]);
 }
 
-function makeCharge(Student $student, Semester $semester, string $type, float $amount): FinanceCharge
+function batchCanonicalLine(Student $student, Semester $semester, string $type, string $amount): InvoiceLine
 {
-    $charge = FinanceCharge::create([
+    $account = BillingAccount::query()->firstOrCreate(['student_id' => $student->id]);
+    $obligation = FinanceObligation::query()->create([
+        'billing_account_id' => $account->id,
+        'source_system' => 'finance-test',
+        'source_kind' => 'batch_dng',
+        'source_ref' => uniqid('batch:', true),
+        'obligation_type' => $type,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+    $charge = FinanceCharge::query()->create([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'charge_type' => $type,
         'amount' => $amount,
-        'description' => "Charge {$type}",
+        'description' => 'Canonical DNG target',
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
     ]);
+    $invoice = StudentInvoice::query()->create([
+        'invoice_number' => 'INV-BATCH-'.uniqid(),
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'status' => 'pending',
+        'due_date' => now()->addDays(7),
+    ]);
 
-    // HP cutover types require an accepted obligation before DNG push.
-    if (in_array($type, [FinanceCharge::TYPE_TUITION_TERM, FinanceCharge::TYPE_EGC_LEVEL_FEE], true)) {
-        $sourceKind = $type === FinanceCharge::TYPE_EGC_LEVEL_FEE
-            ? SubmitEgcLevelFeeDebitAction::SOURCE_KIND_LEGACY_EGC
-            : SubmitTuitionTermDebitAction::SOURCE_KIND_LEGACY_TUITION;
-        $sourceRef = $type === FinanceCharge::TYPE_EGC_LEVEL_FEE
-            ? FinanceOwnedObligationSource::legacyEgcLevelFeeChargeRef((int) $charge->id)
-            : FinanceOwnedObligationSource::legacyTuitionTermChargeRef((int) $charge->id);
-
-        $obligation = FinanceObligation::query()->create([
-            'source_system' => FinanceOwnedObligationSource::SOURCE_SYSTEM,
-            'source_kind' => $sourceKind,
-            'source_ref' => $sourceRef,
-            'obligation_type' => $type,
-            'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
-            'amount' => $amount,
-            'currency' => 'VND',
-            'pricing_rule_version' => "{$type}:test",
-            'pricing_snapshot' => ['provenance' => 'test'],
-            'accepted_at' => now(),
-        ]);
-
-        $charge->update(['finance_obligation_id' => $obligation->id]);
-    }
-
-    return $charge->fresh() ?? $charge;
+    return InvoiceLine::query()->create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $charge->id,
+        'amount_snapshot' => $amount,
+        'description_snapshot' => 'Canonical DNG target',
+        'status' => 'active',
+    ]);
 }
 
-/**
- * Build the action with mocked DNG service, real cancel + simple-charge actions.
- */
-function makeBatchAction(?DngPaymentRequest $fakeCreatedRequest = null, bool $dngFails = false): array
-{
-    $dngPaymentServiceMock = Mockery::mock(DngPaymentService::class);
-
-    if ($dngFails) {
-        $dngPaymentServiceMock->shouldReceive('createAndPush')
-            ->andThrow(new RuntimeException('DNG API failed'));
-    } else {
-        $dngPaymentServiceMock->shouldReceive('createAndPush')
-            ->andReturnUsing(function (Student $student, array $data) use ($fakeCreatedRequest) {
-                if ($fakeCreatedRequest) {
-                    return $fakeCreatedRequest;
-                }
-
-                // Create a real DB record mimicking what the service would create
-                return DngPaymentRequest::create([
-                    'student_id' => $student->id,
-                    'campus_code' => $data['campus_code'],
-                    'student_code' => $data['student_code'],
-                    'fee_type' => $data['fee_type'],
-                    'item_id' => $data['item_id'],
-                    'amount' => $data['amount'],
-                    'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
-                    'description' => $data['description'] ?? null,
-                    'semester_id' => $data['semester_id'] ?? null,
-                    'due_date' => $data['due_date'] ?? null,
-                ]);
-            });
-    }
-
-    $campusResolverMock = Mockery::mock(DngCampusCodeResolver::class);
-    $campusResolverMock->shouldReceive('requireForStudent')->andReturn('FAUHN');
-
-    $cancelAction = app(CancelDngPaymentRequestAction::class);
-
-    $action = new CreateBatchDngFromChargesAction(
-        $dngPaymentServiceMock,
-        $campusResolverMock,
-        $cancelAction,
-    );
-
-    return [$action, $dngPaymentServiceMock];
-}
-
-function batchPayload(array $studentIds, Semester $semester, string $feeType = 'HP'): array
+function batchDngPayload(Student $student, Semester $semester, string $feeType = 'HP'): array
 {
     return [
-        'student_ids' => $studentIds,
+        'student_ids' => [$student->id],
         'dng_fee_type' => $feeType,
-        'due_date' => now()->addDays(30)->toDateString(),
+        'due_date' => now()->addDays(7)->toDateString(),
         'semester_id' => $semester->id,
-        'description' => 'Test DNG batch',
-        'estimate_time' => '05/26',
-        'amount_overrides' => null,
+        'description' => 'Batch canonical DNG',
+        'estimate_time' => '07/26',
     ];
 }
 
-// ─── Tests ──────────────────────────────────────────────────────────────────
-
-beforeEach(function () {
+beforeEach(function (): void {
     $this->campus = Campus::factory()->create(['dng_code' => 'FAUHN']);
-    $this->semester = Semester::factory()->active()->create();
-    $this->user = User::factory()->create();
-    $this->actingAs($this->user);
+    $this->semester = Semester::factory()->create();
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldReceive('pushReserved')->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
+    app()->instance(DngPaymentService::class, $service);
+    $resolver = Mockery::mock(DngCampusCodeResolver::class);
+    $resolver->shouldReceive('requireForStudent')->andReturn('FAUHN');
+    app()->instance(DngCampusCodeResolver::class, $resolver);
 });
 
-it('creates DNG and pivot rows for a single student', function () {
-    $student = makeBatchStudent('BATCH001', $this->campus, $this->semester);
-    $charge = makeCharge($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, 10_000_000);
+it('reserves selected HP lines with exact fee-family breakdowns', function (): void {
+    $student = batchDngStudent($this->campus, $this->semester);
+    $tuition = batchCanonicalLine($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, '5000000.00');
+    $egc = batchCanonicalLine($student, $this->semester, FinanceCharge::TYPE_EGC_LEVEL_FEE, '2000000.00');
 
-    [$action] = makeBatchAction();
+    $result = app(CreateBatchDngFromChargesAction::class)->handle(batchDngPayload($student, $this->semester));
+    $request = DngPaymentRequest::query()->sole();
 
-    $result = $action->handle(batchPayload([$student->id], $this->semester));
-
-    expect($result['created'])->toBe(1)
-        ->and($result['failed'])->toBe(0);
-
-    $dng = DngPaymentRequest::where('student_id', $student->id)->first();
-    expect($dng)->not->toBeNull()
-        ->and((float) $dng->amount)->toBe(10_000_000.0);
-
-    $pivots = DngPaymentRequestCharge::where('dng_payment_request_id', $dng->id)->get();
-    expect($pivots)->toHaveCount(1)
-        ->and($pivots->first()->finance_charge_id)->toBe($charge->id);
+    expect($result)->toMatchArray(['created' => 1, 'failed' => 0])
+        ->and((float) $request->amount)->toBe(7_000_000.0)
+        ->and($request->reservationTargets->pluck('invoice_line_id')->sort()->values()->all())->toBe([$tuition->id, $egc->id])
+        ->and($request->chargeLinks->pluck('amount')->map(fn (string $amount): float => (float) $amount)->sum())->toBe(7_000_000.0);
 });
 
-it('creates DNG for multiple students in a batch', function () {
-    $s1 = makeBatchStudent('MULTI001', $this->campus, $this->semester);
-    $s2 = makeBatchStudent('MULTI002', $this->campus, $this->semester);
-
-    makeCharge($s1, $this->semester, FinanceCharge::TYPE_TUITION_TERM, 5_000_000);
-    makeCharge($s2, $this->semester, FinanceCharge::TYPE_TUITION_TERM, 7_000_000);
-
-    [$action] = makeBatchAction();
-
-    $result = $action->handle(batchPayload([$s1->id, $s2->id], $this->semester));
-
-    expect($result['created'])->toBe(2)
-        ->and($result['failed'])->toBe(0);
-    expect(DngPaymentRequest::whereIn('student_id', [$s1->id, $s2->id])->count())->toBe(2);
-});
-
-it('auto-cancels existing active DNG before creating new one', function () {
-    $student = makeBatchStudent('CANCEL001', $this->campus, $this->semester);
-    makeCharge($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, 10_000_000);
-
-    // Existing pending DNG (no DNG API needed — we can use STATUS_PENDING so cancel is local-only)
-    $oldDng = DngPaymentRequest::create([
-        'student_id' => $student->id,
-        'campus_code' => 'FAUHN',
-        'student_code' => 'CANCEL001',
-        'fee_type' => 'HP',
-        'item_id' => 'OLD-ITEM',
-        'amount' => 8_000_000,
-        'status' => DngPaymentRequest::STATUS_PENDING,
+it('caps a batch request at its pending installment rather than accepting a caller amount', function (): void {
+    $student = batchDngStudent($this->campus, $this->semester);
+    $line = batchCanonicalLine($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, '10000000.00');
+    $installment = FinanceChargeInstallment::factory()->create([
+        'finance_charge_id' => $line->charge_id,
+        'installment_no' => 1,
+        'amount' => 4_000_000,
+        'due_date' => now()->addDays(7)->toDateString(),
     ]);
 
-    [$action] = makeBatchAction();
+    app(CreateBatchDngFromChargesAction::class)->handle(batchDngPayload($student, $this->semester));
+    $request = DngPaymentRequest::query()->sole();
 
-    $result = $action->handle(batchPayload([$student->id], $this->semester));
-
-    expect($result['created'])->toBe(1)
-        ->and($result['cancelled_old'])->toBe(1);
-
-    expect(DngPaymentRequest::find($oldDng->id)->status)
-        ->toBe(DngPaymentRequest::STATUS_CANCELLED);
+    expect((float) $request->amount)->toBe(4_000_000.0)
+        ->and($request->reservationTargets->sole()->finance_charge_installment_id)->toBe($installment->id)
+        ->and($installment->fresh()->dng_payment_request_id)->toBe($request->id);
 });
 
-it('uses amount override when provided', function () {
-    $student = makeBatchStudent('OVERRIDE001', $this->campus, $this->semester);
-    makeCharge($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, 10_000_000);
+it('does not create a request when the selected fee family has no canonical payable line', function (): void {
+    $student = batchDngStudent($this->campus, $this->semester);
 
-    [$action] = makeBatchAction();
+    $result = app(CreateBatchDngFromChargesAction::class)->handle(batchDngPayload($student, $this->semester));
 
-    $payload = batchPayload([$student->id], $this->semester);
-    $payload['amount_overrides'] = [$student->id => 6_000_000.0];
-
-    $result = $action->handle($payload);
-
-    expect($result['created'])->toBe(1);
-
-    $dng = DngPaymentRequest::where('student_id', $student->id)->first();
-    expect((float) $dng->amount)->toBe(6_000_000.0);
-});
-
-it('fails gracefully per student without aborting the batch', function () {
-    $sGood = makeBatchStudent('GRACE001', $this->campus, $this->semester);
-    $sBad = makeBatchStudent('GRACE002', $this->campus, $this->semester);
-
-    makeCharge($sGood, $this->semester, FinanceCharge::TYPE_TUITION_TERM, 5_000_000);
-    // sBad has no charges → action will throw "no charges found"
-
-    [$action] = makeBatchAction();
-
-    $result = $action->handle(batchPayload([$sGood->id, $sBad->id], $this->semester));
-
-    expect($result['created'])->toBe(1)
-        ->and($result['failed'])->toBe(1)
-        ->and($result['errors'])->toHaveCount(1);
-});
-
-it('creates proportional pivot amounts when charge amount is overridden', function () {
-    $student = makeBatchStudent('PROP001', $this->campus, $this->semester);
-    makeCharge($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, 6_000_000);
-    makeCharge($student, $this->semester, FinanceCharge::TYPE_EGC_LEVEL_FEE, 4_000_000);
-
-    [$action] = makeBatchAction();
-
-    $payload = batchPayload([$student->id], $this->semester);
-    $payload['amount_overrides'] = [$student->id => 8_000_000.0]; // override from 10M to 8M
-
-    $action->handle($payload);
-
-    $dng = DngPaymentRequest::where('student_id', $student->id)->first();
-    $pivots = DngPaymentRequestCharge::where('dng_payment_request_id', $dng->id)->get();
-
-    expect($pivots)->toHaveCount(2);
-    expect($pivots->sum('amount'))->toBe(8_000_000.0);
-});
-
-it('does not create an HL request from an arbitrary override outside canonical targets', function () {
-    // The guarded HL path no longer supports amount_override or the legacy
-    // charge-balance fallback. These unmaterialized rows must fail closed.
-    $student = makeBatchStudent('ROUND01', $this->campus, $this->semester);
-    makeCharge($student, $this->semester, FinanceCharge::TYPE_RETAKE_FEE, 1_000_000);
-    makeCharge($student, $this->semester, FinanceCharge::TYPE_RETAKE_FEE, 1_000_000);
-    makeCharge($student, $this->semester, FinanceCharge::TYPE_RETAKE_FEE, 1_000_000);
-
-    [$action] = makeBatchAction();
-
-    $payload = batchPayload([$student->id], $this->semester, 'HL');
-    // 10,000,000 / 3 = 3,333,333.33… → rounding must not drift the total.
-    $payload['amount_overrides'] = [$student->id => 10_000_000.0];
-
-    $result = $action->handle($payload);
-
-    expect($result['created'])->toBe(0)
-        ->and($result['failed'])->toBe(1)
-        ->and(DngPaymentRequest::query()->where('student_id', $student->id)->count())->toBe(0);
-});
-
-it('fails if DNG service throws, and records error', function () {
-    $student = makeBatchStudent('DNGFAIL', $this->campus, $this->semester);
-    makeCharge($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, 5_000_000);
-
-    [$action] = makeBatchAction(dngFails: true);
-
-    $result = $action->handle(batchPayload([$student->id], $this->semester));
-
-    expect($result['created'])->toBe(0)
-        ->and($result['failed'])->toBe(1)
-        ->and($result['errors'][0])->toContain('DNG API failed');
-});
-
-it('HL fee_type: blocks approved retake registration without finance obligation instead of creating a charge', function () {
-    $student = makeBatchStudent('HL001', $this->campus, $this->semester);
-
-    $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
-
-    $academicRecord = AcademicRecord::factory()->create([
-        'student_id' => $student->id,
-        'campus_id' => $this->campus->id,
-        'unit_id' => $offering->unit_id,
-        'course_offering_id' => $offering->id,
-        'completion_status' => 'failed',
-        'is_passed' => false,
-    ]);
-
-    // Approved registration WITHOUT finance_charge_id
-    $reg = CourseRetakeRegistration::create([
-        'student_id' => $student->id,
-        'unit_id' => $offering->unit_id,
-        'course_offering_id' => $offering->id,
-        'semester_id' => $this->semester->id,
-        'campus_id' => $this->campus->id,
-        'original_academic_record_id' => $academicRecord->id,
-        'status' => CourseRetakeRegistration::STATUS_APPROVED,
-        'retake_fee' => 2_500_000,
-        'finance_charge_id' => null,
-    ]);
-
-    [$action] = makeBatchAction();
-
-    $payload = batchPayload([$student->id], $this->semester, 'HL');
-    $result = $action->handle($payload);
-
-    $refreshed = $reg->fresh();
-    expect($result['created'])->toBe(0)
-        ->and($result['failed'])->toBe(1)
-        ->and($result['errors'][0])->toContain('missing_finance_obligation')
-        ->and($refreshed->finance_charge_id)->toBeNull()
-        ->and($refreshed->status)->toBe(CourseRetakeRegistration::STATUS_APPROVED)
-        ->and(FinanceCharge::where('student_id', $student->id)->count())->toBe(0)
-        ->and(DngPaymentRequest::where('student_id', $student->id)->count())->toBe(0);
-});
-
-it('PTL fee_type: blocks approved exam resit attempt without finance obligation instead of creating a charge', function () {
-    $student = makeBatchStudent('PTL001', $this->campus, $this->semester);
-
-    $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
-
-    $academicRecord = AcademicRecord::factory()->create([
-        'student_id' => $student->id,
-        'campus_id' => $this->campus->id,
-        'unit_id' => $offering->unit_id,
-        'course_offering_id' => $offering->id,
-        'completion_status' => 'failed',
-        'is_passed' => false,
-    ]);
-
-    $attempt = ExamResitAttempt::create([
-        'student_id' => $student->id,
-        'academic_record_id' => $academicRecord->id,
-        'original_course_offering_id' => $offering->id,
-        'unit_id' => $offering->unit_id,
-        'campus_id' => $this->campus->id,
-        'original_semester_id' => $this->semester->id,
-        'operation_semester_id' => $this->semester->id,
-        'charge_semester_id' => $this->semester->id,
-        'request_origin' => ExamResitAttempt::REQUEST_ORIGIN_STAFF,
-        'requested_by_user_id' => $this->user->id,
-        'requested_at' => now(),
-        'reviewed_by_user_id' => $this->user->id,
-        'reviewed_at' => now(),
-        'status' => ExamResitAttempt::STATUS_APPROVED,
-        'approved_at' => now(),
-        'hq_fee_status' => ExamResitAttempt::HQ_FEE_PENDING,
-        'fee_amount' => 750_000,
-        'finance_charge_id' => null,
-    ]);
-
-    [$action] = makeBatchAction();
-
-    $result = $action->handle(batchPayload([$student->id], $this->semester, 'PTL'));
-
-    $refreshed = $attempt->fresh();
-    expect($result['created'])->toBe(0)
-        ->and($result['failed'])->toBe(1)
-        ->and($result['errors'][0])->toContain('missing_finance_obligation')
-        ->and($refreshed->finance_charge_id)->toBeNull()
-        ->and($refreshed->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_PENDING)
-        ->and(FinanceCharge::where('student_id', $student->id)->count())->toBe(0)
-        ->and(DngPaymentRequest::where('student_id', $student->id)->count())->toBe(0);
-});
-
-it('HL fee_type: fails closed when a legacy registration has no canonical payable line', function () {
-    $student = makeBatchStudent('HL002', $this->campus, $this->semester);
-
-    // Pre-existing charge (registration already transitioned)
-    $charge = makeCharge($student, $this->semester, FinanceCharge::TYPE_RETAKE_FEE, 2_500_000);
-
-    $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
-
-    $academicRecord = AcademicRecord::factory()->create([
-        'student_id' => $student->id,
-        'campus_id' => $this->campus->id,
-        'unit_id' => $offering->unit_id,
-        'course_offering_id' => $offering->id,
-        'completion_status' => 'failed',
-        'is_passed' => false,
-    ]);
-
-    CourseRetakeRegistration::create([
-        'student_id' => $student->id,
-        'unit_id' => $offering->unit_id,
-        'course_offering_id' => $offering->id,
-        'semester_id' => $this->semester->id,
-        'campus_id' => $this->campus->id,
-        'original_academic_record_id' => $academicRecord->id,
-        'status' => CourseRetakeRegistration::STATUS_PAYMENT_PENDING,
-        'retake_fee' => 2_500_000,
-        'finance_charge_id' => $charge->id, // already linked
-    ]);
-
-    [$action] = makeBatchAction();
-
-    $result = $action->handle(batchPayload([$student->id], $this->semester, 'HL'));
-
-    expect($result['created'])->toBe(0)
-        ->and($result['failed'])->toBe(1)
-        ->and($result['errors'][0])->toContain('Settlement Position');
-
-    // Only 1 charge should exist (no duplicate created)
-    expect(FinanceCharge::where('student_id', $student->id)->count())->toBe(1);
-});
-
-it('builds distinct item ids for same-second pushes of the same student and fee type (FIN-33)', function () {
-    // FIN-33: a bare YmdHis suffix collided when two pushes for the same student +
-    // fee type landed in the same second, breaking webhook resolution (item_id is a
-    // reconciliation key). The random suffix must keep same-second item_ids distinct.
-    $action = app(CreateBatchDngFromChargesAction::class);
-    $method = new ReflectionMethod($action, 'buildItemId');
-    $method->setAccessible(true);
-
-    [$first, $second] = $this->travelTo('2026-06-14 10:00:00', function () use ($action, $method) {
-        return [
-            $method->invoke($action, 'STU001', 'HL'),
-            $method->invoke($action, 'STU001', 'HL'),
-        ];
-    });
-
-    expect($first)->not->toBe($second)
-        ->and($first)->toStartWith('STU001_hl_20260614100000')
-        ->and($second)->toStartWith('STU001_hl_20260614100000')
-        ->and(strlen($first))->toBeLessThanOrEqual(100);
+    expect($result)->toMatchArray(['created' => 0, 'failed' => 1])
+        ->and(DngPaymentRequest::query()->count())->toBe(0);
 });

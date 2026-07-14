@@ -4,6 +4,6 @@ declare(strict_types=1);
 
 return [
     'dng' => [
-        'collection_mode' => env('FINANCE_DNG_COLLECTION_MODE', 'legacy'),
+        'enabled' => env('FINANCE_DNG_ENABLED', true),
     ],
 ];

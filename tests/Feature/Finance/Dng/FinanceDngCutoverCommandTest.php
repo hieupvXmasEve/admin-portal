@@ -250,7 +250,7 @@ it('fails closed when paid request header and pivot identify different charges',
 });
 
 it('fails closed for new DNG collection while still allowing receipt-side code paths', function (): void {
-    config(['finance.dng.collection_mode' => DngCollectionCutover::MODE_OFF]);
+    config(['finance.dng.enabled' => false]);
     $cutover = app(DngCollectionCutover::class);
 
     expect($cutover->allowsNewCollection())->toBeFalse();
