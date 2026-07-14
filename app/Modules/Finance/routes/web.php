@@ -8,7 +8,6 @@ use App\Modules\Finance\Http\Web\Admin\BillingSettlementController;
 use App\Modules\Finance\Http\Web\Admin\DngPaymentRequestController;
 use App\Modules\Finance\Http\Web\Admin\DngReceiptExceptionController;
 use App\Modules\Finance\Http\Web\Admin\DngWebhookEventController;
-use App\Modules\Finance\Http\Web\Admin\DngWorklistController;
 use App\Modules\Finance\Http\Web\Admin\EgcBlockResultsController;
 use App\Modules\Finance\Http\Web\Admin\EgcCarryForwardController;
 use App\Modules\Finance\Http\Web\Admin\EgcChargeGenerationController;
@@ -149,16 +148,6 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::post('/settlement/apply', [BillingSettlementController::class, 'apply'])
             ->middleware('can:allocate_finance_payment')
             ->name('settlement.apply');
-        // /finance/operations/batch-dng removed — replaced by Batch Studio DNG below
-        // Route kept commented for redirect reference only
-
-        // Legacy DNG Worklist URL — compatibility redirect to Batch Studio DNG wizard.
-        Route::get('/dng-worklist', [DngWorklistController::class, 'index'])
-            ->middleware('can:view_finance_batch_studio')
-            ->name('dng-worklist');
-        Route::post('/dng-worklist', [DngWorklistController::class, 'store'])
-            ->middleware('can:create_finance_payments')
-            ->name('dng-worklist.store');
     });
 
     // Invoices
@@ -315,9 +304,6 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
                 ->name('receipt-exceptions.resolve');
         });
     });
-
-    // Retake Course Charge routes removed — absorbed by Batch Studio DNG (fee_type=HL)
-    // See: DngWorklistController + CreateBatchDngFromChargesAction (blocks missing obligations for approved registrations)
 
     Route::prefix('batch-studio')->name('batch-studio.')->group(function () {
         Route::get('/', [BatchStudioController::class, 'hub'])

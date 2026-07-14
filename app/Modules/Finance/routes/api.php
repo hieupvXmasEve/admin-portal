@@ -26,10 +26,6 @@ Route::prefix('api/v1/finance/operations')
         // Non-academic charge generation (CSV upload → bulk charge creation).
         Route::post('/generate-non-academic-charges', [BillingOperationsController::class, 'generateNonAcademic'])->name('generate-non-academic-charges');
 
-        // @deprecated — bulk EGC flow. Retained per Q9 decision; remove after confirming no consumers.
-        Route::post('/preview-charges', [BillingOperationsController::class, 'previewCharges'])->name('preview-charges');
-        Route::post('/export-preview-charges', [BillingOperationsController::class, 'exportPreviewCharges'])->name('export-preview-charges');
-        Route::post('/run-generate', [BillingOperationsController::class, 'runGenerate'])->name('run-generate');
         Route::post('/exceptions/{exceptionId}/fix', [BillingOperationsController::class, 'fixException'])
             ->middleware('can:view_finance_operations_exceptions')
             ->name('fix-exception');

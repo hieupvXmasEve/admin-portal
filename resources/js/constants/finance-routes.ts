@@ -26,7 +26,6 @@ export const FINANCE_ROUTE_NAMES = {
     EGC_RETAKE_ADJUSTMENTS_INDEX: 'finance.egc.retake-adjustments.index',
     EGC_CARRY_FORWARD_INDEX: 'finance.egc.carry-forward.index',
     // Collect & reconcile
-    DNG_WORKLIST: 'finance.operations.dng-worklist',
     DNG_PAYMENT_REQUESTS_INDEX: 'finance.dng.payment-requests.index',
     DNG_PAYMENT_REQUESTS_SHOW: 'finance.dng.payment-requests.show',
     DNG_WEBHOOK_EVENTS_INDEX: 'finance.dng.webhook-events.index',

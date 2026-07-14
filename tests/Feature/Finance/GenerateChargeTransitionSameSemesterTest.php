@@ -22,7 +22,6 @@ use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
-use App\Modules\Finance\Queries\Operations\PreviewChargeGenerationQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -560,38 +559,8 @@ function seedExistingPaidTuitionScenario(): array
     return [$student, $semester, $invoice, $tuitionCharge];
 }
 
-it('marks transition students for a new invoice in preview when the only semester invoice is paid', function () {
-    [$student, $semester] = seedTransitionStudentScenario();
-
-    $result = app(PreviewChargeGenerationQuery::class)->handle([
-        'semester_id' => $semester->id,
-        'scope_type' => 'upload_list',
-        'uploaded_student_ids' => [$student->student_id],
-        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
-        'skip_if_issued_or_paid' => true,
-        'only_update_draft' => true,
-        'merge_invoice' => true,
-    ]);
-
-    expect($result['students'])->toHaveCount(1)
-        ->and($result['students'][0]['student_id'])->toBe('AUS10781')
-        ->and($result['students'][0]['estimated_amount'])->toBe(45000000.0)
-        ->and($result['students'][0]['will_create_invoice'])->toBeTrue()
-        ->and($result['students'][0]['warning'])->toContain('new invoice will be created');
-});
-
-it('does not preview or generate charges for students who have not reached their intake semester yet', function () {
+it('does not generate charges for students who have not reached their intake semester yet', function () {
     [$student, $fall] = seedFutureIntakeStudentScenario();
-
-    $preview = app(PreviewChargeGenerationQuery::class)->handle([
-        'semester_id' => $fall->id,
-        'scope_type' => 'upload_list',
-        'uploaded_student_ids' => [$student->student_id],
-        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
-        'skip_if_issued_or_paid' => true,
-        'only_update_draft' => true,
-        'merge_invoice' => true,
-    ]);
 
     $result = GenerateBatchChargesAction::run([
         'semester_id' => $fall->id,
@@ -603,9 +572,7 @@ it('does not preview or generate charges for students who have not reached their
         'merge_invoice' => true,
     ]);
 
-    expect($preview['students'])->toHaveCount(0)
-        ->and($preview['new_charges_count'])->toBe(0)
-        ->and($result['created_invoices'])->toBe(0)
+    expect($result['created_invoices'])->toBe(0)
         ->and($result['updated_invoices'])->toBe(0)
         ->and($result['created_count'])->toBe(0)
         ->and(FinanceCharge::query()->where('student_id', $student->id)->count())->toBe(0)
@@ -704,16 +671,6 @@ it('creates scholarship invoice discounts and discount allocations during charge
 it('applies scholarship to an existing reusable tuition invoice without creating a new tuition charge', function () {
     [$student, $semester, $invoice, $tuitionCharge, $scholarship] = seedExistingTuitionInvoiceMissingScholarshipScenario();
 
-    $preview = app(PreviewChargeGenerationQuery::class)->handle([
-        'semester_id' => $semester->id,
-        'scope_type' => 'upload_list',
-        'uploaded_student_ids' => [$student->student_id],
-        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
-        'skip_if_issued_or_paid' => true,
-        'only_update_draft' => true,
-        'merge_invoice' => true,
-    ]);
-
     $result = GenerateBatchChargesAction::run([
         'semester_id' => $semester->id,
         'scope_type' => 'upload_list',
@@ -729,12 +686,7 @@ it('applies scholarship to an existing reusable tuition invoice without creating
         ->where('discount_type', 'scholarship')
         ->first();
 
-    expect($preview['students'])->toHaveCount(1)
-        ->and($preview['students'][0]['will_create_invoice'])->toBeFalse()
-        ->and($preview['students'][0]['estimated_amount'])->toBe(-9000000.0)
-        ->and(collect($preview['students'][0]['breakdown'])->pluck('label')->all())->not->toContain('Tuition (Skipped)')
-        ->and(collect($preview['students'][0]['breakdown'])->pluck('label')->all())->toContain("Scholarship ({$scholarship->code})")
-        ->and($result['created_invoices'])->toBe(0)
+    expect($result['created_invoices'])->toBe(0)
         ->and($result['updated_invoices'])->toBe(1)
         ->and($result['created_count'])->toBe(0)
         ->and(FinanceCharge::query()
@@ -750,18 +702,8 @@ it('applies scholarship to an existing reusable tuition invoice without creating
         ->and(InvoiceLine::query()->where('charge_id', $tuitionCharge->id)->count())->toBe(1);
 });
 
-it('skips preview and generate completely when tuition charge already exists on a paid invoice with no pending invoice changes', function () {
+it('skips generation completely when tuition charge already exists on a paid invoice with no pending invoice changes', function () {
     [$student, $semester, $invoice, $tuitionCharge] = seedExistingPaidTuitionScenario();
-
-    $preview = app(PreviewChargeGenerationQuery::class)->handle([
-        'semester_id' => $semester->id,
-        'scope_type' => 'upload_list',
-        'uploaded_student_ids' => [$student->student_id],
-        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
-        'skip_if_issued_or_paid' => true,
-        'only_update_draft' => true,
-        'merge_invoice' => true,
-    ]);
 
     $result = GenerateBatchChargesAction::run([
         'semester_id' => $semester->id,
@@ -773,8 +715,7 @@ it('skips preview and generate completely when tuition charge already exists on 
         'merge_invoice' => true,
     ]);
 
-    expect($preview['students'])->toHaveCount(0)
-        ->and($result['created_invoices'])->toBe(0)
+    expect($result['created_invoices'])->toBe(0)
         ->and($result['updated_invoices'])->toBe(0)
         ->and($result['created_count'])->toBe(0)
         ->and($result['failed_count'])->toBe(0)
@@ -785,16 +726,6 @@ it('skips preview and generate completely when tuition charge already exists on 
 it('does not create invoice for zero tuition term amounts', function () {
     [$student, $semesterOne] = seedZeroAmountTuitionScenario();
 
-    $preview = app(PreviewChargeGenerationQuery::class)->handle([
-        'semester_id' => $semesterOne->id,
-        'scope_type' => 'upload_list',
-        'uploaded_student_ids' => [$student->student_id],
-        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
-        'skip_if_issued_or_paid' => true,
-        'only_update_draft' => true,
-        'merge_invoice' => true,
-    ]);
-
     $result = GenerateBatchChargesAction::run([
         'semester_id' => $semesterOne->id,
         'scope_type' => 'upload_list',
@@ -805,24 +736,13 @@ it('does not create invoice for zero tuition term amounts', function () {
         'merge_invoice' => true,
     ]);
 
-    expect($preview['students'])->toHaveCount(0)
-        ->and($result['created_invoices'])->toBe(0)
+    expect($result['created_invoices'])->toBe(0)
         ->and(FinanceCharge::query()->where('student_id', $student->id)->where('charge_type', FinanceCharge::TYPE_TUITION_TERM)->count())->toBe(0)
         ->and(StudentInvoice::query()->where('student_id', $student->id)->count())->toBe(0);
 });
 
 it('counts installment index by chargeable tuition terms instead of existing charge count', function () {
     [$student, , $semesterTwo] = seedZeroAmountTuitionScenario();
-
-    $preview = app(PreviewChargeGenerationQuery::class)->handle([
-        'semester_id' => $semesterTwo->id,
-        'scope_type' => 'upload_list',
-        'uploaded_student_ids' => [$student->student_id],
-        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
-        'skip_if_issued_or_paid' => true,
-        'only_update_draft' => true,
-        'merge_invoice' => true,
-    ]);
 
     $result = GenerateBatchChargesAction::run([
         'semester_id' => $semesterTwo->id,
@@ -840,24 +760,12 @@ it('counts installment index by chargeable tuition terms instead of existing cha
         ->where('charge_type', FinanceCharge::TYPE_TUITION_TERM)
         ->firstOrFail();
 
-    expect($preview['students'])->toHaveCount(1)
-        ->and($preview['students'][0]['estimated_amount'])->toBe(45000000.0)
-        ->and($result['created_invoices'])->toBe(1)
+    expect($result['created_invoices'])->toBe(1)
         ->and($charge->description)->toBe('Major Tuition (Installment 1)');
 });
 
-it('does not preview or generate new egc charges when that semester already has egc package issued', function () {
+it('does not generate new egc charges when that semester already has egc package issued', function () {
     [$student, $spring, $springInvoice] = seedExistingEgcSemesterScenario();
-
-    $preview = app(PreviewChargeGenerationQuery::class)->handle([
-        'semester_id' => $spring->id,
-        'scope_type' => 'upload_list',
-        'uploaded_student_ids' => [$student->student_id],
-        'charge_types' => [FinanceCharge::TYPE_EGC_LEVEL_FEE],
-        'skip_if_issued_or_paid' => true,
-        'only_update_draft' => true,
-        'merge_invoice' => true,
-    ]);
 
     $result = GenerateBatchChargesAction::run([
         'semester_id' => $spring->id,
@@ -869,24 +777,13 @@ it('does not preview or generate new egc charges when that semester already has 
         'merge_invoice' => true,
     ]);
 
-    expect($preview['students'])->toHaveCount(0)
-        ->and($result['created_count'])->toBe(0)
+    expect($result['created_count'])->toBe(0)
         ->and(FinanceCharge::query()->where('student_id', $student->id)->where('semester_id', $spring->id)->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)->count())->toBe(2)
         ->and(InvoiceLine::query()->where('invoice_id', $springInvoice->id)->count())->toBe(2);
 });
 
 it('reuses an empty draft invoice for egc generation when no egc lines exist yet in that semester', function () {
     [$student, $spring, $springInvoice] = seedEmptyReusableEgcInvoiceScenario();
-
-    $preview = app(PreviewChargeGenerationQuery::class)->handle([
-        'semester_id' => $spring->id,
-        'scope_type' => 'upload_list',
-        'uploaded_student_ids' => [$student->student_id],
-        'charge_types' => [FinanceCharge::TYPE_EGC_LEVEL_FEE],
-        'skip_if_issued_or_paid' => true,
-        'only_update_draft' => true,
-        'merge_invoice' => true,
-    ]);
 
     $result = GenerateBatchChargesAction::run([
         'semester_id' => $spring->id,
@@ -903,10 +800,6 @@ it('reuses an empty draft invoice for egc generation when no egc lines exist yet
         ->and(InvoiceLine::query()->where('invoice_id', $springInvoice->id)->count())->toBe(2)
         ->and(FinanceCharge::query()->where('student_id', $student->id)->where('semester_id', $spring->id)->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)->count())->toBe(2);
 
-    if ($preview['students'] !== []) {
-        expect($preview['students'][0]['will_create_invoice'])->toBeFalse()
-            ->and($preview['students'][0]['estimated_amount'])->toBe(30000000.0);
-    }
 });
 
 it('regenerates a tuition charge after the prior one was voided (FIN-05)', function () {
@@ -1083,25 +976,4 @@ it('does not generate tuition for a deferred-enrollment student (no resurrection
 
     expect($tuitionCharges)->toBe(0)
         ->and($result['created_count'])->toBe(0);
-});
-
-it('previews no tuition for a deferred-enrollment student', function () {
-    [$student, $semester] = seedTransitionStudentScenario();
-    seedDeferredEnrollment($student->id, $semester->id);
-
-    $preview = app(PreviewChargeGenerationQuery::class)->handle([
-        'semester_id' => $semester->id,
-        'scope_type' => 'upload_list',
-        'uploaded_student_ids' => [$student->student_id],
-        'charge_types' => [FinanceCharge::TYPE_TUITION_TERM],
-        'skip_if_issued_or_paid' => true,
-        'only_update_draft' => true,
-        'merge_invoice' => true,
-    ]);
-
-    $row = collect($preview['students'])->firstWhere('student_id', $student->student_id);
-
-    expect($row)->not->toBeNull()
-        ->and((float) $row['estimated_amount'])->toBe(0.0)
-        ->and($row['will_create_invoice'])->toBeFalse();
 });

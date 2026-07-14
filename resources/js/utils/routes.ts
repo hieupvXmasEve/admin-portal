@@ -505,7 +505,6 @@ export const financeRoutes = {
         remindersCommit: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_REMINDERS_COMMIT),
     },
     collect: {
-        dngWorklist: () => route(FINANCE_ROUTE_NAMES.DNG_WORKLIST),
         dngPaymentRequests: () => route(FINANCE_ROUTE_NAMES.DNG_PAYMENT_REQUESTS_INDEX),
         dngPaymentRequestDetail: (dngPaymentRequestId: number) => route(FINANCE_ROUTE_NAMES.DNG_PAYMENT_REQUESTS_SHOW, { dngPaymentRequest: dngPaymentRequestId }),
         dngReceiptExceptions: () => route('finance.dng.receipt-exceptions.index'),
