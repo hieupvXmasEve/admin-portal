@@ -15,6 +15,7 @@ use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\FinancePricingCatalog;
 use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeResult;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
@@ -35,6 +36,7 @@ class RequestFinanceDiscountAction
         private readonly FinancePricingCatalog $pricingCatalog,
         private readonly BillingAccountProvisioner $billingAccountProvisioner,
         private readonly SettlementService $settlementService,
+        private readonly SettlementMutationGuard $settlementMutationGuard,
     ) {}
 
     public function handle(FinanceIntakeData $intake): FinanceIntakeResult
@@ -42,23 +44,26 @@ class RequestFinanceDiscountAction
         return DB::transaction(function () use ($intake): FinanceIntakeResult {
             $this->assertDiscountIntake($intake);
             $this->assertFactsCarryNoPayerIdentity($intake);
+            $billingAccount = $this->resolveBillingAccount($intake);
 
-            $entitlement = $this->findExistingEntitlement($intake);
+            return $this->settlementMutationGuard->handle((int) $billingAccount->id, function () use ($intake): FinanceIntakeResult {
+                $entitlement = $this->findExistingEntitlement($intake);
 
-            if (! $entitlement instanceof FinanceDiscountEntitlement) {
-                $entitlement = $this->createApprovedEntitlement($intake);
-            }
+                if (! $entitlement instanceof FinanceDiscountEntitlement) {
+                    $entitlement = $this->createApprovedEntitlement($intake);
+                }
 
-            $discountIds = $this->ensureDiscountAllocations($entitlement, $intake);
+                $discountIds = $this->ensureDiscountAllocations($entitlement, $intake);
 
-            return new FinanceIntakeResult(
-                lifecycle_status: $entitlement->lifecycle_status,
-                amount: (float) $entitlement->amount,
-                currency: $entitlement->currency,
-                pricing_rule_version: $entitlement->pricing_rule_version,
-                finance_discount_entitlement_id: $entitlement->id,
-                invoice_discount_ids: $discountIds,
-            );
+                return new FinanceIntakeResult(
+                    lifecycle_status: $entitlement->lifecycle_status,
+                    amount: (float) $entitlement->amount,
+                    currency: $entitlement->currency,
+                    pricing_rule_version: $entitlement->pricing_rule_version,
+                    finance_discount_entitlement_id: $entitlement->id,
+                    invoice_discount_ids: $discountIds,
+                );
+            });
         });
     }
 
@@ -240,51 +245,55 @@ class RequestFinanceDiscountAction
         ?int $referenceId,
         string $allocationRule,
     ): InvoiceDiscount {
-        if ((int) $line->invoice_id !== (int) $invoice->id) {
-            throw InvalidFinanceIntakePayload::invalidFact(
-                'invoice_line_id',
-                'must belong to the target invoice'
+        $billingAccountId = $this->billingAccountIdForInvoice($invoice);
+
+        return $this->settlementMutationGuard->handle($billingAccountId, function () use ($invoice, $line, $entitlement, $discountType, $discountSource, $description, $referenceId, $allocationRule): InvoiceDiscount {
+            if ((int) $line->invoice_id !== (int) $invoice->id) {
+                throw InvalidFinanceIntakePayload::invalidFact(
+                    'invoice_line_id',
+                    'must belong to the target invoice'
+                );
+            }
+
+            $amount = (float) $entitlement->amount;
+
+            $lineCapacity = max(
+                0.0,
+                (float) $line->amount_snapshot - $this->settlementService->getLineDiscountAmount($line)
             );
-        }
+            $allocateAmount = min($amount, $lineCapacity);
 
-        $amount = (float) $entitlement->amount;
+            if ($allocateAmount <= 0) {
+                throw InvalidFinanceIntakePayload::invalidFact(
+                    'invoice_line_id',
+                    'has no remaining discount capacity'
+                );
+            }
 
-        $lineCapacity = max(
-            0.0,
-            (float) $line->amount_snapshot - $this->settlementService->getLineDiscountAmount($line)
-        );
-        $allocateAmount = min($amount, $lineCapacity);
+            $discount = InvoiceDiscount::query()->create([
+                'invoice_id' => $invoice->id,
+                'discount_type' => $discountType,
+                'discount_source' => $discountSource,
+                'description' => $description,
+                'amount' => $amount,
+                'status' => 'active',
+                'reference_id' => $referenceId,
+                'approved_by' => auth()->id(),
+                'finance_discount_entitlement_id' => $entitlement->id,
+            ]);
 
-        if ($allocateAmount <= 0) {
-            throw InvalidFinanceIntakePayload::invalidFact(
-                'invoice_line_id',
-                'has no remaining discount capacity'
-            );
-        }
+            DiscountAllocation::query()->create([
+                'invoice_discount_id' => $discount->id,
+                'invoice_line_id' => $line->id,
+                'amount' => $allocateAmount,
+                'entry_type' => 'allocation',
+                'allocation_rule' => $allocationRule,
+            ]);
 
-        $discount = InvoiceDiscount::query()->create([
-            'invoice_id' => $invoice->id,
-            'discount_type' => $discountType,
-            'discount_source' => $discountSource,
-            'description' => $description,
-            'amount' => $amount,
-            'status' => 'active',
-            'reference_id' => $referenceId,
-            'approved_by' => auth()->id(),
-            'finance_discount_entitlement_id' => $entitlement->id,
-        ]);
+            $this->settlementService->recalculateInvoiceSnapshot($invoice);
 
-        DiscountAllocation::query()->create([
-            'invoice_discount_id' => $discount->id,
-            'invoice_line_id' => $line->id,
-            'amount' => $allocateAmount,
-            'entry_type' => 'allocation',
-            'allocation_rule' => $allocationRule,
-        ]);
-
-        $this->settlementService->recalculateInvoiceSnapshot($invoice);
-
-        return $discount;
+            return $discount;
+        });
     }
 
     private function allocationRuleForEntitlement(string $entitlementType, FinanceIntakeData $intake): string
@@ -377,6 +386,13 @@ class RequestFinanceDiscountAction
         $studentId = $this->requiredIntFact($intake, 'student_id');
 
         return $this->billingAccountProvisioner->forStudent($studentId);
+    }
+
+    private function billingAccountIdForInvoice(StudentInvoice $invoice): int
+    {
+        return (int) $this->billingAccountProvisioner
+            ->forStudent((int) $invoice->student_id)
+            ->id;
     }
 
     private function resolveStudentId(

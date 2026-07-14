@@ -9,7 +9,9 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\InvoiceGenerationService;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +31,9 @@ class CreateFinanceChargeAction
     protected const INVOICE_NUMBER_MAX_ATTEMPTS = 5;
 
     public function __construct(
-        protected InvoiceGenerationService $invoiceService
+        protected InvoiceGenerationService $invoiceService,
+        private readonly BillingAccountProvisioner $billingAccountProvisioner,
+        private readonly SettlementMutationGuard $settlementMutationGuard,
     ) {}
 
     /**
@@ -43,7 +47,9 @@ class CreateFinanceChargeAction
             );
         }
 
-        return DB::transaction(function () use ($data) {
+        $billingAccount = $this->billingAccountProvisioner->forStudent((int) $data['student_id']);
+
+        return $this->settlementMutationGuard->handle((int) $billingAccount->id, function () use ($data) {
             // Materialize the debit read-model row. source_type/source_id are
             // intentionally never written (wave 7 retirement).
             $charge = FinanceCharge::create([
@@ -201,21 +207,27 @@ class CreateFinanceChargeAction
      */
     protected function assignChargeToInvoice(FinanceCharge $charge, StudentInvoice $invoice): InvoiceLine
     {
-        $line = InvoiceLine::updateOrCreate(
-            [
-                'invoice_id' => $invoice->id,
-                'charge_id' => $charge->id,
-            ],
-            [
-                'amount_snapshot' => $charge->amount,
-                'description_snapshot' => $charge->description,
-            ]
-        );
+        $billingAccountId = (int) $this->billingAccountProvisioner
+            ->forStudent((int) $charge->student_id)
+            ->id;
 
-        // Recalculate invoice totals
-        $this->recalculateInvoiceTotals($invoice);
+        return $this->settlementMutationGuard->handle($billingAccountId, function () use ($charge, $invoice): InvoiceLine {
+            $line = InvoiceLine::updateOrCreate(
+                [
+                    'invoice_id' => $invoice->id,
+                    'charge_id' => $charge->id,
+                ],
+                [
+                    'amount_snapshot' => $charge->amount,
+                    'description_snapshot' => $charge->description,
+                ]
+            );
 
-        return $line;
+            // Recalculate invoice totals
+            $this->recalculateInvoiceTotals($invoice);
+
+            return $line;
+        });
     }
 
     /**

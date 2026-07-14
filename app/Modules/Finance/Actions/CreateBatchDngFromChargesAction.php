@@ -14,6 +14,8 @@ use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Queries\Dng\ListDngWorklistQuery;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -170,12 +172,18 @@ class CreateBatchDngFromChargesAction
             'estimate_time' => $estimateTime,
         ], $lines->pluck('id')->map(fn ($id): int => (int) $id)->all(), $targetAmounts, $installmentIdsByLine);
         if ($installmentIdsByLine !== []) {
-            FinanceChargeInstallment::query()->whereIn('id', $installmentIdsByLine)->update([
-                'dng_payment_request_id' => $reservation->id,
-                'status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
-                'last_push_error' => null,
-                'last_push_attempted_at' => now(),
-            ]);
+            $billingAccountId = (int) app(BillingAccountProvisioner::class)
+                ->forStudent($studentId)
+                ->id;
+
+            app(SettlementMutationGuard::class)->handle($billingAccountId, function () use ($installmentIdsByLine, $reservation): void {
+                FinanceChargeInstallment::query()->whereIn('id', $installmentIdsByLine)->update([
+                    'dng_payment_request_id' => $reservation->id,
+                    'status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
+                    'last_push_error' => null,
+                    'last_push_attempted_at' => now(),
+                ]);
+            });
         }
 
         return ['cancelled_old' => 0];

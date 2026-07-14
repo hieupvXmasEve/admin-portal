@@ -9,8 +9,11 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use Illuminate\Support\Facades\DB;
 
 class VoidFinanceChargeAction
@@ -18,6 +21,8 @@ class VoidFinanceChargeAction
     public function __construct(
         protected AutoAllocatePaymentsAction $autoAllocatePaymentsAction,
         protected SettlementService $settlementService,
+        private readonly BillingAccountProvisioner $billingAccountProvisioner,
+        private readonly SettlementMutationGuard $settlementMutationGuard,
     ) {}
 
     /**
@@ -37,128 +42,134 @@ class VoidFinanceChargeAction
         bool $autoReallocate = true,
         bool $recalculateInvoices = true,
     ): array {
-        return DB::transaction(function () use ($chargeId, $reason, $userId, $autoReallocate, $recalculateInvoices) {
-            $charge = FinanceCharge::findOrFail($chargeId);
-            $actorId = $userId ?? auth()->id();
+        $billingAccountId = (int) $this->billingAccountProvisioner
+            ->forStudent((int) FinanceCharge::query()->findOrFail($chargeId)->student_id)
+            ->id;
 
-            if ($charge->status === FinanceCharge::STATUS_VOID) {
-                throw new \RuntimeException("Charge #{$chargeId} is already voided.");
-            }
+        return $this->settlementMutationGuard->handle($billingAccountId, function () use ($chargeId, $reason, $userId, $autoReallocate, $recalculateInvoices): array {
+            return DB::transaction(function () use ($chargeId, $reason, $userId, $autoReallocate, $recalculateInvoices): array {
+                $charge = FinanceCharge::query()->lockForUpdate()->findOrFail($chargeId);
+                $actorId = $userId ?? auth()->id();
 
-            // FIN-12: do not unilaterally cancel an installment that is awaiting a
-            // LIVE DNG request — the provider still holds a collectible request.
-            // Block and steer the operator to cancel the DNG first
-            // (CancelDngPaymentRequestAction transitions the request to a terminal
-            // state and then voids the charge safely, so it never deadlocks here).
-            $this->assertNoLiveDngAwaitingInstallment($charge);
-
-            $invoiceLines = InvoiceLine::query()
-                ->where('charge_id', $charge->id)
-                ->where('status', 'active')
-                ->get();
-
-            $releasedInfo = [
-                'count' => 0,
-                'amount' => 0.0,
-                'payment_ids' => [],
-            ];
-
-            $affectedInvoiceIds = [];
-
-            foreach ($invoiceLines as $line) {
-                $lineRelease = $this->settlementService->releaseLinePayments(
-                    $line,
-                    $actorId,
-                    self::class,
-                    $charge->id,
-                );
-
-                $releasedInfo['count'] += $lineRelease['count'];
-                $releasedInfo['amount'] += $lineRelease['amount'];
-                $releasedInfo['payment_ids'] = array_values(array_unique(array_merge(
-                    $releasedInfo['payment_ids'],
-                    $lineRelease['payment_ids'],
-                )));
-
-                $releasedDiscountIds = $this->settlementService->releaseLineDiscounts(
-                    $line,
-                    self::class,
-                    $charge->id,
-                );
-
-                $line->update([
-                    'status' => 'void',
-                    'voided_at' => now(),
-                    'void_reason' => $reason,
-                ]);
-
-                foreach ($releasedDiscountIds as $discountId) {
-                    $discount = InvoiceDiscount::query()->find($discountId);
-
-                    if ($discount) {
-                        $this->settlementService->synchronizeDiscountAllocations($discount);
-                    }
+                if ($charge->status === FinanceCharge::STATUS_VOID) {
+                    throw new \RuntimeException("Charge #{$chargeId} is already voided.");
                 }
 
-                $affectedInvoiceIds[] = (int) $line->invoice_id;
+                // FIN-12: do not unilaterally cancel an installment that is awaiting a
+                // LIVE DNG request — the provider still holds a collectible request.
+                // Block and steer the operator to cancel the DNG first
+                // (CancelDngPaymentRequestAction transitions the request to a terminal
+                // state and then voids the charge safely, so it never deadlocks here).
+                $this->assertNoLiveDngAwaitingInstallment($charge);
 
-                $invoice = $line->invoice()->first();
+                $invoiceLines = InvoiceLine::query()
+                    ->where('charge_id', $charge->id)
+                    ->where('status', 'active')
+                    ->get();
 
-                if ($invoice) {
-                    $overpaymentRelease = $this->settlementService->releaseInvoiceOverpayments(
-                        $invoice,
+                $releasedInfo = [
+                    'count' => 0,
+                    'amount' => 0.0,
+                    'payment_ids' => [],
+                ];
+
+                $affectedInvoiceIds = [];
+
+                foreach ($invoiceLines as $line) {
+                    $lineRelease = $this->settlementService->releaseLinePayments(
+                        $line,
                         $actorId,
                         self::class,
                         $charge->id,
                     );
 
-                    $releasedInfo['count'] += $overpaymentRelease['count'];
-                    $releasedInfo['amount'] += $overpaymentRelease['amount'];
+                    $releasedInfo['count'] += $lineRelease['count'];
+                    $releasedInfo['amount'] += $lineRelease['amount'];
                     $releasedInfo['payment_ids'] = array_values(array_unique(array_merge(
                         $releasedInfo['payment_ids'],
-                        $overpaymentRelease['payment_ids'],
+                        $lineRelease['payment_ids'],
                     )));
+
+                    $releasedDiscountIds = $this->settlementService->releaseLineDiscounts(
+                        $line,
+                        self::class,
+                        $charge->id,
+                    );
+
+                    $line->update([
+                        'status' => 'void',
+                        'voided_at' => now(),
+                        'void_reason' => $reason,
+                    ]);
+
+                    foreach ($releasedDiscountIds as $discountId) {
+                        $discount = InvoiceDiscount::query()->find($discountId);
+
+                        if ($discount) {
+                            $this->settlementService->synchronizeDiscountAllocations($discount);
+                        }
+                    }
+
+                    $affectedInvoiceIds[] = (int) $line->invoice_id;
+
+                    $invoice = $line->invoice()->first();
+
+                    if ($invoice) {
+                        $overpaymentRelease = $this->settlementService->releaseInvoiceOverpayments(
+                            $invoice,
+                            $actorId,
+                            self::class,
+                            $charge->id,
+                        );
+
+                        $releasedInfo['count'] += $overpaymentRelease['count'];
+                        $releasedInfo['amount'] += $overpaymentRelease['amount'];
+                        $releasedInfo['payment_ids'] = array_values(array_unique(array_merge(
+                            $releasedInfo['payment_ids'],
+                            $overpaymentRelease['payment_ids'],
+                        )));
+                    }
                 }
-            }
 
-            $charge->update([
-                'status' => FinanceCharge::STATUS_VOID,
-                'voided_at' => now(),
-                'voided_by_user_id' => $actorId,
-                'void_reason' => $reason,
-            ]);
+                $charge->update([
+                    'status' => FinanceCharge::STATUS_VOID,
+                    'voided_at' => now(),
+                    'voided_by_user_id' => $actorId,
+                    'void_reason' => $reason,
+                ]);
 
-            // FIN-12: a voided charge must not keep live installments. Cancel
-            // non-settled rows so no next-installment DNG can still be pushed and
-            // no invariant flags a live row on a dead charge.
-            $cancelledInstallments = $this->cancelChargeInstallments($charge);
+                // FIN-12: a voided charge must not keep live installments. Cancel
+                // non-settled rows so no next-installment DNG can still be pushed and
+                // no invariant flags a live row on a dead charge.
+                $cancelledInstallments = $this->cancelChargeInstallments($charge);
 
-            // 4. Recalculate affected invoice statuses
-            if ($recalculateInvoices) {
-                $this->recalculateAffectedInvoices($affectedInvoiceIds);
-            }
+                // 4. Recalculate affected invoice statuses
+                if ($recalculateInvoices) {
+                    $this->recalculateAffectedInvoices($affectedInvoiceIds);
+                }
 
-            // 5. Re-allocate newly released balances to the student's remaining unpaid invoices
-            $reallocatedStats = $autoReallocate && $releasedInfo['amount'] > 0
-                ? $this->autoAllocatePaymentsAction->runForStudents(
-                    [$charge->student_id],
-                    AutoAllocatePaymentsAction::DEFAULT_PRIORITY_ORDER,
-                    $actorId
-                )
-                : [
-                    'allocations_created' => 0,
-                    'total_allocated_amount' => 0,
+                // 5. Re-allocate newly released balances to the student's remaining unpaid invoices
+                $reallocatedStats = $autoReallocate && $releasedInfo['amount'] > 0
+                    ? $this->autoAllocatePaymentsAction->runForStudents(
+                        [$charge->student_id],
+                        AutoAllocatePaymentsAction::DEFAULT_PRIORITY_ORDER,
+                        $actorId
+                    )
+                    : [
+                        'allocations_created' => 0,
+                        'total_allocated_amount' => 0,
+                    ];
+
+                return [
+                    'charge' => $charge->fresh(),
+                    'released_allocations' => $releasedInfo['count'],
+                    'released_amount' => $releasedInfo['amount'],
+                    'affected_payments' => $releasedInfo['payment_ids'],
+                    'reallocated_allocations' => $reallocatedStats['allocations_created'],
+                    'reallocated_amount' => (float) $reallocatedStats['total_allocated_amount'],
+                    'cancelled_installments' => $cancelledInstallments,
                 ];
-
-            return [
-                'charge' => $charge->fresh(),
-                'released_allocations' => $releasedInfo['count'],
-                'released_amount' => $releasedInfo['amount'],
-                'affected_payments' => $releasedInfo['payment_ids'],
-                'reallocated_allocations' => $reallocatedStats['allocations_created'],
-                'reallocated_amount' => (float) $reallocatedStats['total_allocated_amount'],
-                'cancelled_installments' => $cancelledInstallments,
-            ];
+            });
         });
     }
 
@@ -202,36 +213,46 @@ class VoidFinanceChargeAction
      */
     protected function cancelChargeInstallments(FinanceCharge $charge): int
     {
-        $installments = FinanceChargeInstallment::query()
-            ->where('finance_charge_id', $charge->id)
-            ->get();
+        $billingAccountId = (int) $this->billingAccountProvisioner
+            ->forStudent((int) $charge->student_id)
+            ->id;
 
-        if ($installments->isEmpty()) {
-            return 0;
-        }
+        return $this->settlementMutationGuard->handle($billingAccountId, function () use ($charge): int {
+            $installments = FinanceChargeInstallment::query()
+                ->where('finance_charge_id', $charge->id)
+                ->get();
 
-        // Payments were released earlier in this transaction, so a fully reversed
-        // charge now nets to zero.
-        $chargeNetPaid = $this->settlementService->getChargePaidAmount($charge->id);
-
-        $cancelled = 0;
-
-        foreach ($installments as $installment) {
-            $isNonSettled = in_array($installment->status, [
-                FinanceChargeInstallment::STATUS_PENDING,
-                FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
-            ], true);
-
-            $isReversedPaid = $installment->status === FinanceChargeInstallment::STATUS_PAID
-                && $chargeNetPaid <= 0.0;
-
-            if ($isNonSettled || $isReversedPaid) {
-                $installment->update(['status' => FinanceChargeInstallment::STATUS_CANCELLED]);
-                $cancelled++;
+            if ($installments->isEmpty()) {
+                return 0;
             }
-        }
 
-        return $cancelled;
+            // The charge and its lines may already be void by this point, so the
+            // current-position reader correctly rejects them as non-payable. The
+            // cancellation decision instead reads the immutable cash evidence.
+            $chargeNetPaid = max(0.0, (float) PaymentApplication::query()
+                ->join('invoice_lines', 'invoice_lines.id', '=', 'payment_applications.invoice_line_id')
+                ->where('invoice_lines.charge_id', $charge->id)
+                ->sum('payment_applications.amount'));
+
+            $cancelled = 0;
+
+            foreach ($installments as $installment) {
+                $isNonSettled = in_array($installment->status, [
+                    FinanceChargeInstallment::STATUS_PENDING,
+                    FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
+                ], true);
+
+                $isReversedPaid = $installment->status === FinanceChargeInstallment::STATUS_PAID
+                    && $chargeNetPaid <= 0.0;
+
+                if ($isNonSettled || $isReversedPaid) {
+                    $installment->update(['status' => FinanceChargeInstallment::STATUS_CANCELLED]);
+                    $cancelled++;
+                }
+            }
+
+            return $cancelled;
+        });
     }
 
     /**

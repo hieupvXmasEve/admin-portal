@@ -10,6 +10,7 @@ use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\FinancePricingCatalog;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeResult;
 use App\Shared\Contracts\Finance\Exceptions\InvalidFinanceIntakePayload;
@@ -22,6 +23,7 @@ class RequestFinanceDebitAction
         private readonly FinancePricingCatalog $pricingCatalog,
         private readonly CreateFinanceChargeAction $createChargeAction,
         private readonly BillingAccountProvisioner $billingAccountProvisioner,
+        private readonly SettlementMutationGuard $settlementMutationGuard,
     ) {}
 
     public function handle(FinanceIntakeData $intake): FinanceIntakeResult
@@ -29,29 +31,38 @@ class RequestFinanceDebitAction
         return DB::transaction(function () use ($intake): FinanceIntakeResult {
             $this->assertFactsCarryNoPricing($intake);
             $this->assertFactsCarryNoPayerIdentity($intake);
+            $billingAccount = $this->resolveBillingAccount($intake);
+            $existingObligation = $this->findExistingObligation($intake);
 
-            $obligation = $this->findExistingObligation($intake);
+            if ($existingObligation instanceof FinanceObligation) {
+                $existingCharge = $existingObligation->financeCharge()
+                    ->with('invoiceLines')
+                    ->first();
+                $existingLine = $existingCharge?->invoiceLines->first();
 
-            if (! $obligation instanceof FinanceObligation) {
-                $obligation = $this->createAcceptedObligation($intake);
+                if ($existingCharge instanceof FinanceCharge
+                    && $existingCharge->status !== FinanceCharge::STATUS_VOID
+                    && $existingLine instanceof InvoiceLine) {
+                    return $this->resultFor($existingObligation, $existingCharge, $existingLine);
+                }
             }
 
-            $charge = $this->ensureCharge($obligation, $intake);
-            $line = $charge->invoiceLines()->first();
+            return $this->settlementMutationGuard->handle((int) $billingAccount->id, function () use ($intake, $existingObligation): FinanceIntakeResult {
+                $obligation = $existingObligation;
 
-            if (! $line instanceof InvoiceLine) {
-                throw new RuntimeException("Finance obligation {$obligation->id} has no invoice line.");
-            }
+                if (! $obligation instanceof FinanceObligation) {
+                    $obligation = $this->createAcceptedObligation($intake);
+                }
 
-            return new FinanceIntakeResult(
-                lifecycle_status: $obligation->lifecycle_status,
-                amount: (float) $obligation->amount,
-                currency: $obligation->currency,
-                pricing_rule_version: $obligation->pricing_rule_version,
-                finance_obligation_id: $obligation->id,
-                finance_charge_id: $charge->id,
-                invoice_line_id: $line->id,
-            );
+                $charge = $this->ensureCharge($obligation, $intake);
+                $line = $charge->invoiceLines()->first();
+
+                if (! $line instanceof InvoiceLine) {
+                    throw new RuntimeException("Finance obligation {$obligation->id} has no invoice line.");
+                }
+
+                return $this->resultFor($obligation, $charge, $line);
+            });
         });
     }
 
@@ -150,6 +161,22 @@ class RequestFinanceDebitAction
         }
 
         return $this->createChargeAction->handle($payload);
+    }
+
+    private function resultFor(
+        FinanceObligation $obligation,
+        FinanceCharge $charge,
+        InvoiceLine $line,
+    ): FinanceIntakeResult {
+        return new FinanceIntakeResult(
+            lifecycle_status: $obligation->lifecycle_status,
+            amount: (float) $obligation->amount,
+            currency: $obligation->currency,
+            pricing_rule_version: $obligation->pricing_rule_version,
+            finance_obligation_id: $obligation->id,
+            finance_charge_id: $charge->id,
+            invoice_line_id: $line->id,
+        );
     }
 
     /**

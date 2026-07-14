@@ -113,11 +113,11 @@ function settlementBypassViolations(string $root): array
     $allowlist = SettlementBypassAllowlist::entries();
     $patterns = [
         'local settlement formula' => '/(?:amount_snapshot|fc\.amount|finance_charges\.amount|total_amount)\s*-\s*(?:.*(?:paid|payment|discount|credit))/i',
-        'direct money-table writer' => '/(?:FinanceCharge|InvoiceLine|InvoiceDiscount|DiscountAllocation|Payment|PaymentApplication|CreditApplication)::(?:query\(\)\s*->\s*)?(?:(?:where|find|findOrFail|first|firstOrFail)\s*\([^;]*?\)\s*->\s*)?(?:create|update|upsert|insert|delete)\s*\(/s',
-        'direct money-model instance writer' => '/\$(?:financeCharge|invoiceLine|invoiceDiscount|discountAllocation|paymentApplication|creditApplication|payment)\w*\s*->\s*(?:save|update|delete|increment|decrement)\s*\(/i',
-        'direct money-model relation writer' => '/->\s*(?:invoiceLines|invoiceDiscounts|discountAllocations|payments|paymentApplications|creditApplications)\s*\(\s*\)\s*->\s*(?:create|update|delete)\s*\(/',
-        'direct money-table query writer' => '/DB::table\s*\(\s*[\'\"](?:finance_charges|invoice_lines|invoice_discounts|discount_allocations|payments|payment_applications|credit_applications)[\'\"]\s*\)\s*->\s*(?:insert|insertGetId|update|upsert|delete)\s*\(/',
-        'direct money-table statement writer' => '/DB::(?:statement|unprepared)\s*\(\s*[\'\"][^\'\"]*(?:finance_charges|invoice_lines|invoice_discounts|discount_allocations|payments|payment_applications|credit_applications)[^\'\"]*[\'\"]\s*\)/i',
+        'direct money-model writer' => '/\b(?:FinanceCharge|InvoiceLine|InvoiceDiscount|DiscountAllocation|Payment|PaymentApplication|CreditApplication|FinanceChargeInstallment)::(?:(?:query\(\)|where|find|findOrFail|first|firstOrFail|lockForUpdate|orderBy|whereIn|whereKey)\s*\([^;]*?\)\s*->\s*)*(?:create|update|upsert|insert|delete|firstOrCreate|updateOrCreate|firstOrNew)\s*\(/s',
+        'direct money-model instance writer' => '/\$(?:financeCharge|invoiceLine|invoiceDiscount|discountAllocation|paymentApplication|creditApplication|payment|installment)\w*\s*->\s*(?:save|update|delete|increment|decrement|forceDelete)\s*\(/i',
+        'direct money-model relation writer' => '/->\s*(?:invoiceLines|invoiceDiscounts|discountAllocations|payments|paymentApplications|creditApplications|installments)\s*\(\s*\)\s*->\s*(?:create|update|delete|firstOrCreate|updateOrCreate)\s*\(/',
+        'direct money-table query writer' => '/(?:DB::(?:table|connection\s*\([^)]*\)\s*->\s*table)|->table)\s*\(\s*[\'\"](?:finance_charges|invoice_lines|invoice_discounts|discount_allocations|payments|payment_applications|credit_applications|finance_charge_installments)[\'\"]\s*\)\s*->\s*(?:insert|insertGetId|update|upsert|delete|increment|decrement)\s*\(/',
+        'direct money-table statement writer' => '/DB::(?:statement|unprepared)\s*\(\s*[\'\"][^\'\"]*(?:finance_charges|invoice_lines|invoice_discounts|discount_allocations|payments|payment_applications|credit_applications|finance_charge_installments)[^\'\"]*[\'\"]\s*\)/i',
     ];
 
     foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root)) as $file) {
@@ -126,15 +126,16 @@ function settlementBypassViolations(string $root): array
         }
 
         $path = $file->getPathname();
-        $relativePath = 'app/'.str_replace(base_path('app').'/', '', $path);
+        $relativePath = str_starts_with($path, base_path('app').'/')
+            ? 'app/'.str_replace(base_path('app').'/', '', $path)
+            : 'app/'.basename($path);
         $contents = file_get_contents($path) ?: '';
         $guardedRanges = settlementMutationGuardedCallbackRanges($contents);
 
         foreach ($patterns as $label => $pattern) {
             preg_match_all($pattern, $contents, $matches, PREG_OFFSET_CAPTURE);
             $hasUnguardedMatch = collect($matches[0] ?? [])->contains(
-                static fn (array $match): bool => ! str_starts_with($label, 'direct money-')
-                    || ! settlementMutationOffsetIsGuarded((int) $match[1], $guardedRanges),
+                static fn (array $match): bool => ! settlementMutationOffsetIsGuarded((int) $match[1], $guardedRanges),
             );
 
             if ($hasUnguardedMatch && ! isset($allowlist[$relativePath])) {
@@ -153,17 +154,12 @@ it('requires every legacy settlement bypass to declare an owner and removal wave
         'app/Console/Commands/BackfillEgcBlocks.php',
         'app/Console/Commands/MigrateScholarshipDiscountsToInvoiceDiscounts.php',
         'app/Console/Commands/MigrateVoucherDiscountsToInvoiceDiscounts.php',
+        'app/Console/Commands/BackfillStudentFees.php',
+        'app/Console/Commands/BackfillVoidedChargeInstallments.php',
         'app/Modules/Finance/Actions/BackfillLegacyDeferCreditEntitlementsAction.php',
         'app/Modules/Finance/Actions/BackfillLegacyEgcExemptCreditEntitlementsAction.php',
         'app/Modules/Finance/Actions/BackfillLegacyScholarshipEntitlementsAction.php',
-        'app/Modules/Finance/Actions/CreateBatchDngFromChargesAction.php',
-        'app/Modules/Finance/Actions/CreateFinanceChargeAction.php',
-        'app/Modules/Finance/Actions/Operations/GenerateNonAcademicChargesAction.php',
-        'app/Modules/Finance/Actions/RequestFinanceCreditAction.php',
-        'app/Modules/Finance/Actions/RequestFinanceDiscountAction.php',
-        'app/Modules/Finance/Services/InvoiceGenerationService.php',
-        'app/Modules/Finance/Services/PaymentService.php',
-        'app/Modules/Finance/Services/SettlementService.php',
+        'app/Modules/Finance/Actions/CloseKnownLegacyDataExceptionsAction.php',
     ];
 
     $actualPaths = array_keys(SettlementBypassAllowlist::entries());
@@ -204,4 +200,32 @@ PHP;
         ->and($unguardedOffset)->not->toBeFalse()
         ->and(settlementMutationOffsetIsGuarded((int) $guardedOffset, $ranges))->toBeTrue()
         ->and(settlementMutationOffsetIsGuarded((int) $unguardedOffset, $ranges))->toBeFalse();
+});
+
+it('detects supported direct settlement writer forms', function (): void {
+    $contents = <<<'PHP'
+<?php
+FinanceCharge::create([]);
+InvoiceLine::query()->where('id', 1)->update([]);
+Payment::firstOrCreate([]);
+PaymentApplication::updateOrCreate([], []);
+$charge = FinanceCharge::firstOrNew([]);
+$charge->save();
+$installment->delete();
+DB::table('finance_charge_installments')->upsert([]);
+PHP;
+
+    $directory = sys_get_temp_dir().'/settlement-bypass-'.uniqid();
+    mkdir($directory);
+    file_put_contents($directory.'/Writer.php', $contents);
+
+    try {
+        expect(settlementBypassViolations($directory))
+            ->toContain('direct money-model writer: app/Writer.php')
+            ->toContain('direct money-model instance writer: app/Writer.php')
+            ->toContain('direct money-table query writer: app/Writer.php');
+    } finally {
+        unlink($directory.'/Writer.php');
+        rmdir($directory);
+    }
 });

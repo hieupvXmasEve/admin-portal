@@ -19,17 +19,12 @@ final class SettlementBypassAllowlist
             'app/Console/Commands/BackfillEgcBlocks.php' => self::legacy('Finance', 'wave-6', 'Historical EGC repair writes invoice lines.'),
             'app/Console/Commands/MigrateScholarshipDiscountsToInvoiceDiscounts.php' => self::legacy('Finance', 'wave-6', 'One-shot discount migration.'),
             'app/Console/Commands/MigrateVoucherDiscountsToInvoiceDiscounts.php' => self::legacy('Finance', 'wave-6', 'One-shot voucher migration.'),
+            'app/Console/Commands/BackfillStudentFees.php' => self::legacy('Finance', 'wave-6', 'Historical student-fee migration.'),
+            'app/Console/Commands/BackfillVoidedChargeInstallments.php' => self::legacy('Finance', 'wave-6', 'Historical voided-installment repair.'),
             'app/Modules/Finance/Actions/BackfillLegacyDeferCreditEntitlementsAction.php' => self::legacy('Finance', 'wave-6', 'Legacy entitlement backfill.'),
             'app/Modules/Finance/Actions/BackfillLegacyEgcExemptCreditEntitlementsAction.php' => self::legacy('Finance', 'wave-6', 'Legacy EGC exemption backfill.'),
             'app/Modules/Finance/Actions/BackfillLegacyScholarshipEntitlementsAction.php' => self::legacy('Finance', 'wave-6', 'Legacy scholarship backfill.'),
-            'app/Modules/Finance/Actions/CreateFinanceChargeAction.php' => self::legacy('Finance', 'wave-6', 'Approved debit materializer pending mutation guard.'),
-            'app/Modules/Finance/Actions/Operations/GenerateNonAcademicChargesAction.php' => self::legacy('Finance', 'wave-5', 'Legacy non-academic charge generator.'),
-            'app/Modules/Finance/Actions/RequestFinanceCreditAction.php' => self::legacy('Finance', 'wave-1', 'Canonical credit request will enter mutation guard.'),
-            'app/Modules/Finance/Actions/RequestFinanceDiscountAction.php' => self::legacy('Finance', 'wave-1', 'Canonical discount request will enter mutation guard.'),
-            'app/Modules/Finance/Actions/CreateBatchDngFromChargesAction.php' => self::legacy('Finance', 'wave-1', 'DNG request amount formula pending guarded reservation.'),
-            'app/Modules/Finance/Services/InvoiceGenerationService.php' => self::legacy('Finance', 'wave-4', 'Legacy invoice-line materializer pending mutation guard.'),
-            'app/Modules/Finance/Services/PaymentService.php' => self::legacy('Finance', 'wave-1', 'Legacy receipt and application writer.'),
-            'app/Modules/Finance/Services/SettlementService.php' => self::legacy('Finance', 'wave-4', 'Legacy settlement writer and formula consumer.'),
+            'app/Modules/Finance/Actions/CloseKnownLegacyDataExceptionsAction.php' => self::legacy('Finance', 'wave-0', 'Approved one-shot canonical data closure.'),
         ];
     }
 

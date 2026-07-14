@@ -11,6 +11,8 @@ use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Queries\GetStudentBalanceQuery;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use Carbon\CarbonImmutable;
@@ -37,6 +39,8 @@ class PaymentService
         protected GetStudentBalanceQuery $getStudentBalanceQuery,
         protected PublishDomainEventAction $publishDomainEventAction,
         protected SettlementService $settlementService,
+        private readonly BillingAccountProvisioner $billingAccountProvisioner,
+        private readonly SettlementMutationGuard $settlementMutationGuard,
     ) {}
 
     /**
@@ -44,22 +48,28 @@ class PaymentService
      */
     public function recordPayment(array $data): Payment
     {
-        $payment = Payment::create([
-            'student_id' => $data['student_id'],
-            'amount' => $data['amount'],
-            'method' => $data['method'] ?? Payment::METHOD_OTHER,
-            'source' => $data['source'] ?? null,
-            'external_ref' => $data['external_ref'] ?? null,
-            'paid_at' => $data['paid_at'] ?? now(),
-            'status' => $data['status'] ?? Payment::STATUS_COMPLETED,
-            'received_by_user_id' => $data['received_by_user_id'] ?? $this->currentUserId(),
-            'raw_payload' => $data['raw_payload'] ?? null,
-            'notes' => $data['notes'] ?? null,
-        ]);
+        $billingAccountId = (int) $this->billingAccountProvisioner
+            ->forStudent((int) $data['student_id'])
+            ->id;
 
-        $this->publishInvoicePaidDomainEvent($payment);
+        return $this->settlementMutationGuard->handle($billingAccountId, function () use ($data): Payment {
+            $payment = Payment::create([
+                'student_id' => $data['student_id'],
+                'amount' => $data['amount'],
+                'method' => $data['method'] ?? Payment::METHOD_OTHER,
+                'source' => $data['source'] ?? null,
+                'external_ref' => $data['external_ref'] ?? null,
+                'paid_at' => $data['paid_at'] ?? now(),
+                'status' => $data['status'] ?? Payment::STATUS_COMPLETED,
+                'received_by_user_id' => $data['received_by_user_id'] ?? $this->currentUserId(),
+                'raw_payload' => $data['raw_payload'] ?? null,
+                'notes' => $data['notes'] ?? null,
+            ]);
 
-        return $payment;
+            $this->publishInvoicePaidDomainEvent($payment);
+
+            return $payment;
+        });
     }
 
     protected function publishInvoicePaidDomainEvent(Payment $payment): void
@@ -122,75 +132,80 @@ class PaymentService
     ): Collection {
         $payment = Payment::findOrFail($paymentId);
         $createdAllocations = collect();
+        $billingAccountId = (int) $this->billingAccountProvisioner
+            ->forStudent((int) $payment->student_id)
+            ->id;
 
-        DB::transaction(function () use ($payment, $allocations, $userId, $allowHeldTargets, &$createdAllocations) {
-            // FIN-11/DB-09: lock the payment row and recompute the unapplied
-            // amount inside the transaction. Concurrent allocators (DNG webhook
-            // bridge + batch auto-allocate) serialize on this lock, so the same
-            // payment can never be applied beyond its unapplied balance.
-            $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
-            $remainingUnapplied = $this->settlementService->getPaymentUnappliedAmount($lockedPayment);
+        $this->settlementMutationGuard->handle($billingAccountId, function () use ($payment, $allocations, $userId, $allowHeldTargets, &$createdAllocations): void {
+            DB::transaction(function () use ($payment, $allocations, $userId, $allowHeldTargets, &$createdAllocations): void {
+                // FIN-11/DB-09: lock the payment row and recompute the unapplied
+                // amount inside the transaction. Concurrent allocators (DNG webhook
+                // bridge + batch auto-allocate) serialize on this lock, so the same
+                // payment can never be applied beyond its unapplied balance.
+                $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+                $remainingUnapplied = $this->settlementService->getPaymentUnappliedAmount($lockedPayment);
 
-            foreach ($allocations as $chargeId => $amount) {
-                if ($amount <= 0 || $remainingUnapplied <= 0) {
-                    continue;
+                foreach ($allocations as $chargeId => $amount) {
+                    if ($amount <= 0 || $remainingUnapplied <= 0) {
+                        continue;
+                    }
+
+                    // FIN-11/DB-09: lock the target line too. Concurrent allocators
+                    // racing onto the same line serialize here and re-read its
+                    // outstanding, so a line can never be applied beyond its balance.
+                    $line = InvoiceLine::query()
+                        ->where('charge_id', (int) $chargeId)
+                        ->where('status', 'active')
+                        ->orderBy('created_at')
+                        ->orderBy('id')
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (! $line) {
+                        continue;
+                    }
+
+                    if (! $allowHeldTargets && DngPaymentRequestReservationTarget::query()
+                        ->where('invoice_line_id', $line->id)
+                        ->whereHas('dngPaymentRequest', fn ($query) => $query->holdingCollection())
+                        ->lockForUpdate()
+                        ->exists()) {
+                        continue;
+                    }
+
+                    // Never apply one student's payment onto another student's line.
+                    $lineStudentId = $line->invoice?->student_id;
+                    if ($lineStudentId !== null && (int) $lineStudentId !== (int) $lockedPayment->student_id) {
+                        continue;
+                    }
+
+                    // Cap by BOTH the payment's remaining unapplied amount AND the
+                    // line's outstanding balance — a too-large requested amount
+                    // (e.g. DNG pivot rounding) becomes unapplied credit, never line overpay.
+                    $applyAmount = min(
+                        (float) $amount,
+                        $remainingUnapplied,
+                        $this->settlementService->getLineOutstandingAmount($line),
+                    );
+
+                    if ($applyAmount <= 0) {
+                        continue;
+                    }
+
+                    $allocation = $this->settlementService->createPaymentApplication(
+                        $lockedPayment,
+                        $line,
+                        $applyAmount,
+                        'application',
+                        $userId ?? $this->currentUserId(),
+                        self::class,
+                        null,
+                    );
+
+                    $createdAllocations->push($allocation);
+                    $remainingUnapplied -= $applyAmount;
                 }
-
-                // FIN-11/DB-09: lock the target line too. Concurrent allocators
-                // racing onto the same line serialize here and re-read its
-                // outstanding, so a line can never be applied beyond its balance.
-                $line = InvoiceLine::query()
-                    ->where('charge_id', (int) $chargeId)
-                    ->where('status', 'active')
-                    ->orderBy('created_at')
-                    ->orderBy('id')
-                    ->lockForUpdate()
-                    ->first();
-
-                if (! $line) {
-                    continue;
-                }
-
-                if (! $allowHeldTargets && DngPaymentRequestReservationTarget::query()
-                    ->where('invoice_line_id', $line->id)
-                    ->whereHas('dngPaymentRequest', fn ($query) => $query->holdingCollection())
-                    ->lockForUpdate()
-                    ->exists()) {
-                    continue;
-                }
-
-                // Never apply one student's payment onto another student's line.
-                $lineStudentId = $line->invoice?->student_id;
-                if ($lineStudentId !== null && (int) $lineStudentId !== (int) $lockedPayment->student_id) {
-                    continue;
-                }
-
-                // Cap by BOTH the payment's remaining unapplied amount AND the
-                // line's outstanding balance — a too-large requested amount
-                // (e.g. DNG pivot rounding) becomes unapplied credit, never line overpay.
-                $applyAmount = min(
-                    (float) $amount,
-                    $remainingUnapplied,
-                    $this->settlementService->getLineOutstandingAmount($line),
-                );
-
-                if ($applyAmount <= 0) {
-                    continue;
-                }
-
-                $allocation = $this->settlementService->createPaymentApplication(
-                    $lockedPayment,
-                    $line,
-                    $applyAmount,
-                    'application',
-                    $userId ?? $this->currentUserId(),
-                    self::class,
-                    null,
-                );
-
-                $createdAllocations->push($allocation);
-                $remainingUnapplied -= $applyAmount;
-            }
+            });
         });
 
         return $createdAllocations;

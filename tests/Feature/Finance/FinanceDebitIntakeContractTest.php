@@ -94,7 +94,8 @@ it('prices and materializes a debit obligation into one finance charge and invoi
         ->and((float) $charge->amount)->toBe(1_500_000.0)
         ->and($charge->source_type)->toBeNull()
         ->and($charge->source_id)->toBeNull()
-        ->and((float) $line->amount_snapshot)->toBe(1_500_000.0);
+        ->and((float) $line->amount_snapshot)->toBe(1_500_000.0)
+        ->and((int) $billingAccount->settlement_version)->toBe(1);
 });
 
 it('is idempotent for the same source quad', function (): void {
@@ -114,13 +115,15 @@ it('is idempotent for the same source quad', function (): void {
     $contract = app(FinanceIntakeContract::class);
 
     $first = $contract->request($intake);
+    $billingAccount = BillingAccount::query()->where('student_id', $this->student->id)->firstOrFail();
     $second = $contract->requestDebit($intake);
 
     expect($second->finance_obligation_id)->toBe($first->finance_obligation_id)
         ->and($second->finance_charge_id)->toBe($first->finance_charge_id)
         ->and(FinanceObligation::query()->count())->toBe(1)
         ->and(FinanceCharge::query()->where('finance_obligation_id', $first->finance_obligation_id)->count())->toBe(1)
-        ->and(InvoiceLine::query()->where('charge_id', $first->finance_charge_id)->count())->toBe(1);
+        ->and(InvoiceLine::query()->where('charge_id', $first->finance_charge_id)->count())->toBe(1)
+        ->and((int) $billingAccount->fresh()->settlement_version)->toBe(1);
 });
 
 it('rejects source supplied pricing values', function (): void {

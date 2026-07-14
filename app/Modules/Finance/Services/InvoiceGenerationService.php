@@ -10,13 +10,17 @@ use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class InvoiceGenerationService
 {
     public function __construct(
-        protected SettlementService $settlementService
+        protected SettlementService $settlementService,
+        private readonly BillingAccountProvisioner $billingAccountProvisioner,
+        private readonly SettlementMutationGuard $settlementMutationGuard,
     ) {}
 
     /**
@@ -66,54 +70,60 @@ class InvoiceGenerationService
             })
             ->get();
 
-        DB::transaction(function () use ($invoice, $charges) {
-            // Get existing line charge IDs
-            $existingChargeIds = $invoice->invoiceLines()->pluck('charge_id')->toArray();
-            $newChargeIds = $charges->pluck('id')->toArray();
+        $billingAccountId = (int) $this->billingAccountProvisioner
+            ->forStudent((int) $invoice->student_id)
+            ->id;
 
-            // Remove lines for charges no longer active
-            $toRemove = array_diff($existingChargeIds, $newChargeIds);
-            InvoiceLine::where('invoice_id', $invoice->id)
-                ->whereIn('charge_id', $toRemove)
-                ->update([
-                    'status' => 'void',
-                    'voided_at' => now(),
-                    'void_reason' => 'Charge no longer active during invoice refresh',
-                ]);
+        $this->settlementMutationGuard->handle($billingAccountId, function () use ($invoice, $charges): void {
+            DB::transaction(function () use ($invoice, $charges): void {
+                // Get existing line charge IDs
+                $existingChargeIds = $invoice->invoiceLines()->pluck('charge_id')->toArray();
+                $newChargeIds = $charges->pluck('id')->toArray();
 
-            // Add lines for new charges. DB-01 / NT2: amount_snapshot and
-            // description_snapshot are frozen at creation — a refresh never
-            // overwrites an existing line's money snapshot. A changed charge
-            // amount is handled by void + recreate, not by restating history.
-            foreach ($charges as $charge) {
-                $line = InvoiceLine::firstOrCreate(
-                    [
-                        'invoice_id' => $invoice->id,
-                        'charge_id' => $charge->id,
-                    ],
-                    [
-                        'amount_snapshot' => $charge->amount,
-                        'description_snapshot' => $charge->description,
-                        'status' => 'active',
-                        'voided_at' => null,
-                        'void_reason' => null,
-                    ]
-                );
-
-                // A line previously voided (e.g. the charge was temporarily
-                // inactive) may be reactivated, but only its lifecycle status is
-                // restored — the frozen amount_snapshot stays untouched.
-                if (! $line->wasRecentlyCreated && $line->status !== 'active') {
-                    $line->update([
-                        'status' => 'active',
-                        'voided_at' => null,
-                        'void_reason' => null,
+                // Remove lines for charges no longer active
+                $toRemove = array_diff($existingChargeIds, $newChargeIds);
+                InvoiceLine::where('invoice_id', $invoice->id)
+                    ->whereIn('charge_id', $toRemove)
+                    ->update([
+                        'status' => 'void',
+                        'voided_at' => now(),
+                        'void_reason' => 'Charge no longer active during invoice refresh',
                     ]);
-                }
-            }
 
-            // Recalculate totals
-            $this->recalculateInvoiceTotals($invoice);
+                // Add lines for new charges. DB-01 / NT2: amount_snapshot and
+                // description_snapshot are frozen at creation — a refresh never
+                // overwrites an existing line's money snapshot. A changed charge
+                // amount is handled by void + recreate, not by restating history.
+                foreach ($charges as $charge) {
+                    $line = InvoiceLine::firstOrCreate(
+                        [
+                            'invoice_id' => $invoice->id,
+                            'charge_id' => $charge->id,
+                        ],
+                        [
+                            'amount_snapshot' => $charge->amount,
+                            'description_snapshot' => $charge->description,
+                            'status' => 'active',
+                            'voided_at' => null,
+                            'void_reason' => null,
+                        ]
+                    );
+
+                    // A line previously voided (e.g. the charge was temporarily
+                    // inactive) may be reactivated, but only its lifecycle status is
+                    // restored — the frozen amount_snapshot stays untouched.
+                    if (! $line->wasRecentlyCreated && $line->status !== 'active') {
+                        $line->update([
+                            'status' => 'active',
+                            'voided_at' => null,
+                            'void_reason' => null,
+                        ]);
+                    }
+                }
+
+                // Recalculate totals
+                $this->recalculateInvoiceTotals($invoice);
+            });
         });
 
         return $invoice->fresh();

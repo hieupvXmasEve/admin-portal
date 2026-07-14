@@ -9,6 +9,8 @@ use App\Modules\Finance\Exceptions\InstallmentSplitNotAllowedException;
 use App\Modules\Finance\Exceptions\InvalidInstallmentPlanException;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +33,11 @@ use Illuminate\Support\Facades\DB;
  */
 class SplitChargeIntoInstallmentsAction
 {
+    public function __construct(
+        private readonly BillingAccountProvisioner $billingAccountProvisioner,
+        private readonly SettlementMutationGuard $settlementMutationGuard,
+    ) {}
+
     /**
      * Decimal precision (cents) used for the sum-equality check.
      * MariaDB decimal(15,2) → comparing in integer cents avoids float drift.
@@ -47,25 +54,32 @@ class SplitChargeIntoInstallmentsAction
      */
     public function handle(int $chargeId, array $installments): Collection
     {
-        return DB::transaction(function () use ($chargeId, $installments) {
-            // Row-level lock to serialize concurrent split attempts on the same charge.
-            $charge = FinanceCharge::query()
-                ->lockForUpdate()
-                ->findOrFail($chargeId);
+        $charge = FinanceCharge::query()->findOrFail($chargeId);
+        $billingAccountId = (int) $this->billingAccountProvisioner
+            ->forStudent((int) $charge->student_id)
+            ->id;
 
-            $this->assertChargeEligible($charge);
-            $this->assertPlanReplaceable($charge);
+        return $this->settlementMutationGuard->handle($billingAccountId, function () use ($chargeId, $installments): Collection {
+            return DB::transaction(function () use ($chargeId, $installments): Collection {
+                // Row-level lock to serialize concurrent split attempts on the same charge.
+                $charge = FinanceCharge::query()
+                    ->lockForUpdate()
+                    ->findOrFail($chargeId);
 
-            $netTarget = $this->computeNetTarget($charge);
-            $this->assertPlanShape($installments, $netTarget);
+                $this->assertChargeEligible($charge);
+                $this->assertPlanReplaceable($charge);
 
-            $this->deleteExistingPending($charge);
-            $rows = $this->insertPlan($charge, $installments);
+                $netTarget = $this->computeNetTarget($charge);
+                $this->assertPlanShape($installments, $netTarget);
 
-            return FinanceChargeInstallment::query()
-                ->whereIn('id', $rows)
-                ->orderBy('installment_no')
-                ->get();
+                $this->deleteExistingPending($charge);
+                $rows = $this->insertPlan($charge, $installments);
+
+                return FinanceChargeInstallment::query()
+                    ->whereIn('id', $rows)
+                    ->orderBy('installment_no')
+                    ->get();
+            });
         });
     }
 
@@ -169,26 +183,32 @@ class SplitChargeIntoInstallmentsAction
 
     private function deleteExistingPending(FinanceCharge $charge): void
     {
-        // Hard-guard: refuse if non-pending installments exist. Should be unreachable
-        // here because hasPaidInstallment() already covered `paid`; but `awaiting_payment`
-        // or `cancelled` blocks replan too — admin must cancel DNG first.
-        $blocking = FinanceChargeInstallment::query()
-            ->where('finance_charge_id', $charge->id)
-            ->whereNotIn('status', [FinanceChargeInstallment::STATUS_PENDING])
-            ->exists();
+        $billingAccountId = (int) $this->billingAccountProvisioner
+            ->forStudent((int) $charge->student_id)
+            ->id;
 
-        if ($blocking) {
-            throw new InvalidInstallmentPlanException(
-                'charge_has_active_installment',
-                "FinanceCharge #{$charge->id} has non-pending installments. ".
-                'Cancel awaiting DNG requests before re-splitting.'
-            );
-        }
+        $this->settlementMutationGuard->handle($billingAccountId, function () use ($charge): void {
+            // Hard-guard: refuse if non-pending installments exist. Should be unreachable
+            // here because hasPaidInstallment() already covered `paid`; but `awaiting_payment`
+            // or `cancelled` blocks replan too — admin must cancel DNG first.
+            $blocking = FinanceChargeInstallment::query()
+                ->where('finance_charge_id', $charge->id)
+                ->whereNotIn('status', [FinanceChargeInstallment::STATUS_PENDING])
+                ->exists();
 
-        FinanceChargeInstallment::query()
-            ->where('finance_charge_id', $charge->id)
-            ->where('status', FinanceChargeInstallment::STATUS_PENDING)
-            ->delete();
+            if ($blocking) {
+                throw new InvalidInstallmentPlanException(
+                    'charge_has_active_installment',
+                    "FinanceCharge #{$charge->id} has non-pending installments. ".
+                    'Cancel awaiting DNG requests before re-splitting.'
+                );
+            }
+
+            FinanceChargeInstallment::query()
+                ->where('finance_charge_id', $charge->id)
+                ->where('status', FinanceChargeInstallment::STATUS_PENDING)
+                ->delete();
+        });
     }
 
     /**
@@ -197,23 +217,29 @@ class SplitChargeIntoInstallmentsAction
      */
     private function insertPlan(FinanceCharge $charge, array $installments): array
     {
-        $now = now();
-        $ids = [];
+        $billingAccountId = (int) $this->billingAccountProvisioner
+            ->forStudent((int) $charge->student_id)
+            ->id;
 
-        foreach ($installments as $row) {
-            $created = FinanceChargeInstallment::create([
-                'finance_charge_id' => $charge->id,
-                'installment_no' => (int) $row['installment_no'],
-                'amount' => $row['amount'],
-                'due_date' => Carbon::parse($row['due_date'])->toDateString(),
-                'status' => FinanceChargeInstallment::STATUS_PENDING,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
-            $ids[] = $created->id;
-        }
+        return $this->settlementMutationGuard->handle($billingAccountId, function () use ($charge, $installments): array {
+            $now = now();
+            $ids = [];
 
-        return $ids;
+            foreach ($installments as $row) {
+                $created = FinanceChargeInstallment::create([
+                    'finance_charge_id' => $charge->id,
+                    'installment_no' => (int) $row['installment_no'],
+                    'amount' => $row['amount'],
+                    'due_date' => Carbon::parse($row['due_date'])->toDateString(),
+                    'status' => FinanceChargeInstallment::STATUS_PENDING,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+                $ids[] = $created->id;
+            }
+
+            return $ids;
+        });
     }
 
     /**

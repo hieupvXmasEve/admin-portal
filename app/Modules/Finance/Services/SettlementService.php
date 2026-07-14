@@ -11,6 +11,8 @@ use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionIssue;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
@@ -25,6 +27,8 @@ class SettlementService
 
     public function __construct(
         private readonly SettlementPositionReader $settlementPositionReader,
+        private readonly BillingAccountProvisioner $billingAccountProvisioner,
+        private readonly SettlementMutationGuard $settlementMutationGuard,
     ) {}
 
     /**
@@ -217,33 +221,37 @@ class SettlementService
 
     public function recalculateInvoiceSnapshot(StudentInvoice $invoice, ?string $preservedPaidAt = null): void
     {
-        $snapshot = $this->deriveInvoiceCacheSnapshot($invoice);
+        $billingAccountId = $this->billingAccountIdForInvoice($invoice);
 
-        $isPaid = $snapshot['status'] === 'paid' && $snapshot['paid'] > 0;
+        $this->settlementMutationGuard->handle($billingAccountId, function () use ($invoice, $preservedPaidAt): void {
+            $snapshot = $this->deriveInvoiceCacheSnapshot($invoice);
 
-        // DB-15: keep the first moment the invoice became paid, and clear the
-        // cached timestamp the moment a reversal makes it no longer paid — never
-        // leave a stale paid_at on a reopened invoice. A historical rebuild must
-        // derive a missing timestamp from ledger evidence, never from wall time.
-        $cachedPaidAt = $isPaid && $preservedPaidAt !== null
-            ? $preservedPaidAt
-            : $this->resolveCachedPaidAt($invoice, $isPaid);
+            $isPaid = $snapshot['status'] === 'paid' && $snapshot['paid'] > 0;
 
-        // status is a lifecycle column, not cache: preserve terminal states so a
-        // cache rebuild (or any recalc) never flips a cancelled/voided invoice
-        // back into the payment lifecycle.
-        $status = in_array($invoice->status, self::TERMINAL_LIFECYCLE_STATUSES, true)
-            ? $invoice->status
-            : $snapshot['status'];
+            // DB-15: keep the first moment the invoice became paid, and clear the
+            // cached timestamp the moment a reversal makes it no longer paid — never
+            // leave a stale paid_at on a reopened invoice. A historical rebuild must
+            // derive a missing timestamp from ledger evidence, never from wall time.
+            $cachedPaidAt = $isPaid && $preservedPaidAt !== null
+                ? $preservedPaidAt
+                : $this->resolveCachedPaidAt($invoice, $isPaid);
 
-        $invoice->forceFill([
-            'cached_subtotal' => $snapshot['gross'],
-            'cached_discount_total' => $snapshot['discount'],
-            'cached_total_amount' => $snapshot['net'],
-            'cached_paid_amount' => $snapshot['paid'],
-            'status' => $status,
-            'cached_paid_at' => $cachedPaidAt,
-        ])->save();
+            // status is a lifecycle column, not cache: preserve terminal states so a
+            // cache rebuild (or any recalc) never flips a cancelled/voided invoice
+            // back into the payment lifecycle.
+            $status = in_array($invoice->status, self::TERMINAL_LIFECYCLE_STATUSES, true)
+                ? $invoice->status
+                : $snapshot['status'];
+
+            $invoice->forceFill([
+                'cached_subtotal' => $snapshot['gross'],
+                'cached_discount_total' => $snapshot['discount'],
+                'cached_total_amount' => $snapshot['net'],
+                'cached_paid_amount' => $snapshot['paid'],
+                'status' => $status,
+                'cached_paid_at' => $cachedPaidAt,
+            ])->save();
+        });
     }
 
     private function invoiceStatusFromSettlement(
@@ -306,24 +314,28 @@ class SettlementService
         ?string $sourceRefType = null,
         ?int $sourceRefId = null,
     ): PaymentApplication {
-        $signedAmount = $entryType === 'reversal'
-            ? -abs($amount)
-            : abs($amount);
+        $billingAccountId = $this->billingAccountProvisioner->forStudent((int) $payment->student_id)->id;
 
-        $application = PaymentApplication::query()->create([
-            'payment_id' => $payment->id,
-            'invoice_line_id' => $line->id,
-            'amount' => $signedAmount,
-            'entry_type' => $entryType,
-            'source_ref_type' => $sourceRefType,
-            'source_ref_id' => $sourceRefId,
-            'applied_at' => now(),
-            'created_by' => $userId,
-        ]);
+        return $this->settlementMutationGuard->handle($billingAccountId, function () use ($payment, $line, $amount, $entryType, $userId, $sourceRefType, $sourceRefId): PaymentApplication {
+            $signedAmount = $entryType === 'reversal'
+                ? -abs($amount)
+                : abs($amount);
 
-        $this->recalculateInvoiceSnapshot($line->invoice()->firstOrFail());
+            $application = PaymentApplication::query()->create([
+                'payment_id' => $payment->id,
+                'invoice_line_id' => $line->id,
+                'amount' => $signedAmount,
+                'entry_type' => $entryType,
+                'source_ref_type' => $sourceRefType,
+                'source_ref_id' => $sourceRefId,
+                'applied_at' => now(),
+                'created_by' => $userId,
+            ]);
 
-        return $application;
+            $this->recalculateInvoiceSnapshot($line->invoice()->firstOrFail());
+
+            return $application;
+        });
     }
 
     public function releaseLinePayments(InvoiceLine $line, ?int $userId = null, ?string $sourceRefType = null, ?int $sourceRefId = null): array
@@ -414,52 +426,60 @@ class SettlementService
         ?int $referenceId = null,
         ?int $approvedBy = null,
     ): InvoiceDiscount {
-        $discount = InvoiceDiscount::query()->firstOrNew([
-            'invoice_id' => $invoice->id,
-            'discount_type' => $discountType,
-            'reference_id' => $referenceId,
-            'discount_source' => $discountSource ?? $discountType,
-        ]);
+        $billingAccountId = $this->billingAccountIdForInvoice($invoice);
 
-        $discount->fill([
-            'description' => $description ?? $discountType,
-            'amount' => abs($amount),
-            'status' => 'active',
-            'approved_by' => $approvedBy,
-        ]);
-        $discount->save();
+        return $this->settlementMutationGuard->handle($billingAccountId, function () use ($invoice, $discountType, $amount, $discountSource, $description, $referenceId, $approvedBy): InvoiceDiscount {
+            $discount = InvoiceDiscount::query()->firstOrNew([
+                'invoice_id' => $invoice->id,
+                'discount_type' => $discountType,
+                'reference_id' => $referenceId,
+                'discount_source' => $discountSource ?? $discountType,
+            ]);
 
-        $this->synchronizeDiscountAllocations($discount);
+            $discount->fill([
+                'description' => $description ?? $discountType,
+                'amount' => abs($amount),
+                'status' => 'active',
+                'approved_by' => $approvedBy,
+            ]);
+            $discount->save();
 
-        return $discount;
+            $this->synchronizeDiscountAllocations($discount);
+
+            return $discount;
+        });
     }
 
     public function releaseLineDiscounts(InvoiceLine $line, ?string $sourceRefType = null, ?int $sourceRefId = null): array
     {
-        $netByDiscount = DiscountAllocation::query()
-            ->selectRaw('invoice_discount_id, SUM(amount) as net_amount')
-            ->where('invoice_line_id', $line->id)
-            ->groupBy('invoice_discount_id')
-            ->havingRaw('SUM(amount) > 0')
-            ->get();
+        $billingAccountId = $this->billingAccountIdForLine($line);
 
-        $released = [];
+        return $this->settlementMutationGuard->handle($billingAccountId, function () use ($line, $sourceRefType, $sourceRefId): array {
+            $netByDiscount = DiscountAllocation::query()
+                ->selectRaw('invoice_discount_id, SUM(amount) as net_amount')
+                ->where('invoice_line_id', $line->id)
+                ->groupBy('invoice_discount_id')
+                ->havingRaw('SUM(amount) > 0')
+                ->get();
 
-        foreach ($netByDiscount as $row) {
-            DiscountAllocation::query()->create([
-                'invoice_discount_id' => $row->invoice_discount_id,
-                'invoice_line_id' => $line->id,
-                'amount' => -abs((float) $row->net_amount),
-                'entry_type' => 'release',
-                'source_ref_type' => $sourceRefType,
-                'source_ref_id' => $sourceRefId,
-                'allocation_rule' => 'current_line_chronology',
-            ]);
+            $released = [];
 
-            $released[] = (int) $row->invoice_discount_id;
-        }
+            foreach ($netByDiscount as $row) {
+                DiscountAllocation::query()->create([
+                    'invoice_discount_id' => $row->invoice_discount_id,
+                    'invoice_line_id' => $line->id,
+                    'amount' => -abs((float) $row->net_amount),
+                    'entry_type' => 'release',
+                    'source_ref_type' => $sourceRefType,
+                    'source_ref_id' => $sourceRefId,
+                    'allocation_rule' => 'current_line_chronology',
+                ]);
 
-        return array_values(array_unique($released));
+                $released[] = (int) $row->invoice_discount_id;
+            }
+
+            return array_values(array_unique($released));
+        });
     }
 
     public function synchronizeDiscountAllocations(InvoiceDiscount $discount): void
@@ -470,52 +490,56 @@ class SettlementService
             return;
         }
 
-        $eligibleLines = InvoiceLine::query()
-            ->where('invoice_id', $invoice->id)
-            ->where('status', 'active')
-            ->where('amount_snapshot', '>', 0)
-            ->orderBy('created_at')
-            ->orderBy('id')
-            ->get();
+        $billingAccountId = $this->billingAccountIdForInvoice($invoice);
 
-        if ($eligibleLines->isEmpty()) {
+        $this->settlementMutationGuard->handle($billingAccountId, function () use ($discount, $invoice): void {
+            $eligibleLines = InvoiceLine::query()
+                ->where('invoice_id', $invoice->id)
+                ->where('status', 'active')
+                ->where('amount_snapshot', '>', 0)
+                ->orderBy('created_at')
+                ->orderBy('id')
+                ->get();
+
+            if ($eligibleLines->isEmpty()) {
+                $this->recalculateInvoiceSnapshot($invoice);
+
+                return;
+            }
+
+            $netAllocated = max(0, (float) DiscountAllocation::query()
+                ->where('invoice_discount_id', $discount->id)
+                ->sum('amount'));
+
+            $remaining = max(0, (float) $discount->amount - $netAllocated);
+
+            foreach ($eligibleLines as $line) {
+                if ($remaining <= 0) {
+                    break;
+                }
+
+                $lineCurrentDiscount = $this->getLineDiscountAmount($line);
+                $lineCapacity = max(0, (float) $line->amount_snapshot - $lineCurrentDiscount);
+
+                if ($lineCapacity <= 0) {
+                    continue;
+                }
+
+                $allocateAmount = min($remaining, $lineCapacity);
+
+                DiscountAllocation::query()->create([
+                    'invoice_discount_id' => $discount->id,
+                    'invoice_line_id' => $line->id,
+                    'amount' => $allocateAmount,
+                    'entry_type' => 'allocation',
+                    'allocation_rule' => 'current_line_chronology',
+                ]);
+
+                $remaining -= $allocateAmount;
+            }
+
             $this->recalculateInvoiceSnapshot($invoice);
-
-            return;
-        }
-
-        $netAllocated = max(0, (float) DiscountAllocation::query()
-            ->where('invoice_discount_id', $discount->id)
-            ->sum('amount'));
-
-        $remaining = max(0, (float) $discount->amount - $netAllocated);
-
-        foreach ($eligibleLines as $line) {
-            if ($remaining <= 0) {
-                break;
-            }
-
-            $lineCurrentDiscount = $this->getLineDiscountAmount($line);
-            $lineCapacity = max(0, (float) $line->amount_snapshot - $lineCurrentDiscount);
-
-            if ($lineCapacity <= 0) {
-                continue;
-            }
-
-            $allocateAmount = min($remaining, $lineCapacity);
-
-            DiscountAllocation::query()->create([
-                'invoice_discount_id' => $discount->id,
-                'invoice_line_id' => $line->id,
-                'amount' => $allocateAmount,
-                'entry_type' => 'allocation',
-                'allocation_rule' => 'current_line_chronology',
-            ]);
-
-            $remaining -= $allocateAmount;
-        }
-
-        $this->recalculateInvoiceSnapshot($invoice);
+        });
     }
 
     public function releaseLineOverpayment(InvoiceLine $line, ?int $userId = null, ?string $sourceRefType = null, ?int $sourceRefId = null): array
@@ -576,6 +600,18 @@ class SettlementService
             'amount' => $releasedAmount,
             'payment_ids' => array_values(array_unique($paymentIds)),
         ];
+    }
+
+    private function billingAccountIdForInvoice(StudentInvoice $invoice): int
+    {
+        return (int) $this->billingAccountProvisioner
+            ->forStudent((int) $invoice->student_id)
+            ->id;
+    }
+
+    private function billingAccountIdForLine(InvoiceLine $line): int
+    {
+        return $this->billingAccountIdForInvoice($line->invoice()->firstOrFail());
     }
 
     public function getOutstandingLinesForStudent(int $studentId, array $priorityOrder): Collection

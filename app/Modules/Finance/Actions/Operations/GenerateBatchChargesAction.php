@@ -10,7 +10,6 @@ use App\Modules\Finance\Actions\Egc\SubmitEgcLevelFeeDebitAction;
 use App\Modules\Finance\Actions\Major\SubmitTuitionTermDebitAction;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceDiscount;
-use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Services\InvoiceGenerationService;
@@ -363,17 +362,10 @@ class GenerateBatchChargesAction
                         $stats['updated_invoices']++;
                     }
 
-                    // 5. Link Charges
-                    foreach ($chargesToLink as $chargeItem) {
-                        InvoiceLine::firstOrCreate([
-                            'invoice_id' => $invoice->id,
-                            'charge_id' => $chargeItem->id,
-                        ], [
-                            'amount_snapshot' => $chargeItem->amount,
-                            'description_snapshot' => $chargeItem->description,
-                        ]);
-                        $stats['created_count']++;
-                    }
+                    // Debit intake owns charge-to-invoice materialization. Batch
+                    // generation only counts the already-materialized results;
+                    // re-linking here would bypass the settlement mutation guard.
+                    $stats['created_count'] += count($chargesToLink);
 
                     foreach ($pendingDiscounts as $pendingDiscount) {
                         $invoiceService->applyInvoiceDiscount(

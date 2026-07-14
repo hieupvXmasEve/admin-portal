@@ -8,6 +8,8 @@ use App\Modules\Finance\Events\InstallmentPushed;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -32,8 +34,17 @@ use Illuminate\Support\Facades\Log;
  */
 class PushNextInstallmentAction
 {
+    public function __construct(
+        private readonly BillingAccountProvisioner $billingAccountProvisioner,
+        private readonly SettlementMutationGuard $settlementMutationGuard,
+    ) {}
+
     public function handle(int $chargeId, ?int $explicitInstallmentId = null): ?FinanceChargeInstallment
     {
+        $billingAccountId = (int) $this->billingAccountProvisioner
+            ->forStudent((int) FinanceCharge::query()->findOrFail($chargeId)->student_id)
+            ->id;
+
         // Lock the charge row to serialize concurrent pushes (webhook + manual).
         $charge = FinanceCharge::query()
             ->with('student')
@@ -75,20 +86,35 @@ class PushNextInstallmentAction
                 [(int) $line->id => (int) $installment->id],
             );
         } catch (\Throwable $exception) {
-            $installment->update([
-                'last_push_error' => $exception->getMessage(),
-                'last_push_attempted_at' => now(),
-                'push_attempt_count' => $installment->push_attempt_count + 1,
-            ]);
+            $this->settlementMutationGuard->handle($billingAccountId, function () use ($installment, $exception): void {
+                $lockedInstallment = FinanceChargeInstallment::query()
+                    ->lockForUpdate()
+                    ->findOrFail($installment->id);
+
+                $lockedInstallment->update([
+                    'last_push_error' => $exception->getMessage(),
+                    'last_push_attempted_at' => now(),
+                    'push_attempt_count' => $lockedInstallment->push_attempt_count + 1,
+                ]);
+            });
 
             throw $exception;
         }
-        $installment->update([
-            'dng_payment_request_id' => $reservation->id,
-            'status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
-            'last_push_error' => null,
-            'last_push_attempted_at' => now(),
-        ]);
+
+        $fresh = $this->settlementMutationGuard->handle($billingAccountId, function () use ($installment, $reservation): FinanceChargeInstallment {
+            $lockedInstallment = FinanceChargeInstallment::query()
+                ->lockForUpdate()
+                ->findOrFail($installment->id);
+
+            $lockedInstallment->update([
+                'dng_payment_request_id' => $reservation->id,
+                'status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
+                'last_push_error' => null,
+                'last_push_attempted_at' => now(),
+            ]);
+
+            return $lockedInstallment->fresh();
+        });
 
         Log::info('Installment pushed to DNG', [
             'finance_charge_id' => $charge->id,
@@ -96,8 +122,6 @@ class PushNextInstallmentAction
             'installment_no' => $installment->installment_no,
             'amount' => $installment->amount,
         ]);
-
-        $fresh = $installment->fresh();
 
         InstallmentPushed::dispatch($fresh);
 

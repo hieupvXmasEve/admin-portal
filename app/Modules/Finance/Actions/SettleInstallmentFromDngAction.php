@@ -9,6 +9,8 @@ use App\Modules\Finance\Events\ChargeFullySettled;
 use App\Modules\Finance\Jobs\PushNextInstallmentJob;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -35,6 +37,11 @@ use Illuminate\Support\Facades\Log;
  */
 class SettleInstallmentFromDngAction
 {
+    public function __construct(
+        private readonly BillingAccountProvisioner $billingAccountProvisioner,
+        private readonly SettlementMutationGuard $settlementMutationGuard,
+    ) {}
+
     /**
      * @return Collection<int, FinanceChargeInstallment> installments settled by this call
      *                                                   (empty if DNG has no linked installments or all already paid)
@@ -47,59 +54,65 @@ class SettleInstallmentFromDngAction
         // PushNextInstallmentJob. The lock serialises settlement; the loser re-reads
         // an empty collectible set and is a clean no-op. dispatchAfterCommit then
         // fires the next-push/fully-settled side effects only once, post-commit.
-        return DB::transaction(function () use ($request): Collection {
-            // FIN-12: only settle installments that are still collectible. A cancelled
-            // installment (e.g. its charge was voided) must never be resurrected to
-            // paid by a late webhook for the same DNG request.
-            $installments = FinanceChargeInstallment::query()
-                ->where('dng_payment_request_id', $request->id)
-                ->whereIn('status', [
-                    FinanceChargeInstallment::STATUS_PENDING,
-                    FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
-                ])
-                ->lockForUpdate()
-                ->get();
+        $billingAccountId = (int) $this->billingAccountProvisioner
+            ->forStudent((int) $request->student_id)
+            ->id;
 
-            if ($installments->isEmpty()) {
-                // Legacy DNG (no installment link) OR all already settled — no-op.
-                return new Collection;
-            }
+        return $this->settlementMutationGuard->handle($billingAccountId, function () use ($request): Collection {
+            return DB::transaction(function () use ($request): Collection {
+                // FIN-12: only settle installments that are still collectible. A cancelled
+                // installment (e.g. its charge was voided) must never be resurrected to
+                // paid by a late webhook for the same DNG request.
+                $installments = FinanceChargeInstallment::query()
+                    ->where('dng_payment_request_id', $request->id)
+                    ->whereIn('status', [
+                        FinanceChargeInstallment::STATUS_PENDING,
+                        FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
+                    ])
+                    ->lockForUpdate()
+                    ->get();
 
-            $paidAt = $request->paid_at ?? now();
+                if ($installments->isEmpty()) {
+                    // Legacy DNG (no installment link) OR all already settled — no-op.
+                    return new Collection;
+                }
 
-            foreach ($installments as $installment) {
-                $installment->update([
-                    'status' => FinanceChargeInstallment::STATUS_PAID,
-                    'paid_at' => $paidAt,
-                ]);
+                $paidAt = $request->paid_at ?? now();
 
-                Log::info('Installment settled from DNG', [
-                    'dng_payment_request_id' => $request->id,
-                    'installment_id' => $installment->id,
-                    'finance_charge_id' => $installment->finance_charge_id,
-                ]);
-            }
+                foreach ($installments as $installment) {
+                    $installment->update([
+                        'status' => FinanceChargeInstallment::STATUS_PAID,
+                        'paid_at' => $paidAt,
+                    ]);
 
-            // For each unique charge touched: decide push-next vs fully-settled.
-            $chargeIds = $installments->pluck('finance_charge_id')->unique()->values();
+                    Log::info('Installment settled from DNG', [
+                        'dng_payment_request_id' => $request->id,
+                        'installment_id' => $installment->id,
+                        'finance_charge_id' => $installment->finance_charge_id,
+                    ]);
+                }
 
-            foreach ($chargeIds as $chargeId) {
-                $hasMorePending = FinanceChargeInstallment::query()
-                    ->where('finance_charge_id', $chargeId)
-                    ->where('status', FinanceChargeInstallment::STATUS_PENDING)
-                    ->exists();
+                // For each unique charge touched: decide push-next vs fully-settled.
+                $chargeIds = $installments->pluck('finance_charge_id')->unique()->values();
 
-                if ($hasMorePending) {
-                    $this->dispatchAfterCommit(fn () => PushNextInstallmentJob::dispatch((int) $chargeId));
-                } else {
-                    $charge = FinanceCharge::find($chargeId);
-                    if ($charge !== null) {
-                        $this->dispatchAfterCommit(fn () => ChargeFullySettled::dispatch($charge));
+                foreach ($chargeIds as $chargeId) {
+                    $hasMorePending = FinanceChargeInstallment::query()
+                        ->where('finance_charge_id', $chargeId)
+                        ->where('status', FinanceChargeInstallment::STATUS_PENDING)
+                        ->exists();
+
+                    if ($hasMorePending) {
+                        $this->dispatchAfterCommit(fn () => PushNextInstallmentJob::dispatch((int) $chargeId));
+                    } else {
+                        $charge = FinanceCharge::find($chargeId);
+                        if ($charge !== null) {
+                            $this->dispatchAfterCommit(fn () => ChargeFullySettled::dispatch($charge));
+                        }
                     }
                 }
-            }
 
-            return $installments->map(fn ($i) => $i->fresh());
+                return $installments->map(fn ($i) => $i->fresh());
+            });
         });
     }
 
