@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Models\EgcBlock;
-use App\Models\Semester;
+use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
+use App\Shared\Contracts\Academic\DTO\AcademicEgcBlockData;
 use Illuminate\Support\Collection;
 
 final class EgcRetakeTargetResolver
@@ -16,64 +16,41 @@ final class EgcRetakeTargetResolver
      * Block 1 failures target block 2 in the same semester. Block 2 failures
      * target block 1 in the immediately following semester. No later fallback.
      *
-     * @return Collection<int, EgcBlock>
+     * @return Collection<int, AcademicEgcBlockData>
      */
-    public static function targetBlocksFor(EgcBlock $sourceBlock): Collection
+    public static function targetBlocksFor(object|int $sourceBlock): Collection
     {
-        $query = EgcBlock::query()
-            ->where('student_id', $sourceBlock->student_id)
-            ->where('result', EgcBlock::RESULT_PENDING)
-            ->whereKeyNot($sourceBlock->id);
-
-        if ((int) $sourceBlock->block_number === 1) {
-            return self::chargeable($query
-                ->where('semester_id', $sourceBlock->semester_id)
-                ->where('block_number', 2)
-                ->orderBy('id')
-                ->get());
+        $source = self::sourceBlockData($sourceBlock);
+        if (! $source instanceof AcademicEgcBlockData) {
+            return collect();
         }
 
-        if ((int) $sourceBlock->block_number !== 2) {
-            return EgcBlock::query()->whereRaw('1 = 0')->get();
-        }
-
-        $nextSemesterId = self::nextSemesterId($sourceBlock);
-        if ($nextSemesterId === null) {
-            return EgcBlock::query()->whereRaw('1 = 0')->get();
-        }
-
-        return self::chargeable($query
-            ->where('semester_id', $nextSemesterId)
-            ->where('block_number', 1)
-            ->orderBy('id')
-            ->get());
+        return self::chargeable(collect(self::academicSources()->egcRetakeTargetsForBlock($source->id)));
     }
 
-    private static function nextSemesterId(EgcBlock $sourceBlock): ?int
+    private static function sourceBlockData(object|int $sourceBlock): ?AcademicEgcBlockData
     {
-        $sourceSemester = Semester::query()->find($sourceBlock->semester_id);
-        if (! $sourceSemester instanceof Semester || $sourceSemester->start_date === null) {
-            return null;
+        if ($sourceBlock instanceof AcademicEgcBlockData) {
+            return $sourceBlock;
         }
 
-        $nextId = Semester::query()
-            ->where('id', '!=', $sourceSemester->id)
-            ->where('is_archived', false)
-            ->where('start_date', '>', $sourceSemester->start_date)
-            ->orderBy('start_date')
-            ->orderBy('id')
-            ->value('id');
+        $blockId = is_int($sourceBlock) ? $sourceBlock : (int) ($sourceBlock->id ?? 0);
 
-        return $nextId !== null ? (int) $nextId : null;
+        return $blockId > 0 ? self::academicSources()->egcBlockById($blockId) : null;
     }
 
-    /** @param Collection<int, EgcBlock> $blocks @return Collection<int, EgcBlock> */
+    /** @param Collection<int, AcademicEgcBlockData> $blocks @return Collection<int, AcademicEgcBlockData> */
     private static function chargeable(Collection $blocks): Collection
     {
         $chargesByBlock = app(EgcBlockFinanceResolver::class)->chargesFor($blocks);
 
         return $blocks
-            ->filter(fn (EgcBlock $block): bool => $chargesByBlock->has($block->id))
+            ->filter(fn (AcademicEgcBlockData $block): bool => $chargesByBlock->has($block->id))
             ->values();
+    }
+
+    private static function academicSources(): AcademicFinanceChargeSourceGateway
+    {
+        return app(AcademicFinanceChargeSourceGateway::class);
     }
 }

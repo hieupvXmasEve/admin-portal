@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Reporting;
 
-use App\Models\CourseRetakeRegistration;
-use App\Models\ExamResitAttempt;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
@@ -18,6 +16,7 @@ use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionIssue;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionScope;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
+use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -36,6 +35,7 @@ class ListFeeMonitorQuery
         private readonly StudentChargeTimingResolver $timingResolver,
         private readonly SettlementPositionReader $settlementPositionReader,
         private readonly CurrentSettlementPositionPresenter $positionPresenter,
+        private readonly AcademicFinanceChargeSourceGateway $academicSources,
     ) {}
 
     /**
@@ -406,16 +406,7 @@ class ListFeeMonitorQuery
 
         // Course retake (học lại): non-terminal source still owes a retake_fee.
         // STATUS_CANCELLED is terminal and therefore already excluded.
-        $retakeStudentIds = CourseRetakeRegistration::query()
-            ->whereIn('status', CourseRetakeRegistration::NON_TERMINAL_STATUSES)
-            ->where(fn ($query) => $query
-                ->where('charge_semester_id', $semesterId)
-                ->orWhere(fn ($fallback) => $fallback->whereNull('charge_semester_id')->where('semester_id', $semesterId)))
-            ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
-            ->distinct()
-            ->pluck('student_id');
-
-        foreach ($retakeStudentIds as $studentId) {
+        foreach ($this->academicSources->retakeStudentIdsWithExpectedFees($semesterId, $campusId) as $studentId) {
             $row = $this->buildMissingSourceRow(
                 (int) $studentId,
                 FeeMonitorExpectedFeeCatalog::SOURCE_COURSE_RETAKE,
@@ -430,22 +421,7 @@ class ListFeeMonitorQuery
 
         // Exam resit (thi lại): an in-flight/sat attempt still owes an exam_resit_fee.
         // Cancelled/rejected attempts and an HQ-cancelled fee are excluded.
-        $resitStudentIds = ExamResitAttempt::query()
-            ->whereIn('status', [
-                ExamResitAttempt::STATUS_APPROVED,
-                ExamResitAttempt::STATUS_SCHEDULED,
-                ExamResitAttempt::STATUS_COMPLETED,
-                ExamResitAttempt::STATUS_NO_SHOW,
-            ])
-            ->where(fn ($query) => $query
-                ->where('hq_fee_status', '!=', ExamResitAttempt::HQ_FEE_CANCELLED)
-                ->orWhereNull('hq_fee_status'))
-            ->where('charge_semester_id', $semesterId)
-            ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
-            ->distinct()
-            ->pluck('student_id');
-
-        foreach ($resitStudentIds as $studentId) {
+        foreach ($this->academicSources->examResitStudentIdsWithExpectedFees($semesterId, $campusId) as $studentId) {
             $row = $this->buildMissingSourceRow(
                 (int) $studentId,
                 FeeMonitorExpectedFeeCatalog::SOURCE_EXAM_RESIT,

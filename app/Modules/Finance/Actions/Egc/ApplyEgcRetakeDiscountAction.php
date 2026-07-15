@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Egc;
 
-use App\Models\EgcBlock;
 use App\Models\EgcRetakeDiscountLink;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceDiscount;
@@ -14,6 +13,8 @@ use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Modules\Finance\Support\EgcRetakeTargetResolver;
 use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
+use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
+use App\Shared\Contracts\Academic\DTO\AcademicEgcBlockData;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
@@ -42,7 +43,12 @@ class ApplyEgcRetakeDiscountAction
     public static function run(int $egcBlockId, int $targetChargeId): InvoiceDiscount
     {
         return DB::transaction(function () use ($egcBlockId, $targetChargeId) {
-            $block = EgcBlock::with('student:id,status')->findOrFail($egcBlockId);
+            $block = app(AcademicFinanceChargeSourceGateway::class)->egcBlockById($egcBlockId);
+            if (! $block instanceof AcademicEgcBlockData) {
+                throw ValidationException::withMessages([
+                    'egc_block_id' => ['EGC block not found.'],
+                ]);
+            }
 
             // Guard: block must be eligible
             if ($block->retake_discount_id !== null) {
@@ -51,13 +57,13 @@ class ApplyEgcRetakeDiscountAction
                 ]);
             }
 
-            if ($block->result !== EgcBlock::RESULT_FAIL) {
+            if ($block->result !== AcademicEgcBlockData::RESULT_FAIL) {
                 throw ValidationException::withMessages([
                     'egc_block_id' => ['Only failed blocks are eligible for retake discounts.'],
                 ]);
             }
 
-            if ($block->student?->status !== 'intake_pre_uni_gc') {
+            if ($block->student_status !== 'intake_pre_uni_gc') {
                 throw ValidationException::withMessages([
                     'egc_block_id' => ['Retake discounts are only available while the student is in EGC stage.'],
                 ]);
@@ -112,7 +118,7 @@ class ApplyEgcRetakeDiscountAction
                     'invoice_id' => (int) $invoice->id,
                     'invoice_line_id' => (int) $invoiceLine->id,
                     'reference_id' => (int) $block->id,
-                    'discount_source' => EgcBlock::class,
+                    'discount_source' => 'App\\Models\\EgcBlock',
                     'allocation_rule' => 'egc_retake_target',
                     'description' => "EGC Retake Discount — Block #{$block->block_number} Level {$block->level_number}",
                     'egc_block_id' => (int) $block->id,
@@ -147,8 +153,7 @@ class ApplyEgcRetakeDiscountAction
                 ]);
             }
 
-            // Mark block entitlement consumed
-            $block->update(['retake_discount_id' => $discount->id]);
+            app(AcademicFinanceChargeSourceGateway::class)->markEgcRetakeDiscountConsumed((int) $block->id, (int) $discount->id);
 
             // If the invoice was already paid, release the newly created overpayment back to unapplied balance.
             app(SettlementService::class)->releaseLineOverpayment(
@@ -169,13 +174,13 @@ class ApplyEgcRetakeDiscountAction
         return "egc_retake:block:{$egcBlockId}";
     }
 
-    private static function isValidTargetCharge(EgcBlock $sourceBlock, FinanceCharge $targetCharge): bool
+    private static function isValidTargetCharge(AcademicEgcBlockData $sourceBlock, FinanceCharge $targetCharge): bool
     {
         $targetBlocks = EgcRetakeTargetResolver::targetBlocksFor($sourceBlock);
         $chargesByBlock = app(EgcBlockFinanceResolver::class)->chargesFor($targetBlocks);
 
         return $targetBlocks
-            ->contains(fn (EgcBlock $targetBlock): bool => (int) $chargesByBlock->get($targetBlock->id)?->id === (int) $targetCharge->id
+            ->contains(fn (AcademicEgcBlockData $targetBlock): bool => (int) $chargesByBlock->get($targetBlock->id)?->id === (int) $targetCharge->id
                 && (int) $targetBlock->level_number === (int) $sourceBlock->level_number
                 && (bool) $targetBlock->is_retake);
     }

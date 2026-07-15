@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Dng;
 
-use App\Models\CourseRetakeRegistration;
-use App\Models\ExamResitAttempt;
 use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
@@ -16,6 +14,8 @@ use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistPresenter;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistReader;
+use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
+use App\Shared\Contracts\Academic\DTO\AcademicChargeSourceData;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -42,6 +42,7 @@ class ListDngWorklistQuery
     public function __construct(
         private readonly SettlementPositionWorklistReader $positionReader,
         private readonly SettlementPositionWorklistPresenter $positionPresenter,
+        private readonly AcademicFinanceChargeSourceGateway $academicSources,
     ) {}
 
     /**
@@ -486,54 +487,32 @@ class ListDngWorklistQuery
             return collect();
         }
 
-        $registrations = CourseRetakeRegistration::query()
-            ->whereIn('student_id', $studentIds)
-            ->where('status', CourseRetakeRegistration::STATUS_APPROVED)
-            ->when($semesterId !== null, fn ($query) => $query->where('semester_id', $semesterId))
-            ->with(['unit:id,code,name', 'semester:id,name'])
-            ->get(['id', 'student_id', 'unit_id', 'semester_id', 'retake_fee', 'status'])
-            ->map(fn ($reg) => [
-                'id' => $reg->id,
-                'student_id' => $reg->student_id,
-                'unit_code' => $reg->unit?->code,
-                'unit_name' => $reg->unit?->name,
-                'semester_name' => $reg->semester?->name,
-                'retake_fee' => (float) $reg->retake_fee,
-            ]);
+        $sources = $semesterId === null
+            ? collect($this->academicSources->approvedRetakeSources())
+                ->filter(fn (AcademicChargeSourceData $source): bool => in_array($source->student_id, $studentIds, true))
+                ->values()
+            : collect($studentIds)
+                ->flatMap(fn (int $studentId): array => $this->academicSources->chargeableRetakeSourcesForStudent($studentId, $semesterId));
 
-        return $registrations->groupBy('student_id');
+        return $sources
+            ->map(fn (AcademicChargeSourceData $source): array => $this->sourcePendingRow($source))
+            ->groupBy('student_id');
     }
 
     private function loadApprovedRetakeSourceRows(?int $campusId, ?int $semesterId, string $search): Collection
     {
-        $registrations = CourseRetakeRegistration::query()
-            ->with(['student:id,student_id,full_name,campus_id', 'student.campus:id,name', 'campus:id,name'])
-            ->where('status', CourseRetakeRegistration::STATUS_APPROVED)
-            ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
-            ->when($semesterId !== null, fn ($query) => $query->where('semester_id', $semesterId))
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->whereHas('student', function ($studentQuery) use ($search): void {
-                    $studentQuery->where('student_id', 'like', "%{$search}%")
-                        ->orWhere('full_name', 'like', "%{$search}%");
-                });
-            })
-            ->get();
-
-        return $registrations
+        return collect($this->academicSources->approvedRetakeSources($campusId, $semesterId, $search))
             ->groupBy('student_id')
-            ->map(function (Collection $studentRegistrations) {
-                /** @var CourseRetakeRegistration $first */
-                $first = $studentRegistrations->first();
-                $student = $first->student;
-                $campus = $first->campus ?? $student?->campus;
-                $total = (float) $studentRegistrations->sum(fn (CourseRetakeRegistration $registration) => (float) $registration->retake_fee);
+            ->map(function (Collection $studentSources) {
+                /** @var AcademicChargeSourceData $first */
+                $first = $studentSources->first();
 
                 return (object) [
                     'student_id' => $first->student_id,
-                    'student_code' => $student?->student_id,
-                    'student_name' => $student?->full_name,
-                    'campus_id' => $campus?->id,
-                    'campus_name' => $campus?->name,
+                    'student_code' => $first->facts['student_code'] ?? null,
+                    'student_name' => $first->facts['student_name'] ?? null,
+                    'campus_id' => $first->campus_id,
+                    'campus_name' => $first->facts['campus_name'] ?? null,
                     'charge_count' => 0,
                     'total_amount' => null,
                     'total_paid' => 0.0,
@@ -568,56 +547,32 @@ class ListDngWorklistQuery
             return collect();
         }
 
-        $attempts = ExamResitAttempt::query()
-            ->whereIn('student_id', $studentIds)
-            ->where('status', ExamResitAttempt::STATUS_APPROVED)
-            ->where('hq_fee_status', ExamResitAttempt::HQ_FEE_PENDING)
-            ->when($semesterId !== null, fn ($query) => $query->where('charge_semester_id', $semesterId))
-            ->with(['unit:id,code,name', 'chargeSemester:id,name'])
-            ->get(['id', 'student_id', 'unit_id', 'charge_semester_id', 'fee_amount', 'status', 'hq_fee_status'])
-            ->map(fn ($attempt) => [
-                'id' => $attempt->id,
-                'student_id' => $attempt->student_id,
-                'unit_code' => $attempt->unit?->code,
-                'unit_name' => $attempt->unit?->name,
-                'semester_name' => $attempt->chargeSemester?->name,
-                'retake_fee' => (float) $attempt->fee_amount,
-            ]);
+        $sources = $semesterId === null
+            ? collect($this->academicSources->approvedExamResitSources())
+                ->filter(fn (AcademicChargeSourceData $source): bool => in_array($source->student_id, $studentIds, true))
+                ->values()
+            : collect($studentIds)
+                ->flatMap(fn (int $studentId): array => $this->academicSources->chargeableExamResitSourcesForStudent($studentId, $semesterId));
 
-        return $attempts->groupBy('student_id');
+        return $sources
+            ->map(fn (AcademicChargeSourceData $source): array => $this->sourcePendingRow($source))
+            ->groupBy('student_id');
     }
 
     private function loadApprovedExamResitSourceRows(?int $campusId, ?int $semesterId, string $search): Collection
     {
-        $attempts = ExamResitAttempt::query()
-            ->with(['student:id,student_id,full_name,campus_id', 'student.campus:id,name', 'campus:id,name'])
-            ->where('status', ExamResitAttempt::STATUS_APPROVED)
-            ->where('hq_fee_status', ExamResitAttempt::HQ_FEE_PENDING)
-            ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
-            ->when($semesterId !== null, fn ($query) => $query->where('charge_semester_id', $semesterId))
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->whereHas('student', function ($studentQuery) use ($search): void {
-                    $studentQuery->where('student_id', 'like', "%{$search}%")
-                        ->orWhere('full_name', 'like', "%{$search}%");
-                });
-            })
-            ->get();
-
-        return $attempts
+        return collect($this->academicSources->approvedExamResitSources($campusId, $semesterId, $search))
             ->groupBy('student_id')
-            ->map(function (Collection $studentAttempts) {
-                /** @var ExamResitAttempt $first */
-                $first = $studentAttempts->first();
-                $student = $first->student;
-                $campus = $first->campus ?? $student?->campus;
-                $total = (float) $studentAttempts->sum(fn (ExamResitAttempt $attempt) => (float) $attempt->fee_amount);
+            ->map(function (Collection $studentSources) {
+                /** @var AcademicChargeSourceData $first */
+                $first = $studentSources->first();
 
                 return (object) [
                     'student_id' => $first->student_id,
-                    'student_code' => $student?->student_id,
-                    'student_name' => $student?->full_name,
-                    'campus_id' => $campus?->id,
-                    'campus_name' => $campus?->name,
+                    'student_code' => $first->facts['student_code'] ?? null,
+                    'student_name' => $first->facts['student_name'] ?? null,
+                    'campus_id' => $first->campus_id,
+                    'campus_name' => $first->facts['campus_name'] ?? null,
                     'charge_count' => 0,
                     'total_amount' => null,
                     'total_paid' => 0.0,
@@ -637,6 +592,18 @@ class ListDngWorklistQuery
                 ];
             })
             ->values();
+    }
+
+    private function sourcePendingRow(AcademicChargeSourceData $source): array
+    {
+        return [
+            'id' => $source->id,
+            'student_id' => $source->student_id,
+            'unit_code' => $source->facts['unit_code'] ?? null,
+            'unit_name' => $source->facts['unit_name'] ?? null,
+            'semester_name' => $source->facts['semester_name'] ?? null,
+            'retake_fee' => (float) ($source->facts['snapshot_amount'] ?? 0),
+        ];
     }
 
     private function mergeApprovedSourcesWithoutCharge(Collection $chargeRows, Collection $sourceRows): Collection

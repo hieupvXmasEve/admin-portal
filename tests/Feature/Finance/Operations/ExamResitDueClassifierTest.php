@@ -10,6 +10,8 @@ use App\Models\Student;
 use App\Models\User;
 use App\Modules\Finance\Support\ExamResitDueClassification;
 use App\Modules\Finance\Support\ExamResitDueClassifier;
+use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
+use App\Shared\Contracts\Academic\DTO\AcademicExamResitDueData;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -43,13 +45,18 @@ function classifierStudent(object $ctx, string $status = 'intake_course', ?strin
         ->create();
 }
 
+function examResitDueSource(ExamResitAttempt $attempt): AcademicExamResitDueData
+{
+    return app(AcademicFinanceChargeSourceGateway::class)->examResitDueSourcesByIds([$attempt->id])[$attempt->id];
+}
+
 it('blocks a paid attempt regardless of DNG state', function () {
     $student = classifierStudent($this);
     $attempt = makeApprovedExamResitAttempt($student, $this->campus, $this->semester);
     $charge = createExamResitChargeFor($attempt);
     payExamResitChargeFully($charge);
 
-    $attempt = $attempt->fresh()->load('financeCharge', 'student', 'session.roomSlot');
+    $attempt = examResitDueSource($attempt->fresh());
 
     $result = $this->classifier->classify($attempt, hasActivePushedDng: true);
 
@@ -64,7 +71,7 @@ it('marks an unpaid scheduled future sitting with a pushed DNG as remindable + u
     createExamResitChargeFor($attempt);
     $attempt = scheduleExamResitAttemptInSlot($attempt->fresh(), now()->addDays(20));
 
-    $attempt = $attempt->load('financeCharge', 'student', 'session.roomSlot');
+    $attempt = examResitDueSource($attempt);
 
     $result = $this->classifier->classify($attempt, hasActivePushedDng: true);
 
@@ -81,7 +88,7 @@ it('marks an unpaid past sitting beyond grace with a pushed DNG as remindable + 
     // Sat 30 days ago, default 14-day grace -> overdue ~16 days.
     $attempt = scheduleExamResitAttemptInSlot($attempt->fresh(), now()->subDays(30));
 
-    $attempt = $attempt->load('financeCharge', 'student', 'session.roomSlot');
+    $attempt = examResitDueSource($attempt);
 
     $result = $this->classifier->classify($attempt, hasActivePushedDng: true);
 
@@ -97,7 +104,7 @@ it('marks an overdue attempt with a charge but no pushed DNG as needs_charge_or_
     createExamResitChargeFor($attempt);
     $attempt = scheduleExamResitAttemptInSlot($attempt->fresh(), now()->subDays(30));
 
-    $attempt = $attempt->load('financeCharge', 'student', 'session.roomSlot');
+    $attempt = examResitDueSource($attempt);
 
     $result = $this->classifier->classify($attempt, hasActivePushedDng: false);
 
@@ -112,9 +119,9 @@ it('marks an overdue attempt with no charge at all as needs_charge_or_dng', func
     $attempt = makeApprovedExamResitAttempt($student, $this->campus, $this->semester);
     $attempt = scheduleExamResitAttemptInSlot($attempt->fresh(), now()->subDays(30));
 
-    $attempt = $attempt->load('financeCharge', 'student', 'session.roomSlot');
+    $attempt = examResitDueSource($attempt);
 
-    expect($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_PENDING);
+    expect($attempt->hq_fee_status)->toBe(AcademicExamResitDueData::HQ_FEE_PENDING);
 
     $result = $this->classifier->classify($attempt, hasActivePushedDng: false);
 
@@ -128,7 +135,7 @@ it('blocks a lifecycle-exception student even with a pushed DNG', function () {
     createExamResitChargeFor($attempt);
     $attempt = scheduleExamResitAttemptInSlot($attempt->fresh(), now()->subDays(30));
 
-    $attempt = $attempt->load('financeCharge', 'student', 'session.roomSlot');
+    $attempt = examResitDueSource($attempt);
 
     $result = $this->classifier->classify($attempt, hasActivePushedDng: true);
 
@@ -142,7 +149,7 @@ it('blocks an attempt whose student has no email', function () {
     createExamResitChargeFor($attempt);
     $attempt = scheduleExamResitAttemptInSlot($attempt->fresh(), now()->subDays(30));
 
-    $attempt = $attempt->load('financeCharge', 'student', 'session.roomSlot');
+    $attempt = examResitDueSource($attempt);
 
     $result = $this->classifier->classify($attempt, hasActivePushedDng: true);
 

@@ -1,7 +1,7 @@
 # Academic/Finance boundary, source-agnostic Finance intake, and the retake/resit debit cutover
 
 **Status:** accepted (supersedes the earlier candidate-centric draft of this ADR)
-**Last updated:** 2026-07-11 (cancellation handoff clarified: Academic outbox, not cross-context TX)
+**Last updated:** 2026-07-15 (Academic source contracts restored for retake/resit/EGC)
 
 Swinx stays a Laravel modular monolith, but Academic and Finance are separate bounded contexts that must be able to change independently: a business change on one side must not force a schema or code change on the other. `Student` is a Shared Kernel identity reference only (see **Student Identity** in `CONTEXT.md`). Academic owns the **Academic Student Lifecycle**; Finance owns all money — charges, credits, discounts, invoices, payments, DNG, settlement, review, and audit.
 
@@ -31,7 +31,9 @@ These are the load-bearing rules. Everything else follows.
 
 **2.3 — Lifecycle status never encodes settlement.** `finance_obligations.lifecycle_status` is limited to the obligation's decision lifecycle: `requested → accepted → rejected → cancelled → voided → superseded`. Settlement state (`unpaid`, `partially_paid`, `paid`, `overpaid`, `settled_by_discount_or_credit`) MUST be **derived** from the authoritative ledger — `invoice_lines`, `payment_applications`, `discount_allocations`, `payments`. Any stored settlement summary is a rebuildable projection; if it disagrees with the ledger, the ledger wins.
 
-**2.4 — Boundary is enforced, not merely documented.** The money models (`FinanceCharge`, `Payment`, `StudentInvoice`, …) move into `App\Modules\Finance\Models`. An architecture test (Pest arch or Deptrac) forbids `App\Modules\Academic\*` from referencing `App\Modules\Finance\Models\*` and vice versa; CI fails on violation. Cross-context access goes only through `app/Shared/Contracts/*`. **Enforcement is a slice-1 deliverable, not yet present:** today there is no arch suite in `tests/`, no Deptrac in `composer.json`, and CI is deploy-only — current code still couples (e.g. Academic imports `FinanceCharge` in `SyncPaidExamResitAttemptsAction`; Finance imports `CourseRetakeRegistration` in `CreateRetakeCourseChargeSimpleAction`). The arch test lands green only after §5's reroute + model relocation, and CI must be re-enabled for it to bite.
+**2.4 — Boundary is enforced, not merely documented.** The money models (`FinanceCharge`, `Payment`, `StudentInvoice`, …) live in `App\Modules\Finance\Models`. Architecture tests forbid `App\Modules\Academic\*` from referencing Finance money models and forbid `App\Modules\Finance\*` from importing/querying Academic source Eloquent models for course registrations, retake registrations, exam-resit attempts, and EGC blocks. Cross-context access goes only through `app/Shared/Contracts/*`.
+
+As of the 2026-07-15 restoration slice, Finance consumes retake/resit/EGC source facts through `AcademicFinanceChargeSourceGateway` DTOs and commands. Academic owns Academic source persistence (including retake/resit fee-state transitions, EGC block creation/result/relevel/discount-consumed updates, and EGC course-result resolution); Finance owns obligations, charges, invoices, DNG, settlement, and discounts.
 
 ---
 
@@ -115,7 +117,7 @@ Academic model callback directly.
 
 ## 6. Out of scope
 
-Tuition, EGC, defer/resume settlement, program-change adjustment, course-drop refund, scholarship/voucher/credit and discount aggregates (design-defined here, not implemented), manual finance override, a database rule engine, and a full Finance rewrite. Each is a later obligation-type slice or a separate ADR.
+Tuition, defer/resume settlement, program-change adjustment, course-drop refund, scholarship/voucher/credit and discount aggregates (design-defined here, not implemented), manual finance override, a database rule engine, and a full Finance rewrite. Each is a later obligation-type slice or a separate ADR. EGC money remains Finance-owned; only the Academic EGC block/source facts and state transitions now sit behind the Academic contract.
 
 ---
 

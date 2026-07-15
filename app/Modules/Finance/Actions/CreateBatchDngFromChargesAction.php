@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions;
 
-use App\Models\CourseRetakeRegistration;
-use App\Models\ExamResitAttempt;
 use App\Models\Student;
-use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
@@ -15,6 +12,8 @@ use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Queries\Dng\ListDngWorklistQuery;
 use App\Modules\Finance\Support\SettlementMutationGuard;
+use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
+use App\Shared\Contracts\Academic\AcademicFinanceSourceKeys;
 use Closure;
 use Illuminate\Support\Facades\Log;
 
@@ -38,6 +37,7 @@ class CreateBatchDngFromChargesAction
 {
     public function __construct(
         protected ?ReserveAndPushSingleFeeDngAction $guardedReservationAction = null,
+        private readonly ?AcademicFinanceChargeSourceGateway $academicSources = null,
     ) {}
 
     /**
@@ -247,36 +247,14 @@ class CreateBatchDngFromChargesAction
      */
     private function assertNoMissingRetakeObligations(Student $student, int $semesterId): void
     {
-        $pendingRegistrations = CourseRetakeRegistration::query()
-            ->where('student_id', $student->id)
-            ->where(function ($query) use ($semesterId): void {
-                $query->where('charge_semester_id', $semesterId)
-                    ->orWhere(function ($legacyQuery) use ($semesterId): void {
-                        $legacyQuery->whereNull('charge_semester_id')
-                            ->where('semester_id', $semesterId);
-                    });
-            })
-            ->whereIn('status', [
-                CourseRetakeRegistration::STATUS_APPROVED,
-                CourseRetakeRegistration::STATUS_PAYMENT_PENDING,
-            ])
-            ->whereIn('hq_fee_status', [
-                CourseRetakeRegistration::HQ_FEE_PENDING,
-                CourseRetakeRegistration::HQ_FEE_CHARGE_CREATED,
-            ])
-            ->lockForUpdate()
-            ->get();
-
-        foreach ($pendingRegistrations as $registration) {
-            $sourceRef = AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration);
-
+        foreach ($this->academicSources()->chargeableRetakeSourcesForStudent((int) $student->id, $semesterId, lockForUpdate: true) as $source) {
             if (! $this->financeObligationExists(
-                AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION,
-                $sourceRef,
+                $source->source_kind,
+                $source->source_ref,
                 FinanceCharge::TYPE_RETAKE_FEE,
             )) {
                 throw new \RuntimeException(
-                    "missing_finance_obligation: Retake registration #{$registration->id} has no Finance obligation."
+                    "missing_finance_obligation: Retake registration #{$source->id} has no Finance obligation."
                 );
             }
         }
@@ -288,30 +266,14 @@ class CreateBatchDngFromChargesAction
      */
     private function assertNoMissingExamResitObligations(Student $student, int $semesterId): void
     {
-        $pendingAttempts = ExamResitAttempt::query()
-            ->where('student_id', $student->id)
-            ->where('charge_semester_id', $semesterId)
-            ->whereIn('status', [
-                ExamResitAttempt::STATUS_APPROVED,
-                ExamResitAttempt::STATUS_SCHEDULED,
-            ])
-            ->whereIn('hq_fee_status', [
-                ExamResitAttempt::HQ_FEE_PENDING,
-                ExamResitAttempt::HQ_FEE_CHARGE_CREATED,
-            ])
-            ->lockForUpdate()
-            ->get();
-
-        foreach ($pendingAttempts as $attempt) {
-            $sourceRef = AcademicFinanceObligationSource::examResitAttemptRef($attempt);
-
+        foreach ($this->academicSources()->chargeableExamResitSourcesForStudent((int) $student->id, $semesterId, lockForUpdate: true) as $source) {
             if (! $this->financeObligationExists(
-                AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT,
-                $sourceRef,
+                $source->source_kind,
+                $source->source_ref,
                 FinanceCharge::TYPE_EXAM_RESIT_FEE,
             )) {
                 throw new \RuntimeException(
-                    "missing_finance_obligation: Exam resit attempt #{$attempt->id} has no Finance obligation."
+                    "missing_finance_obligation: Exam resit attempt #{$source->id} has no Finance obligation."
                 );
             }
         }
@@ -320,10 +282,15 @@ class CreateBatchDngFromChargesAction
     private function financeObligationExists(string $sourceKind, string $sourceRef, string $obligationType): bool
     {
         return FinanceObligation::query()
-            ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+            ->where('source_system', AcademicFinanceSourceKeys::SOURCE_SYSTEM)
             ->where('source_kind', $sourceKind)
             ->where('source_ref', $sourceRef)
             ->where('obligation_type', $obligationType)
             ->exists();
+    }
+
+    private function academicSources(): AcademicFinanceChargeSourceGateway
+    {
+        return $this->academicSources ?? app(AcademicFinanceChargeSourceGateway::class);
     }
 }

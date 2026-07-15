@@ -4,21 +4,23 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Egc;
 
-use App\Models\EgcBlock;
 use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Modules\Finance\Support\EgcBlockGenerationClassifier;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
+use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
+use App\Shared\Contracts\Academic\DTO\AcademicEgcBlockData;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 class PreviewEgcChargeGenerationQuery
 {
     private ?EgcLevelFeeResolver $egcFeeResolver = null;
 
     private ?EgcBlockGenerationClassifier $blockClassifier = null;
+
+    private ?AcademicFinanceChargeSourceGateway $academicSources = null;
 
     public function handle(int $semesterId, array $filters = [], ?int $campusId = null): array
     {
@@ -141,7 +143,7 @@ class PreviewEgcChargeGenerationQuery
 
         // Student đang học current level → phát sinh phí dự kiến cho level tiếp theo
         // Student đã học xong → phát sinh phí cho current level
-        $isStudying = $this->isStudyingLevel($student->id, $currentLevel);
+        $isStudying = $this->academicSources()->isStudentStudyingEgcLevel($student->id, $currentLevel);
         $effectiveStartLevel = $isStudying ? $currentLevel + 1 : $currentLevel;
 
         if ($effectiveStartLevel >= $totalLevels) {
@@ -219,12 +221,10 @@ class PreviewEgcChargeGenerationQuery
             ->where('status', FinanceCharge::STATUS_ACTIVE)
             ->count();
 
-        $semesterBlocks = EgcBlock::where('student_id', $student->id)
-            ->where('semester_id', $semesterId)
-            ->get();
+        $semesterBlocks = collect($this->academicSources()->egcBlocksForStudentSemester($student->id, $semesterId));
         $chargesByBlock = app(EgcBlockFinanceResolver::class)->chargesFor($semesterBlocks);
         $deferredBlocks = $semesterBlocks
-            ->filter(fn (EgcBlock $block): bool => $chargesByBlock->get($block->id) === null);
+            ->filter(fn (AcademicEgcBlockData $block): bool => $chargesByBlock->get($block->id) === null);
 
         $deferredCount = $deferredBlocks->count();
         $levelsRemaining = max(0, $totalLevels - $effectiveStartLevel);
@@ -267,26 +267,6 @@ class PreviewEgcChargeGenerationQuery
         ]);
     }
 
-    private function isStudyingLevel(int $studentId, int $levelNumber): bool
-    {
-        // Kiểm tra semester gần nhất có EGC record của student
-        // Không dùng target semester vì semester tương lai chưa có academic records
-        return DB::table('academic_records as ar')
-            ->join('units', 'ar.unit_id', '=', 'units.id')
-            ->where('ar.student_id', $studentId)
-            ->where('units.unit_type', 'egc')
-            ->where('units.level', $levelNumber)
-            ->where('ar.completion_status', 'in_progress')
-            ->where('ar.semester_id', function ($query) use ($studentId): void {
-                $query->selectRaw('MAX(ar2.semester_id)')
-                    ->from('academic_records as ar2')
-                    ->join('units as u2', 'ar2.unit_id', '=', 'u2.id')
-                    ->where('ar2.student_id', $studentId)
-                    ->where('u2.unit_type', 'egc');
-            })
-            ->exists();
-    }
-
     /**
      * Resolve which levels will be charged, annotated with retake eligibility.
      *
@@ -314,16 +294,16 @@ class PreviewEgcChargeGenerationQuery
     /**
      * Resolve chargeable levels from existing EGC block slots for a safe reissue.
      *
-     * @param  Collection<int, EgcBlock>  $blocks
+     * @param  Collection<int, AcademicEgcBlockData>  $blocks
      * @return array<int, array{level_number: int, is_retake: bool, amount: int}>
      */
     private function resolveChargeableLevelsForBlocks(int $studentId, Collection $blocks, int $count, int $totalLevels): array
     {
         return $blocks
             ->take($count)
-            ->filter(fn (EgcBlock $block): bool => (int) $block->level_number < $totalLevels)
+            ->filter(fn (AcademicEgcBlockData $block): bool => (int) $block->level_number < $totalLevels)
             ->values()
-            ->map(fn (EgcBlock $block): array => [
+            ->map(fn (AcademicEgcBlockData $block): array => [
                 'level_number' => (int) $block->level_number,
                 'is_retake' => $this->isRetakeEligible($studentId, (int) $block->level_number),
                 'amount' => (int) $this->egcFeeResolver()->resolve((int) $block->level_number),
@@ -332,14 +312,14 @@ class PreviewEgcChargeGenerationQuery
     }
 
     /**
-     * @param  Collection<int, EgcBlock>  $blocks
+     * @param  Collection<int, AcademicEgcBlockData>  $blocks
      * @return array<int, array{block_number: int, level_number: int, finance_source_ref: string}>
      */
     private function egcBlockRows(Collection $blocks): array
     {
         return $blocks
             ->values()
-            ->map(fn (EgcBlock $block): array => [
+            ->map(fn (AcademicEgcBlockData $block): array => [
                 'block_number' => (int) $block->block_number,
                 'level_number' => (int) $block->level_number,
                 'finance_source_ref' => app(EgcBlockFinanceResolver::class)->sourceRef($block),
@@ -359,12 +339,7 @@ class PreviewEgcChargeGenerationQuery
 
     private function isRetakeEligible(int $studentId, int $levelNumber): bool
     {
-        return EgcBlock::where('student_id', $studentId)
-            ->where('level_number', $levelNumber)
-            ->where('result', EgcBlock::RESULT_FAIL)
-            ->where('attendance_rate', '>=', 80)
-            ->whereNull('retake_discount_id')
-            ->exists();
+        return $this->academicSources()->isEgcRetakeEligible($studentId, $levelNumber);
     }
 
     private function baseRow(Student $student): array
@@ -401,5 +376,10 @@ class PreviewEgcChargeGenerationQuery
                 'query' => request()->query(),
             ]
         );
+    }
+
+    private function academicSources(): AcademicFinanceChargeSourceGateway
+    {
+        return $this->academicSources ??= app(AcademicFinanceChargeSourceGateway::class);
     }
 }

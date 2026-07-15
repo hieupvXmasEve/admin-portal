@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Operations;
 
-use App\Models\ExamResitAttempt;
-use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Support\ExamResitDngLinkResolver;
 use App\Modules\Finance\Support\ExamResitDueClassification;
 use App\Modules\Finance\Support\ExamResitDueClassifier;
 use App\Modules\Finance\Support\ExamResitDueRowPresenter;
-use Illuminate\Database\Eloquent\Builder;
+use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
+use App\Shared\Contracts\Academic\AcademicFinanceSourceKeys;
+use App\Shared\Contracts\Academic\DTO\AcademicExamResitDueData;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
@@ -34,34 +34,34 @@ class ListExamResitHandoffQuery
     public function __construct(
         private readonly ExamResitDngLinkResolver $linkResolver = new ExamResitDngLinkResolver,
         private readonly ExamResitDueClassifier $classifier = new ExamResitDueClassifier,
+        private readonly ?AcademicFinanceChargeSourceGateway $academicSources = null,
     ) {}
 
     public function handle(?int $semesterId, ?string $search): LengthAwarePaginator
     {
         $campusId = app()->bound('campus') ? app('campus')->id : null;
-        $today = now()->startOfDay();
         $now = now();
 
-        $candidates = $this->candidateQuery($campusId, $semesterId, $search, $today, $now)->get();
+        $candidates = collect($this->academicSources()->overdueExamResitDueSources($campusId, $semesterId, trim((string) $search)));
 
         $chargeIdsByAttempt = FinanceCharge::query()
             ->join('finance_obligations', 'finance_obligations.id', '=', 'finance_charges.finance_obligation_id')
-            ->where('finance_obligations.source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
-            ->where('finance_obligations.source_kind', AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT)
+            ->where('finance_obligations.source_system', AcademicFinanceSourceKeys::SOURCE_SYSTEM)
+            ->where('finance_obligations.source_kind', AcademicFinanceSourceKeys::EXAM_RESIT_ATTEMPT)
             ->whereIn(
                 'finance_obligations.source_ref',
-                $candidates->map(AcademicFinanceObligationSource::examResitAttemptRef(...)),
+                $candidates->map(fn (AcademicExamResitDueData $source): string => AcademicFinanceSourceKeys::examResitAttemptRef($source->id)),
             )
             ->pluck('finance_charges.id', 'finance_obligations.source_ref')
             ->mapWithKeys(fn (int $chargeId, string $sourceRef): array => [
-                (int) substr($sourceRef, strlen('exam-resit:')) => $chargeId,
+                (int) (AcademicFinanceSourceKeys::sourceIdFromRef($sourceRef, 'exam-resit:') ?? 0) => $chargeId,
             ]);
 
         $withActiveDng = array_flip($this->linkResolver->chargeIdsWithActivePushedDng($chargeIdsByAttempt->values()->all()));
 
         $rows = $candidates
-            ->reject(fn (ExamResitAttempt $attempt) => isset($withActiveDng[$chargeIdsByAttempt->get($attempt->id)]))
-            ->map(fn (ExamResitAttempt $attempt) => [
+            ->reject(fn (AcademicExamResitDueData $attempt) => isset($withActiveDng[$chargeIdsByAttempt->get($attempt->id)]))
+            ->map(fn (AcademicExamResitDueData $attempt) => [
                 'attempt' => $attempt,
                 'classification' => $this->classifier->classify($attempt, hasActivePushedDng: false, now: $now),
             ])
@@ -72,38 +72,9 @@ class ListExamResitHandoffQuery
         return $this->paginate($rows);
     }
 
-    private function candidateQuery(?int $campusId, ?int $semesterId, ?string $search, $today, $now): Builder
+    private function academicSources(): AcademicFinanceChargeSourceGateway
     {
-        return ExamResitAttempt::query()
-            ->with([
-                'student:id,student_id,full_name,email,status',
-                'unit:id,code,name',
-                'session:id,exam_room_slot_id,unit_id,status',
-                'session.roomSlot:id,room_id,exam_date,start_time,end_time',
-                'session.roomSlot.room:id,name,code',
-            ])
-            ->when($campusId, fn (Builder $query, int $id) => $query->where('campus_id', $id))
-            ->when($semesterId, fn (Builder $query, int $id) => $query->where('operation_semester_id', $id))
-            ->whereIn('status', [ExamResitAttempt::STATUS_APPROVED, ExamResitAttempt::STATUS_SCHEDULED])
-            ->whereIn('hq_fee_status', [ExamResitAttempt::HQ_FEE_PENDING, ExamResitAttempt::HQ_FEE_CHARGE_CREATED])
-            ->where(function (Builder $query) use ($today, $now) {
-                $query->where(function (Builder $deadline) use ($now) {
-                    $deadline->whereNotNull('payment_deadline')
-                        ->where('payment_deadline', '<', $now);
-                })->orWhereHas('session.roomSlot', function (Builder $slot) use ($today) {
-                    $slot->where('exam_date', '<', $today->toDateString());
-                });
-            })
-            ->when($search, function (Builder $query, string $search) {
-                $query->where(function (Builder $inner) use ($search) {
-                    $inner->whereHas('student', fn (Builder $s) => $s
-                        ->where('full_name', 'like', "%{$search}%")
-                        ->orWhere('student_id', 'like', "%{$search}%"))
-                        ->orWhereHas('unit', fn (Builder $u) => $u
-                            ->where('code', 'like', "%{$search}%")
-                            ->orWhere('name', 'like', "%{$search}%"));
-                });
-            });
+        return $this->academicSources ?? app(AcademicFinanceChargeSourceGateway::class);
     }
 
     private function isOverdueHandoff(ExamResitDueClassification $classification): bool

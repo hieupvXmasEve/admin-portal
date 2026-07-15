@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Egc;
 
-use App\Models\EgcBlock;
 use App\Models\EgcRetakeDiscountLink;
 use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
@@ -16,6 +15,8 @@ use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
 use App\Modules\Finance\Support\EgcRetakeTargetResolver;
 use App\Modules\Finance\Support\SettlementMutationGuard;
+use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
+use App\Shared\Contracts\Academic\DTO\AcademicEgcBlockData;
 use Illuminate\Support\Facades\DB;
 
 class ReconcileEgcChargesAfterSyncAction
@@ -37,17 +38,13 @@ class ReconcileEgcChargesAfterSyncAction
     {
         $summary = self::emptySummary();
 
-        $sourceBlocks = EgcBlock::query()
-            ->where('semester_id', $semesterId)
-            ->where('result', EgcBlock::RESULT_FAIL)
-            ->whereNull('retake_discount_id')
-            ->when($studentIds !== null, fn ($query) => $query->whereIn('student_id', $studentIds))
-            ->with('student:id,gc_total_levels,student_id,status')
-            ->orderBy('student_id')
-            ->orderBy('block_number')
-            ->get();
+        $academicSources = app(AcademicFinanceChargeSourceGateway::class);
+        $sourceBlocks = collect($academicSources->failedEgcBlocksForSemester($semesterId, $studentIds));
         $sourceCharges = app(EgcBlockFinanceResolver::class)->chargesFor($sourceBlocks);
-        $sourceBlocks = $sourceBlocks->filter(fn (EgcBlock $block): bool => $sourceCharges->has($block->id));
+        $sourceBlocks = $sourceBlocks->filter(
+            fn (AcademicEgcBlockData $block): bool => $block->retake_discount_id === null
+                && $sourceCharges->has($block->id)
+        );
 
         $summary['students_considered'] = $sourceBlocks->pluck('student_id')->unique()->count();
         $reconciledStudentIds = [];
@@ -94,10 +91,11 @@ class ReconcileEgcChargesAfterSyncAction
 
                 if ((float) ($sourceBlock->attendance_rate ?? 0) >= 80.0) {
                     $retakeTarget = $targets->first(
-                        fn (EgcBlock $targetBlock): bool => $expectedLevels[(int) $targetBlock->id] === (int) $sourceBlock->level_number
+                        fn (AcademicEgcBlockData $targetBlock): bool => $expectedLevels[(int) $targetBlock->id] === (int) $sourceBlock->level_number
                     );
 
-                    if ($retakeTarget instanceof EgcBlock && $sourceBlock->fresh()->retake_discount_id === null) {
+                    $sourceAfterRelevel = app(AcademicFinanceChargeSourceGateway::class)->egcBlockById((int) $sourceBlock->id);
+                    if ($retakeTarget instanceof AcademicEgcBlockData && $sourceAfterRelevel?->retake_discount_id === null) {
                         $targetCharge = app(EgcBlockFinanceResolver::class)->chargeFor($retakeTarget);
                         if ($targetCharge instanceof FinanceCharge) {
                             ApplyEgcRetakeDiscountAction::run((int) $sourceBlock->id, (int) $targetCharge->id);
@@ -123,7 +121,7 @@ class ReconcileEgcChargesAfterSyncAction
         return $summary;
     }
 
-    private static function relevelTargetBlock(EgcBlock $targetBlock, int $expectedLevel, bool $isRetake): int
+    private static function relevelTargetBlock(AcademicEgcBlockData $targetBlock, int $expectedLevel, bool $isRetake): int
     {
         $charge = app(EgcBlockFinanceResolver::class)->chargeFor($targetBlock);
         if (! $charge instanceof FinanceCharge) {
@@ -135,10 +133,7 @@ class ReconcileEgcChargesAfterSyncAction
         $billingAccountId = (int) app(BillingAccountProvisioner::class)->forStudent((int) $charge->student_id)->id;
 
         return app(SettlementMutationGuard::class)->handle($billingAccountId, function () use ($targetBlock, $expectedLevel, $isRetake, $charge, $line, $amount, $description): int {
-            $targetBlock->update([
-                'level_number' => $expectedLevel,
-                'is_retake' => $isRetake,
-            ]);
+            app(AcademicFinanceChargeSourceGateway::class)->updateEgcBlockLevel((int) $targetBlock->id, $expectedLevel, $isRetake);
             $charge->update([
                 'amount' => $amount,
                 'description' => $description,
@@ -159,11 +154,11 @@ class ReconcileEgcChargesAfterSyncAction
         });
     }
 
-    private static function firstStopReason(EgcBlock $sourceBlock, iterable $targets, array $expectedLevels): ?string
+    private static function firstStopReason(AcademicEgcBlockData $sourceBlock, iterable $targets, array $expectedLevels): ?string
     {
-        $studentTotalLevels = (int) ($sourceBlock->student?->gc_total_levels ?? 0);
+        $studentTotalLevels = (int) ($sourceBlock->student_total_levels ?? 0);
 
-        if ($sourceBlock->student?->status !== 'intake_pre_uni_gc') {
+        if ($sourceBlock->student_status !== 'intake_pre_uni_gc') {
             return 'student_not_in_egc_stage';
         }
 
@@ -173,7 +168,7 @@ class ReconcileEgcChargesAfterSyncAction
                 return 'expected_level_exceeds_student_total_levels';
             }
 
-            if ($targetBlock->result !== EgcBlock::RESULT_PENDING) {
+            if ($targetBlock->result !== AcademicEgcBlockData::RESULT_PENDING) {
                 return 'target_block_not_pending';
             }
 
@@ -208,7 +203,7 @@ class ReconcileEgcChargesAfterSyncAction
         return null;
     }
 
-    private static function targetBlocksFor(EgcBlock $sourceBlock)
+    private static function targetBlocksFor(AcademicEgcBlockData $sourceBlock)
     {
         return EgcRetakeTargetResolver::targetBlocksFor($sourceBlock);
     }
@@ -255,11 +250,11 @@ class ReconcileEgcChargesAfterSyncAction
         ];
     }
 
-    private static function row(EgcBlock $sourceBlock, string $reason): array
+    private static function row(AcademicEgcBlockData $sourceBlock, string $reason): array
     {
         return [
             'student_id' => (int) $sourceBlock->student_id,
-            'student_code' => $sourceBlock->student?->student_id,
+            'student_code' => $sourceBlock->student_code,
             'source_egc_block_id' => (int) $sourceBlock->id,
             'reason' => $reason,
         ];

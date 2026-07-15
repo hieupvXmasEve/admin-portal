@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Operations;
 
-use App\Models\CourseRegistration;
 use App\Models\DeferCase;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\DeferBackfillClassification as C;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * FIN-REV-020 — read-only classifier for the full-scope defer backfill.
@@ -21,7 +21,7 @@ use Illuminate\Support\Collection;
  */
 class ClassifyDeferBackfillCandidatesQuery
 {
-    /** Active enrollment statuses mirror CourseRegistration::scopeActive. */
+    /** Active enrollment statuses mirror the Academic active-enrollment scope. */
     private const ACTIVE_STATUSES = ['pending', 'registered', 'confirmed'];
 
     public function __construct(
@@ -56,7 +56,7 @@ class ClassifyDeferBackfillCandidatesQuery
         $studentId = (int) $deferCase->student_id;
         $semesterId = (int) $deferCase->semester_id;
 
-        $activeRegistrationIds = CourseRegistration::query()
+        $activeRegistrationIds = DB::table('course_registrations')
             ->where('student_id', $studentId)
             ->where('semester_id', $semesterId)
             ->whereIn('registration_status', self::ACTIVE_STATUSES)

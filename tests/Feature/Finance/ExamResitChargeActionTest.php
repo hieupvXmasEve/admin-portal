@@ -11,6 +11,7 @@ use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
+use App\Shared\Contracts\Academic\DTO\AcademicChargeHandoffResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -63,14 +64,17 @@ it('creates one exam_resit_fee charge linked to the attempt and transitions it t
         'fee_amount' => 750_000,
     ]);
 
-    app(CreateExamResitChargeSimpleAction::class)->handle([
+    $result = app(CreateExamResitChargeSimpleAction::class)->handle([
         'attempt_id' => $attempt->id,
     ]);
 
     $attempt->refresh();
     $charge = activeExamResitChargeForAttempt($attempt);
 
-    expect($charge->charge_type)->toBe(FinanceCharge::TYPE_EXAM_RESIT_FEE)
+    expect($result)->toBeInstanceOf(AcademicChargeHandoffResult::class)
+        ->and($result->source_id)->toBe($attempt->id)
+        ->and($result->finance_charge_id)->toBe($charge->id)
+        ->and($charge->charge_type)->toBe(FinanceCharge::TYPE_EXAM_RESIT_FEE)
         ->and((float) $charge->amount)->toBe(750_000.0)
         ->and($charge->semester_id)->toBe($this->semester->id)
         ->and($charge->status)->toBe(FinanceCharge::STATUS_ACTIVE)

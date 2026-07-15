@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Models\CourseRetakeRegistration;
-use App\Models\ExamResitAttempt;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Models\FinanceCharge;
@@ -187,8 +185,8 @@ class ObligationLedgerSettlementReader implements ObligationSettlementReader
     private function legacyChargeIds(string $sourceKind, string $sourceRef, string $obligationType): array
     {
         $sourceType = match ($sourceKind) {
-            'course_retake_registration' => CourseRetakeRegistration::class,
-            'exam_resit_attempt' => ExamResitAttempt::class,
+            'course_retake_registration' => 'App\\Models\\CourseRetakeRegistration',
+            'exam_resit_attempt' => 'App\\Models\\ExamResitAttempt',
             default => null,
         };
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Services;
 
-use App\Models\CourseRegistration;
 use App\Models\DeferCase;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use App\Modules\Finance\Models\FinanceCharge;
@@ -79,7 +78,7 @@ class FinanceChargeService
     /**
      * @deprecated Wave 7 — use CourseRetakeRegistration + Academic intake.
      */
-    public function generateRetakeCharge(CourseRegistration $registration): ?FinanceCharge
+    public function generateRetakeCharge(object $registration): ?FinanceCharge
     {
         throw new RuntimeException(
             'generateRetakeCharge is retired. Use course_retake_registration intake (CreateRetakeCourseRegistrationAction).'

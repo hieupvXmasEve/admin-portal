@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Operations;
 
-use App\Models\CourseRegistration;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Support\BillingExceptionIdentifier;
@@ -42,13 +41,25 @@ class FixBillingExceptionAction
     private static function fixMissingCharge(int $registrationId, ?int $requestedSemesterId): array
     {
         return DB::transaction(function () use ($registrationId, $requestedSemesterId): array {
-            $registration = CourseRegistration::query()
-                ->with(['student', 'courseOffering'])
-                ->whereKey($registrationId)
+            $registration = DB::table('course_registrations')
+                ->leftJoin('students', 'students.id', '=', 'course_registrations.student_id')
+                ->leftJoin('course_offerings', 'course_offerings.id', '=', 'course_registrations.course_offering_id')
+                ->where('course_registrations.id', $registrationId)
                 ->lockForUpdate()
-                ->firstOrFail();
+                ->first([
+                    'course_registrations.id',
+                    'course_registrations.student_id',
+                    'course_registrations.semester_id',
+                    'course_registrations.is_retake',
+                    'students.student_id as student_code',
+                    'course_offerings.semester_id as offering_semester_id',
+                ]);
 
-            $semesterId = (int) ($registration->semester_id ?: $registration->courseOffering?->semester_id);
+            if ($registration === null) {
+                throw new RuntimeException('Course registration not found');
+            }
+
+            $semesterId = (int) ($registration->semester_id ?: $registration->offering_semester_id);
 
             if ($semesterId <= 0) {
                 throw new RuntimeException('Semester is required to fix a missing charge exception');
@@ -58,7 +69,7 @@ class FixBillingExceptionAction
                 throw new RuntimeException('Requested semester does not match the exception registration');
             }
 
-            $studentCode = $registration->student?->student_id;
+            $studentCode = $registration->student_code;
 
             if ($studentCode === null || $studentCode === '') {
                 throw new RuntimeException('Student code is missing for this registration');
@@ -89,10 +100,22 @@ class FixBillingExceptionAction
     private static function fixRetakeNoCharge(int $registrationId): array
     {
         return DB::transaction(function () use ($registrationId): array {
-            $registration = CourseRegistration::query()
-                ->whereKey($registrationId)
+            $registration = DB::table('course_registrations')
+                ->leftJoin('course_offerings', 'course_offerings.id', '=', 'course_registrations.course_offering_id')
+                ->leftJoin('units', 'units.id', '=', 'course_offerings.unit_id')
+                ->where('course_registrations.id', $registrationId)
                 ->lockForUpdate()
-                ->firstOrFail();
+                ->first([
+                    'course_registrations.id',
+                    'course_registrations.student_id',
+                    'course_registrations.semester_id',
+                    'course_registrations.is_retake',
+                    'units.name as unit_name',
+                ]);
+
+            if ($registration === null) {
+                throw new RuntimeException('Course registration not found');
+            }
 
             if (! $registration->is_retake) {
                 throw new RuntimeException('Registration is not marked as retake');
@@ -128,7 +151,7 @@ class FixBillingExceptionAction
                 ->where('semester_id', $registration->semester_id)
                 ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
                 ->where('status', FinanceCharge::STATUS_ACTIVE)
-                ->where('source_type', CourseRegistration::class)
+                ->where('source_type', 'App\\Models\\CourseRegistration')
                 ->where('source_id', $registration->id)
                 ->first();
 
@@ -140,7 +163,7 @@ class FixBillingExceptionAction
                 ];
             }
 
-            $courseName = $registration->courseOffering?->unit?->name ?? 'Unknown Course';
+            $courseName = $registration->unit_name ?? 'Unknown Course';
 
             // CatalogFixed: amount comes from finance_pricing_catalog_items only.
             $result = app(FinanceIntakeContract::class)->request(new FinanceIntakeData(

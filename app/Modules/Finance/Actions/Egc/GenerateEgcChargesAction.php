@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Egc;
 
-use App\Models\EgcBlock;
 use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Modules\Finance\Support\EgcBlockGenerationClassifier;
 use App\Modules\Finance\Support\EgcBlockGenerationState;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
+use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
+use App\Shared\Contracts\Academic\DTO\AcademicEgcBlockData;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -131,7 +131,6 @@ class GenerateEgcChargesAction
     ): void {
         $created = 0;
 
-        /** @var Collection<int, EgcBlock> $blocks */
         $blocks = $blockState->reissueBlocks->take($blockCount);
 
         foreach ($blocks as $block) {
@@ -153,9 +152,11 @@ class GenerateEgcChargesAction
                 ],
                 $block,
             );
-            $block->update([
-                'result' => EgcBlock::RESULT_PENDING,
-            ]);
+            app(AcademicFinanceChargeSourceGateway::class)->updateEgcBlockResult(
+                (int) $block->id,
+                AcademicEgcBlockData::RESULT_PENDING,
+                null,
+            );
 
             $created++;
             $results['created']++;
@@ -174,10 +175,11 @@ class GenerateEgcChargesAction
         int $existingChargeCount,
         array &$results
     ): void {
-        $deferredBlocks = EgcBlock::where('student_id', $studentId)
-            ->where('semester_id', $semesterId)
-            ->get()
-            ->filter(fn (EgcBlock $block): bool => app(EgcBlockFinanceResolver::class)->chargeFor($block) === null);
+        $academicSources = app(AcademicFinanceChargeSourceGateway::class);
+        $semesterBlocks = collect($academicSources->egcBlocksForStudentSemester($studentId, $semesterId));
+        $chargesByBlock = app(EgcBlockFinanceResolver::class)->chargesFor($semesterBlocks);
+        $deferredBlocks = $semesterBlocks
+            ->filter(fn (AcademicEgcBlockData $block): bool => $chargesByBlock->get($block->id) === null);
 
         foreach ($deferredBlocks as $block) {
             self::createChargeViaIntake(
@@ -195,10 +197,9 @@ class GenerateEgcChargesAction
             $results['created']++;
         }
 
-        $existingBlockNumbers = EgcBlock::where('student_id', $studentId)
-            ->where('semester_id', $semesterId)
+        $existingBlockNumbers = $semesterBlocks
             ->pluck('block_number')
-            ->toArray();
+            ->all();
 
         $nextBlockNumber = empty($existingBlockNumbers) ? 1 : (max($existingBlockNumbers) + 1);
         $blocksToCreate = max(0, $blockCount - $existingChargeCount);
@@ -226,14 +227,13 @@ class GenerateEgcChargesAction
             $isRetake = self::isRetakeEligible($studentId, $levelNumber);
 
             try {
-                $block = EgcBlock::create([
-                    'student_id' => $studentId,
-                    'semester_id' => $semesterId,
-                    'block_number' => $blockNumber,
-                    'level_number' => $levelNumber,
-                    'result' => EgcBlock::RESULT_PENDING,
-                    'is_retake' => $isRetake,
-                ]);
+                $block = $academicSources->createEgcBlock(
+                    studentId: $studentId,
+                    semesterId: $semesterId,
+                    blockNumber: $blockNumber,
+                    levelNumber: $levelNumber,
+                    isRetake: $isRetake,
+                );
 
                 self::createChargeViaIntake(
                     $studentId,
@@ -260,14 +260,13 @@ class GenerateEgcChargesAction
 
             if ($deferredLevel < $totalLevels && ! in_array($deferredBlockNumber, $existingBlockNumbers, true)) {
                 try {
-                    EgcBlock::create([
-                        'student_id' => $studentId,
-                        'semester_id' => $semesterId + 1, // next semester placeholder — actual semester set at charge gen time
-                        'block_number' => $deferredBlockNumber,
-                        'level_number' => $deferredLevel,
-                        'result' => EgcBlock::RESULT_PENDING,
-                        'is_retake' => false,
-                    ]);
+                    $academicSources->createEgcBlock(
+                        studentId: $studentId,
+                        semesterId: $semesterId + 1, // next semester placeholder — actual semester set at charge gen time
+                        blockNumber: $deferredBlockNumber,
+                        levelNumber: $deferredLevel,
+                        isRetake: false,
+                    );
                 } catch (UniqueConstraintViolationException) {
                     // already deferred, skip
                 }
@@ -277,30 +276,12 @@ class GenerateEgcChargesAction
 
     private static function isStudyingLevel(int $studentId, int $levelNumber): bool
     {
-        return DB::table('academic_records as ar')
-            ->join('units', 'ar.unit_id', '=', 'units.id')
-            ->where('ar.student_id', $studentId)
-            ->where('units.unit_type', 'egc')
-            ->where('units.level', $levelNumber)
-            ->where('ar.completion_status', 'in_progress')
-            ->where('ar.semester_id', function ($query) use ($studentId): void {
-                $query->selectRaw('MAX(ar2.semester_id)')
-                    ->from('academic_records as ar2')
-                    ->join('units as u2', 'ar2.unit_id', '=', 'u2.id')
-                    ->where('ar2.student_id', $studentId)
-                    ->where('u2.unit_type', 'egc');
-            })
-            ->exists();
+        return app(AcademicFinanceChargeSourceGateway::class)->isStudentStudyingEgcLevel($studentId, $levelNumber);
     }
 
     private static function isRetakeEligible(int $studentId, int $levelNumber): bool
     {
-        return EgcBlock::where('student_id', $studentId)
-            ->where('level_number', $levelNumber)
-            ->where('result', EgcBlock::RESULT_FAIL)
-            ->where('attendance_rate', '>=', 80)
-            ->whereNull('retake_discount_id') // entitlement not yet consumed
-            ->exists();
+        return app(AcademicFinanceChargeSourceGateway::class)->isEgcRetakeEligible($studentId, $levelNumber);
     }
 
     /**
@@ -319,7 +300,7 @@ class GenerateEgcChargesAction
         string $dueDate,
         int $levelNumber,
         array $options,
-        ?EgcBlock $block = null,
+        ?AcademicEgcBlockData $block = null,
     ): FinanceCharge {
         $result = app(SubmitEgcLevelFeeDebitAction::class)->handle(
             $studentId,

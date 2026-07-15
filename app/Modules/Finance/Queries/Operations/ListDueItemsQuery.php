@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Operations;
 
-use App\Models\ExamResitAttempt;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Support\ExamResitDngLinkResolver;
 use App\Modules\Finance\Support\ExamResitDueClassification;
 use App\Modules\Finance\Support\ExamResitDueClassifier;
 use App\Modules\Finance\Support\ExamResitDueRowPresenter;
 use App\Modules\Finance\Support\LifecycleDueItemPredicate;
+use App\Shared\Contracts\Academic\DTO\AcademicExamResitDueData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -102,7 +102,7 @@ class ListDueItemsQuery
     /**
      * @return array<string, mixed>
      */
-    private function toRow(DngPaymentRequest $request, $today, ?ExamResitAttempt $attempt): array
+    private function toRow(DngPaymentRequest $request, $today, ?AcademicExamResitDueData $attempt): array
     {
         $dueDate = $request->due_date;
         $daysUntilDue = $today->diffInDays($dueDate, false);

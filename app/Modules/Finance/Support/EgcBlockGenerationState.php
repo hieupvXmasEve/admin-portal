@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Models\EgcBlock;
 use Illuminate\Support\Collection;
 
 final class EgcBlockGenerationState
@@ -18,8 +17,8 @@ final class EgcBlockGenerationState
     public const Blocked = 'blocked';
 
     /**
-     * @param  Collection<int, EgcBlock>  $blocks
-     * @param  Collection<int, EgcBlock>  $reissueBlocks
+     * @param  Collection<int, object>  $blocks
+     * @param  Collection<int, object>  $reissueBlocks
      */
     public function __construct(
         public readonly string $status,

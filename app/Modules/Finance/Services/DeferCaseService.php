@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Services;
 
-use App\Models\CourseRegistration;
 use App\Models\DeferCase;
 use App\Models\DeferCaseItem;
 use App\Models\StudentActionLog;
@@ -103,7 +102,8 @@ class DeferCaseService
         }
 
         if (! empty($registrationIdsToUpdate)) {
-            CourseRegistration::whereIn('id', array_unique($registrationIdsToUpdate))
+            DB::table('course_registrations')
+                ->whereIn('id', array_unique($registrationIdsToUpdate))
                 ->update(['registration_status' => 'defer']);
         }
 
@@ -142,7 +142,7 @@ class DeferCaseService
     /**
      * Resolve the student's active course registration ids in a semester.
      *
-     * Active enrollments mirror CourseRegistration::scopeActive so a full-scope
+     * Active enrollments mirror the Academic active-enrollment scope so a full-scope
      * defer preserves exactly the courses the student is currently enrolled in,
      * leaving already-dropped/withdrawn/completed registrations untouched.
      *
@@ -150,7 +150,7 @@ class DeferCaseService
      */
     protected function resolveActiveRegistrationIdsForSemester(int $studentId, int $semesterId): array
     {
-        return CourseRegistration::query()
+        return DB::table('course_registrations')
             ->where('student_id', $studentId)
             ->where('semester_id', $semesterId)
             ->whereIn('registration_status', ['pending', 'registered', 'confirmed'])
@@ -217,7 +217,7 @@ class DeferCaseService
         // Get charges linked to these course registrations
         $charges = FinanceCharge::where('student_id', $deferCase->student_id)
             ->where('semester_id', $deferCase->semester_id)
-            ->where('source_type', CourseRegistration::class)
+            ->where('source_type', 'App\\Models\\CourseRegistration')
             ->whereIn('source_id', $courseRegistrationIds)
             ->where('status', FinanceCharge::STATUS_ACTIVE)
             ->sum('amount');

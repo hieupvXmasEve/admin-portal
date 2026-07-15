@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Models\ExamResitAttempt;
-use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
+use App\Shared\Contracts\Academic\AcademicFinanceSourceKeys;
+use App\Shared\Contracts\Academic\DTO\AcademicExamResitDueData;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
 /**
@@ -28,7 +29,7 @@ class ExamResitDueClassifier
     public const DEFAULT_GRACE_DAYS = 14;
 
     public function classify(
-        ExamResitAttempt $attempt,
+        AcademicExamResitDueData $attempt,
         bool $hasActivePushedDng,
         ?CarbonInterface $now = null,
     ): ExamResitDueClassification {
@@ -87,53 +88,51 @@ class ExamResitDueClassifier
      * `payment_deadline` (or a future actual-sitting deadline) when present;
      * otherwise derive it from the scheduled sitting time plus grace days.
      */
-    public function deriveDueAt(ExamResitAttempt $attempt): ?CarbonInterface
+    public function deriveDueAt(AcademicExamResitDueData $attempt): ?CarbonInterface
     {
         if ($attempt->payment_deadline !== null) {
-            return $attempt->payment_deadline;
+            return CarbonImmutable::parse($attempt->payment_deadline);
         }
 
-        $slot = $attempt->session?->roomSlot;
-        if ($slot === null || $slot->exam_date === null) {
+        if ($attempt->exam_date === null) {
             return null;
         }
 
         $graceDays = $attempt->late_payment_grace_days_snapshot ?? self::DEFAULT_GRACE_DAYS;
 
-        return $this->combineDateTime($slot->exam_date, $slot->start_time)
-            ->copy()
+        return $this->combineDateTime($attempt->exam_date, $attempt->exam_start_time)
             ->addDays($graceDays);
     }
 
-    private function resolveHardBlock(ExamResitAttempt $attempt): ?string
+    private function resolveHardBlock(AcademicExamResitDueData $attempt): ?string
     {
         if ($this->isPaid($attempt)) {
             return ExamResitDueClassification::BLOCKED_PAID;
         }
 
-        if ($attempt->status === ExamResitAttempt::STATUS_CANCELLED
-            || $attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_CANCELLED) {
+        if ($attempt->status === AcademicExamResitDueData::STATUS_CANCELLED
+            || $attempt->hq_fee_status === AcademicExamResitDueData::HQ_FEE_CANCELLED) {
             return ExamResitDueClassification::BLOCKED_CANCELLED;
         }
 
-        if (LifecycleDueItemPredicate::isLifecycleException($attempt->student)) {
+        if (LifecycleDueItemPredicate::isLifecycleExceptionStatus($attempt->student_status)) {
             return ExamResitDueClassification::BLOCKED_LIFECYCLE_EXCEPTION;
         }
 
         return null;
     }
 
-    private function isPaid(ExamResitAttempt $attempt): bool
+    private function isPaid(AcademicExamResitDueData $attempt): bool
     {
-        if ($attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_PAID) {
+        if ($attempt->hq_fee_status === AcademicExamResitDueData::HQ_FEE_PAID) {
             return true;
         }
 
         $charge = FinanceCharge::query()
             ->where('finance_obligation_id', FinanceObligation::query()
-                ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
-                ->where('source_kind', AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT)
-                ->where('source_ref', AcademicFinanceObligationSource::examResitAttemptRef($attempt))
+                ->where('source_system', AcademicFinanceSourceKeys::SOURCE_SYSTEM)
+                ->where('source_kind', AcademicFinanceSourceKeys::EXAM_RESIT_ATTEMPT)
+                ->where('source_ref', AcademicFinanceSourceKeys::examResitAttemptRef($attempt->id))
                 ->value('id'))
             ->first();
 
@@ -142,9 +141,9 @@ class ExamResitDueClassifier
             && $charge->is_fully_paid;
     }
 
-    private function hasStudentEmail(ExamResitAttempt $attempt): bool
+    private function hasStudentEmail(AcademicExamResitDueData $attempt): bool
     {
-        $email = $attempt->student?->email;
+        $email = $attempt->student_email;
 
         return is_string($email) && trim($email) !== '';
     }
@@ -180,16 +179,13 @@ class ExamResitDueClassifier
         return $diff < 0 ? abs($diff) : null;
     }
 
-    private function combineDateTime(CarbonInterface $date, ?CarbonInterface $time): CarbonInterface
+    private function combineDateTime(string $date, ?string $time): CarbonInterface
     {
-        $base = $date->copy()->startOfDay();
+        $base = CarbonImmutable::parse($date)->startOfDay();
 
         if ($time !== null) {
-            $base = $base->setTime(
-                (int) $time->format('H'),
-                (int) $time->format('i'),
-                (int) $time->format('s'),
-            );
+            [$hour, $minute] = array_map('intval', explode(':', $time));
+            $base = $base->setTime($hour, $minute);
         }
 
         return $base;

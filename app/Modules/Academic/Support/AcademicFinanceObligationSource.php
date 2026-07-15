@@ -6,30 +6,31 @@ namespace App\Modules\Academic\Support;
 
 use App\Models\CourseRetakeRegistration;
 use App\Models\ExamResitAttempt;
+use App\Shared\Contracts\Academic\AcademicFinanceSourceKeys;
 
 final class AcademicFinanceObligationSource
 {
-    public const SOURCE_SYSTEM = 'academic';
+    public const SOURCE_SYSTEM = AcademicFinanceSourceKeys::SOURCE_SYSTEM;
 
-    public const COURSE_RETAKE_REGISTRATION = 'course_retake_registration';
+    public const COURSE_RETAKE_REGISTRATION = AcademicFinanceSourceKeys::COURSE_RETAKE_REGISTRATION;
 
-    public const EXAM_RESIT_ATTEMPT = 'exam_resit_attempt';
+    public const EXAM_RESIT_ATTEMPT = AcademicFinanceSourceKeys::EXAM_RESIT_ATTEMPT;
 
-    public const RETAKE_FEE = 'retake_fee';
+    public const RETAKE_FEE = AcademicFinanceSourceKeys::RETAKE_FEE;
 
-    public const EXAM_RESIT_FEE = 'exam_resit_fee';
+    public const EXAM_RESIT_FEE = AcademicFinanceSourceKeys::EXAM_RESIT_FEE;
 
     public static function courseRetakeRegistrationRef(CourseRetakeRegistration|int $registration): string
     {
         $id = $registration instanceof CourseRetakeRegistration ? $registration->id : $registration;
 
-        return "retake:{$id}";
+        return AcademicFinanceSourceKeys::courseRetakeRegistrationRef((int) $id);
     }
 
     public static function examResitAttemptRef(ExamResitAttempt|int $attempt): string
     {
         $id = $attempt instanceof ExamResitAttempt ? $attempt->id : $attempt;
 
-        return "exam-resit:{$id}";
+        return AcademicFinanceSourceKeys::examResitAttemptRef((int) $id);
     }
 }

@@ -12,11 +12,16 @@ final class LifecycleDueItemPredicate
 {
     public static function isLifecycleException(?Student $student): bool
     {
-        if ($student === null) {
+        return self::isLifecycleExceptionStatus($student?->status);
+    }
+
+    public static function isLifecycleExceptionStatus(?string $status): bool
+    {
+        if ($status === null) {
             return true;
         }
 
-        return ! in_array($student->status, Student::FINANCIAL_STATUSES, true);
+        return ! in_array($status, Student::FINANCIAL_STATUSES, true);
     }
 
     /**

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Models\EgcBlock;
 use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
@@ -13,6 +12,8 @@ use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Services\DeferChargeResolver;
+use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
+use App\Shared\Contracts\Academic\DTO\AcademicEgcBlockData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -50,6 +51,7 @@ final class EgcBlockGenerationClassifier
     public function __construct(
         private readonly DeferChargeResolver $deferChargeResolver,
         private readonly EgcBlockFinanceResolver $blockFinanceResolver,
+        private readonly AcademicFinanceChargeSourceGateway $academicSources,
     ) {}
 
     public function classify(Student $student, int $semesterId): EgcBlockGenerationState
@@ -90,7 +92,7 @@ final class EgcBlockGenerationClassifier
         }
 
         $collectibleBlocks = $blocks
-            ->filter(fn (EgcBlock $block): bool => $this->isCollectible($chargesByBlock->get($block->id)))
+            ->filter(fn (AcademicEgcBlockData $block): bool => $this->isCollectible($chargesByBlock->get($block->id)))
             ->values();
 
         if ($collectibleBlocks->count() === $blocks->count()) {
@@ -104,7 +106,7 @@ final class EgcBlockGenerationClassifier
         }
 
         $reissueBlocks = $blocks
-            ->reject(fn (EgcBlock $block): bool => $this->isCollectible($chargesByBlock->get($block->id)))
+            ->reject(fn (AcademicEgcBlockData $block): bool => $this->isCollectible($chargesByBlock->get($block->id)))
             ->values();
 
         return new EgcBlockGenerationState(
@@ -117,19 +119,15 @@ final class EgcBlockGenerationClassifier
     }
 
     /**
-     * @return Collection<int, EgcBlock>
+     * @return Collection<int, AcademicEgcBlockData>
      */
     private function loadBlocks(int $studentId, int $semesterId): Collection
     {
-        return EgcBlock::query()
-            ->where('student_id', $studentId)
-            ->where('semester_id', $semesterId)
-            ->orderBy('block_number')
-            ->get();
+        return collect($this->academicSources->egcBlocksForStudentSemester($studentId, $semesterId));
     }
 
     /**
-     * @param  Collection<int, EgcBlock>  $blocks
+     * @param  Collection<int, AcademicEgcBlockData>  $blocks
      */
     private function hasInconsistentShape(Collection $blocks): bool
     {
@@ -213,15 +211,15 @@ final class EgcBlockGenerationClassifier
     }
 
     /**
-     * @param  Collection<int, EgcBlock>  $blocks
+     * @param  Collection<int, AcademicEgcBlockData>  $blocks
      */
     private function reissueReason(Collection $blocks, Collection $chargesByBlock): string
     {
-        if ($blocks->contains(fn (EgcBlock $block): bool => $chargesByBlock->get($block->id) === null)) {
+        if ($blocks->contains(fn (AcademicEgcBlockData $block): bool => $chargesByBlock->get($block->id) === null)) {
             return self::ReasonMissingCharge;
         }
 
-        if ($blocks->contains(fn (EgcBlock $block): bool => $chargesByBlock->get($block->id)?->status === FinanceCharge::STATUS_VOID)) {
+        if ($blocks->contains(fn (AcademicEgcBlockData $block): bool => $chargesByBlock->get($block->id)?->status === FinanceCharge::STATUS_VOID)) {
             return self::ReasonVoidedCharge;
         }
 
@@ -229,7 +227,7 @@ final class EgcBlockGenerationClassifier
     }
 
     /**
-     * @param  Collection<int, EgcBlock>  $blocks
+     * @param  Collection<int, AcademicEgcBlockData>  $blocks
      */
     private function blocked(string $reason, Collection $blocks): EgcBlockGenerationState
     {

@@ -40,3 +40,22 @@ it('flags a deliberate Academic import of a Finance money model as a boundary vi
 
     expect($liveViolations)->toBeEmpty('Live Academic code must not import Finance\\Models.');
 });
+
+it('flags a deliberate Finance import of an Academic source model as a boundary violation', function () {
+    $fixture = <<<'PHP'
+    <?php
+    namespace App\Modules\Finance\Support;
+    use App\Models\ExamResitAttempt;
+    class ForbiddenAcademicModelImportFixture {
+        public function handle(): void { ExamResitAttempt::query(); }
+    }
+    PHP;
+
+    $violations = [];
+    if (preg_match('/use\s+App\\\\Models\\\\(CourseRegistration|CourseRetakeRegistration|ExamResitAttempt|EgcBlock)\s*;/', $fixture) === 1
+        || preg_match('/(?<![A-Za-z0-9_\\\\])(CourseRegistration|CourseRetakeRegistration|ExamResitAttempt|EgcBlock)::/', $fixture) === 1) {
+        $violations[] = 'App\Modules\Finance\Support\ForbiddenAcademicModelImportFixture';
+    }
+
+    expect($violations)->not->toBeEmpty('Red-proof must detect the forbidden Finance -> Academic model pattern.');
+});

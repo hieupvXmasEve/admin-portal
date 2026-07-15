@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Services;
 
-use App\Models\CourseRegistration;
 use App\Models\DeferCase;
 use App\Models\DeferCaseItem;
 use App\Models\Student;
 use App\Modules\Finance\Support\DeferChargePolicy;
+use Illuminate\Support\Facades\DB;
 
 class DeferChargeResolver
 {
@@ -29,7 +29,7 @@ class DeferChargeResolver
      */
     public function isSemesterEnrollmentDeferred(Student $student, int $semesterId): bool
     {
-        $statuses = CourseRegistration::query()
+        $statuses = DB::table('course_registrations')
             ->where('student_id', $student->id)
             ->where('semester_id', $semesterId)
             ->pluck('registration_status');
@@ -41,7 +41,7 @@ class DeferChargeResolver
         return $statuses->intersect(['pending', 'registered', 'confirmed'])->isEmpty();
     }
 
-    public function findApplicableCourseItem(CourseRegistration $registration): ?DeferCaseItem
+    public function findApplicableCourseItem(object $registration): ?DeferCaseItem
     {
         $referenceId = $registration->original_registration_id ?? $registration->id;
 

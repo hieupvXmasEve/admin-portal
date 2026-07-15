@@ -26,7 +26,6 @@ class ListEgcCarryForwardCandidatesQuery
                     ->where('amount', '>', 0);
             })
             ->with([
-                'egcProgress.semester:id,name',
                 'financeCharges' => fn ($query) => $query
                     ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
                     ->where('status', FinanceCharge::STATUS_ACTIVE)
@@ -39,13 +38,6 @@ class ListEgcCarryForwardCandidatesQuery
                 'payments' => fn ($query) => $query
                     ->where('status', Payment::STATUS_COMPLETED)
                     ->with('applications'),
-                'courseRegistrations' => fn ($query) => $query
-                    ->where('semester_id', $semesterId)
-                    ->whereNotIn('registration_status', ['defer', 'dropped', 'withdrawn'])
-                    ->whereHas('courseOffering.unit', fn ($unitQuery) => $unitQuery->where('unit_type', 'egc'))
-                    ->with('courseOffering:id,semester_id')
-                    ->orderBy('registration_date')
-                    ->orderBy('id'),
             ])
             ->orderBy('student_id')
             ->get();

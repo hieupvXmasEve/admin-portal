@@ -13,6 +13,8 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
@@ -115,6 +117,24 @@ function ensureExamResitPricingCatalog(float $amount = 750_000): void
 function createPushedDngForExamResitCharge(FinanceCharge $charge, array $overrides = []): DngPaymentRequest
 {
     $student = Student::find($charge->student_id);
+    $invoice = StudentInvoice::create([
+        'invoice_number' => 'INV-PTL-'.uniqid(),
+        'student_id' => $charge->student_id,
+        'semester_id' => $charge->semester_id,
+        'status' => 'pending',
+        'due_date' => now()->addDays(30)->toDateString(),
+        'subtotal' => $charge->amount,
+        'discount_total' => 0,
+        'total_amount' => $charge->amount,
+        'paid_amount' => 0,
+    ]);
+    $line = InvoiceLine::create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $charge->id,
+        'amount_snapshot' => $charge->amount,
+        'description_snapshot' => $charge->description,
+        'status' => 'active',
+    ]);
 
     $request = DngPaymentRequest::create(array_merge([
         'student_id' => $charge->student_id,
@@ -133,6 +153,13 @@ function createPushedDngForExamResitCharge(FinanceCharge $charge, array $overrid
         'dng_payment_request_id' => $request->id,
         'finance_charge_id' => $charge->id,
         'amount' => $charge->amount,
+    ]);
+
+    $request->reservationTargets()->create([
+        'invoice_line_id' => $line->id,
+        'finance_charge_installment_id' => null,
+        'captured_collectible' => $charge->amount,
+        'target_identity' => 'exam-resit-charge:'.$charge->id,
     ]);
 
     return $request;

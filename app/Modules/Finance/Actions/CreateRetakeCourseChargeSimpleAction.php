@@ -4,24 +4,19 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions;
 
-use App\Models\CourseRetakeRegistration;
-use App\Modules\Academic\Support\AcademicFinanceObligationSource;
-use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
-use App\Shared\Contracts\Finance\Enums\FinancialEffect;
-use App\Shared\Contracts\Finance\FinanceIntakeContract;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
+use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
+use App\Shared\Contracts\Academic\DTO\AcademicChargeHandoffResult;
 
 /**
  * Ensure a retake fee debit exists for an approved registration via intake.
  *
- * Wave 7: no direct CreateFinanceChargeAction / source_type coupling. Look up
- * the materialized charge through the FinanceObligation source triple.
+ * Finance delegates Academic source validation and state transition to the
+ * Academic contract; Finance remains the owner of the materialized debit.
  */
 class CreateRetakeCourseChargeSimpleAction
 {
     public function __construct(
-        private readonly FinanceIntakeContract $intake,
+        private readonly AcademicFinanceChargeSourceGateway $academicSources,
     ) {}
 
     /**
@@ -32,51 +27,12 @@ class CreateRetakeCourseChargeSimpleAction
      *   description?: string,
      * }  $data
      */
-    public function handle(array $data): CourseRetakeRegistration
+    public function handle(array $data): AcademicChargeHandoffResult
     {
-        return DB::transaction(function () use ($data) {
-            $registration = CourseRetakeRegistration::lockForUpdate()->findOrFail($data['registration_id']);
-
-            if ($registration->status !== CourseRetakeRegistration::STATUS_APPROVED) {
-                throw ValidationException::withMessages([
-                    'registration_id' => ['Chỉ có thể tạo charge cho đăng ký ở trạng thái approved.'],
-                ]);
-            }
-
-            $unit = $registration->unit;
-            $description = $data['description']
-                ?? "Phí học lại: {$unit?->code} - {$unit?->name}";
-
-            $result = $this->intake->request(new FinanceIntakeData(
-                source_system: AcademicFinanceObligationSource::SOURCE_SYSTEM,
-                source_kind: AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION,
-                source_ref: AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration),
-                financial_effect: FinancialEffect::Debit,
-                obligation_type: AcademicFinanceObligationSource::RETAKE_FEE,
-                facts: [
-                    'student_id' => $registration->student_id,
-                    'semester_id' => $registration->charge_semester_id ?? $registration->semester_id,
-                    'campus_id' => $registration->campus_id,
-                    'unit_id' => $registration->unit_id,
-                    'course_offering_id' => $registration->course_offering_id,
-                    'original_academic_record_id' => $registration->original_academic_record_id,
-                    'original_semester_id' => $registration->original_semester_id,
-                    'operation_semester_id' => $registration->operation_semester_id,
-                    'charge_semester_id' => $registration->charge_semester_id,
-                    'attempt_number' => $registration->attempt_number,
-                    'description' => $description,
-                ],
-            ));
-
-            if ($result->finance_obligation_id === null || $result->finance_charge_id === null) {
-                throw ValidationException::withMessages([
-                    'registration_id' => ['Finance intake did not materialize a retake charge.'],
-                ]);
-            }
-
-            $registration->transitionToPaymentPending((int) auth()->id());
-
-            return $registration->fresh();
-        });
+        return $this->academicSources->createRetakeCharge(
+            (int) $data['registration_id'],
+            (int) auth()->id(),
+            $data['description'] ?? null,
+        );
     }
 }

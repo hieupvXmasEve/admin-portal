@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Models\ExamResitAttempt;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
+use App\Shared\Contracts\Academic\AcademicFinanceSourceKeys;
+use App\Shared\Contracts\Academic\DTO\AcademicExamResitDueData;
 
 /**
  * Resolve the linkage between Finance DNG payment requests and Academic
@@ -20,12 +22,16 @@ use App\Modules\Finance\Models\FinanceCharge;
  */
 class ExamResitDngLinkResolver
 {
+    public function __construct(
+        private readonly ?AcademicFinanceChargeSourceGateway $academicSources = null,
+    ) {}
+
     /**
-     * Map each PTL/exam-resit DNG request id to its linked ExamResitAttempt,
+     * Map each PTL/exam-resit DNG request id to its linked exam-resit source,
      * with the relations the worklist row needs eager-loaded.
      *
      * @param  iterable<DngPaymentRequest>  $requests
-     * @return array<int, ExamResitAttempt>
+     * @return array<int, AcademicExamResitDueData>
      */
     public function attemptsByDngRequest(iterable $requests): array
     {
@@ -98,9 +104,12 @@ class ExamResitDngLinkResolver
             return 0;
         }
 
-        return ExamResitAttempt::query()
-            ->whereIn('id', array_keys($this->attemptsByChargeId($chargeIds)))
-            ->update(['last_reminded_at' => $timestamp]);
+        $attemptIds = array_map(
+            static fn (AcademicExamResitDueData $attempt): int => $attempt->id,
+            $this->attemptsByChargeId($chargeIds),
+        );
+
+        return $this->academicSources()->touchExamResitDueSources($attemptIds, $timestamp);
     }
 
     /**
@@ -122,7 +131,7 @@ class ExamResitDngLinkResolver
 
     /**
      * @param  array<int>  $chargeIds
-     * @return array<int, ExamResitAttempt> keyed by Finance charge id
+     * @return array<int, AcademicExamResitDueData> keyed by Finance charge id
      */
     private function attemptsByChargeId(array $chargeIds): array
     {
@@ -130,29 +139,22 @@ class ExamResitDngLinkResolver
             ->whereIn('finance_charges.id', $chargeIds)
             ->whereNotNull('finance_charges.finance_obligation_id')
             ->join('finance_obligations', 'finance_obligations.id', '=', 'finance_charges.finance_obligation_id')
-            ->where('finance_obligations.source_system', 'academic')
-            ->where('finance_obligations.source_kind', 'exam_resit_attempt')
+            ->where('finance_obligations.source_system', AcademicFinanceSourceKeys::SOURCE_SYSTEM)
+            ->where('finance_obligations.source_kind', AcademicFinanceSourceKeys::EXAM_RESIT_ATTEMPT)
             ->pluck('finance_obligations.source_ref', 'finance_charges.id')
-            ->map(static fn (string $sourceRef): int => str_starts_with($sourceRef, 'exam-resit:')
-                ? (int) substr($sourceRef, strlen('exam-resit:'))
-                : 0)
+            ->map(static fn (string $sourceRef): int => AcademicFinanceSourceKeys::sourceIdFromRef($sourceRef, 'exam-resit:') ?? 0)
             ->filter(static fn (int $attemptId): bool => $attemptId > 0);
 
-        $attempts = ExamResitAttempt::query()
-            ->whereIn('id', $attemptIdByCharge->values())
-            ->with([
-                'student:id,student_id,full_name,email,status',
-                'unit:id,code,name',
-                'session:id,exam_room_slot_id,unit_id,status',
-                'session.roomSlot:id,room_id,exam_date,start_time,end_time',
-                'session.roomSlot.room:id,name,code',
-            ])
-            ->get()
-            ->keyBy('id');
+        $attempts = $this->academicSources()->examResitDueSourcesByIds($attemptIdByCharge->values()->all());
 
         return $attemptIdByCharge
-            ->map(fn (int $attemptId) => $attempts->get($attemptId))
+            ->map(fn (int $attemptId) => $attempts[$attemptId] ?? null)
             ->filter()
             ->all();
+    }
+
+    private function academicSources(): AcademicFinanceChargeSourceGateway
+    {
+        return $this->academicSources ?? app(AcademicFinanceChargeSourceGateway::class);
     }
 }

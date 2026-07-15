@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Models\ExamResitAttempt;
+use App\Shared\Contracts\Academic\DTO\AcademicExamResitDueData;
 
 /**
  * Build the exam-resit (thi lại / PTL) row context for the Finance Due Reminders
@@ -23,7 +23,7 @@ final class ExamResitDueRowPresenter
      *
      * @return array<string, mixed>
      */
-    public static function examResitContext(ExamResitAttempt $attempt, ExamResitDueClassification $classification): array
+    public static function examResitContext(AcademicExamResitDueData $attempt, ExamResitDueClassification $classification): array
     {
         return array_merge(
             [
@@ -47,10 +47,8 @@ final class ExamResitDueRowPresenter
      *
      * @return array<string, mixed>
      */
-    public static function handoffRow(ExamResitAttempt $attempt, ExamResitDueClassification $classification): array
+    public static function handoffRow(AcademicExamResitDueData $attempt, ExamResitDueClassification $classification): array
     {
-        $student = $attempt->student;
-
         return array_merge(
             [
                 'id' => $attempt->id,
@@ -59,12 +57,12 @@ final class ExamResitDueRowPresenter
                 'source_id' => $attempt->id,
                 'fee_type' => self::FEE_TYPE_PTL,
                 'student_id' => $attempt->student_id,
-                'student_code' => $student?->student_id,
-                'student_name' => $student?->full_name,
-                'student_email' => $student?->email,
-                'student_status_label' => $student?->status_label,
-                'student_status_color' => $student?->status_color,
-                'amount' => (float) $attempt->fee_amount,
+                'student_code' => $attempt->student_code,
+                'student_name' => $attempt->student_name,
+                'student_email' => $attempt->student_email,
+                'student_status_label' => $attempt->student_status_label,
+                'student_status_color' => $attempt->student_status_color,
+                'amount' => (float) $attempt->amount,
                 'hq_fee_status' => $attempt->hq_fee_status,
                 'unpaid_allowed_reason' => $attempt->unpaid_allowed_reason,
                 'reminder_state' => $classification->reminderState,
@@ -92,29 +90,26 @@ final class ExamResitDueRowPresenter
     /**
      * @return array<string, mixed>
      */
-    private static function unitContext(ExamResitAttempt $attempt): array
+    private static function unitContext(AcademicExamResitDueData $attempt): array
     {
-        $unit = $attempt->unit;
-
         return [
-            'unit_code' => $unit?->code,
-            'unit_name' => $unit?->name,
+            'unit_code' => $attempt->unit_code,
+            'unit_name' => $attempt->unit_name,
         ];
     }
 
     /**
      * @return array<string, mixed>
      */
-    private static function sittingContext(ExamResitAttempt $attempt): array
+    private static function sittingContext(AcademicExamResitDueData $attempt): array
     {
-        $slot = $attempt->session?->roomSlot;
-        $room = $slot?->room;
-
         return [
-            'exam_date' => $slot?->exam_date?->toDateString(),
-            'exam_start_time' => $slot?->start_time?->format('H:i'),
-            'exam_end_time' => $slot?->end_time?->format('H:i'),
-            'room' => $room ? ['name' => $room->name, 'code' => $room->code] : null,
+            'exam_date' => $attempt->exam_date,
+            'exam_start_time' => $attempt->exam_start_time,
+            'exam_end_time' => $attempt->exam_end_time,
+            'room' => $attempt->room_name !== null || $attempt->room_code !== null
+                ? ['name' => $attempt->room_name, 'code' => $attempt->room_code]
+                : null,
         ];
     }
 }
