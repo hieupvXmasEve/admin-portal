@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
-
 return new class extends Migration
 {
     private const CHARGE_TYPES = "'tuition_term','egc_level_fee','retake_fee','exam_resit_fee','manual_fee','admission_fee','defer_credit','egc_exempt_credit','scholarship_credit','voucher_credit','adjustment','bhyt'";
