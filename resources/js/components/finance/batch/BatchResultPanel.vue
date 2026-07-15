@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { BatchResult } from '@/types/finance';
-import { CheckCircle2, MinusCircle, RotateCcw, XCircle } from 'lucide-vue-next';
+import { CheckCircle2, CircleAlert, MinusCircle, RotateCcw, XCircle } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 const props = defineProps<{ result: BatchResult }>();
@@ -17,11 +17,12 @@ const skipCount = computed(() =>
     Number(s.value.skipped ?? s.value.skipped_count ?? s.value.skipped_no_debt_count ?? 0),
 );
 const failedCount = computed(() => Number(s.value.failed ?? s.value.failed_count ?? 0));
+const needsReviewCount = computed(() => Number(s.value.needs_review ?? 0));
 </script>
 
 <template>
     <div class="space-y-4">
-        <div class="grid gap-3 sm:grid-cols-3">
+        <div class="grid gap-3 sm:grid-cols-4">
             <Card class="border-emerald-200/80 bg-emerald-50/30">
                 <CardContent class="flex items-center gap-4 pt-6">
                     <CheckCircle2 class="h-8 w-8 text-emerald-600" />
@@ -46,6 +47,15 @@ const failedCount = computed(() => Number(s.value.failed ?? s.value.failed_count
                     <div>
                         <p class="text-2xl font-semibold text-red-700 tabular-nums">{{ failedCount }}</p>
                         <p class="text-muted-foreground text-sm">Lỗi</p>
+                    </div>
+                </CardContent>
+            </Card>
+            <Card v-if="needsReviewCount" class="border-amber-200/80 bg-amber-50/30">
+                <CardContent class="flex items-center gap-4 pt-6">
+                    <CircleAlert class="h-8 w-8 text-amber-600" />
+                    <div>
+                        <p class="text-2xl font-semibold text-amber-700 tabular-nums">{{ needsReviewCount }}</p>
+                        <p class="text-muted-foreground text-sm">Cần kiểm tra</p>
                     </div>
                 </CardContent>
             </Card>

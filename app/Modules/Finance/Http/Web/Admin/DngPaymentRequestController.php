@@ -8,7 +8,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\Campus;
 use App\Modules\Finance\Actions\CancelDngPaymentRequestAction;
+use App\Modules\Finance\Actions\ResolveDngReservationOutcomeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Http\Requests\Dng\ResolveDngReservationOutcomeRequest;
 use App\Modules\Finance\Http\Requests\Student360\ReviewedCancelDngRequest;
 use App\Modules\Finance\Queries\Dng\GetDngPaymentRequestDetailsQuery;
 use App\Modules\Finance\Queries\Dng\ListDngPaymentRequestsQuery;
@@ -61,6 +63,30 @@ class DngPaymentRequestController extends Controller
         }
 
         Inertia::flash('success', 'DNG payment request cancelled.');
+
+        return back();
+    }
+
+    public function resolveOutcome(
+        DngPaymentRequest $dngPaymentRequest,
+        ResolveDngReservationOutcomeRequest $request,
+        ResolveDngReservationOutcomeAction $action,
+    ): RedirectResponse {
+        $dngPaymentRequest->loadMissing('student:id,campus_id');
+        $this->assertCampusAccess($dngPaymentRequest);
+
+        try {
+            $resolved = $action->handle($dngPaymentRequest, $request->validated('outcome'), [
+                'reason' => $request->validated('reason'),
+                'resolved_by_user_id' => $request->user()?->id,
+            ]);
+        } catch (\Throwable $e) {
+            Inertia::flash('error', 'Failed to reconcile DNG reservation: '.$e->getMessage());
+
+            return back();
+        }
+
+        Inertia::flash('success', "DNG reservation resolved as {$resolved->status}.");
 
         return back();
     }

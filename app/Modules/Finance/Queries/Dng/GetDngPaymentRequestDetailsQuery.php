@@ -53,6 +53,7 @@ class GetDngPaymentRequestDetailsQuery
             'created_at' => $paymentRequest->created_at?->toDateTimeString(),
             'updated_at' => $paymentRequest->updated_at?->toDateTimeString(),
             'error_message' => $paymentRequest->error_message,
+            'review_evidence' => $paymentRequest->review_evidence,
             'has_bridged_payment' => $paymentRequest->hasBridgedPayment(),
             'payment' => $paymentRequest->payment ? [
                 'id' => $paymentRequest->payment->id,

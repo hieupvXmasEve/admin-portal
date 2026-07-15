@@ -287,6 +287,9 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
             Route::post('/{dngPaymentRequest}/cancel', [DngPaymentRequestController::class, 'cancel'])
                 ->middleware('can:create_finance_payments')
                 ->name('cancel');
+            Route::post('/{dngPaymentRequest}/resolve-outcome', [DngPaymentRequestController::class, 'resolveOutcome'])
+                ->middleware('can:resolve_finance_dng_receipt_exceptions')
+                ->name('resolve-outcome');
         });
 
         Route::prefix('webhook-events')->name('webhook-events.')->group(function () {

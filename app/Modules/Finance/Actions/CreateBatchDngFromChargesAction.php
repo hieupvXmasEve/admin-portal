@@ -8,12 +8,12 @@ use App\Models\CourseRetakeRegistration;
 use App\Models\ExamResitAttempt;
 use App\Models\Student;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Queries\Dng\ListDngWorklistQuery;
-use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use Illuminate\Support\Facades\Log;
 
@@ -48,7 +48,7 @@ class CreateBatchDngFromChargesAction
      *     description: string,
      *     estimate_time: string,
      * }  $data
-     * @return array{created: int, failed: int, errors: string[]}
+     * @return array{created: int, needs_review: int, failed: int, errors: string[], outcomes: list<array{student_id: int, reservation_id: int, status: string}>}
      */
     public function handle(array $data): array
     {
@@ -61,12 +61,16 @@ class CreateBatchDngFromChargesAction
         $chargeTypes = ListDngWorklistQuery::mapFeeTypeToChargeTypes($dngFeeType);
 
         $created = 0;
+        $needsReview = 0;
         $failed = 0;
         $errors = [];
+        $outcomes = [];
 
         foreach ($studentIds as $studentId) {
+            $reservationIdBeforeAttempt = (int) (DngPaymentRequest::query()->max('id') ?? 0);
+
             try {
-                $this->processStudent(
+                $reservation = $this->processStudent(
                     studentId: (int) $studentId,
                     dngFeeType: $dngFeeType,
                     chargeTypes: $chargeTypes,
@@ -75,9 +79,41 @@ class CreateBatchDngFromChargesAction
                     description: $description,
                     estimateTime: $estimateTime,
                 );
-
-                $created++;
+                $outcomes[] = [
+                    'student_id' => (int) $studentId,
+                    'reservation_id' => (int) $reservation->id,
+                    'status' => $reservation->status,
+                ];
+                if ($reservation->status === DngPaymentRequest::STATUS_PUSHED_TO_DNG) {
+                    $created++;
+                } else {
+                    $needsReview++;
+                }
             } catch (\Throwable $e) {
+                $heldReservation = DngPaymentRequest::query()
+                    ->where('id', '>', $reservationIdBeforeAttempt)
+                    ->where('student_id', $studentId)
+                    ->where('provider_rail', 'dng')
+                    ->where('fee_type', $dngFeeType)
+                    ->where('semester_id', $semesterId)
+                    ->whereIn('status', [
+                        DngPaymentRequest::STATUS_UNKNOWN_OUTCOME,
+                        DngPaymentRequest::STATUS_NEEDS_REVIEW,
+                    ])
+                    ->latest('id')
+                    ->first();
+                if ($heldReservation !== null) {
+                    $this->linkInstallmentsToReservation($heldReservation);
+                    $outcomes[] = [
+                        'student_id' => (int) $studentId,
+                        'reservation_id' => (int) $heldReservation->id,
+                        'status' => $heldReservation->status,
+                    ];
+                    $needsReview++;
+
+                    continue;
+                }
+
                 $failed++;
                 $errors[] = "Student #{$studentId}: {$e->getMessage()}";
                 Log::warning('CreateBatchDngFromChargesAction: failed for student', [
@@ -87,7 +123,13 @@ class CreateBatchDngFromChargesAction
             }
         }
 
-        return compact('created', 'failed', 'errors');
+        return [
+            'created' => $created,
+            'needs_review' => $needsReview,
+            'failed' => $failed,
+            'errors' => $errors,
+            'outcomes' => $outcomes,
+        ];
     }
 
     /**
@@ -103,7 +145,7 @@ class CreateBatchDngFromChargesAction
         string $dueDate,
         string $description,
         string $estimateTime,
-    ): void {
+    ): DngPaymentRequest {
         $student = Student::query()->findOrFail($studentId);
         if ($dngFeeType === 'HL') {
             $this->assertNoMissingRetakeObligations($student, $semesterId);
@@ -165,21 +207,34 @@ class CreateBatchDngFromChargesAction
             'due_date' => $dueDate,
             'estimate_time' => $estimateTime,
         ], $lines->pluck('id')->map(fn ($id): int => (int) $id)->all(), $targetAmounts, $installmentIdsByLine);
-        if ($installmentIdsByLine !== []) {
-            $billingAccountId = (int) app(BillingAccountProvisioner::class)
-                ->forStudent($studentId)
-                ->id;
+        $this->linkInstallmentsToReservation($reservation);
 
-            app(SettlementMutationGuard::class)->handle($billingAccountId, function () use ($installmentIdsByLine, $reservation): void {
-                FinanceChargeInstallment::query()->whereIn('id', array_values($installmentIdsByLine))->update([
-                    'dng_payment_request_id' => $reservation->id,
-                    'status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
-                    'last_push_error' => null,
-                    'last_push_attempted_at' => now(),
-                ]);
-            });
+        return $reservation;
+    }
+
+    private function linkInstallmentsToReservation(DngPaymentRequest $reservation): void
+    {
+        $installmentIds = $reservation->reservationTargets()
+            ->whereNotNull('finance_charge_installment_id')
+            ->pluck('finance_charge_installment_id')
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->all();
+        if ($installmentIds === []) {
+            return;
         }
 
+        app(SettlementMutationGuard::class)->handleIfChanged((int) $reservation->billing_account_id, function () use ($installmentIds, $reservation): void {
+            FinanceChargeInstallment::query()->whereIn('id', $installmentIds)->update([
+                'dng_payment_request_id' => $reservation->id,
+                'status' => $reservation->status === DngPaymentRequest::STATUS_PUSHED_TO_DNG
+                    ? FinanceChargeInstallment::STATUS_AWAITING_PAYMENT
+                    : FinanceChargeInstallment::STATUS_PENDING,
+                'last_push_error' => $reservation->status === DngPaymentRequest::STATUS_PUSHED_TO_DNG
+                    ? null
+                    : "DNG reservation #{$reservation->id} ended as {$reservation->status} and requires Finance review.",
+                'last_push_attempted_at' => now(),
+            ]);
+        });
     }
 
     /**

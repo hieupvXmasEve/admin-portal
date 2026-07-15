@@ -126,6 +126,64 @@ it('caps a batch request at its pending installment rather than accepting a call
         ->and($installment->fresh()->dng_payment_request_id)->toBe($request->id);
 });
 
+it('reports target drift review instead of claiming a batch installment is awaiting payment', function (): void {
+    $student = batchDngStudent($this->campus, $this->semester);
+    $line = batchCanonicalLine($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, '10000000.00');
+    $installment = FinanceChargeInstallment::factory()->create([
+        'finance_charge_id' => $line->charge_id,
+        'installment_no' => 1,
+        'amount' => 4_000_000,
+        'due_date' => now()->addDays(7)->toDateString(),
+    ]);
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldReceive('pushReserved')->once()->andReturnUsing(function () use ($line): array {
+        $line->update(['amount_snapshot' => '3000000.00']);
+
+        return ['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []];
+    });
+    app()->instance(DngPaymentService::class, $service);
+
+    $result = app(CreateBatchDngFromChargesAction::class)->handle(batchDngPayload($student, $this->semester));
+    $request = DngPaymentRequest::query()->sole();
+
+    expect($result['errors'])->toBe([])
+        ->and($result)->toMatchArray(['created' => 0, 'needs_review' => 1, 'failed' => 0])
+        ->and($request->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
+        ->and($installment->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_PENDING)
+        ->and($result['outcomes'])->toBe([[
+            'student_id' => $student->id,
+            'reservation_id' => $request->id,
+            'status' => DngPaymentRequest::STATUS_NEEDS_REVIEW,
+        ]]);
+});
+
+it('reports an ambiguous provider outcome without retrying the batch installment', function (): void {
+    $student = batchDngStudent($this->campus, $this->semester);
+    $line = batchCanonicalLine($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, '10000000.00');
+    $installment = FinanceChargeInstallment::factory()->create([
+        'finance_charge_id' => $line->charge_id,
+        'installment_no' => 1,
+        'amount' => 4_000_000,
+        'due_date' => now()->addDays(7)->toDateString(),
+    ]);
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldReceive('pushReserved')->once()->andThrow(new RuntimeException('Connection timeout'));
+    app()->instance(DngPaymentService::class, $service);
+
+    $result = app(CreateBatchDngFromChargesAction::class)->handle(batchDngPayload($student, $this->semester));
+    $request = DngPaymentRequest::query()->sole();
+
+    expect($result)->toMatchArray(['created' => 0, 'needs_review' => 1, 'failed' => 0, 'errors' => []])
+        ->and($request->status)->toBe(DngPaymentRequest::STATUS_UNKNOWN_OUTCOME)
+        ->and($installment->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_PENDING)
+        ->and($installment->fresh()->dng_payment_request_id)->toBe($request->id)
+        ->and($result['outcomes'])->toBe([[
+            'student_id' => $student->id,
+            'reservation_id' => $request->id,
+            'status' => DngPaymentRequest::STATUS_UNKNOWN_OUTCOME,
+        ]]);
+});
+
 it('does not create a request when the selected fee family has no canonical payable line', function (): void {
     $student = batchDngStudent($this->campus, $this->semester);
 
@@ -133,4 +191,19 @@ it('does not create a request when the selected fee family has no canonical paya
 
     expect($result)->toMatchArray(['created' => 0, 'failed' => 1])
         ->and(DngPaymentRequest::query()->count())->toBe(0);
+});
+
+it('does not report an older held reservation as the outcome of a later failed batch attempt', function (): void {
+    $student = batchDngStudent($this->campus, $this->semester);
+    $line = batchCanonicalLine($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, '10000000.00');
+    $action = app(CreateBatchDngFromChargesAction::class);
+    $action->handle(batchDngPayload($student, $this->semester));
+    $existing = DngPaymentRequest::query()->sole();
+    $existing->update(['status' => DngPaymentRequest::STATUS_NEEDS_REVIEW]);
+    $line->update(['status' => 'void']);
+
+    $result = $action->handle(batchDngPayload($student, $this->semester));
+
+    expect($result)->toMatchArray(['created' => 0, 'needs_review' => 0, 'failed' => 1, 'outcomes' => []])
+        ->and($existing->fresh()->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW);
 });

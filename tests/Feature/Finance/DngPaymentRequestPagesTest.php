@@ -9,6 +9,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -31,7 +32,7 @@ beforeEach(function () {
 
     $permissionService = Mockery::mock(PermissionService::class);
     $permissionService->shouldReceive('getUserPermissions')
-        ->andReturn(['view_finance_dng_payment_requests', 'create_finance_payments']);
+        ->andReturn(['view_finance_dng_payment_requests', 'create_finance_payments', 'resolve_finance_dng_receipt_exceptions']);
 
     app()->singleton(PermissionService::class, fn () => $permissionService);
 });
@@ -101,4 +102,26 @@ it('does not cancel a dng payment request from another campus', function () {
         ->assertForbidden();
 
     expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_PENDING);
+});
+
+it('lets authorized staff resolve a held DNG outcome through the review endpoint', function () {
+    $request = createDngPaymentRequestForStatus($this, DngPaymentRequest::STATUS_NEEDS_REVIEW);
+    $request->update([
+        'billing_account_id' => BillingAccount::query()->firstOrCreate(['student_id' => $request->student_id])->id,
+        'active_slot_key' => 'review-slot-'.$request->id,
+    ]);
+
+    actingAs($this->user)
+        ->withSession(['_token' => 'test-token'])
+        ->from(route('finance.dng.payment-requests.show', $request))
+        ->post(route('finance.dng.payment-requests.resolve-outcome', $request), [
+            '_token' => 'test-token',
+            'outcome' => 'failed',
+            'reason' => 'Provider confirmed the request was not created.',
+        ])
+        ->assertRedirect(route('finance.dng.payment-requests.show', $request))
+        ->assertSessionHas('inertia.flash_data', ['success' => 'DNG reservation resolved as failed.']);
+
+    expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_FAILED)
+        ->and($request->fresh()->active_slot_key)->toBeNull();
 });

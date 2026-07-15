@@ -59,10 +59,10 @@ class DngPaymentRequest extends Model
         self::STATUS_PAID_INVOICED => [self::STATUS_RECONCILED],
         self::STATUS_RECONCILED => [],
         self::STATUS_FAILED => [],
-        self::STATUS_UNKNOWN_OUTCOME => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_NEEDS_REVIEW, self::STATUS_CANCELLED],
+        self::STATUS_UNKNOWN_OUTCOME => [self::STATUS_PUSHED_TO_DNG, self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_NEEDS_REVIEW, self::STATUS_FAILED, self::STATUS_CANCELLED],
         // Review blocks new collection mutations, but it must never discard a
         // later verified provider receipt for an already-pushed request.
-        self::STATUS_NEEDS_REVIEW => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_CANCELLED],
+        self::STATUS_NEEDS_REVIEW => [self::STATUS_PUSHED_TO_DNG, self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_FAILED, self::STATUS_CANCELLED],
         self::STATUS_CANCELLED => [],
         self::STATUS_CANCEL_PUSHED_TO_DNG => [],
     ];
@@ -93,6 +93,7 @@ class DngPaymentRequest extends Model
         'paid_at',
         'push_payload',
         'push_response',
+        'review_evidence',
         'qr_payload',
         'last_callback_payload',
         'error_message',
@@ -111,6 +112,7 @@ class DngPaymentRequest extends Model
             'reserved_at' => 'datetime',
             'push_payload' => 'array',
             'push_response' => 'array',
+            'review_evidence' => 'array',
             'qr_payload' => 'array',
             'last_callback_payload' => 'array',
             'cancel_push_payload' => 'array',

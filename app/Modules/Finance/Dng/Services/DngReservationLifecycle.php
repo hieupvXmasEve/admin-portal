@@ -105,7 +105,7 @@ final class DngReservationLifecycle
                 ->lockForUpdate()
                 ->count() + 1;
             if ($existing !== null) {
-                $this->assertExactRetry(
+                if (! $this->isExactRetry(
                     $existing,
                     $student,
                     $billingAccount,
@@ -118,7 +118,15 @@ final class DngReservationLifecycle
                     $targetFingerprint,
                     $installmentIdsByLine,
                     $sequence - 1,
-                );
+                )) {
+                    $this->holdForReview(
+                        $existing,
+                        $targetFingerprint,
+                        'An active DNG reservation no longer matches the requested payer, settlement targets, amount, version, or provider identity.',
+                    );
+
+                    return $existing->fresh();
+                }
 
                 return $existing;
             }
@@ -164,11 +172,11 @@ final class DngReservationLifecycle
     /** @param array{description: string, semester_id: int, due_date: string, estimate_time: string} $details */
     public function push(int $studentId, DngPaymentRequest $reservation, array $details): DngPaymentRequest
     {
-        if ($reservation->status === DngPaymentRequest::STATUS_UNKNOWN_OUTCOME) {
-            throw new \RuntimeException("DNG reservation #{$reservation->id} has an unknown provider outcome and must be reconciled before retry.");
-        }
-        if ($reservation->status === DngPaymentRequest::STATUS_NEEDS_REVIEW) {
-            throw new \RuntimeException("DNG reservation #{$reservation->id} has changed targets and requires Finance review.");
+        if (in_array($reservation->status, [
+            DngPaymentRequest::STATUS_UNKNOWN_OUTCOME,
+            DngPaymentRequest::STATUS_NEEDS_REVIEW,
+        ], true)) {
+            return $reservation;
         }
         if ($reservation->status === DngPaymentRequest::STATUS_PUSHED_TO_DNG) {
             return $reservation;
@@ -179,12 +187,7 @@ final class DngReservationLifecycle
         try {
             $response = $this->dngPaymentService->pushReserved($payload);
         } catch (\Throwable $exception) {
-            DB::transaction(function () use ($reservation, $exception): void {
-                DngPaymentRequest::query()->lockForUpdate()->findOrFail($reservation->id)->update([
-                    'status' => DngPaymentRequest::STATUS_UNKNOWN_OUTCOME,
-                    'error_message' => $exception->getMessage(),
-                ]);
-            });
+            $this->holdUnknownProviderOutcome($reservation->id, $payload, $exception);
 
             throw $exception;
         }
@@ -202,6 +205,7 @@ final class DngReservationLifecycle
             InvoiceLine::query()->whereIn('id', $targetIds)->lockForUpdate()->get();
             $position = $this->settlementPositionReader->forPayableLines($targetIds);
             $currentTargets = $position->isValid() ? $this->collectibleTargets($position) : [];
+            $currentTargetFingerprint = $this->fingerprint($currentTargets);
             $currentByLine = collect($currentTargets)->keyBy('invoice_line_id');
             $targets = $reservation->reservationTargets()->orderBy('invoice_line_id')->get()
                 ->map(function (DngPaymentRequestReservationTarget $target) use ($currentByLine): ?array {
@@ -218,12 +222,13 @@ final class DngReservationLifecycle
                     ];
                 })->filter()->values()->all();
             if ($targets === [] || $this->fingerprint($targets) !== $reservation->target_fingerprint) {
-                $reservation->update([
-                    'status' => DngPaymentRequest::STATUS_NEEDS_REVIEW,
-                    'push_payload' => $payload,
-                    'push_response' => $response,
-                    'error_message' => 'Reserved Settlement Position targets changed before DNG finalization.',
-                ]);
+                $this->holdForReview(
+                    $reservation,
+                    $currentTargetFingerprint,
+                    'Reserved Settlement Position targets changed before DNG finalization.',
+                    $payload,
+                    $response,
+                );
 
                 return $reservation->fresh();
             }
@@ -293,7 +298,7 @@ final class DngReservationLifecycle
      * @param  list<array{invoice_line_id: int, finance_charge_id: int, collectible: string, identity: string}>  $targets
      * @param  array<int, int>  $installmentIdsByLine
      */
-    private function assertExactRetry(
+    private function isExactRetry(
         DngPaymentRequest $existing,
         Student $student,
         BillingAccount $billingAccount,
@@ -306,7 +311,7 @@ final class DngReservationLifecycle
         string $targetFingerprint,
         array $installmentIdsByLine,
         int $sequence,
-    ): void {
+    ): bool {
         $expectedTargets = collect($targets)
             ->map(fn (array $target): array => [
                 'invoice_line_id' => (int) $target['invoice_line_id'],
@@ -331,7 +336,7 @@ final class DngReservationLifecycle
         $settlementVersionMatches = $existing->captured_settlement_version !== null
             && (int) $billingAccount->settlement_version === (int) $existing->captured_settlement_version + 1;
 
-        if ($existing->student_id !== $student->id
+        return ! ($existing->student_id !== $student->id
             || $existing->billing_account_id !== $billingAccount->id
             || $existing->student_code !== $student->student_id
             || $existing->campus_code !== $campusCode
@@ -343,9 +348,66 @@ final class DngReservationLifecycle
             || $existing->target_fingerprint !== $targetFingerprint
             || $existing->item_id !== $expectedItemId
             || ! $settlementVersionMatches
-            || $storedTargets !== $expectedTargets) {
-            throw new \RuntimeException('An active DNG reservation does not exactly match the requested payer, settlement targets, amount, version, or provider identity. Resolve it before creating a new collection request.');
-        }
+            || $storedTargets !== $expectedTargets);
+    }
+
+    /** @param array<string, mixed>|null $payload @param array<string, mixed>|null $response */
+    private function holdForReview(
+        DngPaymentRequest $reservation,
+        string $currentTargetFingerprint,
+        string $reason,
+        ?array $payload = null,
+        ?array $response = null,
+    ): void {
+        $reservation->update([
+            'status' => DngPaymentRequest::STATUS_NEEDS_REVIEW,
+            'push_payload' => $payload ?? $reservation->push_payload,
+            'push_response' => $response ?? $reservation->push_response,
+            'review_evidence' => [
+                'provider_response' => $response ?? $reservation->push_response,
+                'deterministic_identity' => $reservation->item_id,
+                'original_target_fingerprint' => $reservation->target_fingerprint,
+                'current_target_fingerprint' => $currentTargetFingerprint,
+                'affected_installment_ids' => $this->affectedInstallmentIds($reservation),
+            ],
+            'error_message' => $reason,
+        ]);
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function holdUnknownProviderOutcome(int $reservationId, array $payload, \Throwable $exception): void
+    {
+        DB::transaction(function () use ($reservationId, $payload, $exception): void {
+            $reservation = DngPaymentRequest::query()->lockForUpdate()->findOrFail($reservationId);
+            $targetIds = $reservation->reservationTargets()->pluck('invoice_line_id')->map(fn ($id): int => (int) $id)->all();
+            InvoiceLine::query()->whereIn('id', $targetIds)->lockForUpdate()->get();
+            $position = $this->settlementPositionReader->forPayableLines($targetIds);
+            $currentTargets = $position->isValid() ? $this->collectibleTargets($position) : [];
+
+            $reservation->update([
+                'status' => DngPaymentRequest::STATUS_UNKNOWN_OUTCOME,
+                'push_payload' => $payload,
+                'review_evidence' => [
+                    'provider_response' => null,
+                    'provider_exception' => $exception->getMessage(),
+                    'deterministic_identity' => $reservation->item_id,
+                    'original_target_fingerprint' => $reservation->target_fingerprint,
+                    'current_target_fingerprint' => $this->fingerprint($currentTargets),
+                    'affected_installment_ids' => $this->affectedInstallmentIds($reservation),
+                ],
+                'error_message' => $exception->getMessage(),
+            ]);
+        });
+    }
+
+    /** @return list<int> */
+    private function affectedInstallmentIds(DngPaymentRequest $reservation): array
+    {
+        return $reservation->reservationTargets()
+            ->whereNotNull('finance_charge_installment_id')
+            ->pluck('finance_charge_installment_id')
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->all();
     }
 
     private function slotKey(int $billingAccountId, string $campusCode, string $feeType): string

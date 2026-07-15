@@ -52,6 +52,7 @@ it('keeps repair actions stricter than read-only detail permissions', function (
         'finance.dng.payment-requests.cancel-impact' => 'can:create_finance_payments',
         'finance.dng.payment-requests.cancel-reviewed' => 'can:create_finance_payments',
         'finance.dng.payment-requests.cancel' => 'can:create_finance_payments',
+        'finance.dng.payment-requests.resolve-outcome' => 'can:resolve_finance_dng_receipt_exceptions',
     ];
 
     foreach ($repairRoutes as $name => $middleware) {

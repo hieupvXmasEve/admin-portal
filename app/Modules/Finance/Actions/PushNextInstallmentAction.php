@@ -30,8 +30,8 @@ use Illuminate\Support\Facades\Log;
  *   linked to its DNG reservation before that transaction commits.
  * - The DNG provider call runs only after the reservation transaction commits.
  *
- * Returns the touched installment (now awaiting_payment) on success, or null
- * when there are no pending installments left (caller should fire
+ * Returns the touched installment after the reservation outcome is known, or
+ * null when there are no pending installments left (caller should fire
  * ChargeFullySettled in that case — wired in SettleInstallmentFromDngAction).
  *
  * Throws on DNG HTTP failure; PushNextInstallmentJob handles retry.
@@ -113,13 +113,7 @@ class PushNextInstallmentAction
 
                 $installment->update([
                     'dng_payment_request_id' => $reservation->id,
-                    'status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
-                    'last_push_error' => null,
-                    'last_push_attempted_at' => now(),
                 ]);
-                if (! $reservation->wasRecentlyCreated) {
-                    $markChanged();
-                }
 
                 return [
                     'charge_id' => (int) $lockedCharge->id,
@@ -170,7 +164,39 @@ class PushNextInstallmentAction
             throw $exception;
         }
 
-        $fresh = FinanceChargeInstallment::query()->findOrFail($selection['installment_id']);
+        $fresh = $this->settlementMutationGuard->handleIfChanged($billingAccountId, function () use ($selection, $reservation): FinanceChargeInstallment {
+            $lockedInstallment = FinanceChargeInstallment::query()
+                ->lockForUpdate()
+                ->findOrFail($selection['installment_id']);
+
+            if ((int) $lockedInstallment->dng_payment_request_id !== $selection['reservation_id']) {
+                throw new \RuntimeException(
+                    "Installment #{$lockedInstallment->id} is no longer linked to DNG reservation #{$selection['reservation_id']}."
+                );
+            }
+
+            if ($reservation->status === DngPaymentRequest::STATUS_PUSHED_TO_DNG) {
+                $lockedInstallment->update([
+                    'status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
+                    'last_push_error' => null,
+                    'last_push_attempted_at' => now(),
+                ]);
+
+                return $lockedInstallment->fresh();
+            }
+
+            $lockedInstallment->update([
+                'status' => FinanceChargeInstallment::STATUS_PENDING,
+                'last_push_error' => "DNG reservation #{$reservation->id} ended as {$reservation->status} and requires Finance review.",
+                'last_push_attempted_at' => now(),
+            ]);
+
+            return $lockedInstallment->fresh();
+        });
+
+        if ($reservation->status !== DngPaymentRequest::STATUS_PUSHED_TO_DNG) {
+            return $fresh;
+        }
 
         Log::info('Installment pushed to DNG', [
             'finance_charge_id' => $selection['charge_id'],

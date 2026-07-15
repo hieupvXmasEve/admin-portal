@@ -189,7 +189,7 @@ it('guards concurrent slot contenders with the database unique slot constraint',
     expect(DngPaymentRequest::query()->where('active_slot_key', $reservation->active_slot_key)->count())->toBe(1);
 });
 
-it('fails closed when an active retry adds a different invoice-line target', function (): void {
+it('holds an active retry with a different invoice-line target for reconciliation', function (): void {
     reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
     $service = Mockery::mock(DngPaymentService::class);
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
@@ -199,12 +199,14 @@ it('fails closed when an active retry adds a different invoice-line target', fun
     $first->update(['status' => DngPaymentRequest::STATUS_PENDING]);
     reservationPayableLine($this->invoice, $this->billingAccount, '500000.00');
 
-    expect(fn () => $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester)))
-        ->toThrow(RuntimeException::class, 'does not exactly match');
-    expect(DngPaymentRequest::query()->count())->toBe(1);
+    $second = $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
+
+    expect($second->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
+        ->and(DngPaymentRequest::query()->count())->toBe(1)
+        ->and($second->review_evidence['current_target_fingerprint'])->toBeString();
 });
 
-it('checks exact targets before returning an unknown provider outcome for resolution', function (): void {
+it('promotes a target-drifted unknown outcome to staff review', function (): void {
     reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
     $service = Mockery::mock(DngPaymentService::class);
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
@@ -214,12 +216,13 @@ it('checks exact targets before returning an unknown provider outcome for resolu
     $first->update(['status' => DngPaymentRequest::STATUS_UNKNOWN_OUTCOME]);
     reservationPayableLine($this->invoice, $this->billingAccount, '500000.00');
 
-    expect(fn () => $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester)))
-        ->toThrow(RuntimeException::class, 'does not exactly match');
-    expect(DngPaymentRequest::query()->count())->toBe(1);
+    $second = $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
+
+    expect($second->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
+        ->and(DngPaymentRequest::query()->count())->toBe(1);
 });
 
-it('fails closed when an active retry changes semester', function (): void {
+it('holds an active retry when its semester changes', function (): void {
     reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
     $service = Mockery::mock(DngPaymentService::class);
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
@@ -237,14 +240,16 @@ it('fails closed when an active retry changes semester', function (): void {
     ]);
     reservationPayableLine($nextInvoice, $this->billingAccount, '1000000.00');
 
-    expect(fn () => $action->handle(
+    $second = $action->handle(
         $this->student->id,
         'HL',
         array_replace(guardedReservationDetails($this->semester), ['semester_id' => $nextSemester->id]),
-    ))->toThrow(RuntimeException::class, 'does not exactly match');
+    );
+
+    expect($second->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW);
 });
 
-it('fails closed when an active retry changes its exact installment target', function (): void {
+it('holds an active retry when its exact installment target changes', function (): void {
     $line = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
     $firstInstallment = FinanceChargeInstallment::factory()->create([
         'finance_charge_id' => $line->charge_id,
@@ -270,17 +275,19 @@ it('fails closed when an active retry changes its exact installment target', fun
     );
     $first->update(['status' => DngPaymentRequest::STATUS_PENDING]);
 
-    expect(fn () => $action->handle(
+    $second = $action->handle(
         $this->student->id,
         'HL',
         guardedReservationDetails($this->semester),
         [$line->id],
         [$line->id => '500000.00'],
         [$line->id => $secondInstallment->id],
-    ))->toThrow(RuntimeException::class, 'does not exactly match');
+    );
+
+    expect($second->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW);
 });
 
-it('fails closed when an active retry changes its amount and target fingerprint', function (): void {
+it('holds an active retry when its amount and target fingerprint change', function (): void {
     $line = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
     $service = Mockery::mock(DngPaymentService::class);
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
@@ -295,13 +302,35 @@ it('fails closed when an active retry changes its amount and target fingerprint'
     );
     $first->update(['status' => DngPaymentRequest::STATUS_PENDING]);
 
-    expect(fn () => $action->handle(
+    $second = $action->handle(
         $this->student->id,
         'HL',
         guardedReservationDetails($this->semester),
         [$line->id],
         [$line->id => '600000.00'],
-    ))->toThrow(RuntimeException::class, 'does not exactly match');
+    );
+
+    expect($second->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW);
+});
+
+it('holds a stale settlement-version retry for staff reconciliation', function (): void {
+    reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
+    $action = guardedReservationAction($service);
+
+    $first = $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
+    $first->update(['status' => DngPaymentRequest::STATUS_PENDING]);
+    $this->billingAccount->increment('settlement_version');
+
+    $second = $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
+
+    expect($second->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
+        ->and($second->review_evidence)->toMatchArray([
+            'deterministic_identity' => $first->item_id,
+            'original_target_fingerprint' => $first->target_fingerprint,
+            'current_target_fingerprint' => $first->target_fingerprint,
+        ]);
 });
 
 it('releases a terminal active slot without erasing DNG provider evidence', function (string $terminalStatus): void {
@@ -365,6 +394,30 @@ it('fails closed without a provider call when the canonical target is invalid', 
     expect(DngPaymentRequest::query()->count())->toBe(0);
 });
 
+it('fails before the provider call when a target drifts during local reservation', function (): void {
+    $line = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
+    $realReader = app(SettlementPositionReader::class);
+    $reader = Mockery::mock(SettlementPositionReader::class);
+    $reads = 0;
+    $reader->shouldReceive('forPayableLines')->twice()->andReturnUsing(function (array $lineIds) use (&$reads, $line, $realReader) {
+        $reads++;
+        if ($reads === 2) {
+            $line->update(['amount_snapshot' => '0.00']);
+        }
+
+        return $realReader->forPayableLines($lineIds);
+    });
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldNotReceive('pushReserved');
+    $campusResolver = Mockery::mock(DngCampusCodeResolver::class);
+    $campusResolver->shouldReceive('requireForStudent')->andReturn('FAUHN');
+    $action = new ReserveAndPushSingleFeeDngAction(new DngReservationLifecycle($reader, $campusResolver, $service));
+
+    expect(fn () => $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester)))
+        ->toThrow(RuntimeException::class, 'Settlement Position changed while reserving DNG targets');
+    expect(DngPaymentRequest::query()->count())->toBe(0);
+});
+
 it('holds the request for review when its exact target changes before finalization', function (): void {
     $line = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
     $service = Mockery::mock(DngPaymentService::class);
@@ -378,7 +431,30 @@ it('holds the request for review when its exact target changes before finalizati
 
     expect($reservation->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
         ->and($reservation->reservationTargets)->toHaveCount(1)
-        ->and($reservation->error_message)->toContain('targets changed');
+        ->and($reservation->error_message)->toContain('targets changed')
+        ->and($reservation->review_evidence)->toMatchArray([
+            'provider_response' => ['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []],
+            'deterministic_identity' => $reservation->item_id,
+            'original_target_fingerprint' => $reservation->target_fingerprint,
+            'affected_installment_ids' => [],
+        ])
+        ->and($reservation->review_evidence['current_target_fingerprint'])->toBeString()->not->toBe($reservation->target_fingerprint);
+});
+
+it('records a deterministic current fingerprint when every target disappears before finalization', function (): void {
+    $line = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldReceive('pushReserved')->once()->andReturnUsing(function () use ($line): array {
+        $line->update(['amount_snapshot' => '0.00']);
+
+        return ['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []];
+    });
+
+    $reservation = guardedReservationAction($service)->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
+
+    expect($reservation->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
+        ->and($reservation->review_evidence['current_target_fingerprint'])->toBeString()->not->toBe('')
+        ->and($reservation->review_evidence['current_target_fingerprint'])->not->toBe($reservation->target_fingerprint);
 });
 
 it('blocks a concurrent credit application during the unlocked DNG provider call without over-collecting or losing a settlement version', function (): void {

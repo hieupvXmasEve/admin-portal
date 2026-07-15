@@ -4,9 +4,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import { usePermission } from '@/composables/usePermission';
 import { formatCurrency, formatDate } from '@/utils/format';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, useForm } from '@inertiajs/vue3';
 import { AlertTriangle, ArrowLeft, CheckCircle2, Link2, ReceiptText, Siren, UserRound, Wallet } from 'lucide-vue-next';
 
 interface Props {
@@ -40,6 +41,7 @@ interface Props {
         created_at: string | null;
         updated_at: string | null;
         error_message: string | null;
+        review_evidence: Record<string, unknown> | null;
         has_bridged_payment: boolean;
         payment: {
             id: number;
@@ -69,6 +71,20 @@ interface Props {
 
 const props = defineProps<Props>();
 const permission = usePermission();
+const resolutionForm = useForm({
+    outcome: 'pushed',
+    reason: '',
+});
+const canResolveHeldOutcome = () =>
+    permission.can('resolve_finance_dng_receipt_exceptions')
+    && ['needs_review', 'unknown_outcome'].includes(props.request.status);
+
+function resolveOutcome(outcome: 'pushed' | 'restored_pending' | 'cancelled' | 'failed'): void {
+    resolutionForm.outcome = outcome;
+    resolutionForm.post(route('finance.dng.payment-requests.resolve-outcome', props.request.id), {
+        preserveScroll: true,
+    });
+}
 
 const getStatusClass = (status: string) => {
     switch (status) {
@@ -192,6 +208,22 @@ const getStatusClass = (status: string) => {
             </Card>
         </div>
 
+        <Card v-if="canResolveHeldOutcome()" class="border-amber-200">
+            <CardHeader>
+                <CardTitle class="flex items-center gap-2 text-amber-800"><Siren class="h-4 w-4" />Reconcile held provider outcome</CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-3">
+                <Textarea v-model="resolutionForm.reason" rows="3" placeholder="Record the provider evidence and reconciliation decision..." />
+                <p v-if="resolutionForm.errors.reason" class="text-sm text-destructive">{{ resolutionForm.errors.reason }}</p>
+                <div class="flex flex-wrap gap-2">
+                    <Button size="sm" :disabled="resolutionForm.processing" @click="resolveOutcome('pushed')">Confirm pushed</Button>
+                    <Button size="sm" variant="outline" :disabled="resolutionForm.processing" @click="resolveOutcome('restored_pending')">Restore pending</Button>
+                    <Button size="sm" variant="outline" :disabled="resolutionForm.processing" @click="resolveOutcome('cancelled')">Mark cancelled</Button>
+                    <Button size="sm" variant="destructive" :disabled="resolutionForm.processing" @click="resolveOutcome('failed')">Mark failed</Button>
+                </div>
+            </CardContent>
+        </Card>
+
         <Card>
             <CardHeader><CardTitle>Linked Webhook Events</CardTitle></CardHeader>
             <CardContent>
@@ -239,6 +271,7 @@ const getStatusClass = (status: string) => {
         <div class="grid gap-6 xl:grid-cols-2">
             <JsonPayloadCard title="Push Payload" :payload="request.payloads.push_payload" />
             <JsonPayloadCard title="Push Response" :payload="request.payloads.push_response" />
+            <JsonPayloadCard v-if="request.review_evidence" title="Review Evidence" :payload="request.review_evidence" />
             <JsonPayloadCard title="Last Callback Payload" :payload="request.payloads.last_callback_payload" />
             <JsonPayloadCard v-if="request.payloads.cancel_push_payload" title="Cancel Push Payload" :payload="request.payloads.cancel_push_payload" />
             <JsonPayloadCard v-if="request.payloads.cancel_push_response" title="Cancel Push Response" :payload="request.payloads.cancel_push_response" />

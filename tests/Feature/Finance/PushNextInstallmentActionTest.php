@@ -6,6 +6,7 @@ use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Actions\PushNextInstallmentAction;
+use App\Modules\Finance\Actions\ResolveDngReservationOutcomeAction;
 use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
@@ -234,6 +235,133 @@ it('does not push a later installment when the earliest one is already reserved'
         ->and(DngPaymentRequest::query()->count())->toBe(1);
 });
 
+it('keeps an installment pending when provider success finalizes to target drift review', function () {
+    $fix = createInstallmentPushFixture();
+    $line = InvoiceLine::query()->where('charge_id', $fix['charge']->id)->sole();
+    $mock = Mockery::mock(DngClient::class);
+    $mock->shouldReceive('buildInsertNewRecordPayload')->once()->andReturn(['fake' => 'payload']);
+    $mock->shouldReceive('insertNewRecord')->once()->andReturnUsing(function () use ($line): array {
+        $line->update(['amount_snapshot' => '7400000.00']);
+
+        return ['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []];
+    });
+    app()->instance(DngClient::class, $mock);
+    app()->forgetInstance(DngPaymentService::class);
+
+    $installment = freshPushAction()->handle($fix['charge']->id);
+    $reservation = DngPaymentRequest::query()->findOrFail($installment->dng_payment_request_id);
+
+    expect($reservation->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
+        ->and($installment->status)->toBe(FinanceChargeInstallment::STATUS_PENDING)
+        ->and($installment->last_push_error)->toContain('requires Finance review')
+        ->and($reservation->review_evidence['affected_installment_ids'])->toBe([$installment->id]);
+});
+
+it('lets staff reconcile a held reservation to pushed before awaiting payment', function () {
+    $fix = createInstallmentPushFixture();
+    $billingAccount = BillingAccount::query()->where('student_id', $fix['charge']->student_id)->sole();
+    $installment = $fix['installments'][0];
+    $reservation = DngPaymentRequest::query()->create([
+        'student_id' => $fix['charge']->student_id,
+        'billing_account_id' => $billingAccount->id,
+        'campus_code' => 'TEST',
+        'provider_rail' => 'dng',
+        'student_code' => $fix['charge']->student->student_id,
+        'fee_type' => 'HP',
+        'description' => 'Held installment',
+        'semester_id' => $fix['charge']->semester_id,
+        'due_date' => $installment->due_date,
+        'item_id' => 'held-'.uniqid(),
+        'active_slot_key' => 'held-slot-'.uniqid(),
+        'amount' => $installment->amount,
+        'status' => DngPaymentRequest::STATUS_NEEDS_REVIEW,
+    ]);
+    $reservation->reservationTargets()->create([
+        'invoice_line_id' => InvoiceLine::query()->where('charge_id', $fix['charge']->id)->sole()->id,
+        'finance_charge_installment_id' => $installment->id,
+        'captured_collectible' => $installment->amount,
+        'target_identity' => 'installment:'.$installment->id,
+    ]);
+    $installment->update(['dng_payment_request_id' => $reservation->id]);
+
+    $resolved = app(ResolveDngReservationOutcomeAction::class)->handle(
+        $reservation,
+        'pushed',
+        ['provider_response' => ['Code' => 1, 'Message' => 'confirmed by staff']],
+    );
+
+    expect($resolved->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG)
+        ->and($installment->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_AWAITING_PAYMENT)
+        ->and($resolved->review_evidence['resolution'])->toBe('pushed');
+});
+
+it('returns a held installment to pending for terminal reconciliation outcomes', function (string $outcome, string $initialStatus, string $expectedStatus): void {
+    $fix = createInstallmentPushFixture();
+    $billingAccount = BillingAccount::query()->where('student_id', $fix['charge']->student_id)->sole();
+    $installment = $fix['installments'][0];
+    $reservation = DngPaymentRequest::query()->create([
+        'student_id' => $fix['charge']->student_id,
+        'billing_account_id' => $billingAccount->id,
+        'campus_code' => 'TEST',
+        'provider_rail' => 'dng',
+        'student_code' => $fix['charge']->student->student_id,
+        'fee_type' => 'HP',
+        'description' => 'Held installment',
+        'semester_id' => $fix['charge']->semester_id,
+        'due_date' => $installment->due_date,
+        'item_id' => 'held-'.uniqid(),
+        'active_slot_key' => 'held-slot-'.uniqid(),
+        'amount' => $installment->amount,
+        'status' => $initialStatus,
+    ]);
+    $reservation->reservationTargets()->create([
+        'invoice_line_id' => InvoiceLine::query()->where('charge_id', $fix['charge']->id)->sole()->id,
+        'finance_charge_installment_id' => $installment->id,
+        'captured_collectible' => $installment->amount,
+        'target_identity' => 'installment:'.$installment->id,
+    ]);
+    $installment->update(['dng_payment_request_id' => $reservation->id]);
+
+    $resolved = app(ResolveDngReservationOutcomeAction::class)->handle($reservation, $outcome, ['staff_note' => 'Provider outcome verified']);
+
+    expect($resolved->status)->toBe($expectedStatus)
+        ->and($resolved->active_slot_key)->toBeNull()
+        ->and($installment->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_PENDING)
+        ->and($installment->fresh()->dng_payment_request_id)->toBe($reservation->id)
+        ->and($resolved->review_evidence['resolution'])->toBe($outcome);
+})->with([
+    'unknown provider can restore pending' => ['restored_pending', DngPaymentRequest::STATUS_UNKNOWN_OUTCOME, DngPaymentRequest::STATUS_FAILED],
+    'review can cancel the request' => ['cancelled', DngPaymentRequest::STATUS_NEEDS_REVIEW, DngPaymentRequest::STATUS_CANCELLED],
+    'review can mark the request failed' => ['failed', DngPaymentRequest::STATUS_NEEDS_REVIEW, DngPaymentRequest::STATUS_FAILED],
+]);
+
+it('does not issue a second provider push after deterministic reconciliation confirms an ambiguous attempt', function (): void {
+    $fix = createInstallmentPushFixture();
+    mockDngClientPushFail('Connection timeout');
+
+    try {
+        freshPushAction()->handle($fix['charge']->id);
+    } catch (Throwable) {
+        // The reservation is intentionally retained for reconciliation.
+    }
+
+    $installment = $fix['installments'][0]->fresh();
+    $reservation = DngPaymentRequest::query()->findOrFail($installment->dng_payment_request_id);
+    expect($reservation->status)->toBe(DngPaymentRequest::STATUS_UNKNOWN_OUTCOME);
+
+    app(ResolveDngReservationOutcomeAction::class)->handle($reservation, 'pushed', [
+        'provider_response' => ['ItemId' => $reservation->item_id, 'confirmed' => true],
+    ]);
+    $mock = Mockery::mock(DngClient::class);
+    $mock->shouldNotReceive('buildInsertNewRecordPayload');
+    app()->instance(DngClient::class, $mock);
+    app()->forgetInstance(DngPaymentService::class);
+
+    expect(freshPushAction()->handle($fix['charge']->id))->toBeNull()
+        ->and(DngPaymentRequest::query()->count())->toBe(1)
+        ->and($installment->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_AWAITING_PAYMENT);
+});
+
 // =========================================================================
 // Case 9: settling DNG → installment paid + next push job dispatched
 // =========================================================================
@@ -326,9 +454,17 @@ it('holds an ambiguous provider outcome for reconciliation instead of retrying i
     $mock->shouldNotReceive('buildInsertNewRecordPayload');
     app()->instance(DngClient::class, $mock);
     app()->forgetInstance(DngPaymentService::class);
-    expect(fn () => freshPushAction()->handle($fix['charge']->id))
-        ->toThrow(RuntimeException::class, 'unknown provider outcome');
-    expect($fix['installments'][0]->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_PENDING)
+    $retry = freshPushAction()->handle($fix['charge']->id);
+
+    expect($retry)->not->toBeNull()
+        ->and($retry->status)->toBe(FinanceChargeInstallment::STATUS_PENDING)
+        ->and($retry->last_push_error)->toContain('unknown_outcome')
+        ->and($reservation->fresh()->review_evidence)->toMatchArray([
+            'provider_response' => null,
+            'provider_exception' => 'Transient 502',
+            'deterministic_identity' => $reservation->item_id,
+            'original_target_fingerprint' => $reservation->target_fingerprint,
+        ])
         ->and(DngPaymentRequest::query()->count())->toBe(1);
 });
 
