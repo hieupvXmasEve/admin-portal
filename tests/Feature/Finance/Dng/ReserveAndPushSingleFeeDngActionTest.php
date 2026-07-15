@@ -10,6 +10,7 @@ use App\Modules\Finance\Actions\ReserveAndPushSingleFeeDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
+use App\Modules\Finance\Dng\Services\DngReservationLifecycle;
 use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
@@ -84,11 +85,11 @@ function guardedReservationAction(DngPaymentService $service): ReserveAndPushSin
     $campusResolver = Mockery::mock(DngCampusCodeResolver::class);
     $campusResolver->shouldReceive('requireForStudent')->andReturn('FAUHN');
 
-    return new ReserveAndPushSingleFeeDngAction(
+    return new ReserveAndPushSingleFeeDngAction(new DngReservationLifecycle(
         app(SettlementPositionReader::class),
         $campusResolver,
         $service,
-    );
+    ));
 }
 
 function guardedReservationDetails(Semester $semester): array

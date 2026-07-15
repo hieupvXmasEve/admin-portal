@@ -17,9 +17,12 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -79,17 +82,17 @@ function createInstallmentPushFixture(): array
         'status' => 'active',
     ]);
 
-    $i1 = FinanceChargeInstallment::factory()->create([
-        'finance_charge_id' => $charge->id,
-        'installment_no' => 1,
-        'amount' => 7_500_000,
-        'due_date' => now()->addDays(30)->toDateString(),
-    ]);
     $i2 = FinanceChargeInstallment::factory()->create([
         'finance_charge_id' => $charge->id,
         'installment_no' => 2,
         'amount' => 7_500_000,
         'due_date' => now()->addDays(60)->toDateString(),
+    ]);
+    $i1 = FinanceChargeInstallment::factory()->create([
+        'finance_charge_id' => $charge->id,
+        'installment_no' => 1,
+        'amount' => 7_500_000,
+        'due_date' => now()->addDays(30)->toDateString(),
     ]);
 
     return ['charge' => $charge->fresh(['student']), 'installments' => collect([$i1, $i2])];
@@ -153,11 +156,24 @@ function freshPushAction(): PushNextInstallmentAction
 // =========================================================================
 // Case 8: split + push installment 1 → DNG record created, installment linked
 // =========================================================================
-it('pushes the next pending installment to DNG and links the record', function () {
+it('reserves the lowest installment sequence even when row order is reversed', function () {
     mockDngClientPushSuccess();
     $fix = createInstallmentPushFixture();
+    $line = InvoiceLine::query()->where('charge_id', $fix['charge']->id)->sole();
+    $reader = app(SettlementPositionReader::class);
+    $positionBefore = $reader->forPayableLines([(int) $line->id]);
+    $billingAccount = BillingAccount::query()->where('student_id', $fix['charge']->student_id)->sole();
+    $invoice = StudentInvoice::query()->where('student_id', $fix['charge']->student_id)->sole();
+    $invoiceTotalsBefore = [
+        'total' => $invoice->total_amount,
+        'paid' => $invoice->paid_amount,
+        'outstanding' => $invoice->outstanding_balance,
+    ];
+    $paymentTotalBefore = Payment::query()->where('student_id', $fix['charge']->student_id)->sum('amount');
+    $versionBefore = $billingAccount->settlement_version;
 
     $installment = freshPushAction()->handle($fix['charge']->id);
+    $positionAfter = $reader->forPayableLines([(int) $line->id]);
 
     expect($installment)->not->toBeNull();
     expect($installment->installment_no)->toBe(1);
@@ -170,6 +186,52 @@ it('pushes the next pending installment to DNG and links the record', function (
     expect((float) $dng->amount)->toBe(7_500_000.0);
     expect($dng->chargeLinks->sole()->finance_charge_id)->toBe($fix['charge']->id)
         ->and($dng->chargeLinks->sole()->finance_charge_installment_id)->toBe($installment->id);
+    expect($fix['charge']->fresh()->amount)->toBe('15000000.00')
+        ->and(InvoiceLine::query()->where('charge_id', $fix['charge']->id)->sole()->amount_snapshot)->toBe('15000000.00')
+        ->and($billingAccount->fresh()->settlement_version)->toBe($versionBefore + 1)
+        ->and($positionAfter->amounts->gross->amount)->toBe($positionBefore->amounts->gross->amount)
+        ->and($positionAfter->amounts->discount->amount)->toBe($positionBefore->amounts->discount->amount)
+        ->and($positionAfter->amounts->cash->amount)->toBe($positionBefore->amounts->cash->amount)
+        ->and($positionAfter->amounts->credit->amount)->toBe($positionBefore->amounts->credit->amount)
+        ->and($positionAfter->amounts->remaining->amount)->toBe($positionBefore->amounts->remaining->amount)
+        ->and($invoice->fresh()->total_amount)->toBe($invoiceTotalsBefore['total'])
+        ->and($invoice->fresh()->paid_amount)->toBe($invoiceTotalsBefore['paid'])
+        ->and($invoice->fresh()->outstanding_balance)->toBe($invoiceTotalsBefore['outstanding'])
+        ->and(Payment::query()->where('student_id', $fix['charge']->student_id)->sum('amount'))->toBe($paymentTotalBefore);
+});
+
+it('does not push a later installment when the earliest one is already reserved', function () {
+    $fix = createInstallmentPushFixture();
+    $providerCalls = 0;
+    $nestedResult = null;
+    $transactionLevelAtProviderCall = null;
+    $transactionLevelBeforePush = DB::transactionLevel();
+    $mock = Mockery::mock(DngClient::class);
+    $mock->shouldReceive('buildInsertNewRecordPayload')->andReturn(['fake' => 'payload']);
+    $mock->shouldReceive('insertNewRecord')->once()->andReturnUsing(function () use (&$providerCalls, &$nestedResult, &$transactionLevelAtProviderCall, $fix): array {
+        $providerCalls++;
+        $transactionLevelAtProviderCall = DB::transactionLevel();
+        $nestedResult = freshPushAction()->handle($fix['charge']->id);
+
+        return [
+            'data' => [
+                'TransactionID' => 'TXN-'.uniqid(),
+                'PaymentId' => 'PAY-'.uniqid(),
+            ],
+        ];
+    });
+    app()->instance(DngClient::class, $mock);
+    app()->forgetInstance(DngPaymentService::class);
+
+    $first = freshPushAction()->handle($fix['charge']->id);
+
+    expect($providerCalls)->toBe(1)
+        ->and($transactionLevelAtProviderCall)->toBe($transactionLevelBeforePush)
+        ->and($nestedResult)->toBeNull()
+        ->and($first->installment_no)->toBe(1)
+        ->and($fix['installments'][0]->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_AWAITING_PAYMENT)
+        ->and($fix['installments'][1]->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_PENDING)
+        ->and(DngPaymentRequest::query()->count())->toBe(1);
 });
 
 // =========================================================================
@@ -220,7 +282,7 @@ it('pushes installment 2 when installment 1 is already paid', function () {
 });
 
 // =========================================================================
-// Case 11: DNG push fails → installment stays pending with last_push_error
+// Case 11: DNG push fails → installment remains linked to the ambiguous reservation
 // =========================================================================
 it('records last_push_error and increments push_attempt_count when DNG push fails', function () {
     mockDngClientPushFail('Connection timeout');
@@ -233,7 +295,9 @@ it('records last_push_error and increments push_attempt_count when DNG push fail
     expect($installment->status)->toBe(FinanceChargeInstallment::STATUS_PENDING);
     expect($installment->last_push_error)->toContain('Connection timeout');
     expect($installment->push_attempt_count)->toBe(1);
-    expect($installment->dng_payment_request_id)->toBeNull();
+    expect($installment->dng_payment_request_id)->not->toBeNull();
+    expect(DngPaymentRequest::query()->findOrFail($installment->dng_payment_request_id)->status)
+        ->toBe(DngPaymentRequest::STATUS_UNKNOWN_OUTCOME);
 });
 
 // =========================================================================
@@ -255,17 +319,24 @@ it('holds an ambiguous provider outcome for reconciliation instead of retrying i
     expect($i1->push_attempt_count)->toBe(1);
 
     // A second push must not risk a duplicate provider debt.
-    mockDngClientPushSuccess();
+    $mock = Mockery::mock(DngClient::class);
+    $mock->shouldNotReceive('buildInsertNewRecordPayload');
+    app()->instance(DngClient::class, $mock);
+    app()->forgetInstance(DngPaymentService::class);
     expect(fn () => freshPushAction()->handle($fix['charge']->id))
         ->toThrow(RuntimeException::class, 'unknown provider outcome');
-    expect($fix['installments'][0]->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_PENDING);
+    expect($fix['installments'][0]->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_PENDING)
+        ->and(DngPaymentRequest::query()->count())->toBe(1);
 });
 
 // =========================================================================
 // Case 12: no pending installment left → action returns null (settled)
 // =========================================================================
 it('returns null when there are no pending installments left', function () {
-    mockDngClientPushSuccess();
+    $mock = Mockery::mock(DngClient::class);
+    $mock->shouldNotReceive('buildInsertNewRecordPayload');
+    app()->instance(DngClient::class, $mock);
+    app()->forgetInstance(DngPaymentService::class);
     $fix = createInstallmentPushFixture();
 
     // Mark both installments paid.
@@ -276,22 +347,51 @@ it('returns null when there are no pending installments left', function () {
         ]);
     }
 
+    $billingAccount = BillingAccount::query()->where('student_id', $fix['charge']->student_id)->sole();
+    $versionBefore = $billingAccount->settlement_version;
+
     $result = freshPushAction()->handle($fix['charge']->id);
-    expect($result)->toBeNull();
+
+    expect($result)->toBeNull()
+        ->and($billingAccount->fresh()->settlement_version)->toBe($versionBefore)
+        ->and(DngPaymentRequest::query()->count())->toBe(0);
+});
+
+it('does not provision a billing account when the charge has no installments', function () {
+    $campus = Campus::factory()->create(['dng_code' => 'TEST']);
+    $semester = Semester::factory()->create();
+    $student = Student::factory()->create([
+        'campus_id' => $campus->id,
+        'intake' => 2024,
+        'intake_semester_id' => $semester->id,
+    ]);
+    $charge = FinanceCharge::query()->create([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => 15_000_000,
+        'description' => 'No installment plan',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    BillingAccount::query()->where('student_id', $student->id)->delete();
+
+    expect(freshPushAction()->handle($charge->id))->toBeNull()
+        ->and(BillingAccount::query()->where('student_id', $student->id)->exists())->toBeFalse()
+        ->and(DngPaymentRequest::query()->count())->toBe(0);
 });
 
 // =========================================================================
-// Case 13: manual retry with explicit installment_id → action targets it
+// Case 13: explicit later installment must not bypass sequence order
 // =========================================================================
-it('honors explicit installment_id (manual retry button)', function () {
+it('rejects an explicit later installment while an earlier one remains pending', function () {
     mockDngClientPushSuccess();
     $fix = createInstallmentPushFixture();
 
-    // Bypass installment 1, retry installment 2 directly.
-    // (Real flow: i1 awaiting, i2 pending. Admin can't manual-retry i2 while
-    // i1 is awaiting because DNG invariant blocks. But action itself is
-    // explicit — test verifies the resolveTarget path.)
-    $result = freshPushAction()->handle($fix['charge']->id, $fix['installments'][1]->id);
+    expect(fn () => freshPushAction()->handle($fix['charge']->id, $fix['installments'][1]->id))
+        ->toThrow(RuntimeException::class, 'not the next eligible installment');
 
-    expect($result->installment_no)->toBe(2);
+    expect(DngPaymentRequest::query()->count())->toBe(0)
+        ->and($fix['installments'][0]->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_PENDING)
+        ->and($fix['installments'][1]->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_PENDING);
 });
