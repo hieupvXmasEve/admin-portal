@@ -1,6 +1,6 @@
 # 04 — Converge settlement reads on Settlement Position
 
-Status: ready-for-agent
+Status: completed
 
 ## Parent
 
@@ -14,10 +14,10 @@ Once all consumers have moved, remove the duplicate settlement snapshot, line-ou
 
 ## Acceptance criteria
 
-- [ ] All authoritative current-balance consumers obtain complete settlement components from Settlement Position.
+- [x] All authoritative current-balance consumers obtain complete settlement components from Settlement Position.
 - [x] Applied credit reduces remaining collectible and is displayed separately from cash paid.
-- [ ] No model accessor, query, resource, controller, export, reminder, or worklist calculates authoritative balance as local `amount - paid - discount` arithmetic.
-- [ ] Invalid Settlement Positions fail closed for money-moving or student-facing amounts and surface stable staff review evidence.
+- [x] No model accessor, query, resource, controller, export, reminder, or worklist calculates authoritative balance as local `amount - paid - discount` arithmetic.
+- [x] Invalid Settlement Positions fail closed for money-moving or student-facing amounts and surface stable staff review evidence.
 - [x] Single-scope and batch reads remain mathematically equivalent and meet existing query/latency budgets.
 - [x] Student API response shape and the matching student portal behavior are inspected and updated together if the contract changes.
 - [x] Characterization and integration tests reconcile representative tuition, retake/resit, BHYT, credit, discount, partial-payment, void, and surplus cases.
@@ -37,4 +37,5 @@ Once all consumers have moved, remove the duplicate settlement snapshot, line-ou
 - 2026-07-14: Replaced the remaining local ledger aggregation in `ObligationLedgerSettlementReader` and installment-reminder balance arithmetic with Settlement Position. Invalid overpayment or reversed-discount evidence now fails closed with stable `settlement_position.*` review codes; the Academic retake gate and DNG installment reminder characterization tests pass.
 - 2026-07-14: Removed stale DNG worklist and Collection Progress report bypass entries after confirming both use canonical batch Settlement Position reads. DNG worklist tests now materialize an obligation and payable line; unmaterialized HL sources remain visible only as review exceptions. Collection Progress excludes voided payable lines from current collectible totals.
 - 2026-07-14: Student and parent due-item DNG reminders now derive `balance_formatted` from exact reservation-target Settlement Position scopes. Requests without a target or with invalid positions are not emailed and emit stable review codes; partial cash is characterized as a lower reminder balance.
-- The issue remains `ready-for-agent`: allocation preview and the remaining read consumers still need final convergence proof. The existing architecture test is blocked by the unrelated pre-existing writer in `CloseKnownLegacyDataExceptionsAction` (issue 05).
+- Before issue 14, allocation preview and the remaining read consumers still needed final convergence proof; the architecture guard also had unrelated mutation-writer findings outside this read slice.
+- 2026-07-15: Completed by issue 14. The final manual-allocation preview now reads canonical batch positions directly, returns gross/discount/cash/credit/remaining components, ignores a stale invoice `paid` cache, and fails closed with stable review evidence. Issue 14 records the repository-wide consumer inventory and focused verification.

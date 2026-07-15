@@ -12,6 +12,7 @@ use App\Modules\Finance\Actions\ReserveAndPushSingleFeeDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
+use App\Modules\Finance\Dng\Services\DngReservationLifecycle;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
@@ -87,9 +88,11 @@ function makeBhytBatchDngAction(bool $dngFails = false): CreateBatchDngFromCharg
     $campusResolverMock->shouldReceive('requireForStudent')->andReturn('FAUHN');
 
     return new CreateBatchDngFromChargesAction(new ReserveAndPushSingleFeeDngAction(
-        app(SettlementPositionReader::class),
-        $campusResolverMock,
-        $dngPaymentServiceMock,
+        new DngReservationLifecycle(
+            app(SettlementPositionReader::class),
+            $campusResolverMock,
+            $dngPaymentServiceMock,
+        ),
     ));
 }
 

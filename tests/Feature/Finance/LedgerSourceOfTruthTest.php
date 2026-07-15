@@ -183,6 +183,8 @@ it('preview auto-allocate zero-amount detection uses the canonical net', functio
         'paid_at' => now(),
         'source' => 'manual',
     ]);
+    DB::table('student_invoices')->where('student_id', $student->id)->update(['status' => 'paid']);
+    $this->assertDatabaseHas('student_invoices', ['id' => $invoice->id, 'status' => 'paid']);
 
     $preview = app(PreviewAutoAllocateQuery::class)->handle(
         AutoAllocatePaymentsAction::DEFAULT_PRIORITY_ORDER,
@@ -192,8 +194,11 @@ it('preview auto-allocate zero-amount detection uses the canonical net', functio
     $canonicalNet = (float) app(SettlementService::class)->deriveInvoiceSnapshot($invoice->fresh())['net'];
 
     // Discount carrier nets to 7M — never a zero-amount invoice that would be
-    // counted as "mark paid without cash".
+    // counted as "mark paid without cash". A stale `paid` cache must also not
+    // suppress this canonical outstanding line from the preview.
     expect($canonicalNet)->toBe(7_000_000.0)
+        ->and($preview['summary']['total_allocations'])->toBe(1)
+        ->and($preview['summary']['total_amount'])->toBe(1_000_000.0)
         ->and($preview['summary']['invoices_to_update'] === 0 || $canonicalNet > 0)->toBeTrue();
 });
 

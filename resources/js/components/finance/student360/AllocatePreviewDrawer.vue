@@ -12,8 +12,30 @@ interface Candidate {
     invoice_line_id: number;
     charge_id: number | null;
     label: string;
+    gross: number;
+    discount: number;
+    cash_applied: number;
+    credit_applied: number;
+    remaining_collectible: number;
     outstanding: number;
     would_apply: number;
+}
+
+interface SettlementPositionReview {
+    valid: boolean;
+    issues: Array<{
+        code: string;
+        severity: string;
+        blocking: boolean;
+        evidence: Record<string, string | number>;
+        finance_invariant_code: string | null;
+    }>;
+}
+
+interface AllocationPreview {
+    unapplied: number;
+    candidates: Candidate[];
+    settlement_position: SettlementPositionReview;
 }
 
 const props = defineProps<{ open: boolean; paymentId: number | null }>();
@@ -21,7 +43,7 @@ const emit = defineEmits<{ (e: 'update:open', value: boolean): void }>();
 
 const loading = ref(false);
 const applyingLineId = ref<number | null>(null);
-const preview = ref<{ unapplied: number; candidates: Candidate[] } | null>(null);
+const preview = ref<AllocationPreview | null>(null);
 const { get } = useApi();
 
 watch(
@@ -34,7 +56,7 @@ watch(
 
         loading.value = true;
         try {
-            const response = await get<{ unapplied: number; candidates: Candidate[] }>(financeRoutes.student360.allocatePreview(paymentId));
+            const response = await get<AllocationPreview>(financeRoutes.student360.allocatePreview(paymentId));
             const payload = response.data.value;
             preview.value = payload?.success && payload.data ? payload.data : null;
         } finally {
@@ -73,6 +95,16 @@ const apply = (candidate: Candidate): void => {
                     Dư chưa khớp:
                     <strong class="tabular-nums">{{ formatCurrency(preview.unapplied) }}</strong>
                 </p>
+                <div v-if="!preview.settlement_position.valid" class="border-destructive/30 bg-destructive/5 text-destructive rounded-md border p-3 text-sm">
+                    <p>Không thể đề xuất phân bổ. Cần kiểm tra:</p>
+                    <ul class="mt-2 list-disc space-y-1 pl-5">
+                        <li v-for="issue in preview.settlement_position.issues" :key="issue.code">
+                            {{ issue.code }}
+                            <span v-if="issue.finance_invariant_code">({{ issue.finance_invariant_code }})</span>
+                            <span v-if="Object.keys(issue.evidence).length">— {{ Object.entries(issue.evidence).map(([key, value]) => `${key}: ${value}`).join(', ') }}</span>
+                        </li>
+                    </ul>
+                </div>
                 <div v-for="candidate in preview.candidates" :key="candidate.invoice_line_id" class="flex items-center justify-between gap-2 rounded-md border p-2 text-sm">
                     <div class="min-w-0">
                         {{ candidate.label }}

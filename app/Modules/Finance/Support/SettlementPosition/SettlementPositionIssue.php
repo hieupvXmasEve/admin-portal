@@ -8,6 +8,8 @@ final readonly class SettlementPositionIssue
 {
     public const MISSING_PAYABLE_LINE = 'settlement_position.missing_payable_line';
 
+    public const BATCH_CARDINALITY_MISMATCH = 'settlement_position.batch_cardinality_mismatch';
+
     public const MISSING_FINANCE_OBLIGATION = 'settlement_position.missing_finance_obligation';
 
     public const MISSING_BILLING_ACCOUNT = 'settlement_position.missing_billing_account';

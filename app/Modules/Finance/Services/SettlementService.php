@@ -642,10 +642,7 @@ class SettlementService
             ->with(['invoice', 'charge'])
             ->where('status', 'active')
             ->where('amount_snapshot', '>', 0)
-            ->whereHas('invoice', function ($query) use ($studentId) {
-                $query->where('student_id', $studentId)
-                    ->where('status', '!=', 'paid');
-            })
+            ->whereHas('invoice', fn ($query) => $query->where('student_id', $studentId))
             ->whereHas('charge', function ($query) {
                 $query->where('status', 'active')
                     ->where('amount', '>', 0);

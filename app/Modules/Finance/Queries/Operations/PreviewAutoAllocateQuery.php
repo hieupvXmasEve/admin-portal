@@ -89,14 +89,6 @@ class PreviewAutoAllocateQuery
             return ['allocations' => []];
         }
 
-        $hasUnpaidInvoices = StudentInvoice::where('student_id', $studentId)
-            ->where('status', '!=', 'paid')
-            ->exists();
-
-        if (! $hasUnpaidInvoices) {
-            return ['allocations' => []];
-        }
-
         $lines = $this->settlementService->getOutstandingLinesForStudent($studentId, $priorityOrder);
 
         if ($lines->isEmpty()) {
