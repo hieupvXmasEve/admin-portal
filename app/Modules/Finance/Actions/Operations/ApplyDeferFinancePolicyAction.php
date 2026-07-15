@@ -20,6 +20,8 @@ use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -381,7 +383,10 @@ class ApplyDeferFinancePolicyAction
         }
 
         if ($invoice->status !== 'draft') {
-            $invoice->update(['status' => 'draft']);
+            $billingAccountId = (int) app(BillingAccountProvisioner::class)->forStudent((int) $invoice->student_id)->id;
+            app(SettlementMutationGuard::class)->handle($billingAccountId, function () use ($invoice): void {
+                $invoice->update(['status' => 'draft']);
+            });
         }
 
         return (int) $invoice->id;

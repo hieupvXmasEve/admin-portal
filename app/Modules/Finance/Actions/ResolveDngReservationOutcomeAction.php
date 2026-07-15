@@ -7,6 +7,7 @@ namespace App\Modules\Finance\Actions;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Support\SettlementMutationGuard;
+use Closure;
 
 /** Resolves a held DNG provider outcome without changing settlement money. */
 final class ResolveDngReservationOutcomeAction
@@ -31,7 +32,7 @@ final class ResolveDngReservationOutcomeAction
 
         return $this->settlementMutationGuard->handleIfChanged(
             (int) $request->billing_account_id,
-            function () use ($request, $outcome, $targetStatus, $evidence): DngPaymentRequest {
+            function ($_billingAccount, Closure $markChanged) use ($request, $outcome, $targetStatus, $evidence): DngPaymentRequest {
                 $lockedRequest = DngPaymentRequest::query()->lockForUpdate()->findOrFail($request->id);
                 if (! in_array($lockedRequest->status, [
                     DngPaymentRequest::STATUS_UNKNOWN_OUTCOME,
@@ -84,6 +85,8 @@ final class ResolveDngReservationOutcomeAction
                             : "DNG reservation #{$lockedRequest->id} resolved as {$outcome}; installment returned to pending.",
                     ]);
                 }
+
+                $markChanged();
 
                 return $lockedRequest->fresh();
             },

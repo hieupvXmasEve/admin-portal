@@ -223,7 +223,7 @@ class SettlementService
     {
         $billingAccountId = $this->billingAccountIdForInvoice($invoice);
 
-        $this->settlementMutationGuard->handle($billingAccountId, function () use ($invoice, $preservedPaidAt): void {
+        $this->settlementMutationGuard->handleIfChanged($billingAccountId, function ($_billingAccount, \Closure $markChanged) use ($invoice, $preservedPaidAt): void {
             $snapshot = $this->deriveInvoiceCacheSnapshot($invoice);
 
             $isPaid = $snapshot['status'] === 'paid' && $snapshot['paid'] > 0;
@@ -250,7 +250,12 @@ class SettlementService
                 'cached_paid_amount' => $snapshot['paid'],
                 'status' => $status,
                 'cached_paid_at' => $cachedPaidAt,
-            ])->save();
+            ]);
+
+            if ($invoice->isDirty()) {
+                $invoice->save();
+                $markChanged();
+            }
         });
     }
 

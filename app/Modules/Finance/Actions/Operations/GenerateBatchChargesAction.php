@@ -13,9 +13,11 @@ use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Services\InvoiceGenerationService;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\BillingScopeHelper;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 use Carbon\Carbon;
@@ -349,7 +351,10 @@ class GenerateBatchChargesAction
 
                     if (! $hasInvoiceMutation) {
                         if (! $reusableInvoice) {
-                            $invoice->delete();
+                            $billingAccountId = (int) app(BillingAccountProvisioner::class)->forStudent((int) $invoice->student_id)->id;
+                            app(SettlementMutationGuard::class)->handle($billingAccountId, function () use ($invoice): void {
+                                $invoice->delete();
+                            });
                         }
 
                         continue;
@@ -404,14 +409,18 @@ class GenerateBatchChargesAction
 
     private static function createDraftInvoice(Student $student, int $semesterId, Carbon $dueDate): StudentInvoice
     {
-        return StudentInvoice::create([
-            'student_id' => $student->id,
-            'semester_id' => $semesterId,
-            'invoice_number' => 'INV-'.time().'-'.$student->student_id.'-'.$semesterId,
-            'due_date' => $dueDate,
-            'opened_at' => now(),
-            'status' => 'draft',
-        ]);
+        $billingAccountId = (int) app(BillingAccountProvisioner::class)->forStudent((int) $student->id)->id;
+
+        return app(SettlementMutationGuard::class)->handle($billingAccountId, function () use ($student, $semesterId, $dueDate): StudentInvoice {
+            return StudentInvoice::create([
+                'student_id' => $student->id,
+                'semester_id' => $semesterId,
+                'invoice_number' => 'INV-'.time().'-'.$student->student_id.'-'.$semesterId,
+                'due_date' => $dueDate,
+                'opened_at' => now(),
+                'status' => 'draft',
+            ]);
+        });
     }
 
     /**

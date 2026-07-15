@@ -11,9 +11,11 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
 use App\Modules\Finance\Support\EgcRetakeTargetResolver;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use Illuminate\Support\Facades\DB;
 
 class ReconcileEgcChargesAfterSyncAction
@@ -130,32 +132,31 @@ class ReconcileEgcChargesAfterSyncAction
         $line = self::activeInvoiceLineFor($charge);
         $amount = app(EgcLevelFeeResolver::class)->resolve($expectedLevel);
         $description = "EGC Level {$expectedLevel} Fee";
+        $billingAccountId = (int) app(BillingAccountProvisioner::class)->forStudent((int) $charge->student_id)->id;
 
-        $targetBlock->update([
-            'level_number' => $expectedLevel,
-            'is_retake' => $isRetake,
-        ]);
+        return app(SettlementMutationGuard::class)->handle($billingAccountId, function () use ($targetBlock, $expectedLevel, $isRetake, $charge, $line, $amount, $description): int {
+            $targetBlock->update([
+                'level_number' => $expectedLevel,
+                'is_retake' => $isRetake,
+            ]);
+            $charge->update([
+                'amount' => $amount,
+                'description' => $description,
+            ]);
+            $line->update([
+                'amount_snapshot' => $amount,
+                'description_snapshot' => $description,
+            ]);
+            $released = app(SettlementService::class)->releaseLineOverpayment(
+                $line->fresh(),
+                auth()->id(),
+                self::class,
+                (int) $targetBlock->id,
+            );
+            $line->invoice()->first()?->recalculateTotals();
 
-        $charge->update([
-            'amount' => $amount,
-            'description' => $description,
-        ]);
-
-        $line->update([
-            'amount_snapshot' => $amount,
-            'description_snapshot' => $description,
-        ]);
-
-        $released = app(SettlementService::class)->releaseLineOverpayment(
-            $line->fresh(),
-            auth()->id(),
-            self::class,
-            (int) $targetBlock->id,
-        );
-
-        $line->invoice()->first()?->recalculateTotals();
-
-        return (int) $released['count'];
+            return (int) $released['count'];
+        });
     }
 
     private static function firstStopReason(EgcBlock $sourceBlock, iterable $targets, array $expectedLevels): ?string

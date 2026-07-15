@@ -173,23 +173,26 @@ class CreateFinanceChargeAction
         // violation with a freshly generated number instead of bubbling a 500.
         $due = $dueDate ?? now()->addDays(30);
 
-        for ($attempt = 1; ; $attempt++) {
-            try {
-                return StudentInvoice::create([
-                    'invoice_number' => $this->generateInvoiceNumber($studentId, $semesterId),
-                    'student_id' => $studentId,
-                    'semester_id' => $semesterId,
-                    'billing_cycle_id' => null,
-                    'status' => 'draft',
-                    'due_date' => $due,
-                ]);
-            } catch (QueryException $e) {
-                if (! $this->isInvoiceNumberCollision($e) || $attempt >= self::INVOICE_NUMBER_MAX_ATTEMPTS) {
-                    throw $e;
+        $billingAccountId = (int) $this->billingAccountProvisioner->forStudent($studentId)->id;
+
+        return $this->settlementMutationGuard->handle($billingAccountId, function () use ($studentId, $semesterId, $due): StudentInvoice {
+            for ($attempt = 1; ; $attempt++) {
+                try {
+                    return StudentInvoice::create([
+                        'invoice_number' => $this->generateInvoiceNumber($studentId, $semesterId),
+                        'student_id' => $studentId,
+                        'semester_id' => $semesterId,
+                        'billing_cycle_id' => null,
+                        'status' => 'draft',
+                        'due_date' => $due,
+                    ]);
+                } catch (QueryException $e) {
+                    if (! $this->isInvoiceNumberCollision($e) || $attempt >= self::INVOICE_NUMBER_MAX_ATTEMPTS) {
+                        throw $e;
+                    }
                 }
-                // Loop and regenerate; generateInvoiceNumber re-draws the random suffix.
             }
-        }
+        });
     }
 
     /**

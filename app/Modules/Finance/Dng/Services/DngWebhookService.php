@@ -13,12 +13,14 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\DB;
+use Closure;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -31,6 +33,8 @@ class DngWebhookService
         protected SettleInstallmentFromDngAction $settleInstallmentAction,
         protected RetakeRegistrationPaymentSyncer $retakeRegistrationPaymentSyncer,
         protected ExamResitAttemptPaymentSyncer $examResitAttemptPaymentSyncer,
+        protected ?BillingAccountProvisioner $billingAccountProvisioner = null,
+        protected ?SettlementMutationGuard $settlementMutationGuard = null,
     ) {}
 
     /**
@@ -107,7 +111,7 @@ class DngWebhookService
         // and a late Call 1 could downgrade a request that Call 2 already advanced
         // (e.g. paid_invoiced -> paid_uninvoiced). The lock serialises the decision
         // so each transition is computed against the committed current status.
-        $outcome = DB::transaction(function () use ($request, $payload, $eventType, $targetStatus, $dngPaymentId): array {
+        $outcome = $this->guard()->handleIfChanged($this->billingAccountId($request), function ($_billingAccount, Closure $markChanged) use ($request, $payload, $eventType, $targetStatus, $dngPaymentId): array {
             /** @var DngPaymentRequest $locked */
             $locked = DngPaymentRequest::query()->lockForUpdate()->find($request->id);
 
@@ -126,6 +130,7 @@ class DngWebhookService
             // never poison the request with a wrong dng_payment_id).
             if (! $locked->dng_payment_id) {
                 $locked->update(['dng_payment_id' => $dngPaymentId]);
+                $markChanged();
             }
 
             $currentOrder = $this->statusOrder($locked->status);
@@ -170,6 +175,7 @@ class DngWebhookService
 
             $locked->update($updateData);
             $locked->transitionTo($targetStatus);
+            $markChanged();
 
             return ['result' => 'advanced', 'first_settlement' => $isFirstSettlement];
         });
@@ -246,6 +252,22 @@ class DngWebhookService
             'first_settlement' => $outcome['first_settlement'],
             'new_status' => $request->fresh()->status,
         ]);
+    }
+
+    private function guard(): SettlementMutationGuard
+    {
+        return $this->settlementMutationGuard ?? app(SettlementMutationGuard::class);
+    }
+
+    private function billingAccountId(DngPaymentRequest $request): int
+    {
+        if ($request->billing_account_id !== null) {
+            return (int) $request->billing_account_id;
+        }
+
+        return (int) ($this->billingAccountProvisioner ?? app(BillingAccountProvisioner::class))
+            ->forStudent((int) $request->student_id)
+            ->id;
     }
 
     /**

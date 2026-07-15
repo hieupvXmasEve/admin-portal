@@ -113,7 +113,9 @@ class PushNextInstallmentAction
 
                 $installment->update([
                     'dng_payment_request_id' => $reservation->id,
+                    'status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
                 ]);
+                $markChanged();
 
                 return [
                     'charge_id' => (int) $lockedCharge->id,
@@ -141,7 +143,7 @@ class PushNextInstallmentAction
                 $selection['details'],
             );
         } catch (\Throwable $exception) {
-            $this->settlementMutationGuard->handleIfChanged($billingAccountId, function () use ($selection, $exception): void {
+            $this->settlementMutationGuard->handleIfChanged($billingAccountId, function ($_billingAccount, Closure $markChanged) use ($selection, $exception): void {
                 $lockedInstallment = FinanceChargeInstallment::query()
                     ->lockForUpdate()
                     ->findOrFail($selection['installment_id']);
@@ -159,12 +161,13 @@ class PushNextInstallmentAction
                 }
 
                 $lockedInstallment->update($updates);
+                $markChanged();
             });
 
             throw $exception;
         }
 
-        $fresh = $this->settlementMutationGuard->handleIfChanged($billingAccountId, function () use ($selection, $reservation): FinanceChargeInstallment {
+        $fresh = $this->settlementMutationGuard->handleIfChanged($billingAccountId, function ($_billingAccount, Closure $markChanged) use ($selection, $reservation): FinanceChargeInstallment {
             $lockedInstallment = FinanceChargeInstallment::query()
                 ->lockForUpdate()
                 ->findOrFail($selection['installment_id']);
@@ -181,6 +184,7 @@ class PushNextInstallmentAction
                     'last_push_error' => null,
                     'last_push_attempted_at' => now(),
                 ]);
+                $markChanged();
 
                 return $lockedInstallment->fresh();
             }
@@ -190,6 +194,7 @@ class PushNextInstallmentAction
                 'last_push_error' => "DNG reservation #{$reservation->id} ended as {$reservation->status} and requires Finance review.",
                 'last_push_attempted_at' => now(),
             ]);
+            $markChanged();
 
             return $lockedInstallment->fresh();
         });

@@ -124,7 +124,6 @@ class DngPaymentRequestController extends Controller
             return back();
         }
 
-        $dngPaymentRequest->forceFill(['error_message' => null])->save();
         Inertia::flash('success', 'DNG collection cancellation completed. Underlying obligations remain active. Reason: '.$request->validated('reason'));
 
         return back();

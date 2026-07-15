@@ -193,9 +193,12 @@ class RequestFinanceDiscountAction
                 approvedBy: auth()->id(),
             );
 
-            $discount->forceFill([
-                'finance_discount_entitlement_id' => $entitlement->id,
-            ])->save();
+            $billingAccountId = (int) $this->billingAccountProvisioner->forStudent((int) $invoice->student_id)->id;
+            $this->settlementMutationGuard->handle($billingAccountId, function () use ($discount, $entitlement): void {
+                $discount->forceFill([
+                    'finance_discount_entitlement_id' => $entitlement->id,
+                ])->save();
+            });
         }
 
         $this->refreshAllocationStatus($entitlement);

@@ -274,14 +274,17 @@ class VoidFinanceChargeAction
                 ->contains(fn (InvoiceLine $line) => ($line->status ?? 'active') === 'active');
 
             if (! $hasActiveLines && $invoice->status !== 'cancelled') {
-                $invoice->forceFill([
-                    'cached_subtotal' => 0,
-                    'cached_discount_total' => 0,
-                    'cached_total_amount' => 0,
-                    'cached_paid_amount' => 0,
-                    'cached_paid_at' => null,
-                    'status' => 'cancelled',
-                ])->save();
+                $billingAccountId = (int) $this->billingAccountProvisioner->forStudent((int) $invoice->student_id)->id;
+                $this->settlementMutationGuard->handle($billingAccountId, function () use ($invoice): void {
+                    $invoice->forceFill([
+                        'cached_subtotal' => 0,
+                        'cached_discount_total' => 0,
+                        'cached_total_amount' => 0,
+                        'cached_paid_amount' => 0,
+                        'cached_paid_at' => null,
+                        'status' => 'cancelled',
+                    ])->save();
+                });
             } else {
                 $this->settlementService->recalculateInvoiceSnapshot($invoice);
             }

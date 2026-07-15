@@ -14,6 +14,7 @@ use App\Modules\Finance\Actions\CancelDngPaymentRequestAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Services\DngClient;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\DngReceiptException;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
@@ -106,9 +107,11 @@ function makeRetakeChargeLinked(array $context, string $regStatus = CourseRetake
 function makeDngRequest(array $context, string $status, ?FinanceCharge $charge = null): DngPaymentRequest
 {
     ['student' => $student] = $context;
+    $billingAccount = BillingAccount::query()->firstOrCreate(['student_id' => $student->id]);
 
     $request = DngPaymentRequest::create([
         'student_id' => $student->id,
+        'billing_account_id' => $billingAccount->id,
         'campus_code' => 'HCM',
         'student_code' => 'STU001',
         'fee_type' => 'HL',
@@ -168,10 +171,21 @@ beforeEach(function () {
 
 it('cancels a pending request — transitions to cancelled', function () {
     $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PENDING);
+    $billingAccount = BillingAccount::query()->findOrFail($request->billing_account_id);
 
     app(CancelDngPaymentRequestAction::class)->run($request);
 
-    expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED);
+    expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED)
+        ->and((int) $billingAccount->fresh()->settlement_version)->toBe(1);
+});
+
+it('does not advance settlement version for an already cancelled local lifecycle request', function (): void {
+    $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_CANCELLED);
+    $billingAccount = BillingAccount::query()->findOrFail($request->billing_account_id);
+
+    app(CancelDngPaymentRequestAction::class)->runLocallyForLifecycle($request);
+
+    expect((int) $billingAccount->fresh()->settlement_version)->toBe(0);
 });
 
 it('cancels a pending request without voiding the directly linked charge or source workflow', function () {
@@ -185,13 +199,23 @@ it('cancels a pending request without voiding the directly linked charge or sour
 });
 
 it('cancels a pushed_to_dng request — calls DNG API and transitions to cancel_pushed_to_dng', function () {
-    mockDngClientSuccess();
+    $transactionLevelBefore = DB::transactionLevel();
+    $mock = Mockery::mock(DngClient::class);
+    $mock->shouldReceive('buildInsertNewRecordPayload')->andReturn(['mock' => 'payload']);
+    $mock->shouldReceive('cancelRecord')->once()->andReturnUsing(function () use ($transactionLevelBefore): array {
+        expect(DB::transactionLevel())->toBe($transactionLevelBefore);
+
+        return ['ResponseCode' => '00', 'Message' => 'OK'];
+    });
+    app()->instance(DngClient::class, $mock);
 
     $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+    $billingAccount = BillingAccount::query()->findOrFail($request->billing_account_id);
 
     app(CancelDngPaymentRequestAction::class)->run($request);
 
-    expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG);
+    expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG)
+        ->and((int) $billingAccount->fresh()->settlement_version)->toBe(1);
 });
 
 it('cancels a pushed request locally for a lifecycle closure without calling DNG', function () {

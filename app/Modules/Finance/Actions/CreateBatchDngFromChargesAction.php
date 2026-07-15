@@ -15,6 +15,7 @@ use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Queries\Dng\ListDngWorklistQuery;
 use App\Modules\Finance\Support\SettlementMutationGuard;
+use Closure;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -223,8 +224,8 @@ class CreateBatchDngFromChargesAction
             return;
         }
 
-        app(SettlementMutationGuard::class)->handleIfChanged((int) $reservation->billing_account_id, function () use ($installmentIds, $reservation): void {
-            FinanceChargeInstallment::query()->whereIn('id', $installmentIds)->update([
+        app(SettlementMutationGuard::class)->handleIfChanged((int) $reservation->billing_account_id, function ($_billingAccount, Closure $markChanged) use ($installmentIds, $reservation): void {
+            $updated = FinanceChargeInstallment::query()->whereIn('id', $installmentIds)->update([
                 'dng_payment_request_id' => $reservation->id,
                 'status' => $reservation->status === DngPaymentRequest::STATUS_PUSHED_TO_DNG
                     ? FinanceChargeInstallment::STATUS_AWAITING_PAYMENT
@@ -234,6 +235,9 @@ class CreateBatchDngFromChargesAction
                     : "DNG reservation #{$reservation->id} ended as {$reservation->status} and requires Finance review.",
                 'last_push_attempted_at' => now(),
             ]);
+            if ($updated > 0) {
+                $markChanged();
+            }
         });
     }
 

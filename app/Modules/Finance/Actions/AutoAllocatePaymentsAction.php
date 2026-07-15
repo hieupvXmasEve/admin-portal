@@ -10,6 +10,8 @@ use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use Illuminate\Support\Facades\DB;
@@ -87,7 +89,10 @@ class AutoAllocatePaymentsAction
                 ->filter(fn (StudentInvoice $invoice) => $this->deriveInvoiceSnapshot($invoice)['total_amount'] <= 0);
 
             foreach ($zeroAmountInvoices as $invoice) {
-                $invoice->update(['status' => 'paid']);
+                $billingAccountId = (int) app(BillingAccountProvisioner::class)->forStudent((int) $invoice->student_id)->id;
+                app(SettlementMutationGuard::class)->handle($billingAccountId, function () use ($invoice): void {
+                    $invoice->update(['status' => 'paid']);
+                });
                 $stats['invoices_updated']++;
             }
 

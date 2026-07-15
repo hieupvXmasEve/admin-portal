@@ -32,23 +32,27 @@ class InvoiceGenerationService
         ?int $billingCycleId = null,
         ?Carbon $dueDate = null
     ): StudentInvoice {
-        // Find existing invoice or create new
-        $invoice = StudentInvoice::firstOrNew([
-            'student_id' => $studentId,
-            'semester_id' => $semesterId,
-            'billing_cycle_id' => $billingCycleId,
-        ]);
+        $billingAccountId = (int) $this->billingAccountProvisioner->forStudent($studentId)->id;
 
-        // Generate invoice number if new
-        if (! $invoice->exists) {
-            $invoice->invoice_number = $this->generateInvoiceNumber($studentId, $semesterId);
-            $invoice->status = 'draft';
-            $invoice->due_date = $dueDate ?? now()->addDays(30); // Use provided due_date or default 30 days
-            $invoice->save();
-        }
+        $invoice = $this->settlementMutationGuard->handleIfChanged($billingAccountId, function ($_billingAccount, \Closure $markChanged) use ($studentId, $semesterId, $billingCycleId, $dueDate): StudentInvoice {
+            $invoice = StudentInvoice::firstOrNew([
+                'student_id' => $studentId,
+                'semester_id' => $semesterId,
+                'billing_cycle_id' => $billingCycleId,
+            ]);
 
-        // Refresh invoice lines from charges
-        $this->refreshInvoiceFromCharges($invoice);
+            if (! $invoice->exists) {
+                $invoice->invoice_number = $this->generateInvoiceNumber($studentId, $semesterId);
+                $invoice->status = 'draft';
+                $invoice->due_date = $dueDate ?? now()->addDays(30);
+                $invoice->save();
+                $markChanged();
+            }
+
+            $this->refreshInvoiceFromCharges($invoice);
+
+            return $invoice;
+        });
 
         return $invoice->fresh();
     }
@@ -74,21 +78,24 @@ class InvoiceGenerationService
             ->forStudent((int) $invoice->student_id)
             ->id;
 
-        $this->settlementMutationGuard->handle($billingAccountId, function () use ($invoice, $charges): void {
-            DB::transaction(function () use ($invoice, $charges): void {
+        $this->settlementMutationGuard->handleIfChanged($billingAccountId, function ($_billingAccount, \Closure $markChanged) use ($invoice, $charges): void {
+            DB::transaction(function () use ($invoice, $charges, $markChanged): void {
                 // Get existing line charge IDs
                 $existingChargeIds = $invoice->invoiceLines()->pluck('charge_id')->toArray();
                 $newChargeIds = $charges->pluck('id')->toArray();
 
                 // Remove lines for charges no longer active
                 $toRemove = array_diff($existingChargeIds, $newChargeIds);
-                InvoiceLine::where('invoice_id', $invoice->id)
+                $removedLineCount = InvoiceLine::where('invoice_id', $invoice->id)
                     ->whereIn('charge_id', $toRemove)
                     ->update([
                         'status' => 'void',
                         'voided_at' => now(),
                         'void_reason' => 'Charge no longer active during invoice refresh',
                     ]);
+                if ($removedLineCount > 0) {
+                    $markChanged();
+                }
 
                 // Add lines for new charges. DB-01 / NT2: amount_snapshot and
                 // description_snapshot are frozen at creation — a refresh never
@@ -109,6 +116,10 @@ class InvoiceGenerationService
                         ]
                     );
 
+                    if ($line->wasRecentlyCreated) {
+                        $markChanged();
+                    }
+
                     // A line previously voided (e.g. the charge was temporarily
                     // inactive) may be reactivated, but only its lifecycle status is
                     // restored — the frozen amount_snapshot stays untouched.
@@ -118,6 +129,7 @@ class InvoiceGenerationService
                             'voided_at' => null,
                             'void_reason' => null,
                         ]);
+                        $markChanged();
                     }
                 }
 
@@ -176,7 +188,12 @@ class InvoiceGenerationService
      */
     public function closeInvoice(StudentInvoice $invoice): void
     {
-        if ($invoice->status === 'draft') {
+        $billingAccountId = (int) $this->billingAccountProvisioner->forStudent((int) $invoice->student_id)->id;
+        $this->settlementMutationGuard->handleIfChanged($billingAccountId, function ($_billingAccount, \Closure $markChanged) use ($invoice): void {
+            if ($invoice->status !== 'draft') {
+                return;
+            }
+
             $this->refreshInvoiceFromCharges($invoice);
 
             if ($invoice->total_amount <= 0) {
@@ -184,7 +201,8 @@ class InvoiceGenerationService
             } else {
                 $invoice->update(['status' => 'pending']);
             }
-        }
+            $markChanged();
+        });
     }
 
     public function applyInvoiceDiscount(

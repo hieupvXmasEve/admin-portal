@@ -8,11 +8,12 @@ use App\Models\Department;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Services\PaymentService;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -22,6 +23,8 @@ class DngPaymentService
         protected DngClient $dngClient,
         protected PaymentService $paymentService,
         protected PublishDomainEventAction $publishDomainEventAction,
+        protected ?BillingAccountProvisioner $billingAccountProvisioner = null,
+        protected ?SettlementMutationGuard $settlementMutationGuard = null,
     ) {}
 
     /**
@@ -206,7 +209,8 @@ class DngPaymentService
             return $request->payment;
         }
 
-        $payment = DB::transaction(function () use ($request, $receipt) {
+        $billingAccountId = $this->billingAccountId($request);
+        $payment = $this->guard()->handleIfChanged($billingAccountId, function () use ($request, $receipt) {
             // Lock row to prevent concurrent bridge (webhook + reconciliation race)
             $request = DngPaymentRequest::lockForUpdate()->find($request->id);
             if ($request->hasBridgedPayment()) {
@@ -266,9 +270,11 @@ class DngPaymentService
                 $allocations = $this->paymentService->autoAllocatePayment($payment->id);
             }
         } catch (\Throwable $e) {
-            $request->update([
-                'error_message' => 'Provider receipt captured; target allocation requires review: '.$e->getMessage(),
-            ]);
+            $this->guard()->handle($billingAccountId, function () use ($request, $e): void {
+                $request->fresh()->update([
+                    'error_message' => 'Provider receipt captured; target allocation requires review: '.$e->getMessage(),
+                ]);
+            });
             Log::warning('DNG receipt captured but allocation requires review', [
                 'dng_payment_request_id' => $request->id,
                 'payment_id' => $payment->id,
@@ -285,5 +291,21 @@ class DngPaymentService
         ]);
 
         return $payment;
+    }
+
+    private function guard(): SettlementMutationGuard
+    {
+        return $this->settlementMutationGuard ?? app(SettlementMutationGuard::class);
+    }
+
+    private function billingAccountId(DngPaymentRequest $request): int
+    {
+        if ($request->billing_account_id !== null) {
+            return (int) $request->billing_account_id;
+        }
+
+        return (int) ($this->billingAccountProvisioner ?? app(BillingAccountProvisioner::class))
+            ->forStudent((int) $request->student_id)
+            ->id;
     }
 }

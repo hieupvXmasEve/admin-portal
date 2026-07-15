@@ -13,10 +13,11 @@ use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Queries\Dng\ListDngWorklistQuery;
+use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Modules\Finance\Support\SettlementPosition\Money;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
-use Illuminate\Support\Facades\DB;
+use Closure;
 
 /** Coordinates the durable DNG reservation lifecycle around an external provider call. */
 final class DngReservationLifecycle
@@ -27,6 +28,7 @@ final class DngReservationLifecycle
         private readonly SettlementPositionReader $settlementPositionReader,
         private readonly DngCampusCodeResolver $campusCodeResolver,
         private readonly DngPaymentService $dngPaymentService,
+        private readonly ?SettlementMutationGuard $settlementMutationGuard = null,
     ) {}
 
     /** @param array{description: string, semester_id: int, due_date: string, estimate_time: string} $details */
@@ -43,9 +45,10 @@ final class DngReservationLifecycle
             throw new \InvalidArgumentException("DNG fee type {$feeType} has no supported Finance charge types.");
         }
 
-        return DB::transaction(function () use ($studentId, $feeType, $chargeTypes, $details, $requestedLineIds, $targetAmounts, $installmentIdsByLine): DngPaymentRequest {
+        $billingAccountId = (int) BillingAccount::query()->where('student_id', $studentId)->sole()->id;
+
+        return $this->guard()->handleIfChanged($billingAccountId, function (BillingAccount $billingAccount, Closure $markChanged) use ($studentId, $feeType, $chargeTypes, $details, $requestedLineIds, $targetAmounts, $installmentIdsByLine): DngPaymentRequest {
             $student = Student::query()->lockForUpdate()->findOrFail($studentId);
-            $billingAccount = BillingAccount::query()->where('student_id', $student->id)->lockForUpdate()->firstOrFail();
             $campusCode = $this->campusCodeResolver->requireForStudent($student);
             $slotKey = $this->slotKey((int) $billingAccount->id, $campusCode, $feeType);
             $existing = DngPaymentRequest::query()
@@ -59,6 +62,7 @@ final class DngReservationLifecycle
                 if ($existing->campus_code !== $campusCode) {
                     throw new \RuntimeException('An unresolved DNG request exists on another campus and must be reconciled before creating a replacement.');
                 }
+
             }
 
             $targetLineIds = InvoiceLine::query()
@@ -118,6 +122,10 @@ final class DngReservationLifecycle
                     $targetFingerprint,
                     $installmentIdsByLine,
                     $sequence - 1,
+                    ! in_array($existing->status, [
+                        DngPaymentRequest::STATUS_UNKNOWN_OUTCOME,
+                        DngPaymentRequest::STATUS_NEEDS_REVIEW,
+                    ], true),
                 )) {
                     $this->holdForReview(
                         $existing,
@@ -163,7 +171,7 @@ final class DngReservationLifecycle
                     'finance_charge_installment_id' => $installmentIdsByLine[$target['invoice_line_id']] ?? null,
                 ]);
             }
-            $billingAccount->increment('settlement_version');
+            $markChanged();
 
             return $reservation;
         });
@@ -198,9 +206,10 @@ final class DngReservationLifecycle
     /** @param array{Code: int, Type: string, Message: string, data: mixed} $response @param array<string, mixed> $payload */
     private function finalize(int $reservationId, array $response, array $payload): DngPaymentRequest
     {
-        return DB::transaction(function () use ($reservationId, $response, $payload): DngPaymentRequest {
+        $billingAccountId = (int) DngPaymentRequest::query()->findOrFail($reservationId)->billing_account_id;
+
+        return $this->guard()->handleIfChanged($billingAccountId, function ($_billingAccount, Closure $markChanged) use ($reservationId, $response, $payload): DngPaymentRequest {
             $reservation = DngPaymentRequest::query()->lockForUpdate()->findOrFail($reservationId);
-            BillingAccount::query()->lockForUpdate()->findOrFail($reservation->billing_account_id);
             $targetIds = $reservation->reservationTargets()->pluck('invoice_line_id')->map(fn ($id): int => (int) $id)->all();
             InvoiceLine::query()->whereIn('id', $targetIds)->lockForUpdate()->get();
             $position = $this->settlementPositionReader->forPayableLines($targetIds);
@@ -239,6 +248,7 @@ final class DngReservationLifecycle
                 'dng_transaction_id' => $response['data']['TransactionID'] ?? $response['data']['Id'] ?? null,
                 'dng_payment_id' => $response['data']['PaymentId'] ?? $response['data']['OtherId'] ?? null,
             ]);
+            $markChanged();
 
             return $reservation->fresh();
         });
@@ -311,6 +321,7 @@ final class DngReservationLifecycle
         string $targetFingerprint,
         array $installmentIdsByLine,
         int $sequence,
+        bool $requireSettlementVersion,
     ): bool {
         $expectedTargets = collect($targets)
             ->map(fn (array $target): array => [
@@ -347,7 +358,7 @@ final class DngReservationLifecycle
             || (string) $existing->amount !== $amount->amount
             || $existing->target_fingerprint !== $targetFingerprint
             || $existing->item_id !== $expectedItemId
-            || ! $settlementVersionMatches
+            || ($requireSettlementVersion && ! $settlementVersionMatches)
             || $storedTargets !== $expectedTargets);
     }
 
@@ -359,25 +370,30 @@ final class DngReservationLifecycle
         ?array $payload = null,
         ?array $response = null,
     ): void {
-        $reservation->update([
-            'status' => DngPaymentRequest::STATUS_NEEDS_REVIEW,
-            'push_payload' => $payload ?? $reservation->push_payload,
-            'push_response' => $response ?? $reservation->push_response,
-            'review_evidence' => [
-                'provider_response' => $response ?? $reservation->push_response,
-                'deterministic_identity' => $reservation->item_id,
-                'original_target_fingerprint' => $reservation->target_fingerprint,
-                'current_target_fingerprint' => $currentTargetFingerprint,
-                'affected_installment_ids' => $this->affectedInstallmentIds($reservation),
-            ],
-            'error_message' => $reason,
-        ]);
+        $this->guard()->handle((int) $reservation->billing_account_id, function () use ($reservation, $currentTargetFingerprint, $reason, $payload, $response): void {
+            $lockedReservation = DngPaymentRequest::query()->lockForUpdate()->findOrFail($reservation->id);
+            $lockedReservation->update([
+                'status' => DngPaymentRequest::STATUS_NEEDS_REVIEW,
+                'push_payload' => $payload ?? $lockedReservation->push_payload,
+                'push_response' => $response ?? $lockedReservation->push_response,
+                'review_evidence' => [
+                    'provider_response' => $response ?? $lockedReservation->push_response,
+                    'deterministic_identity' => $lockedReservation->item_id,
+                    'original_target_fingerprint' => $lockedReservation->target_fingerprint,
+                    'current_target_fingerprint' => $currentTargetFingerprint,
+                    'affected_installment_ids' => $this->affectedInstallmentIds($lockedReservation),
+                ],
+                'error_message' => $reason,
+            ]);
+        });
     }
 
     /** @param array<string, mixed> $payload */
     private function holdUnknownProviderOutcome(int $reservationId, array $payload, \Throwable $exception): void
     {
-        DB::transaction(function () use ($reservationId, $payload, $exception): void {
+        $billingAccountId = (int) DngPaymentRequest::query()->findOrFail($reservationId)->billing_account_id;
+
+        $this->guard()->handleIfChanged($billingAccountId, function ($_billingAccount, Closure $markChanged) use ($reservationId, $payload, $exception): void {
             $reservation = DngPaymentRequest::query()->lockForUpdate()->findOrFail($reservationId);
             $targetIds = $reservation->reservationTargets()->pluck('invoice_line_id')->map(fn ($id): int => (int) $id)->all();
             InvoiceLine::query()->whereIn('id', $targetIds)->lockForUpdate()->get();
@@ -397,7 +413,13 @@ final class DngReservationLifecycle
                 ],
                 'error_message' => $exception->getMessage(),
             ]);
+            $markChanged();
         });
+    }
+
+    private function guard(): SettlementMutationGuard
+    {
+        return $this->settlementMutationGuard ?? app(SettlementMutationGuard::class);
     }
 
     /** @return list<int> */

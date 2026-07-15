@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\DB;
 /** Serializes a money mutation for one payer and advances its settlement version. */
 final class SettlementMutationGuard
 {
-    /** @var array<int, true> */
-    private static array $activeBillingAccountIds = [];
+    /** @var array<int, array{billing_account: BillingAccount, changed: bool}> */
+    private static array $activeMutations = [];
 
     /** @template T @param Closure(BillingAccount): T $mutation @return T */
     public function handle(int $billingAccountId, Closure $mutation): mixed
@@ -37,31 +37,37 @@ final class SettlementMutationGuard
     /** @template T @param Closure(BillingAccount): T $mutation @return T */
     private function withinGuard(int $billingAccountId, Closure $mutation, bool $incrementByDefault): mixed
     {
-        if (isset(self::$activeBillingAccountIds[$billingAccountId])) {
-            return $mutation(
-                BillingAccount::query()->findOrFail($billingAccountId),
-                static function (): void {},
-            );
+        if (isset(self::$activeMutations[$billingAccountId])) {
+            if ($incrementByDefault) {
+                self::$activeMutations[$billingAccountId]['changed'] = true;
+            }
+
+            $markChanged = static function () use ($billingAccountId): void {
+                self::$activeMutations[$billingAccountId]['changed'] = true;
+            };
+
+            return $mutation(self::$activeMutations[$billingAccountId]['billing_account'], $markChanged);
         }
 
         return DB::transaction(function () use ($billingAccountId, $incrementByDefault, $mutation): mixed {
             $billingAccount = BillingAccount::query()->lockForUpdate()->findOrFail($billingAccountId);
-            $changed = $incrementByDefault;
-            $markChanged = static function () use (&$changed): void {
-                $changed = true;
+            self::$activeMutations[$billingAccountId] = [
+                'billing_account' => $billingAccount,
+                'changed' => $incrementByDefault,
+            ];
+            $markChanged = static function () use ($billingAccountId): void {
+                self::$activeMutations[$billingAccountId]['changed'] = true;
             };
-
-            self::$activeBillingAccountIds[$billingAccountId] = true;
 
             try {
                 $result = $mutation($billingAccount, $markChanged);
-                if ($changed) {
+                if (self::$activeMutations[$billingAccountId]['changed']) {
                     $billingAccount->increment('settlement_version');
                 }
 
                 return $result;
             } finally {
-                unset(self::$activeBillingAccountIds[$billingAccountId]);
+                unset(self::$activeMutations[$billingAccountId]);
             }
         });
     }

@@ -8,7 +8,9 @@ use App\Modules\Finance\Actions\CaptureDngProviderReceiptAction;
 use App\Modules\Finance\Actions\RegisterDngReceiptExceptionAction;
 use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
-use Illuminate\Support\Facades\DB;
+use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\SettlementMutationGuard;
+use Closure;
 use Illuminate\Support\Facades\Log;
 
 class DngReconciliationService
@@ -17,6 +19,8 @@ class DngReconciliationService
         protected DngClient $dngClient,
         protected DngPaymentService $dngPaymentService,
         protected SettleInstallmentFromDngAction $settleInstallmentAction,
+        protected ?BillingAccountProvisioner $billingAccountProvisioner = null,
+        protected ?SettlementMutationGuard $settlementMutationGuard = null,
     ) {}
 
     /**
@@ -166,7 +170,7 @@ class DngReconciliationService
         // concurrent webhook (e.g. Call 2 already advanced to paid_invoiced) cannot be
         // downgraded by a stale reconciliation read. Mirrors DngWebhookService so the
         // webhook-vs-reconciliation race is serialised, not just webhook-vs-webhook.
-        $outcome = DB::transaction(function () use ($request, $txn, $hasInvoice, $targetStatus, $dngPaymentId): array {
+        $outcome = $this->guard()->handleIfChanged($this->billingAccountId($request), function ($_billingAccount, Closure $markChanged) use ($request, $txn, $hasInvoice, $targetStatus, $dngPaymentId): array {
             /** @var DngPaymentRequest $locked */
             $locked = DngPaymentRequest::query()->lockForUpdate()->find($request->id);
 
@@ -182,6 +186,7 @@ class DngReconciliationService
             // from the fallback match so a non-matching DNG row cannot poison it).
             if (! $locked->dng_payment_id) {
                 $locked->update(['dng_payment_id' => $dngPaymentId]);
+                $markChanged();
             }
 
             $statusOrder = $this->statusOrder();
@@ -215,6 +220,7 @@ class DngReconciliationService
 
             $locked->update($updateData);
             $locked->transitionTo($targetStatus);
+            $markChanged();
 
             return ['result' => 'backfilled'];
         });
@@ -287,6 +293,22 @@ class DngReconciliationService
             'dng_payment_id' => $dngPaymentId,
             'new_status' => $request->fresh()->status,
         ]);
+    }
+
+    private function guard(): SettlementMutationGuard
+    {
+        return $this->settlementMutationGuard ?? app(SettlementMutationGuard::class);
+    }
+
+    private function billingAccountId(DngPaymentRequest $request): int
+    {
+        if ($request->billing_account_id !== null) {
+            return (int) $request->billing_account_id;
+        }
+
+        return (int) ($this->billingAccountProvisioner ?? app(BillingAccountProvisioner::class))
+            ->forStudent((int) $request->student_id)
+            ->id;
     }
 
     /**

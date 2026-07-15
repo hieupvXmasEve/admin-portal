@@ -189,7 +189,7 @@ it('reserves the lowest installment sequence even when row order is reversed', f
         ->and($dng->chargeLinks->sole()->finance_charge_installment_id)->toBe($installment->id);
     expect($fix['charge']->fresh()->amount)->toBe('15000000.00')
         ->and(InvoiceLine::query()->where('charge_id', $fix['charge']->id)->sole()->amount_snapshot)->toBe('15000000.00')
-        ->and($billingAccount->fresh()->settlement_version)->toBe($versionBefore + 1)
+        ->and($billingAccount->fresh()->settlement_version)->toBe($versionBefore + 3)
         ->and($positionAfter->amounts->gross->amount)->toBe($positionBefore->amounts->gross->amount)
         ->and($positionAfter->amounts->discount->amount)->toBe($positionBefore->amounts->discount->amount)
         ->and($positionAfter->amounts->cash->amount)->toBe($positionBefore->amounts->cash->amount)
@@ -447,7 +447,7 @@ it('holds an ambiguous provider outcome for reconciliation instead of retrying i
     expect($i1->push_attempt_count)->toBe(1);
     $reservation = DngPaymentRequest::query()->findOrFail($i1->dng_payment_request_id);
     expect((int) BillingAccount::query()->where('student_id', $fix['charge']->student_id)->sole()->settlement_version)
-        ->toBe((int) $reservation->captured_settlement_version + 1);
+        ->toBe((int) $reservation->captured_settlement_version + 3);
 
     // A second push must not risk a duplicate provider debt.
     $mock = Mockery::mock(DngClient::class);

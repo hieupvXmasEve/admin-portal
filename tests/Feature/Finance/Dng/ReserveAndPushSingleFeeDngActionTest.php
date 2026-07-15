@@ -118,7 +118,7 @@ it('reserves exact canonical HL targets and finalizes outside the reservation tr
         ->and($reservation->active_slot_key)->toBe('dng:FAUHN:'.$this->billingAccount->id.':HL')
         ->and($reservation->reservationTargets)->toHaveCount(2)
         ->and($reservation->reservationTargets->pluck('invoice_line_id')->all())->toContain($lineOne->id, $lineTwo->id)
-        ->and((int) $this->billingAccount->fresh()->settlement_version)->toBeGreaterThan(0);
+        ->and((int) $this->billingAccount->fresh()->settlement_version)->toBe(2);
 });
 
 it('uses the same guarded reservation for the HP fee family', function (): void {
@@ -152,11 +152,10 @@ it('uses guarded canonical targets for every remaining supported fee family', fu
 it('reuses an exact active reservation with one durable deterministic item identity', function (): void {
     reservationPayableLine($this->invoice, $this->billingAccount);
     $service = Mockery::mock(DngPaymentService::class);
-    $service->shouldReceive('pushReserved')->twice()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
+    $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
 
     $first = $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
-    $first->update(['status' => DngPaymentRequest::STATUS_PENDING]);
     $second = $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
 
     expect($second->id)->toBe($first->id)
@@ -484,5 +483,5 @@ it('blocks a concurrent credit application during the unlocked DNG provider call
     expect($credit)->not->toBeNull()
         ->and($credit->credit_application_ids)->toBe([])
         ->and((float) $reservation->amount)->toBe(1_500_000.0)
-        ->and((int) $this->billingAccount->fresh()->settlement_version)->toBe(2);
+        ->and((int) $this->billingAccount->fresh()->settlement_version)->toBe(3);
 });
