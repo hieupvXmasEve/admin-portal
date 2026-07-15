@@ -146,11 +146,19 @@ class BatchStudioController extends Controller
             ->map(fn (string $key) => (int) (explode(':', $key)[2] ?? 0))
             ->filter()->values()->all();
 
-        $this->recomputeOrFail(
+        $currentByKey = $this->recomputeOrFail(
             $userId, $token, BatchJobType::DngPush, $selectedKeys, $tokens,
             fn () => collect($assembler->handle($semesterId, $dngFeeType, $studentIds, $campusId)['lines'])
                 ->keyBy(fn (BatchPreviewLine $line) => $line->key)->all(),
         );
+        $blocked = collect($selectedKeys)
+            ->filter(fn (string $key): bool => ($currentByKey[$key]?->display['diff'] ?? null) === 'skip')
+            ->count();
+        if ($blocked > 0) {
+            throw ValidationException::withMessages([
+                'selected_keys' => 'Có '.$blocked.' sinh viên đang có DNG hoạt động. Hãy xử lý DNG hiện tại trước khi chạy lô mới.',
+            ]);
+        }
 
         $result = $action->handle([
             'student_ids' => $studentIds,

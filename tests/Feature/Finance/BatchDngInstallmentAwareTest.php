@@ -17,6 +17,8 @@ use App\Modules\Finance\Jobs\PushNextInstallmentJob;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\FinanceOwnedObligationSource;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -87,6 +89,20 @@ function makeBatchChargeWithInstallments(int $studentId, int $semesterId, float 
 
     $obligation->update([
         'source_ref' => FinanceOwnedObligationSource::legacyTuitionTermChargeRef((int) $charge->id),
+    ]);
+    $invoice = StudentInvoice::query()->create([
+        'invoice_number' => 'INV-BATCH-'.uniqid(),
+        'student_id' => $studentId,
+        'semester_id' => $semesterId,
+        'status' => 'pending',
+        'due_date' => now()->addDays(30),
+    ]);
+    InvoiceLine::query()->create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $charge->id,
+        'amount_snapshot' => $gross,
+        'description_snapshot' => 'HP batch test',
+        'status' => 'active',
     ]);
 
     $per = $gross / $installmentCount;
@@ -296,7 +312,7 @@ it('still links installments when amount_override equals the auto-computed sum',
 // =========================================================================
 // Amount override that DIFFERS from installment-aware sum → skip linkage
 // =========================================================================
-it('skips installment linkage when amount_override differs from auto-computed sum', function () {
+it('ignores a legacy amount_override and keeps the canonical installment target', function () {
     batch_mockDngClientPushSuccess();
 
     $campus = Campus::factory()->create(['dng_code' => 'TEST']);
@@ -321,11 +337,11 @@ it('skips installment linkage when amount_override differs from auto-computed su
     ]);
 
     $dng = DngPaymentRequest::query()->where('student_id', $student->id)->latest('id')->first();
-    expect((float) $dng->amount)->toBe(5_000_000.0);
+    expect((float) $dng->amount)->toBe(10_000_000.0);
 
     $i1 = $charge->installments->where('installment_no', 1)->first()->fresh();
-    expect($i1->dng_payment_request_id)->toBeNull();
-    expect($i1->status)->toBe(FinanceChargeInstallment::STATUS_PENDING);
+    expect($i1->dng_payment_request_id)->toBe($dng->id);
+    expect($i1->status)->toBe(FinanceChargeInstallment::STATUS_AWAITING_PAYMENT);
 });
 
 // =========================================================================
@@ -358,7 +374,7 @@ it('worklist falls back to charge.balance when a charge has no installment row (
         'pricing_snapshot' => ['provenance' => 'test_fixture'],
         'accepted_at' => now(),
     ]);
-    FinanceCharge::create([
+    $charge = FinanceCharge::create([
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
@@ -367,6 +383,20 @@ it('worklist falls back to charge.balance when a charge has no installment row (
         'effective_at' => now(),
         'status' => FinanceCharge::STATUS_ACTIVE,
         'finance_obligation_id' => $obligation->id,
+    ]);
+    $invoice = StudentInvoice::query()->create([
+        'invoice_number' => 'INV-BATCH-LEGACY-'.uniqid(),
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'status' => 'pending',
+        'due_date' => now()->addDays(30),
+    ]);
+    InvoiceLine::query()->create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $charge->id,
+        'amount_snapshot' => 5_000_000,
+        'description_snapshot' => 'Legacy HP batch test',
+        'status' => 'active',
     ]);
 
     app()->forgetInstance(CreateBatchDngFromChargesAction::class);

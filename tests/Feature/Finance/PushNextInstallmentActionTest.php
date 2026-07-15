@@ -317,6 +317,9 @@ it('holds an ambiguous provider outcome for reconciliation instead of retrying i
     $i1 = $fix['installments'][0]->fresh();
     expect($i1->last_push_error)->toContain('Transient 502');
     expect($i1->push_attempt_count)->toBe(1);
+    $reservation = DngPaymentRequest::query()->findOrFail($i1->dng_payment_request_id);
+    expect((int) BillingAccount::query()->where('student_id', $fix['charge']->student_id)->sole()->settlement_version)
+        ->toBe((int) $reservation->captured_settlement_version + 1);
 
     // A second push must not risk a duplicate provider debt.
     $mock = Mockery::mock(DngClient::class);

@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { BatchResult } from '@/types/finance';
-import { AlertTriangle, CheckCircle2, MinusCircle, RotateCcw, XCircle } from 'lucide-vue-next';
+import { CheckCircle2, MinusCircle, RotateCcw, XCircle } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 const props = defineProps<{ result: BatchResult }>();
@@ -50,16 +50,6 @@ const failedCount = computed(() => Number(s.value.failed ?? s.value.failed_count
                 </CardContent>
             </Card>
         </div>
-
-        <Card
-            v-if="result.job === 'dng_push' && Number(s.cancelled_old) > 0"
-            class="border-amber-200 bg-amber-50/50"
-        >
-            <CardContent class="flex items-start gap-3 pt-6 text-sm text-amber-900">
-                <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0" />
-                <p>Đã hủy {{ s.cancelled_old }} DNG cũ (cùng SV + loại phí) trước khi tạo mới.</p>
-            </CardContent>
-        </Card>
 
         <Card v-if="errors.length" class="border-red-200">
             <CardHeader class="pb-2">

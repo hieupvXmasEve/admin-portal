@@ -147,7 +147,7 @@ class PushNextInstallmentAction
                 $selection['details'],
             );
         } catch (\Throwable $exception) {
-            $this->settlementMutationGuard->handle($billingAccountId, function () use ($selection, $exception): void {
+            $this->settlementMutationGuard->handleIfChanged($billingAccountId, function () use ($selection, $exception): void {
                 $lockedInstallment = FinanceChargeInstallment::query()
                     ->lockForUpdate()
                     ->findOrFail($selection['installment_id']);

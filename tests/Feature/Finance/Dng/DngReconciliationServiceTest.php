@@ -242,7 +242,7 @@ it('does not bind dng_payment_id to a fallback-matched request that fails the mi
 });
 
 it('does not bridge or settle a failed request during reconciliation (P1 cannot_transition)', function () {
-    // P1: an illegal transition (e.g. a failed request can only go back to pending) is
+    // P1: an illegal transition from a terminal failed request is
     // an error — reconciliation must not create a Payment or settle installments while
     // the DNG request stays failed.
     $request = createReconciliationRequest($this->student, 'PAY001', 5000000);

@@ -10,8 +10,7 @@ class CommitBatchDngRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) ($this->user()?->can('create_finance_payments')
-            && $this->user()?->can('void_finance_charges'));
+        return (bool) $this->user()?->can('create_finance_payments');
     }
 
     /**

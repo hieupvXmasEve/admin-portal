@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\User;
+use App\Modules\Finance\Actions\CreateBatchDngFromChargesAction;
 use App\Modules\Finance\Queries\Batch\AssembleBatchDngPreviewQuery;
 use App\Modules\Finance\Services\Batch\BatchPreviewTokenService;
 use App\Modules\Finance\Support\Batch\BatchJobType;
@@ -21,26 +22,42 @@ beforeEach(function () {
     ];
 });
 
-function stubDngAssembler(string $key, array $payload): void
+function stubDngAssembler(string $key, array $payload, array $display = []): void
 {
     $stub = Mockery::mock(AssembleBatchDngPreviewQuery::class);
     $stub->shouldReceive('handle')->andReturn([
-        'lines' => [new BatchPreviewLine($key, $payload, [])],
+        'lines' => [new BatchPreviewLine($key, $payload, $display)],
         'summary' => [],
     ]);
     app()->instance(AssembleBatchDngPreviewQuery::class, $stub);
 }
 
-it('forbids the DNG commit without void_finance_charges (rerun can void linked charges)', function () {
+function stubDngAction(): void
+{
+    $action = Mockery::mock(CreateBatchDngFromChargesAction::class);
+    $action->shouldReceive('handle')->once()->andReturn(['created' => 1, 'failed' => 0, 'errors' => []]);
+    app()->instance(CreateBatchDngFromChargesAction::class, $action);
+}
+
+it('allows the DNG commit without void_finance_charges because conflicts fail closed', function () {
     grantFinance($this->user, ['create_finance_payments'], $this->campus);
+
+    $token = app(BatchPreviewTokenService::class)->issue(
+        (int) $this->user->id,
+        BatchJobType::DngPush,
+        ['dng_fee_type' => 'HP', 'semester_id' => $this->semester->id, 'scope' => []],
+        [new BatchPreviewLine($this->key, ['net' => 500000.0], [])],
+    );
+    stubDngAssembler($this->key, ['net' => 500000.0]);
+    stubDngAction();
 
     $this->actingAs($this->user)
         ->withSession(financeWebSession($this->campus))
         ->from(route('finance.batch-studio.dng'))
         ->post(route('finance.batch-studio.dng.commit'), financePostPayload(array_merge($this->base, [
-            'preview_token' => 'x', 'selected_keys' => [$this->key],
+            'preview_token' => $token, 'selected_keys' => [$this->key],
         ])))
-        ->assertForbidden();
+        ->assertSessionHasNoErrors();
 });
 
 it('caps the batch at 100 students', function () {
@@ -63,7 +80,7 @@ it('blocks the commit when the re-resolved DNG line drifted', function () {
     $token = app(BatchPreviewTokenService::class)->issue(
         (int) $this->user->id,
         BatchJobType::DngPush,
-        ['dng_fee_type' => 'tuition', 'semester_id' => $this->semester->id, 'scope' => []],
+        ['dng_fee_type' => 'HP', 'semester_id' => $this->semester->id, 'scope' => []],
         [new BatchPreviewLine($this->key, ['net' => 500000.0], [])],
     );
     stubDngAssembler($this->key, ['net' => 700000.0]);
@@ -75,4 +92,24 @@ it('blocks the commit when the re-resolved DNG line drifted', function () {
             'preview_token' => $token, 'selected_keys' => [$this->key],
         ])))
         ->assertSessionHasErrors('preview_token');
+});
+
+it('blocks selected DNG rows that still require active-request resolution', function () {
+    grantFinance($this->user, ['create_finance_payments'], $this->campus);
+
+    $token = app(BatchPreviewTokenService::class)->issue(
+        (int) $this->user->id,
+        BatchJobType::DngPush,
+        ['dng_fee_type' => 'HP', 'semester_id' => $this->semester->id, 'scope' => []],
+        [new BatchPreviewLine($this->key, ['net' => 500000.0], [])],
+    );
+    stubDngAssembler($this->key, ['net' => 500000.0], ['diff' => 'skip']);
+
+    $this->actingAs($this->user)
+        ->withSession(financeWebSession($this->campus))
+        ->from(route('finance.batch-studio.dng'))
+        ->post(route('finance.batch-studio.dng.commit'), financePostPayload(array_merge($this->base, [
+            'preview_token' => $token, 'selected_keys' => [$this->key],
+        ])))
+        ->assertSessionHasErrors('selected_keys');
 });

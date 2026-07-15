@@ -41,6 +41,14 @@ class DngPaymentRequest extends Model
 
     public const STATUS_NEEDS_REVIEW = 'needs_review';
 
+    /** @var list<string> */
+    private const HOLDING_COLLECTION_STATUSES = [
+        self::STATUS_PENDING,
+        self::STATUS_PUSHED_TO_DNG,
+        self::STATUS_UNKNOWN_OUTCOME,
+        self::STATUS_NEEDS_REVIEW,
+    ];
+
     /**
      * Allowed forward transitions. Key = current status, value = allowed next statuses.
      */
@@ -50,7 +58,7 @@ class DngPaymentRequest extends Model
         self::STATUS_PAID_UNINVOICED => [self::STATUS_PAID_INVOICED, self::STATUS_RECONCILED],
         self::STATUS_PAID_INVOICED => [self::STATUS_RECONCILED],
         self::STATUS_RECONCILED => [],
-        self::STATUS_FAILED => [self::STATUS_PENDING],
+        self::STATUS_FAILED => [],
         self::STATUS_UNKNOWN_OUTCOME => [self::STATUS_PAID_UNINVOICED, self::STATUS_PAID_INVOICED, self::STATUS_NEEDS_REVIEW, self::STATUS_CANCELLED],
         // Review blocks new collection mutations, but it must never discard a
         // later verified provider receipt for an already-pushed request.
@@ -173,7 +181,15 @@ class DngPaymentRequest extends Model
             );
         }
 
-        $this->update(['status' => $newStatus]);
+        $this->update([
+            'status' => $newStatus,
+            'active_slot_key' => self::holdsCollectionStatus($newStatus) ? $this->active_slot_key : null,
+        ]);
+    }
+
+    public static function holdsCollectionStatus(string $status): bool
+    {
+        return in_array($status, self::HOLDING_COLLECTION_STATUSES, true);
     }
 
     /**
@@ -273,11 +289,6 @@ class DngPaymentRequest extends Model
     /** @param Builder<self> $query */
     public function scopeHoldingCollection(Builder $query): Builder
     {
-        return $query->whereIn('status', [
-            self::STATUS_PENDING,
-            self::STATUS_PUSHED_TO_DNG,
-            self::STATUS_UNKNOWN_OUTCOME,
-            self::STATUS_NEEDS_REVIEW,
-        ]);
+        return $query->whereIn('status', self::HOLDING_COLLECTION_STATUSES);
     }
 }

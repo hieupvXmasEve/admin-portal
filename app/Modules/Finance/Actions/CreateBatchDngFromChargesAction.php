@@ -48,7 +48,7 @@ class CreateBatchDngFromChargesAction
      *     description: string,
      *     estimate_time: string,
      * }  $data
-     * @return array{created: int, failed: int, cancelled_old: int, errors: string[]}
+     * @return array{created: int, failed: int, errors: string[]}
      */
     public function handle(array $data): array
     {
@@ -62,12 +62,11 @@ class CreateBatchDngFromChargesAction
 
         $created = 0;
         $failed = 0;
-        $cancelledOld = 0;
         $errors = [];
 
         foreach ($studentIds as $studentId) {
             try {
-                $result = $this->processStudent(
+                $this->processStudent(
                     studentId: (int) $studentId,
                     dngFeeType: $dngFeeType,
                     chargeTypes: $chargeTypes,
@@ -78,7 +77,6 @@ class CreateBatchDngFromChargesAction
                 );
 
                 $created++;
-                $cancelledOld += $result['cancelled_old'];
             } catch (\Throwable $e) {
                 $failed++;
                 $errors[] = "Student #{$studentId}: {$e->getMessage()}";
@@ -89,14 +87,13 @@ class CreateBatchDngFromChargesAction
             }
         }
 
-        return compact('created', 'failed', 'cancelledOld', 'errors') + ['cancelled_old' => $cancelledOld];
+        return compact('created', 'failed', 'errors');
     }
 
     /**
      * Process a single student: guard missing HL/PTL obligations, then push DNG.
      *
      * @param  array<int, string>  $chargeTypes
-     * @return array{cancelled_old: int}
      */
     private function processStudent(
         int $studentId,
@@ -106,7 +103,7 @@ class CreateBatchDngFromChargesAction
         string $dueDate,
         string $description,
         string $estimateTime,
-    ): array {
+    ): void {
         $student = Student::query()->findOrFail($studentId);
         if ($dngFeeType === 'HL') {
             $this->assertNoMissingRetakeObligations($student, $semesterId);
@@ -150,7 +147,8 @@ class CreateBatchDngFromChargesAction
             ->orderBy('finance_charge_id')
             ->orderBy('installment_no')
             ->get()
-            ->keyBy('finance_charge_id');
+            ->groupBy('finance_charge_id')
+            ->map(fn ($rows) => $rows->first());
         $targetAmounts = [];
         $installmentIdsByLine = [];
         foreach ($lines as $line) {
@@ -173,7 +171,7 @@ class CreateBatchDngFromChargesAction
                 ->id;
 
             app(SettlementMutationGuard::class)->handle($billingAccountId, function () use ($installmentIdsByLine, $reservation): void {
-                FinanceChargeInstallment::query()->whereIn('id', $installmentIdsByLine)->update([
+                FinanceChargeInstallment::query()->whereIn('id', array_values($installmentIdsByLine))->update([
                     'dng_payment_request_id' => $reservation->id,
                     'status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
                     'last_push_error' => null,
@@ -182,7 +180,6 @@ class CreateBatchDngFromChargesAction
             });
         }
 
-        return ['cancelled_old' => 0];
     }
 
     /**

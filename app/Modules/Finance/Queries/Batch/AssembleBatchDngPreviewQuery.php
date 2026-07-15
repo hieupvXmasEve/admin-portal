@@ -57,11 +57,11 @@ class AssembleBatchDngPreviewQuery
                 display: [
                     'student_id' => (string) ($row['student_code'] ?? ''),
                     'label' => (string) ($row['student_name'] ?? ''),
-                    'diff' => $hasActiveDng ? 'warning' : 'create',
+                    'diff' => $hasActiveDng ? 'skip' : 'create',
                     'net' => $total,
                     'installment_aware_total' => $total,
-                    'reason' => $hasActiveDng ? 'rerun_cancels_old_dng' : null,
-                    'warning_codes' => $hasActiveDng ? ['rerun_cancels_old_dng'] : [],
+                    'reason' => $hasActiveDng ? 'active_dng_resolution_required' : null,
+                    'warning_codes' => $hasActiveDng ? ['active_dng_resolution_required'] : [],
                 ],
             );
         }

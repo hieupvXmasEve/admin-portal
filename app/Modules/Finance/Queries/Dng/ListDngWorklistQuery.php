@@ -199,11 +199,12 @@ class ListDngWorklistQuery
 
         $studentIds = $allStudentRows->pluck('student_id')->unique()->values()->all();
 
-        // Active DNG per student for this fee_type
+        // A provider-uncertain or review-held request still owns its active slot
+        // and must be resolved before Batch Studio offers a new collection.
         $activeDngByStudent = DngPaymentRequest::query()
             ->whereIn('student_id', $studentIds)
             ->where('fee_type', $dngFeeType)
-            ->awaitingPayment()
+            ->holdingCollection()
             ->orderByDesc('created_at')
             ->get(['id', 'student_id', 'status', 'amount', 'created_at'])
             ->groupBy('student_id')

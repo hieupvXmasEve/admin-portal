@@ -107,8 +107,6 @@ const ack = computed({
 const needsAck = computed(() => wizard.selected.value.size > 50);
 const nextDisabled = computed(() => wizard.step.value === 3 && needsAck.value && !ack.value);
 
-const rerunCancelsCount = computed(() => wizard.lines.value.filter((l) => l.display.warning_codes?.includes('rerun_cancels_old_dng')).length);
-
 const fieldError = (field: 'due_date' | 'description' | 'estimate_time'): string | undefined =>
     setupErrors.value[field] ?? (wizard.form.errors[field] as string | undefined);
 
@@ -292,9 +290,6 @@ function retryFailedSubset() {
                                 <div><span class="text-muted-foreground">Hạn thanh toán:</span> {{ wizard.setup.due_date }}</div>
                                 <div><span class="text-muted-foreground">Thời hạn DNG:</span> {{ wizard.setup.estimate_time }}</div>
                             </div>
-                            <Alert v-if="rerunCancelsCount > 0" variant="destructive">
-                                <AlertDescription> {{ rerunCancelsCount }} SV đã có DNG đang chờ — chạy lại sẽ <strong>hủy DNG cũ</strong> rồi tạo mới. </AlertDescription>
-                            </Alert>
                             <Button type="button" variant="link" class="h-auto p-0" @click="wizard.excludeWarnings()"> Loại trừ tất cả dòng 🟠 cảnh báo </Button>
                             <label v-if="needsAck" class="flex items-start gap-3 text-sm leading-relaxed">
                                 <Checkbox v-model="ack" class="mt-0.5" />

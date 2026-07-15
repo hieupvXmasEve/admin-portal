@@ -34,7 +34,11 @@ class ResolveDngReceiptExceptionAction
             if ($request !== null
                 && $request->status === DngPaymentRequest::STATUS_NEEDS_REVIEW
                 && ! DngReceiptException::query()->where('dng_payment_request_id', $request->id)->where('status', DngReceiptException::STATUS_OPEN)->exists()) {
-                $request->update(['status' => DngPaymentRequest::STATUS_FAILED, 'error_message' => null]);
+                $request->update([
+                    'status' => DngPaymentRequest::STATUS_FAILED,
+                    'active_slot_key' => null,
+                    'error_message' => null,
+                ]);
             }
 
             return $exception->fresh();

@@ -24,7 +24,7 @@ const REASON_LABELS: Record<string, string> = {
     paid_dng_or_payment_review_required: 'Đã có bằng chứng thanh toán/DNG - cần rà soát trước',
     deferred_non_billable: 'Kỳ bảo lưu không phát sinh phí',
     inconsistent_block_shape: 'Dữ liệu block EGC không nhất quán - cần sửa thủ công',
-    rerun_cancels_old_dng: 'Đã có DNG đang chờ — chạy lại sẽ hủy DNG cũ',
+    active_dng_resolution_required: 'Đã có DNG đang chờ — cần xử lý DNG hiện tại trước',
     no_email: 'Không có email',
     recently_reminded: 'Đã nhắc trong 24h gần đây',
     scholarship_expired: 'Học bổng đã hết hạn',

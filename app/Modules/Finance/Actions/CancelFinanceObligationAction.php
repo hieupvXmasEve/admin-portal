@@ -169,6 +169,9 @@ class CancelFinanceObligationAction implements FinanceObligationCancellationCont
 
         return DngPaymentRequest::query()
             ->whereIn('id', $requestIds)
-            ->update(['status' => DngPaymentRequest::STATUS_CANCELLED]);
+            ->update([
+                'status' => DngPaymentRequest::STATUS_CANCELLED,
+                'active_slot_key' => null,
+            ]);
     }
 }

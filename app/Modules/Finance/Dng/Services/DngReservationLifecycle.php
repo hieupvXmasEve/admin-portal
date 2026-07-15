@@ -59,8 +59,6 @@ final class DngReservationLifecycle
                 if ($existing->campus_code !== $campusCode) {
                     throw new \RuntimeException('An unresolved DNG request exists on another campus and must be reconciled before creating a replacement.');
                 }
-
-                return $existing;
             }
 
             $targetLineIds = InvoiceLine::query()
@@ -98,6 +96,7 @@ final class DngReservationLifecycle
             }
             $targets = $this->collectibleTargets($position, $targetAmounts);
             $targetFingerprint = $this->fingerprint($targets);
+            $amount = array_reduce($targets, fn (Money $total, array $target): Money => $total->add(Money::vnd($target['collectible'])), Money::zero());
             $sequence = DngPaymentRequest::query()
                 ->where('billing_account_id', $billingAccount->id)
                 ->where('provider_rail', self::PROVIDER_RAIL)
@@ -105,7 +104,24 @@ final class DngReservationLifecycle
                 ->where('fee_type', $feeType)
                 ->lockForUpdate()
                 ->count() + 1;
-            $amount = array_reduce($targets, fn (Money $total, array $target): Money => $total->add(Money::vnd($target['collectible'])), Money::zero());
+            if ($existing !== null) {
+                $this->assertExactRetry(
+                    $existing,
+                    $student,
+                    $billingAccount,
+                    $campusCode,
+                    $feeType,
+                    $details,
+                    $slotKey,
+                    $targets,
+                    $amount,
+                    $targetFingerprint,
+                    $installmentIdsByLine,
+                    $sequence - 1,
+                );
+
+                return $existing;
+            }
             $reservation = DngPaymentRequest::query()->create([
                 'student_id' => $student->id,
                 'billing_account_id' => $billingAccount->id,
@@ -267,6 +283,69 @@ final class DngReservationLifecycle
     private function fingerprint(array $targets): string
     {
         return DngReservationTargetFingerprint::make($targets);
+    }
+
+    /**
+     * Reuse is valid only when the current reservation request describes the
+     * exact durable target already held by the provider identity.
+     *
+     * @param  array{description: string, semester_id: int, due_date: string, estimate_time: string}  $details
+     * @param  list<array{invoice_line_id: int, finance_charge_id: int, collectible: string, identity: string}>  $targets
+     * @param  array<int, int>  $installmentIdsByLine
+     */
+    private function assertExactRetry(
+        DngPaymentRequest $existing,
+        Student $student,
+        BillingAccount $billingAccount,
+        string $campusCode,
+        string $feeType,
+        array $details,
+        string $slotKey,
+        array $targets,
+        Money $amount,
+        string $targetFingerprint,
+        array $installmentIdsByLine,
+        int $sequence,
+    ): void {
+        $expectedTargets = collect($targets)
+            ->map(fn (array $target): array => [
+                'invoice_line_id' => (int) $target['invoice_line_id'],
+                'captured_collectible' => (string) $target['collectible'],
+                'target_identity' => (string) $target['identity'],
+                'finance_charge_installment_id' => $installmentIdsByLine[(int) $target['invoice_line_id']] ?? null,
+            ])
+            ->sortBy('invoice_line_id')
+            ->values()
+            ->all();
+        $storedTargets = $existing->reservationTargets()
+            ->orderBy('invoice_line_id')
+            ->get()
+            ->map(fn (DngPaymentRequestReservationTarget $target): array => [
+                'invoice_line_id' => (int) $target->invoice_line_id,
+                'captured_collectible' => (string) $target->captured_collectible,
+                'target_identity' => (string) $target->target_identity,
+                'finance_charge_installment_id' => $target->finance_charge_installment_id === null ? null : (int) $target->finance_charge_installment_id,
+            ])
+            ->all();
+        $expectedItemId = $this->itemId((int) $billingAccount->id, $campusCode, $feeType, $sequence);
+        $settlementVersionMatches = $existing->captured_settlement_version !== null
+            && (int) $billingAccount->settlement_version === (int) $existing->captured_settlement_version + 1;
+
+        if ($existing->student_id !== $student->id
+            || $existing->billing_account_id !== $billingAccount->id
+            || $existing->student_code !== $student->student_id
+            || $existing->campus_code !== $campusCode
+            || $existing->provider_rail !== self::PROVIDER_RAIL
+            || $existing->fee_type !== $feeType
+            || $existing->semester_id !== $details['semester_id']
+            || $existing->active_slot_key !== $slotKey
+            || (string) $existing->amount !== $amount->amount
+            || $existing->target_fingerprint !== $targetFingerprint
+            || $existing->item_id !== $expectedItemId
+            || ! $settlementVersionMatches
+            || $storedTargets !== $expectedTargets) {
+            throw new \RuntimeException('An active DNG reservation does not exactly match the requested payer, settlement targets, amount, version, or provider identity. Resolve it before creating a new collection request.');
+        }
     }
 
     private function slotKey(int $billingAccountId, string $campusCode, string $feeType): string
