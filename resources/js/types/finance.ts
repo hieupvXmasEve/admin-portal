@@ -440,10 +440,17 @@ export type BatchDiffBucket = 'create' | 'update' | 'skip' | 'warning';
 export interface BatchPreviewLineDisplay {
     student_id: string;
     label: string;
+    fee_category?: 'major' | 'egc' | 'non_academic';
     diff: BatchDiffBucket;
     gross?: number;
     discount?: number;
     net: number;
+    scholarship_name?: string | null;
+    scholarship_type?: string | null;
+    scholarship_raw_value?: number | null;
+    scholarship_amount?: number;
+    voucher_codes?: string[];
+    voucher_amount?: number;
     installment_aware_total?: number;
     reason?: string | null;
     warning_codes?: string[];

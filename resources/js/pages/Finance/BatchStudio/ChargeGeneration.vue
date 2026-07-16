@@ -118,6 +118,21 @@ function setBlockOverride(key: string, count: number) {
     blockOverrides[key] = count;
 }
 
+function exportPreview() {
+    if (!wizard.setup.semester_id) {
+        wizard.driftMessage.value = 'Vui lòng chọn kỳ học trước khi xuất Excel.';
+        return;
+    }
+
+    window.location.assign(
+        financeRoutes.batchStudio.chargesExport({
+            fee_category: wizard.setup.fee_category,
+            semester_id: wizard.setup.semester_id,
+            scope: wizard.setup.scope,
+        }),
+    );
+}
+
 function prepareScopeForCategory(): boolean {
     if (isNonAcademic.value) {
         return prepareNonAcademicScope();
@@ -241,6 +256,7 @@ function prepareNonAcademicScope(): boolean {
                     :block-counts="blockOverrides"
                     exportable
                     @toggle="wizard.toggle"
+                    @export="exportPreview"
                     @update-block-count="setBlockOverride"
                 />
 

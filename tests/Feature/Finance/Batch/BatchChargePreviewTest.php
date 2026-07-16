@@ -45,6 +45,34 @@ it('includes intake-major students in major charge preview', function () {
         ->toContain($student->student_id);
 });
 
+it('includes every eligible student in a major charge preview', function () {
+    grantFinance($this->user, ['create_finance_charges', 'view_finance_all_campus'], $this->campus);
+    $studentCodePrefix = 'BULK'.random_int(100000, 999999);
+
+    $template = makeBatchHpStudent($this->campus, $this->semester, $studentCodePrefix.'01', 'intake_major');
+
+    foreach (range(2, 21) as $index) {
+        $studentCode = $studentCodePrefix.str_pad((string) $index, 2, '0', STR_PAD_LEFT);
+        $student = $template->replicate();
+        $student->student_id = $studentCode;
+        $student->email = strtolower($studentCode).'@example.test';
+        $student->national_id = null;
+        $student->save();
+    }
+
+    $response = $this->actingAs($this->user)
+        ->withHeaders(['X-CSRF-TOKEN' => BATCH_STUDIO_CSRF])
+        ->postJson(route('finance.batch-studio.charges.preview'), [
+            'fee_category' => 'major',
+            'semester_id' => $this->semester->id,
+            'scope' => ['filters' => ['search' => $studentCodePrefix]],
+        ])
+        ->assertOk();
+
+    expect($response->json('data.lines'))->toHaveCount(21)
+        ->and($response->json('data.summary.eligible_count'))->toBe(21);
+});
+
 it('ignores stale non-academic scope fields when previewing major charges', function () {
     grantFinance($this->user, ['create_finance_charges', 'view_finance_all_campus'], $this->campus);
 

@@ -53,6 +53,7 @@ export const FINANCE_ROUTE_NAMES = {
     BATCH_STUDIO_HUB: 'finance.batch-studio.hub',
     BATCH_STUDIO_CHARGES: 'finance.batch-studio.charges',
     BATCH_STUDIO_CHARGES_PREVIEW: 'finance.batch-studio.charges.preview',
+    BATCH_STUDIO_CHARGES_EXPORT: 'finance.batch-studio.charges.export',
     BATCH_STUDIO_CHARGES_COMMIT: 'finance.batch-studio.charges.commit',
     BATCH_STUDIO_DNG: 'finance.batch-studio.dng',
     BATCH_STUDIO_DNG_PREVIEW: 'finance.batch-studio.dng.preview',

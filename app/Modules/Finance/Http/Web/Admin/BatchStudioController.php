@@ -14,9 +14,11 @@ use App\Modules\Finance\Actions\Operations\SendDueItemParentRemindersAction;
 use App\Modules\Finance\Actions\Operations\SendDueItemRemindersAction;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
 use App\Modules\Finance\Enums\NonAcademicChargeTypeEnum;
+use App\Modules\Finance\Exports\BatchChargePreviewExport;
 use App\Modules\Finance\Http\Requests\Batch\CommitBatchChargesRequest;
 use App\Modules\Finance\Http\Requests\Batch\CommitBatchDngRequest;
 use App\Modules\Finance\Http\Requests\Batch\CommitBatchRemindersRequest;
+use App\Modules\Finance\Http\Requests\Batch\PreviewBatchChargesRequest;
 use App\Modules\Finance\Queries\Batch\AssembleBatchChargePreviewQuery;
 use App\Modules\Finance\Queries\Batch\AssembleBatchDngPreviewQuery;
 use App\Modules\Finance\Queries\Batch\AssembleBatchReminderPreviewQuery;
@@ -29,6 +31,8 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class BatchStudioController extends Controller
 {
@@ -52,6 +56,22 @@ class BatchStudioController extends Controller
             'feeTypeOptions' => NonAcademicChargeTypeEnum::forSelect(),
             'prefill' => $this->chargePrefill($request),
         ]);
+    }
+
+    public function exportCharges(
+        PreviewBatchChargesRequest $request,
+        AssembleBatchChargePreviewQuery $assembler,
+    ): BinaryFileResponse {
+        $feeCategory = (string) $request->input('fee_category');
+        $semesterId = (int) $request->input('semester_id');
+        $scope = $assembler->normalizeScope($feeCategory, $semesterId, (array) $request->input('scope', []));
+        $campusId = $request->user()?->can('view_finance_all_campus') ? null : (int) session('current_campus_id');
+        $result = $assembler->handle($feeCategory, $semesterId, $scope, $campusId);
+
+        return Excel::download(
+            new BatchChargePreviewExport($result['lines']),
+            "batch-charge-preview-{$feeCategory}-{$semesterId}.xlsx",
+        );
     }
 
     public function dng(Request $request): Response

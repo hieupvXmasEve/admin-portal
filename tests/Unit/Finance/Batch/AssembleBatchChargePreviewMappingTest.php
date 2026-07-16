@@ -13,6 +13,12 @@ it('maps an eligible row into a 🟢 create line with a stable key and net in th
         'gross_amount' => 600000.0,
         'discount_amount' => 100000.0,
         'scholarship_id' => 7,
+        'scholarship_name' => 'Học bổng Tài năng',
+        'scholarship_type' => 'percentage',
+        'scholarship_raw_value' => 20,
+        'scholarship_amount' => 100000.0,
+        'voucher_codes' => [],
+        'voucher_amount' => 0.0,
         'voucher_id' => null,
         'has_existing_charge' => false,
         'warning' => null,
@@ -27,6 +33,9 @@ it('maps an eligible row into a 🟢 create line with a stable key and net in th
     expect($line->key)->toBe('charge:major:student:11:semester:5')
         ->and($line->display['diff'])->toBe('create')
         ->and($line->display['net'])->toBe(500000.0)
+        ->and($line->display['scholarship_name'])->toBe('Học bổng Tài năng')
+        ->and($line->display['scholarship_type'])->toBe('percentage')
+        ->and($line->display['scholarship_amount'])->toBe(100000.0)
         ->and($line->hashPayload['net'])->toBe(500000.0)
         ->and($line->hashPayload['scholarship_id'])->toBe(7)
         ->and($line->hashPayload['fee_config_fingerprint'])->toBe('plan:42@2026-06-01 10:00:00|term:9@2026-06-02 11:00:00');

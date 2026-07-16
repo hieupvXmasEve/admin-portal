@@ -496,6 +496,7 @@ export const financeRoutes = {
         hub: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_HUB),
         charges: (params?: Record<string, unknown>) => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_CHARGES, params ?? {}),
         chargesPreview: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_CHARGES_PREVIEW),
+        chargesExport: (params: Record<string, unknown>) => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_CHARGES_EXPORT, params),
         chargesCommit: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_CHARGES_COMMIT),
         dng: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_DNG),
         dngPreview: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_DNG_PREVIEW),

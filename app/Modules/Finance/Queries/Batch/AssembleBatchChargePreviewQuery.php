@@ -124,10 +124,17 @@ class AssembleBatchChargePreviewQuery
             display: [
                 'student_id' => (string) ($row['student_code'] ?? $row['student_id'] ?? ''),
                 'label' => (string) ($row['full_name'] ?? ''),
+                'fee_category' => $feeCategory,
                 'diff' => $bucket,
                 'gross' => $hashPayload['gross'],
                 'discount' => $hashPayload['discount'],
                 'net' => $hashPayload['net'],
+                'scholarship_name' => $row['scholarship_name'] ?? null,
+                'scholarship_type' => $row['scholarship_type'] ?? null,
+                'scholarship_raw_value' => isset($row['scholarship_raw_value']) ? (float) $row['scholarship_raw_value'] : null,
+                'scholarship_amount' => (float) ($row['scholarship_amount'] ?? 0),
+                'voucher_codes' => array_values((array) ($row['voucher_codes'] ?? [])),
+                'voucher_amount' => (float) ($row['voucher_amount'] ?? 0),
                 'reason' => $reason,
                 'warning_codes' => $warningCodes,
                 'block_count' => isset($row['max_chargeable_blocks']) ? (int) $row['max_chargeable_blocks'] : null,
@@ -142,20 +149,28 @@ class AssembleBatchChargePreviewQuery
      */
     private function fromMajor(int $semesterId, array $scope, ?int $campusId): array
     {
-        $result = $this->majorPreview->handle($semesterId, $scope['filters'] ?? [], $campusId);
+        $rows = $this->majorPreview->collectClassificationRows($semesterId, $scope['filters'] ?? [], $campusId);
+        $eligible = $rows->where('eligibility_status', 'eligible');
+        $warnings = $rows->where('eligibility_status', 'warning');
+        $ineligible = $rows->where('eligibility_status', 'ineligible');
         $lines = [];
 
-        foreach ($this->collection($result['eligible_students'] ?? []) as $row) {
+        foreach ($eligible as $row) {
             $lines[] = self::mapChargeRow($row, 'major', $semesterId, 'create');
         }
-        foreach (($result['warning_students'] ?? []) as $row) {
+        foreach ($warnings as $row) {
             $lines[] = self::mapChargeRow($row, 'major', $semesterId, 'warning');
         }
-        foreach (($result['ineligible_students'] ?? []) as $row) {
+        foreach ($ineligible as $row) {
             $lines[] = self::mapChargeRow($row, 'major', $semesterId, 'skip');
         }
 
-        return ['lines' => $lines, 'summary' => $result['summary'] ?? []];
+        return ['lines' => $lines, 'summary' => [
+            'eligible_count' => $eligible->count(),
+            'ineligible_count' => $ineligible->count(),
+            'warning_count' => $warnings->count(),
+            'total_count' => $rows->count(),
+        ]];
     }
 
     /**
@@ -164,21 +179,33 @@ class AssembleBatchChargePreviewQuery
      */
     private function fromEgc(int $semesterId, array $scope, ?int $campusId): array
     {
-        $result = $this->egcPreview->handle($semesterId, $scope['filters'] ?? [], $campusId);
+        $rows = $this->egcPreview->collectClassificationRows($semesterId, $scope['filters'] ?? [], $campusId);
+        $eligible = $rows->where('eligibility_status', 'eligible');
+        $warnings = $rows->where('eligibility_status', 'warning');
+        $ineligible = $rows->where('eligibility_status', 'ineligible');
         $lines = [];
 
-        foreach ($this->collection($result['eligible_students'] ?? []) as $row) {
+        foreach ($eligible as $row) {
             $bucket = ($row['generation_mode'] ?? null) === 'reissue' ? 'update' : 'create';
             $lines[] = self::mapChargeRow($row, 'egc', $semesterId, $bucket);
         }
-        foreach (($result['warning_students'] ?? []) as $row) {
+        foreach ($warnings as $row) {
             $lines[] = self::mapChargeRow($row, 'egc', $semesterId, 'warning');
         }
-        foreach (($result['ineligible_students'] ?? []) as $row) {
+        foreach ($ineligible as $row) {
             $lines[] = self::mapChargeRow($row, 'egc', $semesterId, 'skip');
         }
 
-        return ['lines' => $lines, 'summary' => $result['summary'] ?? []];
+        return ['lines' => $lines, 'summary' => [
+            'eligible_count' => $eligible->count(),
+            'ineligible_count' => $ineligible->count(),
+            'warning_count' => $warnings->count(),
+            'total_count' => $rows->count(),
+            'projected_block_count' => (int) $eligible->sum('max_chargeable_blocks'),
+            'projected_total_amount' => (float) $eligible->sum(
+                fn (array $student): int|float => collect($student['chargeable_levels'] ?? [])->sum('amount')
+            ),
+        ]];
     }
 
     /**
@@ -208,7 +235,7 @@ class AssembleBatchChargePreviewQuery
 
         /** @var StudentChargeTimingResolver $timingResolver */
         $timingResolver = app(StudentChargeTimingResolver::class);
-        $students = $query->limit(500)->get()
+        $students = $query->get()
             ->filter(fn (Student $student): bool => $timingResolver->shouldIncludeStudentForChargeGeneration($student, $semesterId, [$feeType]))
             ->values();
 
@@ -326,20 +353,5 @@ class AssembleBatchChargePreviewQuery
         }
 
         return $normalized;
-    }
-
-    /**
-     * Normalize a paginator or array into an iterable of row arrays.
-     *
-     * @param  mixed  $value
-     * @return iterable<array<string, mixed>>
-     */
-    private function collection($value): iterable
-    {
-        if (is_array($value)) {
-            return $value;
-        }
-
-        return method_exists($value, 'items') ? $value->items() : (array) $value;
     }
 }

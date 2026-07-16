@@ -313,6 +313,8 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
             ->middleware('can:view_finance_batch_studio')->name('hub');
         Route::get('/charges', [BatchStudioController::class, 'charges'])
             ->middleware('can:view_finance_batch_studio')->name('charges');
+        Route::get('/charges/export', [BatchStudioController::class, 'exportCharges'])
+            ->middleware('can:view_finance_batch_studio')->name('charges.export');
         Route::post('/charges', [BatchStudioController::class, 'commitCharges'])
             ->name('charges.commit');
         Route::get('/dng', [BatchStudioController::class, 'dng'])
