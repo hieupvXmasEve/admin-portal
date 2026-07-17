@@ -7,6 +7,8 @@ use App\Models\Semester;
 use App\Models\User;
 use App\Modules\Finance\Exports\BatchChargePreviewExport;
 use App\Modules\Finance\Queries\Batch\AssembleBatchChargePreviewQuery;
+use App\Modules\Finance\Services\Batch\BatchPreviewTokenService;
+use App\Modules\Finance\Support\Batch\BatchJobType;
 use App\Modules\Finance\Support\Batch\BatchPreviewLine;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -20,7 +22,7 @@ it('downloads the batch charge preview as an Excel workbook', function () {
     grantFinance($this->user, ['view_finance_batch_studio', 'create_finance_charges', 'view_finance_all_campus'], $this->campus);
     Excel::fake();
 
-    $scope = ['filters' => []];
+    $scope = ['filters' => ['search' => 'SV001']];
     $line = new BatchPreviewLine(
         key: 'charge:major:student:1:semester:'.$this->semester->id,
         hashPayload: [],
@@ -42,22 +44,28 @@ it('downloads the batch charge preview as an Excel workbook', function () {
         ],
     );
 
+    $token = app(BatchPreviewTokenService::class)->issue(
+        (int) $this->user->id,
+        BatchJobType::ChargeGeneration,
+        [
+            'fee_category' => 'major',
+            'semester_id' => $this->semester->id,
+            'scope' => $scope,
+            'campus_id' => $this->campus->id,
+        ],
+        [$line],
+    );
+
     $assembler = Mockery::mock(AssembleBatchChargePreviewQuery::class);
-    $assembler->shouldReceive('normalizeScope')
-        ->once()
-        ->with('major', $this->semester->id, [])
-        ->andReturn($scope);
     $assembler->shouldReceive('handle')
         ->once()
-        ->with('major', $this->semester->id, $scope, null)
+        ->with('major', $this->semester->id, $scope, $this->campus->id)
         ->andReturn(['lines' => [$line], 'summary' => []]);
     app()->instance(AssembleBatchChargePreviewQuery::class, $assembler);
 
     $this->actingAs($this->user)
         ->get(route('finance.batch-studio.charges.export', [
-            'fee_category' => 'major',
-            'semester_id' => $this->semester->id,
-            'scope' => ['filters' => []],
+            'preview_token' => $token,
         ]))
         ->assertOk();
 
@@ -80,8 +88,7 @@ it('forbids a major charge export without the category permission', function () 
 
     $this->actingAs($this->user)
         ->get(route('finance.batch-studio.charges.export', [
-            'fee_category' => 'major',
-            'semester_id' => $this->semester->id,
+            'preview_token' => 'forbidden-token',
         ]))
         ->assertForbidden();
 });

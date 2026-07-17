@@ -20,10 +20,19 @@ beforeEach(function () {
     $this->key = 'charge:major:student:1:semester:'.$this->semester->id;
 });
 
-function stubChargeAssembler(string $key, array $payload): void
+function stubChargeAssembler(string $key, array $payload, ?int $expectedCampusId = null): void
 {
     $stub = Mockery::mock(AssembleBatchChargePreviewQuery::class);
-    $stub->shouldReceive('handle')->andReturn([
+    $expectation = $stub->shouldReceive('handle');
+    if ($expectedCampusId !== null) {
+        $expectation->once()->withArgs(
+            fn (string $feeCategory, int $semesterId, array $scope, int $campusId): bool => $feeCategory === 'major'
+                && $semesterId > 0
+                && $scope === []
+                && $campusId === $expectedCampusId,
+        );
+    }
+    $expectation->andReturn([
         'lines' => [new BatchPreviewLine($key, $payload, [])],
         'summary' => [],
     ]);
@@ -47,7 +56,7 @@ it('blocks the commit when the re-resolved line drifted from the issued hash', f
     $token = app(BatchPreviewTokenService::class)->issue(
         (int) $this->user->id,
         BatchJobType::ChargeGeneration,
-        ['fee_category' => 'major', 'semester_id' => $this->semester->id, 'scope' => []],
+        ['fee_category' => 'major', 'semester_id' => $this->semester->id, 'scope' => [], 'campus_id' => $this->campus->id],
         [new BatchPreviewLine($this->key, ['net' => 500000.0], [])],
     );
     stubChargeAssembler($this->key, ['net' => 999999.0]);
@@ -67,10 +76,10 @@ it('commits the clean subset and flashes a job summary when nothing drifted', fu
     $token = app(BatchPreviewTokenService::class)->issue(
         (int) $this->user->id,
         BatchJobType::ChargeGeneration,
-        ['fee_category' => 'major', 'semester_id' => $this->semester->id, 'scope' => []],
+        ['fee_category' => 'major', 'semester_id' => $this->semester->id, 'scope' => [], 'campus_id' => $this->campus->id],
         [new BatchPreviewLine($this->key, $payload, [])],
     );
-    stubChargeAssembler($this->key, $payload);
+    stubChargeAssembler($this->key, $payload, $this->campus->id);
 
     $this->actingAs($this->user)
         ->withSession(financeWebSession($this->campus))
@@ -81,6 +90,32 @@ it('commits the clean subset and flashes a job summary when nothing drifted', fu
         ]))
         ->assertSessionHasNoErrors()
         ->assertRedirect(route('finance.batch-studio.charges'));
+});
+
+it('rejects confirmation when the current campus changed after preview', function () {
+    grantFinance($this->user, ['create_finance_charges', 'view_finance_all_campus'], $this->campus);
+    $otherCampus = Campus::factory()->create();
+    $payload = ['net' => 500000.0];
+    $token = app(BatchPreviewTokenService::class)->issue(
+        (int) $this->user->id,
+        BatchJobType::ChargeGeneration,
+        [
+            'fee_category' => 'major',
+            'semester_id' => $this->semester->id,
+            'scope' => [],
+            'campus_id' => $this->campus->id,
+        ],
+        [new BatchPreviewLine($this->key, $payload, [])],
+    );
+
+    $this->actingAs($this->user)
+        ->withSession(financeWebSession($otherCampus))
+        ->from(route('finance.batch-studio.charges'))
+        ->post(route('finance.batch-studio.charges.commit'), financePostPayload([
+            'preview_token' => $token,
+            'selected_keys' => [$this->key],
+        ]))
+        ->assertSessionHasErrors('preview_token');
 });
 
 it('forbids the commit without create_finance_charges', function () {
@@ -101,7 +136,7 @@ it('forbids a major commit for an EGC-only operator after reading the trusted to
     $token = app(BatchPreviewTokenService::class)->issue(
         (int) $this->user->id,
         BatchJobType::ChargeGeneration,
-        ['fee_category' => 'major', 'semester_id' => $this->semester->id, 'scope' => []],
+        ['fee_category' => 'major', 'semester_id' => $this->semester->id, 'scope' => [], 'campus_id' => $this->campus->id],
         [new BatchPreviewLine($this->key, ['net' => 500000.0], [])],
     );
 
@@ -123,7 +158,7 @@ it('allows an EGC-only operator to commit an unchanged EGC preview token', funct
     $token = app(BatchPreviewTokenService::class)->issue(
         (int) $this->user->id,
         BatchJobType::ChargeGeneration,
-        ['fee_category' => 'egc', 'semester_id' => $this->semester->id, 'scope' => []],
+        ['fee_category' => 'egc', 'semester_id' => $this->semester->id, 'scope' => [], 'campus_id' => $this->campus->id],
         [new BatchPreviewLine($key, $payload, ['block_count' => 1])],
     );
     stubChargeAssembler($key, $payload);

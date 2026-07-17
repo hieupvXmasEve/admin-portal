@@ -73,6 +73,36 @@ it('includes every eligible student in a major charge preview', function () {
         ->and($response->json('data.summary.eligible_count'))->toBe(21);
 });
 
+it('limits a major charge preview to the current campus for an all-campus operator', function () {
+    grantFinance($this->user, ['create_finance_charges', 'view_finance_all_campus'], $this->campus);
+    $otherCampus = Campus::factory()->create();
+    $studentCodePrefix = 'CAMP'.random_int(100000, 999999);
+    $currentCampusStudent = makeBatchHpStudent(
+        $this->campus,
+        $this->semester,
+        $studentCodePrefix.'01',
+        'intake_major',
+    );
+    $otherCampusStudent = $currentCampusStudent->replicate();
+    $otherCampusStudent->student_id = $studentCodePrefix.'02';
+    $otherCampusStudent->email = strtolower($studentCodePrefix).'02@example.test';
+    $otherCampusStudent->national_id = null;
+    $otherCampusStudent->campus_id = $otherCampus->id;
+    $otherCampusStudent->save();
+
+    $response = $this->actingAs($this->user)
+        ->withHeaders(['X-CSRF-TOKEN' => BATCH_STUDIO_CSRF])
+        ->postJson(route('finance.batch-studio.charges.preview'), [
+            'fee_category' => 'major',
+            'semester_id' => $this->semester->id,
+            'scope' => ['filters' => ['search' => $studentCodePrefix]],
+        ])
+        ->assertOk();
+
+    expect(collect($response->json('data.lines'))->pluck('display.student_id')->all())
+        ->toBe([$currentCampusStudent->student_id]);
+});
+
 it('ignores stale non-academic scope fields when previewing major charges', function () {
     grantFinance($this->user, ['create_finance_charges', 'view_finance_all_campus'], $this->campus);
 

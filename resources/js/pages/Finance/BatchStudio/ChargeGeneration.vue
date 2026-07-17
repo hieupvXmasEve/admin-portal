@@ -119,16 +119,14 @@ function setBlockOverride(key: string, count: number) {
 }
 
 function exportPreview() {
-    if (!wizard.setup.semester_id) {
-        wizard.driftMessage.value = 'Vui lòng chọn kỳ học trước khi xuất Excel.';
+    if (!wizard.previewToken.value) {
+        wizard.driftMessage.value = 'Phiên xem trước không hợp lệ. Vui lòng xem trước lại.';
         return;
     }
 
     window.location.assign(
         financeRoutes.batchStudio.chargesExport({
-            fee_category: wizard.setup.fee_category,
-            semester_id: wizard.setup.semester_id,
-            scope: wizard.setup.scope,
+            preview_token: wizard.previewToken.value,
         }),
     );
 }

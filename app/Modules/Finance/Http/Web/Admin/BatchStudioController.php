@@ -18,11 +18,12 @@ use App\Modules\Finance\Exports\BatchChargePreviewExport;
 use App\Modules\Finance\Http\Requests\Batch\CommitBatchChargesRequest;
 use App\Modules\Finance\Http\Requests\Batch\CommitBatchDngRequest;
 use App\Modules\Finance\Http\Requests\Batch\CommitBatchRemindersRequest;
-use App\Modules\Finance\Http\Requests\Batch\PreviewBatchChargesRequest;
+use App\Modules\Finance\Http\Requests\Batch\ExportBatchChargesRequest;
 use App\Modules\Finance\Queries\Batch\AssembleBatchChargePreviewQuery;
 use App\Modules\Finance\Queries\Batch\AssembleBatchDngPreviewQuery;
 use App\Modules\Finance\Queries\Batch\AssembleBatchReminderPreviewQuery;
 use App\Modules\Finance\Services\Batch\BatchPreviewTokenService;
+use App\Modules\Finance\Support\Batch\BatchChargeCampusScope;
 use App\Modules\Finance\Support\Batch\BatchJobType;
 use App\Modules\Finance\Support\Batch\BatchPreviewLine;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -59,13 +60,27 @@ class BatchStudioController extends Controller
     }
 
     public function exportCharges(
-        PreviewBatchChargesRequest $request,
+        ExportBatchChargesRequest $request,
+        BatchPreviewTokenService $tokens,
         AssembleBatchChargePreviewQuery $assembler,
+        BatchChargeCampusScope $campusScope,
     ): BinaryFileResponse {
-        $feeCategory = (string) $request->input('fee_category');
-        $semesterId = (int) $request->input('semester_id');
-        $scope = $assembler->normalizeScope($feeCategory, $semesterId, (array) $request->input('scope', []));
-        $campusId = $request->user()?->can('view_finance_all_campus') ? null : (int) session('current_campus_id');
+        $userId = (int) $request->user()->id;
+        $token = (string) $request->input('preview_token');
+        $tokenScope = $tokens->scope($userId, $token, BatchJobType::ChargeGeneration);
+        if ($tokenScope === null) {
+            throw ValidationException::withMessages([
+                'preview_token' => 'Phiên xem trước đã hết hạn hoặc không hợp lệ. Vui lòng xem trước lại.',
+            ]);
+        }
+
+        $feeCategory = (string) ($tokenScope['fee_category'] ?? '');
+        $semesterId = (int) ($tokenScope['semester_id'] ?? 0);
+        $scope = (array) ($tokenScope['scope'] ?? []);
+        $campusId = $campusScope->assertCurrent((int) ($tokenScope['campus_id'] ?? 0));
+
+        $this->authorizeChargeCategory($request, $feeCategory);
+
         $result = $assembler->handle($feeCategory, $semesterId, $scope, $campusId);
 
         return Excel::download(
@@ -91,6 +106,7 @@ class BatchStudioController extends Controller
         CommitBatchChargesRequest $request,
         BatchPreviewTokenService $tokens,
         AssembleBatchChargePreviewQuery $assembler,
+        BatchChargeCampusScope $campusScope,
     ): RedirectResponse {
         $userId = (int) $request->user()->id;
         $token = (string) $request->input('preview_token');
@@ -108,7 +124,7 @@ class BatchStudioController extends Controller
 
         $this->authorizeChargeCategory($request, $feeCategory);
 
-        $campusId = $request->user()?->can('view_finance_all_campus') ? null : (int) session('current_campus_id');
+        $campusId = $campusScope->assertCurrent((int) ($scope['campus_id'] ?? 0));
 
         $currentByKey = $this->recomputeOrFail(
             $userId, $token, BatchJobType::ChargeGeneration, $selectedKeys, $tokens,

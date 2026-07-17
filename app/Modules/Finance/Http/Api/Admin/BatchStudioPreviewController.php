@@ -13,6 +13,7 @@ use App\Modules\Finance\Queries\Batch\AssembleBatchChargePreviewQuery;
 use App\Modules\Finance\Queries\Batch\AssembleBatchDngPreviewQuery;
 use App\Modules\Finance\Queries\Batch\AssembleBatchReminderPreviewQuery;
 use App\Modules\Finance\Services\Batch\BatchPreviewTokenService;
+use App\Modules\Finance\Support\Batch\BatchChargeCampusScope;
 use App\Modules\Finance\Support\Batch\BatchJobType;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
@@ -26,13 +27,14 @@ class BatchStudioPreviewController extends Controller
     public function previewCharges(
         PreviewBatchChargesRequest $request,
         AssembleBatchChargePreviewQuery $assembler,
+        BatchChargeCampusScope $campusScope,
     ): JsonResponse {
         $feeCategory = (string) $request->input('fee_category');
         $semesterId = (int) $request->input('semester_id');
 
         $this->authorizeChargeCategory($request, $feeCategory);
 
-        $campusId = $request->user()?->can('view_finance_all_campus') ? null : (int) session('current_campus_id');
+        $campusId = $campusScope->currentId();
         $scope = $assembler->normalizeScope($feeCategory, $semesterId, (array) $request->input('scope', []));
 
         $result = $assembler->handle(
@@ -49,6 +51,7 @@ class BatchStudioPreviewController extends Controller
                 'fee_category' => $feeCategory,
                 'semester_id' => $semesterId,
                 'scope' => $scope,
+                'campus_id' => $campusId,
             ],
             $result['lines'],
         );
