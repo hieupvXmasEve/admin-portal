@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Web\ClassSessionController;
+use App\Modules\Academic\Http\Web\BulkUpdateClassSessionAttendanceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -62,6 +63,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('class-sessions/{classSession}/generate-attendance', [ClassSessionController::class, 'generateAttendance'])
         ->middleware('can:generate_class_session_attendance')
         ->name('class-sessions.generate-attendance');
+
+    Route::post('class-sessions/{classSession}/attendance/bulk-update', BulkUpdateClassSessionAttendanceController::class)
+        ->middleware('can:edit_class_session')
+        ->name('class-sessions.attendance.bulk-update');
 
     // Export attendance to CSV
     Route::get('class-sessions/{classSession}/export-attendance', [ClassSessionController::class, 'exportAttendance'])

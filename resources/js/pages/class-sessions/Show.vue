@@ -6,22 +6,17 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useApi } from '@/composables/useApiRequest';
 import { createColumns } from '@/lib/table-utils';
 import type { Attendance, ClassSession, Student } from '@/types/models';
 import { formatDate, formatDateTimeToFull } from '@/utils/date';
-import { Head, router } from '@inertiajs/vue3';
+import { Head, router, useForm } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { toTypedSchema } from '@vee-validate/zod';
 import { AlertCircle, ArrowLeft, Calendar, CheckSquare, Edit, MapPin, UserPlus, Users, Video, X } from 'lucide-vue-next';
-import { useForm } from 'vee-validate';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
-import { z } from 'zod';
 
 interface Props {
     session: ClassSession;
@@ -35,8 +30,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
-const { post: apiCall } = useApi();
 
 // Filter state - Initialize with props or defaults
 const filters = ref({
@@ -92,7 +85,6 @@ const data = computed(() => props.attendanceData || []);
 
 // Bulk update modal state
 const showBulkUpdateModal = ref(false);
-const loading = ref(false);
 
 // Ref to track selected rows to clear after update
 const selectedRows = ref<Attendance[]>([]);
@@ -100,20 +92,12 @@ const selectedRows = ref<Attendance[]>([]);
 // DataTable ref for clearing selection
 const dataTableRef = ref<any>(null);
 
-// Form schema for bulk update
-const formSchema = toTypedSchema(
-    z.object({
-        status: z.string().min(1, 'Status is required'),
-        attendanceIds: z.array(z.number()).min(1, 'At least one attendance record must be selected'),
-    }),
-);
-
-const { handleSubmit, values, setFieldValue, resetForm } = useForm({
-    validationSchema: formSchema,
-    initialValues: {
-        status: '',
-        attendanceIds: [],
-    },
+const bulkUpdateForm = useForm<{
+    attendance_ids: number[];
+    status: Attendance['status'] | '';
+}>({
+    attendance_ids: [],
+    status: '',
 });
 
 // Selected attendance count for UI
@@ -125,50 +109,32 @@ const handleSelectionChange = (selectedRowsData: Attendance[]) => {
     const attendanceIds = selectedRowsData.map((attendance) => attendance.id).filter((id): id is number => id !== undefined);
 
     selectedAttendanceCount.value = attendanceIds.length;
-    setFieldValue('attendanceIds', attendanceIds);
+    bulkUpdateForm.attendance_ids = attendanceIds;
 };
 
 // Submit bulk update
-const onBulkUpdateSubmit = handleSubmit(async (values) => {
-    try {
-        loading.value = true;
+const onBulkUpdateSubmit = () => {
+    if (!bulkUpdateForm.attendance_ids.length) {
+        toast.error('Select at least one attendance record');
+        return;
+    }
 
-        const result = await apiCall('/api/attendance/bulk-update', {
-            attendance_ids: values.attendanceIds,
-            status: values.status,
-        });
-
-        if (result.error.value) {
-            console.error('API Error:', result.error.value);
-            throw new Error('Failed to update attendance records');
-        }
-
-        if (result.data.value?.success) {
-            toast.success(result.data.value.message || 'Attendance records updated successfully');
+    bulkUpdateForm.post(route('class-sessions.attendance.bulk-update', props.session.id), {
+        preserveScroll: true,
+        only: ['attendanceData', 'session'],
+        onSuccess: () => {
             showBulkUpdateModal.value = false;
-            resetForm();
+            bulkUpdateForm.reset();
 
-            // Clear table selection
             if (dataTableRef.value?.clearSelection) {
                 dataTableRef.value.clearSelection();
             }
 
-            router.reload({
-                only: ['attendanceData', 'session'],
-                onSuccess: () => {
-                    // Clear selection after reload
-                    selectedAttendanceCount.value = 0;
-                    selectedRows.value = [];
-                },
-            });
+            selectedAttendanceCount.value = 0;
+            selectedRows.value = [];
         }
-    } catch (error) {
-        console.error('Failed to update attendance records:', error);
-        toast.error('Failed to update attendance records');
-    } finally {
-        loading.value = false;
-    }
-});
+    });
+};
 
 const openBulkUpdateModal = () => {
     if (selectedAttendanceCount.value === 0) {
@@ -180,8 +146,8 @@ const openBulkUpdateModal = () => {
 
 const closeBulkUpdateModal = () => {
     showBulkUpdateModal.value = false;
-    // Only reset form fields, keep selection data intact
-    setFieldValue('status', '');
+    bulkUpdateForm.status = '';
+    bulkUpdateForm.clearErrors();
 };
 
 // Column definitions for the data table
@@ -587,31 +553,28 @@ const generateAttendance = () => {
                     <DialogDescription> Update attendance status for {{ selectedAttendanceCount }} selected student{{ selectedAttendanceCount !== 1 ? 's' : '' }} </DialogDescription>
                 </DialogHeader>
 
-                <form @submit="onBulkUpdateSubmit" class="space-y-6">
-                    <FormField v-slot="{ componentField }" name="status">
-                        <FormItem>
-                            <FormLabel>New Status</FormLabel>
-                            <FormControl>
-                                <Select v-bind="componentField">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select new status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="present">Present</SelectItem>
-                                        <SelectItem value="absent">Absent</SelectItem>
-                                        <SelectItem value="late">Late</SelectItem>
-                                        <SelectItem value="excused">Excused</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                <form class="space-y-6" @submit.prevent="onBulkUpdateSubmit">
+                    <div class="space-y-2">
+                        <label for="bulk-attendance-status" class="text-sm font-medium">New Status</label>
+                        <Select v-model="bulkUpdateForm.status">
+                            <SelectTrigger id="bulk-attendance-status">
+                                <SelectValue placeholder="Select new status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="present">Present</SelectItem>
+                                <SelectItem value="absent">Absent</SelectItem>
+                                <SelectItem value="late">Late</SelectItem>
+                                <SelectItem value="excused">Excused</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p v-if="bulkUpdateForm.errors.status" class="text-destructive text-sm">{{ bulkUpdateForm.errors.status }}</p>
+                        <p v-if="bulkUpdateForm.errors.attendance_ids" class="text-destructive text-sm">{{ bulkUpdateForm.errors.attendance_ids }}</p>
+                    </div>
 
                     <DialogFooter>
                         <Button type="button" variant="outline" @click="closeBulkUpdateModal"> Cancel </Button>
-                        <Button type="submit" :disabled="loading || !values.status">
-                            {{ loading ? 'Updating...' : `Update ${selectedAttendanceCount} Record${selectedAttendanceCount !== 1 ? 's' : ''}` }}
+                        <Button type="submit" :disabled="bulkUpdateForm.processing || !bulkUpdateForm.status">
+                            {{ bulkUpdateForm.processing ? 'Updating...' : `Update ${selectedAttendanceCount} Record${selectedAttendanceCount !== 1 ? 's' : ''}` }}
                         </Button>
                     </DialogFooter>
                 </form>
