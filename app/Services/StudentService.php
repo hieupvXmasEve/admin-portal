@@ -21,6 +21,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
+use Throwable;
 
 class StudentService
 {
@@ -111,7 +113,10 @@ class StudentService
      */
     public function updateStudent(Student $student, array $data): Student
     {
-        return DB::transaction(function () use ($student, $data) {
+        $parentEmailWasProvided = array_key_exists('parent_email', $data);
+        $newParentEmail = null;
+
+        $updatedStudent = DB::transaction(function () use ($student, $data, $parentEmailWasProvided, &$newParentEmail) {
             // Extract parent user data if provided
             $parentName = $data['parent_name'] ?? null;
             $parentEmail = $data['parent_email'] ?? null;
@@ -158,10 +163,29 @@ class StudentService
             // Handle parent user update/creation
             // Parent linking is handled via parents + parent_student tables
             if ($parentEmail !== null) {
-                $this->handleParentAssignment($student, $parentEmail, $parentName);
+                $parentEmail = strtolower(trim($parentEmail));
+                $currentPrimaryParent = $student->primaryParentProfile();
+                $parentUserAlreadyExists = User::query()
+                    ->where('email', $parentEmail)
+                    ->exists();
+                $assignedParent = $this->handleParentAssignment($student, $parentEmail, $parentName);
+
+                if ($currentPrimaryParent && $currentPrimaryParent->id !== $assignedParent->id) {
+                    $this->detachAndRevokeParentAccess($currentPrimaryParent, $student);
+                }
+
+                if (! $parentUserAlreadyExists) {
+                    $newParentEmail = $parentEmail;
+                }
+            } elseif ($parentEmailWasProvided) {
+                $currentPrimaryParent = $student->primaryParentProfile();
+
+                if ($currentPrimaryParent) {
+                    $this->detachAndRevokeParentAccess($currentPrimaryParent, $student);
+                }
             } elseif ($parentName !== null) {
                 // If only name provided, update name of existing parent profile linked to this student
-                $parentProfile = $student->parentProfiles()->first();
+                $parentProfile = $student->primaryParentProfile();
                 if ($parentProfile) {
                     $parentProfile->update(['full_name' => $parentName]);
                     // Also update the user name
@@ -185,6 +209,12 @@ class StudentService
 
             return $student;
         });
+
+        if ($newParentEmail !== null) {
+            $this->sendParentPasswordSetupLink($newParentEmail);
+        }
+
+        return $updatedStudent;
     }
 
     /**
@@ -773,7 +803,7 @@ class StudentService
         string $relationship = 'guardian',
         bool $isPrimary = true,
         ?string $parentPhone = null,
-    ): void {
+    ): ParentProfile {
         // Normalize email
         $parentEmail = strtolower(trim($parentEmail));
 
@@ -784,7 +814,7 @@ class StudentService
                 'email' => $parentEmail,
             ]);
 
-            return;
+            throw new Exception('Sinh viên không thể tự gán chính mình làm phụ huynh.');
         }
 
         // Each Guardian email maps to exactly one Parent account. Find-or-create
@@ -792,7 +822,7 @@ class StudentService
         // several guardians (distinct emails), of which one is primary — so we no
         // longer overwrite "the student's first parent"; that conflated distinct
         // guardians and broke multi-guardian approval.
-        $this->assignParentByEmail($student, $parentEmail, $parentName, $relationship, $isPrimary, $parentPhone);
+        return $this->assignParentByEmail($student, $parentEmail, $parentName, $relationship, $isPrimary, $parentPhone);
     }
 
     /**
@@ -805,7 +835,7 @@ class StudentService
         string $relationship = 'guardian',
         bool $isPrimary = true,
         ?string $parentPhone = null,
-    ): void {
+    ): ParentProfile {
         $parentUser = User::where('email', $parentEmail)->first();
 
         if ($parentUser) {
@@ -829,6 +859,8 @@ class StudentService
 
         $parentProfile = $this->ensureParentProfile($parentUser, $parentName, $parentEmail, $parentPhone);
         $this->linkParentToStudent($parentProfile, $student, $relationship, $isPrimary);
+
+        return $parentProfile;
     }
 
     /**
@@ -864,8 +896,14 @@ class StudentService
             );
         }
 
+        if ($parentUser->isService()) {
+            throw new Exception(
+                'Không thể sử dụng email này làm phụ huynh. Email này thuộc về tài khoản dịch vụ.'
+            );
+        }
+
         // Check if this parent already exists and is linked to another student (via parent_student table)
-        $parentProfile = ParentProfile::where('user_id', $parentUser->id)->first();
+        $parentProfile = ParentProfile::withTrashed()->where('user_id', $parentUser->id)->first();
         if ($parentProfile) {
             $existingStudentViaParentStudent = DB::table('parent_student')
                 ->where('parent_id', $parentProfile->id)
@@ -887,7 +925,7 @@ class StudentService
      */
     private function ensureParentProfile(User $parentUser, ?string $parentName, string $parentEmail, ?string $parentPhone = null): ParentProfile
     {
-        $parentProfile = ParentProfile::where('user_id', $parentUser->id)->first();
+        $parentProfile = ParentProfile::withTrashed()->where('user_id', $parentUser->id)->first();
 
         if (! $parentProfile) {
             // Create new ParentProfile
@@ -904,18 +942,61 @@ class StudentService
                 'user_id' => $parentUser->id,
             ]);
         } else {
-            // Update existing ParentProfile if name / phone is provided
+            if ($parentProfile->trashed()) {
+                $parentProfile->restore();
+            }
+
+            // Keep the snapshot current and reactivate profiles reused for a new assignment.
             $updates = array_filter([
                 'full_name' => $parentName,
                 'phone' => $parentPhone,
             ], fn ($value) => $value !== null);
+            $updates['email_snapshot'] = $parentEmail;
+            $updates['status'] = 'active';
 
-            if (! empty($updates)) {
-                $parentProfile->update($updates);
-            }
+            $parentProfile->update($updates);
         }
 
         return $parentProfile;
+    }
+
+    /**
+     * Remove a primary parent from this student and revoke their portal access
+     * when they are no longer linked to any student.
+     */
+    private function detachAndRevokeParentAccess(ParentProfile $parentProfile, Student $student): void
+    {
+        $parentProfile->students()->detach($student->id);
+
+        if ($parentProfile->students()->exists()) {
+            return;
+        }
+
+        $parentProfile->user?->tokens()->delete();
+        $parentProfile->update(['status' => 'inactive']);
+    }
+
+    /**
+     * Send a one-time password setup link only after the parent account has
+     * committed, so a failed notification never rolls back the student update.
+     */
+    private function sendParentPasswordSetupLink(string $parentEmail): void
+    {
+        try {
+            $status = Password::sendResetLink(['email' => $parentEmail]);
+
+            if ($status !== Password::RESET_LINK_SENT) {
+                Log::warning('Could not send parent password setup link', [
+                    'email' => $parentEmail,
+                    'status' => $status,
+                ]);
+            }
+        } catch (Throwable $exception) {
+            Log::warning('Could not send parent password setup link', [
+                'email' => $parentEmail,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     /**

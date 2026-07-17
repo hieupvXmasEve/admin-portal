@@ -184,8 +184,8 @@ class StudentController extends Controller
             ->get(['id', 'version_code']);
 
         // Get primary parent info for the form
-        $primaryParent = $student->parentProfiles->first();
-        $student->setAttribute('parent_user', $primaryParent?->user);
+        $primaryParent = $student->primaryParentProfile();
+        $student->setRelation('parentUser', $primaryParent?->user);
 
         return Inertia::render('students/Edit', [
             'student' => $student,

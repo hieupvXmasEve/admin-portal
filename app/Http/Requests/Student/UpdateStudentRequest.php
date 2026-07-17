@@ -95,22 +95,51 @@ class UpdateStudentRequest extends FormRequest
             'max:255',
         ];
 
-        // Get current parent user ID from parent_student table
-        $currentParentUserId = $this->getCurrentParentUserId($student);
-
         // Custom validation: Check if email is already used by another student's parent
         // One user can only be parent of one student
-        $parentEmailRules[] = function ($attribute, $value, $fail) use ($studentId) {
+        $parentEmailRules[] = function ($attribute, $value, $fail) use ($student, $studentId) {
             if (empty($value)) {
                 return; // Skip validation if empty (nullable)
             }
 
+            $parentEmail = strtolower(trim($value));
+
+            if ($parentEmail === strtolower(trim((string) $student->email))) {
+                $fail('Sinh viên không thể tự gán chính mình làm phụ huynh.');
+
+                return;
+            }
+
             // Find user by email
-            $user = User::where('email', $value)->first();
+            $user = User::where('email', $parentEmail)->first();
 
             if ($user) {
+                if ($user->isStudent()) {
+                    $fail('Không thể sử dụng email này làm phụ huynh. Email này thuộc về tài khoản sinh viên.');
+
+                    return;
+                }
+
+                if ($user->isLecturer()) {
+                    $fail('Không thể sử dụng email này làm phụ huynh. Email này thuộc về tài khoản giảng viên.');
+
+                    return;
+                }
+
+                if ($user->isStaff()) {
+                    $fail('Không thể sử dụng email này làm phụ huynh. Email này thuộc về tài khoản nhân viên.');
+
+                    return;
+                }
+
+                if ($user->isService()) {
+                    $fail('Không thể sử dụng email này làm phụ huynh. Email này thuộc về tài khoản dịch vụ.');
+
+                    return;
+                }
+
                 // Check if this user already has a ParentProfile linked to another student
-                $parentProfile = ParentProfile::where('user_id', $user->id)->first();
+                $parentProfile = ParentProfile::withTrashed()->where('user_id', $user->id)->first();
 
                 if ($parentProfile) {
                     $existingLink = DB::table('parent_student')
@@ -125,25 +154,9 @@ class UpdateStudentRequest extends FormRequest
             }
         };
 
-        // Validate email uniqueness in users table (but allow if it's the current parent)
-        if ($currentParentUserId) {
-            // Student has a parent user - validate unique but ignore current parent
-            $parentEmailRules[] = Rule::unique('users', 'email')->ignore($currentParentUserId);
-        }
-
         $rules['parent_email'] = $parentEmailRules;
 
         return $rules;
-    }
-
-    /**
-     * Get the current parent user ID from parent_student table
-     */
-    private function getCurrentParentUserId(Student $student): ?int
-    {
-        $parentProfile = $student->parentProfiles()->first();
-
-        return $parentProfile?->user_id;
     }
 
     public function messages(): array
