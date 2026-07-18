@@ -9,6 +9,7 @@ use App\Models\CourseOffering;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Modules\Academic\Progression\Models\TranscriptEntry;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -56,7 +57,7 @@ beforeEach(function () {
             'campus_id' => $this->campus->id,
         ]);
 
-        return AcademicRecord::factory()->create(array_merge([
+        $record = AcademicRecord::factory()->create(array_merge([
             'student_id' => $this->student->id,
             'semester_id' => $semester->id,
             'unit_id' => $unit->id,
@@ -68,6 +69,32 @@ beforeEach(function () {
             'excluded_from_gpa' => false,
             'is_passed' => true,
         ], $overrides));
+
+        if ($record->grade_status === 'final') {
+            TranscriptEntry::query()->create([
+                'course_result_id' => $record->id,
+                'student_id' => $record->student_id,
+                'course_offering_id' => $record->course_offering_id,
+                'semester_id' => $record->semester_id,
+                'unit_id' => $record->unit_id,
+                'program_id' => $record->program_id,
+                'campus_id' => $record->campus_id,
+                'attempt_number' => $record->attempt_number ?? 1,
+                'final_percentage' => $record->final_percentage,
+                'final_letter_grade' => $record->final_letter_grade,
+                'credit_points' => $record->credit_points,
+                'credit_points_earned' => $record->is_passed ? $record->credit_points : 0,
+                'quality_points' => (float) $record->final_percentage * (float) $record->credit_points,
+                'is_passed' => $record->is_passed,
+                'excluded_from_gpa' => $record->excluded_from_gpa,
+                'affects_academic_standing' => true,
+                'affects_graduation_requirement' => true,
+                'satisfies_prerequisite' => $record->is_passed,
+                'finalized_at' => now(),
+            ]);
+        }
+
+        return $record;
     };
 });
 

@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Actions\Academic;
 
-use App\Models\AcademicRecord;
-use App\Models\Semester;
 use App\Models\Student;
+use App\Shared\Contracts\Academic\TranscriptEntryGpaReader;
 
 class CalculateCumulativeGpaAction
 {
+    public function __construct(private readonly TranscriptEntryGpaReader $transcriptEntries) {}
+
     /**
      * Calculate cumulative GPA for a student up to (and including) a specific semester.
      *
@@ -19,24 +20,7 @@ class CalculateCumulativeGpaAction
      */
     public function execute(Student $student, int|string|null $upToSemesterId = null): array
     {
-        $query = AcademicRecord::query()
-            ->where('student_id', $student->id)
-            ->where('excluded_from_gpa', false)
-            ->where('credit_points', '>', 0)
-            ->where('grade_status', 'final');
-
-        if ($upToSemesterId !== null) {
-            $target = Semester::find($upToSemesterId);
-            if ($target && $target->start_date) {
-                $query->whereHas('semester', function ($q) use ($target) {
-                    $q->where('start_date', '<=', $target->start_date);
-                });
-            } else {
-                $query->where('semester_id', '<=', $upToSemesterId);
-            }
-        }
-
-        $records = $query->get();
+        $records = collect($this->transcriptEntries->throughSemester($student->id, $upToSemesterId));
 
         if ($records->isEmpty()) {
             return [
@@ -48,10 +32,10 @@ class CalculateCumulativeGpaAction
         }
 
         $totalQualityPoints = $records->sum(function ($record) {
-            return (float) $record->final_percentage * (float) $record->credit_points;
+            return $record->finalPercentage * $record->creditPoints;
         });
-        $totalCreditPoints = (float) $records->sum('credit_points');
-        $creditPointsEarned = (float) $records->where('is_passed', true)->sum('credit_points');
+        $totalCreditPoints = (float) $records->sum('creditPoints');
+        $creditPointsEarned = (float) $records->where('isPassed', true)->sum('creditPoints');
 
         $gpa = $totalCreditPoints > 0 ? $totalQualityPoints / $totalCreditPoints : 0.0;
 

@@ -6,6 +6,7 @@ namespace App\Modules\Academic\Actions;
 
 use App\Models\CourseOffering;
 use App\Services\CourseCompletionService;
+use App\Shared\Contracts\Academic\CourseResultTranscriptCommitter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -98,6 +99,10 @@ class MarkCourseOfferingCompletedAction
 
                 // Finalize course with all validations and EGC progression
                 $result = app(CourseCompletionService::class)->finalizeCourse($courseOffering, $recalculate, $dryRun, $finalPercentageOverrides);
+
+                if (! $dryRun) {
+                    app(CourseResultTranscriptCommitter::class)->commitForCourseOffering($courseOffering->id);
+                }
 
                 // Update course offering status (only if not already completed, never on a dry run)
                 if (! $dryRun && $courseOffering->course_status !== 'completed') {

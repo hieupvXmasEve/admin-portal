@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Actions\Academic;
 
-use App\Models\AcademicRecord;
 use App\Models\Student;
+use App\Shared\Contracts\Academic\TranscriptEntryGpaReader;
 
 class CalculateStudentSemesterGpaAction
 {
+    public function __construct(private readonly TranscriptEntryGpaReader $transcriptEntries) {}
+
     /**
      * Calculate GPA for a student in a specific semester (100-point scale).
      * Every final, credit-bearing attempt counts — including failed attempts
@@ -17,12 +19,7 @@ class CalculateStudentSemesterGpaAction
      */
     public function execute(Student $student, int|string $semesterId): array
     {
-        $records = AcademicRecord::where('student_id', $student->id)
-            ->where('semester_id', $semesterId)
-            ->where('excluded_from_gpa', false)
-            ->where('credit_points', '>', 0)
-            ->where('grade_status', 'final')
-            ->get();
+        $records = collect($this->transcriptEntries->forSemester($student->id, $semesterId));
 
         if ($records->isEmpty()) {
             return [
@@ -34,10 +31,10 @@ class CalculateStudentSemesterGpaAction
         }
 
         $totalQualityPoints = $records->sum(function ($record) {
-            return (float) $record->final_percentage * (float) $record->credit_points;
+            return $record->finalPercentage * $record->creditPoints;
         });
-        $totalCreditPoints = (float) $records->sum('credit_points');
-        $creditPointsEarned = (float) $records->where('is_passed', true)->sum('credit_points');
+        $totalCreditPoints = (float) $records->sum('creditPoints');
+        $creditPointsEarned = (float) $records->where('isPassed', true)->sum('creditPoints');
 
         $gpa = $totalCreditPoints > 0 ? $totalQualityPoints / $totalCreditPoints : 0.0;
 

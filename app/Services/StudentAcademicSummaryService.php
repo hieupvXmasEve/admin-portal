@@ -12,6 +12,7 @@ use App\Models\GpaCalculation;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Modules\Academic\Progression\Models\TranscriptEntry;
 use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use Carbon\Carbon;
@@ -1315,8 +1316,8 @@ class StudentAcademicSummaryService
         // Get completed, passed academic records (earned credit). "Earned" mirrors
         // getCreditPointSnapshots: a passed record (is_passed), not a non-existent
         // grade_status='passing' enum value that would silently match nothing.
-        $completedRecords = $student->academicRecords()
-            ->where('completion_status', 'completed')
+        $completedRecords = TranscriptEntry::query()
+            ->where('student_id', $student->id)
             ->where('is_passed', true)
             ->with('unit')
             ->get();

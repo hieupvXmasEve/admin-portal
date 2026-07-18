@@ -12,6 +12,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
+use App\Modules\Academic\Progression\Models\TranscriptEntry;
 use App\Services\PermissionService;
 use App\Services\StudentAcademicSummaryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -56,7 +57,7 @@ function recordPassingCredit(Student $student, Unit $unit, Semester $semester, f
         'campus_id' => $student->campus_id,
     ]);
 
-    AcademicRecord::factory()->create([
+    $courseResult = AcademicRecord::factory()->create([
         'student_id' => $student->id,
         'unit_id' => $unit->id,
         'semester_id' => $semester->id,
@@ -68,6 +69,28 @@ function recordPassingCredit(Student $student, Unit $unit, Semester $semester, f
         'completion_status' => 'completed',
         'grade_status' => 'final',
         'is_passed' => true,
+    ]);
+
+    TranscriptEntry::query()->create([
+        'course_result_id' => $courseResult->id,
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $semester->id,
+        'unit_id' => $unit->id,
+        'program_id' => $student->program_id,
+        'campus_id' => $student->campus_id,
+        'attempt_number' => 1,
+        'final_percentage' => 80,
+        'final_letter_grade' => 'D',
+        'credit_points' => $creditsEarned,
+        'credit_points_earned' => $creditsEarned,
+        'quality_points' => 80 * $creditsEarned,
+        'is_passed' => true,
+        'excluded_from_gpa' => false,
+        'affects_academic_standing' => true,
+        'affects_graduation_requirement' => true,
+        'satisfies_prerequisite' => true,
+        'finalized_at' => now(),
     ]);
 }
 

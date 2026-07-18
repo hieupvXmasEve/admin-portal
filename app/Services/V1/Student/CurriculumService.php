@@ -9,6 +9,7 @@ use App\Models\Student;
 use App\Models\Unit;
 use App\Models\UnitPrerequisiteCondition;
 use App\Models\UnitPrerequisiteGroup;
+use App\Modules\Academic\Progression\Models\TranscriptEntry;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -170,8 +171,9 @@ class CurriculumService
             ]);
 
             // Get passed unit IDs based on academic records
-            $passedUnitIds = $student->academicRecords()
-                ->where('completion_status', 'completed')
+            $passedUnitIds = TranscriptEntry::query()
+                ->where('student_id', $student->id)
+                ->where('is_passed', true)
                 ->pluck('unit_id')
                 ->unique();
 
@@ -279,7 +281,8 @@ class CurriculumService
      */
     protected function getAcademicRecords(Student $student): Collection
     {
-        return $student->academicRecords()
+        return TranscriptEntry::query()
+            ->where('student_id', $student->id)
             ->with(['unit', 'semester', 'courseOffering'])
             ->get();
     }
@@ -292,7 +295,7 @@ class CurriculumService
         return $student->courseRegistrations()
             ->with([
                 'courseOffering.unit',
-                'semester'
+                'semester',
             ])
             ->get();
     }
@@ -382,8 +385,8 @@ class CurriculumService
             })
                 // Sort by: 1) has registration first, 2) then by unit code
                 ->sortBy([
-                    fn($subject) => !$subject['has_registration'], // Registered subjects first
-                    fn($subject) => $subject['unit']['code'], // Then alphabetically by code
+                    fn ($subject) => ! $subject['has_registration'], // Registered subjects first
+                    fn ($subject) => $subject['unit']['code'], // Then alphabetically by code
                 ])
                 ->values()
                 ->toArray();
@@ -428,6 +431,7 @@ class CurriculumService
             if ($a['semester_info']['year_level'] !== $b['semester_info']['year_level']) {
                 return $a['semester_info']['year_level'] <=> $b['semester_info']['year_level'];
             }
+
             return $a['semester_info']['semester_number'] <=> $b['semester_info']['semester_number'];
         });
 
@@ -519,7 +523,7 @@ class CurriculumService
      */
     protected function getGradeInfo($academicRecord): ?array
     {
-        if (!$academicRecord) {
+        if (! $academicRecord) {
             return null;
         }
 
@@ -544,7 +548,7 @@ class CurriculumService
             'by_year_level' => $this->groupByYearLevel($curriculumUnits),
             'by_semester' => $this->groupBySemester($curriculumUnits),
             'total_units' => $curriculumUnits->count(),
-            'total_credit_hours' => $curriculumUnits->sum(fn($cu) => $cu->unit->credit_points ?? 0),
+            'total_credit_hours' => $curriculumUnits->sum(fn ($cu) => $cu->unit->credit_points ?? 0),
         ];
     }
 
@@ -558,9 +562,9 @@ class CurriculumService
         $currentCount = $currentEnrollments->count();
         $remainingCount = $totalUnits - $completedCount - $currentCount;
 
-        $totalCredits = $curriculumUnits->sum(fn($cu) => $cu->unit->credit_points ?? 0);
-        $completedCredits = $curriculumUnits->whereIn('unit_id', $completedUnits->pluck('id'))->sum(fn($cu) => $cu->unit->credit_points ?? 0);
-        $currentCredits = $curriculumUnits->whereIn('unit_id', $currentEnrollments->pluck('id'))->sum(fn($cu) => $cu->unit->credit_points ?? 0);
+        $totalCredits = $curriculumUnits->sum(fn ($cu) => $cu->unit->credit_points ?? 0);
+        $completedCredits = $curriculumUnits->whereIn('unit_id', $completedUnits->pluck('id'))->sum(fn ($cu) => $cu->unit->credit_points ?? 0);
+        $currentCredits = $curriculumUnits->whereIn('unit_id', $currentEnrollments->pluck('id'))->sum(fn ($cu) => $cu->unit->credit_points ?? 0);
 
         return [
             'units' => [
@@ -624,7 +628,7 @@ class CurriculumService
                         'required_unit_id' => $condition->required_unit_id,
                     ];
                 });
-            })->filter(fn($item) => $item['unit'] !== null);
+            })->filter(fn ($item) => $item['unit'] !== null);
 
             $tree[] = [
                 'unit' => [
@@ -770,8 +774,8 @@ class CurriculumService
         return [
             'total_units' => $coreUnits->count(),
             'completed_units' => $coreUnits->whereIn('unit_id', $completedUnitIds)->count(),
-            'total_credits' => $coreUnits->sum(fn($cu) => $cu->unit->credit_points ?? 0),
-            'completed_credits' => $coreUnits->whereIn('unit_id', $completedUnitIds)->sum(fn($cu) => $cu->unit->credit_points ?? 0),
+            'total_credits' => $coreUnits->sum(fn ($cu) => $cu->unit->credit_points ?? 0),
+            'completed_credits' => $coreUnits->whereIn('unit_id', $completedUnitIds)->sum(fn ($cu) => $cu->unit->credit_points ?? 0),
             'units' => $coreUnits->map(function ($curriculumUnit) use ($completedUnitIds) {
                 return [
                     'unit' => [
@@ -799,8 +803,8 @@ class CurriculumService
         return [
             'total_units' => $electiveUnits->count(),
             'completed_units' => $electiveUnits->whereIn('unit_id', $completedUnitIds)->count(),
-            'total_credits' => $electiveUnits->sum(fn($cu) => $cu->unit->credit_points ?? 0),
-            'completed_credits' => $electiveUnits->whereIn('unit_id', $completedUnitIds)->sum(fn($cu) => $cu->unit->credit_points ?? 0),
+            'total_credits' => $electiveUnits->sum(fn ($cu) => $cu->unit->credit_points ?? 0),
+            'completed_credits' => $electiveUnits->whereIn('unit_id', $completedUnitIds)->sum(fn ($cu) => $cu->unit->credit_points ?? 0),
             'units' => $electiveUnits->map(function ($curriculumUnit) use ($completedUnitIds) {
                 return [
                     'unit' => [
@@ -828,8 +832,8 @@ class CurriculumService
         return [
             'total_units' => $specializationUnits->count(),
             'completed_units' => $specializationUnits->whereIn('unit_id', $completedUnitIds)->count(),
-            'total_credits' => $specializationUnits->sum(fn($cu) => $cu->unit->credit_points ?? 0),
-            'completed_credits' => $specializationUnits->whereIn('unit_id', $completedUnitIds)->sum(fn($cu) => $cu->unit->credit_points ?? 0),
+            'total_credits' => $specializationUnits->sum(fn ($cu) => $cu->unit->credit_points ?? 0),
+            'completed_credits' => $specializationUnits->whereIn('unit_id', $completedUnitIds)->sum(fn ($cu) => $cu->unit->credit_points ?? 0),
             'units' => $specializationUnits->map(function ($curriculumUnit) use ($completedUnitIds) {
                 return [
                     'unit' => [
@@ -861,8 +865,8 @@ class CurriculumService
         return [
             'total_units' => $genEdUnits->count(),
             'completed_units' => $genEdUnits->whereIn('unit_id', $completedUnitIds)->count(),
-            'total_credits' => $genEdUnits->sum(fn($cu) => $cu->unit->credit_points ?? 0),
-            'completed_credits' => $genEdUnits->whereIn('unit_id', $completedUnitIds)->sum(fn($cu) => $cu->unit->credit_points ?? 0),
+            'total_credits' => $genEdUnits->sum(fn ($cu) => $cu->unit->credit_points ?? 0),
+            'completed_credits' => $genEdUnits->whereIn('unit_id', $completedUnitIds)->sum(fn ($cu) => $cu->unit->credit_points ?? 0),
             'units' => $genEdUnits->map(function ($curriculumUnit) use ($completedUnitIds) {
                 return [
                     'unit' => [
@@ -887,8 +891,8 @@ class CurriculumService
         $completedUnitIds = $completedUnits->pluck('id');
 
         return $curriculumUnits->groupBy('unit_scope')->map(function ($categoryUnits, $category) use ($completedUnitIds) {
-            $totalCredits = $categoryUnits->sum(fn($cu) => $cu->unit->credit_points ?? 0);
-            $completedCredits = $categoryUnits->whereIn('unit_id', $completedUnitIds)->sum(fn($cu) => $cu->unit->credit_points ?? 0);
+            $totalCredits = $categoryUnits->sum(fn ($cu) => $cu->unit->credit_points ?? 0);
+            $completedCredits = $categoryUnits->whereIn('unit_id', $completedUnitIds)->sum(fn ($cu) => $cu->unit->credit_points ?? 0);
 
             return [
                 'category' => $category ?? 'unknown',
@@ -906,9 +910,10 @@ class CurriculumService
     protected function getGraduationRequirements(Student $student): array
     {
         $curriculumVersion = $student->curriculumVersion;
-        $completedCredits = $student->academicRecords()
-            ->where('completion_status', 'completed')
-            ->sum('credit_hours_earned');
+        $completedCredits = TranscriptEntry::query()
+            ->where('student_id', $student->id)
+            ->where('is_passed', true)
+            ->sum('credit_points_earned');
 
         return [
             'total_credits_required' => $curriculumVersion->total_credit_hours,
@@ -1028,6 +1033,7 @@ class CurriculumService
     protected function isUnitAvailableWithGroups(Unit $unit, Collection $completedUnitIds): bool
     {
         $prerequisiteGroups = $unit->prerequisiteGroups ?? collect();
+
         return $this->arePrerequisitesMetWithGroups($prerequisiteGroups, $completedUnitIds);
     }
 
@@ -1062,7 +1068,7 @@ class CurriculumService
         foreach ($conditions as $condition) {
             $conditionMet = $this->isPrerequisiteConditionMet($condition, $completedUnitIds);
 
-            if ($operator === 'AND' && !$conditionMet) {
+            if ($operator === 'AND' && ! $conditionMet) {
                 return false;
             }
             if ($operator === 'OR' && $conditionMet) {
@@ -1093,7 +1099,7 @@ class CurriculumService
             foreach ($group->conditions as $condition) {
                 if ($condition->required_unit_id) {
                     $prereqUnit = $allUnits->where('unit_id', $condition->required_unit_id)->first();
-                    if ($prereqUnit instanceof \App\Models\CurriculumUnit) {
+                    if ($prereqUnit instanceof CurriculumUnit) {
                         $subChain = $this->buildPrerequisiteChainWithGroups($prereqUnit, $allUnits);
                         $chain = array_merge($subChain, $chain);
                     }
@@ -1127,7 +1133,8 @@ class CurriculumService
 
     protected function calculateSemestersCompleted(Student $student): int
     {
-        return $student->academicRecords()
+        return TranscriptEntry::query()
+            ->where('student_id', $student->id)
             ->select('semester_id')
             ->distinct()
             ->count();
@@ -1195,18 +1202,16 @@ class CurriculumService
     /**
      * Check if a unit is in the student's curriculum
      *
-     * @param Student $student
-     * @param int $unitId
      * @return array{is_in_curriculum: bool, curriculum_unit: ?CurriculumUnit, reason: string}
      */
     public function isUnitInStudentCurriculum(Student $student, int $unitId): array
     {
         // Check if student has curriculum version assigned
-        if (!$student->curriculum_version_id) {
+        if (! $student->curriculum_version_id) {
             return [
                 'is_in_curriculum' => false,
                 'curriculum_unit' => null,
-                'reason' => 'Student is not assigned to any curriculum version'
+                'reason' => 'Student is not assigned to any curriculum version',
             ];
         }
 
@@ -1216,27 +1221,23 @@ class CurriculumService
             ->with(['unit', 'curriculumVersion'])
             ->first();
 
-        if (!$curriculumUnit) {
+        if (! $curriculumUnit) {
             return [
                 'is_in_curriculum' => false,
                 'curriculum_unit' => null,
-                'reason' => 'Unit is not in the student\'s curriculum'
+                'reason' => 'Unit is not in the student\'s curriculum',
             ];
         }
 
         return [
             'is_in_curriculum' => true,
             'curriculum_unit' => $curriculumUnit,
-            'reason' => 'Unit is found in student\'s curriculum'
+            'reason' => 'Unit is found in student\'s curriculum',
         ];
     }
 
     /**
      * Check if a unit is in the student's curriculum (simple boolean version)
-     *
-     * @param Student $student
-     * @param int $unitId
-     * @return bool
      */
     public function isUnitInCurriculum(Student $student, int $unitId): bool
     {

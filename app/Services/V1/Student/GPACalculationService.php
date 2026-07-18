@@ -7,11 +7,13 @@ namespace App\Services\V1\Student;
 use App\Models\GpaCalculation;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Shared\Contracts\Academic\TranscriptEntryGpaReader;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 class GPACalculationService
 {
+    public function __construct(private readonly TranscriptEntryGpaReader $transcriptEntries) {}
+
     public function calculateCurrentGPA(Student $student): array
     {
         $gpaCalculation = GpaCalculation::query()
@@ -26,18 +28,12 @@ class GPACalculationService
                 'quality_points' => (float) $gpaCalculation->cumulative_quality_points,
                 'credit_hours_attempted' => (float) $gpaCalculation->cumulative_credit_points,
                 'credit_hours_earned' => (float) $gpaCalculation->cumulative_credit_points_earned,
-                'total_courses' => $student->academicRecords()
-                    ->where('completion_status', 'completed')
-                    ->where('excluded_from_gpa', false)
-                    ->count(),
+                'total_courses' => count($this->transcriptEntries->throughSemester($student->id, null)),
                 'from_stored_calculation' => true,
             ];
         }
 
-        $academicRecords = $student->academicRecords()
-            ->where('completion_status', 'completed')
-            ->where('excluded_from_gpa', false)
-            ->get();
+        $academicRecords = collect($this->transcriptEntries->throughSemester($student->id, null));
 
         if ($academicRecords->isEmpty()) {
             return [
@@ -49,9 +45,9 @@ class GPACalculationService
             ];
         }
 
-        $totalQualityPoints = $academicRecords->sum('quality_points');
-        $totalCreditPoints = $academicRecords->sum('credit_points');
-        $totalCreditPointsEarned = $academicRecords->sum('credit_points_earned');
+        $totalQualityPoints = $academicRecords->sum('qualityPoints');
+        $totalCreditPoints = $academicRecords->sum('creditPoints');
+        $totalCreditPointsEarned = $academicRecords->sum('creditPointsEarned');
 
         $gpa = $totalCreditPoints > 0 ? $totalQualityPoints / $totalCreditPoints : 0.0;
 
@@ -81,20 +77,12 @@ class GPACalculationService
                 'quality_points' => (float) $gpaCalculation->semester_quality_points,
                 'credit_hours' => (float) $gpaCalculation->semester_credit_points,
                 'earned_credits' => (float) $gpaCalculation->semester_credit_points_earned,
-                'courses_completed' => $student->academicRecords()
-                    ->where('semester_id', $semester->id)
-                    ->where('completion_status', 'completed')
-                    ->where('excluded_from_gpa', false)
-                    ->count(),
+                'courses_completed' => count($this->transcriptEntries->forSemester($student->id, $semester->id)),
                 'from_stored_calculation' => true,
             ];
         }
 
-        $academicRecords = $student->academicRecords()
-            ->where('semester_id', $semester->id)
-            ->where('completion_status', 'completed')
-            ->where('excluded_from_gpa', false)
-            ->get();
+        $academicRecords = collect($this->transcriptEntries->forSemester($student->id, $semester->id));
 
         if ($academicRecords->isEmpty()) {
             return [
@@ -108,9 +96,9 @@ class GPACalculationService
             ];
         }
 
-        $totalQualityPoints = $academicRecords->sum('quality_points');
-        $totalCreditPoints = $academicRecords->sum('credit_points');
-        $totalCreditPointsEarned = $academicRecords->sum('credit_points_earned');
+        $totalQualityPoints = $academicRecords->sum('qualityPoints');
+        $totalCreditPoints = $academicRecords->sum('creditPoints');
+        $totalCreditPointsEarned = $academicRecords->sum('creditPointsEarned');
 
         $gpa = $totalCreditPoints > 0 ? $totalQualityPoints / $totalCreditPoints : 0.0;
 
@@ -160,12 +148,9 @@ class GPACalculationService
      */
     public function getGradeDistribution(Student $student): array
     {
-        $gradeDistribution = $student->academicRecords()
-            ->where('completion_status', 'completed')
-            ->select('final_letter_grade', DB::raw('count(*) as count'))
-            ->groupBy('final_letter_grade')
-            ->pluck('count', 'final_letter_grade')
-            ->toArray();
+        $gradeDistribution = collect($this->transcriptEntries->throughSemester($student->id, null))
+            ->countBy('finalLetterGrade')
+            ->all();
 
         // Ensure all grade categories are present
         $standardGrades = ['HD', 'D', 'C', 'P', 'N', 'F'];
