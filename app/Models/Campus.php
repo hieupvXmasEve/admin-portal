@@ -4,22 +4,18 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Database\Factories\CampusFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Campus extends AuditableModel
 {
-    /** @use HasFactory<\Database\Factories\CampusFactory> */
+    /** @use HasFactory<CampusFactory> */
     use HasFactory;
 
-    protected $fillable = ['name', 'code', 'dng_code', 'address'];
+    protected $fillable = ['name', 'code', 'address'];
 
-    public function getDngCode(): ?string
-    {
-        $dngCode = trim((string) $this->dng_code);
-
-        return $dngCode !== '' ? $dngCode : null;
-    }
+    protected $hidden = ['dng_code'];
 
     public function emailConfigurations(): HasMany
     {

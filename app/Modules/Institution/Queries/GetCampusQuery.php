@@ -9,7 +9,7 @@ use App\Models\Campus;
 class GetCampusQuery
 {
     /**
-     * @return array{id: int, name: string, code: string, dng_code: string|null, address: string}
+     * @return array{id: int, name: string, code: string, address: string}
      */
     public function forEdit(int|string $campusId): array
     {
@@ -19,7 +19,6 @@ class GetCampusQuery
             'id' => (int) $campus->id,
             'name' => (string) $campus->name,
             'code' => (string) $campus->code,
-            'dng_code' => $campus->dng_code,
             'address' => (string) $campus->address,
         ];
     }

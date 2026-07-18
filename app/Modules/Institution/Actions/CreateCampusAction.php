@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Institution\Actions;
 
 use App\Models\Campus;
-use App\Shared\Contracts\Finance\LegacyDngCampusMappingWriter;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -13,7 +12,7 @@ use Illuminate\Support\Facades\Log;
 class CreateCampusAction
 {
     /**
-     * @param  array{name: string, code: string, dng_code?: string|null, address: string}  $data
+     * @param  array{name: string, code: string, address: string}  $data
      */
     public static function run(array $data): Campus
     {
@@ -22,18 +21,11 @@ class CreateCampusAction
         ]);
 
         $campus = DB::transaction(function () use ($data): Campus {
-            $campus = Campus::create([
+            return Campus::create([
                 'name' => $data['name'],
                 'code' => $data['code'],
                 'address' => $data['address'],
             ]);
-
-            app(LegacyDngCampusMappingWriter::class)->replace(
-                (int) $campus->id,
-                $data['dng_code'] ?? null,
-            );
-
-            return $campus;
         });
 
         self::invalidateCaches();

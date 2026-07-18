@@ -30,7 +30,7 @@ uses(RefreshDatabase::class);
 beforeEach(function (): void {
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
-    $this->campus = Campus::factory()->create(['dng_code' => 'FAUHN']);
+    $this->campus = Campus::factory()->withDngMapping('FAUHN')->create();
     $this->semester = Semester::factory()->create();
     $this->student = Student::factory()->forCampus($this->campus)->create([
         'intake' => 2024,

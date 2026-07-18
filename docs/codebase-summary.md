@@ -104,7 +104,7 @@ Current counts:
     - Permissions: `create_finance_payments`, `view_finance_dng_payment_requests`, `view_finance_dng_webhook_events`
     - Webhook event list is cross-campus; webhook detail access still validates linked request `campus_code` or orphan payload campus code
     - Webhook flow is inbox-first: controller stores raw callback immediately, queue processing applies checksum/business validation later, and event lifecycle now uses `received`, `processing`, `processed`, `failed_retryable`, `failed_terminal`, `mismatch`, `skipped`
-    - Campus mapping: `campuses.dng_code` is the per-campus source of truth for DNG `CampusCode`
+    - Campus mapping: Finance-owned `finance_dng_campus_mappings.provider_code` is the per-campus source of truth for DNG `CampusCode`; the legacy `campuses.dng_code` column remains only for a reversible cleanup step
     - Replacement rule: same `student + fee_type` keeps only one active unpaid DNG request locally; older unpaid requests move to `cancelled` only after the newer push succeeds
     - Cancelled requests are terminal for webhook/reconciliation processing
     - Student DNG request API now accepts `cancelled` in status filtering

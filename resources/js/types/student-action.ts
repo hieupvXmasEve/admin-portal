@@ -59,7 +59,6 @@ export interface Campus {
     id: number;
     name: string;
     code: string;
-    dng_code?: string | null;
 }
 
 export interface User {

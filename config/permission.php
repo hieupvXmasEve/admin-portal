@@ -414,6 +414,9 @@ return [
             // Pricing Operations (obligation v2 wave 1) — catalog rules only; types are code-owned
             'view_finance_pricing_operations' => 'view_finance_pricing_operations',
             'manage_finance_pricing_operations' => 'manage_finance_pricing_operations',
+            // DNG provider configuration is Finance-owned and scoped to the selected campus.
+            'view_finance_dng_campus_mappings' => 'view_finance_dng_campus_mappings',
+            'manage_finance_dng_campus_mappings' => 'manage_finance_dng_campus_mappings',
         ],
         'modules' => [
             'view_module' => 'view_module',

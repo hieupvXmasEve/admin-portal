@@ -5,6 +5,7 @@ use App\Modules\Finance\Http\Web\Admin\BatchStudioController;
 use App\Modules\Finance\Http\Web\Admin\BillingInvoiceController;
 use App\Modules\Finance\Http\Web\Admin\BillingOperationsController;
 use App\Modules\Finance\Http\Web\Admin\BillingSettlementController;
+use App\Modules\Finance\Http\Web\Admin\DngCampusMappingController;
 use App\Modules\Finance\Http\Web\Admin\DngPaymentRequestController;
 use App\Modules\Finance\Http\Web\Admin\DngReceiptExceptionController;
 use App\Modules\Finance\Http\Web\Admin\DngWebhookEventController;
@@ -268,6 +269,12 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
     });
 
     Route::prefix('dng')->name('dng.')->group(function () {
+        Route::get('/campus-mapping', [DngCampusMappingController::class, 'show'])
+            ->middleware('can:view_finance_dng_campus_mappings')
+            ->name('campus-mapping.show');
+        Route::put('/campus-mapping', [DngCampusMappingController::class, 'update'])
+            ->middleware('can:manage_finance_dng_campus_mappings')
+            ->name('campus-mapping.update');
         Route::get('/receipt-exceptions', [DngReceiptExceptionController::class, 'index'])
             ->middleware('can:view_finance_dng_receipt_exceptions')
             ->name('receipt-exceptions.index');

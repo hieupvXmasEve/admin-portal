@@ -11,7 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 it('uses configured campus dng codes for reconciliation', function () {
-    Campus::factory()->create(['dng_code' => 'FAUHN']);
+    Campus::factory()->withDngMapping('FAUHN')->create();
 
     $service = Mockery::mock(DngReconciliationService::class);
     $service->shouldReceive('reconcileDay')
@@ -29,7 +29,7 @@ it('uses configured campus dng codes for reconciliation', function () {
 });
 
 it('skips reconciliation when no campus dng code is configured', function () {
-    Campus::factory()->create(['dng_code' => null]);
+    Campus::factory()->create();
 
     $service = Mockery::mock(DngReconciliationService::class);
     $service->shouldNotReceive('reconcileDay');

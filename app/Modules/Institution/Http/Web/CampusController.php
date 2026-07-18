@@ -38,10 +38,7 @@ class CampusController extends Controller
 
     public function store(StoreCampusRequest $request): RedirectResponse
     {
-        CreateCampusAction::run([
-            ...$request->validated(),
-            'dng_code' => $request->input('dng_code'),
-        ]);
+        CreateCampusAction::run($request->validated());
 
         Inertia::flash('message', 'Campus created successfully.');
 
@@ -60,7 +57,6 @@ class CampusController extends Controller
         UpdateCampusAction::run([
             ...$request->validated(),
             'campus_id' => (int) $campus,
-            'dng_code' => $request->input('dng_code'),
         ]);
 
         Inertia::flash('message', 'Campus updated successfully.');

@@ -27,7 +27,6 @@ use App\Modules\Finance\Support\AiFinanceMetricReader as ModuleAiFinanceMetricRe
 use App\Modules\Finance\Support\AiFinanceStudentProfileReader as ModuleAiFinanceStudentProfileReader;
 use App\Modules\Finance\Support\FinanceIntakeRouter;
 use App\Modules\Finance\Support\HubStudentFinanceSummaryReader as ModuleHubStudentFinanceSummaryReader;
-use App\Modules\Finance\Support\LegacyDngCampusMappingWriter as ModuleLegacyDngCampusMappingWriter;
 use App\Modules\Finance\Support\ObligationLedgerSettlementReader;
 use App\Modules\Finance\Support\SettlementPosition\CurrentPayableSettlementPositionReader;
 use App\Shared\Contracts\Finance\AiFinanceMetricReader;
@@ -37,7 +36,6 @@ use App\Shared\Contracts\Finance\FinanceCancellationOperationRequestContract;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use App\Shared\Contracts\Finance\FinanceObligationCancellationContract;
 use App\Shared\Contracts\Finance\HubStudentFinanceSummaryReader;
-use App\Shared\Contracts\Finance\LegacyDngCampusMappingWriter;
 use App\Shared\Contracts\Finance\ObligationSettlementReader;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use App\Shared\Contracts\Finance\StudentFeeSummaryReader;
@@ -58,7 +56,6 @@ class FinanceServiceProvider extends ServiceProvider
         $this->app->bind(FinanceCancellationChargeStateReader::class, ResolveFinanceCancellationChargeStateAction::class);
         $this->app->bind(FinanceObligationCancellationContract::class, CancelFinanceObligationAction::class);
         $this->app->bind(HubStudentFinanceSummaryReader::class, ModuleHubStudentFinanceSummaryReader::class);
-        $this->app->bind(LegacyDngCampusMappingWriter::class, ModuleLegacyDngCampusMappingWriter::class);
         $this->app->bind(ObligationSettlementReader::class, ObligationLedgerSettlementReader::class);
         $this->app->bind(SettlementPositionReader::class, CurrentPayableSettlementPositionReader::class);
         $this->app->bind(StudentFeeSummaryReader::class, GetStudentFeeSummaryQuery::class);

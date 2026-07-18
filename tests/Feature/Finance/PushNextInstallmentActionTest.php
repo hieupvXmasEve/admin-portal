@@ -36,7 +36,7 @@ uses(RefreshDatabase::class);
  */
 function createInstallmentPushFixture(): array
 {
-    $campus = Campus::factory()->create(['dng_code' => 'TEST']);
+    $campus = Campus::factory()->withDngMapping('TEST')->create();
     $semester = Semester::factory()->create();
     $student = Student::factory()->create([
         'campus_id' => $campus->id,
@@ -497,7 +497,7 @@ it('returns null when there are no pending installments left', function () {
 });
 
 it('does not provision a billing account when the charge has no installments', function () {
-    $campus = Campus::factory()->create(['dng_code' => 'TEST']);
+    $campus = Campus::factory()->withDngMapping('TEST')->create();
     $semester = Semester::factory()->create();
     $student = Student::factory()->create([
         'campus_id' => $campus->id,

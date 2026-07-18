@@ -84,7 +84,7 @@ function batchDngPayload(Student $student, Semester $semester, string $feeType =
 }
 
 beforeEach(function (): void {
-    $this->campus = Campus::factory()->create(['dng_code' => 'FAUHN']);
+    $this->campus = Campus::factory()->withDngMapping('FAUHN')->create();
     $this->semester = Semester::factory()->create();
     $service = Mockery::mock(DngPaymentService::class);
     $service->shouldReceive('pushReserved')->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);

@@ -376,6 +376,7 @@ export const mainNavGroups: NavGroup[] = [
                 icon: Send,
                 children: [
                     { title: 'DNG Due Reminders', href: financeRoutes.collect.dueReminders(), icon: CalendarIcon, requiredPermissions: ['view_finance_operations_due_calendar'] },
+                    { title: 'DNG Campus Mapping', href: financeRoutes.collect.dngCampusMapping(), icon: Settings2, requiredPermissions: ['view_finance_dng_campus_mappings'] },
                     { title: 'Lập yêu cầu thanh toán DNG', href: financeRoutes.batchStudio.dng(), icon: Send, requiredPermissions: ['view_finance_batch_studio', 'create_finance_payments'] },
                     { title: 'Settlement Worklist', href: financeRoutes.collect.settlement(), icon: Sparkles, requiredPermissions: ['allocate_finance_payment'] },
                     { title: 'Payments', href: financeRoutes.collect.payments(), icon: BarChart3, requiredPermissions: ['view_finance_payments'] },

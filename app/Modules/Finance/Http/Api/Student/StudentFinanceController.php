@@ -11,6 +11,7 @@ use App\Modules\Finance\Actions\CreateStudentDngPaymentAccessAction;
 use App\Modules\Finance\Dng\Exceptions\StudentDngPaymentAccessUnavailable;
 use App\Modules\Finance\Dng\Exceptions\StudentDngPaymentRequestNotFound;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
 use App\Modules\Finance\Http\Requests\StudentFinance\ListStudentFinanceChargesRequest;
 use App\Modules\Finance\Http\Requests\StudentFinance\ListStudentFinanceInvoicesRequest;
 use App\Modules\Finance\Http\Requests\StudentFinance\StudentFinanceBalanceRequest;
@@ -24,6 +25,7 @@ use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 
 class StudentFinanceController extends Controller
 {
@@ -31,6 +33,7 @@ class StudentFinanceController extends Controller
         private PaymentService $paymentService,
         private SettlementPositionReader $settlementPositionReader,
         private GetStudentFinancePresentationQuery $studentFinance,
+        private DngCampusCodeResolver $dngCampusCodeResolver,
     ) {}
 
     /**
@@ -536,12 +539,16 @@ class StudentFinanceController extends Controller
 
     private function hasSafeStudentDngAccessMetadata(DngPaymentRequest $request, Student $student): bool
     {
-        $student->loadMissing('campus');
+        try {
+            $campusCode = $this->dngCampusCodeResolver->requireForStudent($student);
+        } catch (ValidationException) {
+            return false;
+        }
 
         $metadataSafe = $request->student_id === $student->id
             && $request->billing_account_id !== null
             && $request->provider_rail === 'dng'
-            && $request->campus_code === $student->campus?->getDngCode()
+            && $request->campus_code === $campusCode
             && $request->student_code === $student->student_id
             && filled($request->item_id)
             && (float) $request->amount > 0;

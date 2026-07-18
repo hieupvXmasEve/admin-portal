@@ -124,7 +124,7 @@ function makeBatchChargeWithInstallments(int $studentId, int $semesterId, float 
 it('worklist push uses next-pending installment amount (not full charge balance)', function () {
     batch_mockDngClientPushSuccess();
 
-    $campus = Campus::factory()->create(['dng_code' => 'TEST']);
+    $campus = Campus::factory()->withDngMapping('TEST')->create();
     $semester = Semester::factory()->create();
     $student = Student::factory()->create([
         'campus_id' => $campus->id,
@@ -173,7 +173,7 @@ it('worklist push uses next-pending installment amount (not full charge balance)
 it('worklist bundles next-pending across multiple charges of same student', function () {
     batch_mockDngClientPushSuccess();
 
-    $campus = Campus::factory()->create(['dng_code' => 'TEST']);
+    $campus = Campus::factory()->withDngMapping('TEST')->create();
     $semester = Semester::factory()->create();
     $student = Student::factory()->create([
         'campus_id' => $campus->id,
@@ -237,7 +237,7 @@ it('settling a bundled DNG settles ALL linked installments and dispatches per-ch
     Queue::fake();
     batch_mockDngClientPushSuccess();
 
-    $campus = Campus::factory()->create(['dng_code' => 'TEST']);
+    $campus = Campus::factory()->withDngMapping('TEST')->create();
     $semester = Semester::factory()->create();
     $student = Student::factory()->create([
         'campus_id' => $campus->id,
@@ -280,7 +280,7 @@ it('settling a bundled DNG settles ALL linked installments and dispatches per-ch
 it('still links installments when amount_override equals the auto-computed sum', function () {
     batch_mockDngClientPushSuccess();
 
-    $campus = Campus::factory()->create(['dng_code' => 'TEST']);
+    $campus = Campus::factory()->withDngMapping('TEST')->create();
     $semester = Semester::factory()->create();
     $student = Student::factory()->create([
         'campus_id' => $campus->id,
@@ -315,7 +315,7 @@ it('still links installments when amount_override equals the auto-computed sum',
 it('ignores a legacy amount_override and keeps the canonical installment target', function () {
     batch_mockDngClientPushSuccess();
 
-    $campus = Campus::factory()->create(['dng_code' => 'TEST']);
+    $campus = Campus::factory()->withDngMapping('TEST')->create();
     $semester = Semester::factory()->create();
     $student = Student::factory()->create([
         'campus_id' => $campus->id,
@@ -350,7 +350,7 @@ it('ignores a legacy amount_override and keeps the canonical installment target'
 it('worklist falls back to charge.balance when a charge has no installment row (legacy)', function () {
     batch_mockDngClientPushSuccess();
 
-    $campus = Campus::factory()->create(['dng_code' => 'TEST']);
+    $campus = Campus::factory()->withDngMapping('TEST')->create();
     $semester = Semester::factory()->create();
     $student = Student::factory()->create([
         'campus_id' => $campus->id,

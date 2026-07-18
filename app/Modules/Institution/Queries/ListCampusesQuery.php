@@ -25,7 +25,6 @@ class ListCampusesQuery
                 $query->where(function (Builder $campusQuery) use ($search): void {
                     $campusQuery->where('name', 'like', "%{$search}%")
                         ->orWhere('code', 'like', "%{$search}%")
-                        ->orWhere('dng_code', 'like', "%{$search}%")
                         ->orWhere('address', 'like', "%{$search}%");
                 });
             })

@@ -30,10 +30,6 @@ it('keeps Institution campus and department writes inside the Institution owner'
                 continue;
             }
 
-            if ($file->getPathname() === dirname(__DIR__, 3).'/app/Modules/Finance/Support/LegacyDngCampusMappingWriter.php') {
-                continue;
-            }
-
             $contents = file_get_contents($file->getPathname()) ?: '';
             foreach ($forbiddenWrites as $model => $pattern) {
                 if (preg_match($pattern, $contents) === 1) {

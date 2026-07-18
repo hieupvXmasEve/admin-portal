@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Models\Campus;
+use App\Modules\Finance\Dng\Models\DngCampusMapping;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Campus>
+ * @extends Factory<Campus>
  */
 class CampusFactory extends Factory
 {
@@ -23,8 +25,17 @@ class CampusFactory extends Factory
         return [
             'name' => fake()->name().' Campus',
             'code' => $code,
-            'dng_code' => $code,
             'address' => fake()->address(),
         ];
+    }
+
+    public function withDngMapping(?string $providerCode = null): static
+    {
+        return $this->afterCreating(function (Campus $campus) use ($providerCode): void {
+            DngCampusMapping::query()->create([
+                'campus_id' => $campus->id,
+                'provider_code' => $providerCode ?? $campus->code,
+            ]);
+        });
     }
 }

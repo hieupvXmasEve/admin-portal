@@ -12,7 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->campus = Campus::factory()->create(['dng_code' => 'FAUHN']);
+    $this->campus = Campus::factory()->withDngMapping('FAUHN')->create();
     $this->semester = Semester::factory()->active()->create();
 
     app()->singleton('campus', fn () => $this->campus);

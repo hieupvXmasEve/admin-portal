@@ -6,6 +6,7 @@ namespace App\Modules\Finance\Dng\Services;
 
 use App\Models\Campus;
 use App\Models\Student;
+use App\Modules\Finance\Dng\Models\DngCampusMapping;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -15,7 +16,7 @@ class DngCampusCodeResolver
     {
         $campus = app()->bound('campus') ? app('campus') : null;
 
-        return $campus instanceof Campus ? $campus->getDngCode() : null;
+        return $campus instanceof Campus ? $this->mappingCodeForCampus($campus) : null;
     }
 
     public function requireCurrentCampusCode(): string
@@ -38,9 +39,7 @@ class DngCampusCodeResolver
     public function allConfiguredCampusCodes(): array
     {
         /** @var Collection<int, string> $codes */
-        $codes = Campus::query()
-            ->whereNotNull('dng_code')
-            ->pluck('dng_code');
+        $codes = DngCampusMapping::query()->pluck('provider_code');
 
         return $codes
             ->map(fn (string $code) => trim($code))
@@ -52,13 +51,24 @@ class DngCampusCodeResolver
 
     private function requireForCampus(?Campus $campus): string
     {
-        $dngCode = $campus?->getDngCode();
+        $dngCode = $campus instanceof Campus ? $this->mappingCodeForCampus($campus) : null;
         if ($dngCode !== null) {
             return $dngCode;
         }
 
         throw ValidationException::withMessages([
-            'campus_code' => 'DNG code is not configured for the selected campus.',
+            'campus_code' => 'DNG code is not configured for the selected campus. Configure it in Finance → DNG Campus Mapping before creating or reconciling payment requests.',
         ]);
+    }
+
+    private function mappingCodeForCampus(Campus $campus): ?string
+    {
+        $providerCode = DngCampusMapping::query()
+            ->where('campus_id', $campus->id)
+            ->value('provider_code');
+
+        $providerCode = trim((string) $providerCode);
+
+        return $providerCode !== '' ? $providerCode : null;
     }
 }

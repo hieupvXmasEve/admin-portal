@@ -29,18 +29,7 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const {
-    filters,
-    hasActiveFilters,
-    isLoading,
-    currentSort,
-    currentDirection,
-    handleSearch,
-    handleSortChange,
-    handlePaginationNavigate,
-    handlePageSizeChange,
-    clearAllFilters,
-} = useDataTable<CampusFilters>({
+const { filters, hasActiveFilters, isLoading, currentSort, currentDirection, handleSearch, handleSortChange, handlePaginationNavigate, handlePageSizeChange, clearAllFilters } = useDataTable<CampusFilters>({
     baseUrl: route('campuses.index'),
     initialFilters: {
         search: props.filters?.search || '',
@@ -81,12 +70,6 @@ const columns: ColumnDef<Campus>[] = [
         accessorKey: 'code',
         enableSorting: true,
         cell: ({ row }) => h('div', { class: 'font-mono font-medium' }, row.original.code),
-    },
-    {
-        header: 'DNG Code',
-        accessorKey: 'dng_code',
-        enableSorting: true,
-        cell: ({ row }) => h('div', { class: 'font-mono text-sm' }, row.original.dng_code || 'Not set'),
     },
     {
         header: 'Campus Name',
@@ -152,7 +135,7 @@ const columns: ColumnDef<Campus>[] = [
         <ModalLink
             :href="route('campuses.create')"
             as="button"
-            class="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            class="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium shadow focus-visible:ring-1 focus-visible:outline-none"
         >
             <Plus class="h-4 w-4" />
             Add Campus
@@ -165,25 +148,16 @@ const columns: ColumnDef<Campus>[] = [
             <div class="w-full max-w-sm">
                 <DebouncedInput :model-value="filters.search" @update:model-value="handleSearch" placeholder="Search campuses..." />
             </div>
-            <Button variant="outline" size="sm" @click="clearAllFilters" :disabled="!hasActiveFilters" v-if="hasActiveFilters">
-                Clear
-            </Button>
+            <Button variant="outline" size="sm" @click="clearAllFilters" :disabled="!hasActiveFilters" v-if="hasActiveFilters"> Clear </Button>
         </div>
 
-        <DataTable
-            :data="data"
-            :columns="columns"
-            :loading="isLoading"
-            :initial-sort="currentSort ?? undefined"
-            :initial-direction="currentDirection ?? undefined"
-            @sort-change="handleSortChange"
-        >
+        <DataTable :data="data" :columns="columns" :loading="isLoading" :initial-sort="currentSort ?? undefined" :initial-direction="currentDirection ?? undefined" @sort-change="handleSortChange">
             <template #cell-actions="{ row }">
                 <div class="flex items-center gap-2">
                     <TooltipProvider :delay-duration="0">
                         <Tooltip>
                             <TooltipTrigger as-child>
-                                <Button variant="ghost" size="icon" class="h-8 w-8 text-muted-foreground hover:text-primary" @click="goToViewPage(row.original)">
+                                <Button variant="ghost" size="icon" class="text-muted-foreground hover:text-primary h-8 w-8" @click="goToViewPage(row.original)">
                                     <Eye class="h-4 w-4" />
                                 </Button>
                             </TooltipTrigger>
@@ -195,11 +169,7 @@ const columns: ColumnDef<Campus>[] = [
                     <TooltipProvider :delay-duration="0">
                         <Tooltip>
                             <TooltipTrigger as-child>
-                                <ModalLink
-                                    :href="route('campuses.edit', row.original.id)"
-                                    as="button"
-                                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-primary"
-                                >
+                                <ModalLink :href="route('campuses.edit', row.original.id)" as="button" class="text-muted-foreground hover:bg-accent hover:text-primary inline-flex h-8 w-8 items-center justify-center rounded-md">
                                     <Edit class="h-4 w-4" />
                                 </ModalLink>
                             </TooltipTrigger>

@@ -82,11 +82,7 @@ const buildingColumns: ColumnDef<Building>[] = [
         enableSorting: false,
         cell: ({ row }) => {
             const description = row.original.description;
-            return h(
-                'div',
-                { class: 'max-w-xs truncate text-sm text-gray-600 dark:text-gray-300' },
-                description || 'No description',
-            );
+            return h('div', { class: 'max-w-xs truncate text-sm text-gray-600 dark:text-gray-300' }, description || 'No description');
         },
     },
     {
@@ -95,11 +91,7 @@ const buildingColumns: ColumnDef<Building>[] = [
         enableSorting: false,
         cell: ({ row }) => {
             const address = row.original.address;
-            return h(
-                'div',
-                { class: 'max-w-xs truncate text-sm text-gray-600 dark:text-gray-300' },
-                address || 'No address',
-            );
+            return h('div', { class: 'max-w-xs truncate text-sm text-gray-600 dark:text-gray-300' }, address || 'No address');
         },
     },
     {
@@ -171,10 +163,6 @@ const deleteBuilding = (building: Building) => {
                         <p class="font-mono font-medium">{{ campus.code }}</p>
                     </div>
                     <div>
-                        <label class="text-sm font-medium text-gray-500 dark:text-gray-400">DNG Code</label>
-                        <p class="font-mono font-medium">{{ campus.dng_code || 'Not set' }}</p>
-                    </div>
-                    <div>
                         <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Campus Name</label>
                         <p class="font-medium">{{ campus.name }}</p>
                     </div>
@@ -219,7 +207,11 @@ const deleteBuilding = (building: Building) => {
                     <h3 class="text-lg font-semibold">Buildings Management</h3>
                     <p class="text-muted-foreground text-sm">Manage buildings for {{ campus.name }}</p>
                 </div>
-                <ModalLink :href="systemRoutes.campuses.buildings.create(campus.id)" as="button" class="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">
+                <ModalLink
+                    :href="systemRoutes.campuses.buildings.create(campus.id)"
+                    as="button"
+                    class="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium shadow focus-visible:ring-1 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+                >
                     <Plus class="h-4 w-4" />
                     Add Building
                 </ModalLink>
@@ -231,27 +223,16 @@ const deleteBuilding = (building: Building) => {
                     <DebouncedInput :model-value="filters.search" @update:model-value="handleSearch" placeholder="Search buildings by name, code, or description..." />
                 </div>
                 <Button variant="outline" size="sm" @click="clearAllFilters" :disabled="!hasActiveFilters" v-if="hasActiveFilters">
-                    <X class="h-4 w-4 mr-2" />
+                    <X class="mr-2 h-4 w-4" />
                     Clear
                 </Button>
             </div>
 
             <!-- Buildings Table -->
-            <DataTable
-                :data="buildingData"
-                :columns="buildingColumns"
-                :loading="isLoading"
-                :initial-sort="currentSort ?? undefined"
-                :initial-direction="currentDirection ?? undefined"
-                @sort-change="handleSortChange"
-            >
+            <DataTable :data="buildingData" :columns="buildingColumns" :loading="isLoading" :initial-sort="currentSort ?? undefined" :initial-direction="currentDirection ?? undefined" @sort-change="handleSortChange">
                 <template #cell-actions="{ row }">
                     <div class="flex items-center gap-1">
-                        <ModalLink
-                            :href="systemRoutes.campuses.buildings.edit(campus.id, row.original.id)"
-                            as="button"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground"
-                        >
+                        <ModalLink :href="systemRoutes.campuses.buildings.edit(campus.id, row.original.id)" as="button" class="hover:bg-accent hover:text-accent-foreground inline-flex h-8 w-8 items-center justify-center rounded-md">
                             <Edit class="h-4 w-4" />
                         </ModalLink>
                         <Button variant="ghost" size="sm" class="text-red-600 hover:text-red-700" @click="confirmDeleteBuilding(row.original)">

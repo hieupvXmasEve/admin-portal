@@ -66,7 +66,7 @@ For Notification V2 Phase 1 contracts keep exact fields:
     - Always use `DngClient` for API calls; verify checksum before processing webhook events.
     - Use `DngPaymentService` entrypoints for DNG create/push flows and payment-link flows.
     - Student identifier field is `student_code` (string MSSV from `students.student_id`), never `student_id` (int DB PK).
-    - Campus code for DNG is resolved per campus from `campuses.dng_code`; do not treat `services.dng.campus_code` as source of truth.
+    - Campus code for DNG is resolved from Finance-owned `finance_dng_campus_mappings`; do not treat Institution Campus metadata or `services.dng.campus_code` as a source of truth.
     - When creating a new DNG request for the same `student + fee_type`, only cancel previous unpaid requests (`pending`, `pushed_to_dng`) after the new push succeeds.
     - Cancelled DNG requests are terminal and must not be revived by late webhook/reconciliation processing.
     - Queue webhook processing via `ProcessDngWebhookJob` instead of synchronous response handlers.

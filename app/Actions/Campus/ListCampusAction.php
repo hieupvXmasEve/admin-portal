@@ -34,18 +34,17 @@ class ListCampusAction
             ->withCount(['buildings', 'users'])
             ->when($search, function ($query, $term) {
                 $query->where(function ($q) use ($term) {
-                        $q->where('name', 'like', "%{$term}%")
-                            ->orWhere('code', 'like', "%{$term}%")
-                            ->orWhere('dng_code', 'like', "%{$term}%")
-                            ->orWhere('address', 'like', "%{$term}%");
-                    });
-                })
-                ->when($sort, function ($query, $column) use ($direction) {
-                    $query->orderBy($column, $direction);
-                })
-                ->unless($sort, function ($query) {
-                    $query->orderBy('created_at', 'desc');
-                })
-                ->paginate($perPage, ['*'], 'page', $page);
+                    $q->where('name', 'like', "%{$term}%")
+                        ->orWhere('code', 'like', "%{$term}%")
+                        ->orWhere('address', 'like', "%{$term}%");
+                });
+            })
+            ->when($sort, function ($query, $column) use ($direction) {
+                $query->orderBy($column, $direction);
+            })
+            ->unless($sort, function ($query) {
+                $query->orderBy('created_at', 'desc');
+            })
+            ->paginate($perPage, ['*'], 'page', $page);
     }
 }

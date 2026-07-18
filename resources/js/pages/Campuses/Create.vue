@@ -14,7 +14,6 @@ const modalRef = ref<InstanceType<typeof Modal> | null>(null);
 const form = useForm({
     name: '',
     code: '',
-    dng_code: '',
     address: '',
 });
 
@@ -38,48 +37,19 @@ const submit = () => {
             <form class="grid gap-4" @submit.prevent="submit">
                 <div class="grid gap-1.5">
                     <Label for="name">Campus Name <span class="text-destructive">*</span></Label>
-                    <Input
-                        id="name"
-                        v-model="form.name"
-                        placeholder="e.g., Swinburne Hanoi"
-                        :class="{ 'border-destructive': form.errors.name }"
-                    />
+                    <Input id="name" v-model="form.name" placeholder="e.g., Swinburne Hanoi" :class="{ 'border-destructive': form.errors.name }" />
                     <InputError :message="form.errors.name" />
                 </div>
 
                 <div class="grid gap-1.5">
                     <Label for="code">Campus Code <span class="text-destructive">*</span></Label>
-                    <Input
-                        id="code"
-                        v-model="form.code"
-                        placeholder="e.g., HN, HCM, DN"
-                        class="font-mono"
-                        :class="{ 'border-destructive': form.errors.code }"
-                    />
+                    <Input id="code" v-model="form.code" placeholder="e.g., HN, HCM, DN" class="font-mono" :class="{ 'border-destructive': form.errors.code }" />
                     <InputError :message="form.errors.code" />
                 </div>
 
                 <div class="grid gap-1.5">
-                    <Label for="dng_code">DNG Code</Label>
-                    <Input
-                        id="dng_code"
-                        v-model="form.dng_code"
-                        placeholder="e.g., FAUHN"
-                        class="font-mono"
-                        :class="{ 'border-destructive': form.errors.dng_code }"
-                    />
-                    <InputError :message="form.errors.dng_code" />
-                </div>
-
-                <div class="grid gap-1.5">
                     <Label for="address">Campus Address <span class="text-destructive">*</span></Label>
-                    <Textarea
-                        id="address"
-                        v-model="form.address"
-                        placeholder="Enter the full address of the campus..."
-                        rows="3"
-                        :class="{ 'border-destructive': form.errors.address }"
-                    />
+                    <Textarea id="address" v-model="form.address" placeholder="Enter the full address of the campus..." rows="3" :class="{ 'border-destructive': form.errors.address }" />
                     <InputError :message="form.errors.address" />
                 </div>
 

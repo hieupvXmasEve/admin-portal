@@ -65,7 +65,6 @@ it('creates a campus through the Institution owner action', function (): void {
     $campus = CreateCampusAction::run([
         'name' => 'Da Nang Campus',
         'code' => 'DN',
-        'dng_code' => 'FAUDN',
         'address' => 'Da Nang',
     ]);
 
@@ -75,7 +74,6 @@ it('creates a campus through the Institution owner action', function (): void {
         'id' => $campus->id,
         'name' => 'Da Nang Campus',
         'code' => 'DN',
-        'dng_code' => 'FAUDN',
     ]);
 });
 
@@ -126,7 +124,6 @@ it('preserves campus administration URLs and authorization through Institution',
         ->post(route('campuses.store'), [
             'name' => 'Can Tho Campus',
             'code' => 'CT',
-            'dng_code' => 'FAUCT',
             'address' => 'Can Tho',
         ])
         ->assertRedirect();
@@ -142,7 +139,6 @@ it('preserves campus administration URLs and authorization through Institution',
         ->put(route('campuses.update', $managedCampus), [
             'name' => 'Can Tho Main Campus',
             'code' => 'CT',
-            'dng_code' => 'FAUCT',
             'address' => 'Can Tho',
         ])
         ->assertRedirect();
