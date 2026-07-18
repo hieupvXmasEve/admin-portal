@@ -7,13 +7,16 @@ namespace App\Policies;
 use App\Models\Lecture;
 use App\Models\Student;
 use App\Models\User;
+use App\Shared\Contracts\Identity\DTO\LecturerAccessGrant;
 use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
+use App\Shared\Contracts\Identity\LecturerAccessGrantReader;
 use Illuminate\Http\Request;
 
 class ApiActorPolicy
 {
     public function __construct(
         private readonly GuardianAccessGrantReader $guardianAccessGrantReader,
+        private readonly LecturerAccessGrantReader $lecturerAccessGrantReader,
     ) {}
 
     public function accessStudentOrParent(mixed $user, Request $request): bool
@@ -36,12 +39,18 @@ class ApiActorPolicy
             return false;
         }
 
-        if ($user->trashed()) {
-            return false;
+        $account = User::query()->find($user->user_id);
+
+        return $account !== null && $this->lecturerAccessFor($account) !== null;
+    }
+
+    public function lecturerAccessFor(User $user): ?LecturerAccessGrant
+    {
+        if (! $user->isActive() || ! $user->isLecturer()) {
+            return null;
         }
 
-        return (bool) $user->is_active
-            && in_array((string) $user->employment_status, ['active', 'employed', 'contract_active'], true);
+        return $this->lecturerAccessGrantReader->activeForUser((int) $user->id);
     }
 
     private function isActiveParent(mixed $user): bool

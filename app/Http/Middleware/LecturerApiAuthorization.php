@@ -6,6 +6,8 @@ namespace App\Http\Middleware;
 
 use App\Http\Responses\ApiResponse;
 use App\Models\Lecture;
+use App\Models\User;
+use App\Shared\Contracts\Identity\LecturerAccessGrantReader;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,17 +31,11 @@ class LecturerApiAuthorization
 
         $lecturer = $request->user();
 
-        // Check if lecturer account is active
-        if (! $this->isLecturerActive($lecturer)) {
+        // Access state is owned by Identity. Workforce remains responsible for
+        // updating the grant synchronously, not for being queried at request time.
+        if (! $this->hasActiveIdentityAccess($lecturer)) {
             return ApiResponse::authorizationError(
                 'Lecturer account is not active. Please contact administration.'
-            );
-        }
-
-        // Check for employment status that prevents access
-        if ($this->hasEmploymentRestrictions($lecturer, $request)) {
-            return ApiResponse::authorizationError(
-                'Access restricted due to employment status. Please contact HR.'
             );
         }
 
@@ -59,55 +55,14 @@ class LecturerApiAuthorization
     /**
      * Check if lecturer account is active
      */
-    protected function isLecturerActive(Lecture $lecturer): bool
+    protected function hasActiveIdentityAccess(Lecture $lecturer): bool
     {
-        // Check if lecturer is soft deleted first
-        if ($lecturer->trashed()) {
+        $user = User::query()->find($lecturer->user_id);
+        if ($user === null || ! $user->isActive()) {
             return false;
         }
-        
-        return $lecturer->is_active &&
-            in_array($lecturer->employment_status, ['active', 'employed', 'contract_active']);
-    }
 
-    /**
-     * Check for employment restrictions that block API access
-     */
-    protected function hasEmploymentRestrictions(Lecture $lecturer, Request $request): bool
-    {
-        // Block access for terminated, suspended, or inactive lecturers
-        $restrictedStatuses = ['terminated', 'suspended', 'inactive', 'on_leave'];
-
-        if (in_array($lecturer->employment_status, $restrictedStatuses)) {
-            return true;
-        }
-
-        // Check contract expiration for contract lecturers
-        if ($lecturer->employment_type === 'contract' && $lecturer->contract_end_date) {
-            if (now()->isAfter($lecturer->contract_end_date)) {
-                return true;
-            }
-        }
-
-        // Check if lecturer is available for assignment
-        if (! $lecturer->is_available_for_assignment) {
-            // Allow access to profile and basic endpoints even if not available for new assignments
-            $allowedRoutes = [
-                'api/v1/lecturer/auth/*',
-                'api/v1/lecturer/profile',
-                'api/v1/lecturer/profile/*',
-            ];
-
-            foreach ($allowedRoutes as $pattern) {
-                if ($request->is($pattern)) {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        return false;
+        return app(LecturerAccessGrantReader::class)->activeForUser((int) $user->id) !== null;
     }
 
     /**

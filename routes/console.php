@@ -79,6 +79,12 @@ Schedule::command('finance:recover-cancellation-work --limit=100')
     ->onOneServer()
     ->runInBackground();
 
+Schedule::command('faculty:reconcile-lecturer-access')
+    ->hourly()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->runInBackground();
+
 // DNG payment reconciliation - every 15 minutes
 Schedule::job(new ReconcileDngPaymentsJob)
     ->everyFifteenMinutes()

@@ -14,8 +14,11 @@ use App\Modules\Identity\Actions\LecturerLogoutAction;
 use App\Modules\Identity\Actions\LecturerRefreshTokenAction;
 use App\Modules\Identity\Http\Requests\Identity\GoogleLoginRequest;
 use App\Modules\Identity\Http\Requests\Identity\LecturerLoginRequest;
+use App\Modules\Identity\Http\Requests\Identity\LecturerRefreshRequest;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class LecturerAuthController extends Controller
 {
@@ -30,19 +33,19 @@ class LecturerAuthController extends Controller
             return ApiResponse::success(
                 data: [
                     // 'lecturer' => new LecturerResource($result['lecturer']), // Legacy didn't return lecturer here commented out, but new one returns token
-                     // The legacy one returned: token, token_type, expires_in.
-                     // The Action returns: token, lecturer.
-                     // Let's construct the response to match legacy behavior strictly first, but maybe include lecturer info if useful?
-                     // Legacy code:
-                     // 'token' => $token,
-                     // 'token_type' => 'Bearer',
-                     // 'expires_in' => config('sanctum.expiration', 525600),
+                    // The legacy one returned: token, token_type, expires_in.
+                    // The Action returns: token, lecturer.
+                    // Let's construct the response to match legacy behavior strictly first, but maybe include lecturer info if useful?
+                    // Legacy code:
+                    // 'token' => $token,
+                    // 'token_type' => 'Bearer',
+                    // 'expires_in' => config('sanctum.expiration', 525600),
 
-                     // My Action returns ['token' => ..., 'lecturer' => ...]
+                    // My Action returns ['token' => ..., 'lecturer' => ...]
 
-                     'token' => $result['token'],
-                     'token_type' => 'Bearer',
-                     'expires_in' => 8 * 60, // minutes
+                    'token' => $result['token'],
+                    'token_type' => 'Bearer',
+                    'expires_in' => 8 * 60, // minutes
                 ],
                 message: 'Login successful'
             );
@@ -56,10 +59,10 @@ class LecturerAuthController extends Controller
             // If it's a ValidationException (business logic checks), it renders 422.
 
             // If general exception (unexpected):
-            if ($e instanceof \Illuminate\Auth\AuthenticationException) {
-                 return ApiResponse::authenticationError($e->getMessage());
+            if ($e instanceof AuthenticationException) {
+                return ApiResponse::authenticationError($e->getMessage());
             }
-            if ($e instanceof \Illuminate\Validation\ValidationException) {
+            if ($e instanceof ValidationException) {
                 throw $e;
             }
 
@@ -70,9 +73,9 @@ class LecturerAuthController extends Controller
     /**
      * Refresh lecturer token
      */
-    public function refresh(Request $request): JsonResponse
+    public function refresh(LecturerRefreshRequest $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var object $lecturer */
         $lecturer = $request->user();
 
         if (! $lecturer) {
@@ -82,7 +85,10 @@ class LecturerAuthController extends Controller
         try {
             $currentToken = $request->user()->currentAccessToken();
 
-            $result = LecturerRefreshTokenAction::run($lecturer, $request->device_name);
+            $result = LecturerRefreshTokenAction::run([
+                'user_id' => (int) $lecturer->user_id,
+                'device_name' => $request->validated('device_name'),
+            ]);
             $currentToken?->delete();
 
             return ApiResponse::success(
@@ -95,7 +101,7 @@ class LecturerAuthController extends Controller
                 message: 'Token refreshed successfully'
             );
         } catch (\Exception $e) {
-             return ApiResponse::serverError($e->getMessage());
+            return ApiResponse::serverError($e->getMessage());
         }
     }
 
@@ -117,7 +123,7 @@ class LecturerAuthController extends Controller
      */
     public function me(Request $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var object $lecturer */
         $lecturer = $request->user();
 
         if (! $lecturer) {
@@ -139,11 +145,11 @@ class LecturerAuthController extends Controller
     public function loginWithGoogle(GoogleLoginRequest $request): JsonResponse
     {
         try {
-            $result = LecturerGoogleLoginAction::run(
-                $request->id_token,
-                $request->ip(),
-                $request->device_name
-            );
+            $result = LecturerGoogleLoginAction::run([
+                'id_token' => $request->id_token,
+                'ip' => $request->ip(),
+                'device_name' => $request->device_name,
+            ]);
 
             return ApiResponse::success(
                 data: [
@@ -155,10 +161,11 @@ class LecturerAuthController extends Controller
                 message: 'Google login successful'
             );
         } catch (\Exception $e) {
-             if ($e instanceof \Illuminate\Validation\ValidationException) {
+            if ($e instanceof ValidationException) {
                 throw $e;
             }
-            return ApiResponse::serverError('Failed to authenticate with Google: ' . $e->getMessage());
+
+            return ApiResponse::serverError('Failed to authenticate with Google: '.$e->getMessage());
         }
     }
 
@@ -183,7 +190,7 @@ class LecturerAuthController extends Controller
                 message: 'Science status retrieved successfully'
             );
         } catch (\Exception $e) {
-             return ApiResponse::serverError('Failed to check Science status: ' . $e->getMessage());
+            return ApiResponse::serverError('Failed to check Science status: '.$e->getMessage());
         }
     }
 }

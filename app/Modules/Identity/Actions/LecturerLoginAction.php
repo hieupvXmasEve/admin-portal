@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Identity\Actions;
 
 use App\Models\User;
+use App\Policies\ApiActorPolicy;
+use App\Shared\Contracts\Identity\LecturerTokenIssuer;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -37,47 +39,26 @@ class LecturerLoginAction
             ]);
         }
 
-        // 4. Retrieve Associated Lecturer Profile
-        $lecturer = $user->lecturer;
-
-        if (! $lecturer) {
-            throw ValidationException::withMessages([
-                'email' => ['This account is not associated with a lecturer profile.'],
-            ]);
-        }
-
-        // 5. Verify Lecturer Status (Legacy Rules)
-        if (! $lecturer->is_active) {
-            throw ValidationException::withMessages([
-                'email' => ['Lecturer account is inactive. Please contact administration.'],
-            ]);
-        }
-
-        // Check employment status
-        if (! in_array($lecturer->employment_status, ['active', 'employed', 'contract_active'])) {
+        // Lecturer authorization is strictly Identity-owned. Faculty Workforce
+        // synchronously maintains this grant through its narrow command contract.
+        $grant = app(ApiActorPolicy::class)->lecturerAccessFor($user);
+        if ($grant === null) {
             throw ValidationException::withMessages([
                 'email' => ['Account access restricted. Please contact HR.'],
             ]);
         }
 
-        // 6. Update Last Login
+        // 4. Update Last Login
         $user->update(['last_login_at' => now()]);
 
-        // 7. Generate Token
-        // note: We issue the token to the Lecturer model to maintain compatibility
-        // with existing routes that expect $request->user() to be a Lecture instance.
+        // The compatibility adapter issues the token to the existing Lecturer
+        // authenticatable without exposing Faculty persistence to Identity.
         $deviceName = $data['device_name'] ?? 'Lecturer Device';
-        $expiresAt = now()->addHours(8);
-
-        $token = $lecturer->createToken(
-            $deviceName,
-            ['lecturer:access'],
-            $expiresAt
-        )->plainTextToken;
+        $issued = app(LecturerTokenIssuer::class)->issue($grant->lecturerId, $deviceName);
 
         return [
-            'token' => $token,
-            'lecturer' => $lecturer,
+            'token' => $issued['token'],
+            'lecturer' => $issued['lecturer'],
         ];
     }
 }

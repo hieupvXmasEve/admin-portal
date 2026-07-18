@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Identity\Actions;
 
-use App\Models\Lecture;
+use App\Models\User;
+use App\Policies\ApiActorPolicy;
+use App\Shared\Contracts\Identity\LecturerTokenIssuer;
 use Illuminate\Validation\ValidationException;
 
 class LecturerRefreshTokenAction
@@ -12,38 +14,32 @@ class LecturerRefreshTokenAction
     /**
      * @throws ValidationException
      */
-    public static function run(Lecture $lecturer, ?string $deviceName = null): array
+    /** @param array{user_id: int, device_name?: string|null} $data */
+    public static function run(array $data): array
     {
-        // 1. Verify associated User is active
-        $user = $lecturer->user;
-        if (!$user || !$user->isActive()) {
+        // Refresh authorization reads only Identity-owned Account Status and
+        // Lecturer Access Grant. The legacy lecturer token subject is resolved
+        // by an infrastructure adapter after authorization succeeds.
+        $user = User::query()->find($data['user_id']);
+        if (! $user || ! $user->isActive()) {
             throw ValidationException::withMessages([
                 'token' => ['Account is inactive. Please contact administration.'],
             ]);
         }
 
-        // 2. Verify Lecturer profile is active
-        if (!$lecturer->is_active) {
-            throw ValidationException::withMessages([
-                'token' => ['Lecturer account is inactive. Please contact administration.'],
-            ]);
-        }
-
-        // 3. Check employment status
-        if (!in_array($lecturer->employment_status, ['active', 'employed', 'contract_active'])) {
+        $grant = app(ApiActorPolicy::class)->lecturerAccessFor($user);
+        if ($grant === null) {
             throw ValidationException::withMessages([
                 'token' => ['Account access restricted. Please contact HR.'],
             ]);
         }
 
-        $deviceName = $deviceName ?? 'Lecturer Portal';
+        $deviceName = $data['device_name'] ?? 'Lecturer Portal';
         $expirationMinutes = 8 * 60;
-        $expiresAt = now()->addHours(8);
-
-        $token = $lecturer->createToken($deviceName, ['lecturer:access'], $expiresAt)->plainTextToken;
+        $issued = app(LecturerTokenIssuer::class)->issue($grant->lecturerId, $deviceName);
 
         return [
-            'token' => $token,
+            'token' => $issued['token'],
             'token_type' => 'Bearer',
             'expires_in' => $expirationMinutes,
         ];

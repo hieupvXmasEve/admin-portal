@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Providers;
 
 use App\Mcp\Support\ActiveUserMcpActorResolver;
@@ -14,8 +16,11 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentApplication;
 use App\Models\User;
+use App\Modules\Academic\FacultyWorkforce\Observers\SyncLecturerAccessEligibility;
+use App\Modules\Academic\FacultyWorkforce\Support\EloquentLecturerTokenIssuer;
 use App\Policies\ApiActorPolicy;
 use App\Policies\StudentApplicationPolicy;
+use App\Shared\Contracts\Identity\LecturerTokenIssuer;
 use App\Shared\Support\Admissions\AdmissionsIngestion;
 use App\Support\ThemeConfig;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -45,6 +50,7 @@ class AppServiceProvider extends ServiceProvider
             McpCampusResolver::class,
             PermissionMcpCampusResolver::class,
         );
+        $this->app->bind(LecturerTokenIssuer::class, EloquentLecturerTokenIssuer::class);
     }
 
     /**
@@ -53,6 +59,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         umask(0002);
+        Lecture::observe(SyncLecturerAccessEligibility::class);
         $this->registerApiActorGates();
         $this->registerPolicies();
         $this->configureRateLimiting();

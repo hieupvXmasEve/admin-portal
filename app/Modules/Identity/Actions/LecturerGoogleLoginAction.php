@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Identity\Actions;
 
 use App\Models\User;
+use App\Policies\ApiActorPolicy;
+use App\Shared\Contracts\Identity\LecturerTokenIssuer;
+use Exception;
 use Google\Client;
 use Illuminate\Validation\ValidationException;
-use Exception;
 
 class LecturerGoogleLoginAction
 {
@@ -15,7 +17,8 @@ class LecturerGoogleLoginAction
      * @throws ValidationException
      * @throws Exception
      */
-    public static function run(string $idToken, string $ip, ?string $deviceName = null): array
+    /** @param array{id_token: string, ip: string, device_name?: string|null} $data */
+    public static function run(array $data): array
     {
         try {
             // Initialize Google Client
@@ -24,22 +27,22 @@ class LecturerGoogleLoginAction
             ]);
 
             // Verify the ID token
-            $payload = $client->verifyIdToken($idToken);
+            $payload = $client->verifyIdToken($data['id_token']);
 
-            if (!$payload) {
+            if (! $payload) {
                 throw ValidationException::withMessages([
                     'id_token' => ['Invalid Google ID token'],
                 ]);
             }
 
             $email = $payload['email'] ?? null;
-            if (!$email) {
+            if (! $email) {
                 throw ValidationException::withMessages([
                     'email' => ['Unable to retrieve email from Google account'],
                 ]);
             }
 
-            if (!($payload['email_verified'] ?? false)) {
+            if (! ($payload['email_verified'] ?? false)) {
                 throw ValidationException::withMessages([
                     'email' => ['Google account email is not verified'],
                 ]);
@@ -48,30 +51,28 @@ class LecturerGoogleLoginAction
             // 1. Find User by email (Single Source of Truth)
             $user = User::where('email', $email)->first();
 
-            if (!$user) {
+            if (! $user) {
                 throw ValidationException::withMessages([
                     'email' => ['No account found with this email address.'],
                 ]);
             }
 
             // 2. Verify User Status
-            if (!$user->isActive()) {
+            if (! $user->isActive()) {
                 throw ValidationException::withMessages([
                     'email' => ['Account is inactive. Please contact administration.'],
                 ]);
             }
 
-            // 3. Retrieve Associated Lecturer Profile
-            $lecturer = $user->lecturer;
-
-            if (!$lecturer) {
+            $grant = app(ApiActorPolicy::class)->lecturerAccessFor($user);
+            if ($grant === null) {
                 throw ValidationException::withMessages([
-                    'email' => ['This account is not associated with a lecturer profile.'],
+                    'email' => ['Account access restricted. Please contact HR.'],
                 ]);
             }
 
             // 4. Update OAuth provider data on User model
-            if (!$user->oauth_provider_id) {
+            if (! $user->oauth_provider_id) {
                 $user->update([
                     'oauth_provider' => 'google',
                     'oauth_provider_id' => $payload['sub'],
@@ -79,40 +80,24 @@ class LecturerGoogleLoginAction
                 ]);
             }
 
-            // Update avatar if needed (profile specific)
-            if (!$lecturer->avatar_url && ($payload['picture'] ?? null)) {
-                $lecturer->update(['avatar_url' => $payload['picture']]);
-            }
-
-            // 5. Check Lecturer Status
-            if (!$lecturer->is_active) {
-                throw ValidationException::withMessages([
-                    'email' => ['Lecturer account is inactive. Please contact administration.'],
-                ]);
-            }
-
-            // Check employment status
-            if (!in_array($lecturer->employment_status, ['active', 'employed', 'contract_active'])) {
-                throw ValidationException::withMessages([
-                    'email' => ['Account access restricted. Please contact HR.'],
-                ]);
-            }
-
-            // 6. Update Last Login
+            // 4. Update Last Login
             $user->update(['last_login_at' => now()]);
 
-            // 7. Generate Token
-            $deviceName = $deviceName ?? 'Lecturer Portal (Google)';
-            $expiresAt = now()->addHours(8);
-
-            $token = $lecturer->createToken($deviceName, ['lecturer:access'], $expiresAt)->plainTextToken;
+            // The existing Lecturer authenticatable remains the Sanctum token
+            // subject through an adapter outside Identity's persistence boundary.
+            $deviceName = $data['device_name'] ?? 'Lecturer Portal (Google)';
+            $issued = app(LecturerTokenIssuer::class)->issue(
+                $grant->lecturerId,
+                $deviceName,
+                $payload['picture'] ?? null,
+            );
 
             return [
-                'token' => $token,
-                'lecturer' => $lecturer,
+                'token' => $issued['token'],
+                'lecturer' => $issued['lecturer'],
             ];
         } catch (\Google\Exception $e) {
-            throw new Exception('Google authentication failed: ' . $e->getMessage());
+            throw new Exception('Google authentication failed: '.$e->getMessage());
         }
     }
 }
