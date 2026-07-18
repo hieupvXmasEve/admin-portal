@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Dng;
 
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -16,6 +17,8 @@ class ListDngWebhookEventsQuery
         'processing_status' => 'processing_status',
         'event_type' => 'event_type',
     ];
+
+    public function __construct(private readonly StudentReferenceReader $studentReferences) {}
 
     public function handle(Request $request): array
     {
@@ -35,7 +38,6 @@ class ListDngWebhookEventsQuery
         $query = $this->buildFilteredQuery($validated)
             ->with([
                 'dngPaymentRequest:id,student_id,campus_code,status,dng_payment_id,payment_id',
-                'dngPaymentRequest.student:id,student_id,full_name',
                 'dngPaymentRequest.payment:id,status,amount,external_ref',
             ]);
 
@@ -49,6 +51,7 @@ class ListDngWebhookEventsQuery
 
         $items->through(function (DngWebhookEvent $event): array {
             $linkedRequest = $event->dngPaymentRequest;
+            $student = $linkedRequest === null ? null : $this->studentReferences->find((int) $linkedRequest->student_id);
 
             return [
                 'id' => $event->id,
@@ -62,9 +65,9 @@ class ListDngWebhookEventsQuery
                 'linked_request' => $linkedRequest ? [
                     'id' => $linkedRequest->id,
                     'status' => $linkedRequest->status,
-                    'student' => $linkedRequest->student ? [
-                        'student_code' => $linkedRequest->student->student_id,
-                        'full_name' => $linkedRequest->student->full_name,
+                    'student' => $student ? [
+                        'student_code' => $student->studentCode,
+                        'full_name' => $student->fullName,
                     ] : null,
                     'payment' => $linkedRequest->payment ? [
                         'id' => $linkedRequest->payment->id,

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions;
 
-use App\Models\Student;
 use App\Modules\Finance\Dng\Exceptions\StudentDngPaymentAccessUnavailable;
 use App\Modules\Finance\Dng\Exceptions\StudentDngPaymentRequestNotFound;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
@@ -13,6 +12,8 @@ use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Support\SettlementPosition\Money;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -24,21 +25,22 @@ final class CreateStudentDngPaymentAccessAction
         private readonly DngCampusCodeResolver $campusCodeResolver,
         private readonly DngPaymentService $dngPaymentService,
         private readonly SettlementPositionReader $settlementPositionReader,
+        private readonly StudentReferenceReader $studentReferences,
     ) {}
 
     /**
-     * @param  array{student: Student, payment_method: string, dng_request_id?: int|null}  $data
+     * @param  array{student_id: int, payment_method: string, dng_request_id?: int|null}  $data
      * @return array<string, mixed>
      */
     public static function run(array $data): array
     {
-        $student = $data['student'] ?? null;
-        if (! $student instanceof Student) {
+        $studentId = isset($data['student_id']) ? (int) $data['student_id'] : 0;
+        if ($studentId <= 0) {
             throw new \InvalidArgumentException('A student is required for DNG payment access.');
         }
 
         return app(self::class)->handle(
-            $student,
+            $studentId,
             (string) $data['payment_method'],
             isset($data['dng_request_id']) ? (int) $data['dng_request_id'] : null,
         );
@@ -47,10 +49,15 @@ final class CreateStudentDngPaymentAccessAction
     /**
      * @return array<string, mixed>
      */
-    public function handle(Student $student, string $paymentMethod, ?int $dngRequestId = null): array
+    public function handle(int $studentId, string $paymentMethod, ?int $dngRequestId = null): array
     {
         if (! in_array($paymentMethod, self::PAYMENT_METHODS, true)) {
             throw new \InvalidArgumentException("Unsupported student DNG payment method [{$paymentMethod}].");
+        }
+
+        $student = $this->studentReferences->find($studentId);
+        if ($student === null) {
+            throw new StudentDngPaymentAccessUnavailable;
         }
 
         $campusCode = $this->campusCode($student);
@@ -153,13 +160,13 @@ final class CreateStudentDngPaymentAccessAction
         }
     }
 
-    private function assertRequestIsSafe(DngPaymentRequest $request, Student $student, string $campusCode): void
+    private function assertRequestIsSafe(DngPaymentRequest $request, StudentReference $student, string $campusCode): void
     {
         if ($request->student_id !== $student->id
             || $request->billing_account_id === null
             || $request->provider_rail !== 'dng'
             || $request->campus_code !== $campusCode
-            || $request->student_code !== $student->student_id
+            || $request->student_code !== $student->studentCode
             || $request->status !== DngPaymentRequest::STATUS_PUSHED_TO_DNG
             || blank($request->item_id)
             || (float) $request->amount <= 0) {
@@ -187,10 +194,10 @@ final class CreateStudentDngPaymentAccessAction
         }
     }
 
-    private function campusCode(Student $student): string
+    private function campusCode(StudentReference $student): string
     {
         try {
-            return $this->campusCodeResolver->requireForStudent($student);
+            return $this->campusCodeResolver->requireForCampusId($student->campusId);
         } catch (ValidationException) {
             throw new StudentDngPaymentAccessUnavailable;
         }

@@ -95,6 +95,10 @@ class FinanceServiceProvider extends ServiceProvider
             $this->loadRoutesFrom($routesPath.'/api.php');
         }
 
+        // Transitional adapter: Student Registry still owns the backing model
+        // while Finance must preserve eager billing-account provisioning for
+        // pre-existing creation flows. Collection paths resolve identity only
+        // through StudentReferenceReader.
         Student::observe(StudentBillingAccountObserver::class);
 
         // Explicit registration required: Laravel 13 auto-discovery does not

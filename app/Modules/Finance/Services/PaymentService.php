@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Services;
 
-use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestReservationTarget;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
@@ -15,6 +14,7 @@ use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -41,6 +41,7 @@ class PaymentService
         protected SettlementService $settlementService,
         private readonly BillingAccountProvisioner $billingAccountProvisioner,
         private readonly SettlementMutationGuard $settlementMutationGuard,
+        private readonly StudentReferenceReader $studentReferences,
     ) {}
 
     /**
@@ -83,7 +84,7 @@ class PaymentService
             return;
         }
 
-        $student = Student::query()->find($payment->student_id);
+        $student = $this->studentReferences->find((int) $payment->student_id);
         if (! $student) {
             return;
         }
@@ -95,14 +96,14 @@ class PaymentService
             occurredAt: CarbonImmutable::now(),
             aggregateType: 'payment',
             aggregateId: (string) $payment->id,
-            campusId: (int) $student->campus_id,
+            campusId: $student->campusId,
             actorUserId: $this->currentUserId(),
             payload: [
                 'type_key' => 'invoice_paid',
-                'student_id' => (int) $student->id,
+                'student_id' => $student->id,
                 'channels' => ['email', 'realtime'],
                 'recipient_targets' => [
-                    ['type' => 'student', 'id' => (int) $student->id],
+                    ['type' => 'student', 'id' => $student->id],
                 ],
                 'data' => [
                     'title' => 'Payment received',

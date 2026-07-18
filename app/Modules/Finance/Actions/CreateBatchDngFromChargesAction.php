@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions;
 
-use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
@@ -14,6 +13,7 @@ use App\Modules\Finance\Queries\Dng\ListDngWorklistQuery;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
 use App\Shared\Contracts\Academic\AcademicFinanceSourceKeys;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Closure;
 use Illuminate\Support\Facades\Log;
 
@@ -147,12 +147,14 @@ class CreateBatchDngFromChargesAction
         string $description,
         string $estimateTime,
     ): DngPaymentRequest {
-        $student = Student::query()->findOrFail($studentId);
+        if (app(StudentReferenceReader::class)->find($studentId) === null) {
+            throw new \RuntimeException("Student reference #{$studentId} could not be resolved.");
+        }
         if ($dngFeeType === 'HL') {
-            $this->assertNoMissingRetakeObligations($student, $semesterId);
+            $this->assertNoMissingRetakeObligations($studentId, $semesterId);
         }
         if ($dngFeeType === 'PTL') {
-            $this->assertNoMissingExamResitObligations($student, $semesterId);
+            $this->assertNoMissingExamResitObligations($studentId, $semesterId);
         }
 
         $charges = FinanceCharge::query()
@@ -245,9 +247,9 @@ class CreateBatchDngFromChargesAction
      * For HL fee_type: fail fast when a chargeable retake source has no
      * legacy charge link and no FinanceObligation.
      */
-    private function assertNoMissingRetakeObligations(Student $student, int $semesterId): void
+    private function assertNoMissingRetakeObligations(int $studentId, int $semesterId): void
     {
-        foreach ($this->academicSources()->chargeableRetakeSourcesForStudent((int) $student->id, $semesterId, lockForUpdate: true) as $source) {
+        foreach ($this->academicSources()->chargeableRetakeSourcesForStudent($studentId, $semesterId, lockForUpdate: true) as $source) {
             if (! $this->financeObligationExists(
                 $source->source_kind,
                 $source->source_ref,
@@ -264,9 +266,9 @@ class CreateBatchDngFromChargesAction
      * For PTL fee_type: fail fast when a chargeable exam-resit source has no
      * legacy charge link and no FinanceObligation.
      */
-    private function assertNoMissingExamResitObligations(Student $student, int $semesterId): void
+    private function assertNoMissingExamResitObligations(int $studentId, int $semesterId): void
     {
-        foreach ($this->academicSources()->chargeableExamResitSourcesForStudent((int) $student->id, $semesterId, lockForUpdate: true) as $source) {
+        foreach ($this->academicSources()->chargeableExamResitSourcesForStudent($studentId, $semesterId, lockForUpdate: true) as $source) {
             if (! $this->financeObligationExists(
                 $source->source_kind,
                 $source->source_ref,

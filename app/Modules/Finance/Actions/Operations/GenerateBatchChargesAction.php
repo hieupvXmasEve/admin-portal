@@ -20,6 +20,7 @@ use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
+use App\Shared\Contracts\StudentRegistry\StudentCollectionEligibilityReader;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -43,24 +44,17 @@ class GenerateBatchChargesAction
             ]
         );
 
-        // Scope by selected charge types: EGC-only => only intake_pre_uni_gc; tuition-only => only intake_course
+        // Scope by selected charge types through the Registry-owned eligibility decision.
         $hasEgc = in_array(FinanceCharge::TYPE_EGC_LEVEL_FEE, $chargeTypes);
         $hasTuition = in_array(FinanceCharge::TYPE_TUITION_TERM, $chargeTypes);
-        if ($hasEgc && ! $hasTuition) {
-            $query->where('students.status', 'intake_pre_uni_gc');
-        } elseif ($hasTuition && ! $hasEgc) {
-            $query->where('students.status', 'intake_course');
-        } else {
-            $query->whereIn('students.status', ['intake_pre_uni_gc', 'intake_course']);
-        }
-
-        // Filter by Campus (assuming BillingScopeHelper might already do it, but to be safe)
-        if (function_exists('app') && app()->bound('campus')) {
-            $campusId = app('campus')->id ?? null;
-            if ($campusId) {
-                $query->where('students.campus_id', $campusId);
-            }
-        }
+        $collectionPurposes = match (true) {
+            $hasEgc && ! $hasTuition => ['egc'],
+            $hasTuition && ! $hasEgc => ['tuition'],
+            default => [],
+        };
+        $campusId = app()->bound('campus') ? app('campus')->id : null;
+        $eligibleStudentIds = app(StudentCollectionEligibilityReader::class)->eligibleStudentIds($collectionPurposes, $campusId === null ? null : (int) $campusId);
+        $query->whereIn('students.id', $eligibleStudentIds);
 
         // Eager load necessary relations for logic check
         $query->with(['scholarshipAward.scholarshipDefinition', 'voucherApplications.voucherDefinition', 'courseRegistrations' => function ($q) use ($semesterId) {

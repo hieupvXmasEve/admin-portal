@@ -15,6 +15,7 @@ use App\Modules\Finance\Http\Requests\Student360\ReviewedCancelDngRequest;
 use App\Modules\Finance\Queries\Dng\GetDngPaymentRequestDetailsQuery;
 use App\Modules\Finance\Queries\Dng\ListDngPaymentRequestsQuery;
 use App\Modules\Finance\Queries\Student360\BuildDngCancelImpactQuery;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -24,6 +25,8 @@ use Inertia\Response;
 
 class DngPaymentRequestController extends Controller
 {
+    public function __construct(private readonly StudentReferenceReader $studentReferences) {}
+
     public function index(Request $request, ListDngPaymentRequestsQuery $query): Response
     {
         $result = $query->handle($request);
@@ -44,7 +47,6 @@ class DngPaymentRequestController extends Controller
 
     public function cancel(DngPaymentRequest $dngPaymentRequest, CancelDngPaymentRequestAction $action): RedirectResponse
     {
-        $dngPaymentRequest->loadMissing('student:id,campus_id');
         $this->assertCampusAccess($dngPaymentRequest);
 
         $cancellableStatuses = [DngPaymentRequest::STATUS_PENDING, DngPaymentRequest::STATUS_PUSHED_TO_DNG];
@@ -72,7 +74,6 @@ class DngPaymentRequestController extends Controller
         ResolveDngReservationOutcomeRequest $request,
         ResolveDngReservationOutcomeAction $action,
     ): RedirectResponse {
-        $dngPaymentRequest->loadMissing('student:id,campus_id');
         $this->assertCampusAccess($dngPaymentRequest);
 
         try {
@@ -94,7 +95,6 @@ class DngPaymentRequestController extends Controller
     /** JSON: impact of cancelling this DNG (linked charges + blocking reasons). */
     public function cancelImpact(DngPaymentRequest $dngPaymentRequest, BuildDngCancelImpactQuery $query): JsonResponse
     {
-        $dngPaymentRequest->loadMissing('student:id,campus_id');
         $this->assertCampusAccess($dngPaymentRequest);
 
         return ApiResponse::success($query->handle($dngPaymentRequest));
@@ -106,7 +106,6 @@ class DngPaymentRequestController extends Controller
         ReviewedCancelDngRequest $request,
         CancelDngPaymentRequestAction $action,
     ): RedirectResponse {
-        $dngPaymentRequest->loadMissing('student:id,campus_id');
         $this->assertCampusAccess($dngPaymentRequest);
 
         $cancellable = [DngPaymentRequest::STATUS_PENDING, DngPaymentRequest::STATUS_PUSHED_TO_DNG];
@@ -132,7 +131,8 @@ class DngPaymentRequestController extends Controller
     private function assertCampusAccess(DngPaymentRequest $paymentRequest): void
     {
         $campus = app()->bound('campus') ? app('campus') : null;
-        if ($campus instanceof Campus && $campus->id !== null && $paymentRequest->student?->campus_id !== (int) $campus->id) {
+        $student = $this->studentReferences->find((int) $paymentRequest->student_id);
+        if ($campus instanceof Campus && $campus->id !== null && $student?->campusId !== (int) $campus->id) {
             throw new AuthorizationException;
         }
     }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Dng\Services;
 
-use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestReservationTarget;
@@ -17,6 +16,8 @@ use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Modules\Finance\Support\SettlementPosition\Money;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Closure;
 
 /** Coordinates the durable DNG reservation lifecycle around an external provider call. */
@@ -29,6 +30,7 @@ final class DngReservationLifecycle
         private readonly DngCampusCodeResolver $campusCodeResolver,
         private readonly DngPaymentService $dngPaymentService,
         private readonly ?SettlementMutationGuard $settlementMutationGuard = null,
+        private readonly ?StudentReferenceReader $studentReferences = null,
     ) {}
 
     /** @param array{description: string, semester_id: int, due_date: string, estimate_time: string} $details */
@@ -45,11 +47,11 @@ final class DngReservationLifecycle
             throw new \InvalidArgumentException("DNG fee type {$feeType} has no supported Finance charge types.");
         }
 
+        $student = $this->studentReference($studentId);
         $billingAccountId = (int) BillingAccount::query()->where('student_id', $studentId)->sole()->id;
 
-        return $this->guard()->handleIfChanged($billingAccountId, function (BillingAccount $billingAccount, Closure $markChanged) use ($studentId, $feeType, $chargeTypes, $details, $requestedLineIds, $targetAmounts, $installmentIdsByLine): DngPaymentRequest {
-            $student = Student::query()->lockForUpdate()->findOrFail($studentId);
-            $campusCode = $this->campusCodeResolver->requireForStudent($student);
+        return $this->guard()->handleIfChanged($billingAccountId, function (BillingAccount $billingAccount, Closure $markChanged) use ($student, $studentId, $feeType, $chargeTypes, $details, $requestedLineIds, $targetAmounts, $installmentIdsByLine): DngPaymentRequest {
+            $campusCode = $this->campusCodeResolver->requireForCampusId($student->campusId);
             $slotKey = $this->slotKey((int) $billingAccount->id, $campusCode, $feeType);
             $existing = DngPaymentRequest::query()
                 ->holdingCollection()
@@ -143,7 +145,7 @@ final class DngReservationLifecycle
                 'billing_account_id' => $billingAccount->id,
                 'campus_code' => $campusCode,
                 'provider_rail' => self::PROVIDER_RAIL,
-                'student_code' => $student->student_id,
+                'student_code' => $student->studentCode,
                 'fee_type' => $feeType,
                 'description' => $details['description'],
                 'semester_id' => $details['semester_id'],
@@ -190,7 +192,7 @@ final class DngReservationLifecycle
             return $reservation;
         }
 
-        $student = Student::query()->findOrFail($studentId);
+        $student = $this->studentReference($studentId);
         $payload = $this->providerPayload($student, $reservation, $details);
         try {
             $response = $this->dngPaymentService->pushReserved($payload);
@@ -310,7 +312,7 @@ final class DngReservationLifecycle
      */
     private function isExactRetry(
         DngPaymentRequest $existing,
-        Student $student,
+        StudentReference $student,
         BillingAccount $billingAccount,
         string $campusCode,
         string $feeType,
@@ -349,7 +351,7 @@ final class DngReservationLifecycle
 
         return ! ($existing->student_id !== $student->id
             || $existing->billing_account_id !== $billingAccount->id
-            || $existing->student_code !== $student->student_id
+            || $existing->student_code !== $student->studentCode
             || $existing->campus_code !== $campusCode
             || $existing->provider_rail !== self::PROVIDER_RAIL
             || $existing->fee_type !== $feeType
@@ -443,11 +445,11 @@ final class DngReservationLifecycle
     }
 
     /** @param array{description: string, semester_id: int, due_date: string, estimate_time: string} $details @return array<string, mixed> */
-    private function providerPayload(Student $student, DngPaymentRequest $reservation, array $details): array
+    private function providerPayload(StudentReference $student, DngPaymentRequest $reservation, array $details): array
     {
         return [
             'campus_code' => $reservation->campus_code,
-            'student_code' => $student->student_id,
+            'student_code' => $student->studentCode,
             'fee_type' => $reservation->fee_type,
             'type' => $reservation->fee_type,
             'description' => $reservation->description,
@@ -455,11 +457,17 @@ final class DngReservationLifecycle
             'due_date' => $details['due_date'],
             'item_id' => $reservation->item_id,
             'amount' => $reservation->amount,
-            'student_name' => $student->full_name,
+            'student_name' => $student->fullName,
             'email' => $student->email ?? '',
             'estimate_time' => $details['estimate_time'],
-            'student_address' => $student->current_address_line ?? $student->address ?? '',
-            'cccd' => $student->national_id ?? null,
+            'student_address' => $student->address ?? '',
+            'cccd' => $student->nationalId,
         ];
+    }
+
+    private function studentReference(int $studentId): StudentReference
+    {
+        return ($this->studentReferences ?? app(StudentReferenceReader::class))->find($studentId)
+            ?? throw new \RuntimeException("Student reference #{$studentId} cannot be resolved for the DNG payment request.");
     }
 }

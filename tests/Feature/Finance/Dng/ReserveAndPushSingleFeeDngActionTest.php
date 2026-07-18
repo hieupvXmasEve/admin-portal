@@ -85,7 +85,7 @@ function reservationPayableLine(StudentInvoice $invoice, BillingAccount $billing
 function guardedReservationAction(DngPaymentService $service): ReserveAndPushSingleFeeDngAction
 {
     $campusResolver = Mockery::mock(DngCampusCodeResolver::class);
-    $campusResolver->shouldReceive('requireForStudent')->andReturn('FAUHN');
+    $campusResolver->shouldReceive('requireForCampusId')->andReturn('FAUHN');
 
     return new ReserveAndPushSingleFeeDngAction(new DngReservationLifecycle(
         app(SettlementPositionReader::class),
@@ -409,7 +409,7 @@ it('fails before the provider call when a target drifts during local reservation
     $service = Mockery::mock(DngPaymentService::class);
     $service->shouldNotReceive('pushReserved');
     $campusResolver = Mockery::mock(DngCampusCodeResolver::class);
-    $campusResolver->shouldReceive('requireForStudent')->andReturn('FAUHN');
+    $campusResolver->shouldReceive('requireForCampusId')->andReturn('FAUHN');
     $action = new ReserveAndPushSingleFeeDngAction(new DngReservationLifecycle($reader, $campusResolver, $service));
 
     expect(fn () => $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester)))

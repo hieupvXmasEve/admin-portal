@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Dng;
 
-use App\Models\Student;
+use App\Models\Campus;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
 use App\Modules\Finance\Models\FinanceCharge;
@@ -16,6 +16,7 @@ use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistPre
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistReader;
 use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
 use App\Shared\Contracts\Academic\DTO\AcademicChargeSourceData;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -43,6 +44,7 @@ class ListDngWorklistQuery
         private readonly SettlementPositionWorklistReader $positionReader,
         private readonly SettlementPositionWorklistPresenter $positionPresenter,
         private readonly AcademicFinanceChargeSourceGateway $academicSources,
+        private readonly StudentReferenceReader $studentReferences,
     ) {}
 
     /**
@@ -77,24 +79,42 @@ class ListDngWorklistQuery
         $chargeTypes = self::mapFeeTypeToChargeTypes($dngFeeType);
 
         $campusFilter = app()->bound('campus') ? app('campus')->id : $campusId;
+        $studentIdsForFilters = $this->studentIdsForFilters($campusFilter === null ? null : (int) $campusFilter, $search);
 
         $lines = InvoiceLine::query()
-            ->with(['invoice.student.campus', 'invoice.semester', 'charge.financeObligation'])
+            ->with(['invoice.semester', 'charge.financeObligation'])
             ->where('invoice_lines.status', 'active')
             ->whereHas('charge', function ($query) use ($chargeTypes): void {
                 $query->where('status', FinanceCharge::STATUS_ACTIVE)
                     ->where('amount', '>', 0)
                     ->whereIn('charge_type', $chargeTypes);
             })
-            ->whereHas('invoice', function ($query) use ($campusFilter, $semesterId, $search): void {
+            ->whereHas('invoice', function ($query) use ($studentIdsForFilters, $semesterId): void {
                 $query->when($semesterId !== null, fn ($q) => $q->where('semester_id', $semesterId))
-                    ->when($campusFilter !== null, fn ($q) => $q->whereHas('student', fn ($sq) => $sq->where('campus_id', $campusFilter)))
-                    ->when($search !== '', fn ($q) => $q->whereHas('student', function ($sq) use ($search): void {
-                        $sq->where('student_id', 'like', "%{$search}%")
-                            ->orWhere('full_name', 'like', "%{$search}%");
-                    }));
+                    ->when($studentIdsForFilters !== null, fn ($q) => $q->whereIn('student_id', $studentIdsForFilters));
             })
             ->get();
+
+        $unlinkedCharges = FinanceCharge::query()
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->where('amount', '>', 0)
+            ->whereIn('charge_type', $chargeTypes)
+            ->whereDoesntHave('invoiceLines', fn ($query) => $query->where('status', 'active'))
+            ->when($studentIdsForFilters !== null, fn ($query) => $query->whereIn('student_id', $studentIdsForFilters))
+            ->when($semesterId !== null, fn ($query) => $query->where('semester_id', $semesterId))
+            ->get();
+
+        $studentReferences = $this->studentReferences->findMany(
+            $lines->pluck('invoice.student_id')
+                ->merge($unlinkedCharges->pluck('student_id'))
+                ->map(static fn (int|string $id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all(),
+        );
+        $campusNames = Campus::query()
+            ->whereIn('id', collect($studentReferences)->map(fn ($student): int => $student->campusId)->unique()->all())
+            ->pluck('name', 'id');
 
         $lineIdsByStudent = $lines->groupBy(fn (InvoiceLine $line): int => (int) $line->invoice->student_id)
             ->map(fn (Collection $studentLines): array => $studentLines->pluck('id')->map(fn ($id): int => (int) $id)->all())
@@ -102,10 +122,9 @@ class ListDngWorklistQuery
         $positionsByStudent = $this->positionReader->forLineGroups($lineIdsByStudent);
 
         $allStudentRows = $lines->groupBy(fn (InvoiceLine $line): int => (int) $line->invoice->student_id)
-            ->map(function (Collection $studentLines, int|string $studentId) use ($positionsByStudent): object {
+            ->map(function (Collection $studentLines, int|string $studentId) use ($campusNames, $positionsByStudent, $studentReferences): object {
                 $studentId = (int) $studentId;
-                $firstLine = $studentLines->first();
-                $student = $firstLine->invoice->student;
+                $student = $studentReferences[$studentId] ?? null;
                 $position = $positionsByStudent[$studentId] ?? null;
                 $summary = $position instanceof SettlementPosition
                     ? $this->positionPresenter->summarize($position)
@@ -113,10 +132,10 @@ class ListDngWorklistQuery
 
                 return (object) [
                     'student_id' => $studentId,
-                    'student_code' => $student?->student_id,
-                    'student_name' => $student?->full_name,
-                    'campus_id' => $student?->campus_id,
-                    'campus_name' => $student?->campus?->name,
+                    'student_code' => $student?->studentCode,
+                    'student_name' => $student?->fullName,
+                    'campus_id' => $student?->campusId,
+                    'campus_name' => $student === null ? null : $campusNames->get($student->campusId),
                     'charge_count' => $studentLines->pluck('charge_id')->filter()->unique()->count(),
                     'total_amount' => $summary['net'],
                     'total_paid' => $summary['cash'],
@@ -132,29 +151,14 @@ class ListDngWorklistQuery
             ->filter(fn (object $row): bool => $row->needs_review || ($row->balance !== null && $row->balance > 0))
             ->values();
 
-        $unlinkedCharges = FinanceCharge::query()
-            ->with(['student.campus'])
-            ->where('status', FinanceCharge::STATUS_ACTIVE)
-            ->where('amount', '>', 0)
-            ->whereIn('charge_type', $chargeTypes)
-            ->whereDoesntHave('invoiceLines', fn ($query) => $query->where('status', 'active'))
-            ->when($campusFilter !== null, fn ($query) => $query->whereHas('student', fn ($q) => $q->where('campus_id', $campusFilter)))
-            ->when($semesterId !== null, fn ($query) => $query->where('semester_id', $semesterId))
-            ->when($search !== '', fn ($query) => $query->whereHas('student', function ($q) use ($search): void {
-                $q->where('student_id', 'like', "%{$search}%")
-                    ->orWhere('full_name', 'like', "%{$search}%");
-            }))
-            ->get();
-
         foreach ($unlinkedCharges->groupBy('student_id') as $studentId => $charges) {
-            $firstCharge = $charges->first();
-            $student = $firstCharge->student;
+            $student = $studentReferences[(int) $studentId] ?? null;
             $missingRow = (object) [
                 'student_id' => (int) $studentId,
-                'student_code' => $student?->student_id,
-                'student_name' => $student?->full_name,
-                'campus_id' => $student?->campus_id,
-                'campus_name' => $student?->campus?->name,
+                'student_code' => $student?->studentCode,
+                'student_name' => $student?->fullName,
+                'campus_id' => $student?->campusId,
+                'campus_name' => $student === null ? null : $campusNames->get($student->campusId),
                 'charge_count' => $charges->count(),
                 'total_amount' => null,
                 'total_paid' => null,
@@ -389,6 +393,20 @@ class ListDngWorklistQuery
         }
 
         return $types;
+    }
+
+    /** @return list<int>|null */
+    private function studentIdsForFilters(?int $campusId, string $search): ?array
+    {
+        if ($search !== '') {
+            return $this->studentReferences->idsMatchingSearch($search, $campusId);
+        }
+
+        if ($campusId !== null) {
+            return $this->studentReferences->idsForCampus($campusId);
+        }
+
+        return null;
     }
 
     /**

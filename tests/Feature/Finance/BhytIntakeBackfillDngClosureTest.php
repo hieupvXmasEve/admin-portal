@@ -85,7 +85,7 @@ function makeBhytBatchDngAction(bool $dngFails = false): CreateBatchDngFromCharg
     }
 
     $campusResolverMock = Mockery::mock(DngCampusCodeResolver::class);
-    $campusResolverMock->shouldReceive('requireForStudent')->andReturn('FAUHN');
+    $campusResolverMock->shouldReceive('requireForCampusId')->andReturn('FAUHN');
 
     return new CreateBatchDngFromChargesAction(new ReserveAndPushSingleFeeDngAction(
         new DngReservationLifecycle(

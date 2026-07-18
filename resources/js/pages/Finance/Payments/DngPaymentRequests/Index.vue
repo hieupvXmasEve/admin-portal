@@ -27,8 +27,6 @@ interface DngPaymentRequestRow {
         id: number;
         student_code: string;
         full_name: string;
-        status_label: string;
-        status_color: string;
     } | null;
     campus_code: string;
     student_code: string;
@@ -194,19 +192,6 @@ const getRequestStatusClass = (status: string) => {
     }
 };
 
-const getStudentStatusClass = (color: string) => {
-    const map: Record<string, string> = {
-        red: 'bg-red-50 text-red-700 border-red-200',
-        blue: 'bg-blue-50 text-blue-700 border-blue-200',
-        yellow: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-        indigo: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-        green: 'bg-green-50 text-green-700 border-green-200',
-        orange: 'bg-orange-50 text-orange-700 border-orange-200',
-        gray: 'bg-slate-50 text-slate-700 border-slate-200',
-    };
-    return map[color] ?? map.gray;
-};
-
 const getWebhookStatusClass = (status: string) => {
     switch (status) {
         case 'processed':
@@ -348,9 +333,6 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
                             <div class="font-medium">{{ row.original.student?.full_name || '-' }}</div>
                             <div class="text-muted-foreground text-xs">{{ row.original.student_code }}</div>
                             <div class="text-muted-foreground text-xs">Campus {{ row.original.campus_code }}</div>
-                            <Badge v-if="row.original.student?.status_label" variant="outline" :class="getStudentStatusClass(row.original.student.status_color)">
-                                {{ row.original.student.status_label }}
-                            </Badge>
                         </div>
                     </template>
 

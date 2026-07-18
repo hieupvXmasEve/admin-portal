@@ -6,7 +6,6 @@ namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Semester;
-use App\Models\Student;
 use App\Modules\Finance\Actions\AllocatePaymentAction;
 use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
@@ -18,6 +17,8 @@ use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Queries\GetPaymentDetailsQuery;
 use App\Modules\Finance\Queries\ListPaymentsQuery;
 use App\Modules\Finance\Queries\Operations\PreviewAutoAllocateQuery;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -26,6 +27,7 @@ class PaymentController extends Controller
 {
     public function __construct(
         private DngCampusCodeResolver $dngCampusCodeResolver,
+        private StudentReferenceReader $studentReferences,
     ) {}
 
     public function index(FilterPaymentsRequest $request, ListPaymentsQuery $query): Response
@@ -64,13 +66,8 @@ class PaymentController extends Controller
      */
     public function getStudentDngData(int $studentId)
     {
-        $studentQuery = Student::query()->whereKey($studentId);
-        $campus = app()->bound('campus') ? app('campus') : null;
-        if ($campus !== null && isset($campus->id)) {
-            $studentQuery->where('campus_id', (int) $campus->id);
-        }
-
-        $student = $studentQuery->firstOrFail();
+        $student = $this->visibleStudentReference($studentId);
+        abort_if($student === null, 404);
 
         return response()->json($this->buildStudentDngData($student));
     }
@@ -87,7 +84,7 @@ class PaymentController extends Controller
      *     latest_dng_request: array{id: int, status: string, item_id: string, description: string|null, created_at: string|null}|null,
      * }
      */
-    private function buildStudentDngData(Student $student): array
+    private function buildStudentDngData(StudentReference $student): array
     {
         $latestDngRequest = DngPaymentRequest::query()
             ->where('student_id', $student->id)
@@ -96,12 +93,12 @@ class PaymentController extends Controller
 
         return [
             'student_id' => $student->id,
-            'campus_code' => $this->dngCampusCodeResolver->requireForStudent($student),
-            'student_code' => $student->student_id,
-            'student_name' => $student->full_name,
+            'campus_code' => $this->dngCampusCodeResolver->requireForCampusId($student->campusId),
+            'student_code' => $student->studentCode,
+            'student_name' => $student->fullName,
             'email' => $student->email ?? '',
-            'student_address' => $student->address ?? $student->current_address_line ?? '',
-            'cccd' => $student->national_id ?? '',
+            'student_address' => $student->address ?? '',
+            'cccd' => $student->nationalId ?? '',
             'latest_dng_request' => $latestDngRequest ? [
                 'id' => $latestDngRequest->id,
                 'status' => $latestDngRequest->status,
@@ -136,7 +133,7 @@ class PaymentController extends Controller
     private function buildCreatePrefill(Request $request): ?array
     {
         $validated = $request->validate([
-            'student_id' => ['nullable', 'integer', 'exists:students,id'],
+            'student_id' => ['nullable', 'integer'],
             'amount' => ['nullable', 'numeric', 'min:1'],
             'fee_type' => ['nullable', 'string', 'max:20'],
             'description' => ['nullable', 'string', 'max:255'],
@@ -149,13 +146,7 @@ class PaymentController extends Controller
             return null;
         }
 
-        $studentQuery = Student::query()->whereKey((int) $validated['student_id']);
-        $campus = app()->bound('campus') ? app('campus') : null;
-        if ($campus !== null && isset($campus->id)) {
-            $studentQuery->where('campus_id', (int) $campus->id);
-        }
-
-        $student = $studentQuery->first();
+        $student = $this->visibleStudentReference((int) $validated['student_id']);
 
         if (! $student) {
             return null;
@@ -164,8 +155,8 @@ class PaymentController extends Controller
         return [
             'student' => [
                 'id' => $student->id,
-                'student_id' => $student->student_id,
-                'full_name' => $student->full_name,
+                'student_id' => $student->studentCode,
+                'full_name' => $student->fullName,
                 'email' => $student->email ?? '',
             ],
             'dng_data' => $this->buildStudentDngData($student),
@@ -192,6 +183,16 @@ class PaymentController extends Controller
                 'code' => $semester->code,
             ])
             ->all();
+    }
+
+    private function visibleStudentReference(int $studentId): ?StudentReference
+    {
+        $student = $this->studentReferences->find($studentId);
+        $campusId = app()->bound('campus') ? app('campus')?->id : null;
+
+        return $student !== null && $campusId !== null && $student->campusId === (int) $campusId
+            ? $student
+            : null;
     }
 
     public function allocate(int $id, Request $request, AllocatePaymentAction $action)

@@ -11,6 +11,9 @@ final readonly class StudentReference
         public string $studentCode,
         public string $fullName,
         public int $campusId,
+        public ?string $email = null,
+        public ?string $address = null,
+        public ?string $nationalId = null,
     ) {}
 
     /**

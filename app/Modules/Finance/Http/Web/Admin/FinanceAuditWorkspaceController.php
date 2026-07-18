@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Http\Requests\Audit\FinanceAuditSearchRequest;
 use App\Modules\Finance\Models\FinanceCharge;
@@ -20,6 +19,7 @@ use App\Modules\Finance\Support\Integrity\FinanceAuditScope;
 use App\Modules\Finance\Support\Integrity\FinanceIntegrityAuditor;
 use App\Modules\Finance\Support\Integrity\FinanceInvariantRegistry;
 use App\Modules\Finance\Support\Integrity\FinanceInvariantSampleResolver;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -42,6 +42,8 @@ class FinanceAuditWorkspaceController extends Controller
         'dng' => ['finance.dng.payment-requests.show', 'dngPaymentRequest', 'view_finance_dng_payment_requests'],
         'student' => ['finance.students.charges', 'student', 'view_finance_charges'],
     ];
+
+    public function __construct(private readonly StudentReferenceReader $studentReferences) {}
 
     public function index(
         FinanceAuditSearchRequest $request,
@@ -162,7 +164,7 @@ class FinanceAuditWorkspaceController extends Controller
             return false;
         }
 
-        $ownerCampusId = Student::find($studentId)?->campus_id;
+        $ownerCampusId = $this->studentReferences->find($studentId)?->campusId;
 
         return $ownerCampusId !== null && (int) $ownerCampusId === $campusId;
     }
@@ -288,6 +290,6 @@ class FinanceAuditWorkspaceController extends Controller
             return [];
         }
 
-        return Student::query()->where('campus_id', $campusId)->pluck('id')->map(fn ($id) => (int) $id)->all();
+        return $this->studentReferences->idsForCampus($campusId);
     }
 }

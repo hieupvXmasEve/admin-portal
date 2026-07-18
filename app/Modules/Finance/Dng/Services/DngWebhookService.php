@@ -19,6 +19,7 @@ use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Support\Facades\Log;
@@ -35,6 +36,7 @@ class DngWebhookService
         protected ExamResitAttemptPaymentSyncer $examResitAttemptPaymentSyncer,
         protected ?BillingAccountProvisioner $billingAccountProvisioner = null,
         protected ?SettlementMutationGuard $settlementMutationGuard = null,
+        protected ?StudentReferenceReader $studentReferences = null,
     ) {}
 
     /**
@@ -483,8 +485,8 @@ class DngWebhookService
     private function publishPaymentReceivedNotification(DngPaymentRequest $request): void
     {
         try {
-            $student = $request->student;
-            $studentName = $student?->full_name ?? '';
+            $student = $this->studentReferences()->find((int) $request->student_id);
+            $studentName = $student?->fullName ?? '';
             $formattedAmount = number_format((float) $request->amount, 0, ',', '.').' VNĐ';
 
             $envelope = new DomainEventEnvelope(
@@ -494,7 +496,7 @@ class DngWebhookService
                 occurredAt: CarbonImmutable::now(),
                 aggregateType: 'dng_payment_request',
                 aggregateId: (string) $request->id,
-                campusId: $student?->campus_id ? (int) $student->campus_id : null,
+                campusId: $student?->campusId,
                 actorUserId: null,
                 payload: [
                     'type_key' => 'dng_payment_received',
@@ -524,6 +526,11 @@ class DngWebhookService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    private function studentReferences(): StudentReferenceReader
+    {
+        return $this->studentReferences ?? app(StudentReferenceReader::class);
     }
 
     private function statusOrder(string $status): int

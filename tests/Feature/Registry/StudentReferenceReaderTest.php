@@ -44,6 +44,9 @@ it('publishes a campus-scoped student reference without lifecycle or finance sta
             'campus_id' => $campus->id,
         ])
         ->and($reader->find(999_999))->toBeNull()
+        ->and($reader->findMany([(int) $student->id, 999_999]))->toHaveKey((int) $student->id)
+        ->and($reader->idsForCampus((int) $campus->id))->toBe([(int) $student->id])
+        ->and($reader->idsMatchingSearch('Registry', (int) $campus->id))->toBe([(int) $student->id])
         ->and($reader->findByStudentCode('REG-1001', (int) $campus->id)?->id)->toBe($student->id)
         ->and($reader->findByStudentCode('REG-1001', (int) $otherCampus->id))->toBeNull()
         ->and(array_map(static fn (StudentReference $match): int => $match->id, $reader->search('Registry', (int) $campus->id)))

@@ -22,6 +22,7 @@ use App\Modules\Finance\Queries\GetStudentFinancePresentationQuery;
 use App\Modules\Finance\Services\PaymentService;
 use App\Modules\Finance\Support\SettlementPosition\Money;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -34,6 +35,7 @@ class StudentFinanceController extends Controller
         private SettlementPositionReader $settlementPositionReader,
         private GetStudentFinancePresentationQuery $studentFinance,
         private DngCampusCodeResolver $dngCampusCodeResolver,
+        private StudentReferenceReader $studentReferences,
     ) {}
 
     /**
@@ -281,7 +283,7 @@ class StudentFinanceController extends Controller
                 'invoice_date' => $r->invoice_date?->toDateString(),
                 'created_at' => $r->created_at?->toIso8601String(),
                 'payment_access' => [
-                    'status' => $this->hasSafeStudentDngAccessMetadata($r, $student)
+                    'status' => $this->hasSafeStudentDngAccessMetadata($r, (int) $student->id)
                         && $r->status === DngPaymentRequest::STATUS_PUSHED_TO_DNG
                         ? 'available'
                         : 'unavailable',
@@ -366,7 +368,7 @@ class StudentFinanceController extends Controller
                 'payment_access' => [
                     'status' => $activeCollectionItems->count() === 1
                         && $activeCollectionItems->first()->status === DngPaymentRequest::STATUS_PUSHED_TO_DNG
-                        && $this->hasSafeStudentDngAccessMetadata($activeCollectionItems->first(), $student)
+                        && $this->hasSafeStudentDngAccessMetadata($activeCollectionItems->first(), (int) $student->id)
                         ? 'available'
                         : 'unavailable',
                 ],
@@ -518,7 +520,7 @@ class StudentFinanceController extends Controller
 
         try {
             return ApiResponse::success(CreateStudentDngPaymentAccessAction::run([
-                'student' => $student,
+                'student_id' => (int) $student->id,
                 'payment_method' => $paymentMethod,
                 'dng_request_id' => $dngRequestId,
             ]));
@@ -537,10 +539,15 @@ class StudentFinanceController extends Controller
         }
     }
 
-    private function hasSafeStudentDngAccessMetadata(DngPaymentRequest $request, Student $student): bool
+    private function hasSafeStudentDngAccessMetadata(DngPaymentRequest $request, int $studentId): bool
     {
+        $student = $this->studentReferences->find($studentId);
+        if ($student === null) {
+            return false;
+        }
+
         try {
-            $campusCode = $this->dngCampusCodeResolver->requireForStudent($student);
+            $campusCode = $this->dngCampusCodeResolver->requireForCampusId($student->campusId);
         } catch (ValidationException) {
             return false;
         }
@@ -549,7 +556,7 @@ class StudentFinanceController extends Controller
             && $request->billing_account_id !== null
             && $request->provider_rail === 'dng'
             && $request->campus_code === $campusCode
-            && $request->student_code === $student->student_id
+            && $request->student_code === $student->studentCode
             && filled($request->item_id)
             && (float) $request->amount > 0;
 

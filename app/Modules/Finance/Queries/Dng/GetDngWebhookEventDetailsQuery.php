@@ -6,19 +6,22 @@ namespace App\Modules\Finance\Queries\Dng;
 
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
 use App\Modules\Finance\Models\DngReceiptException;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 
 class GetDngWebhookEventDetailsQuery
 {
+    public function __construct(private readonly StudentReferenceReader $studentReferences) {}
+
     public function handle(DngWebhookEvent $webhookEvent): array
     {
         $webhookEvent = DngWebhookEvent::query()
             ->with([
-                'dngPaymentRequest.student:id,student_id,full_name,email',
                 'dngPaymentRequest.payment:id,amount,status,external_ref,paid_at',
             ])
             ->findOrFail($webhookEvent->id);
 
         $request = $webhookEvent->dngPaymentRequest;
+        $student = $request === null ? null : $this->studentReferences->find((int) $request->student_id);
         $payload = $webhookEvent->payload ?? [];
         $exceptions = DngReceiptException::query()
             ->where('dng_webhook_event_id', $webhookEvent->id)
@@ -52,11 +55,11 @@ class GetDngWebhookEventDetailsQuery
                 'student_code' => $request->student_code,
                 'item_id' => $request->item_id,
                 'amount' => (float) $request->amount,
-                'student' => $request->student ? [
-                    'id' => $request->student->id,
-                    'student_code' => $request->student->student_id,
-                    'full_name' => $request->student->full_name,
-                    'email' => $request->student->email,
+                'student' => $student ? [
+                    'id' => $student->id,
+                    'student_code' => $student->studentCode,
+                    'full_name' => $student->fullName,
+                    'email' => $student->email,
                 ] : null,
                 'payment' => $request->payment ? [
                     'id' => $request->payment->id,

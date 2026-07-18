@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Support;
 
 use App\Models\Student;
+use App\Shared\Contracts\StudentRegistry\StudentCollectionEligibilityReader;
 use Illuminate\Database\Eloquent\Builder;
 
 class BillingScopeHelper
@@ -24,11 +25,12 @@ class BillingScopeHelper
             // Campus binding might not exist in console/test env
         }
 
+        $eligibleStudentIds = app(StudentCollectionEligibilityReader::class)->eligibleStudentIds([], $campusId);
+
         $query = Student::query()
             ->select('students.*', 'programs.code as program_code')
             ->leftJoin('programs', 'students.program_id', '=', 'programs.id')
-            ->whereIn('students.status', Student::FINANCIAL_STATUSES)
-            ->when($campusId, fn ($q) => $q->where('students.campus_id', $campusId));
+            ->whereIn('students.id', $eligibleStudentIds);
 
         // Eager load relationships needed for logic
         $query->with([
@@ -43,9 +45,7 @@ class BillingScopeHelper
                     $query->where('students.program_id', $filters['program_id']);
                 }
                 if (! empty($filters['enrollment_status']) && $filters['enrollment_status'] !== 'all') {
-                    // If specific status requested (though base query limits to FINANCIAL_STATUSES)
-                    // If 'active' vs 'enrolled' distinction exists, apply here.
-                    // taking 'active' as generic for FINANCIAL_STATUSES
+                    // Enrollment-status selection is owned by the Registry eligibility contract.
                 }
                 break;
 
@@ -57,7 +57,7 @@ class BillingScopeHelper
 
             case 'all_eligible':
             default:
-                // No extra filters needed beyond base FINANCIAL_STATUSES + Campus
+                // No extra filters needed beyond the Registry eligibility decision.
                 break;
         }
 

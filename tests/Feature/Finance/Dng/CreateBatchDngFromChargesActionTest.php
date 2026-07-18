@@ -90,7 +90,7 @@ beforeEach(function (): void {
     $service->shouldReceive('pushReserved')->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     app()->instance(DngPaymentService::class, $service);
     $resolver = Mockery::mock(DngCampusCodeResolver::class);
-    $resolver->shouldReceive('requireForStudent')->andReturn('FAUHN');
+    $resolver->shouldReceive('requireForCampusId')->andReturn('FAUHN');
     app()->instance(DngCampusCodeResolver::class, $resolver);
 });
 

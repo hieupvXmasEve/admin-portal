@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Support;
 
 use App\Modules\Finance\Models\BillingAccount;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Database\QueryException;
 
 /**
@@ -15,8 +16,14 @@ use Illuminate\Database\QueryException;
  */
 class BillingAccountProvisioner
 {
+    public function __construct(private readonly StudentReferenceReader $studentReferences) {}
+
     public function forStudent(int $studentId): BillingAccount
     {
+        if ($this->studentReferences->find($studentId) === null) {
+            throw new \RuntimeException("Student reference #{$studentId} cannot be resolved for Finance billing-account provisioning.");
+        }
+
         try {
             return BillingAccount::query()->firstOrCreate(
                 ['student_id' => $studentId],

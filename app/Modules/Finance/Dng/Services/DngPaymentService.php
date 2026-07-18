@@ -12,6 +12,7 @@ use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -25,6 +26,7 @@ class DngPaymentService
         protected PublishDomainEventAction $publishDomainEventAction,
         protected ?BillingAccountProvisioner $billingAccountProvisioner = null,
         protected ?SettlementMutationGuard $settlementMutationGuard = null,
+        protected ?StudentReferenceReader $studentReferences = null,
     ) {}
 
     /**
@@ -142,7 +144,7 @@ class DngPaymentService
                 return;
             }
 
-            $studentName = $request->student?->full_name ?? $request->student_code;
+            $studentName = $this->studentReferences()->find((int) $request->student_id)?->fullName ?? $request->student_code;
             $studentCode = $request->student_code;
             $formattedAmount = number_format((float) $payment->amount, 0, ',', '.').' VNĐ';
 
@@ -307,5 +309,10 @@ class DngPaymentService
         return (int) ($this->billingAccountProvisioner ?? app(BillingAccountProvisioner::class))
             ->forStudent((int) $request->student_id)
             ->id;
+    }
+
+    private function studentReferences(): StudentReferenceReader
+    {
+        return $this->studentReferences ?? app(StudentReferenceReader::class);
     }
 }

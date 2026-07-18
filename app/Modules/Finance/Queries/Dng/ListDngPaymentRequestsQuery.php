@@ -6,6 +6,7 @@ namespace App\Modules\Finance\Queries\Dng;
 
 use App\Models\Campus;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -18,6 +19,8 @@ class ListDngPaymentRequestsQuery
         'status' => 'status',
         'updated_at' => 'updated_at',
     ];
+
+    public function __construct(private readonly StudentReferenceReader $studentReferences) {}
 
     public function handle(Request $request): array
     {
@@ -35,7 +38,6 @@ class ListDngPaymentRequestsQuery
 
         $query = $this->buildFilteredQuery($validated)
             ->with([
-                'student:id,student_id,full_name,status',
                 'semester:id,name,code',
                 'payment:id,external_ref,status,amount,paid_at',
                 'webhookEvents' => fn ($builder) => $builder
@@ -58,19 +60,26 @@ class ListDngPaymentRequestsQuery
             ->orderBy($sort, $direction)
             ->paginate((int) ($validated['per_page'] ?? 15))
             ->withQueryString();
+        $studentReferences = $this->studentReferences->findMany(
+            $items->getCollection()
+                ->pluck('student_id')
+                ->map(static fn (int|string $id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all(),
+        );
 
-        $items->through(function (DngPaymentRequest $paymentRequest): array {
+        $items->through(function (DngPaymentRequest $paymentRequest) use ($studentReferences): array {
             $latestEvent = $paymentRequest->webhookEvents->first();
+            $student = $studentReferences[(int) $paymentRequest->student_id] ?? null;
 
             return [
                 'id' => $paymentRequest->id,
                 'created_at' => $paymentRequest->created_at?->toDateTimeString(),
-                'student' => $paymentRequest->student ? [
-                    'id' => $paymentRequest->student->id,
-                    'student_code' => $paymentRequest->student->student_id,
-                    'full_name' => $paymentRequest->student->full_name,
-                    'status_label' => $paymentRequest->student->status_label,
-                    'status_color' => $paymentRequest->student->status_color,
+                'student' => $student ? [
+                    'id' => $student->id,
+                    'student_code' => $student->studentCode,
+                    'full_name' => $student->fullName,
                 ] : null,
                 'campus_code' => $paymentRequest->campus_code,
                 'student_code' => $paymentRequest->student_code,
@@ -128,20 +137,19 @@ class ListDngPaymentRequestsQuery
         $campus = app()->bound('campus') ? app('campus') : null;
         if ($campus instanceof Campus && $campus->id !== null) {
             $campusId = (int) $campus->id;
-            $query->whereHas('student', fn (Builder $studentQuery) => $studentQuery->where('campus_id', $campusId));
+            $query->whereIn('student_id', $this->studentReferences->idsForCampus($campusId));
         }
 
         $search = trim((string) ($filters['search'] ?? ''));
         if ($search !== '') {
-            $query->where(function (Builder $builder) use ($search) {
+            $campusId = $campus instanceof Campus && $campus->id !== null ? (int) $campus->id : null;
+            $matchingStudentIds = $this->studentReferences->idsMatchingSearch($search, $campusId);
+            $query->where(function (Builder $builder) use ($matchingStudentIds, $search) {
                 $builder->where('student_code', 'like', "%{$search}%")
                     ->orWhere('item_id', 'like', "%{$search}%")
                     ->orWhere('dng_payment_id', 'like', "%{$search}%")
                     ->orWhere('dng_transaction_id', 'like', "%{$search}%")
-                    ->orWhereHas('student', function (Builder $studentQuery) use ($search) {
-                        $studentQuery->where('student_id', 'like', "%{$search}%")
-                            ->orWhere('full_name', 'like', "%{$search}%");
-                    });
+                    ->orWhereIn('student_id', $matchingStudentIds);
             });
         }
 

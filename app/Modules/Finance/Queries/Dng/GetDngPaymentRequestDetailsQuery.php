@@ -6,30 +6,36 @@ namespace App\Modules\Finance\Queries\Dng;
 
 use App\Models\Campus;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Auth\Access\AuthorizationException;
 
 class GetDngPaymentRequestDetailsQuery
 {
+    public function __construct(private readonly StudentReferenceReader $studentReferences) {}
+
     public function handle(DngPaymentRequest $paymentRequest): array
     {
         $paymentRequest = DngPaymentRequest::query()
             ->with([
-                'student:id,campus_id,student_id,full_name,email',
                 'semester:id,name,code',
-                'payment.student:id,student_id,full_name',
+                'payment',
                 'webhookEvents' => fn ($builder) => $builder->orderByDesc('created_at'),
             ])
             ->findOrFail($paymentRequest->id);
 
         $this->assertCampusAccess($paymentRequest);
+        $student = $this->studentReferences->find((int) $paymentRequest->student_id);
+        $paymentStudent = $paymentRequest->payment === null
+            ? null
+            : $this->studentReferences->find((int) $paymentRequest->payment->student_id);
 
         return [
             'id' => $paymentRequest->id,
-            'student' => $paymentRequest->student ? [
-                'id' => $paymentRequest->student->id,
-                'student_code' => $paymentRequest->student->student_id,
-                'full_name' => $paymentRequest->student->full_name,
-                'email' => $paymentRequest->student->email,
+            'student' => $student ? [
+                'id' => $student->id,
+                'student_code' => $student->studentCode,
+                'full_name' => $student->fullName,
+                'email' => $student->email,
             ] : null,
             'campus_code' => $paymentRequest->campus_code,
             'student_code' => $paymentRequest->student_code,
@@ -61,10 +67,10 @@ class GetDngPaymentRequestDetailsQuery
                 'status' => $paymentRequest->payment->status,
                 'external_ref' => $paymentRequest->payment->external_ref,
                 'paid_at' => $paymentRequest->payment->paid_at?->toDateTimeString(),
-                'student' => $paymentRequest->payment->student ? [
-                    'id' => $paymentRequest->payment->student->id,
-                    'student_code' => $paymentRequest->payment->student->student_id,
-                    'full_name' => $paymentRequest->payment->student->full_name,
+                'student' => $paymentStudent ? [
+                    'id' => $paymentStudent->id,
+                    'student_code' => $paymentStudent->studentCode,
+                    'full_name' => $paymentStudent->fullName,
                 ] : null,
             ] : null,
             'payloads' => [
@@ -89,7 +95,8 @@ class GetDngPaymentRequestDetailsQuery
     private function assertCampusAccess(DngPaymentRequest $paymentRequest): void
     {
         $campus = app()->bound('campus') ? app('campus') : null;
-        if ($campus instanceof Campus && $campus->id !== null && $paymentRequest->student?->campus_id !== (int) $campus->id) {
+        $student = $this->studentReferences->find((int) $paymentRequest->student_id);
+        if ($campus instanceof Campus && $campus->id !== null && $student?->campusId !== (int) $campus->id) {
             throw new AuthorizationException;
         }
     }

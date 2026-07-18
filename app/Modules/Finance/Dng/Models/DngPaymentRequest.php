@@ -124,6 +124,10 @@ class DngPaymentRequest extends Model
     // Relationships
     // =====================
 
+    /**
+     * Transitional compatibility relation for unmigrated operational flows.
+     * New Finance collection paths resolve identity through StudentReferenceReader.
+     */
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
