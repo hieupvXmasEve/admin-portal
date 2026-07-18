@@ -14,7 +14,7 @@ final class EloquentStudentReferenceReader implements StudentReferenceReader
     public function find(int $studentId): ?StudentReference
     {
         $student = Student::query()
-            ->select(['id', 'student_id', 'full_name', 'campus_id', 'email', 'current_address_line', 'address', 'national_id'])
+            ->select(['id', 'student_id', 'user_id', 'full_name', 'campus_id', 'email', 'current_address_line', 'address', 'national_id'])
             ->find($studentId);
 
         return $student !== null ? $this->reference($student) : null;
@@ -31,7 +31,7 @@ final class EloquentStudentReferenceReader implements StudentReferenceReader
         }
 
         return Student::query()
-            ->select(['id', 'student_id', 'full_name', 'campus_id', 'email', 'current_address_line', 'address', 'national_id'])
+            ->select(['id', 'student_id', 'user_id', 'full_name', 'campus_id', 'email', 'current_address_line', 'address', 'national_id'])
             ->whereIn('id', $studentIds)
             ->get()
             ->mapWithKeys(fn (Student $student): array => [(int) $student->id => $this->reference($student)])
@@ -41,7 +41,7 @@ final class EloquentStudentReferenceReader implements StudentReferenceReader
     public function findByStudentCode(string $studentCode, int $campusId): ?StudentReference
     {
         $student = Student::query()
-            ->select(['id', 'student_id', 'full_name', 'campus_id', 'email', 'current_address_line', 'address', 'national_id'])
+            ->select(['id', 'student_id', 'user_id', 'full_name', 'campus_id', 'email', 'current_address_line', 'address', 'national_id'])
             ->where('student_id', $studentCode)
             ->where('campus_id', $campusId)
             ->first();
@@ -80,7 +80,7 @@ final class EloquentStudentReferenceReader implements StudentReferenceReader
     public function search(string $query, int $campusId): array
     {
         return Student::query()
-            ->select(['id', 'student_id', 'full_name', 'campus_id', 'email', 'current_address_line', 'address', 'national_id'])
+            ->select(['id', 'student_id', 'user_id', 'full_name', 'campus_id', 'email', 'current_address_line', 'address', 'national_id'])
             ->where('campus_id', $campusId)
             ->where(function (Builder $students) use ($query): void {
                 $students->where('student_id', 'like', "%{$query}%")
@@ -104,6 +104,7 @@ final class EloquentStudentReferenceReader implements StudentReferenceReader
             email: $student->email === null ? null : (string) $student->email,
             address: $student->current_address_line ?? $student->address,
             nationalId: $student->national_id === null ? null : (string) $student->national_id,
+            userId: $student->user_id === null ? null : (int) $student->user_id,
         );
     }
 }

@@ -10,7 +10,13 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentApplication;
 use App\Models\User;
+use App\Modules\Academic\Progression\Models\ProgramEnrollment;
+use App\Modules\Finance\Models\BillingAccount;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Services\PermissionService;
+use App\Shared\Contracts\Academic\ProgramEnrollmentWriter;
+use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
+use App\Shared\Contracts\Identity\StudentAccessWriter;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -136,6 +142,14 @@ it('approves a pending application, atomically creating user, student, role, and
     // Student role assigned within the campus.
     expect(DB::table('campus_user_roles')->where('user_id', $user->id)->exists())->toBeTrue();
 
+    // Progression owns the independent Program Enrollment materialized during
+    // approval; it remains distinct from Student Identity.
+    expect(ProgramEnrollment::query()
+        ->where('student_id', $student->id)
+        ->where('is_primary', true)
+        ->where('enrollment_status', 'active')
+        ->exists())->toBeTrue();
+
     // Activity log records the staff causer against the application.
     expect(
         DB::table('activity_log')
@@ -144,6 +158,137 @@ it('approves a pending application, atomically creating user, student, role, and
             ->where('causer_id', $staff->id)
             ->exists()
     )->toBeTrue();
+});
+
+it('preserves every applicant guardian and rolls all approval writes back when enrollment fails', function () {
+    setupApprovalMapping($this->campus);
+    $staff = makeStaff();
+    $application = makePendingApplication($this->campus, [
+        'email' => 'guardian-rollback@example.com',
+        'student_code' => 'SGUARD0001',
+    ]);
+    $application->guardians()->createMany([
+        [
+            'full_name' => 'Offline Guardian',
+            'relationship' => 'Parent',
+            'phone' => '0901000001',
+            'email' => null,
+            'is_primary' => true,
+        ],
+        [
+            'full_name' => 'Portal Guardian',
+            'relationship' => 'Parent',
+            'phone' => '0901000002',
+            'email' => 'portal-guardian@example.com',
+            'is_primary' => false,
+        ],
+    ]);
+
+    $enrollmentWriter = Mockery::mock(ProgramEnrollmentWriter::class);
+    $enrollmentWriter->shouldReceive('materialize')
+        ->once()
+        ->andThrow(new RuntimeException('Program Enrollment rejected the admission.'));
+    $this->app->instance(ProgramEnrollmentWriter::class, $enrollmentWriter);
+
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->post(route('student-applications.approve', $application), [
+            'admission_date' => now()->toDateString(),
+        ])
+        ->assertSessionHas('error');
+
+    expect($application->fresh()->status)->toBe(StudentApplication::STATUS_PENDING)
+        ->and($application->fresh()->student_id)->toBeNull()
+        ->and(Student::query()->where('student_id', 'SGUARD0001')->exists())->toBeFalse()
+        ->and(User::query()->where('email', 'guardian-rollback@example.com')->exists())->toBeFalse()
+        ->and(DB::table('student_guardian_relationships')->count())->toBe(0)
+        ->and(ProgramEnrollment::query()->count())->toBe(0);
+});
+
+it('preserves every applicant guardian when only one can receive portal access', function () {
+    setupApprovalMapping($this->campus);
+    $staff = makeStaff();
+    $application = makePendingApplication($this->campus, [
+        'email' => 'guardian-preserved@example.com',
+        'student_code' => 'SGUARD0002',
+    ]);
+    $application->guardians()->createMany([
+        [
+            'full_name' => 'Offline Guardian',
+            'relationship' => 'Parent',
+            'phone' => '0901000003',
+            'email' => null,
+            'is_primary' => true,
+        ],
+        [
+            'full_name' => 'Portal Guardian',
+            'relationship' => 'Parent',
+            'phone' => '0901000004',
+            'email' => 'portal-guardian@example.com',
+            'is_primary' => false,
+        ],
+    ]);
+
+    $application = approveViaHttp($application, $staff);
+
+    expect(DB::table('student_guardian_relationships')
+        ->where('student_id', $application->student_id)
+        ->count())->toBe(2)
+        ->and(DB::table('guardian_access_grants')
+            ->where('student_id', $application->student_id)
+            ->count())->toBe(1);
+});
+
+it('rolls back every approval write when Guardian access fails', function () {
+    setupApprovalMapping($this->campus);
+    $staff = makeStaff();
+    $application = makePendingApplication($this->campus, [
+        'email' => 'guardian-access-failure@example.com',
+        'student_code' => 'SGUARD0003',
+    ]);
+    $application->guardians()->create([
+        'full_name' => 'Portal Guardian',
+        'relationship' => 'Parent',
+        'phone' => '0901000005',
+        'email' => 'guardian-access@example.com',
+        'is_primary' => true,
+    ]);
+
+    $grantWriter = Mockery::mock(GuardianAccessGrantWriter::class);
+    $grantWriter->shouldReceive('grant')->once()->andThrow(new RuntimeException('Guardian access rejected.'));
+    $this->app->instance(GuardianAccessGrantWriter::class, $grantWriter);
+
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->post(route('student-applications.approve', $application))
+        ->assertSessionHas('error');
+
+    expect($application->fresh()->status)->toBe(StudentApplication::STATUS_PENDING)
+        ->and(Student::query()->where('student_id', 'SGUARD0003')->exists())->toBeFalse()
+        ->and(User::query()->where('email', 'guardian-access-failure@example.com')->exists())->toBeFalse()
+        ->and(DB::table('student_guardian_relationships')->count())->toBe(0);
+});
+
+it('leaves the application pending when Identity cannot provision the account', function () {
+    setupApprovalMapping($this->campus);
+    $staff = makeStaff();
+    $application = makePendingApplication($this->campus, [
+        'email' => 'identity-failure@example.com',
+        'student_code' => 'SGUARD0004',
+    ]);
+
+    $accessWriter = Mockery::mock(StudentAccessWriter::class);
+    $accessWriter->shouldReceive('provision')->once()->andThrow(new RuntimeException('Identity rejected the account.'));
+    $this->app->instance(StudentAccessWriter::class, $accessWriter);
+
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->post(route('student-applications.approve', $application))
+        ->assertSessionHas('error');
+
+    expect($application->fresh()->status)->toBe(StudentApplication::STATUS_PENDING)
+        ->and(Student::query()->where('student_id', 'SGUARD0004')->exists())->toBeFalse()
+        ->and(User::query()->where('email', 'identity-failure@example.com')->exists())->toBeFalse();
 });
 
 it('rolls back the entire approval when student creation fails, leaving no user or student and the application pending', function () {
@@ -298,6 +443,7 @@ it('revokes an enrolled application within the safe window, tearing down student
     expect(Student::find($studentId))->toBeNull();
     expect(User::find($userId))->toBeNull();
     expect(DB::table('campus_user_roles')->where('user_id', $userId)->exists())->toBeFalse();
+    expect(BillingAccount::query()->where('student_id', $studentId)->exists())->toBeFalse();
 
     // Activity log records the revoking staff causer.
     expect(
@@ -366,6 +512,57 @@ it('blocks revoke once the student has logged in', function () {
     $application->refresh();
     expect($application->status)->toBe(StudentApplication::STATUS_ENROLLED);
     expect(Student::find($student->id))->not->toBeNull();
+});
+
+it('blocks revoke and preserves a progressed Program Enrollment', function () {
+    setupApprovalMapping($this->campus);
+    $staff = makeStaff();
+    $application = approveViaHttp(makePendingApplication($this->campus, [
+        'email' => 'progressed-enrollment@example.com',
+        'student_code' => 'SREV0005',
+    ]), $staff);
+    $student = Student::findOrFail($application->student_id);
+
+    $enrollment = ProgramEnrollment::query()->where('student_id', $student->id)->sole();
+    $enrollment->update(['study_stage' => 'intake_major']);
+
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->post(route('student-applications.revoke', $application))
+        ->assertSessionHas('error');
+
+    expect($application->fresh()->status)->toBe(StudentApplication::STATUS_ENROLLED)
+        ->and(Student::query()->whereKey($student->id)->exists())->toBeTrue()
+        ->and(ProgramEnrollment::query()->whereKey($enrollment->id)->exists())->toBeTrue();
+});
+
+it('blocks revoke when Finance activity exists without deleting any owner record', function () {
+    setupApprovalMapping($this->campus);
+    $staff = makeStaff();
+    $application = approveViaHttp(makePendingApplication($this->campus, [
+        'email' => 'finance-activity@example.com',
+        'student_code' => 'SREV0006',
+    ]), $staff);
+    $student = Student::findOrFail($application->student_id);
+
+    FinanceCharge::query()->create([
+        'student_id' => $student->id,
+        'semester_id' => $student->intake_semester_id,
+        'charge_type' => FinanceCharge::TYPE_ADMISSION_FEE,
+        'amount' => 100000,
+        'description' => 'Admission activity that blocks revoke.',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->post(route('student-applications.revoke', $application))
+        ->assertSessionHas('error');
+
+    expect($application->fresh()->status)->toBe(StudentApplication::STATUS_ENROLLED)
+        ->and(Student::query()->whereKey($student->id)->exists())->toBeTrue()
+        ->and(FinanceCharge::query()->where('student_id', $student->id)->exists())->toBeTrue();
 });
 
 it('cannot revoke an application that is not enrolled', function () {

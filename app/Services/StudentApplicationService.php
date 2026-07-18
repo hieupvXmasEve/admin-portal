@@ -6,20 +6,21 @@ namespace App\Services;
 
 use App\Models\ApplicationGuardian;
 use App\Models\Campus;
-use App\Models\CampusUserRole;
 use App\Models\Program;
 use App\Models\Specialization;
-use App\Models\Student;
 use App\Models\StudentApplication;
 use App\Models\User;
+use App\Shared\Contracts\Academic\ProgramEnrollmentWriter;
+use App\Shared\Contracts\Finance\BillingAccountRollbackWriter;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
+use App\Shared\Contracts\Identity\StudentAccessWriter;
+use App\Shared\Contracts\StudentRegistry\DTO\AdmittedStudentIdentity;
 use App\Shared\Contracts\StudentRegistry\DTO\GuardianRelationship;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
-use App\Shared\Support\Enums\UserType;
+use App\Shared\Contracts\StudentRegistry\StudentIdentityWriter;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -32,14 +33,17 @@ class StudentApplicationService
 {
     public function __construct(
         private ProgramMappingService $programMappingService,
-        private StudentService $studentService,
+        private StudentIdentityWriter $studentIdentityWriter,
+        private StudentAccessWriter $studentAccessWriter,
         private StudentGuardianRelationshipWriter $guardianRelationshipWriter,
         private GuardianAccessGrantWriter $guardianAccessGrantWriter,
+        private ProgramEnrollmentWriter $programEnrollmentWriter,
+        private BillingAccountRollbackWriter $billingAccountRollbackWriter,
     ) {}
 
     /**
-     * Approve a pending Application: atomically create the User + Student + roles,
-     * link Guardians, link the Application to the Student, and record the actor.
+     * Approve a pending Application through the owning Registry, Identity, and
+     * Progression commands, then record the Admissions transition and actor.
      *
      * Any failure rolls the whole transaction back — never a half-created Student
      * (ADR-0001). Exceptions propagate so callers can surface a clean failure.
@@ -48,7 +52,7 @@ class StudentApplicationService
      *
      * @throws RuntimeException when the Application cannot be approved
      */
-    public function approve(StudentApplication $application, User $actor, array $options = []): Student
+    public function approve(StudentApplication $application, User $actor, array $options = []): StudentReference
     {
         if (! $application->isPending()) {
             throw new RuntimeException('Only a pending application can be approved.');
@@ -65,7 +69,7 @@ class StudentApplicationService
             throw new RuntimeException(implode(' ', $relationshipValidation['errors']));
         }
 
-        return DB::transaction(function () use ($application, $actor, $options, $mappingData): Student {
+        return DB::transaction(function () use ($application, $actor, $options, $mappingData): StudentReference {
             // specialization_id is left as $mappingData resolved it — from the
             // Curriculum Version, the single source of truth (ADR-0005); callers
             // do not override it.
@@ -74,36 +78,21 @@ class StudentApplicationService
                 'expected_graduation_date' => $options['expected_graduation_date'] ?? null,
             ]);
 
-            $studentData = $this->mapApplicationToStudentData($application, $conversionData);
-            $studentData['student_id'] = $application->student_code;
+            $account = $this->studentAccessWriter->provision(
+                campusId: (int) $mappingData['campus_id'],
+                fullName: (string) $application->full_name,
+                email: (string) $application->email,
+            );
+            $studentIdentity = $this->admittedStudentIdentity($application, $conversionData, $account->id);
 
-            // 1. Create the student's User account with a secure random password.
-            //    The applicant never receives a default password — they must use
-            //    the password-reset / verification flow to set one.
-            $user = User::create([
-                'name' => $application->full_name,
-                'email' => $application->email,
-                'password' => Hash::make(Str::password(40)),
-                'type' => UserType::STUDENT,
-                'status' => User::STATUS_ACTIVE,
-            ]);
+            // DB uniqueness constraints remain the final protection against a
+            // duplicate applicant identity. Any command failure aborts this one
+            // transaction, including the account and guardian-access writes.
+            $student = $this->studentIdentityWriter->register($studentIdentity);
+            $this->linkGuardiansAsParents($application, $student->id);
+            $this->programEnrollmentWriter->materialize($student->id);
 
-            $studentData['user_id'] = $user->id;
-
-            // 2. Create the Student profile (DB unique constraints enforce one
-            //    student per student_code / email — a clash aborts the whole tx).
-            $student = Student::create($studentData);
-
-            // 3. Assign the student role within the campus.
-            $this->studentService->assignStudentRole($student);
-
-            // 4. Link Guardians as Parent accounts. Each Guardian with an email
-            //    becomes/links a Parent (a login needs an email); the primary
-            //    Guardian is linked as the primary parent with its real name and
-            //    relationship.
-            $this->linkGuardiansAsParents($application, $student);
-
-            // 5. Move the Application to `enrolled` and record who approved it.
+            // Admissions owns this application transition and audit fact.
             $application->update([
                 'status' => StudentApplication::STATUS_ENROLLED,
                 'student_id' => $student->id,
@@ -123,7 +112,7 @@ class StudentApplicationService
      * real name and relationship); additional Guardians are linked as secondary
      * parents.
      */
-    private function linkGuardiansAsParents(StudentApplication $application, Student $student): void
+    private function linkGuardiansAsParents(StudentApplication $application, int $studentId): void
     {
         $guardians = $application->guardians()
             ->orderByDesc('is_primary')
@@ -141,7 +130,7 @@ class StudentApplicationService
             ])
             ->all();
 
-        $relationships = $this->guardianRelationshipWriter->preserveForStudent((int) $student->id, $guardians);
+        $relationships = $this->guardianRelationshipWriter->preserveForStudent($studentId, $guardians);
         $grantableRelationships = array_values(array_filter(
             $relationships,
             static fn (GuardianRelationship $relationship): bool => $relationship->email !== null
@@ -186,43 +175,6 @@ class StudentApplicationService
     }
 
     /**
-     * Student relations that represent real downstream activity. The presence of
-     * any record here means the Student has been operated on (academically or
-     * financially) and a Revoke must be refused — that is the Withdraw path's job
-     * (ADR-0002). A freshly-approved Student has none of these.
-     *
-     * @var list<string>
-     */
-    private const DOWNSTREAM_ACTIVITY_RELATIONS = [
-        // Academic
-        'courseRegistrations',
-        'enrollments',
-        'academicRecords',
-        'attendances',
-        'gpaCalculations',
-        'academicStandings',
-        'academicHolds',
-        'programChangeRequests',
-        'academicProgressionEvents',
-        'actionLogs',
-        'ieltsCertificates',
-        'egcProgress',
-        // Financial
-        'financeCharges',
-        'payments',
-        'invoices',
-        'deferCases',
-        'voucherApplications',
-        'dngPaymentRequests',
-        'goldTransactions',
-        'wallet',
-        'scholarshipAward',
-        // Engagement
-        'clubMemberships',
-        'formResponses',
-    ];
-
-    /**
      * Revoke a mistaken approval while it is still safe to do so.
      *
      * Within the safe window (the linked Student has zero downstream activity),
@@ -240,26 +192,23 @@ class StudentApplicationService
             throw new RuntimeException('Only an enrolled application can be revoked.');
         }
 
-        $student = $application->student;
-
-        if ($student === null) {
+        if ($application->student_id === null) {
             throw new RuntimeException('This application has no linked student to revoke.');
         }
 
-        return DB::transaction(function () use ($application, $actor, $student): StudentApplication {
-            // Re-check the safe window inside the transaction so the guard and the
-            // teardown are atomic — no activity can be recorded between them.
-            if ($this->studentHasDownstreamActivity($student)) {
-                throw new RuntimeException(
-                    'This student already has academic or financial activity and cannot be revoked. '
-                    .'Use the Withdraw process to remove a student who has already studied.'
-                );
-            }
+        return DB::transaction(function () use ($application, $actor): StudentApplication {
+            // Registry locks and checks the established safe-window rule before
+            // any owner command reverses the admission outcomes.
+            $student = $this->studentIdentityWriter->requireRevocable((int) $application->student_id);
 
-            $user = $student->user;
+            // Progression removes only the fresh owner-managed enrollment before
+            // Registry removes the student identity, then Identity removes account
+            // access. Finance removes its empty payer account before the Registry
+            // identity, because the account foreign key intentionally restricts
+            // deletion. The outer transaction keeps the reversal all-or-nothing.
+            $this->programEnrollmentWriter->removeUnstarted($student->id);
+            $this->billingAccountRollbackWriter->removeEmptyForStudent($student->id);
 
-            // Detach the Application from the Student first so deleting the
-            // Student cannot trip a foreign-key constraint, and record the revoke.
             $application->update([
                 'status' => StudentApplication::STATUS_PENDING,
                 'student_id' => null,
@@ -269,34 +218,14 @@ class StudentApplicationService
                 'revoked_at' => now(),
             ]);
 
-            // Tear down the campus roles, the Student, then the User account. The
-            // parent account (if any) is intentionally left intact — parents are
-            // shared across siblings; the parent_student pivot cascades on delete.
-            if ($user !== null) {
-                CampusUserRole::where('user_id', $user->id)->delete();
+            $this->studentIdentityWriter->revoke($student->id);
+
+            if ($student->userId !== null) {
+                $this->studentAccessWriter->revoke($student->userId);
             }
-
-            $student->delete();
-
-            $user?->delete();
 
             return $application;
         });
-    }
-
-    /**
-     * Whether the Student has any record indicating real downstream activity.
-     */
-    private function studentHasDownstreamActivity(Student $student): bool
-    {
-        foreach (self::DOWNSTREAM_ACTIVITY_RELATIONS as $relation) {
-            if ($student->{$relation}()->exists()) {
-                return true;
-            }
-        }
-
-        // A login is activity too: a freshly-created account has never signed in.
-        return $student->user?->last_login_at !== null;
     }
 
     /**
@@ -327,67 +256,49 @@ class StudentApplicationService
     }
 
     /**
-     * Map student application data to student model data
-     *
-     * @param  array<string, mixed>  $additionalData
-     * @return array<string, mixed>
+     * @param  array{campus_id: int|null, program_id: int|null, curriculum_version_id: int|null, specialization_id: int|null, intake_semester_id: int|null, admission_date: string, expected_graduation_date: string|null}  $admissionData
      */
-    public function mapApplicationToStudentData(StudentApplication $application, array $additionalData): array
+    private function admittedStudentIdentity(StudentApplication $application, array $admissionData, int $accountId): AdmittedStudentIdentity
     {
-        // The primary Guardian populates the Student's emergency contact.
         $primaryGuardian = $application->primaryGuardian();
+        $dateOfBirth = null;
 
-        $mappedData = [
-            // Basic information
-            'full_name' => $application->full_name,
-            'email' => $application->email,
-            'phone' => $application->phone,
-            'gender' => $application->gender,
-            'nationality' => $application->ethnicity ?: 'Vietnamese',
-            'national_id' => $application->national_id,
-            'address' => $application->address,
-
-            // Emergency contact from the primary Guardian.
-            'emergency_contact_name' => $primaryGuardian?->full_name,
-            'emergency_contact_phone' => $primaryGuardian?->phone,
-            'emergency_contact_relationship' => $primaryGuardian?->relationship ?? 'Parent',
-
-            // Academic information
-            'campus_id' => $additionalData['campus_id'],
-            'program_id' => $additionalData['program_id'],
-            'curriculum_version_id' => $additionalData['curriculum_version_id'],
-            'specialization_id' => $additionalData['specialization_id'] ?? null,
-            'intake_semester_id' => $additionalData['intake_semester_id'] ?? null,
-            'admission_date' => $additionalData['admission_date'] ?? now()->toDateString(),
-            'expected_graduation_date' => $additionalData['expected_graduation_date'] ?? null,
-
-            // Status
-            'status' => 'active',
-            'academic_status' => 'active',
-
-            // Additional fields with defaults
-            'high_school_name' => $additionalData['school'] ?? null,
-            'high_school_graduation_year' => null,
-            'admission_notes' => $this->generateAdmissionNotes($application),
-            'intake' => 0,
-        ];
-
-        // Handle date of birth conversion
         if ($application->birth_day && $application->birth_month && $application->birth_year) {
             try {
-                $mappedData['date_of_birth'] = Carbon::createFromDate(
+                $dateOfBirth = Carbon::createFromDate(
                     $application->birth_year,
                     $application->birth_month,
                     $application->birth_day
-                );
+                )->toDateString();
             } catch (\Exception $e) {
-                $mappedData['date_of_birth'] = null;
+                $dateOfBirth = null;
             }
-        } else {
-            $mappedData['date_of_birth'] = null;
         }
 
-        return $mappedData;
+        return new AdmittedStudentIdentity(
+            studentCode: (string) $application->student_code,
+            accountId: $accountId,
+            fullName: (string) $application->full_name,
+            email: (string) $application->email,
+            campusId: (int) $admissionData['campus_id'],
+            programId: (int) $admissionData['program_id'],
+            curriculumVersionId: (int) $admissionData['curriculum_version_id'],
+            specializationId: $admissionData['specialization_id'],
+            intakeSemesterId: (int) $admissionData['intake_semester_id'],
+            admissionDate: $admissionData['admission_date'],
+            expectedGraduationDate: $admissionData['expected_graduation_date'],
+            phone: $application->phone,
+            dateOfBirth: $dateOfBirth,
+            gender: $application->gender,
+            nationality: $application->ethnicity ?: 'Vietnamese',
+            nationalId: $application->national_id,
+            address: $application->address,
+            emergencyContactName: $primaryGuardian?->full_name,
+            emergencyContactPhone: $primaryGuardian?->phone,
+            emergencyContactRelationship: $primaryGuardian?->relationship ?? 'Parent',
+            highSchoolName: null,
+            admissionNotes: $this->generateAdmissionNotes($application),
+        );
     }
 
     /**

@@ -25,12 +25,14 @@ use App\Modules\Finance\Services\PaymentService;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\AiFinanceMetricReader as ModuleAiFinanceMetricReader;
 use App\Modules\Finance\Support\AiFinanceStudentProfileReader as ModuleAiFinanceStudentProfileReader;
+use App\Modules\Finance\Support\EloquentBillingAccountRollbackWriter;
 use App\Modules\Finance\Support\FinanceIntakeRouter;
 use App\Modules\Finance\Support\HubStudentFinanceSummaryReader as ModuleHubStudentFinanceSummaryReader;
 use App\Modules\Finance\Support\ObligationLedgerSettlementReader;
 use App\Modules\Finance\Support\SettlementPosition\CurrentPayableSettlementPositionReader;
 use App\Shared\Contracts\Finance\AiFinanceMetricReader;
 use App\Shared\Contracts\Finance\AiFinanceStudentProfileReader;
+use App\Shared\Contracts\Finance\BillingAccountRollbackWriter;
 use App\Shared\Contracts\Finance\FinanceCancellationChargeStateReader;
 use App\Shared\Contracts\Finance\FinanceCancellationOperationRequestContract;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
@@ -51,6 +53,7 @@ class FinanceServiceProvider extends ServiceProvider
     {
         $this->app->bind(AiFinanceMetricReader::class, ModuleAiFinanceMetricReader::class);
         $this->app->bind(AiFinanceStudentProfileReader::class, ModuleAiFinanceStudentProfileReader::class);
+        $this->app->bind(BillingAccountRollbackWriter::class, EloquentBillingAccountRollbackWriter::class);
         $this->app->bind(FinanceIntakeContract::class, FinanceIntakeRouter::class);
         $this->app->bind(FinanceCancellationOperationRequestContract::class, RequestFinanceCancellationOperationAction::class);
         $this->app->bind(FinanceCancellationChargeStateReader::class, ResolveFinanceCancellationChargeStateAction::class);
