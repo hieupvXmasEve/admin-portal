@@ -122,11 +122,13 @@ class SyllabusTemplate extends AuditableModel
             ->exists();
     }
 
-    public function scopeAssignableToCourseOffering(Builder $query, ?CourseOffering $courseOffering = null): Builder
+    public function scopeAssignableToCourseOffering(Builder $query, CourseOffering|int|null $courseOffering = null): Builder
     {
-        $currentTemplateId = $courseOffering?->syllabus_template_id;
+        $currentSyllabusTemplateId = $courseOffering instanceof CourseOffering
+            ? $courseOffering->syllabus_template_id
+            : $courseOffering;
 
-        return $query->where(function (Builder $query) use ($currentTemplateId) {
+        return $query->where(function (Builder $query) use ($currentSyllabusTemplateId) {
             $query->where(function (Builder $query) {
                 $query->whereRaw('LOWER(syllabus_templates.title) NOT LIKE ?', ['%canvas%'])
                     ->whereDoesntHave('courseOfferings', function (Builder $query) {
@@ -137,8 +139,8 @@ class SyllabusTemplate extends AuditableModel
                     });
             });
 
-            if ($currentTemplateId !== null) {
-                $query->orWhere('syllabus_templates.id', $currentTemplateId);
+            if ($currentSyllabusTemplateId !== null) {
+                $query->orWhere('syllabus_templates.id', $currentSyllabusTemplateId);
             }
         });
     }

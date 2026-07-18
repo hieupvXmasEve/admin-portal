@@ -18,7 +18,7 @@ import { toast } from 'vue-sonner';
 import { z } from 'zod';
 
 interface Props {
-    activeSemester: {
+    active_semester: {
         id: number;
         name: string;
         code: string;
@@ -34,7 +34,7 @@ interface Props {
         unit_type: string | null;
     }>;
     lectures: Lecture[];
-    syllabusTemplates: Array<{
+    syllabus_templates: Array<{
         id: number;
         unit_id: number;
         title: string;
@@ -125,7 +125,7 @@ const filteredUnits = computed(() => {
 // Filter syllabus templates based on selected unit
 const filteredSyllabusTemplates = computed(() => {
     if (!selectedUnit.value) return [];
-    return props.syllabusTemplates.filter((template) => template.unit_id === selectedUnit.value!.unit_id);
+    return props.syllabus_templates.filter((template) => template.unit_id === selectedUnit.value!.unit_id);
 });
 
 // Watch for unit changes and clear syllabus template selection
@@ -144,7 +144,7 @@ const onSubmit = handleSubmit((values) => {
 
     // Transform form data to match backend expectations
     const formData = {
-        semester_id: props.activeSemester?.id,
+        semester_id: props.active_semester?.id,
         unit_id: values.unit_id,
         syllabus_template_id: !values.syllabus_template_id || values.syllabus_template_id === 'none' || values.syllabus_template_id === '' ? null : values.syllabus_template_id,
         lecture_id: !values.lecture_id || values.lecture_id === '' ? null : values.lecture_id,
@@ -223,7 +223,7 @@ const goBack = () => window.history.back();
     </div>
 
     <!-- No Active Semester State -->
-    <div v-if="!props.activeSemester" class="rounded-lg border border-red-200 bg-red-50 p-6">
+    <div v-if="!props.active_semester" class="rounded-lg border border-red-200 bg-red-50 p-6">
         <div class="flex items-start">
             <div class="flex-shrink-0">
                 <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -249,7 +249,7 @@ const goBack = () => window.history.back();
     </div>
 
     <!-- Active Semester Info -->
-    <div v-if="props.activeSemester" class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+    <div v-if="props.active_semester" class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
         <div class="flex items-start">
             <div class="flex-shrink-0">
                 <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -264,11 +264,11 @@ const goBack = () => window.history.back();
                 <h3 class="text-sm font-medium text-blue-800">Active Semester</h3>
                 <div class="mt-1 text-sm text-blue-700">
                     <p>
-                        <strong>{{ props.activeSemester.name }}</strong> ({{ props.activeSemester.code }})
+                        <strong>{{ props.active_semester.name }}</strong> ({{ props.active_semester.code }})
                     </p>
                     <p class="mt-1 text-xs">
-                        {{ new Date(props.activeSemester.start_date).toLocaleDateString() }} -
-                        {{ new Date(props.activeSemester.end_date).toLocaleDateString() }}
+                        {{ new Date(props.active_semester.start_date).toLocaleDateString() }} -
+                        {{ new Date(props.active_semester.end_date).toLocaleDateString() }}
                     </p>
                 </div>
             </div>
@@ -280,7 +280,7 @@ const goBack = () => window.history.back();
         </div>
     </div>
 
-    <form v-if="props.activeSemester" @submit="onSubmit" class="space-y-6">
+    <form v-if="props.active_semester" @submit="onSubmit" class="space-y-6">
         <div class="grid gap-6 lg:grid-cols-2">
             <!-- Basic Information -->
             <Card>

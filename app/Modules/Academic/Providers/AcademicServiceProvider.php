@@ -8,6 +8,7 @@ use App\Models\CourseRegistration;
 use App\Modules\Academic\Actions\CompleteFinanceCancellationOperationAction;
 use App\Modules\Academic\Actions\SyncPaidExamResitAttemptsAction;
 use App\Modules\Academic\Actions\SyncPaidRetakeRegistrationsAction;
+use App\Modules\Academic\Catalog\Support\EloquentCourseOfferingCatalogReader;
 use App\Modules\Academic\Catalog\Support\SemesterAcademicPeriodReader;
 use App\Modules\Academic\Observers\CourseRegistrationObserver;
 use App\Modules\Academic\Support\AcademicFinanceChargeSourceGateway as ModuleAcademicFinanceChargeSourceGateway;
@@ -22,6 +23,7 @@ use App\Shared\Contracts\Academic\AiAcademicEntitySearchReader;
 use App\Shared\Contracts\Academic\AiAcademicMetricReader;
 use App\Shared\Contracts\Academic\AiAcademicStudentProfileReader;
 use App\Shared\Contracts\Academic\CampusBuildingCountReader;
+use App\Shared\Contracts\Academic\CourseOfferingCatalogReader;
 use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
@@ -34,6 +36,7 @@ class AcademicServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(AcademicPeriodReader::class, SemesterAcademicPeriodReader::class);
+        $this->app->bind(CourseOfferingCatalogReader::class, EloquentCourseOfferingCatalogReader::class);
         $this->app->bind(AiAcademicMetricReader::class, ModuleAiAcademicMetricReader::class);
         $this->app->bind(AiAcademicEntitySearchReader::class, ModuleAiAcademicEntitySearchReader::class);
         $this->app->bind(AiAcademicStudentProfileReader::class, ModuleAiAcademicStudentProfileReader::class);

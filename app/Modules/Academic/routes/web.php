@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Constants\CourseOfferingRoutes;
 use App\Constants\StudentRoutes;
 use App\Modules\Academic\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\AcademicProgressionAuditController;
+use App\Modules\Academic\Http\Web\Admin\CourseOfferingCatalogFormController;
 use App\Modules\Academic\Http\Web\BuildingController;
 use App\Modules\Academic\Http\Web\CampusDetailController;
 use App\Modules\Academic\Http\Web\ExamResitAttemptController;
@@ -30,6 +32,24 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::prefix('course-offerings')->group(function () {
+        Route::get('/create', [CourseOfferingCatalogFormController::class, 'create'])
+            ->middleware('can:create_course_offering')
+            ->name(CourseOfferingRoutes::CREATE);
+
+        Route::post('/', [CourseOfferingCatalogFormController::class, 'store'])
+            ->middleware('can:create_course_offering')
+            ->name(CourseOfferingRoutes::STORE);
+
+        Route::get('/{courseOffering}/edit', [CourseOfferingCatalogFormController::class, 'edit'])
+            ->middleware('can:edit_course_offering')
+            ->name(CourseOfferingRoutes::EDIT);
+
+        Route::put('/{courseOffering}', [CourseOfferingCatalogFormController::class, 'update'])
+            ->middleware('can:edit_course_offering')
+            ->name(CourseOfferingRoutes::UPDATE);
+    });
+
     Route::get('campuses/{campus}', [CampusDetailController::class, 'show'])
         ->middleware('can:view_campus')
         ->name('campuses.show');

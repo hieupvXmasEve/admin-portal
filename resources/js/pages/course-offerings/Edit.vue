@@ -15,9 +15,9 @@ import { toast } from 'vue-sonner';
 import { z } from 'zod';
 
 interface Props {
-    courseOffering: CourseOffering;
+    course_offering: CourseOffering;
     lectures: Lecture[];
-    syllabusTemplates?: Array<{
+    syllabus_templates?: Array<{
         id: number;
         unit_id: number;
         title: string;
@@ -75,28 +75,28 @@ const formatDateForInput = (dateString: string | null): string => {
 const { handleSubmit, isSubmitting } = useForm({
     validationSchema: formSchema,
     initialValues: {
-        unit_id: props.courseOffering.unit_id,
-        section_code: props.courseOffering.section_code || '',
-        syllabus_template_id: props.courseOffering.syllabus_template?.id.toString() || '',
-        max_capacity: props.courseOffering.max_capacity,
-        waitlist_capacity: props.courseOffering.waitlist_capacity || 0,
-        delivery_mode: props.courseOffering.delivery_mode,
-        schedule_days: props.courseOffering.schedule_days || [],
-        schedule_time_start: props.courseOffering.schedule_time_start || '',
-        schedule_time_end: props.courseOffering.schedule_time_end || '',
-        location: props.courseOffering.location || '',
-        enrollment_status: props.courseOffering.enrollment_status,
-        lecture_id: props.courseOffering.lecture_id?.toString() || '',
-        registration_start_date: formatDateForInput(props.courseOffering.registration_start_date || null),
-        registration_end_date: formatDateForInput(props.courseOffering.registration_end_date || null),
-        special_requirements: props.courseOffering.special_requirements || '',
-        notes: props.courseOffering.notes || '',
+        unit_id: props.course_offering.unit_id,
+        section_code: props.course_offering.section_code || '',
+        syllabus_template_id: props.course_offering.syllabus_template?.id.toString() || '',
+        max_capacity: props.course_offering.max_capacity,
+        waitlist_capacity: props.course_offering.waitlist_capacity || 0,
+        delivery_mode: props.course_offering.delivery_mode,
+        schedule_days: props.course_offering.schedule_days || [],
+        schedule_time_start: props.course_offering.schedule_time_start || '',
+        schedule_time_end: props.course_offering.schedule_time_end || '',
+        location: props.course_offering.location || '',
+        enrollment_status: props.course_offering.enrollment_status,
+        lecture_id: props.course_offering.lecture_id?.toString() || '',
+        registration_start_date: formatDateForInput(props.course_offering.registration_start_date || null),
+        registration_end_date: formatDateForInput(props.course_offering.registration_end_date || null),
+        special_requirements: props.course_offering.special_requirements || '',
+        notes: props.course_offering.notes || '',
     },
 });
 const onSubmit = handleSubmit((values) => {
     const formData = {
-        semester_id: props.courseOffering.semester_id,
-        unit_id: Number(values.unit_id) || Number(props.courseOffering.unit_id),
+        semester_id: props.course_offering.semester_id,
+        unit_id: Number(values.unit_id) || Number(props.course_offering.unit_id),
         lecture_id: values.lecture_id === '' || values.lecture_id === 'none' ? null : values.lecture_id,
         section_code: values.section_code || null,
         syllabus_template_id: values.syllabus_template_id,
@@ -114,7 +114,7 @@ const onSubmit = handleSubmit((values) => {
         notes: values.notes || null,
     };
 
-    router.put(`/course-offerings/${props.courseOffering.id}`, formData, {
+    router.put(`/course-offerings/${props.course_offering.id}`, formData, {
         onSuccess: () => {
             // Success handled by redirect
             toast.success('Course offering updated successfully');
@@ -180,11 +180,11 @@ const enrollmentStatusOptions = [
                                 <h3 class="text-sm font-medium text-blue-800">Semester</h3>
                                 <div class="mt-1 text-sm text-blue-700">
                                     <p>
-                                        <strong>{{ courseOffering.semester?.name }}</strong> ({{ courseOffering.semester?.code }})
+                                        <strong>{{ course_offering.semester?.name }}</strong> ({{ course_offering.semester?.code }})
                                     </p>
-                                    <p class="mt-1 text-xs" v-if="courseOffering.semester">
-                                        {{ new Date(courseOffering.semester.start_date).toLocaleDateString() }} -
-                                        {{ new Date(courseOffering.semester.end_date).toLocaleDateString() }}
+                                    <p class="mt-1 text-xs" v-if="course_offering.semester">
+                                        {{ new Date(course_offering.semester.start_date).toLocaleDateString() }} -
+                                        {{ new Date(course_offering.semester.end_date).toLocaleDateString() }}
                                     </p>
                                 </div>
                             </div>
@@ -203,9 +203,9 @@ const enrollmentStatusOptions = [
                                 <h3 class="text-sm font-medium text-green-800">Unit</h3>
                                 <div class="mt-1 text-sm text-green-700">
                                     <p>
-                                        <strong>{{ courseOffering.unit?.code }} - {{ courseOffering.unit?.name }}</strong>
+                                        <strong>{{ course_offering.unit?.code }} - {{ course_offering.unit?.name }}</strong>
                                     </p>
-                                    <p class="mt-1 text-xs" v-if="courseOffering.unit">{{ courseOffering.unit.credit_points }} credits</p>
+                                    <p class="mt-1 text-xs" v-if="course_offering.unit">{{ course_offering.unit.credit_points }} credits</p>
                                 </div>
                             </div>
                         </div>
@@ -230,8 +230,8 @@ const enrollmentStatusOptions = [
                                         <SelectValue placeholder="Select syllabus template" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <template v-if="syllabusTemplates">
-                                            <SelectItem v-for="template in syllabusTemplates" :key="template.id" :value="template.id.toString()">
+                                        <template v-if="syllabus_templates">
+                                            <SelectItem v-for="template in syllabus_templates" :key="template.id" :value="template.id.toString()">
                                                 <div class="flex flex-col">
                                                     <span class="font-medium">{{ template.title }} v{{ template.version }}</span>
                                                     <div class="text-muted-foreground text-xs">

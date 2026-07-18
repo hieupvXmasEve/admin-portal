@@ -22,25 +22,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:view_course_offering')
             ->name(CourseOfferingRoutes::INDEX);
 
-        Route::get('/create', [CourseOfferingController::class, 'create'])
-            ->middleware('can:create_course_offering')
-            ->name(CourseOfferingRoutes::CREATE);
-
-        Route::post('/', [CourseOfferingController::class, 'store'])
-            ->middleware('can:create_course_offering')
-            ->name(CourseOfferingRoutes::STORE);
-
         Route::get('/{courseOffering}', [CourseOfferingController::class, 'show'])
             ->middleware('can:view_course_offering')
             ->name(CourseOfferingRoutes::SHOW);
-
-        Route::get('/{courseOffering}/edit', [CourseOfferingController::class, 'edit'])
-            ->middleware('can:edit_course_offering')
-            ->name(CourseOfferingRoutes::EDIT);
-
-        Route::put('/{courseOffering}', [CourseOfferingController::class, 'update'])
-            ->middleware('can:edit_course_offering')
-            ->name(CourseOfferingRoutes::UPDATE);
 
         Route::delete('/{courseOffering}', [CourseOfferingController::class, 'destroy'])
             ->middleware('can:delete_course_offering')
