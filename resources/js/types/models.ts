@@ -437,6 +437,19 @@ export interface StudentOverview {
             name: string;
             email: string;
         } | null;
+        guardians?: Array<{
+            id: number;
+            student_id: number;
+            full_name: string;
+            relationship_type: string | null;
+            phone: string | null;
+            email: string | null;
+            occupation: string | null;
+            address: string | null;
+            is_primary: boolean;
+            can_receive_access: boolean;
+            has_active_access: boolean;
+        }>;
     };
     academic_info: {
         intake_school?: {

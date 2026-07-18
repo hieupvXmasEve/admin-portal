@@ -12,6 +12,9 @@ use App\Models\Specialization;
 use App\Models\Student;
 use App\Models\StudentApplication;
 use App\Models\User;
+use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
+use App\Shared\Contracts\StudentRegistry\DTO\GuardianRelationship;
+use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +32,9 @@ class StudentApplicationService
 {
     public function __construct(
         private ProgramMappingService $programMappingService,
-        private StudentService $studentService
+        private StudentService $studentService,
+        private StudentGuardianRelationshipWriter $guardianRelationshipWriter,
+        private GuardianAccessGrantWriter $guardianAccessGrantWriter,
     ) {}
 
     /**
@@ -120,33 +125,41 @@ class StudentApplicationService
      */
     private function linkGuardiansAsParents(StudentApplication $application, Student $student): void
     {
-        // A Parent account is a login, so only Guardians carrying an email can be
-        // linked.
-        $linkable = $application->guardians()
+        $guardians = $application->guardians()
             ->orderByDesc('is_primary')
             ->orderBy('id')
             ->get()
-            ->filter(fn (ApplicationGuardian $guardian): bool => ! empty($guardian->email))
-            ->values();
+            ->map(static fn (ApplicationGuardian $guardian): array => [
+                'source_application_guardian_id' => (int) $guardian->id,
+                'full_name' => (string) $guardian->full_name,
+                'relationship_type' => $guardian->relationship,
+                'phone' => $guardian->phone,
+                'email' => $guardian->email,
+                'occupation' => $guardian->occupation,
+                'address' => $guardian->address,
+                'is_primary' => (bool) $guardian->is_primary,
+            ])
+            ->all();
 
-        if ($linkable->isEmpty()) {
+        $relationships = $this->guardianRelationshipWriter->preserveForStudent((int) $student->id, $guardians);
+        $grantableRelationships = array_values(array_filter(
+            $relationships,
+            static fn (GuardianRelationship $relationship): bool => $relationship->email !== null
+                && trim($relationship->email) !== '',
+        ));
+
+        if ($grantableRelationships === []) {
             return;
         }
 
-        // The primary parent is the primary Guardian when it has an email;
-        // otherwise the first email-bearing Guardian takes the primary-parent
-        // slot, so the Student always ends up with exactly one primary parent
-        // even when the primary Guardian has no email of its own.
-        $primaryGuardian = $linkable->firstWhere('is_primary', true) ?? $linkable->first();
+        $primaryPortalRelationshipId = collect($grantableRelationships)
+            ->first(fn (GuardianRelationship $relationship): bool => $relationship->isPrimary)?->id
+            ?? $grantableRelationships[0]->id;
 
-        foreach ($linkable as $guardian) {
-            $this->studentService->handleParentAssignment(
-                $student,
-                $guardian->email,
-                $guardian->full_name,
-                $guardian->relationship ?: 'guardian',
-                $guardian->id === $primaryGuardian->id,
-                $guardian->phone,
+        foreach ($grantableRelationships as $relationship) {
+            $this->guardianAccessGrantWriter->grant(
+                $relationship,
+                isPrimaryPortalAccount: $relationship->id === $primaryPortalRelationshipId,
             );
         }
     }

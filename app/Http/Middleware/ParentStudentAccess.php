@@ -7,12 +7,17 @@ namespace App\Http\Middleware;
 use App\Http\Responses\ApiResponse;
 use App\Models\Student;
 use App\Models\User;
+use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class ParentStudentAccess
 {
+    public function __construct(
+        private readonly GuardianAccessGrantReader $accessGrantReader,
+    ) {}
+
     /**
      * Handle an incoming request.
      *
@@ -24,7 +29,7 @@ class ParentStudentAccess
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             return ApiResponse::authenticationError('Authentication required');
         }
 
@@ -51,9 +56,9 @@ class ParentStudentAccess
             ?? $request->header('X-Student-ID')
             ?? $request->route('student_id');
 
-        if (!$studentId) {
+        if (! $studentId) {
             return ApiResponse::validationError([
-                'student_id' => ['Parent must specify student_id to access student data']
+                'student_id' => ['Parent must specify student_id to access student data'],
             ]);
         }
 
@@ -62,17 +67,17 @@ class ParentStudentAccess
         $student = Student::where('student_id', $studentId)->first()
             ?? Student::where('id', $studentId)->first();
 
-        if (!$student) {
+        if (! $student) {
             return ApiResponse::notFound('Student not found');
         }
 
         // Verify parent has access to this student
-        if (!$this->canParentAccessStudent($parent, $student)) {
+        if (! $this->canParentAccessStudent($parent, $student)) {
             return ApiResponse::authorizationError('You do not have permission to access this student\'s data');
         }
 
         // Check student account status
-        if (!$this->isStudentAccessible($student)) {
+        if (! $this->isStudentAccessible($student)) {
             return ApiResponse::authorizationError('Student account is not accessible');
         }
 
@@ -93,19 +98,7 @@ class ParentStudentAccess
      */
     protected function canParentAccessStudent(User $parent, Student $student): bool
     {
-        // Check relationship via ParentProfile and parent_student pivot table
-        $parentProfile = $parent->parentProfile;
-        if ($parentProfile) {
-            $hasPivotAccess = $parentProfile->students()
-                ->where('parent_student.student_id', $student->id)
-                ->exists();
-
-            if ($hasPivotAccess) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->accessGrantReader->hasActiveGrant((int) $parent->id, (int) $student->id);
     }
 
     /**
@@ -114,7 +107,7 @@ class ParentStudentAccess
     protected function isStudentAccessible(Student $student): bool
     {
         // Use the Model's logic for consistency
-        if (!$student->isActive()) {
+        if (! $student->isActive()) {
             return false;
         }
 
@@ -126,10 +119,10 @@ class ParentStudentAccess
             'intake_pre_uni',
             'intake',
             'pre_uni',
-            'intake_course'
+            'intake_course',
         ];
 
-        if (!in_array($student->status, $allowedStatuses)) {
+        if (! in_array($student->status, $allowedStatuses)) {
             return false;
         }
 
@@ -143,7 +136,7 @@ class ParentStudentAccess
     {
         $route = $request->route();
 
-        if (!$route) {
+        if (! $route) {
             return null;
         }
 

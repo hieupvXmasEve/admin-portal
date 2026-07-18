@@ -176,7 +176,7 @@ Authorization: Bearer {parent_token}
 
 ## Security & Permissions
 
-1. **Relationship Verification**: Parents can only access data for students linked to them through the `parent_student` pivot table and `parents` profile table.
+1. **Access Grant Verification**: Parents can only access Students covered by an active Identity-owned `guardian_access_grants` row. The Registry-owned Student–Guardian Relationship remains intact when access is changed or revoked.
 
 2. **Campus Scoping**: Parent roles are assigned per campus, following the existing campus-scoped permission system.
 

@@ -14,6 +14,11 @@ use App\Models\Role;
 use App\Models\Specialization;
 use App\Models\Student;
 use App\Models\User;
+use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
+use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
+use App\Shared\Contracts\StudentRegistry\DTO\GuardianRelationship;
+use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipReader;
+use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
 use App\Shared\Support\Enums\UserType;
 use Exception;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -860,6 +865,33 @@ class StudentService
         $parentProfile = $this->ensureParentProfile($parentUser, $parentName, $parentEmail, $parentPhone);
         $this->linkParentToStudent($parentProfile, $student, $relationship, $isPrimary);
 
+        $registryRelationships = app(StudentGuardianRelationshipReader::class)->forStudent((int) $student->id);
+        $registryRelationship = collect($registryRelationships)
+            ->first(
+                static fn (GuardianRelationship $guardian): bool => $guardian->email !== null
+                    && strtolower($guardian->email) === $parentEmail,
+            );
+
+        if ($registryRelationship === null) {
+            $registryRelationship = app(StudentGuardianRelationshipWriter::class)->preserveForStudent(
+                (int) $student->id,
+                [[
+                    'full_name' => $parentName ?? $parentProfile->full_name,
+                    'relationship_type' => $relationship,
+                    'phone' => $parentPhone,
+                    'email' => $parentEmail,
+                    'is_primary' => $isPrimary,
+                ]],
+            )[0];
+        }
+
+        app(GuardianAccessGrantWriter::class)->grant(
+            $registryRelationship,
+            isPrimaryPortalAccount: $isPrimary,
+            accountEmail: $parentEmail,
+            accountName: $parentName,
+        );
+
         return $parentProfile;
     }
 
@@ -966,6 +998,16 @@ class StudentService
      */
     private function detachAndRevokeParentAccess(ParentProfile $parentProfile, Student $student): void
     {
+        $userId = $parentProfile->user_id;
+        $grant = $userId !== null
+            ? collect(app(GuardianAccessGrantReader::class)->activeForUser((int) $userId))
+                ->first(static fn ($accessGrant): bool => $accessGrant->studentId === (int) $student->id)
+            : null;
+
+        if ($grant !== null) {
+            app(GuardianAccessGrantWriter::class)->revoke($grant->guardianRelationshipId);
+        }
+
         $parentProfile->students()->detach($student->id);
 
         if ($parentProfile->students()->exists()) {

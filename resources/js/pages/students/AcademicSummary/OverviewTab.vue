@@ -382,25 +382,32 @@ const recentRegistrations = computed(() => props.overview.recent_registrations ?
                                 </div>
                             </div>
 
-                            <!-- Parent Login Information -->
-                            <div class="space-y-4 pt-4">
+                            <!-- Guardian relationships and independent portal access -->
+                            <div v-if="overview.student_info.guardians !== undefined" class="space-y-4 pt-4">
                                 <Separator />
                                 <div class="space-y-3">
-                                    <h4 class="text-sm font-semibold text-gray-700">Parent Login Information</h4>
-                                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                        <div class="flex items-center gap-3">
-                                            <User class="text-muted-foreground h-4 w-4 flex-shrink-0" />
-                                            <div class="min-w-0 flex-1">
-                                                <p class="text-muted-foreground text-sm">Parent Name</p>
-                                                <p class="font-medium capitalize">{{ overview.student_info.parent_user?.name || 'N/A' }}</p>
+                                    <h4 class="text-sm font-semibold">Guardians</h4>
+                                    <p v-if="!overview.student_info.guardians?.length" class="text-muted-foreground text-sm">No Guardian relationships recorded.</p>
+                                    <div v-else class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                        <div v-for="guardian in overview.student_info.guardians" :key="guardian.id" class="space-y-2 rounded-lg border p-3">
+                                            <div class="flex items-start justify-between gap-3">
+                                                <div class="min-w-0">
+                                                    <p class="truncate font-medium capitalize">{{ guardian.full_name }}</p>
+                                                    <p class="text-muted-foreground text-sm capitalize">{{ guardian.relationship_type || 'Guardian' }}</p>
+                                                </div>
+                                                <Badge v-if="guardian.is_primary" variant="outline">Primary</Badge>
                                             </div>
-                                        </div>
-                                        <div class="flex items-center gap-3">
-                                            <Mail class="text-muted-foreground h-4 w-4 flex-shrink-0" />
-                                            <div class="min-w-0 flex-1">
-                                                <p class="text-muted-foreground text-sm">Parent Email</p>
-                                                <p class="truncate font-medium">{{ overview.student_info.parent_user?.email || 'N/A' }}</p>
+                                            <div v-if="guardian.phone" class="text-muted-foreground flex items-center gap-2 text-sm">
+                                                <Phone class="h-4 w-4" />
+                                                <span>{{ guardian.phone }}</span>
                                             </div>
+                                            <div v-if="guardian.email" class="text-muted-foreground flex min-w-0 items-center gap-2 text-sm">
+                                                <Mail class="h-4 w-4 flex-shrink-0" />
+                                                <span class="truncate">{{ guardian.email }}</span>
+                                            </div>
+                                            <Badge v-if="guardian.has_active_access" variant="secondary">Portal access active</Badge>
+                                            <Badge v-else-if="guardian.can_receive_access" variant="outline">No portal access</Badge>
+                                            <p v-else class="text-muted-foreground text-xs">No email — portal access unavailable</p>
                                         </div>
                                     </div>
                                 </div>

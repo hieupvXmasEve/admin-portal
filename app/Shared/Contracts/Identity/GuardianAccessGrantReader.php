@@ -1,0 +1,26 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Shared\Contracts\Identity;
+
+use App\Shared\Contracts\Identity\DTO\GuardianAccessGrant;
+
+interface GuardianAccessGrantReader
+{
+    /** @return list<GuardianAccessGrant> */
+    public function activeForUser(int $userId): array;
+
+    /** @return list<int> */
+    public function activeStudentIdsForUser(int $userId): array;
+
+    public function hasActiveGrant(int $userId, int $studentId): bool;
+
+    public function hasAnyActiveGrant(int $userId): bool;
+
+    /**
+     * @param  list<int>  $guardianRelationshipIds
+     * @return list<int>
+     */
+    public function activeRelationshipIds(array $guardianRelationshipIds): array;
+}

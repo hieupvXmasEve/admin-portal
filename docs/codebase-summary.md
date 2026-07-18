@@ -1,6 +1,6 @@
 # Codebase Summary
 
-Last updated: 2026-07-15
+Last updated: 2026-07-18
 Owner: Platform Team
 Status: Current-state snapshot
 Primary source: `repomix-output.xml` (generated 2026-03-02 / updated for runtime code through commit 8651e0f4); Finance source-pointer corrections were manually verified against current runtime code on 2026-07-15.
@@ -39,6 +39,7 @@ Current counts:
     - module domains in `app/Modules/*`
     - large shared layer in `app/Services/*`, `app/Models/*`, and shared HTTP layers
 - Vue 3 + Inertia frontend in `resources/js/*`
+- Student Registry now owns durable `student_guardian_relationships`, including Guardians without email or accounts. Identity owns optional `guardian_access_grants`; Guardian login, refresh, parent context, and Student proxy authorization evaluate active grants while `parent_student` remains a transitional compatibility projection.
 - Academic admin now includes a Student Decisions registry with nullable linkage from `student_action_logs.decision_id` to `student_decisions.id`.
 - Student action reporting stores EGC defer source block as `student_action_logs.egc_defer_from_block_number`, filtering reports by `from_semester_id` and Block 1/2 without deriving from finance EGC block records.
 - Notification V2 module (`app/Modules/Notification/`) implements domain event + outbox pattern with Phase 1 foundation complete:

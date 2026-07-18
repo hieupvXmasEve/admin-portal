@@ -12,6 +12,8 @@ use App\Models\Student;
 use App\Models\User;
 use App\Services\PermissionService;
 use App\Services\StudentService;
+use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
+use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Auth\Middleware\Authorize;
@@ -254,21 +256,21 @@ it('replaces the primary parent, revokes the old parent access, and sends the ne
     ]);
     $oldParentUser = User::factory()->create([
         'type' => UserType::PARENT,
+        'email' => 'old-parent@example.com',
     ]);
     $oldParentProfile = ParentProfile::factory()->create([
         'user_id' => $oldParentUser->id,
+        'full_name' => 'Old Parent',
+        'email_snapshot' => 'old-parent@example.com',
     ]);
     $oldParentUser->createToken('Old parent portal token');
-
-    DB::table('parent_student')->insert([
-        'parent_id' => $oldParentProfile->id,
-        'student_id' => $student->id,
-        'relationship' => 'guardian',
+    $oldRelationship = app(StudentGuardianRelationshipWriter::class)->preserveForStudent((int) $student->id, [[
+        'full_name' => 'Old Parent',
+        'relationship_type' => 'guardian',
+        'email' => 'old-parent@example.com',
         'is_primary' => true,
-        'access_level' => 'read_only',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    ]])[0];
+    app(GuardianAccessGrantWriter::class)->grant($oldRelationship, isPrimaryPortalAccount: true);
 
     app(StudentService::class)->updateStudent($student, [
         'full_name' => $student->full_name,
@@ -289,7 +291,21 @@ it('replaces the primary parent, revokes the old parent access, and sends the ne
             ->where('parent_id', ParentProfile::query()->where('user_id', $newParentUser->id)->value('id'))
             ->where('student_id', $student->id)
             ->where('is_primary', true)
-            ->exists())->toBeTrue();
+            ->exists())->toBeTrue()
+        ->and(DB::table('student_guardian_relationships')->where('student_id', $student->id)->count())->toBe(2)
+        ->and(DB::table('student_guardian_relationships')->where('id', $oldRelationship->id)->value('full_name'))->toBe('Old Parent')
+        ->and(DB::table('student_guardian_relationships')
+            ->where('student_id', $student->id)
+            ->where('email', 'new-parent@example.com')
+            ->where('is_primary', true)
+            ->exists())->toBeTrue()
+        ->and(DB::table('guardian_access_grants')
+            ->where('student_id', $student->id)
+            ->where('status', 'active')
+            ->count())->toBe(1)
+        ->and(DB::table('guardian_access_grants')
+            ->where('guardian_relationship_id', $oldRelationship->id)
+            ->value('status'))->toBe('revoked');
 
     Notification::assertSentTo($newParentUser, ResetPassword::class);
 });

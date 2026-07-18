@@ -1,6 +1,6 @@
 # Parent Auth and Data Model (Current State)
 
-Last updated: 2026-03-02  
+Last updated: 2026-07-18
 Owner: Platform Team  
 Status: Code-verified snapshot
 
@@ -20,22 +20,29 @@ Protected middleware chain:
 - `api.logging`
 - `api.actor:parent`
 
-## Parent Tables
+## Guardian Relationship and Access Tables
 
-Created by `database/migrations/2026_01_02_000001_setup_parent_portal.php`:
+Current ownership is split between Student Registry and Identity & Access:
 
-- `parents`
+- `student_guardian_relationships` (Student Registry)
+    - stores every Guardian relationship, contact facts, relationship type, and primary designation
+    - exists independently of email, account, or portal access
+- `guardian_access_grants` (Identity & Access)
+    - links an account-backed Parent profile to one Registry relationship and Student
+    - stores `access_level`, active/revoked status, and grant/revocation timestamps
+- `parents` (Identity & Access)
     - key fields: `user_id` (unique FK), `full_name`, `phone`, `email_snapshot`, `status`
     - includes soft deletes
-- `parent_student`
-    - key fields: `parent_id`, `student_id`, `relationship`, `is_primary`, `access_level`
-    - unique pair on (`parent_id`, `student_id`)
+
+The legacy `parent_student` table remains as a transitional compatibility projection for unmigrated consumers. Authentication, token refresh, parent context, and parent-proxy Student authorization do not evaluate it.
+
+The 2026-07-18 expand/backfill migrations restore every Guardian from approved Applications, reconcile matching account-backed `parent_student` rows by Student and email without duplicates, and retain relationship type, primary designation, and access level.
 
 ## Model Contracts
 
-- `App\Models\ParentProfile` uses table `parents` and includes `students()` belongsToMany via `parent_student`.
-- `App\Models\Student` exposes parent relation via `parent_student` pivot.
-- `App\Models\User` exposes `parentProfile()` and `children()` helpers.
+- Registry readers/writers are exposed through `App\Shared\Contracts\StudentRegistry`.
+- Identity grant readers/writers are exposed through `App\Shared\Contracts\Identity`.
+- Parent API responses retain the existing `children` shape, but the allowed Student ids come from active Identity grants.
 
 ## Drift Note
 

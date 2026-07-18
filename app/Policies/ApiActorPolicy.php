@@ -7,10 +7,15 @@ namespace App\Policies;
 use App\Models\Lecture;
 use App\Models\Student;
 use App\Models\User;
+use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use Illuminate\Http\Request;
 
 class ApiActorPolicy
 {
+    public function __construct(
+        private readonly GuardianAccessGrantReader $guardianAccessGrantReader,
+    ) {}
+
     public function accessStudentOrParent(mixed $user, Request $request): bool
     {
         if ($user instanceof Student) {
@@ -49,7 +54,7 @@ class ApiActorPolicy
             return false;
         }
 
-        return $user->parentProfile?->status === 'active';
+        return $user->parentProfile?->status === 'active'
+            && $this->guardianAccessGrantReader->hasAnyActiveGrant((int) $user->id);
     }
 }
-

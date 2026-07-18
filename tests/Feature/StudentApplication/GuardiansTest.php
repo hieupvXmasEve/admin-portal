@@ -315,6 +315,25 @@ it('promotes an email-bearing guardian to primary parent when the primary guardi
     expect($links)->toHaveCount(1);
     expect((bool) $links->first()->is_primary)->toBeTrue();
     expect(User::where('email', 'has-email@example.com')->exists())->toBeTrue();
+
+    $relationships = DB::table('student_guardian_relationships')
+        ->where('student_id', $student->id)
+        ->orderBy('id')
+        ->get();
+
+    expect($relationships)->toHaveCount(2)
+        ->and($relationships->firstWhere('full_name', 'No Email Primary')->is_primary)->toBe(1)
+        ->and($relationships->firstWhere('full_name', 'Has Email')->is_primary)->toBe(0);
+
+    $accessGrants = DB::table('guardian_access_grants')
+        ->where('student_id', $student->id)
+        ->get();
+
+    expect($accessGrants)->toHaveCount(1)
+        ->and($accessGrants->first()->guardian_relationship_id)
+        ->toBe($relationships->firstWhere('full_name', 'Has Email')->id)
+        ->and($accessGrants->first()->status)->toBe('active')
+        ->and($accessGrants->first()->access_level)->toBe('read_only');
 });
 
 it('links multiple guardians as parents on approve with exactly one primary', function () {

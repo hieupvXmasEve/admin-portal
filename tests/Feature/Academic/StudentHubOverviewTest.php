@@ -12,6 +12,8 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Services\PermissionService;
 use App\Services\StudentAcademicSummaryService;
+use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
+use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -148,6 +150,38 @@ it('renders the full Hub overview for an act-capable academic officer', function
             ->where('overview.student_info.emergency_contact_name', 'Jane Doe')
             ->has('overview.additional_info')
             ->has('overview.recent_registrations', 5));
+});
+
+it('shows every Registry Guardian and marks no-email Guardians as unable to receive portal access', function () {
+    $student = hubOverviewStudent();
+    $user = actAsHubUser(['view_student_summary', 'change_student_status']);
+    $relationships = app(StudentGuardianRelationshipWriter::class)->preserveForStudent((int) $student->id, [
+        [
+            'full_name' => 'Offline Primary Guardian',
+            'relationship_type' => 'mother',
+            'email' => null,
+            'is_primary' => true,
+        ],
+        [
+            'full_name' => 'Portal Guardian',
+            'relationship_type' => 'father',
+            'email' => 'portal-guardian@example.test',
+            'is_primary' => false,
+        ],
+    ]);
+    app(GuardianAccessGrantWriter::class)->grant($relationships[1], isPrimaryPortalAccount: true);
+
+    actingAs($user)
+        ->get(route('students.academic-summary.overview', $student))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('overview.student_info.guardians', 2)
+            ->where('overview.student_info.guardians.0.full_name', 'Offline Primary Guardian')
+            ->where('overview.student_info.guardians.0.can_receive_access', false)
+            ->where('overview.student_info.guardians.0.has_active_access', false)
+            ->where('overview.student_info.guardians.1.full_name', 'Portal Guardian')
+            ->where('overview.student_info.guardians.1.can_receive_access', true)
+            ->where('overview.student_info.guardians.1.has_active_access', true));
 });
 
 it('treats view_student_action alone as act-capable and renders the full overview', function () {

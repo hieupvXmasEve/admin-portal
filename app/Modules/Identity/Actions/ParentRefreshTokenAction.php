@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Identity\Actions;
 
 use App\Models\User;
+use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use Exception;
 
 class ParentRefreshTokenAction
@@ -23,6 +24,10 @@ class ParentRefreshTokenAction
             throw new Exception('Parent profile is not active.');
         }
 
+        if (! app(GuardianAccessGrantReader::class)->hasAnyActiveGrant((int) $user->id)) {
+            throw new Exception('Guardian access has been revoked.');
+        }
+
         $deviceName = $deviceName ?? 'Parent Portal';
         $expiresAt = now()->addHours(8);
 
@@ -35,4 +40,3 @@ class ParentRefreshTokenAction
         ];
     }
 }
-

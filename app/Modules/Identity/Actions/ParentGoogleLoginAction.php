@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Identity\Actions;
 
 use App\Models\User;
-use App\Models\ParentProfile;
 use App\Modules\Identity\Http\Resources\Identity\ParentResource;
-use Google\Client;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\RateLimiter;
+use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use Exception;
+use Google\Client;
 
 class ParentGoogleLoginAction
 {
@@ -23,7 +21,7 @@ class ParentGoogleLoginAction
         $ip = $data['ip'] ?? request()->ip();
         $deviceName = $data['device_name'] ?? 'Parent Portal (Google)';
 
-        $key = 'google-login:' . $ip;
+        $key = 'google-login:'.$ip;
 
         try {
             // Initialize Google Client
@@ -34,40 +32,40 @@ class ParentGoogleLoginAction
             // Verify the ID token
             $payload = $client->verifyIdToken($idToken);
 
-            if (!$payload) {
+            if (! $payload) {
                 throw new Exception('Invalid Google ID token');
             }
 
             $email = $payload['email'] ?? null;
-            if (!$email) {
+            if (! $email) {
                 throw new Exception('Unable to retrieve email from Google account');
             }
 
-            if (!($payload['email_verified'] ?? false)) {
+            if (! ($payload['email_verified'] ?? false)) {
                 throw new Exception('Google account email is not verified');
             }
 
             // 1. Find User by email
             $user = User::where('email', $email)->first();
 
-            if (!$user) {
+            if (! $user) {
                 throw new Exception('No account found with this email address');
             }
 
             // 2. Verify User is active
-            if (!$user->isActive()) {
+            if (! $user->isActive()) {
                 throw new Exception('Account is not active. Please contact administration.');
             }
 
             // 3. Verify User is a parent
-            if (!$user->isParent()) {
+            if (! $user->isParent()) {
                 throw new Exception('This account is not authorized for the parent portal.');
             }
 
             // 4. Retrieve Associated Parent Profile
             $parentProfile = $user->parentProfile;
 
-            if (!$parentProfile) {
+            if (! $parentProfile) {
                 throw new Exception('Parent profile not found.');
             }
 
@@ -76,8 +74,13 @@ class ParentGoogleLoginAction
                 throw new Exception('Parent account is not active. Please contact administration.');
             }
 
+            $accessGrantReader = app(GuardianAccessGrantReader::class);
+            if (! $accessGrantReader->hasAnyActiveGrant((int) $user->id)) {
+                throw new Exception('Guardian access has been revoked.');
+            }
+
             // Update OAuth provider data if not already set on the User
-            if (!$user->oauth_provider_id) {
+            if (! $user->oauth_provider_id) {
                 $user->update([
                     'oauth_provider' => 'google',
                     'oauth_provider_id' => $payload['sub'],
@@ -93,8 +96,8 @@ class ParentGoogleLoginAction
             // 6. Create Token with 'parent' ability
             $token = $user->createToken($deviceName, ['parent'], $expiresAt)->plainTextToken;
 
-            // Load children for the resource
-            $parentProfile->load('students');
+            $activeStudentIds = $accessGrantReader->activeStudentIdsForUser((int) $user->id);
+            $parentProfile->load(['students' => fn ($students) => $students->whereKey($activeStudentIds)]);
 
             return [
                 'parent' => (new ParentResource($parentProfile))->resolve(),
@@ -104,7 +107,7 @@ class ParentGoogleLoginAction
             ];
 
         } catch (\Google\Exception $e) {
-            throw new Exception('Google authentication failed: ' . $e->getMessage());
+            throw new Exception('Google authentication failed: '.$e->getMessage());
         }
     }
 }

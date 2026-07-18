@@ -20,6 +20,8 @@ use App\Services\ExcelExportService;
 use App\Services\StudentAcademicSummaryService;
 use App\Shared\Contracts\Finance\HubStudentFinanceSummaryReader;
 use App\Shared\Contracts\Finance\StudentFeeSummaryReader;
+use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
+use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -43,6 +45,8 @@ class StudentAcademicSummaryController extends Controller
         private StudentAcademicSummaryService $academicSummaryService,
         private StudentWalletController $studentWalletController,
         private GoldTransactionController $goldTransactionController,
+        private StudentGuardianRelationshipReader $guardianRelationshipReader,
+        private GuardianAccessGrantReader $guardianAccessGrantReader,
     ) {
         $this->middleware('can:view_student_summary')->only([
             'show',
@@ -148,6 +152,21 @@ class StudentAcademicSummaryController extends Controller
         $canAct = $this->canActOnStudent($request);
 
         $overviewData = $this->academicSummaryService->getOverviewData($student, $canAct);
+
+        if ($canAct) {
+            $relationships = $this->guardianRelationshipReader->forStudent((int) $student->id);
+            $activeRelationshipIds = array_flip($this->guardianAccessGrantReader->activeRelationshipIds(
+                array_map(static fn ($relationship): int => $relationship->id, $relationships),
+            ));
+            $overviewData['student_info']['guardians'] = array_map(
+                static fn ($relationship): array => [
+                    ...$relationship->toArray(),
+                    'can_receive_access' => $relationship->email !== null && trim($relationship->email) !== '',
+                    'has_active_access' => isset($activeRelationshipIds[$relationship->id]),
+                ],
+                $relationships,
+            );
+        }
 
         return Inertia::render('students/AcademicSummary/Overview', [
             'student' => $this->hubStudentContext($student),

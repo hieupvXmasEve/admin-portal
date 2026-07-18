@@ -6,13 +6,23 @@ namespace App\Modules\Identity\Queries;
 
 use App\Models\ParentProfile;
 use App\Modules\Identity\Http\Resources\Identity\ParentResource;
+use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 
 class GetParentContextQuery
 {
+    public function __construct(
+        private readonly GuardianAccessGrantReader $accessGrantReader,
+    ) {}
+
     public function handle(ParentProfile $parentProfile): array
     {
-        // 1. Load relationships
-        $parentProfile->load(['user', 'students.campus', 'students.program']);
+        $parentProfile->load('user');
+        $activeStudentIds = $this->accessGrantReader->activeStudentIdsForUser((int) $parentProfile->user_id);
+        $parentProfile->load([
+            'students' => fn ($students) => $students->whereKey($activeStudentIds),
+            'students.campus',
+            'students.program',
+        ]);
 
         // 2. Get Notification Summary (for the parent user)
         $unreadNotifications = $parentProfile->user->notifications()->unread()->count();
