@@ -9,6 +9,8 @@ use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -18,7 +20,8 @@ class CourseRegistrationService
     public function __construct(
         protected ConflictDetectionService $conflictDetectionService,
         protected EnrollmentCapacityService $capacityService,
-        protected PrerequisiteValidationService $prerequisiteService
+        protected PrerequisiteValidationService $prerequisiteService,
+        protected AcademicPeriodReader $academicPeriods,
     ) {}
 
     /**
@@ -26,11 +29,12 @@ class CourseRegistrationService
      */
     public function getEnrolledCourses(Student $student, array $filters = []): Collection
     {
-        $currentSemester = Semester::where('is_active', true)->first();
+        $currentSemester = $this->currentSemester();
 
         // Return empty collection if no active semester instead of throwing exception
         if (! $currentSemester) {
-            Log::info('No active semester found, returning empty enrolled courses list for student: ' . $student->id);
+            Log::info('No active semester found, returning empty enrolled courses list for student: '.$student->id);
+
             return collect();
         }
 
@@ -42,11 +46,11 @@ class CourseRegistrationService
                 'courseOffering.unit',
                 'courseOffering.lecture',
                 'courseOffering.classSessions.room',
-                'courseOffering.semester'
+                'courseOffering.semester',
             ])
             ->get();
 
-        Log::info('Student enrolled courses count: ' . $studentRegistrations->count());
+        Log::info('Student enrolled courses count: '.$studentRegistrations->count());
 
         // Filter only course offerings that have class sessions
         $enrolledCourseOfferings = $studentRegistrations
@@ -66,11 +70,12 @@ class CourseRegistrationService
      */
     public function getAvailableCoursesForRegistration(Student $student, array $filters = []): Collection
     {
-        $currentSemester = Semester::where('is_active', true)->first();
+        $currentSemester = $this->currentSemester();
 
         // Return empty collection if no active semester
         if (! $currentSemester) {
-            Log::info('No active semester found, returning empty available courses list for student: ' . $student->id);
+            Log::info('No active semester found, returning empty available courses list for student: '.$student->id);
+
             return collect();
         }
 
@@ -80,15 +85,15 @@ class CourseRegistrationService
             'lecture',
             'classSessions.room',
             'semester',
-            'courseRegistrations'
+            'courseRegistrations',
         ])
-        ->where('semester_id', $currentSemester->id)
-        ->where('is_active', true);
+            ->where('semester_id', $currentSemester->id)
+            ->where('is_active', true);
 
         // Apply filters if provided
-        if (!empty($filters['unit_code'])) {
+        if (! empty($filters['unit_code'])) {
             $query->whereHas('unit', function ($q) use ($filters) {
-                $q->where('code', 'like', '%' . $filters['unit_code'] . '%');
+                $q->where('code', 'like', '%'.$filters['unit_code'].'%');
             });
         }
 
@@ -114,7 +119,7 @@ class CourseRegistrationService
                 return $this->formatCourseOfferingForRegistration($offering, $student);
             });
 
-        Log::info('Available courses for registration count: ' . $availableCourses->count());
+        Log::info('Available courses for registration count: '.$availableCourses->count());
 
         return $availableCourses->values();
     }
@@ -162,11 +167,11 @@ class CourseRegistrationService
         }
 
         if (! in_array($registration->registration_status, ['registered', 'pending'])) {
-            throw new BusinessLogicException('Cannot drop course with status: ' . $registration->registration_status);
+            throw new BusinessLogicException('Cannot drop course with status: '.$registration->registration_status);
         }
 
         // Check drop deadline
-        $currentSemester = Semester::where('is_active', true)->first();
+        $currentSemester = $this->currentSemester();
         if ($currentSemester && $currentSemester->drop_deadline && now()->isAfter($currentSemester->drop_deadline)) {
             throw new BusinessLogicException('Drop deadline has passed');
         }
@@ -204,7 +209,7 @@ class CourseRegistrationService
             $query->where('semester_id', $semesterId);
         } else {
             // Get current semester registrations
-            $currentSemester = Semester::where('is_active', true)->first();
+            $currentSemester = $this->currentSemester();
             if ($currentSemester) {
                 $query->where('semester_id', $currentSemester->id);
             }
@@ -221,8 +226,12 @@ class CourseRegistrationService
     protected function validateRegistration(Student $student, CourseOffering $courseOffering): void
     {
         // Check if registration is open
-        $currentSemester = Semester::where('is_active', true)->first();
-        if (! $currentSemester || ! $currentSemester->isRegistrationOpen()) {
+        $currentPeriod = $this->academicPeriods->current();
+        $schedule = $currentPeriod === null
+            ? null
+            : $this->academicPeriods->scheduleForCampus($currentPeriod->id, (int) $student->campus_id);
+
+        if (! $this->isRegistrationOpen($schedule?->registration_start_date, $schedule?->registration_end_date)) {
             throw new BusinessLogicException('Registration is not currently open');
         }
 
@@ -266,7 +275,7 @@ class CourseRegistrationService
      */
     protected function validateCreditHourLimits(Student $student, CourseOffering $courseOffering): void
     {
-        $currentSemester = Semester::where('is_active', true)->first();
+        $currentSemester = $this->currentSemester();
 
         $currentCredits = $student->courseRegistrations()
             ->where('semester_id', $currentSemester->id)
@@ -282,6 +291,20 @@ class CourseRegistrationService
         if ($newTotalCredits > $maxCredits) {
             throw new BusinessLogicException("Registration would exceed maximum credit limit of {$maxCredits}");
         }
+    }
+
+    private function isRegistrationOpen(?CarbonImmutable $startsAt, ?CarbonImmutable $endsAt): bool
+    {
+        return $startsAt !== null
+            && $endsAt !== null
+            && now()->betweenIncluded($startsAt, $endsAt);
+    }
+
+    private function currentSemester(): ?Semester
+    {
+        $currentPeriodId = $this->academicPeriods->current()?->id;
+
+        return $currentPeriodId === null ? null : Semester::find($currentPeriodId);
     }
 
     /**
@@ -305,12 +328,12 @@ class CourseRegistrationService
                 'name' => $offering->lecture?->display_name ?? $offering->lecture?->full_name ?? null,
                 'email' => $offering->lecture?->email,
             ],
-//            'registration_eligibility' => [
-//                'can_register' => $this->canRegisterForCourse($student, $offering),
-//                'prerequisites_met' => $this->prerequisiteService->hasMetPrerequisites($student, $offering),
-//                'has_conflicts' => ! $this->conflictDetectionService->detectConflicts($student, $offering)->isEmpty(),
-//                'capacity_available' => $availableSpots > 0,
-//            ],
+            //            'registration_eligibility' => [
+            //                'can_register' => $this->canRegisterForCourse($student, $offering),
+            //                'prerequisites_met' => $this->prerequisiteService->hasMetPrerequisites($student, $offering),
+            //                'has_conflicts' => ! $this->conflictDetectionService->detectConflicts($student, $offering)->isEmpty(),
+            //                'capacity_available' => $availableSpots > 0,
+            //            ],
         ];
     }
 

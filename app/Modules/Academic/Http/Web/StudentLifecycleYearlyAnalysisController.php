@@ -10,6 +10,7 @@ use App\Modules\Academic\Exports\StudentLifecycleStatusExport;
 use App\Modules\Academic\Queries\Reporting\GetStudentLifecycleYearlyAnalysisQuery;
 use App\Modules\Academic\Queries\Reporting\GetStudentStatusBySemesterQuery;
 use App\Services\ExcelExportService;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -19,7 +20,8 @@ class StudentLifecycleYearlyAnalysisController extends Controller
 {
     public function __construct(
         private readonly GetStudentLifecycleYearlyAnalysisQuery $yearlyQuery,
-        private readonly GetStudentStatusBySemesterQuery $statusBySemesterQuery
+        private readonly GetStudentStatusBySemesterQuery $statusBySemesterQuery,
+        private readonly AcademicPeriodReader $academicPeriods,
     ) {}
 
     public function index(Request $request): Response
@@ -39,9 +41,7 @@ class StudentLifecycleYearlyAnalysisController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
-        $defaultSemesterId = Semester::query()
-            ->where('is_active', true)
-            ->value('id');
+        $defaultSemesterId = $this->academicPeriods->current()?->id;
 
         if (! $defaultSemesterId) {
             $defaultSemesterId = Semester::query()->orderByDesc('start_date')->value('id');

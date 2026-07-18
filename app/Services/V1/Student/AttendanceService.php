@@ -8,6 +8,7 @@ use App\Models\Attendance;
 use App\Models\CourseOffering;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -25,7 +26,7 @@ class AttendanceService
             return $this->getEmptyAttendanceSummary();
         }
 
-        $cacheKey = "attendance:summary:student:{$student->id}:semester:{$semester->id}:" . md5(serialize($filters));
+        $cacheKey = "attendance:summary:student:{$student->id}:semester:{$semester->id}:".md5(serialize($filters));
 
         return Cache::remember($cacheKey, 300, function () use ($student, $semester, $filters) {
             $attendanceRecords = $this->getAttendanceRecords($student, $semester, $filters);
@@ -130,7 +131,7 @@ class AttendanceService
     {
         if (! empty($filters['course_code'])) {
             $query->whereHas('courseOffering.unit', function ($q) use ($filters) {
-                $q->where('code', 'like', '%' . $filters['course_code'] . '%');
+                $q->where('code', 'like', '%'.$filters['course_code'].'%');
             });
         }
 
@@ -272,7 +273,7 @@ class AttendanceService
                 'course_name' => $record->courseOffering->unit->name,
                 'session_date' => $record->session_date->toDateString(),
                 'session_time' => $record->classSession ?
-                    $record->classSession->start_time . ' - ' . $record->classSession->end_time : null,
+                    $record->classSession->start_time.' - '.$record->classSession->end_time : null,
                 'status' => $record->status,
                 'status_display' => $this->getStatusDisplay($record->status),
                 'marked_at' => $record->marked_at?->toDateTimeString(),
@@ -551,7 +552,7 @@ class AttendanceService
         $start = Carbon::createFromTimeString($startTime);
         $end = Carbon::createFromTimeString($endTime);
 
-        return $start->format('g:i A') . ' - ' . $end->format('g:i A');
+        return $start->format('g:i A').' - '.$end->format('g:i A');
     }
 
     /**
@@ -653,7 +654,7 @@ class AttendanceService
     protected function calculateStandardDeviation(Collection $values): float
     {
         $mean = $values->avg();
-        $variance = $values->map(fn($value) => pow($value - $mean, 2))->avg();
+        $variance = $values->map(fn ($value) => pow($value - $mean, 2))->avg();
 
         return sqrt($variance);
     }
@@ -704,7 +705,7 @@ class AttendanceService
     protected function getPerfectAttendanceCourses(Collection $records): array
     {
         return $records->groupBy('course_offering_id')->filter(function ($courseRecords) {
-            return $courseRecords->every(fn($record) => in_array($record->status, ['present', 'late']));
+            return $courseRecords->every(fn ($record) => in_array($record->status, ['present', 'late']));
         })->map(function ($courseRecords) {
             $courseOffering = $courseRecords->first()->courseOffering;
 
@@ -725,7 +726,9 @@ class AttendanceService
             return Semester::find($semesterId);
         }
 
-        return Semester::where('is_active', true)->first();
+        $currentPeriodId = app(AcademicPeriodReader::class)->current()?->id;
+
+        return $currentPeriodId === null ? null : Semester::find($currentPeriodId);
     }
 
     /**
@@ -743,7 +746,7 @@ class AttendanceService
         // Determine which semester to use for the report
         $targetSemester = $this->determineReportSemester($student, $semesterId, $availableSemesters);
 
-        if (!$targetSemester) {
+        if (! $targetSemester) {
             return $this->getEmptyAttendanceReport();
         }
 
@@ -763,9 +766,9 @@ class AttendanceService
     protected function getStudentSemesters(Student $student): Collection
     {
         return Semester::where(function ($query) use ($student) {
-                $query->whereHas('enrollments', function ($enrollmentQuery) use ($student) {
-                    $enrollmentQuery->where('student_id', $student->id);
-                })
+            $query->whereHas('enrollments', function ($enrollmentQuery) use ($student) {
+                $enrollmentQuery->where('student_id', $student->id);
+            })
                 ->orWhereHas('courseRegistrations', function ($registrationQuery) use ($student) {
                     $registrationQuery->where('student_id', $student->id)
                         ->whereIn('registration_status', ['pending', 'registered', 'confirmed', 'completed']);
@@ -773,7 +776,7 @@ class AttendanceService
                 ->orWhereHas('courseOfferings.classSessions.attendances', function ($attendanceQuery) use ($student) {
                     $attendanceQuery->where('student_id', $student->id);
                 });
-            })
+        })
             ->orderBy('start_date', 'desc')
             ->get();
     }
@@ -816,6 +819,7 @@ class AttendanceService
 
         // Fallback to most recent semester with enrollment
         $firstSemester = $availableSemesters->first();
+
         return $firstSemester instanceof Semester ? $firstSemester : null;
     }
 
@@ -851,7 +855,7 @@ class AttendanceService
                 },
                 'courseOffering.classSessions.attendances' => function ($query) use ($student) {
                     $query->where('student_id', $student->id);
-                }
+                },
             ])
             ->get();
 

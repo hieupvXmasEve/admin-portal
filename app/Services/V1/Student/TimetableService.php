@@ -9,6 +9,7 @@ use App\Models\Event;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Repositories\V1\Student\ClassSessionRepository;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -515,7 +516,8 @@ class TimetableService
         }
 
         // First try to get the manually marked active semester
-        $activeSemester = Semester::where('is_active', true)->first();
+        $currentPeriodId = app(AcademicPeriodReader::class)->current()?->id;
+        $activeSemester = $currentPeriodId === null ? null : Semester::find($currentPeriodId);
         if ($activeSemester) {
             return $activeSemester;
         }

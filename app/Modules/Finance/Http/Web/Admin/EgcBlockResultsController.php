@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Semester;
 use App\Modules\Finance\Actions\Egc\SyncEgcBlockResultsAction;
 use App\Modules\Finance\Queries\Egc\ListEgcBlockResultsQuery;
 use App\Modules\Finance\Queries\Egc\ListEgcRetakeAdjustmentsQuery;
 use App\Modules\Finance\Support\FinanceSemesterContextResolver;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -21,6 +21,7 @@ class EgcBlockResultsController extends Controller
         Request $request,
         ListEgcBlockResultsQuery $query,
         ListEgcRetakeAdjustmentsQuery $adjustmentsQuery,
+        AcademicPeriodReader $academicPeriods,
     ): Response {
         $validated = $request->validate([
             'search' => 'nullable|string|max:100',
@@ -31,8 +32,8 @@ class EgcBlockResultsController extends Controller
 
         $currentCampusId = session('current_campus_id') ? (int) session('current_campus_id') : null;
         $semesterId = FinanceSemesterContextResolver::selectedId();
-        $activeSemesterId = Semester::query()->where('is_active', true)->value('id');
-        $currentSemester = $semesterId ? Semester::find($semesterId) : null;
+        $activeSemesterId = $academicPeriods->current()?->id;
+        $currentSemester = $semesterId ? $academicPeriods->find($semesterId) : null;
 
         $blocks = $semesterId ? $query->handle($semesterId, $validated, $currentCampusId) : collect();
         $adjustments = $semesterId ? $adjustmentsQuery->handle($semesterId, $currentCampusId) : [
@@ -41,7 +42,7 @@ class EgcBlockResultsController extends Controller
             'ineligible' => [],
             'already_discounted' => [],
         ];
-        $semesters = Semester::orderBy('start_date', 'desc')->get();
+        $semesters = $academicPeriods->selectable();
 
         return Inertia::render('Finance/EgcOperations/BlockResults', [
             'blocks' => $blocks,
@@ -60,14 +61,14 @@ class EgcBlockResultsController extends Controller
         ]);
     }
 
-    public function sync(Request $request): RedirectResponse
+    public function sync(Request $request, AcademicPeriodReader $academicPeriods): RedirectResponse
     {
         $validated = $request->validate([
             'semester_id' => 'required|integer|exists:semesters,id',
         ]);
 
         $semesterId = (int) $validated['semester_id'];
-        $activeSemesterId = Semester::query()->where('is_active', true)->value('id');
+        $activeSemesterId = $academicPeriods->current()?->id;
 
         if ($activeSemesterId === null || $semesterId !== (int) $activeSemesterId) {
             return redirect()

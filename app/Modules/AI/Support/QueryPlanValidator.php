@@ -8,12 +8,14 @@ use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\User;
 use App\Services\PermissionService;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 
 class QueryPlanValidator
 {
     public function __construct(
         private readonly MetricCatalog $catalog,
         private readonly PermissionService $permissionService,
+        private readonly AcademicPeriodReader $academicPeriods,
     ) {}
 
     public function validate(
@@ -220,7 +222,9 @@ class QueryPlanValidator
     private function resolveSemester(mixed $value): ?Semester
     {
         if ($value === 'current') {
-            return Semester::query()->where('is_active', true)->first();
+            $currentPeriodId = $this->academicPeriods->current()?->id;
+
+            return $currentPeriodId === null ? null : Semester::query()->find($currentPeriodId);
         }
 
         if (is_numeric($value)) {

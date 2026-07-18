@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Campus;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 
@@ -140,15 +141,11 @@ class CampusLogContext
     protected static function getCurrentAcademicYear(): ?string
     {
         // Try to get from active semester
-        $activeSemester = Cache::remember('active_semester_log_context', 900, function () {
-            if (class_exists(\App\Models\Semester::class)) {
-                return \App\Models\Semester::where('is_active', true)
-                    ->select('code', 'name')
-                    ->first();
-            }
-
-            return null;
-        });
+        $activeSemester = Cache::remember(
+            'active_semester_log_context',
+            900,
+            fn () => app(AcademicPeriodReader::class)->current(),
+        );
 
         if ($activeSemester) {
             return $activeSemester->code ?? $activeSemester->name;

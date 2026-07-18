@@ -6,6 +6,7 @@ namespace App\Services\V1\Student;
 
 use App\Models\Semester;
 use App\Models\Student;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -349,7 +350,7 @@ class ProfileService
             'percentage' => $percentage,
             'completed_fields' => $completedCount,
             'total_fields' => $totalFields,
-            'missing_fields' => array_keys(array_filter($fields, fn($completed) => ! $completed)),
+            'missing_fields' => array_keys(array_filter($fields, fn ($completed) => ! $completed)),
             'status' => $this->getCompletionStatus($percentage),
         ];
     }
@@ -609,7 +610,7 @@ class ProfileService
             $achievements[] = [
                 'type' => 'deans_list',
                 'title' => 'Dean\'s List',
-                'description' => 'Achieved GPA of ' . round($achievement->gpa, 2),
+                'description' => 'Achieved GPA of '.round($achievement->gpa, 2),
                 'semester' => $achievement->semester?->name,
                 'date' => $achievement->created_at?->toDateString(),
             ];
@@ -724,7 +725,8 @@ class ProfileService
     protected function resolveCurrentSemester(): ?Semester
     {
         // Prefer explicitly active semester if set
-        $active = Semester::getActiveSemester();
+        $currentPeriodId = app(AcademicPeriodReader::class)->current()?->id;
+        $active = $currentPeriodId === null ? null : Semester::find($currentPeriodId);
         if ($active) {
             return $active;
         }

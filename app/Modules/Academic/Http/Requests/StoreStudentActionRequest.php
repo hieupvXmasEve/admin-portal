@@ -10,6 +10,7 @@ use App\Models\DeferCaseItem;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Services\FinanceChargeService;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -240,8 +241,8 @@ class StoreStudentActionRequest extends FormRequest
     {
         return [
             function (string $attribute, mixed $value, \Closure $fail): void {
-                $activeSemester = Semester::getActiveSemester();
-                if ($activeSemester === null) {
+                $currentPeriod = app(AcademicPeriodReader::class)->current();
+                if ($currentPeriod === null) {
                     return;
                 }
 
@@ -252,8 +253,8 @@ class StoreStudentActionRequest extends FormRequest
 
                 if (
                     $selectedSemester->start_date
-                    && $activeSemester->start_date
-                    && $selectedSemester->start_date->lt($activeSemester->start_date)
+                    && $currentPeriod->start_date !== null
+                    && $selectedSemester->start_date->lt($currentPeriod->start_date)
                 ) {
                     $fail('From semester cannot be before the current semester.');
                 }

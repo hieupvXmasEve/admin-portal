@@ -8,7 +8,6 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicWarningSetting;
 use App\Models\CourseOffering;
 use App\Models\GpaCalculation;
-use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Academic\Actions\Warnings\SendAcademicStandingWarningAction;
 use App\Modules\Academic\Actions\Warnings\SendAttendanceWarningAction;
@@ -18,6 +17,7 @@ use App\Modules\Academic\Http\Requests\Warnings\SendAcademicStandingWarningReque
 use App\Modules\Academic\Http\Requests\Warnings\SendAttendanceWarningRequest;
 use App\Modules\Academic\Http\Requests\Warnings\UpdateWarningSettingsRequest;
 use App\Modules\Academic\Queries\ListWarningCenterQuery;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -27,6 +27,7 @@ class WarningCenterController extends Controller
 {
     public function __construct(
         private readonly ListWarningCenterQuery $warningCenterQuery,
+        private readonly AcademicPeriodReader $academicPeriods,
     ) {}
 
     public function index(ListWarningCenterRequest $request): Response
@@ -34,19 +35,19 @@ class WarningCenterController extends Controller
         $filters = $request->validated();
         $campusId = $this->currentCampusId();
         $settings = AcademicWarningSetting::forCampus($campusId);
-        $activeSemester = Semester::getActiveSemester();
+        $currentPeriod = $this->academicPeriods->current();
 
         return Inertia::render('Academic/Warnings/Index', [
             'academic_warnings' => $this->warningCenterQuery->academicStandingWarnings($filters, $campusId),
             'attendance_subjects' => $this->warningCenterQuery->attendanceWarnings(
                 $campusId,
-                $activeSemester,
+                $currentPeriod?->id,
                 (float) $settings->attendance_warning_ratio,
             ),
-            'active_semester' => $activeSemester ? [
-                'id' => (int) $activeSemester->id,
-                'name' => (string) $activeSemester->name,
-                'code' => (string) $activeSemester->code,
+            'active_semester' => $currentPeriod ? [
+                'id' => $currentPeriod->id,
+                'name' => $currentPeriod->name,
+                'code' => $currentPeriod->code,
             ] : null,
             'settings' => $this->settingsPayload($settings),
             'filters' => $request->only(['search', 'sort', 'direction', 'per_page']),

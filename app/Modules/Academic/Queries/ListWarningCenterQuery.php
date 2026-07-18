@@ -6,7 +6,6 @@ namespace App\Modules\Academic\Queries;
 
 use App\Models\CourseOffering;
 use App\Models\GpaCalculation;
-use App\Models\Semester;
 use App\Models\StudentWarningLog;
 use App\Modules\Academic\Support\WarningDedupe;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -100,9 +99,9 @@ class ListWarningCenterQuery
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function attendanceWarnings(?int $campusId, ?Semester $activeSemester, float $warningRatio = 0.50): array
+    public function attendanceWarnings(?int $campusId, ?int $academicPeriodId, float $warningRatio = 0.50): array
     {
-        if (! $activeSemester) {
+        if ($academicPeriodId === null) {
             return [];
         }
 
@@ -125,7 +124,7 @@ class ListWarningCenterQuery
                         ]);
                 },
             ])
-            ->where('semester_id', $activeSemester->id)
+            ->where('semester_id', $academicPeriodId)
             ->when($campusId, fn (Builder $query) => $query->where('campus_id', $campusId))
             ->where('is_active', true)
             ->orderBy('unit_id')

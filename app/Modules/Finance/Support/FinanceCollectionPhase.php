@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Models\Semester;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Carbon\Carbon;
 
 /**
@@ -21,13 +21,13 @@ class FinanceCollectionPhase
             return self::label($override, 'manual');
         }
 
-        $semester = Semester::getActiveSemester();
-        if ($semester === null || $semester->start_date === null || $semester->end_date === null) {
+        $currentPeriod = app(AcademicPeriodReader::class)->current();
+        if ($currentPeriod === null) {
             return self::label('mid', 'default');
         }
 
-        $start = Carbon::parse($semester->start_date);
-        $end = Carbon::parse($semester->end_date);
+        $start = Carbon::parse($currentPeriod->start_date);
+        $end = Carbon::parse($currentPeriod->end_date);
         $now = Carbon::now();
         $total = max(1, $start->diffInDays($end));
         $elapsed = max(0, $start->diffInDays($now));

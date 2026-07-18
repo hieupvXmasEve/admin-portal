@@ -8,11 +8,11 @@ use App\Enums\StudentActionType;
 use App\Models\AcademicRecord;
 use App\Models\CourseRegistration;
 use App\Models\GpaCalculation;
-use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Modules\Academic\Queries\GetStudentActionHistoryQuery;
 use App\Modules\Academic\Queries\GetStudentAttendanceQuery;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\AiAcademicStudentProfileReader as AiAcademicStudentProfileReaderContract;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -21,6 +21,7 @@ class AiAcademicStudentProfileReader implements AiAcademicStudentProfileReaderCo
     public function __construct(
         private readonly GetStudentAttendanceQuery $attendanceQuery,
         private readonly GetStudentActionHistoryQuery $actionHistoryQuery,
+        private readonly AcademicPeriodReader $academicPeriods,
     ) {}
 
     public function identity(int $studentId): ?array
@@ -96,10 +97,10 @@ class AiAcademicStudentProfileReader implements AiAcademicStudentProfileReaderCo
 
         $registrationQuery = CourseRegistration::query()->where('student_id', $studentId);
         $recordQuery = AcademicRecord::query()->where('student_id', $studentId);
-        $activeSemester = Semester::query()->where('is_active', true)->first(['id', 'code', 'name']);
+        $currentPeriod = $this->academicPeriods->current();
 
         return [
-            'current_semester_code' => $currentGpa?->semester?->code ?? $activeSemester?->code,
+            'current_semester_code' => $currentGpa?->semester?->code ?? $currentPeriod?->code,
             'semester_gpa' => $this->nullableFloat($currentGpa?->semester_gpa),
             'cumulative_gpa' => $this->nullableFloat($currentGpa?->cumulative_gpa),
             'academic_standing' => $currentGpa?->academic_standing,
@@ -110,8 +111,8 @@ class AiAcademicStudentProfileReader implements AiAcademicStudentProfileReaderCo
             'completed_courses' => (clone $recordQuery)
                 ->where('completion_status', 'completed')
                 ->count(),
-            'current_semester_registrations' => $activeSemester instanceof Semester
-                ? (clone $registrationQuery)->where('semester_id', $activeSemester->id)->count()
+            'current_semester_registrations' => $currentPeriod !== null
+                ? (clone $registrationQuery)->where('semester_id', $currentPeriod->id)->count()
                 : 0,
             'attempted_credit_points' => $this->sumAsFloat((clone $recordQuery), 'credit_points'),
             'earned_credit_points' => $this->sumAsFloat((clone $recordQuery), 'credit_points_earned'),

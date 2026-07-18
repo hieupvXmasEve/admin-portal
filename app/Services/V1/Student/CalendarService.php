@@ -8,6 +8,7 @@ use App\Models\AcademicCalendarEvent;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -21,8 +22,8 @@ class CalendarService
     {
         $cacheKey = "calendar:semesters:student:{$student->id}";
 
-        return Cache::remember($cacheKey, 3600, function () use ($student) {
-            $semesters = Semester::where('campus_id', $student->campus_id)
+        return Cache::remember($cacheKey, 3600, function () {
+            $semesters = Semester::query()
                 ->orderBy('start_date', 'desc')
                 ->get();
 
@@ -102,13 +103,16 @@ class CalendarService
                 ];
             }
 
+            $schedule = app(AcademicPeriodReader::class)
+                ->scheduleForCampus((int) $currentSemester->id, (int) $student->campus_id);
+
             return [
                 'current_semester' => [
                     'id' => $currentSemester->id,
                     'name' => $currentSemester->name,
                     'code' => $currentSemester->code,
-                    'start_date' => $currentSemester->start_date->toDateString(),
-                    'end_date' => $currentSemester->end_date->toDateString(),
+                    'start_date' => ($schedule?->operating_start_date ?? $currentSemester->start_date)->toDateString(),
+                    'end_date' => ($schedule?->operating_end_date ?? $currentSemester->end_date)->toDateString(),
                     'is_active' => $currentSemester->is_active,
                 ],
                 'semester_progress' => $this->calculateSemesterProgress($currentSemester),
@@ -124,11 +128,9 @@ class CalendarService
      */
     protected function getCurrentSemesterForStudent(Student $student): ?Semester
     {
-        return Semester::where('campus_id', $student->campus_id)
-            ->where('is_active', true)
-            ->where('start_date', '<=', now())
-            ->where('end_date', '>=', now())
-            ->first();
+        $currentPeriodId = app(AcademicPeriodReader::class)->current()?->id;
+
+        return $currentPeriodId === null ? null : Semester::find($currentPeriodId);
     }
 
     /**
@@ -151,7 +153,7 @@ class CalendarService
     {
         return $semesters->where('start_date', '>', now())
             ->take(3)
-            ->map(fn($semester) => $this->formatSemester($semester))
+            ->map(fn ($semester) => $this->formatSemester($semester))
             ->values()
             ->toArray();
     }
@@ -163,7 +165,7 @@ class CalendarService
     {
         return $semesters->where('end_date', '<', now())
             ->take(5)
-            ->map(fn($semester) => $this->formatSemester($semester))
+            ->map(fn ($semester) => $this->formatSemester($semester))
             ->values()
             ->toArray();
     }
@@ -173,7 +175,7 @@ class CalendarService
      */
     protected function formatSemesters(Collection $semesters): array
     {
-        return $semesters->map(fn($semester) => $this->formatSemester($semester))->toArray();
+        return $semesters->map(fn ($semester) => $this->formatSemester($semester))->toArray();
     }
 
     /**
@@ -348,7 +350,7 @@ class CalendarService
         }
 
         // Sort by date and take next 10
-        usort($deadlines, fn($a, $b) => strcmp($a['date'], $b['date']));
+        usort($deadlines, fn ($a, $b) => strcmp($a['date'], $b['date']));
 
         return array_slice($deadlines, 0, 10);
     }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-use App\Models\Semester;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 
 final class SemesterContextResolver
 {
@@ -29,8 +29,6 @@ final class SemesterContextResolver
 
     private static function activeSemesterId(): ?int
     {
-        $activeId = Semester::query()->where('is_active', true)->value('id');
-
-        return $activeId !== null ? (int) $activeId : null;
+        return app(AcademicPeriodReader::class)->current()?->id;
     }
 }

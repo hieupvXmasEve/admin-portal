@@ -12,6 +12,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentDecision;
 use App\Modules\Finance\Services\FinanceChargeService;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Institution\CampusReferenceReader;
 use Illuminate\Support\Collection;
 
@@ -27,6 +28,7 @@ class LifecycleFormOptions
 {
     public function __construct(
         private readonly CampusReferenceReader $campusReferences,
+        private readonly AcademicPeriodReader $academicPeriods,
     ) {}
 
     /**
@@ -36,7 +38,7 @@ class LifecycleFormOptions
      */
     public function actionOptions(?Student $student = null): array
     {
-        $activeSemester = Semester::getActiveSemester();
+        $activeSemesterId = $this->academicPeriods->current()?->id;
 
         $options = [
             'actionTypes' => StudentActionType::options(),
@@ -44,7 +46,7 @@ class LifecycleFormOptions
                 ->select('id', 'name', 'code', 'start_date', 'end_date')
                 ->orderBy('start_date', 'desc')
                 ->get(),
-            'activeSemesterId' => $activeSemester?->id,
+            'activeSemesterId' => $activeSemesterId,
             'campuses' => array_map(
                 fn ($campus): array => $campus->toArray(),
                 $this->campusReferences->all(),
@@ -66,21 +68,16 @@ class LifecycleFormOptions
         ];
 
         if ($student) {
-            $activeSemesterId = $activeSemester?->id;
-
             // The next actions a staff member may select for this student's
             // current status (single source of truth — the dropdown filters to
             // these so illogical picks like resume-from-course never appear).
             $options['allowedActionTypes'] = StudentStatusTransitionPolicy::selectableActionValues((string) $student->status);
 
-            $options['courseRegistrations'] = $student->courseRegistrations()
+            $courseRegistrations = $student->courseRegistrations()
                 ->with(['courseOffering.unit', 'courseOffering.semester'])
-                ->whereHas('courseOffering', function ($query) {
-                    $query->whereHas('semester', function ($q) {
-                        $q->where('is_active', true);
-                    });
-                })
-                ->when($activeSemesterId, fn ($query) => $query->where('semester_id', $activeSemesterId))
+                ->where('semester_id', $activeSemesterId ?? 0);
+
+            $options['courseRegistrations'] = $courseRegistrations
                 ->get()
                 ->map(fn ($reg) => [
                     'id' => $reg->id,

@@ -6,13 +6,13 @@ namespace App\Http\Controllers\Api\V1\Student;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Student\AttendanceFilterRequest;
-use App\Http\Resources\Api\V1\Student\AttendanceResource;
 use App\Http\Resources\Api\V1\Student\AttendanceReportResource;
-//use App\Http\Resources\Api\V1\Student\CourseAttendanceResource;
+// use App\Http\Resources\Api\V1\Student\CourseAttendanceResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\Semester;
+use App\Models\Student;
 use App\Services\V1\Student\AttendanceService;
-
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -28,7 +28,7 @@ class AttendanceController extends Controller
      */
     public function index(AttendanceFilterRequest $request): JsonResponse
     {
-        /** @var \App\Models\Student $student */
+        /** @var Student $student */
         $student = $request->user();
 
         try {
@@ -45,6 +45,7 @@ class AttendanceController extends Controller
             );
         } catch (\Exception $e) {
             Log::DEBUG($e->getMessage());
+
             return ApiResponse::serverError('Failed to retrieve attendance summary');
         }
     }
@@ -54,7 +55,7 @@ class AttendanceController extends Controller
      */
     public function courseAttendance(Request $request, int $courseOfferingId): JsonResponse
     {
-        /** @var \App\Models\Student $student */
+        /** @var Student $student */
         $student = $request->user();
 
         try {
@@ -75,7 +76,7 @@ class AttendanceController extends Controller
      */
     public function statistics(Request $request): JsonResponse
     {
-        /** @var \App\Models\Student $student */
+        /** @var Student $student */
         $student = $request->user();
 
         try {
@@ -97,18 +98,19 @@ class AttendanceController extends Controller
      */
     public function report(Request $request): JsonResponse
     {
-        /** @var \App\Models\Student $student */
+        /** @var Student $student */
         $student = $request->user();
         $semesterId = null;
 
         try {
-            $activeSemester = Semester::getActiveSemester();
+            $currentPeriod = app(AcademicPeriodReader::class)->current();
             $requestedSemesterId = $request->query('semester_id');
             $semesterId = $requestedSemesterId !== null
                 ? (int) $requestedSemesterId
-                : ($activeSemester?->id);
+                : ($currentPeriod?->id);
             $reportData = $this->attendanceService->getAttendanceReport($student, $semesterId);
             Log::info('Report Data', ['report_data' => $reportData]);
+
             return ApiResponse::success(
                 new AttendanceReportResource($reportData),
                 [],

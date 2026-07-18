@@ -8,11 +8,16 @@ use App\Models\CourseOffering;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\AiAcademicEntitySearchReader as AiAcademicEntitySearchReaderContract;
 use Illuminate\Database\Eloquent\Builder;
 
 class AiAcademicEntitySearchReader implements AiAcademicEntitySearchReaderContract
 {
+    public function __construct(
+        private readonly AcademicPeriodReader $academicPeriods,
+    ) {}
+
     public function searchStudents(string $query, ?int $campusId, array $filters, int $limit): array
     {
         $normalized = $this->normalize($query);
@@ -202,11 +207,7 @@ class AiAcademicEntitySearchReader implements AiAcademicEntitySearchReaderContra
         }
 
         if ($this->normalize((string) $filters['semester']) === 'current') {
-            $semesterId = Semester::query()
-                ->where('is_active', true)
-                ->value('id');
-
-            return is_numeric($semesterId) ? (int) $semesterId : null;
+            return $this->academicPeriods->current()?->id;
         }
 
         return (int) $filters['semester'];

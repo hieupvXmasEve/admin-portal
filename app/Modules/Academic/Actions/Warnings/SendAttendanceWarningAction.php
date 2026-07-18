@@ -6,13 +6,13 @@ namespace App\Modules\Academic\Actions\Warnings;
 
 use App\Models\AcademicWarningSetting;
 use App\Models\CourseOffering;
-use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentWarningLog;
 use App\Models\User;
 use App\Modules\Academic\Queries\ListWarningCenterQuery;
 use App\Modules\Academic\Support\WarningDedupe;
 use App\Modules\Academic\Support\WarningMessageRenderer;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -21,6 +21,7 @@ class SendAttendanceWarningAction
     public function __construct(
         private readonly PublishWarningNotificationAction $publishWarningNotification,
         private readonly ListWarningCenterQuery $warningCenterQuery,
+        private readonly AcademicPeriodReader $academicPeriods,
     ) {}
 
     /**
@@ -28,8 +29,8 @@ class SendAttendanceWarningAction
      */
     public function run(CourseOffering $courseOffering, Student $student, User $actor, AcademicWarningSetting $settings): array
     {
-        $activeSemester = Semester::getActiveSemester();
-        if (! $activeSemester || (int) $courseOffering->semester_id !== (int) $activeSemester->id) {
+        $currentPeriodId = $this->academicPeriods->current()?->id;
+        if ($currentPeriodId === null || (int) $courseOffering->semester_id !== $currentPeriodId) {
             throw ValidationException::withMessages([
                 'course_offering' => 'Attendance warnings can only be sent for sections in the active semester.',
             ]);

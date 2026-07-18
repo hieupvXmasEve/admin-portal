@@ -10,8 +10,8 @@ use App\Models\Enrollment;
 use App\Models\GpaCalculation;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
 class DashboardService
 {
@@ -45,7 +45,7 @@ class DashboardService
      */
     public function getCurrentSemesterData(Student $student): array
     {
-        $currentSemester = Semester::where('is_active', 1)->first();
+        $currentSemester = $this->currentSemester();
 
         if (! $currentSemester) {
             return [
@@ -64,6 +64,7 @@ class DashboardService
             ->whereIn('registration_status', ['registered', 'confirmed'])
             ->with(['courseOffering.unit'])
             ->get();
+
         return [
             'semester' => [
                 'id' => $currentSemester->id,
@@ -154,7 +155,7 @@ class DashboardService
      */
     public function getUpcomingAssessments(Student $student): array
     {
-        $currentSemester = Semester::where('is_active', true)->first();
+        $currentSemester = $this->currentSemester();
 
         if (! $currentSemester) {
             return ['assessments' => []];
@@ -201,7 +202,7 @@ class DashboardService
      */
     protected function getEnrollmentStatus(Student $student): array
     {
-        $currentSemester = Semester::where('is_active', true)->first();
+        $currentSemester = $this->currentSemester();
 
         if (! $currentSemester) {
             return ['status' => 'no_active_semester'];
@@ -227,11 +228,18 @@ class DashboardService
                 ->where('completion_status', 'completed')
                 ->count(),
             'current_semester_courses' => $student->courseRegistrations()
-                ->whereHas('semester', fn($q) => $q->where('is_active', true))
+                ->whereHas('semester', fn ($q) => $q->where('is_active', true))
                 ->where('registration_status', 'registered')
                 ->count(),
             'attendance_rate' => $this->calculateOverallAttendanceRate($student),
         ];
+    }
+
+    private function currentSemester(): ?Semester
+    {
+        $currentPeriodId = app(AcademicPeriodReader::class)->current()?->id;
+
+        return $currentPeriodId === null ? null : Semester::find($currentPeriodId);
     }
 
     /**

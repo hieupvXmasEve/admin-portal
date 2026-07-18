@@ -8,6 +8,7 @@ use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -18,7 +19,7 @@ class ConflictDetectionService
      */
     public function detectConflicts(Student $student, CourseOffering $newCourseOffering): Collection
     {
-        $currentSemester = Semester::where('is_active', true)->first();
+        $currentSemester = $this->currentSemester();
 
         if (! $currentSemester) {
             return collect();
@@ -195,7 +196,7 @@ class ConflictDetectionService
     {
         $semester = $semesterId
             ? Semester::find($semesterId)
-            : Semester::where('is_active', true)->first();
+            : $this->currentSemester();
 
         if (! $semester) {
             return [];
@@ -248,7 +249,7 @@ class ConflictDetectionService
      */
     public function detectTravelTimeConflicts(Student $student, CourseOffering $newCourseOffering, int $minimumBreakMinutes = 15): Collection
     {
-        $currentSemester = Semester::where('is_active', true)->first();
+        $currentSemester = $this->currentSemester();
 
         if (! $currentSemester) {
             return collect();
@@ -276,6 +277,13 @@ class ConflictDetectionService
         }
 
         return $travelConflicts;
+    }
+
+    private function currentSemester(): ?Semester
+    {
+        $currentPeriodId = app(AcademicPeriodReader::class)->current()?->id;
+
+        return $currentPeriodId === null ? null : Semester::find($currentPeriodId);
     }
 
     /**

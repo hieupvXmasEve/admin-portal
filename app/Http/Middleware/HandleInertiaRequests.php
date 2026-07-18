@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Middleware;
 
-use App\Models\Semester;
 use App\Services\PermissionService;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\Academic\DTO\AcademicPeriodReference;
 use App\Support\SemesterContextResolver;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
@@ -84,17 +87,15 @@ class HandleInertiaRequests extends Middleware
 
                 return [
                     'selected_id' => SemesterContextResolver::selectedId(),
-                    'options' => Semester::query()
-                        ->where('is_archived', false)
-                        ->orderByDesc('start_date')
-                        ->get(['id', 'code', 'name', 'is_active'])
-                        ->map(fn (Semester $s) => [
-                            'id' => (int) $s->id,
-                            'code' => $s->code,
-                            'name' => $s->name,
-                            'is_active' => (bool) $s->is_active,
-                        ])
-                        ->all(),
+                    'options' => array_map(
+                        fn (AcademicPeriodReference $period): array => [
+                            'id' => $period->id,
+                            'code' => $period->code,
+                            'name' => $period->name,
+                            'is_active' => $period->is_current,
+                        ],
+                        app(AcademicPeriodReader::class)->selectable(),
+                    ),
                 ];
             },
             'ziggy' => [

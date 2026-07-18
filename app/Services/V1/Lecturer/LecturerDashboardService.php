@@ -8,6 +8,7 @@ use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\Lecture;
 use App\Models\Semester;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -19,7 +20,7 @@ class LecturerDashboardService
      */
     public function getDashboardData(Lecture $lecturer, ?int $semesterId = null): array
     {
-        $semester = $semesterId ? Semester::find($semesterId) : Semester::getActiveSemester();
+        $semester = $semesterId ? Semester::find($semesterId) : $this->currentSemester();
         $cacheKey = "lecturer-dashboard:{$lecturer->id}:{$semester?->id}";
 
         // If no semester is found, return empty data structure
@@ -55,6 +56,13 @@ class LecturerDashboardService
             'recent_activities' => $this->getRecentActivities($lecturer, 10),
         ];
         //        });
+    }
+
+    private function currentSemester(): ?Semester
+    {
+        $currentPeriodId = app(AcademicPeriodReader::class)->current()?->id;
+
+        return $currentPeriodId === null ? null : Semester::find($currentPeriodId);
     }
 
     /**
