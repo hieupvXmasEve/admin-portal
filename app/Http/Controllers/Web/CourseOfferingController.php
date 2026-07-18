@@ -22,8 +22,12 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
-use App\Modules\Academic\Actions\MoveStudentToSectionAction;
 use App\Modules\Academic\Delivery\Actions\BulkAssignInstructorsAction;
+use App\Modules\Academic\Delivery\Actions\BulkUpdateCourseRegistrationStatusAction;
+use App\Modules\Academic\Delivery\Actions\EnrollStudentInCourseOfferingAction;
+use App\Modules\Academic\Delivery\Actions\MoveStudentBetweenCourseOfferingSectionsAction;
+use App\Modules\Academic\Delivery\Actions\RemoveCourseOfferingRosterAction;
+use App\Modules\Academic\Delivery\Actions\RemoveStudentFromCourseOfferingAction;
 use App\Modules\Academic\Delivery\Actions\SplitCourseOfferingAction;
 use App\Modules\Academic\Delivery\Exceptions\CourseOfferingSplitException;
 use App\Modules\Academic\Delivery\Exceptions\InstructorAssignmentException;
@@ -546,7 +550,7 @@ class CourseOfferingController extends Controller
         }
 
         try {
-            MoveStudentToSectionAction::run($request->validated());
+            MoveStudentBetweenCourseOfferingSectionsAction::run($request->validated());
 
             return ApiResponse::success(null, [], 'Student moved successfully.');
         } catch (ValidationException $e) {
@@ -675,8 +679,7 @@ class CourseOfferingController extends Controller
             // Get registration count for notification
             $registrationCount = $courseOffering->courseRegistrations()->count();
 
-            // Delete all associated course registrations first
-            $courseOffering->courseRegistrations()->delete();
+            RemoveCourseOfferingRosterAction::run(['course_offering_id' => $courseOffering->id]);
 
             // Delete the course offering
             $courseOffering->delete();
@@ -751,8 +754,7 @@ class CourseOfferingController extends Controller
                 $registrationCount = $courseOffering->courseRegistrations()->count();
                 $totalRegistrations += $registrationCount;
 
-                // Delete associated course registrations first
-                $courseOffering->courseRegistrations()->delete();
+                RemoveCourseOfferingRosterAction::run(['course_offering_id' => $courseOffering->id]);
             }
 
             // Delete the course offerings
@@ -1522,19 +1524,12 @@ class CourseOfferingController extends Controller
                     $attemptNumber = $isRetake ? $previousAttempts->first()->attempt_number + 1 : 1;
                     $originalRecordId = $isRetake ? $previousAttempts->first()->id : null;
 
-                    // Create course registration (only for tracking enrollment)
-                    $registration = CourseRegistration::create([
+                    $registration = EnrollStudentInCourseOfferingAction::run([
                         'student_id' => $student->id,
                         'course_offering_id' => $courseOffering->id,
-                        'semester_id' => $courseOffering->semester_id,
                         'registration_status' => 'confirmed',
-                        'registration_date' => now(),
                         'registration_method' => 'admin_override',
-                        'credit_hours' => $courseOffering->unit->credit_points ?? 3,
-                        'attempt_number' => 1, // Keep for backward compatibility, but don't use
-                        'is_retake' => false,  // Keep for backward compatibility, but don't use
-                        'retake_fee' => 0.00,  // Keep for backward compatibility, but don't use
-                        'is_retake_paid' => 'no', // Keep for backward compatibility, but don't use
+                        'force_registration' => true,
                     ]);
 
                     // Create academic record immediately with proper retake tracking
@@ -1571,9 +1566,6 @@ class CourseOfferingController extends Controller
                         'grade_points' => null,
                         'quality_points' => null,
                     ]);
-
-                    // Update course offering enrollment count
-                    $courseOffering->increment('current_enrollment');
 
                     $result['success'] = true;
                     $result['message'] = 'Successfully registered';
@@ -1934,11 +1926,7 @@ class CourseOfferingController extends Controller
                 $record->forceDelete();
             }
 
-            // Delete the course registration
-            $registration->delete();
-
-            // Update course offering enrollment count
-            $courseOffering->decrement('current_enrollment');
+            RemoveStudentFromCourseOfferingAction::run($registration->id);
 
             DB::commit();
 
@@ -1975,28 +1963,12 @@ class CourseOfferingController extends Controller
         try {
             DB::beginTransaction();
 
-            $updatedCount = CourseRegistration::where('course_offering_id', $courseOffering->id)
-                ->where('registration_status', $request->from_status)
-                ->whereIn('student_id', $request->student_ids)
-                ->update([
-                    'registration_status' => $request->to_status,
-                    'updated_at' => now(),
-                ]);
-
-            // Update course offering enrollment counts if needed
-            if (
-                in_array($request->from_status, ['registered', 'confirmed']) &&
-                ! in_array($request->to_status, ['registered', 'confirmed'])
-            ) {
-                // Students are being removed from active status
-                $courseOffering->decrement('current_enrollment', $updatedCount);
-            } elseif (
-                ! in_array($request->from_status, ['registered', 'confirmed']) &&
-                in_array($request->to_status, ['registered', 'confirmed'])
-            ) {
-                // Students are being added to active status
-                $courseOffering->increment('current_enrollment', $updatedCount);
-            }
+            $updatedCount = BulkUpdateCourseRegistrationStatusAction::run([
+                'course_offering_id' => $courseOffering->id,
+                'from_status' => $request->from_status,
+                'to_status' => $request->to_status,
+                'student_ids' => array_map('intval', $request->student_ids),
+            ]);
 
             DB::commit();
 

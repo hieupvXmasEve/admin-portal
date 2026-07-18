@@ -17,6 +17,7 @@ use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
 use App\Services\V1\Student\CourseRegistrationService;
+use App\Shared\Contracts\Academic\CourseRosterReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -25,6 +26,7 @@ class CourseRegistrationController extends Controller
 {
     public function __construct(
         protected CourseRegistrationService $registrationService,
+        private readonly CourseRosterReader $courseRosters,
     ) {}
 
     /**
@@ -179,12 +181,7 @@ class CourseRegistrationController extends Controller
 
         try {
             // Check if student is registered for this course
-            $registration = $student->courseRegistrations()
-                ->where('course_offering_id', $courseOfferingId)
-                ->whereIn('registration_status', ['registered', 'confirmed', 'completed'])
-                ->first();
-
-            if (! $registration) {
+            if (! $this->courseRosters->studentHasVisibleRegistration($student->id, $courseOfferingId)) {
                 return ApiResponse::businessLogicError('You are not enrolled in this course');
             }
 

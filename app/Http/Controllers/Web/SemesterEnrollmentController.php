@@ -16,6 +16,7 @@ use App\Models\Enrollment;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Modules\Academic\Delivery\Actions\EnrollStudentInCourseOfferingAction;
 use App\Modules\Academic\Delivery\Actions\OpenSingleCourseOfferingAction;
 use App\Modules\Academic\Delivery\Exceptions\InstructorAssignmentException;
 use App\Modules\Academic\Http\Requests\CourseDelivery\OpenSingleCourseOfferingRequest;
@@ -956,18 +957,16 @@ class SemesterEnrollmentController extends Controller
                                 continue;
                             }
 
-                            // Create registration directly (bypass mass-assignment pitfalls)
                             try {
-                                $registration = new CourseRegistration;
-                                $registration->student_id = $student->id;
-                                $registration->course_offering_id = $offeringLocked->id;
-                                $registration->semester_id = $semester->id;
-                                $registration->registration_status = 'confirmed';
-                                $registration->registration_date = now();
-                                $registration->registration_method = $registrationMethod;
-                                $registration->credit_hours = $curriculumUnit->unit->credit_points ?? 3;
-                                $registration->notes = 'Bulk registration via admin';
-                                $registration->save();
+                                EnrollStudentInCourseOfferingAction::run([
+                                    'student_id' => $student->id,
+                                    'course_offering_id' => $offeringLocked->id,
+                                    'registration_status' => 'confirmed',
+                                    'registration_method' => $registrationMethod,
+                                    'force_registration' => $forceRegistration,
+                                    'credit_hours' => $curriculumUnit->unit->credit_points ?? 3,
+                                    'notes' => 'Bulk registration via admin',
+                                ]);
                             } catch (\Throwable $ex) {
                                 // Unique constraint hit or other issue
                                 Log::warning('Registration insert conflict or error', [
@@ -988,15 +987,6 @@ class SemesterEnrollmentController extends Controller
                                 ];
 
                                 continue;
-                            }
-
-                            // Update capacity safely
-                            if ($hasCapacity) {
-                                $offeringLocked->current_enrollment = (int) $offeringLocked->current_enrollment + 1;
-                                if ($offeringLocked->current_enrollment >= (int) $offeringLocked->max_capacity) {
-                                    $offeringLocked->enrollment_status = 'closed';
-                                }
-                                $offeringLocked->save();
                             }
 
                             $registrationsCreated++;

@@ -11,6 +11,9 @@ use App\Models\CourseRegistration;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Modules\Academic\Delivery\Actions\EnrollStudentInCourseOfferingAction;
+use App\Modules\Academic\Delivery\Actions\RemoveStudentFromCourseOfferingAction;
+use App\Modules\Academic\Delivery\Actions\UpdateCourseRegistrationStatusAction;
 use App\Services\RegistrationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -124,9 +127,9 @@ class CourseRegistrationController extends Controller
                 ->orderBy('course_offerings.section_code')
                 ->select('course_offerings.*')
                 ->get()
-                ->map(fn($offering) => [
+                ->map(fn ($offering) => [
                     'value' => $offering->id,
-                    'label' => "{$offering->course_code} - {$offering->course_title}" .
+                    'label' => "{$offering->course_code} - {$offering->course_title}".
                         ($offering->section_code ? " (Section {$offering->section_code})" : ''),
                 ]);
         }
@@ -226,24 +229,17 @@ class CourseRegistrationController extends Controller
                         // Validate registration
                         $this->validateAdminRegistration($student, $courseOffering);
 
-                        // Create registration
-                        CourseRegistration::create([
+                        EnrollStudentInCourseOfferingAction::run([
                             'student_id' => $student->id,
                             'course_offering_id' => $courseOffering->id,
-                            'semester_id' => $activeSemester->id,
-                            'registration_date' => now(),
                             'registration_status' => 'confirmed',
-                            'credit_hours' => $courseOffering->unit->credit_points,
+                            'registration_method' => 'admin_override',
                             'notes' => $request->notes,
                         ]);
 
-                        // Update course offering enrollment
-                        $courseOffering->incrementEnrollment();
-                        $courseOffering->updateStatus();
-
                         $registeredCount++;
                     } catch (\Exception $e) {
-                        $errors[] = "Unit ID {$unitId}: " . $e->getMessage();
+                        $errors[] = "Unit ID {$unitId}: ".$e->getMessage();
                     }
                 }
             });
@@ -251,7 +247,7 @@ class CourseRegistrationController extends Controller
             if ($registeredCount > 0) {
                 $message = "Successfully registered student for {$registeredCount} unit(s).";
                 if (! empty($errors)) {
-                    $message .= ' Some units could not be registered: ' . implode('; ', $errors);
+                    $message .= ' Some units could not be registered: '.implode('; ', $errors);
                 }
 
                 return Redirect::route(CourseRegistrationRoutes::INDEX)
@@ -259,7 +255,7 @@ class CourseRegistrationController extends Controller
             } else {
                 return Redirect::back()
                     ->withInput()
-                    ->with('error', 'No units were registered. Errors: ' . implode('; ', $errors));
+                    ->with('error', 'No units were registered. Errors: '.implode('; ', $errors));
             }
         } catch (\Exception $e) {
             return Redirect::back()
@@ -326,7 +322,8 @@ class CourseRegistrationController extends Controller
                     ->with('error', 'Registration status can only be changed during the course registration period.');
             }
 
-            $adminCourseRegistration->update([
+            UpdateCourseRegistrationStatusAction::run([
+                'course_registration_id' => $adminCourseRegistration->id,
                 'registration_status' => $request->registration_status,
                 'notes' => $request->notes,
             ]);
@@ -336,7 +333,7 @@ class CourseRegistrationController extends Controller
         } catch (\Exception $e) {
             return Redirect::back()
                 ->withInput()
-                ->with('error', 'Failed to update course registration: ' . $e->getMessage());
+                ->with('error', 'Failed to update course registration: '.$e->getMessage());
         }
     }
 
@@ -346,20 +343,13 @@ class CourseRegistrationController extends Controller
     public function destroy(CourseRegistration $adminCourseRegistration): RedirectResponse
     {
         try {
-            DB::transaction(function () use ($adminCourseRegistration) {
-                // Update course offering enrollment
-                $adminCourseRegistration->courseOffering->decrementEnrollment();
-                $adminCourseRegistration->courseOffering->updateStatus();
-
-                // Delete registration
-                $adminCourseRegistration->delete();
-            });
+            RemoveStudentFromCourseOfferingAction::run($adminCourseRegistration->id);
 
             return Redirect::route(CourseRegistrationRoutes::INDEX)
                 ->with('success', 'Course registration deleted successfully.');
         } catch (\Exception $e) {
             return Redirect::back()
-                ->with('error', 'Failed to delete course registration: ' . $e->getMessage());
+                ->with('error', 'Failed to delete course registration: '.$e->getMessage());
         }
     }
 
@@ -374,26 +364,13 @@ class CourseRegistrationController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use ($request) {
-                $registrations = CourseRegistration::with('courseOffering')
-                    ->whereIn('id', $request->ids)
-                    ->get();
-
-                foreach ($registrations as $registration) {
-                    // Update course offering enrollment
-                    $registration->courseOffering->decrementEnrollment();
-                    $registration->courseOffering->updateStatus();
-
-                    // Delete registration
-                    $registration->delete();
-                }
-            });
+            RemoveStudentFromCourseOfferingAction::runMany(array_map('intval', $request->ids));
 
             return Redirect::route(CourseRegistrationRoutes::INDEX)
                 ->with('success', 'Selected course registrations deleted successfully.');
         } catch (\Exception $e) {
             return Redirect::back()
-                ->with('error', 'Failed to delete course registrations: ' . $e->getMessage());
+                ->with('error', 'Failed to delete course registrations: '.$e->getMessage());
         }
     }
 

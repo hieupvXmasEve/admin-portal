@@ -14,13 +14,15 @@ use App\Http\Responses\ApiResponse;
 use App\Models\CourseOffering;
 use App\Models\Lecture;
 use App\Services\V1\Lecturer\LecturerCourseService;
+use App\Shared\Contracts\Academic\CourseRosterReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class CourseController extends Controller
 {
     public function __construct(
-        protected LecturerCourseService $courseService
+        protected LecturerCourseService $courseService,
+        private readonly CourseRosterReader $courseRosters,
     ) {}
 
     /**
@@ -174,7 +176,7 @@ class CourseController extends Controller
                 return ApiResponse::success([]);
             }
 
-            $activeStudentIds = $courseOffering->activeClassRosterStudentIds();
+            $activeStudentIds = collect($this->courseRosters->activeStudentIds($courseOffering->id));
             $expectedAttendees = $activeStudentIds->count();
 
             $sessions = $courseOffering->classSessions->map(function ($session) use ($activeStudentIds, $expectedAttendees) {
