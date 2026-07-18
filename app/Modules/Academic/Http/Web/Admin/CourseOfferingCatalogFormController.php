@@ -9,11 +9,13 @@ use App\Http\Controllers\Controller;
 use App\Models\CourseOffering;
 use App\Modules\Academic\Actions\CreateCourseOfferingAction;
 use App\Modules\Academic\Actions\UpdateCourseOfferingAction;
+use App\Modules\Academic\Delivery\Exceptions\InstructorAssignmentException;
 use App\Modules\Academic\Http\Requests\CourseDelivery\StoreCourseOfferingRequest;
 use App\Modules\Academic\Http\Requests\CourseDelivery\UpdateCourseOfferingRequest;
 use App\Modules\Academic\Queries\GetCourseOfferingCatalogFormQuery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -44,7 +46,13 @@ class CourseOfferingCatalogFormController extends Controller
         $attributes = $request->validated();
         $attributes['campus_id'] = app('campus')->id;
 
-        CreateCourseOfferingAction::run($attributes);
+        try {
+            CreateCourseOfferingAction::run($attributes);
+        } catch (InstructorAssignmentException $exception) {
+            throw ValidationException::withMessages([
+                $exception->field => [$exception->getMessage()],
+            ]);
+        }
 
         Inertia::flash('success', 'Course offering created successfully.');
 
@@ -88,7 +96,13 @@ class CourseOfferingCatalogFormController extends Controller
             return Redirect::back();
         }
 
-        UpdateCourseOfferingAction::run($courseOffering, $request->validated());
+        try {
+            UpdateCourseOfferingAction::run($courseOffering, $request->validated());
+        } catch (InstructorAssignmentException $exception) {
+            throw ValidationException::withMessages([
+                $exception->field => [$exception->getMessage()],
+            ]);
+        }
 
         Inertia::flash('success', 'Course offering updated successfully.');
 

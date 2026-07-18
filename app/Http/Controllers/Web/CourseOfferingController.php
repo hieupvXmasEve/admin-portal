@@ -23,6 +23,12 @@ use App\Models\Student;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Modules\Academic\Actions\MoveStudentToSectionAction;
+use App\Modules\Academic\Delivery\Actions\BulkAssignInstructorsAction;
+use App\Modules\Academic\Delivery\Actions\SplitCourseOfferingAction;
+use App\Modules\Academic\Delivery\Exceptions\CourseOfferingSplitException;
+use App\Modules\Academic\Delivery\Exceptions\InstructorAssignmentException;
+use App\Modules\Academic\Http\Requests\CourseDelivery\BulkAssignInstructorsRequest;
+use App\Modules\Academic\Http\Requests\CourseDelivery\SplitCourseOfferingRequest;
 use App\Modules\Academic\Http\Requests\MoveStudentRequest;
 use App\Modules\Academic\Queries\GetCourseOfferingOperationalStateQuery;
 use App\Modules\Academic\Queries\GetCourseOfferingScoresQuery;
@@ -1794,121 +1800,24 @@ class CourseOfferingController extends Controller
     /**
      * Perform the course offering split
      */
-    public function performSplit(Request $request, CourseOffering $courseOffering): RedirectResponse
+    public function performSplit(SplitCourseOfferingRequest $request, CourseOffering $courseOffering): RedirectResponse
     {
-        // Ensure the course offering belongs to current campus
-        if ($courseOffering->campus_id !== app('campus')->id) {
-            abort(404);
-        }
-
-        $request->validate([
-            'number_of_sections' => 'required|integer|min:2|max:10',
-            'assignment_mode' => 'required|in:equal,custom',
-            'sections' => 'required|array',
-            'sections.*.section_code' => 'required|string|max:10',
-            'sections.*.max_capacity' => 'required|integer|min:1',
-            'sections.*.lecture_id' => ['nullable', function ($attribute, $value, $fail) {
-                if ($value && $value !== 'none' && ! Lecture::find($value)) {
-                    $fail('The selected lecture does not exist.');
-                }
-            }],
-            'sections.*.location' => 'nullable|string|max:255',
-            'sections.*.student_ids' => 'required|array',
-            'sections.*.student_ids.*' => 'exists:students,id',
-        ]);
-
-        // Check if this course offering can be split
-        if ($courseOffering->section_code) {
-            return Redirect::back()
-                ->with('error', 'This course offering is already a section and cannot be split further.');
-        }
-
-        if ($courseOffering->current_enrollment === 0) {
-            return Redirect::back()
-                ->with('error', 'Cannot split a course offering with no enrolled students.');
-        }
-
-        $sections = $request->sections;
-        $totalStudentsAssigned = collect($sections)->sum(fn ($section) => count($section['student_ids']));
-
-        if ($totalStudentsAssigned !== $courseOffering->current_enrollment) {
-            return Redirect::back()
-                ->with('error', 'All enrolled students must be assigned to sections.');
-        }
-
         try {
-            DB::beginTransaction();
-
-            $newOfferings = [];
-            $registrationUpdates = [];
-
-            foreach ($sections as $sectionData) {
-                // Handle lecture assignment - null if 'none' is selected
-                $lectureId = null;
-                if (isset($sectionData['lecture_id']) && $sectionData['lecture_id'] !== 'none') {
-                    $lectureId = (int) $sectionData['lecture_id'];
-                }
-
-                // Create new course offering for this section
-                $newOffering = CourseOffering::create([
-                    'campus_id' => app('campus')->id,
-                    'semester_id' => $courseOffering->semester_id,
-                    'unit_id' => $courseOffering->unit_id,
-                    'lecture_id' => $lectureId,
-                    'section_code' => $sectionData['section_code'],
-                    'max_capacity' => $sectionData['max_capacity'],
-                    'current_enrollment' => count($sectionData['student_ids']),
-                    'waitlist_capacity' => $courseOffering->waitlist_capacity,
-                    'current_waitlist' => 0,
-                    'delivery_mode' => $courseOffering->delivery_mode,
-                    'schedule_days' => $courseOffering->schedule_days,
-                    'schedule_time_start' => $courseOffering->schedule_time_start,
-                    'schedule_time_end' => $courseOffering->schedule_time_end,
-                    'location' => $sectionData['location'] ?? $courseOffering->location,
-                    'is_active' => $courseOffering->is_active,
-                    'enrollment_status' => $courseOffering->enrollment_status,
-                    'registration_start_date' => $courseOffering->registration_start_date,
-                    'registration_end_date' => $courseOffering->registration_end_date,
-                    'special_requirements' => $courseOffering->special_requirements,
-                    'notes' => $courseOffering->notes,
-                ]);
-
-                $newOfferings[] = $newOffering;
-
-                // Prepare registration updates for this section
-                foreach ($sectionData['student_ids'] as $studentId) {
-                    $registrationUpdates[] = [
-                        'student_id' => $studentId,
-                        'new_course_offering_id' => $newOffering->id,
-                    ];
-                }
-            }
-
-            // Update course registrations to point to new sections
-            // First, move active students to their assigned sections
-            foreach ($registrationUpdates as $update) {
-                CourseRegistration::where('course_offering_id', $courseOffering->id)
-                    ->where('student_id', $update['student_id'])
-                    ->whereIn('registration_status', ['registered', 'confirmed'])
-                    ->update(['course_offering_id' => $update['new_course_offering_id']]);
-            }
-
-            // Move any remaining registrations (dropped, withdrawn, etc.) to the first section
-            // to maintain historical records
-            $firstSectionId = $newOfferings[0]->id;
-            CourseRegistration::where('course_offering_id', $courseOffering->id)
-                ->update(['course_offering_id' => $firstSectionId]);
-
-            // Now we can safely delete the original course offering since all registrations have been moved
-            $courseOffering->delete();
-
-            DB::commit();
+            $sectionCount = SplitCourseOfferingAction::run([
+                'course_offering_id' => (int) $courseOffering->id,
+                'campus_id' => (int) app('campus')->id,
+                'sections' => $request->validated('sections'),
+            ]);
 
             return Redirect::route(CourseOfferingRoutes::INDEX)
-                ->with('success', 'Course offering successfully split into '.count($sections).' sections. The original course offering has been deleted.');
+                ->with('success', 'Course offering successfully split into '.$sectionCount.' sections. The original course offering has been deleted.');
+        } catch (InstructorAssignmentException $exception) {
+            throw ValidationException::withMessages([
+                $exception->field => [$exception->getMessage()],
+            ]);
+        } catch (CourseOfferingSplitException $exception) {
+            return Redirect::back()->with('error', $exception->getMessage());
         } catch (\Exception $e) {
-            DB::rollBack();
-
             return Redirect::back()
                 ->with('error', 'Failed to split course offering: '.$e->getMessage());
         }
@@ -1962,35 +1871,23 @@ class CourseOfferingController extends Controller
     /**
      * Bulk assign instructors to course offerings
      */
-    public function bulkAssignLectures(Request $request): RedirectResponse
+    public function bulkAssignLectures(BulkAssignInstructorsRequest $request): RedirectResponse
     {
-        $request->validate([
-            'assignments' => 'required|array',
-            'assignments.*.course_offering_id' => 'required|exists:course_offerings,id',
-            'assignments.*.lecture_id' => 'required|exists:lectures,id',
-        ]);
-
         try {
-            DB::beginTransaction();
-
-            $assignmentsCount = 0;
-            foreach ($request->assignments as $assignment) {
-                $courseOffering = CourseOffering::where('id', $assignment['course_offering_id'])
-                    ->where('campus_id', app('campus')->id)
-                    ->first();
-                if ($courseOffering && ! $courseOffering->lecture_id) {
-                    $courseOffering->update(['lecture_id' => $assignment['lecture_id']]);
-                    $assignmentsCount++;
-                }
-            }
-
-            DB::commit();
+            $assignmentsCount = BulkAssignInstructorsAction::run([
+                'campus_id' => (int) app('campus')->id,
+                'assignments' => $request->validated('assignments'),
+            ]);
 
             return Redirect::back()
                 ->with('success', "Successfully assigned lectures to {$assignmentsCount} course offerings.");
+        } catch (InstructorAssignmentException $exception) {
+            throw ValidationException::withMessages([
+                $exception->field => [$exception->getMessage()],
+            ]);
+        } catch (ValidationException $exception) {
+            throw $exception;
         } catch (\Exception $e) {
-            DB::rollBack();
-
             return Redirect::back()
                 ->with('error', 'Failed to assign lectures: '.$e->getMessage());
         }

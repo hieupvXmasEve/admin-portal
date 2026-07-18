@@ -26,6 +26,7 @@ class StoreCourseOfferingRequest extends FormRequest
         $rules['semester_id'] = ['required', $this->academicPeriodRule($catalog, $messages['semester_id.exists'])];
         $rules['unit_id'] = ['required', $this->unitRule($catalog, $messages['unit_id.exists'])];
         $rules['syllabus_template_id'] = ['required', $this->syllabusTemplateRule($catalog, $messages['syllabus_template_id.exists'])];
+        $rules['lecture_id'] = ['nullable', 'integer'];
 
         return $rules;
     }
