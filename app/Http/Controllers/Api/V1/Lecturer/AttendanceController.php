@@ -10,7 +10,8 @@ use App\Http\Requests\Api\V1\Lecturer\MarkAttendanceRequest;
 use App\Http\Resources\Api\V1\Lecturer\AttendanceSessionResource;
 use App\Http\Resources\Api\V1\Lecturer\SessionAttendanceResource;
 use App\Http\Responses\ApiResponse;
-use App\Services\V1\Lecturer\LecturerAttendanceService;
+use App\Models\Lecture;
+use App\Modules\Academic\Delivery\Support\LecturerAttendanceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -26,7 +27,7 @@ class AttendanceController extends Controller
      */
     public function index(AttendanceFilterRequest $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -37,7 +38,7 @@ class AttendanceController extends Controller
             $sessions = $this->attendanceService->getAttendanceSessions($lecturer, $filters, $perPage);
 
             return ApiResponse::paginated(
-                $sessions->through(fn($session) => new AttendanceSessionResource($session)),
+                $sessions->through(fn ($session) => new AttendanceSessionResource($session)),
                 'Attendance sessions retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -50,7 +51,7 @@ class AttendanceController extends Controller
      */
     public function sessionsRequiringAttention(Request $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -72,7 +73,7 @@ class AttendanceController extends Controller
      */
     public function sessionAttendance(Request $request, int $sessionId): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
         try {
             $attendanceData = $this->attendanceService->getSessionAttendance($lecturer, $sessionId);
@@ -99,7 +100,7 @@ class AttendanceController extends Controller
      */
     public function markAttendance(MarkAttendanceRequest $request, int $sessionId): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -138,7 +139,7 @@ class AttendanceController extends Controller
      */
     public function bulkMarkAttendance(Request $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -190,7 +191,7 @@ class AttendanceController extends Controller
      */
     public function courseAnalytics(Request $request, int $courseOfferingId): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -221,7 +222,7 @@ class AttendanceController extends Controller
      */
     public function alerts(Request $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -244,7 +245,7 @@ class AttendanceController extends Controller
      */
     public function exportAttendance(Request $request, int $courseOfferingId): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -282,7 +283,7 @@ class AttendanceController extends Controller
      */
     public function generateAttendance(Request $request, int $session): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -307,7 +308,7 @@ class AttendanceController extends Controller
      */
     public function summary(Request $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {

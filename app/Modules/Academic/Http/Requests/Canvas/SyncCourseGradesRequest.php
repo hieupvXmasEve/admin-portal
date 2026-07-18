@@ -12,7 +12,7 @@ use Illuminate\Validation\Rule;
  * Validates the selected students for a Canvas grade sync preview/apply
  * (issue 10). Permission is enforced by the `can:sync_course_grades` route
  * middleware; this request only checks the campus guard and that every
- * selected student is on the offering's active roster.
+ * selected student is eligible to receive assessment evidence in the offering.
  */
 class SyncCourseGradesRequest extends FormRequest
 {
@@ -32,10 +32,10 @@ class SyncCourseGradesRequest extends FormRequest
         /** @var CourseOffering $courseOffering */
         $courseOffering = $this->route('courseOffering');
 
-        // Matches the roster CanvasGradeSyncService actually syncs (registered,
-        // confirmed, completed) — broader than the "active class roster" used
-        // for attendance, since a completed registration can still get a
-        // late Canvas correction while the offering itself isn't completed yet.
+        // Canvas uses Delivery's assessment-evidence eligibility (registered,
+        // confirmed, and completed registrations). This deliberately differs
+        // from live attendance: a completed registration may need a Canvas
+        // correction until the offering itself is completed.
         $rosterStudentIds = $courseOffering->courseRegistrations()
             ->whereIn('registration_status', ['registered', 'confirmed', 'completed'])
             ->pluck('student_id');
@@ -49,7 +49,7 @@ class SyncCourseGradesRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'student_ids.*.in' => 'The selected student is not on this course offering\'s active roster.',
+            'student_ids.*.in' => 'The selected student is not eligible for Canvas assessment evidence in this course offering.',
         ];
     }
 

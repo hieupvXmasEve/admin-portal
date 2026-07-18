@@ -6,8 +6,8 @@ namespace App\Http\Controllers\Web\Canvas;
 
 use App\Http\Controllers\Controller;
 use App\Models\CanvasCourseMapping;
+use App\Modules\Academic\Delivery\Support\CanvasGradeSyncService;
 use App\Services\Canvas\CanvasAssignmentSyncService;
-use App\Services\Canvas\CanvasGradeSyncService;
 use App\Services\Canvas\CanvasSyllabusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;

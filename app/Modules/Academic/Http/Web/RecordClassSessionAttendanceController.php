@@ -7,7 +7,7 @@ namespace App\Modules\Academic\Http\Web;
 use App\Http\Controllers\Controller;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
-use App\Modules\Academic\Actions\Attendance\RecordAttendanceAction;
+use App\Modules\Academic\Delivery\Actions\RecordAttendanceAction;
 use App\Modules\Academic\Http\Requests\Attendance\RecordClassSessionAttendanceRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Redirect;

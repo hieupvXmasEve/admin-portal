@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Modules\Academic\FacultyWorkforce\Observers\SyncLecturerAccessEligibility;
 use App\Modules\Academic\FacultyWorkforce\Support\EloquentLecturerTokenIssuer;
 use App\Policies\ApiActorPolicy;
+use App\Policies\CourseOfferingPolicy;
 use App\Policies\StudentApplicationPolicy;
 use App\Shared\Contracts\Identity\LecturerTokenIssuer;
 use App\Shared\Support\Admissions\AdmissionsIngestion;
@@ -152,6 +153,7 @@ class AppServiceProvider extends ServiceProvider
     protected function registerPolicies(): void
     {
         Gate::policy(StudentApplication::class, StudentApplicationPolicy::class);
+        Gate::policy(CourseOffering::class, CourseOfferingPolicy::class);
     }
 
     /**

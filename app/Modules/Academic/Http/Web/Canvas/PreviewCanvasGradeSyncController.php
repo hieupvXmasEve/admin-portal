@@ -7,8 +7,8 @@ namespace App\Modules\Academic\Http\Web\Canvas;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\CourseOffering;
+use App\Modules\Academic\Delivery\Support\CanvasGradeSyncService;
 use App\Modules\Academic\Http\Requests\Canvas\SyncCourseGradesRequest;
-use App\Services\Canvas\CanvasGradeSyncService;
 use Illuminate\Http\JsonResponse;
 
 class PreviewCanvasGradeSyncController extends Controller

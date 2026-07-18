@@ -5,23 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Actions\Attendance;
 
 use App\Models\ClassSession;
-use Illuminate\Support\Facades\DB;
 
+/** @deprecated Resolve the Delivery action instead. */
 class BulkUpdateClassSessionAttendanceAction
 {
-    /**
-     * @param  array<int, int>  $attendanceIds
-     */
-    public static function run(ClassSession $classSession, array $attendanceIds, string $status): int
+    /** @param array{class_session: ClassSession, attendance_ids: array<int, int>, status: string} $data */
+    public static function run(array $data): int
     {
-        return DB::transaction(function () use ($classSession, $attendanceIds, $status): int {
-            $updated = $classSession->attendances()
-                ->whereIn('id', $attendanceIds)
-                ->update(['status' => $status]);
-
-            $classSession->updateAttendanceStatistics();
-
-            return $updated;
-        });
+        return \App\Modules\Academic\Delivery\Actions\BulkUpdateClassSessionAttendanceAction::run($data);
     }
 }

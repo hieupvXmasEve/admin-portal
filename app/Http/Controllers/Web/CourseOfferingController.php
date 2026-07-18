@@ -31,10 +31,10 @@ use App\Modules\Academic\Delivery\Actions\RemoveStudentFromCourseOfferingAction;
 use App\Modules\Academic\Delivery\Actions\SplitCourseOfferingAction;
 use App\Modules\Academic\Delivery\Exceptions\CourseOfferingSplitException;
 use App\Modules\Academic\Delivery\Exceptions\InstructorAssignmentException;
+use App\Modules\Academic\Delivery\Queries\GetCourseOfferingOperationalStateQuery;
 use App\Modules\Academic\Http\Requests\CourseDelivery\BulkAssignInstructorsRequest;
 use App\Modules\Academic\Http\Requests\CourseDelivery\SplitCourseOfferingRequest;
 use App\Modules\Academic\Http\Requests\MoveStudentRequest;
-use App\Modules\Academic\Queries\GetCourseOfferingOperationalStateQuery;
 use App\Modules\Academic\Queries\GetCourseOfferingScoresQuery;
 use App\Modules\Academic\Queries\GetCourseOfferingSurveyQuery;
 use App\Modules\Academic\Queries\ListCourseOfferingModuleOptionsQuery;
@@ -62,7 +62,8 @@ class CourseOfferingController extends Controller
     public function __construct(
         protected SystemConfigService $systemConfigService,
         protected CourseSurveyService $courseSurveyService,
-        protected CurriculumService $curriculumService
+        protected CurriculumService $curriculumService,
+        protected GetCourseOfferingOperationalStateQuery $operationalStateQuery,
     ) {}
 
     /**
@@ -518,7 +519,7 @@ class CourseOfferingController extends Controller
 
             // Eager — single operational-state contract for the cockpit
             // (ADR 0013); re-derived on every visit and partial reload.
-            'operational_state' => GetCourseOfferingOperationalStateQuery::handle($courseOffering, Auth::user()),
+            'operational_state' => $this->operationalStateQuery->handle($courseOffering, Auth::user()),
 
             // Once — rarely change during page session, skip on partial reloads
             'availableRooms' => Inertia::once(fn () => $availableRooms),

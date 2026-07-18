@@ -6,7 +6,7 @@ namespace App\Console\Commands;
 
 use App\Exceptions\CanvasConnectionException;
 use App\Models\CanvasCourseMapping;
-use App\Services\Canvas\CanvasGradeSyncService;
+use App\Modules\Academic\Delivery\Support\CanvasGradeSyncService;
 use Illuminate\Console\Command;
 
 class SyncAcademicRecordsCommand extends Command
@@ -109,17 +109,19 @@ class SyncAcademicRecordsCommand extends Command
                         $this->warn("⏭ Skipping {$courseOfferingName} - Canvas integration was deactivated");
                         $totalStats['courses_skipped']++;
                         $progressBar->advance();
+
                         continue;
                     }
 
                     // Double-check integration is still active (may have been deactivated by another process)
                     $mapping->canvasIntegration->refresh();
-                    if (!$mapping->canvasIntegration->is_active) {
+                    if (! $mapping->canvasIntegration->is_active) {
                         $this->newLine();
                         $this->warn("⏭ Skipping {$courseOfferingName} - Canvas integration is inactive");
                         $totalStats['courses_skipped']++;
                         $deactivatedIntegrationIds[] = $mapping->canvas_integration_id;
                         $progressBar->advance();
+
                         continue;
                     }
 

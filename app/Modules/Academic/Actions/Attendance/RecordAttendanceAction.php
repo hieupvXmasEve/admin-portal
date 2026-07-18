@@ -6,40 +6,16 @@ namespace App\Modules\Academic\Actions\Attendance;
 
 use App\Models\Attendance;
 
-/**
- * Single source of truth for recording one attendance record. Used by the
- * Course Offering Cockpit's per-session recording endpoint (ADR 0013 phase B);
- * the standalone staff Attendance pages no longer record attendance and are
- * reporting-only.
- */
+/** @deprecated Resolve the Delivery action instead. */
 class RecordAttendanceAction
 {
-    public const STATUSES = ['present', 'late', 'absent', 'excused'];
+    public const STATUSES = \App\Modules\Academic\Delivery\Actions\RecordAttendanceAction::STATUSES;
 
-    public const RECORDING_METHODS = ['manual', 'qr_code', 'rfid', 'geolocation', 'biometric', 'mobile_app'];
+    public const RECORDING_METHODS = \App\Modules\Academic\Delivery\Actions\RecordAttendanceAction::RECORDING_METHODS;
 
-    /**
-     * Records one student's attendance for one session. Keyed on the
-     * (class_session_id, student_id) unique constraint so re-recording a
-     * session already covered by auto-system attendance confirms it manually
-     * instead of failing on a duplicate-key error.
-     *
-     * `recorded_by_lecture_id` is FK-constrained to the `lectures` table, so
-     * it only ever holds a Lecture id (set by the lecturer API's own
-     * recording path). Staff recording attendance from the web app act as a
-     * `User`, not a `Lecture` — passing a User id here would violate the FK,
-     * so staff-recorded rows leave it null.
-     *
-     * @param  array<string, mixed>  $attributes
-     */
-    public static function run(array $attributes, ?int $recordedByLectureId = null): Attendance
+    /** @param array<string, mixed> $data */
+    public static function run(array $data): Attendance
     {
-        return Attendance::updateOrCreate(
-            [
-                'class_session_id' => $attributes['class_session_id'],
-                'student_id' => $attributes['student_id'],
-            ],
-            [...$attributes, 'recorded_by_lecture_id' => $recordedByLectureId]
-        );
+        return \App\Modules\Academic\Delivery\Actions\RecordAttendanceAction::run($data);
     }
 }

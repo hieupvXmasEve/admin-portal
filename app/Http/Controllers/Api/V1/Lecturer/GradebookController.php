@@ -9,17 +9,17 @@ use App\Http\Requests\Api\V1\Lecturer\SaveGradebookScoresRequest;
 use App\Http\Responses\ApiResponse;
 use App\Models\CourseOffering;
 use App\Models\Lecture;
-use App\Modules\Academic\Actions\SaveLecturerGradebookScoresAction;
-use App\Modules\Academic\Queries\GetLecturerCourseGradebookQuery;
+use App\Modules\Academic\Delivery\Actions\SaveLecturerGradebookScoresAction;
+use App\Modules\Academic\Delivery\Queries\GetLecturerCourseGradebookQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 class GradebookController extends Controller
 {
     public function __construct(
         private readonly GetLecturerCourseGradebookQuery $getGradebook,
-        private readonly SaveLecturerGradebookScoresAction $saveGradebookScores,
     ) {}
 
     public function show(Request $request, CourseOffering $courseOffering): JsonResponse
@@ -27,7 +27,7 @@ class GradebookController extends Controller
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
-        if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
+        if (Gate::forUser($lecturer)->denies('viewGradebook', $courseOffering)) {
             return ApiResponse::error('Unauthorized access to course offering', [], 403);
         }
 
@@ -43,25 +43,22 @@ class GradebookController extends Controller
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
-        if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
+        if (Gate::forUser($lecturer)->denies('viewGradebook', $courseOffering)) {
             return ApiResponse::error('Unauthorized access to course offering', [], 403);
         }
 
         try {
             return ApiResponse::success(
-                $this->saveGradebookScores->handle($courseOffering, $request->validated('scores'), $lecturer->id),
+                SaveLecturerGradebookScoresAction::run([
+                    'course_offering' => $courseOffering,
+                    'scores' => $request->validated('scores'),
+                    'lecturer_id' => $lecturer->id,
+                ]),
                 [],
                 'Gradebook scores saved successfully'
             );
         } catch (ValidationException $e) {
             return ApiResponse::validationError($e->errors());
         }
-    }
-
-    private function canAccessCourseOffering(Lecture $lecturer, CourseOffering $courseOffering): bool
-    {
-        return $courseOffering->classSessions()
-            ->where('lecture_id', $lecturer->id)
-            ->exists();
     }
 }

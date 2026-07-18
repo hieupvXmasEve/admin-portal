@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Http\Requests\Attendance;
 
 use App\Models\ClassSession;
-use App\Modules\Academic\Actions\Attendance\RecordAttendanceAction;
+use App\Modules\Academic\Delivery\Actions\RecordAttendanceAction;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
