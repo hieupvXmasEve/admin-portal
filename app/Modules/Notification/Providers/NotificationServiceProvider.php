@@ -10,7 +10,9 @@ use App\Modules\Notification\EmailContent\EmailContentRegistry;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
 use App\Modules\Notification\Observers\CampusObserver;
 use App\Modules\Notification\Policies\NotificationTemplatePolicy;
+use App\Modules\Notification\Support\NotificationDomainEventPublisher;
 use App\Modules\Notification\Support\NotificationMetrics;
+use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Support\Facades\Event;
@@ -21,6 +23,7 @@ class NotificationServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->bind(DomainEventPublisher::class, NotificationDomainEventPublisher::class);
         $this->app->singleton(NotificationMetrics::class);
         $this->app->singleton(EmailContentRegistry::class);
         $this->mergeConfigFrom(config_path('notification.php'), 'notification');

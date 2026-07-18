@@ -10,14 +10,12 @@ use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\Student;
+use App\Modules\Academic\Support\AcademicLifecycleEventFactory;
 use App\Modules\Academic\Support\FailureReasonClassifier;
 use App\Modules\Academic\Support\Grading\GradingCalculatorResolver;
-use App\Modules\Notification\Actions\PublishDomainEventAction;
-use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
-use Carbon\CarbonImmutable;
+use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class CourseCompletionService
 {
@@ -36,7 +34,7 @@ class CourseCompletionService
     public function __construct(
         protected EgcLevelProgressionService $egcService,
         protected CourseSurveyService $courseSurveyService,
-        protected PublishDomainEventAction $publishDomainEventAction,
+        protected DomainEventPublisher $domainEventPublisher,
         protected GradingCalculatorResolver $gradingResolver,
     ) {}
 
@@ -736,58 +734,20 @@ class CourseCompletionService
         float $creditPoints,
         bool $passed
     ): void {
-        if (! (bool) config('notification.v2_enabled', false)) {
-            return;
-        }
-
-        $writeMode = (string) config('notification.write_mode', 'off');
-        if (! in_array($writeMode, ['dual', 'v2', 'v2_only'], true)) {
-            return;
-        }
-
         if (! $student->user_id) {
             return;
         }
 
-        $body = $passed
-            ? "Congratulations! You have successfully completed {$courseOffering->unit->name} with grade {$grade} ({$finalPercentage}%). You earned {$creditPoints} credit points."
-            : "You have completed {$courseOffering->unit->name} with grade {$grade} ({$finalPercentage}%). Unfortunately, you did not meet the passing threshold.";
-
-        $envelope = new DomainEventEnvelope(
-            eventId: (string) Str::uuid(),
-            eventName: 'academic.course_completed',
-            eventVersion: 1,
-            occurredAt: CarbonImmutable::now(),
-            aggregateType: 'course_offering',
-            aggregateId: (string) $courseOffering->id,
-            campusId: (int) $student->campus_id,
-            actorUserId: null,
-            payload: [
-                'type_key' => 'course_completed',
-                'channels' => ['realtime'],
-                'recipient_targets' => [
-                    ['type' => 'student', 'id' => (int) $student->id],
-                ],
-                'data' => [
-                    'title' => $passed
-                        ? "Course Completed: {$courseOffering->unit->code}"
-                        : "Course Completed (Not Passed): {$courseOffering->unit->code}",
-                    'body' => $body,
-                    'category' => 'academic',
-                    'is_important' => ! $passed,
-                    'action_url' => '',
-                    'action_text' => 'View Academic Records',
-                    'course_code' => $courseOffering->unit->code,
-                    'course_name' => $courseOffering->unit->name,
-                    'grade' => $grade,
-                    'final_percentage' => $finalPercentage,
-                    'credit_points' => $creditPoints,
-                    'passed' => $passed,
-                ],
-            ],
+        $this->domainEventPublisher->publishAfterCommit(
+            AcademicLifecycleEventFactory::courseCompleted(
+                $student,
+                $courseOffering,
+                $grade,
+                $finalPercentage,
+                $creditPoints,
+                $passed,
+            ),
         );
-
-        $this->publishDomainEventAction->runAfterCommit($envelope);
     }
 
     /**
@@ -802,50 +762,18 @@ class CourseCompletionService
         float $newPercentage,
         string $grade,
     ): void {
-        if (! (bool) config('notification.v2_enabled', false)) {
-            return;
-        }
-
-        $writeMode = (string) config('notification.write_mode', 'off');
-        if (! in_array($writeMode, ['dual', 'v2', 'v2_only'], true)) {
-            return;
-        }
-
         if (! $student->user_id) {
             return;
         }
 
-        $envelope = new DomainEventEnvelope(
-            eventId: (string) Str::uuid(),
-            eventName: 'academic.course_score_updated',
-            eventVersion: 1,
-            occurredAt: CarbonImmutable::now(),
-            aggregateType: 'course_offering',
-            aggregateId: (string) $courseOffering->id,
-            campusId: (int) $student->campus_id,
-            actorUserId: null,
-            payload: [
-                'type_key' => 'course_score_updated',
-                'channels' => ['realtime'],
-                'recipient_targets' => [
-                    ['type' => 'student', 'id' => (int) $student->id],
-                ],
-                'data' => [
-                    'title' => "Score Updated: {$courseOffering->unit->code}",
-                    'body' => "Your score for {$courseOffering->unit->name} was updated from {$oldPercentage}% to {$newPercentage}% (grade {$grade}).",
-                    'category' => 'academic',
-                    'is_important' => false,
-                    'action_url' => '',
-                    'action_text' => 'View Academic Records',
-                    'course_code' => $courseOffering->unit->code,
-                    'course_name' => $courseOffering->unit->name,
-                    'grade' => $grade,
-                    'old_final_percentage' => $oldPercentage,
-                    'new_final_percentage' => $newPercentage,
-                ],
-            ],
+        $this->domainEventPublisher->publishAfterCommit(
+            AcademicLifecycleEventFactory::courseScoreUpdated(
+                $student,
+                $courseOffering,
+                $oldPercentage,
+                $newPercentage,
+                $grade,
+            ),
         );
-
-        $this->publishDomainEventAction->runAfterCommit($envelope);
     }
 }

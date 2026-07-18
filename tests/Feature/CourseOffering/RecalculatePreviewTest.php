@@ -20,10 +20,10 @@ use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Actions\MarkCourseOfferingCompletedAction;
-use App\Modules\Notification\Actions\PublishDomainEventAction;
-use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use App\Services\Canvas\CanvasApiService;
 use App\Services\PermissionService;
+use App\Shared\Contracts\DomainEvents\DomainEvent;
+use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -168,9 +168,9 @@ it('previews a recalculate without persisting, dispatching, or flipping course_s
     // Correct the underlying score after completion — this is what a preview should surface.
     gradeStudent($offering, $detail, $student, 50);
 
-    $publishSpy = Mockery::mock(PublishDomainEventAction::class);
-    app()->instance(PublishDomainEventAction::class, $publishSpy);
-    $publishSpy->shouldNotReceive('runAfterCommit');
+    $publishSpy = Mockery::mock(DomainEventPublisher::class);
+    app()->instance(DomainEventPublisher::class, $publishSpy);
+    $publishSpy->shouldNotReceive('publishAfterCommit');
 
     $response = actingAs($this->user)
         ->withSession(['current_campus_id' => $this->campus->id])
@@ -222,12 +222,12 @@ it('assigns strong/light/none notification tiers correctly on recalculate', func
     gradeStudent($offering, $detail, $lightStudent, 80);
 
     $tiers = [];
-    $publishSpy = Mockery::mock(PublishDomainEventAction::class);
-    app()->instance(PublishDomainEventAction::class, $publishSpy);
-    $publishSpy->shouldReceive('runAfterCommit')
+    $publishSpy = Mockery::mock(DomainEventPublisher::class);
+    app()->instance(DomainEventPublisher::class, $publishSpy);
+    $publishSpy->shouldReceive('publishAfterCommit')
         ->twice()
-        ->withArgs(function (DomainEventEnvelope $envelope) use (&$tiers) {
-            $tiers[] = $envelope->eventName;
+        ->withArgs(function (DomainEvent $event) use (&$tiers) {
+            $tiers[] = $event->name;
 
             return true;
         });

@@ -11,17 +11,15 @@ use App\Models\AcademicRecord;
 use App\Models\CourseOffering;
 use App\Models\Student;
 use App\Models\Unit;
-use App\Modules\Notification\Actions\PublishDomainEventAction;
-use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
-use Carbon\CarbonImmutable;
+use App\Modules\Academic\Support\AcademicLifecycleEventFactory;
+use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class EgcLevelProgressionService
 {
     public function __construct(
-        protected PublishDomainEventAction $publishDomainEventAction
+        protected DomainEventPublisher $domainEventPublisher
     ) {}
 
     /**
@@ -530,15 +528,6 @@ class EgcLevelProgressionService
      */
     private function publishScoreUpdatedNotificationV2(Student $student, CourseOffering $courseOffering, array $previousScoreMap, AcademicRecord $record): void
     {
-        if (! (bool) config('notification.v2_enabled', false)) {
-            return;
-        }
-
-        $writeMode = (string) config('notification.write_mode', 'off');
-        if (! in_array($writeMode, ['dual', 'v2', 'v2_only'], true)) {
-            return;
-        }
-
         if (! $student->user_id) {
             return;
         }
@@ -546,38 +535,15 @@ class EgcLevelProgressionService
         $oldPercentage = (float) ($previousScoreMap[$student->id] ?? 0);
         $newPercentage = (float) ($record->final_percentage ?? 0);
 
-        $envelope = new DomainEventEnvelope(
-            eventId: (string) Str::uuid(),
-            eventName: 'academic.course_score_updated',
-            eventVersion: 1,
-            occurredAt: CarbonImmutable::now(),
-            aggregateType: 'course_offering',
-            aggregateId: (string) $courseOffering->id,
-            campusId: (int) $student->campus_id,
-            actorUserId: null,
-            payload: [
-                'type_key' => 'course_score_updated',
-                'channels' => ['realtime'],
-                'recipient_targets' => [
-                    ['type' => 'student', 'id' => (int) $student->id],
-                ],
-                'data' => [
-                    'title' => "Score Updated: {$courseOffering->unit->code}",
-                    'body' => "Your score for {$courseOffering->unit->name} was updated from {$oldPercentage}% to {$newPercentage}% (grade {$record->final_letter_grade}).",
-                    'category' => 'academic',
-                    'is_important' => false,
-                    'action_url' => '',
-                    'action_text' => 'View Academic Records',
-                    'course_code' => $courseOffering->unit->code,
-                    'course_name' => $courseOffering->unit->name,
-                    'grade' => $record->final_letter_grade,
-                    'old_final_percentage' => $oldPercentage,
-                    'new_final_percentage' => $newPercentage,
-                ],
-            ],
+        $this->domainEventPublisher->publishAfterCommit(
+            AcademicLifecycleEventFactory::courseScoreUpdated(
+                $student,
+                $courseOffering,
+                $oldPercentage,
+                $newPercentage,
+                $record->final_letter_grade,
+            ),
         );
-
-        $this->publishDomainEventAction->runAfterCommit($envelope);
     }
 
     private function publishEgcCourseCompletedNotificationV2(
@@ -589,58 +555,20 @@ class EgcLevelProgressionService
         int $currentLevel,
         string $message
     ): void {
-        if (! (bool) config('notification.v2_enabled', false)) {
-            return;
-        }
-
-        $writeMode = (string) config('notification.write_mode', 'off');
-        if (! in_array($writeMode, ['dual', 'v2', 'v2_only'], true)) {
-            return;
-        }
-
         if (! $student->user_id) {
             return;
         }
-
-        $body = $passed
-            ? "You passed {$courseOffering->unit->code} - {$courseOffering->unit->name} with grade {$grade}. {$message}"
-            : "You did not pass {$courseOffering->unit->code} - {$courseOffering->unit->name}. Grade: {$grade}. {$message}";
-
-        $envelope = new DomainEventEnvelope(
-            eventId: (string) Str::uuid(),
-            eventName: 'academic.egc_course_completed',
-            eventVersion: 1,
-            occurredAt: CarbonImmutable::now(),
-            aggregateType: 'course_offering',
-            aggregateId: (string) $courseOffering->id,
-            campusId: (int) $student->campus_id,
-            actorUserId: null,
-            payload: [
-                'type_key' => 'egc_course_completed',
-                'channels' => ['realtime'],
-                'recipient_targets' => [
-                    ['type' => 'student', 'id' => (int) $student->id],
-                ],
-                'data' => [
-                    'title' => $passed
-                        ? "EGC Course Completed: {$courseOffering->unit->code}"
-                        : "EGC Course Result: {$courseOffering->unit->code}",
-                    'body' => $body,
-                    'category' => 'academic',
-                    'is_important' => true,
-                    'action_url' => '',
-                    'action_text' => 'View Academic Records',
-                    'course_code' => $courseOffering->unit->code,
-                    'course_name' => $courseOffering->unit->name,
-                    'grade' => $grade,
-                    'passed' => $passed,
-                    'level_progressed' => $levelProgressed,
-                    'current_level' => $currentLevel,
-                ],
-            ],
+        $this->domainEventPublisher->publishAfterCommit(
+            AcademicLifecycleEventFactory::egcCourseCompleted(
+                $student,
+                $courseOffering,
+                $grade,
+                $passed,
+                $levelProgressed,
+                $currentLevel,
+                $message,
+            ),
         );
-
-        $this->publishDomainEventAction->runAfterCommit($envelope);
     }
 
     private function publishEgcProgramCompletedNotificationV2(
@@ -648,48 +576,12 @@ class EgcLevelProgressionService
         int $totalLevels,
         string $newStatus
     ): void {
-        if (! (bool) config('notification.v2_enabled', false)) {
-            return;
-        }
-
-        $writeMode = (string) config('notification.write_mode', 'off');
-        if (! in_array($writeMode, ['dual', 'v2', 'v2_only'], true)) {
-            return;
-        }
-
         if (! $student->user_id) {
             return;
         }
-
-        $envelope = new DomainEventEnvelope(
-            eventId: (string) Str::uuid(),
-            eventName: 'academic.egc_program_completed',
-            eventVersion: 1,
-            occurredAt: CarbonImmutable::now(),
-            aggregateType: 'student',
-            aggregateId: (string) $student->id,
-            campusId: (int) $student->campus_id,
-            actorUserId: null,
-            payload: [
-                'type_key' => 'egc_program_completed',
-                'channels' => ['realtime'],
-                'recipient_targets' => [
-                    ['type' => 'student', 'id' => (int) $student->id],
-                ],
-                'data' => [
-                    'title' => 'EGC Program Completed',
-                    'body' => "Congratulations! You have completed all {$totalLevels} EGC levels. Please contact academic services for your next status transition.",
-                    'category' => 'academic',
-                    'is_important' => true,
-                    'action_url' => '',
-                    'action_text' => 'View Academic Records',
-                    'total_levels' => $totalLevels,
-                    'new_status' => $newStatus,
-                ],
-            ],
+        $this->domainEventPublisher->publishAfterCommit(
+            AcademicLifecycleEventFactory::egcProgramCompleted($student, $totalLevels, $newStatus),
         );
-
-        $this->publishDomainEventAction->runAfterCommit($envelope);
     }
 
     /**

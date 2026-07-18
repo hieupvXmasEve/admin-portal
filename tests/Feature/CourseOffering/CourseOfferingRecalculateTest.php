@@ -16,9 +16,9 @@ use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Actions\MarkCourseOfferingCompletedAction;
-use App\Modules\Notification\Actions\PublishDomainEventAction;
-use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use App\Services\PermissionService;
+use App\Shared\Contracts\DomainEvents\DomainEvent;
+use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -210,14 +210,14 @@ it('notifies only students whose pass/fail status changed on recalculate', funct
         ->where('student_id', $studentB->id)
         ->update(['final_percentage' => 50]);
 
-    $publishSpy = Mockery::mock(PublishDomainEventAction::class);
-    app()->instance(PublishDomainEventAction::class, $publishSpy);
+    $publishSpy = Mockery::mock(DomainEventPublisher::class);
+    app()->instance(DomainEventPublisher::class, $publishSpy);
 
-    $publishSpy->shouldReceive('runAfterCommit')
+    $publishSpy->shouldReceive('publishAfterCommit')
         ->once()
-        ->withArgs(function (DomainEventEnvelope $envelope) use ($studentB) {
-            return $envelope->eventName === 'academic.course_completed'
-                && $envelope->payload['recipient_targets'][0]['id'] === $studentB->id;
+        ->withArgs(function (DomainEvent $event) use ($studentB) {
+            return $event->name === 'academic.course_completed'
+                && $event->payload['student_id'] === $studentB->id;
         });
 
     MarkCourseOfferingCompletedAction::run($offering, recalculate: true);
