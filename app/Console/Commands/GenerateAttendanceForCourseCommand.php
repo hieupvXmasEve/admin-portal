@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\CourseOffering;
-use App\Services\ClassSessionService;
+use App\Modules\Academic\Delivery\Support\ClassSessionService;
 use Illuminate\Console\Command;
 
 class GenerateAttendanceForCourseCommand extends Command
@@ -45,11 +45,12 @@ class GenerateAttendanceForCourseCommand extends Command
             },
             'courseRegistrations' => function ($query) {
                 $query->where('registration_status', 'confirmed');
-            }
+            },
         ])->find($courseOfferingId);
 
-        if (!$courseOffering) {
+        if (! $courseOffering) {
             $this->error("❌ Course offering with ID {$courseOfferingId} not found.");
+
             return Command::FAILURE;
         }
 
@@ -61,6 +62,7 @@ class GenerateAttendanceForCourseCommand extends Command
         if ($enrolledCount === 0) {
             $this->warn('⚠️  No enrolled students found for this course offering.');
             $this->info('Please ensure students are registered before generating attendance.');
+
             return Command::FAILURE;
         }
 
@@ -69,6 +71,7 @@ class GenerateAttendanceForCourseCommand extends Command
         if ($sessions->isEmpty()) {
             $this->warn('⚠️  No class sessions found for this course offering.');
             $this->info('Please generate class sessions first before creating attendance records.');
+
             return Command::FAILURE;
         }
 
@@ -90,6 +93,7 @@ class GenerateAttendanceForCourseCommand extends Command
 
                 if ($isDryRun) {
                     $this->displayDryRunInfo($session);
+
                     continue;
                 }
 
@@ -177,7 +181,7 @@ class GenerateAttendanceForCourseCommand extends Command
     private function displaySessionHeader($session, int $sessionNumber, int $totalSessions): void
     {
         $date = $session->session_date->format('M d, Y');
-        $time = $session->start_time->format('H:i') . ' - ' . $session->end_time->format('H:i');
+        $time = $session->start_time->format('H:i').' - '.$session->end_time->format('H:i');
         $status = ucfirst($session->status);
         $title = $session->session_title ?? "Session {$sessionNumber}";
 
@@ -205,7 +209,7 @@ class GenerateAttendanceForCourseCommand extends Command
         }
 
         if ($wouldCreate === 0 && $existingCount === 0) {
-            $this->comment("  → No students enrolled");
+            $this->comment('  → No students enrolled');
         }
 
         $this->newLine();
@@ -238,7 +242,7 @@ class GenerateAttendanceForCourseCommand extends Command
             );
             $this->info('✓ Dry run completed. Use the command without --dry-run to actually generate attendance.');
         } else {
-            $successRate = $totalSessions > 0 
+            $successRate = $totalSessions > 0
                 ? round((($totalSessions - count($errors)) / $totalSessions) * 100, 1)
                 : 0;
 
@@ -250,7 +254,7 @@ class GenerateAttendanceForCourseCommand extends Command
                     ['Existing records skipped', $totalExisting],
                     ['Total records', $totalNew + $totalExisting],
                     ['Enrolled students', $enrolledCount],
-                    ['Success rate', $successRate . '%'],
+                    ['Success rate', $successRate.'%'],
                 ]
             );
 

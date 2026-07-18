@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
-it('routes attendance, gradebook, Canvas, and readiness operations through Delivery boundaries', function (): void {
+it('routes Delivery operations through Delivery-owned boundaries', function (): void {
     $files = [
+        base_path('app/Http/Controllers/Api/ClassSessionController.php'),
         base_path('app/Http/Controllers/Api/V1/Lecturer/AttendanceController.php'),
+        base_path('app/Http/Controllers/Api/V1/Lecturer/AssessmentController.php'),
         base_path('app/Http/Controllers/Api/V1/Lecturer/GradebookController.php'),
         base_path('app/Http/Controllers/Web/CourseOfferingController.php'),
         base_path('app/Modules/Academic/Http/Web/BulkUpdateClassSessionAttendanceController.php'),
@@ -18,7 +20,7 @@ it('routes attendance, gradebook, Canvas, and readiness operations through Deliv
 
     foreach ($files as $file) {
         $contents = file_get_contents($file) ?: '';
-        if (preg_match('/use\s+App\\\\(?:Services\\\\(?:Canvas\\\\CanvasGradeSyncService|V1\\\\Lecturer\\\\LecturerAttendanceService)|Modules\\\\Academic\\\\(?:Actions\\\\(?:Attendance\\\\(?:RecordAttendanceAction|BulkUpdateClassSessionAttendanceAction)|SaveLecturerGradebookScoresAction)|Queries\\\\(?:GetCourseOfferingOperationalStateQuery|GetLecturerCourseGradebookQuery)))\s*;/', $contents) === 1) {
+        if (preg_match('/use\s+App\\\\(?:Services\\\\(?:Canvas\\\\CanvasGradeSyncService|V1\\\\Lecturer\\\\LecturerAttendanceService|ClassSessionService|AssessmentManagementService|AssessmentWeightValidationService)|Modules\\\\Academic\\\\(?:Actions\\\\(?:Attendance\\\\(?:RecordAttendanceAction|BulkUpdateClassSessionAttendanceAction)|SaveLecturerGradebookScoresAction)|Queries\\\\(?:GetCourseOfferingOperationalStateQuery|GetLecturerCourseGradebookQuery)))\s*;/', $contents) === 1) {
             $legacyImports[] = $file;
         }
     }
@@ -48,7 +50,7 @@ it('keeps Progression from reading Delivery attendance or component-score persis
     );
 });
 
-it('keeps Delivery implementations independent of legacy attendance, gradebook, and Canvas classes', function (): void {
+it('keeps Delivery implementations independent of legacy delivery classes', function (): void {
     $deliveryRoot = base_path('app/Modules/Academic/Delivery');
     $violations = [];
 
@@ -58,7 +60,7 @@ it('keeps Delivery implementations independent of legacy attendance, gradebook, 
         }
 
         $contents = file_get_contents($file->getPathname()) ?: '';
-        if (preg_match('/(?:App\\\\Modules\\\\Academic\\\\(?:Actions\\\\(?:Attendance\\\\(?:RecordAttendanceAction|BulkUpdateClassSessionAttendanceAction)|SaveLecturerGradebookScoresAction)|Queries\\\\(?:GetCourseOfferingOperationalStateQuery|GetLecturerCourseGradebookQuery))|App\\\\Services\\\\(?:Canvas\\\\CanvasGradeSyncService|V1\\\\Lecturer\\\\LecturerAttendanceService))/', $contents) === 1) {
+        if (preg_match('/(?:App\\\\Modules\\\\Academic\\\\(?:Actions\\\\(?:Attendance\\\\(?:RecordAttendanceAction|BulkUpdateClassSessionAttendanceAction)|SaveLecturerGradebookScoresAction)|Queries\\\\(?:GetCourseOfferingOperationalStateQuery|GetLecturerCourseGradebookQuery))|App\\\\Services\\\\(?:Canvas\\\\CanvasGradeSyncService|V1\\\\Lecturer\\\\LecturerAttendanceService|ClassSessionService|AssessmentManagementService|AssessmentWeightValidationService))/', $contents) === 1) {
             $violations[] = $file->getPathname();
         }
     }

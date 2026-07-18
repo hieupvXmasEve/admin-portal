@@ -10,7 +10,7 @@ use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\Lecture;
 use App\Models\Room;
-use App\Services\ClassSessionService;
+use App\Modules\Academic\Delivery\Support\ClassSessionService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;

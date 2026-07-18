@@ -11,6 +11,8 @@ use App\Models\Lecture;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Models\User;
+use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 
@@ -26,7 +28,12 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     $this->campus = Campus::factory()->create();
     $this->semester = Semester::factory()->active()->create();
+    $this->lecturerUser = User::factory()->create([
+        'type' => UserType::LECTURER,
+        'status' => User::STATUS_ACTIVE,
+    ]);
     $this->lecturer = Lecture::factory()->create([
+        'user_id' => $this->lecturerUser->id,
         'campus_id' => $this->campus->id,
         'is_active' => true,
         'employment_status' => 'active',
@@ -43,6 +50,8 @@ beforeEach(function () {
         'course_offering_id' => $this->offering->id,
         'lecture_id' => $this->lecturer->id,
         'status' => 'completed',
+        'start_time' => '09:00:00',
+        'end_time' => '11:00:00',
     ]);
     $this->student = Student::factory()->forCampus($this->campus)->create([
         'status' => 'intake_course',
@@ -87,7 +96,12 @@ it('marks attendance through the lecturer API unaffected by the cockpit attendan
 });
 
 it('rejects lecturer attendance marking for a session the lecturer does not own', function () {
+    $otherLecturerUser = User::factory()->create([
+        'type' => UserType::LECTURER,
+        'status' => User::STATUS_ACTIVE,
+    ]);
     $otherLecturer = Lecture::factory()->create([
+        'user_id' => $otherLecturerUser->id,
         'campus_id' => $this->campus->id,
         'is_active' => true,
         'employment_status' => 'active',

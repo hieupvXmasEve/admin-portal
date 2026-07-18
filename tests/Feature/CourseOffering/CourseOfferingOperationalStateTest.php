@@ -66,6 +66,10 @@ function makeOperationalOffering(object $context, array $overrides = []): Course
 
 function makeOperationalSession(CourseOffering $courseOffering, array $overrides = []): ClassSession
 {
+    $nextSequenceNumber = (int) ClassSession::query()
+        ->where('course_offering_id', $courseOffering->id)
+        ->max('sequence_number') + 1;
+
     return ClassSession::factory()->create(array_merge([
         'course_offering_id' => $courseOffering->id,
         'status' => 'completed',
@@ -74,6 +78,7 @@ function makeOperationalSession(CourseOffering $courseOffering, array $overrides
         'end_time' => '11:00:00',
         'session_type' => 'lecture',
         'delivery_mode' => 'in_person',
+        'sequence_number' => $nextSequenceNumber,
     ], $overrides));
 }
 

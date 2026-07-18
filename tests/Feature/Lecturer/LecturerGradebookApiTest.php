@@ -15,6 +15,8 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
+use App\Models\User;
+use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 
@@ -23,7 +25,12 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     $this->campus = Campus::factory()->create();
     $this->semester = Semester::factory()->active()->create();
+    $this->lecturerUser = User::factory()->create([
+        'type' => UserType::LECTURER,
+        'status' => User::STATUS_ACTIVE,
+    ]);
     $this->lecturer = Lecture::factory()->create([
+        'user_id' => $this->lecturerUser->id,
         'campus_id' => $this->campus->id,
         'is_active' => true,
         'employment_status' => 'active',
@@ -87,6 +94,8 @@ beforeEach(function () {
             'course_offering_id' => $offering->id,
             'lecture_id' => $this->lecturer->id,
             'status' => 'scheduled',
+            'start_time' => '09:00:00',
+            'end_time' => '11:00:00',
         ]);
 
         return $offering;

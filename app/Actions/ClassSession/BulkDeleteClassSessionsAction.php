@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\ClassSession;
 
-use App\Services\ClassSessionService;
+use App\Modules\Academic\Delivery\Support\ClassSessionService;
 
 class BulkDeleteClassSessionsAction
 {
@@ -15,7 +15,7 @@ class BulkDeleteClassSessionsAction
     /**
      * Delete multiple class sessions
      *
-     * @param array<int> $ids
+     * @param  array<int>  $ids
      * @return int Number of deleted sessions
      */
     public function execute(array $ids): int

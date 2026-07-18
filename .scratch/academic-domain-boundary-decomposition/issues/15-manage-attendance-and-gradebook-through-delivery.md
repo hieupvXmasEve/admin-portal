@@ -14,13 +14,13 @@ Complete the operational Course Delivery tracer by placing sessions, attendance,
 
 ## Acceptance criteria
 
-- [ ] Delivery owns sessions, attendance evidence, assessment components, component scores, Canvas sync, and grading-rule inputs.
+- [x] Delivery owns sessions, attendance evidence, assessment components, component scores, Canvas sync, and grading-rule inputs.
 - [x] Only active eligible roster members can receive attendance or assessment evidence according to existing rules.
-- [ ] Lecturer gradebook and attendance APIs retain authorization, response shapes, validation, and campus/offering scoping.
+- [x] Lecturer gradebook and attendance APIs retain authorization, response shapes, validation, and campus/offering scoping.
 - [x] Sync preview remains side-effect free, and apply reads fresh Canvas data before committing.
 - [x] Readiness blockers are supplied by the backend Delivery boundary rather than inferred by frontend code.
 - [x] No Progression consumer reads component-score or attendance persistence directly to create transcript outcomes.
-- [ ] Existing staff, student portal, lecturer portal, Canvas, attendance, and gradebook tests pass with new architecture guards.
+- [ ] Existing staff, student portal, lecturer portal, Canvas, attendance, and gradebook tests pass with new architecture guards. (Portal lint remains blocked by workspace configuration.)
 
 ## Blocked by
 
@@ -29,11 +29,12 @@ Complete the operational Course Delivery tracer by placing sessions, attendance,
 ## Verification
 
 - Passed: `./scripts/dev.sh artisan test --compact tests/Feature/Architecture/CourseDeliveryAssessmentBoundaryArchTest.php tests/Feature/CourseOffering/CourseOfferingRecordAttendanceTest.php` — 10 tests, 26 assertions.
-- Passed: focused Delivery, attendance, operational-state, Canvas, and recalculation run — 41 tests, 314 assertions; one unrelated `CourseOfferingOperationalStateTest` factory sequence collision prevented a fully green aggregate run.
+- Passed: focused Delivery, attendance, operational-state, Canvas, recalculation, lecturer assessment, attendance, and gradebook run — 73 tests, 501 assertions.
 - Passed: Pint, `NODE_OPTIONS=--max-old-space-size=4096 ./scripts/dev.sh npm run type-check`, and `git diff --check`.
 - Portal checks: student and lecturer `pnpm typecheck`/`pnpm build` completed with existing Nuxt duplicate-import warnings. Both `pnpm lint` commands fail before linting because `eslint-plugin-pnpm` cannot find a `pnpm-workspace.yaml`.
-- Known verification gap: `LecturerAttendanceMarkApiTest` and `LecturerGradebookApiTest` currently receive `403 Actor is not authorized for this API surface` from actor middleware before reaching their controllers; the refactor does not alter this middleware. The existing gradebook test also has an unrelated invalid class-session factory time failure.
+- The Docker wrapper's unfiltered `artisan test --compact` currently returns exit code 0 without enumerating tests, so the explicit focused command above is the auditable backend result.
 
 ## Comments
 
-- 2026-07-18: Moved the operational attendance, lecturer-attendance, gradebook, Canvas-sync, and cockpit-readiness implementations into `app/Modules/Academic/Delivery`. Old namespaces now provide compatibility adapters only. Lecturer gradebook offering ownership is enforced through `CourseOfferingPolicy`; response shapes and endpoints are unchanged. Delivery architecture tests prohibit legacy implementation imports and Progression reads of attendance/component-score persistence. Remaining scope is the session/assessment-component management and grading-rule input cutover, plus the pre-existing API actor-middleware, factory, and portal-lint verification gaps.
+- 2026-07-18: Moved the operational attendance, lecturer-attendance, gradebook, Canvas-sync, cockpit-readiness, class-session, assessment-component, and assessment-weight implementations into `app/Modules/Academic/Delivery`. Old namespaces now provide compatibility adapters only. Lecturer gradebook offering ownership is enforced through `CourseOfferingPolicy`; response shapes and endpoints are unchanged. Delivery architecture tests prohibit legacy implementation imports and Progression reads of attendance/component-score persistence.
+- 2026-07-18: Updated lecturer API fixtures to create an active lecturer `User` linked to its `Lecture`, which creates the required access grant and allows `api.actor:lecturer` to authorize the request. Fixed valid class-session times and unique session sequencing in the affected test fixtures. Explicit Delivery regressions pass; portal lint remains an environment configuration gap because `eslint-plugin-pnpm` cannot find `pnpm-workspace.yaml`.

@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\ClassSession\BulkDeleteClassSessionsAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ClassSession\BulkDeleteClassSessionsRequest;
 use App\Http\Requests\GenerateClassSessionsRequest;
 use App\Http\Resources\ClassSession\ClassSessionResource;
+use App\Models\ClassSession;
 use App\Models\CourseOffering;
-use App\Services\ClassSessionService;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use App\Http\Requests\ClassSession\BulkDeleteClassSessionsRequest;
-use App\Actions\ClassSession\BulkDeleteClassSessionsAction;
+use App\Modules\Academic\Delivery\Support\ClassSessionService;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ClassSessionController extends Controller
 {
@@ -43,8 +45,8 @@ class ClassSessionController extends Controller
 
             // Generate new sessions
             $sessions = $this->classSessionService->generateClassSessions(
-                $courseOffering, 
-                $roomId, 
+                $courseOffering,
+                $roomId,
                 $startDate,
                 $weeklySchedule,
                 $excludedDates
@@ -71,7 +73,7 @@ class ClassSessionController extends Controller
     /**
      * Generate attendance records for all enrolled students in a class session
      */
-    public function generateAttendance(\App\Models\ClassSession $classSession): JsonResponse
+    public function generateAttendance(ClassSession $classSession): JsonResponse
     {
         try {
             $result = $this->classSessionService->generateAttendanceForSession($classSession);
@@ -110,7 +112,7 @@ class ClassSessionController extends Controller
     /**
      * Create a new class session
      */
-    public function store(\Illuminate\Http\Request $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'course_offering_id' => 'required|exists:course_offerings,id',
@@ -133,10 +135,10 @@ class ClassSessionController extends Controller
         try {
             // Check syllabus template total_sessions limit
             $courseOffering = CourseOffering::with('syllabusTemplate')->find($validated['course_offering_id']);
-            
+
             if ($courseOffering && $courseOffering->syllabusTemplate && $courseOffering->syllabusTemplate->total_sessions) {
-                $currentSessionsCount = \App\Models\ClassSession::where('course_offering_id', $courseOffering->id)->count();
-                
+                $currentSessionsCount = ClassSession::where('course_offering_id', $courseOffering->id)->count();
+
                 if ($currentSessionsCount >= $courseOffering->syllabusTemplate->total_sessions) {
                     return response()->json([
                         'success' => false,
@@ -163,7 +165,7 @@ class ClassSessionController extends Controller
     /**
      * Delete a single class session
      */
-    public function destroySingle(\App\Models\ClassSession $classSession): JsonResponse
+    public function destroySingle(ClassSession $classSession): JsonResponse
     {
         try {
             $deleted = $this->classSessionService->deleteClassSession($classSession);
