@@ -2,16 +2,112 @@
 
 declare(strict_types=1);
 
+use App\Enums\StudentActionType;
 use App\Models\Campus;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Specialization;
 use App\Models\Student;
+use App\Models\StudentActionLog;
+use App\Models\User;
+use App\Modules\Academic\Actions\RecordStudentActionAction;
+use App\Modules\Academic\Progression\Actions\MaterializeProgramEnrollmentAction;
 use App\Modules\Academic\Queries\ExportStudentsQuery;
 use App\Modules\Academic\Queries\ListStudentsQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
+
+it('filters lifecycle status from Program Enrollment after the Student snapshot becomes stale', function (): void {
+    $campus = Campus::factory()->create();
+    $program = Program::factory()->create();
+    $semester = Semester::factory()->create();
+    $user = User::factory()->create();
+    $student = Student::factory()->forCampus($campus)->forProgram($program)->create([
+        'status' => 'intake_course',
+        'academic_status' => 'active',
+        'intake' => 1,
+        'intake_semester_id' => $semester->id,
+    ]);
+
+    RecordStudentActionAction::run([
+        'student_id' => $student->id,
+        'action_type' => StudentActionType::ACADEMIC_DROPOUT->value,
+        'reason' => 'Approved withdrawal',
+        'dropout_semester_id' => $semester->id,
+        'changed_by_user_id' => $user->id,
+    ]);
+
+    $students = (new ListStudentsQuery)->handle(['status' => 'dropout'], $campus->id);
+
+    expect(collect($students->items())->pluck('id')->all())->toBe([$student->id])
+        ->and($student->fresh()->status)->toBe('intake_course');
+});
+
+it('keeps normalized Program Enrollment lifecycle subtypes exact in staff filters', function (): void {
+    $campus = Campus::factory()->create();
+    $program = Program::factory()->create();
+    $semester = Semester::factory()->create();
+    $students = collect([
+        'dropout' => Student::factory()->forCampus($campus)->forProgram($program)->create([
+            'status' => 'dropout',
+            'intake' => 1,
+            'intake_semester_id' => $semester->id,
+        ]),
+        'dropout_transfer' => Student::factory()->forCampus($campus)->forProgram($program)->create([
+            'status' => 'dropout_transfer',
+            'intake' => 1,
+            'intake_semester_id' => $semester->id,
+        ]),
+        'deferred' => Student::factory()->forCampus($campus)->forProgram($program)->create([
+            'status' => 'deferred',
+            'intake' => 1,
+            'intake_semester_id' => $semester->id,
+        ]),
+        'admission_deferred' => Student::factory()->forCampus($campus)->forProgram($program)->create([
+            'status' => 'admission_deferred',
+            'intake' => 1,
+            'intake_semester_id' => $semester->id,
+        ]),
+    ]);
+    $students->each(static fn (Student $student) => MaterializeProgramEnrollmentAction::run([
+        'student_id' => $student->id,
+    ]));
+
+    foreach ($students as $status => $student) {
+        $filtered = (new ListStudentsQuery)->handle(['status' => $status], $campus->id);
+
+        expect(collect($filtered->items())->pluck('id')->all())->toBe([$student->id]);
+    }
+});
+
+it('prefers the backfill snapshot over lifecycle history recorded before materialization', function (): void {
+    $campus = Campus::factory()->create();
+    $program = Program::factory()->create();
+    $semester = Semester::factory()->create();
+    $user = User::factory()->create();
+    $student = Student::factory()->forCampus($campus)->forProgram($program)->create([
+        'status' => 'dropout_transfer',
+        'intake' => 1,
+        'intake_semester_id' => $semester->id,
+    ]);
+    $historicalLog = StudentActionLog::query()->create([
+        'student_id' => $student->id,
+        'action_type' => StudentActionType::ACADEMIC_DROPOUT->value,
+        'reason' => 'Historical dropout before transfer classification',
+        'new_status' => 'dropout',
+        'changed_by_user_id' => $user->id,
+    ]);
+    $historicalLog->created_at = now()->subDay();
+    $historicalLog->saveQuietly();
+    MaterializeProgramEnrollmentAction::run(['student_id' => $student->id]);
+
+    $transferStudents = (new ListStudentsQuery)->handle(['status' => 'dropout_transfer'], $campus->id);
+    $dropoutStudents = (new ListStudentsQuery)->handle(['status' => 'dropout'], $campus->id);
+
+    expect(collect($transferStudents->items())->pluck('id')->all())->toBe([$student->id])
+        ->and(collect($dropoutStudents->items())->pluck('id')->all())->toBe([]);
+});
 
 it('filters exact student codes within the current campus', function () {
     $campus = Campus::factory()->create();

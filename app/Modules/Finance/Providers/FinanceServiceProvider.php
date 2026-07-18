@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Providers;
 
 use App\Models\Student;
+use App\Modules\Finance\Actions\ApplyStudentLifecycleDeferAction;
+use App\Modules\Finance\Actions\AttachStudentLifecycleFinanceEvidenceAction;
 use App\Modules\Finance\Actions\CancelFinanceObligationAction;
 use App\Modules\Finance\Actions\RequestFinanceCancellationOperationAction;
 use App\Modules\Finance\Actions\ResolveFinanceCancellationChargeStateAction;
@@ -18,6 +20,7 @@ use App\Modules\Finance\Observers\StudentBillingAccountObserver;
 use App\Modules\Finance\Policies\DngReceiptExceptionPolicy;
 use App\Modules\Finance\Policies\FinanceChargePolicy;
 use App\Modules\Finance\Queries\GetStudentFeeSummaryQuery;
+use App\Modules\Finance\Queries\StudentLifecycleFinanceQuery;
 use App\Modules\Finance\Services\DeferCaseService;
 use App\Modules\Finance\Services\FinanceChargeService;
 use App\Modules\Finance\Services\InvoiceGenerationService;
@@ -30,6 +33,7 @@ use App\Modules\Finance\Support\FinanceIntakeRouter;
 use App\Modules\Finance\Support\HubStudentFinanceSummaryReader as ModuleHubStudentFinanceSummaryReader;
 use App\Modules\Finance\Support\ObligationLedgerSettlementReader;
 use App\Modules\Finance\Support\SettlementPosition\CurrentPayableSettlementPositionReader;
+use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
 use App\Shared\Contracts\Finance\AiFinanceMetricReader;
 use App\Shared\Contracts\Finance\AiFinanceStudentProfileReader;
 use App\Shared\Contracts\Finance\BillingAccountRollbackWriter;
@@ -41,6 +45,9 @@ use App\Shared\Contracts\Finance\HubStudentFinanceSummaryReader;
 use App\Shared\Contracts\Finance\ObligationSettlementReader;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use App\Shared\Contracts\Finance\StudentFeeSummaryReader;
+use App\Shared\Contracts\Finance\StudentLifecycleFinanceCommand;
+use App\Shared\Contracts\Finance\StudentLifecycleFinanceEvidenceWriter;
+use App\Shared\Contracts\Finance\StudentLifecycleFinanceReader;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -62,6 +69,12 @@ class FinanceServiceProvider extends ServiceProvider
         $this->app->bind(ObligationSettlementReader::class, ObligationLedgerSettlementReader::class);
         $this->app->bind(SettlementPositionReader::class, CurrentPayableSettlementPositionReader::class);
         $this->app->bind(StudentFeeSummaryReader::class, GetStudentFeeSummaryQuery::class);
+        $this->app->bind(StudentLifecycleFinanceCommand::class, ApplyStudentLifecycleDeferAction::class);
+        $this->app->bind(
+            StudentLifecycleFinanceEvidenceWriter::class,
+            AttachStudentLifecycleFinanceEvidenceAction::class,
+        );
+        $this->app->bind(StudentLifecycleFinanceReader::class, StudentLifecycleFinanceQuery::class);
 
         // Register services as singletons
         $this->app->singleton(FinanceChargeService::class);
@@ -70,7 +83,8 @@ class FinanceServiceProvider extends ServiceProvider
         $this->app->singleton(InvoiceGenerationService::class);
         $this->app->singleton(DeferCaseService::class, function ($app) {
             return new DeferCaseService(
-                $app->make(FinanceChargeService::class)
+                $app->make(FinanceChargeService::class),
+                $app->make(StudentLifecycleCourseRegistrationGateway::class),
             );
         });
 

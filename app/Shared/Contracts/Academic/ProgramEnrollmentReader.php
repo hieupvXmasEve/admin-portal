@@ -14,4 +14,10 @@ interface ProgramEnrollmentReader
      * has run in every environment.
      */
     public function forStudentId(int $studentId): ProgramEnrollmentSummary;
+
+    /**
+     * @param  list<int>  $studentIds
+     * @return array<int, ProgramEnrollmentSummary>
+     */
+    public function forStudentIds(array $studentIds): array;
 }

@@ -13,6 +13,8 @@ use App\Models\User;
 use App\Modules\Academic\Actions\RecordStudentActionAction;
 use App\Modules\Academic\Progression\Models\ProgramEnrollment;
 use App\Services\PermissionService;
+use App\Shared\Contracts\Finance\DTO\StudentLifecycleDeferData;
+use App\Shared\Contracts\Finance\StudentLifecycleFinanceCommand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia;
@@ -111,7 +113,9 @@ it('rejects recording an illogical transition (resume while intake_course) at th
     expect($courseStudent->fresh()->status)->toBe('intake_course');
 });
 
-it('writes the lifecycle stage to the primary Program Enrollment before mirroring Student status', function () {
+it('writes the lifecycle stage to Program Enrollment without mutating Student identity state', function () {
+    $legacyStudentStatus = $this->student->status;
+
     RecordStudentActionAction::run([
         'student_id' => $this->student->id,
         'action_type' => StudentActionType::WAITING_COURSE_OPENING->value,
@@ -123,10 +127,10 @@ it('writes the lifecycle stage to the primary Program Enrollment before mirrorin
 
     expect($enrollment->enrollment_status)->toBe('active')
         ->and($enrollment->study_stage)->toBe('pending_course_opening')
-        ->and($this->student->fresh()->status)->toBe('pending_course_opening');
+        ->and($this->student->fresh()->status)->toBe($legacyStudentStatus);
 });
 
-it('reactivates Program Enrollment when a pending Student enters study', function () {
+it('reactivates Program Enrollment without changing the Student identity snapshot', function () {
     $pendingStudent = Student::factory()
         ->forCampus($this->campus)
         ->forProgram($this->program)
@@ -149,7 +153,101 @@ it('reactivates Program Enrollment when a pending Student enters study', functio
 
     expect($enrollment->enrollment_status)->toBe('active')
         ->and($enrollment->study_stage)->toBe('intake_pre_uni_gc')
-        ->and($pendingStudent->fresh()->status)->toBe('intake_pre_uni_gc');
+        ->and($pendingStudent->fresh()->status)->toBe('pending');
+});
+
+it('resumes from the Progression-owned study stage while the Student snapshot stays unchanged', function () {
+    RecordStudentActionAction::run([
+        'student_id' => $this->student->id,
+        'action_type' => StudentActionType::WAITING_COURSE_OPENING->value,
+        'reason' => 'Course opening is pending',
+        'changed_by_user_id' => $this->user->id,
+    ]);
+
+    RecordStudentActionAction::run([
+        'student_id' => $this->student->id,
+        'action_type' => StudentActionType::ACADEMIC_RESUME->value,
+        'reason' => 'Course is available',
+        'return_semester_id' => $this->semester->id,
+        'changed_by_user_id' => $this->user->id,
+    ]);
+
+    $enrollment = ProgramEnrollment::query()->sole();
+    $resumeLog = StudentActionLog::query()
+        ->where('action_type', StudentActionType::ACADEMIC_RESUME->value)
+        ->sole();
+
+    expect($enrollment->enrollment_status)->toBe('active')
+        ->and($enrollment->study_stage)->toBe('intake_pre_uni_gc')
+        ->and($resumeLog->previous_status)->toBe('pending_course_opening')
+        ->and($resumeLog->new_status)->toBe('intake_pre_uni_gc')
+        ->and($this->student->fresh()->status)->toBe('intake_pre_uni_gc');
+});
+
+it('builds lifecycle staff options from Program Enrollment instead of the stale Student snapshot', function () {
+    RecordStudentActionAction::run([
+        'student_id' => $this->student->id,
+        'action_type' => StudentActionType::WAITING_COURSE_OPENING->value,
+        'reason' => 'Course opening is pending',
+        'changed_by_user_id' => $this->user->id,
+    ]);
+
+    actingAs($this->user)
+        ->get(route('students.academic-summary.lifecycle', $this->student->id))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('student.status', 'pending_course_opening')
+            ->where('options.action.allowedActionTypes', [
+                StudentActionType::ACADEMIC_RESUME->value,
+                StudentActionType::ACADEMIC_DEFER->value,
+                StudentActionType::ACADEMIC_DROPOUT->value,
+            ])
+        );
+});
+
+it('withdraws Program Enrollment without mutating Student identity or account status', function () {
+    $accountStatus = $this->student->user?->status;
+
+    RecordStudentActionAction::run([
+        'student_id' => $this->student->id,
+        'action_type' => StudentActionType::ACADEMIC_DROPOUT->value,
+        'reason' => 'Student withdrew',
+        'dropout_semester_id' => $this->semester->id,
+        'changed_by_user_id' => $this->user->id,
+    ]);
+
+    $enrollment = ProgramEnrollment::query()->sole();
+
+    expect($enrollment->enrollment_status)->toBe('withdrawn')
+        ->and($enrollment->study_stage)->toBe('intake_pre_uni_gc')
+        ->and($this->student->fresh()->status)->toBe('intake_pre_uni_gc')
+        ->and($this->student->fresh()->user?->status)->toBe($accountStatus);
+});
+
+it('rolls back the lifecycle transition and audit log when the Finance handoff fails', function () {
+    app()->instance(StudentLifecycleFinanceCommand::class, new class implements StudentLifecycleFinanceCommand
+    {
+        public function applyDefer(StudentLifecycleDeferData $data): int
+        {
+            throw new RuntimeException('Simulated Finance failure');
+        }
+    });
+
+    expect(fn () => RecordStudentActionAction::run([
+        'student_id' => $this->student->id,
+        'action_type' => StudentActionType::ACADEMIC_DEFER->value,
+        'reason' => 'Defer with failed Finance handoff',
+        'from_semester_id' => $this->semester->id,
+        'return_semester_id' => $this->semester->id,
+        'defer_scope_type' => 'FULL',
+        'defer_fee_policy' => 'PRESERVE',
+        'egc_defer_from_block_number' => 1,
+        'changed_by_user_id' => $this->user->id,
+    ]))->toThrow(RuntimeException::class, 'Simulated Finance failure');
+
+    expect(ProgramEnrollment::query()->where('student_id', $this->student->id)->exists())->toBeFalse()
+        ->and(StudentActionLog::query()->where('student_id', $this->student->id)->exists())->toBeFalse()
+        ->and($this->student->fresh()->status)->toBe('intake_pre_uni_gc');
 });
 
 it('redirects the retired standalone actions and placement pages into the Lifecycle tab', function () {

@@ -25,13 +25,18 @@ final readonly class ProgramEnrollmentSummary
         public ?string $intakeMajorSemesterName,
         public string $enrollmentStatus,
         public ?string $studyStage,
+        public ?string $legacyLifecycleStatus = null,
     ) {}
 
     public function legacyCompatibleStatus(): string
     {
-        return $this->enrollmentStatus === 'active'
-            ? $this->studyStage ?? $this->enrollmentStatus
-            : $this->enrollmentStatus;
+        return $this->legacyLifecycleStatus
+            ?? ($this->enrollmentStatus === 'active'
+                ? $this->studyStage ?? $this->enrollmentStatus
+                : match ($this->enrollmentStatus) {
+                    'withdrawn' => 'dropout',
+                    default => $this->enrollmentStatus,
+                });
     }
 
     /**

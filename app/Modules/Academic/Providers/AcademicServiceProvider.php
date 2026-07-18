@@ -14,8 +14,10 @@ use App\Modules\Academic\Delivery\Actions\CommitCourseResultsAndTranscriptEntrie
 use App\Modules\Academic\Delivery\Support\DeliveryInstructorAssignmentWriter;
 use App\Modules\Academic\Delivery\Support\EloquentAcademicSpaceOccupancyReader;
 use App\Modules\Academic\Delivery\Support\EloquentCourseRosterReader;
+use App\Modules\Academic\Delivery\Support\EloquentStudentLifecycleCourseRegistrationGateway;
 use App\Modules\Academic\FacultyWorkforce\Support\EloquentTeachingEligibilityReader;
 use App\Modules\Academic\Observers\CourseRegistrationObserver;
+use App\Modules\Academic\Progression\Queries\FilterStudentsByProgramEnrollmentStatus;
 use App\Modules\Academic\Progression\Support\EloquentCourseResultTranscriptWriter;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentLifecycleWriter;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentReader;
@@ -44,6 +46,8 @@ use App\Shared\Contracts\Academic\ProgramEnrollmentLifecycleWriter;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Academic\ProgramEnrollmentWriter;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
+use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusFilter;
 use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use App\Shared\Contracts\Academic\TeachingEligibilityReader;
 use App\Shared\Contracts\Academic\TranscriptEntryGpaReader;
@@ -73,6 +77,11 @@ class AcademicServiceProvider extends ServiceProvider
         $this->app->bind(ProgramEnrollmentLifecycleWriter::class, EloquentProgramEnrollmentLifecycleWriter::class);
         $this->app->bind(ProgramEnrollmentWriter::class, EloquentProgramEnrollmentWriter::class);
         $this->app->bind(StudentLifecycleStatusReader::class, ModuleStudentLifecycleStatusReader::class);
+        $this->app->bind(
+            StudentLifecycleCourseRegistrationGateway::class,
+            EloquentStudentLifecycleCourseRegistrationGateway::class,
+        );
+        $this->app->bind(StudentLifecycleStatusFilter::class, FilterStudentsByProgramEnrollmentStatus::class);
         $this->app->bind(RetakeRegistrationPaymentSyncer::class, SyncPaidRetakeRegistrationsAction::class);
         $this->app->bind(ExamResitAttemptPaymentSyncer::class, SyncPaidExamResitAttemptsAction::class);
         $this->app->bind(FinanceCancellationCompletionContract::class, CompleteFinanceCancellationOperationAction::class);

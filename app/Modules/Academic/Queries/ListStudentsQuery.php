@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Queries;
 
 use App\Models\Student;
+use App\Modules\Academic\Progression\Queries\FilterStudentsByProgramEnrollmentStatus;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -79,9 +80,9 @@ class ListStudentsQuery
         }
 
         if (! empty($filters['statuses'])) {
-            $query->whereIn('status', $filters['statuses']);
+            (new FilterStudentsByProgramEnrollmentStatus)->apply($query, array_values($filters['statuses']));
         } elseif (! empty($filters['status'])) {
-            $query->where('status', $filters['status']);
+            (new FilterStudentsByProgramEnrollmentStatus)->apply($query, [(string) $filters['status']]);
         }
 
         if (! empty($filters['intake_semester_ids'])) {

@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Enums\StudentActionType;
 use App\Models\Campus;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Academic\Actions\RecordStudentActionAction;
 use App\Modules\Academic\Queries\Reporting\GetStudentStatusBySemesterQuery;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -84,6 +86,26 @@ it('exposes the student primary key in the lifecycle status report so rows can d
     expect($rows->total())->toBe(1)
         ->and($rows->items()[0]['id'])->toBe($this->student->id)
         ->and($rows->items()[0]['student_id'])->toBe('SE700001');
+});
+
+it('reports and filters the current status from Program Enrollment', function (): void {
+    RecordStudentActionAction::run([
+        'student_id' => $this->student->id,
+        'action_type' => StudentActionType::ACADEMIC_DROPOUT->value,
+        'reason' => 'Approved withdrawal',
+        'dropout_semester_id' => $this->semester->id,
+        'changed_by_user_id' => $this->user->id,
+    ]);
+
+    $rows = (new GetStudentStatusBySemesterQuery)->handle(
+        $this->semester->id,
+        $this->campus->id,
+        'dropout',
+    );
+
+    expect($rows->total())->toBe(1)
+        ->and($rows->items()[0]['current_status'])->toBe('dropout')
+        ->and($this->student->fresh()->status)->toBe('intake_course');
 });
 
 it('reaches the Hub Lifecycle tab that the lifecycle reports link to', function () {

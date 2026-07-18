@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Http\Requests;
 
 use App\Enums\StudentActionType;
-use App\Models\CourseRegistration;
-use App\Models\DeferCaseItem;
 use App\Models\Semester;
-use App\Models\Student;
-use App\Modules\Finance\Services\FinanceChargeService;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
+use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
+use App\Shared\Contracts\Finance\StudentLifecycleFinanceReader;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -78,19 +77,20 @@ class StoreStudentActionRequest extends FormRequest
                 'integer',
                 Rule::in([1, 2]),
                 function (string $attribute, mixed $value, \Closure $fail): void {
-                    $student = Student::query()
-                        ->select(['id', 'status'])
-                        ->find($this->input('student_id'));
+                    $studentId = (int) $this->input('student_id');
+                    $studyStage = $studentId > 0
+                        ? app(ProgramEnrollmentReader::class)->forStudentId($studentId)->studyStage
+                        : null;
 
                     $isBlank = $value === null || $value === '';
 
-                    if ($student?->status === 'intake_pre_uni_gc' && $isBlank) {
+                    if ($studyStage === 'intake_pre_uni_gc' && $isBlank) {
                         $fail('EGC defer from block is required for EGC students.');
 
                         return;
                     }
 
-                    if ($student && $student->status !== 'intake_pre_uni_gc' && ! $isBlank) {
+                    if ($studentId > 0 && $studyStage !== 'intake_pre_uni_gc' && ! $isBlank) {
                         $fail('EGC defer from block is only available for EGC students.');
                     }
                 },
@@ -104,49 +104,29 @@ class StoreStudentActionRequest extends FormRequest
             'defer_course_registration_ids.*' => [
                 'integer',
                 'distinct',
-                Rule::exists('course_registrations', 'id')->where(function ($query) {
-                    return $query
-                        ->where('student_id', $this->input('student_id'))
-                        ->where('semester_id', $this->input('from_semester_id'));
-                }),
                 function (string $attribute, mixed $value, \Closure $fail): void {
-                    $registration = CourseRegistration::find($value);
-                    if (! $registration) {
-                        return;
-                    }
-
-                    if ($registration->registration_status === 'defer') {
-                        $fail('Course has already been deferred for this semester.');
-
-                        return;
-                    }
-
                     $semesterId = (int) $this->input('from_semester_id');
                     $studentId = (int) $this->input('student_id');
+                    $registrationId = (int) $value;
+                    $deferredIds = app(StudentLifecycleFinanceReader::class)
+                        ->deferredCourseRegistrationIds($studentId, $semesterId);
 
-                    $hasDefer = DeferCaseItem::query()
-                        ->where('course_registration_id', $registration->id)
-                        ->whereHas('deferCase', function ($query) use ($semesterId, $studentId) {
-                            $query->where('student_id', $studentId)
-                                ->where('semester_id', $semesterId);
-                        })
-                        ->exists();
-
-                    if ($hasDefer) {
+                    if (in_array($registrationId, $deferredIds, true)) {
                         $fail('Course has already been deferred for this semester.');
+
+                        return;
+                    }
+
+                    $deferableIds = app(StudentLifecycleCourseRegistrationGateway::class)
+                        ->deferableIds($studentId, $semesterId);
+                    if (! in_array($registrationId, $deferableIds, true)) {
+                        $fail('Selected course is not eligible for defer in this semester.');
                     }
                 },
             ],
             'defer_egc_charge_ids.*' => [
                 'integer',
                 'distinct',
-                Rule::exists('finance_charges', 'id')->where(function ($query) {
-                    return $query
-                        ->where('student_id', $this->input('student_id'))
-                        ->where('semester_id', $this->input('from_semester_id'))
-                        ->where('charge_type', 'egc_level_fee')
-                        ->where('status', 'active');
-                }),
                 function (string $attribute, mixed $value, \Closure $fail): void {
                     $feePolicy = $this->input('defer_fee_policy') ?? 'FORFEIT';
                     if ($feePolicy === 'FORFEIT') {
@@ -155,16 +135,19 @@ class StoreStudentActionRequest extends FormRequest
                         return;
                     }
 
-                    $student = Student::find($this->input('student_id'));
-                    if ($student && $student->status !== 'intake_pre_uni_gc') {
+                    $studentId = (int) $this->input('student_id');
+                    $studyStage = $studentId > 0
+                        ? app(ProgramEnrollmentReader::class)->forStudentId($studentId)->studyStage
+                        : null;
+                    if ($studentId > 0 && $studyStage !== 'intake_pre_uni_gc') {
                         $fail('EGC level preserve is only available for EGC students.');
 
                         return;
                     }
 
-                    $error = app(FinanceChargeService::class)->validateEgcChargeForPreserve(
+                    $error = app(StudentLifecycleFinanceReader::class)->egcPreserveValidationError(
                         (int) $value,
-                        (int) $this->input('student_id'),
+                        $studentId,
                         $this->input('from_semester_id') !== null ? (int) $this->input('from_semester_id') : null,
                     );
 

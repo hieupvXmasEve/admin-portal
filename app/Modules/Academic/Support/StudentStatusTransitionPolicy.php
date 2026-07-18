@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Support;
 
 use App\Enums\StudentActionType;
-use App\Modules\Academic\Actions\RecordStudentActionAction;
+use App\Modules\Academic\Progression\Actions\TransitionProgramEnrollmentAction;
 
 /**
  * Single source of truth for which Student Actions a staff member may *select*
@@ -15,7 +15,7 @@ use App\Modules\Academic\Actions\RecordStudentActionAction;
  * page's Vue-only `availableActions` computed (which fell back to "show all").
  * It is deliberately a curated subset of what the backend will accept:
  *
- * - The backend remains the authority. {@see RecordStudentActionAction}
+ * - The backend remains the authority. {@see TransitionProgramEnrollmentAction}
  *   still fully validates every transition (e.g. ACADEMIC_RESUME is rejected
  *   unless the student is `deferred` or `pending_course_opening`), so an illegal
  *   action can never be created even if the UI were bypassed.

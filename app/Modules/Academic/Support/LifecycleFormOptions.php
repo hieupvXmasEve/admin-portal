@@ -11,8 +11,10 @@ use App\Models\IeltsCertificate;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentDecision;
-use App\Modules\Finance\Services\FinanceChargeService;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
+use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
+use App\Shared\Contracts\Finance\StudentLifecycleFinanceReader;
 use App\Shared\Contracts\Institution\CampusReferenceReader;
 use Illuminate\Support\Collection;
 
@@ -29,6 +31,9 @@ class LifecycleFormOptions
     public function __construct(
         private readonly CampusReferenceReader $campusReferences,
         private readonly AcademicPeriodReader $academicPeriods,
+        private readonly ProgramEnrollmentReader $programEnrollments,
+        private readonly StudentLifecycleFinanceReader $finance,
+        private readonly StudentLifecycleCourseRegistrationGateway $courseRegistrations,
     ) {}
 
     /**
@@ -71,25 +76,23 @@ class LifecycleFormOptions
             // The next actions a staff member may select for this student's
             // current status (single source of truth — the dropdown filters to
             // these so illogical picks like resume-from-course never appear).
-            $options['allowedActionTypes'] = StudentStatusTransitionPolicy::selectableActionValues((string) $student->status);
+            $lifecycleStatus = $this->programEnrollments
+                ->forStudentId((int) $student->id)
+                ->legacyCompatibleStatus();
+            $options['allowedActionTypes'] = StudentStatusTransitionPolicy::selectableActionValues($lifecycleStatus);
 
-            $courseRegistrations = $student->courseRegistrations()
-                ->with(['courseOffering.unit', 'courseOffering.semester'])
-                ->where('semester_id', $activeSemesterId ?? 0);
+            $options['courseRegistrations'] = array_map(
+                static fn ($registration): array => $registration->toArray(),
+                $this->courseRegistrations->forStudentSemester(
+                    (int) $student->id,
+                    $activeSemesterId ?? 0,
+                ),
+            );
 
-            $options['courseRegistrations'] = $courseRegistrations
-                ->get()
-                ->map(fn ($reg) => [
-                    'id' => $reg->id,
-                    'course_code' => $reg->courseOffering?->unit?->code ?? 'N/A',
-                    'course_name' => $reg->courseOffering?->unit?->name ?? 'N/A',
-                    'semester_name' => $reg->courseOffering?->semester?->name ?? 'N/A',
-                    'semester_id' => $reg->courseOffering?->semester_id,
-                    'registration_status' => $reg->registration_status,
-                ]);
-
-            $options['egcCharges'] = app(FinanceChargeService::class)
-                ->listActiveEgcChargesForStudent((int) $student->id, $activeSemesterId);
+            $options['egcCharges'] = array_map(
+                static fn ($charge): array => $charge->toArray(),
+                $this->finance->activeEgcCharges((int) $student->id, $activeSemesterId),
+            );
         }
 
         return $options;

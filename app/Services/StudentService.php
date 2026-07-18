@@ -14,6 +14,7 @@ use App\Models\Role;
 use App\Models\Specialization;
 use App\Models\Student;
 use App\Models\User;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusFilter;
 use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
 use App\Shared\Contracts\StudentRegistry\DTO\GuardianRelationship;
@@ -335,7 +336,7 @@ class StudentService
         }
 
         if (! empty($filters['status'])) {
-            $query->where('status', $filters['status']);
+            app(StudentLifecycleStatusFilter::class)->apply($query, [(string) $filters['status']]);
         }
 
         if (! empty($filters['program_id'])) {

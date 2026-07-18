@@ -8,6 +8,8 @@ use App\Enums\StudentActionType;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentActionLog;
+use App\Modules\Academic\Progression\Queries\FilterStudentsByProgramEnrollmentStatus;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -75,7 +77,7 @@ class GetStudentStatusBySemesterQuery
                 $query->where('campus_id', $currentCampusId);
             })
             ->when($currentStatus, function ($query, $status) {
-                $query->where('status', $status);
+                (new FilterStudentsByProgramEnrollmentStatus)->apply($query, [(string) $status]);
             });
     }
 
@@ -100,8 +102,9 @@ class GetStudentStatusBySemesterQuery
             ->orderBy('id')
             ->get()
             ->groupBy('student_id');
+        $programEnrollments = app(ProgramEnrollmentReader::class)->forStudentIds($studentIds);
 
-        return $students->map(function (Student $student) use ($actionsByStudent, $selectedStart) {
+        return $students->map(function (Student $student) use ($actionsByStudent, $programEnrollments, $selectedStart) {
             $actions = $actionsByStudent->get($student->id, collect());
 
             $latestStatusAction = null;
@@ -164,7 +167,7 @@ class GetStudentStatusBySemesterQuery
                     : null,
                 'current_campus' => $student->campus?->name,
                 'status_at_selected_semester' => $statusAtSelectedSemester,
-                'current_status' => $student->status,
+                'current_status' => $programEnrollments[$student->id]->legacyCompatibleStatus(),
                 'latest_action_type' => $this->actionTypeValue($latestAction),
                 'latest_action_effective_semester' => $this->resolveRelevantSemester($latestAction)?->code,
                 'ne' => $student->user_id !== null,

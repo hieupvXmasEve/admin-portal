@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Identity\Queries;
 
-use App\Models\Student;
 use App\Actions\Form\CheckPortalGateAction;
 use App\Http\Resources\Student\StudentResource;
 use App\Http\Resources\StudentFormAssignmentResource;
+use App\Models\Student;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 
 class GetStudentContextQuery
 {
     public function __construct(
-        protected CheckPortalGateAction $checkPortalGateAction
+        protected CheckPortalGateAction $checkPortalGateAction,
+        private readonly ProgramEnrollmentReader $programEnrollments,
     ) {}
 
     public function handle(Student $student): array
@@ -40,11 +42,15 @@ class GetStudentContextQuery
         ];
 
         // 6. Permissions (Simplified for frontend UI logic)
+        $lifecycleStatus = $this->programEnrollments
+            ->forStudentId((int) $student->id)
+            ->legacyCompatibleStatus();
         $permissions = [
             'can_book_room' => true,
             'can_join_club' => true,
             'can_submit_forms' => true,
-            'can_register_courses' => $student->canRegisterForCourses(),
+            'can_register_courses' => ! in_array($lifecycleStatus, Student::BLOCKED_STATUSES, true)
+                && ! $student->hasActiveHolds(),
         ];
 
         return [

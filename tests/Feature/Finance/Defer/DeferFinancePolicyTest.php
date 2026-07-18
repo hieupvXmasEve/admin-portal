@@ -331,7 +331,7 @@ it('cancels a pivot-linked DNG locally before voiding a deferred obligation', fu
         ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID);
 });
 
-it('cancels a header-linked DNG locally before voiding a deferred obligation', function () {
+it('does not treat the retired DNG header pointer as a supported charge link', function () {
     [$student, $case] = deferPolicyCase($this->semester, $this->campus, $this->program, $this->user, 'DNG-HEADER', DeferCase::POLICY_FORFEIT);
     $charge = deferObligation($student->id, $this->semester->id, 45_000_000);
 
@@ -349,8 +349,8 @@ it('cancels a header-linked DNG locally before voiding a deferred obligation', f
     $result = app(ApplyDeferFinancePolicyAction::class)->handle($case, $this->user->id);
 
     expect($result['status'])->toBe('applied')
-        ->and($result['cancelled_dng_request_ids'])->toBe([$dng->id])
-        ->and($dng->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCELLED)
+        ->and($result['cancelled_dng_request_ids'])->toBe([])
+        ->and($dng->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG)
         ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID);
 });
 

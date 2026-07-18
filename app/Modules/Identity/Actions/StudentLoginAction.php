@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Identity\Actions;
 
-use App\Models\Student;
 use App\Models\User;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
+use Exception;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
-use Exception;
 
 class StudentLoginAction
 {
@@ -17,7 +17,7 @@ class StudentLoginAction
      */
     public static function run(array $data, string $ip): array
     {
-        $key = 'login:' . $ip;
+        $key = 'login:'.$ip;
 
         // Check rate limiting
         if (RateLimiter::tooManyAttempts($key, 5)) {
@@ -28,29 +28,29 @@ class StudentLoginAction
         // 1. Find User by email (Single Source of Truth)
         $user = User::where('email', $data['email'])->first();
 
-        if (!$user || !Hash::check($data['password'], $user->password)) {
+        if (! $user || ! Hash::check($data['password'], $user->password)) {
             RateLimiter::hit($key, 900);
             throw new Exception('Invalid credentials');
         }
 
         // 2. Verify User is active
-        if (!$user->isActive()) {
+        if (! $user->isActive()) {
             throw new Exception('Account is not active. Please contact administration.');
         }
 
         // 3. Retrieve Associated Student Profile
         $student = $user->student;
 
-        if (!$student) {
+        if (! $student) {
             throw new Exception('This account is not associated with a student profile.');
         }
 
-        // 4. Verify Student is active
-        if (!$student->isActive()) {
-            throw new Exception('Student account is not active. Please contact administration.');
-        }
+        $lifecycleStatus = app(ProgramEnrollmentReader::class)
+            ->forStudentId((int) $student->id)
+            ->legacyCompatibleStatus();
 
-        // 5. Check for blocking academic holds
+        // 4. Check for blocking academic holds. Authentication itself is
+        // controlled by Account Status, independently of enrollment lifecycle.
         $blockingHolds = $student->academicHolds()
             ->where('status', 'active')
             ->where('hold_category', 'all')
@@ -76,7 +76,7 @@ class StudentLoginAction
                 'user_id' => $user->id,
                 'full_name' => $student->full_name,
                 'email' => $student->email,
-                'status' => $student->status,
+                'status' => $lifecycleStatus,
                 'campus' => $student->campus?->name,
                 'program' => $student->program?->name,
                 'specialization' => $student->specialization?->name,

@@ -8,6 +8,7 @@ use App\Models\StudentActionLog;
 use App\Modules\Academic\Support\StudentActionExcelRowMapper;
 use App\Modules\Academic\Support\StudentActionImportConflictValidator;
 use App\Modules\Academic\Support\StudentActionPreservePreviewResolver;
+use App\Shared\Contracts\Finance\StudentLifecycleFinanceEvidenceWriter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -21,7 +22,8 @@ class ImportStudentActionsFromExcelAction
     public function __construct(
         private readonly StudentActionExcelRowMapper $mapper,
         private readonly StudentActionImportConflictValidator $conflictValidator,
-        private readonly StudentActionPreservePreviewResolver $preservePreviewResolver
+        private readonly StudentActionPreservePreviewResolver $preservePreviewResolver,
+        private readonly StudentLifecycleFinanceEvidenceWriter $financeEvidence,
     ) {}
 
     public function preview(UploadedFile $file, ?int $sharedUploadRecordId): array
@@ -122,9 +124,11 @@ class ImportStudentActionsFromExcelAction
                     $actionLog->update(['missing_documents' => $sharedUploadRecordId === null]);
 
                     if ($sharedUploadRecordId !== null
-                        && $payload['action_type'] === 'ACADEMIC_DEFER'
-                        && $actionLog->deferCase) {
-                        $actionLog->deferCase->update(['upload_record_id' => $sharedUploadRecordId]);
+                        && $payload['action_type'] === 'ACADEMIC_DEFER') {
+                        $this->financeEvidence->attachDeferEvidence(
+                            (int) $actionLog->id,
+                            $sharedUploadRecordId,
+                        );
                     }
                 });
 

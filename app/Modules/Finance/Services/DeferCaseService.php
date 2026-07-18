@@ -8,13 +8,15 @@ use App\Models\DeferCase;
 use App\Models\DeferCaseItem;
 use App\Models\StudentActionLog;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class DeferCaseService
 {
     public function __construct(
-        protected FinanceChargeService $chargeService
+        protected FinanceChargeService $chargeService,
+        private readonly StudentLifecycleCourseRegistrationGateway $courseRegistrations,
     ) {}
 
     /**
@@ -102,9 +104,7 @@ class DeferCaseService
         }
 
         if (! empty($registrationIdsToUpdate)) {
-            DB::table('course_registrations')
-                ->whereIn('id', array_unique($registrationIdsToUpdate))
-                ->update(['registration_status' => 'defer']);
+            $this->courseRegistrations->markDeferred(array_values(array_unique($registrationIdsToUpdate)));
         }
 
         return $items;
@@ -150,13 +150,7 @@ class DeferCaseService
      */
     protected function resolveActiveRegistrationIdsForSemester(int $studentId, int $semesterId): array
     {
-        return DB::table('course_registrations')
-            ->where('student_id', $studentId)
-            ->where('semester_id', $semesterId)
-            ->whereIn('registration_status', ['pending', 'registered', 'confirmed'])
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+        return $this->courseRegistrations->deferableIds($studentId, $semesterId);
     }
 
     /**

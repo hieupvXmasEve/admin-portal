@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Identity\Http\Resources\Identity;
 
+use App\Models\User;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -13,7 +15,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * @property string|null $email_snapshot
  * @property string|null $phone
  * @property string $status
- * @property \App\Models\User $user
+ * @property User $user
  */
 class ParentResource extends JsonResource
 {
@@ -32,14 +34,22 @@ class ParentResource extends JsonResource
             'status' => $this->status,
             'user_id' => $this->user_id,
             'children' => $this->whenLoaded('students', function () {
-                return $this->students->map(fn($student) => [
-                    'id' => $student->id,
-                    'student_id' => $student->student_id,
-                    'full_name' => $student->full_name,
-                    'campus' => $this->when($student->relationLoaded('campus'), fn() => $student->campus->name),
-                    'program' => $this->when($student->relationLoaded('program'), fn() => $student->program?->name),
-                    'status' => $student->status,
-                ]);
+                $programEnrollments = app(ProgramEnrollmentReader::class)->forStudentIds(
+                    $this->students->pluck('id')->map(static fn (int|string $id): int => (int) $id)->all(),
+                );
+
+                return $this->students->map(function ($student) use ($programEnrollments): array {
+                    $programEnrollment = $programEnrollments[(int) $student->id];
+
+                    return [
+                        'id' => $student->id,
+                        'student_id' => $student->student_id,
+                        'full_name' => $student->full_name,
+                        'campus' => $this->when($student->relationLoaded('campus'), fn () => $student->campus->name),
+                        'program' => $this->when($student->relationLoaded('program'), fn () => $student->program?->name),
+                        'status' => $programEnrollment->legacyCompatibleStatus(),
+                    ];
+                });
             }),
         ];
     }

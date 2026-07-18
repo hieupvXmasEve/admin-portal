@@ -13,6 +13,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Modules\Academic\Actions\RecordStudentActionAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
 
@@ -100,4 +101,32 @@ it('itemizes only active registrations and marks them defer for a full-scope def
         ->and($activeOne->fresh()->registration_status)->toBe('defer')
         ->and($activeTwo->fresh()->registration_status)->toBe('defer')
         ->and($completed->fresh()->registration_status)->toBe('completed');
+});
+
+it('rejects a course-scoped defer outside the Program Enrollment student and semester scope', function () {
+    ['fromSemester' => $from, 'returnSemester' => $return, 'user' => $user, 'student' => $student] = fullScopeDeferFixture();
+    $otherStudent = Student::factory()
+        ->forCampus($student->campus)
+        ->forProgram($student->program)
+        ->create([
+            'status' => 'intake_course',
+            'intake' => 1,
+            'intake_semester_id' => $from->id,
+        ]);
+    $otherRegistration = makeRegistration($otherStudent->id, $from->id, 'registered');
+
+    expect(fn () => RecordStudentActionAction::run([
+        'student_id' => $student->id,
+        'action_type' => StudentActionType::ACADEMIC_DEFER->value,
+        'reason' => 'Invalid course scope',
+        'changed_by_user_id' => $user->id,
+        'from_semester_id' => $from->id,
+        'return_semester_id' => $return->id,
+        'defer_scope_type' => 'COURSES',
+        'defer_fee_policy' => 'FORFEIT',
+        'defer_course_registration_ids' => [$otherRegistration->id],
+    ]))->toThrow(ValidationException::class);
+
+    expect($otherRegistration->fresh()->registration_status)->toBe('registered')
+        ->and(DeferCase::query()->where('student_id', $student->id)->exists())->toBeFalse();
 });
