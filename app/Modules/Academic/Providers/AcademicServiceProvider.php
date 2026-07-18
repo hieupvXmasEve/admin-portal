@@ -10,6 +10,7 @@ use App\Modules\Academic\Actions\SyncPaidExamResitAttemptsAction;
 use App\Modules\Academic\Actions\SyncPaidRetakeRegistrationsAction;
 use App\Modules\Academic\Catalog\Support\EloquentCourseOfferingCatalogReader;
 use App\Modules\Academic\Catalog\Support\SemesterAcademicPeriodReader;
+use App\Modules\Academic\Delivery\Support\EloquentAcademicSpaceOccupancyReader;
 use App\Modules\Academic\Observers\CourseRegistrationObserver;
 use App\Modules\Academic\Support\AcademicFinanceChargeSourceGateway as ModuleAcademicFinanceChargeSourceGateway;
 use App\Modules\Academic\Support\AiAcademicEntitySearchReader as ModuleAiAcademicEntitySearchReader;
@@ -19,6 +20,7 @@ use App\Modules\Academic\Support\CampusBuildingCountReader as ModuleCampusBuildi
 use App\Modules\Academic\Support\StudentLifecycleStatusReader as ModuleStudentLifecycleStatusReader;
 use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\Academic\AcademicSpaceOccupancyReader;
 use App\Shared\Contracts\Academic\AiAcademicEntitySearchReader;
 use App\Shared\Contracts\Academic\AiAcademicMetricReader;
 use App\Shared\Contracts\Academic\AiAcademicStudentProfileReader;
@@ -36,6 +38,7 @@ class AcademicServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(AcademicPeriodReader::class, SemesterAcademicPeriodReader::class);
+        $this->app->bind(AcademicSpaceOccupancyReader::class, EloquentAcademicSpaceOccupancyReader::class);
         $this->app->bind(CourseOfferingCatalogReader::class, EloquentCourseOfferingCatalogReader::class);
         $this->app->bind(AiAcademicMetricReader::class, ModuleAiAcademicMetricReader::class);
         $this->app->bind(AiAcademicEntitySearchReader::class, ModuleAiAcademicEntitySearchReader::class);

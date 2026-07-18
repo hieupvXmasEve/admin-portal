@@ -14,8 +14,8 @@ use App\Http\Controllers\Api\V1\EventParticipantController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\FormController;
 use App\Http\Controllers\Web\LectureController;
-use App\Http\Controllers\Web\RoomController;
 use App\Modules\Academic\Http\Web\StudentController as WebStudentController;
+use App\Modules\Facilities\Http\Web\RoomController;
 use App\Modules\Notification\Http\Api\V1\Admin\NotificationTemplateController as NotificationTemplateApiController;
 use Illuminate\Support\Facades\Route;
 

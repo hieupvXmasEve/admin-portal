@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web;
+namespace App\Modules\Facilities\Http\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Building;
-use App\Models\Campus;
-use App\Modules\Academic\Actions\CreateBuildingAction;
-use App\Modules\Academic\Actions\DeleteBuildingAction;
-use App\Modules\Academic\Actions\UpdateBuildingAction;
-use App\Modules\Academic\Http\Requests\Building\StoreBuildingRequest;
-use App\Modules\Academic\Http\Requests\Building\UpdateBuildingRequest;
-use App\Modules\Academic\Queries\ListBuildingsQuery;
+use App\Modules\Facilities\Actions\CreateBuildingAction;
+use App\Modules\Facilities\Actions\DeleteBuildingAction;
+use App\Modules\Facilities\Actions\UpdateBuildingAction;
+use App\Modules\Facilities\Http\Requests\Building\StoreBuildingRequest;
+use App\Modules\Facilities\Http\Requests\Building\UpdateBuildingRequest;
+use App\Modules\Facilities\Queries\ListBuildingsQuery;
+use App\Shared\Contracts\Institution\CampusReferenceReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,6 +23,7 @@ class BuildingController extends Controller
 {
     public function __construct(
         private readonly ListBuildingsQuery $query,
+        private readonly CampusReferenceReader $campusReferences,
     ) {}
 
     public function index(Request $request): Response
@@ -46,63 +47,49 @@ class BuildingController extends Controller
     {
         $building->load(['campus']);
 
-        $statistics = [
-            'total_rooms' => $building->getTotalRooms(),
-            'available_rooms' => 0,
-            'occupied_rooms' => 0,
-            'maintenance_rooms' => 0,
-        ];
-
         return Inertia::render('Buildings/Show', [
             'building' => $building,
-            'statistics' => $statistics,
+            'statistics' => [
+                'total_rooms' => $building->getTotalRooms(),
+                'available_rooms' => 0,
+                'occupied_rooms' => 0,
+                'maintenance_rooms' => 0,
+            ],
         ]);
     }
 
-    /**
-     * Render create building form inside a modal (route-based modal via @inertiaui/modal-vue).
-     * The Campus is passed via route parameter so the form knows which campus to attach to.
-     */
-    public function create(Campus $campus): Response
+    public function create(string $campus): Response
     {
+        $campusReference = $this->campusReference((int) $campus);
+
         return Inertia::render('Buildings/Create', [
-            'campus' => $campus->only('id', 'name'),
+            'campus' => $campusReference,
         ]);
     }
 
-    /**
-     * Store a new building and redirect back to the campus detail page.
-     */
-    public function store(StoreBuildingRequest $request, Campus $campus): RedirectResponse
+    public function store(StoreBuildingRequest $request, string $campus): RedirectResponse
     {
-        $data = array_merge($request->validated(), ['campus_id' => $campus->id]);
-
-        CreateBuildingAction::run($data);
+        CreateBuildingAction::run([...$request->validated(), 'campus_id' => $this->campusReference((int) $campus)['id']]);
 
         Inertia::flash('message', 'Building created successfully.');
 
         return back();
     }
 
-    /**
-     * Render edit building form inside a modal (route-based modal via @inertiaui/modal-vue).
-     */
-    public function edit(Campus $campus, Building $building): Response
+    public function edit(string $campus, Building $building): Response
     {
-        abort_unless($building->campus_id === $campus->id, 404);
+        $campusReference = $this->campusReference((int) $campus);
+        abort_unless($building->campus_id === $campusReference['id'], 404);
 
         return Inertia::render('Buildings/Edit', [
-            'campus' => $campus->only('id', 'name'),
+            'campus' => $campusReference,
             'building' => $building->only('id', 'name', 'code', 'description', 'address'),
         ]);
     }
 
-    /**
-     * Update building and redirect back to the campus detail page.
-     */
-    public function update(UpdateBuildingRequest $request, Campus $campus, Building $building): RedirectResponse
+    public function update(UpdateBuildingRequest $request, string $campus, Building $building): RedirectResponse
     {
-        abort_unless($building->campus_id === $campus->id, 404);
+        abort_unless($building->campus_id === $this->campusReference((int) $campus)['id'], 404);
 
         UpdateBuildingAction::run($building, $request->validated());
 
@@ -111,12 +98,9 @@ class BuildingController extends Controller
         return back();
     }
 
-    /**
-     * Delete building and redirect back to the campus detail page.
-     */
-    public function destroy(Campus $campus, Building $building): RedirectResponse
+    public function destroy(string $campus, Building $building): RedirectResponse
     {
-        abort_unless($building->campus_id === $campus->id, 404);
+        abort_unless($building->campus_id === $this->campusReference((int) $campus)['id'], 404);
 
         DeleteBuildingAction::run($building);
 
@@ -125,9 +109,6 @@ class BuildingController extends Controller
         return back();
     }
 
-    /**
-     * JSON endpoint for dropdown/autocomplete usage (e.g. room assignment, schedule forms).
-     */
     public function api(Request $request): JsonResponse
     {
         $request->validate([
@@ -144,5 +125,16 @@ class BuildingController extends Controller
             'success' => true,
             'data' => $buildings,
         ]);
+    }
+
+    /** @return array{id: int, name: string} */
+    private function campusReference(int $campusId): array
+    {
+        $campus = collect($this->campusReferences->all())
+            ->first(fn ($reference) => $reference->id === $campusId);
+
+        abort_if($campus === null, 404);
+
+        return ['id' => $campus->id, 'name' => $campus->name];
     }
 }

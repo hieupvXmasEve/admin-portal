@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Actions;
+namespace App\Modules\Facilities\Actions;
 
 use App\Models\Building;
 use Illuminate\Support\Facades\Cache;

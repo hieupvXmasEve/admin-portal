@@ -6,7 +6,6 @@ namespace App\Modules\Academic\Http\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Lecture;
-use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Unit;
 use App\Modules\Academic\Actions\AssignExamResitInvigilatorAction;
@@ -16,6 +15,7 @@ use App\Modules\Academic\Http\Requests\ExamResit\AssignInvigilatorRequest;
 use App\Modules\Academic\Http\Requests\ExamResit\StoreExamResitSessionRequest;
 use App\Modules\Academic\Http\Requests\ExamResit\StoreExamRoomSlotRequest;
 use App\Modules\Academic\Queries\ListExamRoomSlotsQuery;
+use App\Shared\Contracts\Facilities\SpaceReferenceReader;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -29,6 +29,7 @@ class ExamScheduleController extends Controller
 {
     public function __construct(
         private readonly ListExamRoomSlotsQuery $slotsQuery,
+        private readonly SpaceReferenceReader $spaceReferences,
     ) {}
 
     public function index(): Response
@@ -40,10 +41,9 @@ class ExamScheduleController extends Controller
         return Inertia::render('Academic/ExamResit/Schedule/Index', [
             'campus_id' => $campusId,
             'slots' => $result['slots'],
-            'rooms' => Room::query()
-                ->when($campusId, fn ($q) => $q->where('campus_id', $campusId))
-                ->orderBy('name')
-                ->get(['id', 'name', 'code', 'capacity']),
+            'rooms' => collect($this->spaceReferences->forCampus($campusId ? (int) $campusId : null))
+                ->map(fn ($room) => $room->toArray())
+                ->all(),
             'units' => Unit::orderBy('code')->get(['id', 'code', 'name']),
             'lecturers' => Lecture::query()
                 ->when($campusId, fn ($q) => $q->where('campus_id', $campusId))

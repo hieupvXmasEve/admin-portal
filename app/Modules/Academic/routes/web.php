@@ -7,7 +7,6 @@ use App\Constants\StudentRoutes;
 use App\Modules\Academic\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\AcademicProgressionAuditController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingCatalogFormController;
-use App\Modules\Academic\Http\Web\BuildingController;
 use App\Modules\Academic\Http\Web\CampusDetailController;
 use App\Modules\Academic\Http\Web\ExamResitAttemptController;
 use App\Modules\Academic\Http\Web\ExamScheduleController;
@@ -19,6 +18,7 @@ use App\Modules\Academic\Http\Web\StudentController;
 use App\Modules\Academic\Http\Web\StudentDecisionController;
 use App\Modules\Academic\Http\Web\StudentLifecycleYearlyAnalysisController;
 use App\Modules\Academic\Http\Web\StudentStatusController;
+use App\Modules\Facilities\Http\Web\BuildingController;
 use Illuminate\Support\Facades\Route;
 
 /*

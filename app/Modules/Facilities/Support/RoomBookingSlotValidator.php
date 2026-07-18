@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Facilities\Support;
 
-use App\Models\ClassSession;
 use App\Models\Room;
 use App\Models\RoomBooking;
 use App\Services\SystemConfigService;
+use App\Shared\Contracts\Academic\AcademicSpaceOccupancyReader;
 use Carbon\Carbon;
 
 class RoomBookingSlotValidator
@@ -18,17 +18,23 @@ class RoomBookingSlotValidator
 
     public function __construct(
         private readonly SystemConfigService $systemConfigService,
-        private readonly ExamSlotBookingConflictChecker $examSlotConflictChecker
+        private readonly AcademicSpaceOccupancyReader $academicSpaceOccupancyReader,
     ) {}
 
-    public function validateRoomAndSlot(Room $room, string $date, string $startTime, string $endTime, ?int $campusId = null): void
-    {
+    public function validateRoomAndSlot(
+        Room $room,
+        string $date,
+        string $startTime,
+        string $endTime,
+        ?int $campusId = null,
+        bool $allowPastDate = false,
+    ): void {
         if ($campusId !== null && (int) $room->campus_id !== $campusId) {
             throw new \InvalidArgumentException('The selected room does not belong to the current campus.');
         }
 
         $this->validateRoomIsBookable($room);
-        $this->validateTimeSlot($room, $date, $startTime, $endTime);
+        $this->validateTimeSlot($room, $date, $startTime, $endTime, $allowPastDate);
     }
 
     public function conflictsFor(int $roomId, string $date, string $startTime, string $endTime, ?int $excludeBookingId = null): array
@@ -59,34 +65,26 @@ class RoomBookingSlotValidator
             ];
         }
 
-        $sessionConflicts = ClassSession::query()
-            ->where('room_id', $roomId)
-            ->whereDate('session_date', $date)
-            ->whereNotIn('status', ['cancelled', 'postponed'])
-            ->where(function ($query) use ($startTime, $endTime) {
-                $query->whereRaw('TIME(start_time) < ?', [$endTime])
-                    ->whereRaw('TIME(end_time) > ?', [$startTime]);
-            })
-            ->with(['courseOffering.unit'])
-            ->get();
+        foreach ($this->academicSpaceOccupancyReader->forRooms([$roomId], $date, $date) as $occupancy) {
+            if ($occupancy->endTime <= $startTime || $occupancy->startTime >= $endTime) {
+                continue;
+            }
 
-        foreach ($sessionConflicts as $session) {
+            if ($occupancy->reservationId !== null && $occupancy->reservationId === $excludeBookingId) {
+                continue;
+            }
+
             $conflicts[] = [
-                'type' => 'class_session',
-                'id' => $session->id,
-                'title' => ($session->courseOffering?->unit?->code ?? 'Class').' - '.($session->courseOffering?->unit?->name ?? $session->session_title),
-                'booking_date' => $session->session_date->format('Y-m-d'),
-                'start_time' => $this->formatTime($session->start_time),
-                'end_time' => $this->formatTime($session->end_time),
-                'status' => $session->status,
-                'class_session_id' => $session->id,
+                'type' => $occupancy->type,
+                'id' => $occupancy->sourceId,
+                'title' => $occupancy->title,
+                'booking_date' => $occupancy->date,
+                'start_time' => $occupancy->startTime,
+                'end_time' => $occupancy->endTime,
+                'status' => $occupancy->status,
+                $occupancy->type.'_id' => $occupancy->sourceId,
                 'is_editable' => false,
             ];
-        }
-
-        // Scheduled exam-resit blocks are a third occupancy source (see S-003).
-        foreach ($this->examSlotConflictChecker->conflictsFor($roomId, $date, $startTime, $endTime, $excludeBookingId) as $examConflict) {
-            $conflicts[] = $examConflict;
         }
 
         return $conflicts;
@@ -117,15 +115,15 @@ class RoomBookingSlotValidator
         }
     }
 
-    private function validateTimeSlot(Room $room, string $date, string $startTime, string $endTime): void
+    private function validateTimeSlot(Room $room, string $date, string $startTime, string $endTime, bool $allowPastDate): void
     {
         $bookingDate = Carbon::parse($date)->startOfDay();
 
-        if ($bookingDate->lt(Carbon::today())) {
+        if (! $allowPastDate && $bookingDate->lt(Carbon::today())) {
             throw new \InvalidArgumentException('Cannot book a room for a past date.');
         }
 
-        if ($bookingDate->isToday()) {
+        if (! $allowPastDate && $bookingDate->isToday()) {
             $startDateTime = Carbon::parse($date.' '.$startTime);
             if ($startDateTime->lt(Carbon::now())) {
                 throw new \InvalidArgumentException('Start time must be in the future for today\'s booking.');

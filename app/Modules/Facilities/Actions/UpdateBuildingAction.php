@@ -2,19 +2,20 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Actions;
+namespace App\Modules\Facilities\Actions;
 
 use App\Models\Building;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
-class CreateBuildingAction
+class UpdateBuildingAction
 {
-    public static function run(array $data): Building
+    /** @param array<string, mixed> $data */
+    public static function run(Building $building, array $data): Building
     {
-        Log::info('Creating a new building', $data);
+        Log::info("Updating building {$building->id}", $data);
 
-        $building = Building::create($data);
+        $building->update($data);
 
         self::invalidateCaches();
 

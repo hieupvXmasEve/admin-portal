@@ -88,6 +88,45 @@ it('honors an explicit capacity within the room capacity', function () {
     expect($slot->capacity)->toBe(25);
 });
 
+it('uses a supplied Facilities reservation without creating a duplicate booking', function () {
+    $booking = roomBookingInRoom($this->room, '2026-07-01', '09:00:00', '11:00:00');
+
+    $slot = runCreateExamRoomSlot(['room_booking_id' => $booking->id]);
+
+    expect($slot->room_booking_id)->toBe($booking->id)
+        ->and(RoomBooking::query()->count())->toBe(1);
+});
+
+it('rejects a supplied reservation for a different campus', function () {
+    $booking = roomBookingInRoom($this->room, '2026-07-01', '09:00:00', '11:00:00');
+
+    runCreateExamRoomSlot([
+        'campus_id' => Campus::factory()->create()->id,
+        'room_booking_id' => $booking->id,
+    ]);
+})->throws(ValidationException::class);
+
+it('rejects a supplied reservation whose requested capacity exceeds the room', function () {
+    $booking = roomBookingInRoom($this->room, '2026-07-01', '09:00:00', '11:00:00');
+
+    runCreateExamRoomSlot([
+        'room_booking_id' => $booking->id,
+        'capacity' => 100,
+    ]);
+})->throws(ValidationException::class);
+
+it('rejects an inactive supplied reservation', function () {
+    $booking = roomBookingInRoom(
+        $this->room,
+        '2026-07-01',
+        '09:00:00',
+        '11:00:00',
+        RoomBooking::STATUS_CANCELLED,
+    );
+
+    runCreateExamRoomSlot(['room_booking_id' => $booking->id]);
+})->throws(ValidationException::class);
+
 it('rejects a capacity larger than the room capacity', function () {
     runCreateExamRoomSlot(['capacity' => 100]);
 })->throws(ValidationException::class);

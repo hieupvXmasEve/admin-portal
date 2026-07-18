@@ -4,19 +4,18 @@ declare(strict_types=1);
 
 namespace App\Modules\Facilities\Queries;
 
-use App\Models\ClassSession;
-use App\Models\ExamResitSession;
-use App\Models\ExamRoomSlot;
 use App\Models\Room;
 use App\Models\RoomBooking;
 use App\Modules\Facilities\Support\RoomBookingSlotValidator;
+use App\Shared\Contracts\Academic\AcademicSpaceOccupancyReader;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 
 class GetRoomAvailabilityBoardQuery
 {
     public function __construct(
-        private readonly RoomBookingSlotValidator $slotValidator
+        private readonly RoomBookingSlotValidator $slotValidator,
+        private readonly AcademicSpaceOccupancyReader $academicSpaceOccupancyReader,
     ) {}
 
     public function handle(array $filters): array
@@ -61,60 +60,31 @@ class GetRoomAvailabilityBoardQuery
                 'booker_name' => $booking->booker_name,
             ]);
 
-        $classEvents = ClassSession::query()
-            ->with(['courseOffering.unit', 'lecture'])
-            ->whereIn('room_id', $roomIds)
-            ->whereBetween('session_date', [$startDate, $endDate])
-            ->whereNotIn('status', ['cancelled', 'postponed'])
-            ->get()
-            ->map(fn (ClassSession $session) => [
-                'type' => 'class_session',
-                'id' => $session->id,
-                'class_session_id' => $session->id,
-                'room_id' => $session->room_id,
-                'date' => $session->session_date->format('Y-m-d'),
-                'title' => ($session->courseOffering?->unit?->code ?? 'Class').' - '.($session->courseOffering?->unit?->name ?? $session->session_title),
-                'start_time' => $this->formatTime($session->start_time),
-                'end_time' => $this->formatTime($session->end_time),
-                'status' => $session->status,
-                'instructor' => $session->lecture?->name,
-                'is_editable' => false,
-            ]);
-
-        // Exam-resit blocks are a separate occupancy source (exam_room_slots), not
-        // class_sessions. Only `scheduled` slots occupy a room. Slots already mirrored
-        // into the canonical booking ledger surface as room_booking events above, so
-        // skip them here to avoid double-display.
         $mirroredBookingIds = $bookingEvents
             ->pluck('booking_id')
             ->filter()
             ->values()
             ->all();
 
-        $examEvents = ExamRoomSlot::query()
-            ->with(['sessions:id,exam_room_slot_id,unit_id', 'sessions.unit:id,code,name'])
-            ->whereIn('room_id', $roomIds)
-            ->whereBetween('exam_date', [$startDate, $endDate])
-            ->where('status', ExamRoomSlot::STATUS_SCHEDULED)
-            ->when(! empty($mirroredBookingIds), fn ($query) => $query->whereNotIn('room_booking_id', $mirroredBookingIds))
-            ->get()
-            ->map(fn (ExamRoomSlot $slot) => [
-                'type' => 'exam_room_slot',
-                'id' => $slot->id,
-                'exam_room_slot_id' => $slot->id,
-                'room_id' => $slot->room_id,
-                'date' => $slot->exam_date->format('Y-m-d'),
-                'title' => $this->examTitle($slot),
-                'start_time' => $this->formatTime($slot->start_time),
-                'end_time' => $this->formatTime($slot->end_time),
-                'status' => $slot->status,
-                'session_count' => $slot->sessions->count(),
+        $academicEvents = collect($this->academicSpaceOccupancyReader->forRooms($roomIds, $startDate, $endDate))
+            ->reject(fn ($occupancy) => $occupancy->type === 'exam_room_slot'
+                && $occupancy->reservationId !== null
+                && in_array($occupancy->reservationId, $mirroredBookingIds, true))
+            ->map(fn ($occupancy) => [
+                'type' => $occupancy->type,
+                'id' => $occupancy->sourceId,
+                $occupancy->type.'_id' => $occupancy->sourceId,
+                'room_id' => $occupancy->roomId,
+                'date' => $occupancy->date,
+                'title' => $occupancy->title,
+                'start_time' => $occupancy->startTime,
+                'end_time' => $occupancy->endTime,
+                'status' => $occupancy->status,
                 'is_editable' => false,
             ]);
 
         $eventsByRoomDate = $bookingEvents
-            ->concat($classEvents)
-            ->concat($examEvents)
+            ->concat($academicEvents)
             ->filter(fn (array $event) => $event['end_time'] > $startTime && $event['start_time'] < $endTime)
             ->groupBy(fn (array $event) => $event['room_id'].'|'.$event['date']);
 
@@ -162,26 +132,9 @@ class GetRoomAvailabilityBoardQuery
             'summary' => [
                 'rooms' => count($roomRows),
                 'dates' => count($dates),
-                'busy_events' => $bookingEvents->count() + $classEvents->count() + $examEvents->count(),
+                'busy_events' => $bookingEvents->count() + $academicEvents->count(),
             ],
         ];
-    }
-
-    /**
-     * Build the exam block label from its unit-scoped sessions. A slot may group
-     * several small retake exams, so distinct unit codes are joined.
-     */
-    private function examTitle(ExamRoomSlot $slot): string
-    {
-        $unitCodes = $slot->sessions
-            ->map(fn (ExamResitSession $session) => $session->unit?->code)
-            ->filter()
-            ->unique()
-            ->values();
-
-        return $unitCodes->isNotEmpty()
-            ? 'Thi lại: '.$unitCodes->implode(', ')
-            : 'Thi lại';
     }
 
     private function freeWindows(string $windowStart, string $windowEnd, array $events): array

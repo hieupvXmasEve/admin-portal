@@ -2,27 +2,30 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Requests\Building;
+namespace App\Modules\Facilities\Http\Requests\Building;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreBuildingRequest extends FormRequest
+class UpdateBuildingRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('create_building');
+        return $this->user()->can('edit_building');
     }
 
     public function rules(): array
     {
+        $building = $this->route('building');
+
         return [
             'name' => ['required', 'string', 'max:100'],
-            'code' => ['required', 'string', 'max:20', 'unique:buildings,code'],
+            'code' => ['required', 'string', 'max:20', 'unique:buildings,code,'.$building->id],
             'description' => ['nullable', 'string'],
             'address' => ['nullable', 'string'],
         ];
     }
 
+    /** @return array<string, string> */
     public function messages(): array
     {
         return [
@@ -34,6 +37,7 @@ class StoreBuildingRequest extends FormRequest
         ];
     }
 
+    /** @return array<string, string> */
     public function attributes(): array
     {
         return [
