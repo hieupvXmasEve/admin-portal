@@ -6,12 +6,18 @@ namespace App\Services;
 
 use App\Models\Student;
 use App\Models\User;
+use App\Shared\Contracts\Academic\ProgramEnrollmentLifecycleWriter;
 use Exception;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class StudentStatusService
 {
+    public function __construct(
+        private readonly ProgramEnrollmentLifecycleWriter $programEnrollmentLifecycleWriter,
+    ) {}
+
     /**
      * Update student academic status
      */
@@ -21,6 +27,10 @@ class StudentStatusService
             $this->validateStatusChange($student, $newStatus);
 
             $oldStatus = $student->academic_status;
+
+            $this->programEnrollmentLifecycleWriter->update($student->id, [
+                'enrollment_status' => $newStatus,
+            ]);
 
             $student->update([
                 'academic_status' => $newStatus,
@@ -44,7 +54,7 @@ class StudentStatusService
     /**
      * Get students by status with filtering
      */
-    public function getStudentsByStatus(string $status, array $filters = []): \Illuminate\Pagination\LengthAwarePaginator
+    public function getStudentsByStatus(string $status, array $filters = []): LengthAwarePaginator
     {
         $query = Student::where('academic_status', $status)
             ->with(['campus', 'program', 'specialization', 'statusChangedBy']);

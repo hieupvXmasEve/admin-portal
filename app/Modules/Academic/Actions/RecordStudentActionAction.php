@@ -16,6 +16,7 @@ use App\Models\StudentDecision;
 use App\Modules\Finance\Actions\Operations\ApplyDeferFinancePolicyAction;
 use App\Modules\Finance\Services\DeferCaseService;
 use App\Modules\Finance\Services\FinanceChargeService;
+use App\Shared\Contracts\Academic\ProgramEnrollmentLifecycleWriter;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -389,14 +390,22 @@ class RecordStudentActionAction
 
         // Update status if action changes it
         if (self::shouldUpdateStatus($actionType, $data)) {
-            $updateData['status'] = $targetStatus ?? $actionType->targetStatus();
+            $newStatus = $targetStatus ?? $actionType->targetStatus();
+            $updateData['status'] = $newStatus;
             $updateData['status_change_date'] = now()->toDateString();
             $updateData['status_reason'] = $data['reason'];
             $updateData['status_changed_by'] = $userId;
 
+            $lifecycleData = self::programEnrollmentLifecycleData($student, $newStatus);
+
             if ($actionType === StudentActionType::STUDENT_MAJOR_ENROLLMENT) {
                 $updateData['intake_major'] = $fromSemesterId;
+                $lifecycleData['intake_major_semester_id'] = $fromSemesterId;
             }
+
+            $studentId = $lifecycleData['student_id'];
+            unset($lifecycleData['student_id']);
+            app(ProgramEnrollmentLifecycleWriter::class)->update($studentId, $lifecycleData);
         }
 
         // Update campus if action changes it
@@ -407,6 +416,31 @@ class RecordStudentActionAction
         if (! empty($updateData)) {
             $student->update($updateData);
         }
+    }
+
+    /**
+     * @return array{student_id: int, enrollment_status?: string, study_stage?: string|null, intake_major_semester_id?: int|null}
+     */
+    private static function programEnrollmentLifecycleData(Student $student, string $newStatus): array
+    {
+        $data = ['student_id' => $student->id];
+
+        if (in_array($newStatus, ['intake_pre_uni_gc', 'intake_course', 'intake_major', 'pending_course_opening'], true)) {
+            $data['study_stage'] = $newStatus;
+            $data['enrollment_status'] = 'active';
+
+            return $data;
+        }
+
+        $data['enrollment_status'] = match ($newStatus) {
+            'deferred', 'admission_deferred' => 'deferred',
+            'dropout', 'dropout_transfer' => 'withdrawn',
+            'graduated' => 'graduated',
+            'pending' => 'pending',
+            default => 'active',
+        };
+
+        return $data;
     }
 
     private static function recordAcademicProgressionEvent(

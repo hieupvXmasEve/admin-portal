@@ -5,11 +5,13 @@ declare(strict_types=1);
 use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
+use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
+use App\Modules\Academic\Progression\Models\ProgramEnrollment;
 use App\Services\PermissionService;
 use App\Services\StudentAcademicSummaryService;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
@@ -150,6 +152,43 @@ it('renders the full Hub overview for an act-capable academic officer', function
             ->where('overview.student_info.emergency_contact_name', 'Jane Doe')
             ->has('overview.additional_info')
             ->has('overview.recent_registrations', 5));
+});
+
+it('reads program and lifecycle context from the primary Program Enrollment', function () {
+    $student = hubOverviewStudent();
+    $program = Program::factory()->create(['code' => 'PROG-ENROLLMENT']);
+    $curriculumVersion = CurriculumVersion::factory()->create(['program_id' => $program->id]);
+    $semester = Semester::factory()->create(['code' => 'PE2026', 'name' => 'Program Enrollment 2026']);
+    $majorSemester = Semester::factory()->create(['code' => 'MAJOR2026', 'name' => 'Major Enrollment 2026']);
+    $enrollment = new ProgramEnrollment([
+        'student_id' => $student->id,
+        'program_id' => $program->id,
+        'curriculum_version_id' => $curriculumVersion->id,
+        'intake_semester_id' => $semester->id,
+        'intake_major_semester_id' => $majorSemester->id,
+        'enrollment_status' => 'active',
+        'study_stage' => 'intake_major',
+        'is_primary' => true,
+        'source_type' => 'test_program_enrollment',
+        'source_id' => $student->id,
+        'source_snapshot' => [],
+        'materialized_at' => now(),
+    ]);
+    $enrollment->save();
+    $user = actAsHubUser(['view_student_summary', 'change_student_status']);
+
+    actingAs($user)
+        ->get(route('students.academic-summary.overview', $student))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('student.status', 'intake_major')
+            ->where('student.program.id', $program->id)
+            ->where('overview.student_info.status', 'intake_major')
+            ->where('overview.student_info.academic_status', 'active')
+            ->where('overview.student_info.intake_semester.id', $semester->id)
+            ->where('overview.academic_info.intake_major.code', 'MAJOR2026')
+            ->where('overview.program_info.program.id', $program->id)
+            ->where('overview.program_info.curriculum_version.id', $curriculumVersion->id));
 });
 
 it('shows every Registry Guardian and marks no-email Guardians as unable to receive portal access', function () {

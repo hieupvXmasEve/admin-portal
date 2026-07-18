@@ -11,6 +11,7 @@ use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
 use App\Models\User;
 use App\Modules\Academic\Actions\RecordStudentActionAction;
+use App\Modules\Academic\Progression\Models\ProgramEnrollment;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -108,6 +109,47 @@ it('rejects recording an illogical transition (resume while intake_course) at th
     ]))->toThrow(ValidationException::class);
 
     expect($courseStudent->fresh()->status)->toBe('intake_course');
+});
+
+it('writes the lifecycle stage to the primary Program Enrollment before mirroring Student status', function () {
+    RecordStudentActionAction::run([
+        'student_id' => $this->student->id,
+        'action_type' => StudentActionType::WAITING_COURSE_OPENING->value,
+        'reason' => 'Course opening is pending',
+        'changed_by_user_id' => $this->user->id,
+    ]);
+
+    $enrollment = ProgramEnrollment::query()->sole();
+
+    expect($enrollment->enrollment_status)->toBe('active')
+        ->and($enrollment->study_stage)->toBe('pending_course_opening')
+        ->and($this->student->fresh()->status)->toBe('pending_course_opening');
+});
+
+it('reactivates Program Enrollment when a pending Student enters study', function () {
+    $pendingStudent = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->create([
+            'student_id' => 'SE820003',
+            'status' => 'pending',
+            'academic_status' => 'active',
+            'intake' => 1,
+            'intake_semester_id' => $this->semester->id,
+        ]);
+
+    RecordStudentActionAction::run([
+        'student_id' => $pendingStudent->id,
+        'action_type' => StudentActionType::STUDENT_ENROLLMENT_NE->value,
+        'reason' => 'Enrollment confirmed',
+        'changed_by_user_id' => $this->user->id,
+    ]);
+
+    $enrollment = ProgramEnrollment::query()->where('student_id', $pendingStudent->id)->sole();
+
+    expect($enrollment->enrollment_status)->toBe('active')
+        ->and($enrollment->study_stage)->toBe('intake_pre_uni_gc')
+        ->and($pendingStudent->fresh()->status)->toBe('intake_pre_uni_gc');
 });
 
 it('redirects the retired standalone actions and placement pages into the Lifecycle tab', function () {

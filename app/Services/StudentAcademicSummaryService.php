@@ -13,6 +13,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +29,7 @@ class StudentAcademicSummaryService
 {
     public function __construct(
         private readonly GradeDisplayPresenter $gradeDisplayPresenter,
+        private readonly ProgramEnrollmentReader $programEnrollmentReader,
     ) {}
 
     /**
@@ -38,6 +40,8 @@ class StudentAcademicSummaryService
      */
     private function getStudentOverview(Student $student): array
     {
+        $programEnrollment = $this->programEnrollmentReader->forStudentId((int) $student->id);
+
         // Get current GPA calculation
         $currentGpa = $student->gpaCalculations()
             ->where('is_current', true)
@@ -103,8 +107,8 @@ class StudentAcademicSummaryService
                 'cccd_ward' => $student->cccd_ward,
                 'cccd_province' => $student->cccd_province,
                 'cccd_country' => $student->cccd_country,
-                'status' => $student->status,
-                'academic_status' => $student->academic_status,
+                'status' => $programEnrollment->legacyCompatibleStatus(),
+                'academic_status' => $programEnrollment->enrollmentStatus,
                 'admission_date' => $student->admission_date,
                 'expected_graduation_date' => $student->expected_graduation_date,
                 'status_change_date' => $student->status_change_date,
@@ -123,11 +127,7 @@ class StudentAcademicSummaryService
                 'emergency_contact_relationship_1' => $student->emergency_contact_relationship_1,
 
                 'high_school_name' => $student->high_school_name,
-                'intake_semester' => $student->intakeSemester ? [
-                    'id' => $student->intakeSemester->id,
-                    'code' => $student->intakeSemester->code,
-                    'name' => $student->intakeSemester->name,
-                ] : null,
+                'intake_semester' => $programEnrollment->intakeSemesterPayload(),
                 'scholarship' => $student->scholarshipAward ? [
                     'code' => $student->scholarshipAward->scholarship_code,
                     'name' => $student->scholarshipAward->scholarshipDefinition?->name ?? $student->scholarshipAward->scholarship_code,
@@ -143,15 +143,14 @@ class StudentAcademicSummaryService
 
             ],
             'academic_info' => [
-                'intake_school' => $student->intakeSemester ? [
-                    'code' => $student->intakeSemester->code,
-                    'name' => $student->intakeSemester->name,
-                    'intake_year' => Carbon::parse($student->intakeSemester->start_date)->year,
+                'intake_school' => $programEnrollment->intakeSemesterId !== null ? [
+                    'code' => $programEnrollment->intakeSemesterCode,
+                    'name' => $programEnrollment->intakeSemesterName,
+                    'intake_year' => $programEnrollment->intakeSemesterStartDate !== null
+                        ? Carbon::parse($programEnrollment->intakeSemesterStartDate)->year
+                        : null,
                 ] : null,
-                'intake_major' => $student->intakeMajorSemester ? [
-                    'code' => $student->intakeMajorSemester->code,
-                    'name' => $student->intakeMajorSemester->name,
-                ] : null,
+                'intake_major' => $programEnrollment->intakeMajorSemesterPayload(),
             ],
             'program_info' => [
                 'campus' => $student->campus ? [
@@ -159,23 +158,15 @@ class StudentAcademicSummaryService
                     'name' => $student->campus->name,
                     'code' => $student->campus->code,
                 ] : null,
-                'program' => $student->program ? [
-                    'id' => $student->program->id,
-                    'name' => $student->program->name,
-                    'code' => $student->program->code,
-                ] : null,
-                'specialization' => $student->specialization ? [
-                    'id' => $student->specialization->id,
-                    'name' => $student->specialization->name,
-                    'code' => $student->specialization->code,
-                ] : null,
-                'curriculum_version' => $student->curriculumVersion ? [
-                    'id' => $student->curriculumVersion->id,
-                    'version_code' => $student->curriculumVersion->version_code,
-                    'program_name' => $student->curriculumVersion->program?->name,
-                    'program_code' => $student->curriculumVersion->program?->code,
-                    'specialization_name' => $student->curriculumVersion->specialization?->name,
-                    'specialization_code' => $student->curriculumVersion->specialization?->code,
+                'program' => $programEnrollment->programPayload(),
+                'specialization' => $programEnrollment->specializationPayload(),
+                'curriculum_version' => $programEnrollment->curriculumVersionId !== null ? [
+                    'id' => $programEnrollment->curriculumVersionId,
+                    'version_code' => $programEnrollment->curriculumVersionCode,
+                    'program_name' => $programEnrollment->programName,
+                    'program_code' => $programEnrollment->programCode,
+                    'specialization_name' => $programEnrollment->specializationName,
+                    'specialization_code' => $programEnrollment->specializationCode,
                 ] : null,
 
             ],

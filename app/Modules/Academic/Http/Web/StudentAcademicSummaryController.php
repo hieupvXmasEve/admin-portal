@@ -18,6 +18,7 @@ use App\Modules\Academic\Queries\GetStudentLifecycleTimelineQuery;
 use App\Modules\Academic\Support\LifecycleFormOptions;
 use App\Services\ExcelExportService;
 use App\Services\StudentAcademicSummaryService;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Finance\HubStudentFinanceSummaryReader;
 use App\Shared\Contracts\Finance\StudentFeeSummaryReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
@@ -47,6 +48,7 @@ class StudentAcademicSummaryController extends Controller
         private GoldTransactionController $goldTransactionController,
         private StudentGuardianRelationshipReader $guardianRelationshipReader,
         private GuardianAccessGrantReader $guardianAccessGrantReader,
+        private ProgramEnrollmentReader $programEnrollmentReader,
     ) {
         $this->middleware('can:view_student_summary')->only([
             'show',
@@ -76,17 +78,17 @@ class StudentAcademicSummaryController extends Controller
      */
     private function hubStudentContext(Student $student): array
     {
+        $programEnrollment = $this->programEnrollmentReader->forStudentId((int) $student->id);
+
         $student->loadMissing([
             'campus:id,name,code',
-            'program:id,name,code',
-            'specialization:id,name,code',
         ]);
 
         return [
             'id' => $student->id,
             'student_id' => $student->student_id,
             'full_name' => $student->full_name,
-            'status' => $student->status,
+            'status' => $programEnrollment->legacyCompatibleStatus(),
             'email' => $student->email,
             'intake' => $student->intake,
             'avatar_url' => $student->avatar_url,
@@ -95,16 +97,8 @@ class StudentAcademicSummaryController extends Controller
                 'name' => $student->campus->name,
                 'code' => $student->campus->code,
             ] : null,
-            'program' => $student->program ? [
-                'id' => $student->program->id,
-                'name' => $student->program->name,
-                'code' => $student->program->code,
-            ] : null,
-            'specialization' => $student->specialization ? [
-                'id' => $student->specialization->id,
-                'name' => $student->specialization->name,
-                'code' => $student->specialization->code,
-            ] : null,
+            'program' => $programEnrollment->programPayload(),
+            'specialization' => $programEnrollment->specializationPayload(),
         ];
     }
 
