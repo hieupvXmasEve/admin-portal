@@ -6,7 +6,7 @@ use App\Constants\StudentRoutes;
 use App\Modules\Academic\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\AcademicProgressionAuditController;
 use App\Modules\Academic\Http\Web\BuildingController;
-use App\Modules\Academic\Http\Web\CampusController;
+use App\Modules\Academic\Http\Web\CampusDetailController;
 use App\Modules\Academic\Http\Web\ExamResitAttemptController;
 use App\Modules\Academic\Http\Web\ExamScheduleController;
 use App\Modules\Academic\Http\Web\RetakeCourseRegistrationController;
@@ -30,36 +30,9 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    /**
-     * ==========================================================
-     * Campuses (CRU — no delete)
-     * ==========================================================
-     */
-    Route::prefix('campuses')->name('campuses.')->group(function () {
-        Route::get('/', [CampusController::class, 'index'])
-            ->middleware('can:view_campus')
-            ->name('index');
-
-        Route::get('/create', [CampusController::class, 'create'])
-            ->middleware('can:create_campus')
-            ->name('create');
-
-        Route::post('/', [CampusController::class, 'store'])
-            ->middleware('can:create_campus')
-            ->name('store');
-
-        Route::get('/{campus}', [CampusController::class, 'show'])
-            ->middleware('can:view_campus')
-            ->name('show');
-
-        Route::get('/{campus}/edit', [CampusController::class, 'edit'])
-            ->middleware('can:edit_campus')
-            ->name('edit');
-
-        Route::put('/{campus}', [CampusController::class, 'update'])
-            ->middleware('can:edit_campus')
-            ->name('update');
-    });
+    Route::get('campuses/{campus}', [CampusDetailController::class, 'show'])
+        ->middleware('can:view_campus')
+        ->name('campuses.show');
 
     /**
      * ==========================================================

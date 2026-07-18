@@ -13,11 +13,13 @@ use App\Modules\Academic\Support\AcademicFinanceChargeSourceGateway as ModuleAca
 use App\Modules\Academic\Support\AiAcademicEntitySearchReader as ModuleAiAcademicEntitySearchReader;
 use App\Modules\Academic\Support\AiAcademicMetricReader as ModuleAiAcademicMetricReader;
 use App\Modules\Academic\Support\AiAcademicStudentProfileReader as ModuleAiAcademicStudentProfileReader;
+use App\Modules\Academic\Support\CampusBuildingCountReader as ModuleCampusBuildingCountReader;
 use App\Modules\Academic\Support\StudentLifecycleStatusReader as ModuleStudentLifecycleStatusReader;
 use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
 use App\Shared\Contracts\Academic\AiAcademicEntitySearchReader;
 use App\Shared\Contracts\Academic\AiAcademicMetricReader;
 use App\Shared\Contracts\Academic\AiAcademicStudentProfileReader;
+use App\Shared\Contracts\Academic\CampusBuildingCountReader;
 use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
@@ -32,6 +34,7 @@ class AcademicServiceProvider extends ServiceProvider
         $this->app->bind(AiAcademicMetricReader::class, ModuleAiAcademicMetricReader::class);
         $this->app->bind(AiAcademicEntitySearchReader::class, ModuleAiAcademicEntitySearchReader::class);
         $this->app->bind(AiAcademicStudentProfileReader::class, ModuleAiAcademicStudentProfileReader::class);
+        $this->app->bind(CampusBuildingCountReader::class, ModuleCampusBuildingCountReader::class);
         $this->app->bind(AcademicFinanceChargeSourceGateway::class, ModuleAcademicFinanceChargeSourceGateway::class);
         $this->app->bind(StudentLifecycleStatusReader::class, ModuleStudentLifecycleStatusReader::class);
         $this->app->bind(RetakeRegistrationPaymentSyncer::class, SyncPaidRetakeRegistrationsAction::class);

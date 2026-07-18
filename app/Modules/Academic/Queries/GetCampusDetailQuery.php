@@ -5,38 +5,32 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Queries;
 
 use App\Models\Campus;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class GetCampusDetailQuery
 {
     /**
-     * Load campus detail with counts and paginated buildings.
-     *
-     * @param array{
-     *   search?: string|null,
-     *   sort?: string|null,
-     *   direction?: string|null,
-     *   per_page?: int|null,
-     * } $filters  Building filters for the nested table
+     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|null}  $filters
      * @return array{campus: Campus, buildings: LengthAwarePaginator}
      */
-    public function handle(Campus $campus, array $filters): array
+    public function handle(int|string $campusId, array $filters): array
     {
+        $campus = Campus::query()->findOrFail($campusId);
         $campus->loadCount(['buildings', 'users']);
 
         $buildings = $campus->buildings()
-            ->when($filters['search'] ?? null, function ($query, $search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
+            ->when($filters['search'] ?? null, function (HasMany $query, string $search): void {
+                $query->where(function (Builder $buildingQuery) use ($search): void {
+                    $buildingQuery->where('name', 'like', "%{$search}%")
                         ->orWhere('code', 'like', "%{$search}%")
                         ->orWhere('description', 'like', "%{$search}%")
                         ->orWhere('address', 'like', "%{$search}%");
                 });
             })
-            ->when($filters['sort'] ?? null, function ($query, $sort) use ($filters) {
-                $query->orderBy($sort, $filters['direction'] ?? 'asc');
-            })
-            ->orderBy('created_at', 'desc')
+            ->when($filters['sort'] ?? null, fn (HasMany $query, string $sort): HasMany => $query->orderBy($sort, $filters['direction'] ?? 'asc'))
+            ->orderByDesc('created_at')
             ->paginate($filters['per_page'] ?? 15)
             ->withQueryString();
 

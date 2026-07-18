@@ -117,6 +117,5 @@ require __DIR__.'/web/vouchers.php';
 // require __DIR__ . '/web/surveys.php';
 // @deprecated Room booking routes migrated to App\Modules\Facilities\routes\web.php.
 // require __DIR__ . '/web/room-bookings.php';
-require __DIR__.'/web/departments.php';
 require __DIR__.'/web/notifications.php';
 require __DIR__.'/web/academic.php';

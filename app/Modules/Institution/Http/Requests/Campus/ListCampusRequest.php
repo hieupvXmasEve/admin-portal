@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Requests\Campus;
+namespace App\Modules\Institution\Http\Requests\Campus;
 
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -13,6 +13,9 @@ class ListCampusRequest extends FormRequest
         return true;
     }
 
+    /**
+     * @return array<string, array<int, string>>
+     */
     public function rules(): array
     {
         return [

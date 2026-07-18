@@ -7,12 +7,12 @@ namespace App\Modules\Academic\Support;
 use App\Enums\AcademicProgressionEventType;
 use App\Enums\ProgressionTriggerSource;
 use App\Enums\StudentActionType;
-use App\Models\Campus;
 use App\Models\IeltsCertificate;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentDecision;
 use App\Modules\Finance\Services\FinanceChargeService;
+use App\Shared\Contracts\Institution\CampusReferenceReader;
 use Illuminate\Support\Collection;
 
 /**
@@ -25,6 +25,10 @@ use Illuminate\Support\Collection;
  */
 class LifecycleFormOptions
 {
+    public function __construct(
+        private readonly CampusReferenceReader $campusReferences,
+    ) {}
+
     /**
      * Options for the "Record Student Action" form.
      *
@@ -41,10 +45,10 @@ class LifecycleFormOptions
                 ->orderBy('start_date', 'desc')
                 ->get(),
             'activeSemesterId' => $activeSemester?->id,
-            'campuses' => Campus::query()
-                ->select('id', 'name', 'code')
-                ->orderBy('name')
-                ->get(),
+            'campuses' => array_map(
+                fn ($campus): array => $campus->toArray(),
+                $this->campusReferences->all(),
+            ),
             'deferScopeTypes' => [
                 ['value' => 'FULL', 'label' => 'Toàn kỳ (Full Semester)'],
                 ['value' => 'COURSES', 'label' => 'Theo môn (Specific Courses)'],

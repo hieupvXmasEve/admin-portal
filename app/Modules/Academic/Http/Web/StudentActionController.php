@@ -105,6 +105,6 @@ class StudentActionController extends Controller
      */
     protected function getFormOptions(?Student $student = null): array
     {
-        return (new LifecycleFormOptions)->actionOptions($student);
+        return app(LifecycleFormOptions::class)->actionOptions($student);
     }
 }
