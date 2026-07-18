@@ -136,6 +136,7 @@ it('renders the 360 shell with identity and four balances for a visible student'
             ->component('Finance/Student360/Show')
             ->where('student.id', $student->id)
             ->where('student.student_code', $student->student_id)
+            ->where('student.academic_status', $student->academic_status)
             ->has('student.lifecycle_reason')
             ->has('balances.net_charges')
             ->has('balances.total_paid')
@@ -1145,6 +1146,12 @@ it('denies access without the permission', function () {
     $student = makeOverviewStudent($this->campus, $this->program, $this->semester);
 
     actingAs($user)->get("/finance/students/{$student->id}")->assertForbidden();
+});
+
+it('hides a missing student as not found', function () {
+    $user = grantFinanceOverview(['view_finance_student_overview']);
+
+    actingAs($user)->get('/finance/students/999999')->assertNotFound();
 });
 
 it('hides a cross-campus student as not found', function () {

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Student;
 use App\Modules\Finance\Http\Requests\Student360ShowRequest;
 use App\Modules\Finance\Queries\Audit\GetFinanceAuditGraphQuery;
 use App\Modules\Finance\Queries\Student360\GetStudent360LedgerQuery;
@@ -16,6 +15,8 @@ use App\Modules\Finance\Queries\Student360\GetStudentFinanceReviewSignalsQuery;
 use App\Modules\Finance\Support\Audit\FinanceLedgerTimelineBuilder;
 use App\Modules\Finance\Support\LifecycleDueExceptionReasonResolver;
 use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -28,8 +29,10 @@ use Inertia\Response;
 class FinanceStudentOverviewController extends Controller
 {
     public function show(
-        Student $student,
+        int|string $student,
         Student360ShowRequest $request,
+        StudentReferenceReader $studentReferences,
+        StudentLifecycleStatusReader $lifecycleStatuses,
         StudentFinanceSettlementPositionReader $positionReader,
         GetFinanceAuditGraphQuery $graphQuery,
         FinanceLedgerTimelineBuilder $timelineBuilder,
@@ -39,21 +42,25 @@ class FinanceStudentOverviewController extends Controller
         GetStudentFinancePaymentHistoryQuery $paymentHistoryQuery,
         GetStudentFinanceReviewSignalsQuery $reviewSignalsQuery,
     ): Response {
-        if (! $this->visible($student, $request)) {
+        $studentId = (int) $student;
+        $reference = $studentReferences->find($studentId);
+
+        if ($reference === null || ! $this->visible($reference->campusId, $request)) {
             abort(404);
         }
 
-        $studentId = (int) $student->id;
         $position = $positionReader->current($studentId);
-        $reason = LifecycleDueExceptionReasonResolver::resolve($student);
+        $lifecycleStatus = $lifecycleStatuses->statusesFor([$studentId])[$studentId] ?? null;
+        $academicStatus = $lifecycleStatuses->academicStatusesFor([$studentId])[$studentId] ?? null;
+        $reason = LifecycleDueExceptionReasonResolver::forStatus($lifecycleStatus);
 
         $props = [
             'student' => [
                 'id' => $studentId,
-                'student_code' => $student->student_id,
-                'full_name' => $student->full_name,
-                'status' => $student->status,
-                'academic_status' => $student->academic_status,
+                'student_code' => $reference->studentCode,
+                'full_name' => $reference->fullName,
+                'status' => $lifecycleStatus ?? 'unknown',
+                'academic_status' => $academicStatus,
                 'lifecycle_reason' => $reason->value,
                 'lifecycle_label' => $reason->label(),
             ],
@@ -102,10 +109,10 @@ class FinanceStudentOverviewController extends Controller
         return Inertia::render('Finance/Student360/Show', $props);
     }
 
-    private function visible(Student $student, Student360ShowRequest $request): bool
+    private function visible(int $studentCampusId, Student360ShowRequest $request): bool
     {
         $campusId = $this->currentCampusId();
-        if ($campusId !== null && (int) $student->campus_id === $campusId) {
+        if ($campusId !== null && $studentCampusId === $campusId) {
             return true;
         }
 

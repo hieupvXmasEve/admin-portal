@@ -11,4 +11,10 @@ interface StudentLifecycleStatusReader
      * @return array<int, string>
      */
     public function statusesFor(array $studentIds): array;
+
+    /**
+     * @param  list<int>  $studentIds
+     * @return array<int, string|null>
+     */
+    public function academicStatusesFor(array $studentIds): array;
 }

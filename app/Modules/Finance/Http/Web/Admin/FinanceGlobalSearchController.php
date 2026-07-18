@@ -6,12 +6,12 @@ namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
-use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Audit\ResolveFinanceAuditSearchQuery;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -22,6 +22,8 @@ use Illuminate\Http\Request;
  */
 class FinanceGlobalSearchController extends Controller
 {
+    public function __construct(private readonly StudentReferenceReader $studentReferences) {}
+
     public function search(Request $request, ResolveFinanceAuditSearchQuery $resolver): JsonResponse
     {
         $q = (string) $request->query('q', '');
@@ -67,13 +69,17 @@ class FinanceGlobalSearchController extends Controller
         $id = (int) $target['id'];
         $focus = $type !== 'student' ? "{$type}:{$id}" : null;
 
-        $student = Student::find($studentId);
+        $student = $this->studentReferences->find($studentId);
+
+        if ($student === null) {
+            return null;
+        }
 
         return [
             'type' => $type,
             'id' => $studentId, // navigate to the owning student
-            'label' => $label ?? (string) ($student?->full_name ?? ''),
-            'sublabel' => $sublabel ?? (string) ($student?->student_id ?? ''),
+            'label' => $label ?? $student->fullName,
+            'sublabel' => $sublabel ?? $student->studentCode,
             'url' => route('finance.students.overview', $focus
                 ? ['student' => $studentId, 'focus' => $focus]
                 : ['student' => $studentId]),

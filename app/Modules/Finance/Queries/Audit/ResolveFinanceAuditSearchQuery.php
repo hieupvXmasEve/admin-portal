@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Audit;
 
-use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 
 /**
  * Deterministic, campus-scoped resolver for the audit workspace universal search.
@@ -29,6 +30,8 @@ use App\Modules\Finance\Models\StudentInvoice;
  */
 class ResolveFinanceAuditSearchQuery
 {
+    public function __construct(private readonly StudentReferenceReader $studentReferences) {}
+
     /** @return Resolution */
     public function handle(?string $q, ?int $campusId): array
     {
@@ -48,9 +51,8 @@ class ResolveFinanceAuditSearchQuery
         // 2. Exact invoice number.
         $invoice = StudentInvoice::query()
             ->where('invoice_number', $q)
-            ->whereHas('student', fn ($s) => $s->where('campus_id', $campusId))
             ->first();
-        if ($invoice !== null) {
+        if ($invoice !== null && $this->visible((int) $invoice->student_id, $campusId)) {
             return $this->single('invoice', (int) $invoice->id);
         }
 
@@ -58,18 +60,14 @@ class ResolveFinanceAuditSearchQuery
         foreach (['item_id', 'dng_payment_id', 'dng_transaction_id'] as $field) {
             $dng = DngPaymentRequest::query()
                 ->where($field, $q)
-                ->whereHas('student', fn ($s) => $s->where('campus_id', $campusId))
                 ->first();
-            if ($dng !== null) {
+            if ($dng !== null && $this->visible((int) $dng->student_id, $campusId)) {
                 return $this->single('dng', (int) $dng->id);
             }
         }
 
         // 4. Exact student code (MSSV).
-        $student = Student::query()
-            ->where('student_id', $q)
-            ->where('campus_id', $campusId)
-            ->first();
+        $student = $this->studentReferences->findByStudentCode($q, $campusId);
         if ($student !== null) {
             return $this->single('student', (int) $student->id);
         }
@@ -79,53 +77,44 @@ class ResolveFinanceAuditSearchQuery
         if (! $this->looksLikeStudentCode($q)) {
             $payment = Payment::query()
                 ->where('external_ref', $q)
-                ->whereHas('student', fn ($s) => $s->where('campus_id', $campusId))
                 ->first();
-            if ($payment !== null) {
+            if ($payment !== null && $this->visible((int) $payment->student_id, $campusId)) {
                 return $this->single('payment', (int) $payment->id);
             }
         }
 
         // 6. Fuzzy student code/name/email -> single or ambiguous.
-        $students = Student::query()
-            ->where('campus_id', $campusId)
-            ->where(fn ($w) => $w
-                ->where('student_id', 'like', "%{$q}%")
-                ->orWhere('full_name', 'like', "%{$q}%")
-                ->orWhere('email', 'like', "%{$q}%"))
-            ->orderBy('full_name')
-            ->limit(10)
-            ->get();
+        $students = $this->studentReferences->search($q, $campusId);
 
-        if ($students->isEmpty()) {
+        if ($students === []) {
             return $this->empty();
         }
 
-        if ($students->count() === 1) {
-            return $this->single('student', (int) $students->first()->id);
+        if (count($students) === 1) {
+            return $this->single('student', $students[0]->id);
         }
 
         return [
             'status' => 'ambiguous',
             'target' => null,
-            'matches' => $students->map(fn (Student $s) => $this->studentMatch($s))->all(),
+            'matches' => array_map(fn (StudentReference $reference): array => $this->studentMatch($reference), $students),
         ];
     }
 
     /** @return Resolution */
     private function resolvePrefixed(string $type, int $id, ?int $campusId): array
     {
-        $campusScoped = fn ($s) => $s->where('campus_id', $campusId);
-
-        $exists = match ($type) {
-            'payment' => Payment::query()->whereKey($id)->whereHas('student', $campusScoped)->exists(),
-            'invoice' => StudentInvoice::query()->whereKey($id)->whereHas('student', $campusScoped)->exists(),
-            'dng' => DngPaymentRequest::query()->whereKey($id)->whereHas('student', $campusScoped)->exists(),
-            'charge' => FinanceCharge::query()->whereKey($id)->whereHas('student', $campusScoped)->exists(),
-            default => false,
+        $studentId = match ($type) {
+            'payment' => Payment::query()->find($id)?->student_id,
+            'invoice' => StudentInvoice::query()->find($id)?->student_id,
+            'dng' => DngPaymentRequest::query()->find($id)?->student_id,
+            'charge' => FinanceCharge::query()->find($id)?->student_id,
+            default => null,
         };
 
-        return $exists ? $this->single($type, $id) : $this->empty();
+        return $studentId !== null && $this->visible((int) $studentId, $campusId)
+            ? $this->single($type, $id)
+            : $this->empty();
     }
 
     private function looksLikeStudentCode(string $q): bool
@@ -147,13 +136,18 @@ class ResolveFinanceAuditSearchQuery
     }
 
     /** @return array{type:string,id:int,label:string,sublabel:string} */
-    private function studentMatch(Student $student): array
+    private function visible(int $studentId, int $campusId): bool
+    {
+        return $this->studentReferences->find($studentId)?->campusId === $campusId;
+    }
+
+    private function studentMatch(StudentReference $student): array
     {
         return [
             'type' => 'student',
-            'id' => (int) $student->id,
-            'label' => (string) $student->full_name,
-            'sublabel' => (string) $student->student_id,
+            'id' => $student->id,
+            'label' => $student->fullName,
+            'sublabel' => $student->studentCode,
         ];
     }
 }

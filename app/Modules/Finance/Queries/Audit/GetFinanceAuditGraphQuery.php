@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Audit;
 
-use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Support\Collection;
 
 /**
@@ -26,7 +28,11 @@ class GetFinanceAuditGraphQuery
     /** Structural node types that are always kept even with no edges. */
     private const STRUCTURAL_TYPES = ['student', 'invoice', 'invoice_line', 'charge'];
 
-    public function __construct(private readonly SettlementService $settlement) {}
+    public function __construct(
+        private readonly SettlementService $settlement,
+        private readonly StudentReferenceReader $studentReferences,
+        private readonly StudentLifecycleStatusReader $lifecycleStatuses,
+    ) {}
 
     /**
      * @param  array{type:string,id:int}  $target
@@ -35,7 +41,7 @@ class GetFinanceAuditGraphQuery
     public function handle(array $target, ?int $semesterId = null, ?int $billingCycleId = null): array
     {
         $studentId = $this->resolveStudentId($target);
-        $student = Student::find($studentId);
+        $student = $this->studentReferences->find($studentId);
 
         if ($student === null) {
             return $this->emptyGraph($studentId);
@@ -43,7 +49,8 @@ class GetFinanceAuditGraphQuery
 
         $semesterIds = $this->scopeSemesterIds($studentId, $semesterId);
 
-        $invoices = $student->invoices()
+        $invoices = StudentInvoice::query()
+            ->where('student_id', $studentId)
             ->whereIn('semester_id', $semesterIds)
             ->when($billingCycleId !== null, fn ($q) => $q->where('billing_cycle_id', $billingCycleId))
             ->with([
@@ -56,17 +63,18 @@ class GetFinanceAuditGraphQuery
         $lines = $invoices->flatMap(fn (StudentInvoice $invoice) => $invoice->invoiceLines);
         $inScopeLineIds = $lines->pluck('id')->map(fn ($id) => (int) $id)->all();
 
-        $payments = $student->payments()->with('applications')->get();
-        $dngRequests = $student->dngPaymentRequests()->with('chargeLinks')->get();
-        $charges = $this->collectCharges($student, $semesterIds, $lines, $dngRequests);
+        $payments = Payment::query()->where('student_id', $studentId)->with('applications')->get();
+        $dngRequests = DngPaymentRequest::query()->where('student_id', $studentId)->with('chargeLinks')->get();
+        $charges = $this->collectCharges($studentId, $semesterIds, $lines, $dngRequests);
+        $academicStatus = $this->lifecycleStatuses->academicStatusesFor([$studentId])[$studentId] ?? null;
 
-        $nodes = $this->buildNodes($student, $invoices, $lines, $charges, $payments, $dngRequests);
+        $nodes = $this->buildNodes($student, $academicStatus, $invoices, $lines, $charges, $payments, $dngRequests);
         $edges = $this->buildEdges($invoices, $lines, $charges, $payments, $dngRequests, $inScopeLineIds);
         $nodes = $this->pruneOrphanNodes($nodes, $edges);
 
         return [
             'subject' => $this->subject($student),
-            'student_id' => (int) $student->id,
+            'student_id' => $student->id,
             'nodes' => array_values($nodes),
             'edges' => $edges,
             'derived_balance' => $this->derivedBalance($invoices),
@@ -106,9 +114,12 @@ class GetFinanceAuditGraphQuery
     }
 
     /** @return Collection<int,FinanceCharge> keyed by id */
-    private function collectCharges(Student $student, array $semesterIds, Collection $lines, Collection $dngRequests): Collection
+    private function collectCharges(int $studentId, array $semesterIds, Collection $lines, Collection $dngRequests): Collection
     {
-        $scoped = $student->financeCharges()->whereIn('semester_id', $semesterIds)->get();
+        $scoped = FinanceCharge::query()
+            ->where('student_id', $studentId)
+            ->whereIn('semester_id', $semesterIds)
+            ->get();
         $fromLines = $lines->pluck('charge')->filter();
 
         $known = $scoped->pluck('id')->merge($fromLines->pluck('id'))->unique();
@@ -123,14 +134,14 @@ class GetFinanceAuditGraphQuery
     }
 
     /** @return array<string,array> keyed by node key */
-    private function buildNodes(Student $student, Collection $invoices, Collection $lines, Collection $charges, Collection $payments, Collection $dngRequests): array
+    private function buildNodes(StudentReference $student, ?string $academicStatus, Collection $invoices, Collection $lines, Collection $charges, Collection $payments, Collection $dngRequests): array
     {
         $nodes = [];
         $put = function (array $node) use (&$nodes): void {
             $nodes[$node['key']] = $node;
         };
 
-        $put($this->node('student', (int) $student->id, (string) $student->full_name, $student->academic_status));
+        $put($this->node('student', $student->id, $student->fullName, $academicStatus));
 
         foreach ($invoices as $invoice) {
             $put($this->node('invoice', (int) $invoice->id, (string) $invoice->invoice_number, $invoice->status, (float) $invoice->total_amount, $invoice->due_date?->toDateString()));
@@ -262,13 +273,13 @@ class GetFinanceAuditGraphQuery
         return $entries;
     }
 
-    private function subject(Student $student): array
+    private function subject(StudentReference $student): array
     {
         return [
-            'student_id' => (int) $student->id,
-            'student_code' => (string) $student->student_id,
-            'full_name' => (string) $student->full_name,
-            'campus_id' => $student->campus_id !== null ? (int) $student->campus_id : null,
+            'student_id' => $student->id,
+            'student_code' => $student->studentCode,
+            'full_name' => $student->fullName,
+            'campus_id' => $student->campusId,
         ];
     }
 

@@ -19,4 +19,15 @@ final class StudentLifecycleStatusReader implements StudentLifecycleStatusReader
             ])
             ->all();
     }
+
+    public function academicStatusesFor(array $studentIds): array
+    {
+        return Student::query()
+            ->whereKey($studentIds)
+            ->pluck('academic_status', 'id')
+            ->mapWithKeys(static fn (mixed $status, int|string $studentId): array => [
+                (int) $studentId => $status !== null ? (string) $status : null,
+            ])
+            ->all();
+    }
 }

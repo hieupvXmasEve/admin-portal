@@ -11,14 +11,16 @@ final class LifecycleDueExceptionReasonResolver
 {
     public static function resolve(?Student $student): LifecycleDueExceptionReason
     {
-        if ($student === null) {
-            return LifecycleDueExceptionReason::MissingStudent;
-        }
+        return self::forStatus($student?->status);
+    }
 
-        return match ($student->status) {
+    public static function forStatus(?string $status): LifecycleDueExceptionReason
+    {
+        return match ($status) {
             'deferred' => LifecycleDueExceptionReason::Deferred,
             'dropout' => LifecycleDueExceptionReason::Dropout,
             'dropout_transfer' => LifecycleDueExceptionReason::DropoutTransfer,
+            null => LifecycleDueExceptionReason::MissingStudent,
             default => LifecycleDueExceptionReason::InactiveOrNonFinancial,
         };
     }
