@@ -6,12 +6,15 @@ namespace App\Modules\Finance\Services;
 
 use App\Models\DeferCase;
 use App\Models\DeferCaseItem;
-use App\Models\Student;
 use App\Modules\Finance\Support\DeferChargePolicy;
-use Illuminate\Support\Facades\DB;
+use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
 
 class DeferChargeResolver
 {
+    public function __construct(
+        private readonly StudentLifecycleCourseRegistrationGateway $courseRegistrations,
+    ) {}
+
     /**
      * Whether the student's enrollment in this semester is fully deferred and so
      * non-billable for batch charge generation/preview.
@@ -27,12 +30,15 @@ class DeferChargeResolver
      * registrations billable, so it does NOT suppress the semester's term
      * charges here (course-level handling stays report-only).
      */
-    public function isSemesterEnrollmentDeferred(Student $student, int $semesterId): bool
+    public function isSemesterEnrollmentDeferred(int|object $student, int $semesterId): bool
     {
-        $statuses = DB::table('course_registrations')
-            ->where('student_id', $student->id)
-            ->where('semester_id', $semesterId)
-            ->pluck('registration_status');
+        $studentId = is_int($student) ? $student : (int) ($student->id ?? 0);
+        if ($studentId <= 0) {
+            return false;
+        }
+
+        $statuses = collect($this->courseRegistrations->forStudentSemester($studentId, $semesterId))
+            ->map(static fn ($registration): string => $registration->registrationStatus);
 
         if (! $statuses->contains('defer')) {
             return false;

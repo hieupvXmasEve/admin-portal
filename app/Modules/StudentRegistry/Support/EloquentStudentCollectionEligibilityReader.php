@@ -17,7 +17,7 @@ final class EloquentStudentCollectionEligibilityReader implements StudentCollect
     {
         $statuses = match ($collectionPurposes) {
             ['egc'] => ['intake_pre_uni_gc'],
-            ['tuition'] => ['intake_course'],
+            ['tuition'] => ['intake_course', 'intake_major'],
             default => Student::FINANCIAL_STATUSES,
         };
 

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Egc;
 
-use App\Models\EgcRetakeDiscountLink;
 use App\Modules\Finance\Models\DiscountAllocation;
+use App\Modules\Finance\Models\EgcRetakeDiscountLink;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;

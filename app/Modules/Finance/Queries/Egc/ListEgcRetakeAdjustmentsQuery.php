@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Egc;
 
-use App\Models\EgcRetakeDiscountLink;
+use App\Modules\Finance\Models\EgcRetakeDiscountLink;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Modules\Finance\Support\EgcRetakeTargetResolver;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Egc;
 
-use App\Models\EgcRetakeDiscountLink;
+use App\Modules\Finance\Models\EgcRetakeDiscountLink;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;

@@ -28,6 +28,14 @@ class SemesterAcademicPeriodReader implements AcademicPeriodReader
         return $this->mapPeriod(Semester::query()->find($academicPeriodId));
     }
 
+    public function countStartingBetween(CarbonImmutable $start, CarbonImmutable $end): int
+    {
+        return Semester::query()
+            ->where('start_date', '>=', $start)
+            ->where('start_date', '<=', $end)
+            ->count();
+    }
+
     /**
      * @return list<AcademicPeriodReference>
      */

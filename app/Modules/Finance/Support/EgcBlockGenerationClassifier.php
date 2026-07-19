@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Models\FinanceCharge;
@@ -54,11 +53,11 @@ final class EgcBlockGenerationClassifier
         private readonly AcademicFinanceChargeSourceGateway $academicSources,
     ) {}
 
-    public function classify(Student $student, int $semesterId): EgcBlockGenerationState
+    public function classify(int $studentId, int $semesterId): EgcBlockGenerationState
     {
-        $blocks = $this->loadBlocks($student->id, $semesterId);
+        $blocks = $this->loadBlocks($studentId, $semesterId);
 
-        if ($this->deferChargeResolver->isSemesterEnrollmentDeferred($student, $semesterId)) {
+        if ($this->deferChargeResolver->isSemesterEnrollmentDeferred($studentId, $semesterId)) {
             return $this->blocked(self::ReasonDeferredNonBillable, $blocks);
         }
 

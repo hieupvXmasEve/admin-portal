@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Models\Student;
-use App\Models\Unit;
 use App\Models\VoucherDefinition;
+use App\Shared\Contracts\Academic\DTO\ProgramEnrollmentSummary;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 
 class VoucherDiscountAmountResolver
 {
@@ -17,9 +17,17 @@ class VoucherDiscountAmountResolver
      *
      * @return array{base_amount: float|null, discount_amount: float}
      */
-    public function resolveAmounts(VoucherDefinition $voucher, Student $student, int $semesterId): array
+    public function resolveAmounts(VoucherDefinition $voucher, int|object $student, int $semesterId): array
     {
-        $baseAmount = $this->resolveBaseAmount($student, $semesterId);
+        $studentId = is_int($student) ? $student : (int) ($student->id ?? 0);
+        if ($studentId <= 0) {
+            throw new \InvalidArgumentException('Voucher pricing requires a student identifier.');
+        }
+
+        $baseAmount = $this->resolveBaseAmount(
+            app(ProgramEnrollmentReader::class)->forStudentId($studentId),
+            $semesterId,
+        );
 
         if ($voucher->voucher_type !== 'discount') {
             return [
@@ -46,23 +54,23 @@ class VoucherDiscountAmountResolver
         ];
     }
 
-    private function resolveBaseAmount(Student $student, int $semesterId): ?float
+    private function resolveBaseAmount(ProgramEnrollmentSummary $enrollment, int $semesterId): ?float
     {
-        if ($this->studentChargeTimingResolver->shouldGenerateTuitionForSemester($student, $semesterId)) {
-            return $this->getTuitionFee($student, $semesterId);
+        if ($this->studentChargeTimingResolver->shouldGenerateTuitionForSemester($enrollment, $semesterId)) {
+            return $this->getTuitionFee($enrollment, $semesterId);
         }
 
-        if ($this->studentChargeTimingResolver->shouldGenerateEgcForSemester($student, $semesterId)) {
-            return $this->getEgcFee($student);
+        if ($this->studentChargeTimingResolver->shouldGenerateEgcForSemester($enrollment, $semesterId)) {
+            return $this->getEgcFee($enrollment);
         }
 
         return null;
     }
 
-    private function getEgcFee(Student $student): ?float
+    private function getEgcFee(ProgramEnrollmentSummary $enrollment): ?float
     {
-        $startLevel = $student->gc_current_level ?? 1;
-        $totalLevels = $student->gc_total_levels ?? 6;
+        $startLevel = $enrollment->egcCurrentLevel ?? 1;
+        $totalLevels = $enrollment->egcTotalLevels ?? 6;
 
         $levelsToCharge = [$startLevel];
 
@@ -70,24 +78,14 @@ class VoucherDiscountAmountResolver
             $levelsToCharge[] = $startLevel + 1;
         }
 
-        $amount = 0.0;
-
-        foreach ($levelsToCharge as $level) {
-            $unit = Unit::query()
-                ->where('unit_type', 'egc')
-                ->where('level', $level)
-                ->first();
-
-            if ($unit) {
-                $amount += (float) $unit->base_fee;
-            }
-        }
+        $amount = collect($levelsToCharge)
+            ->sum(fn (int $level): float => app(EgcLevelFeeResolver::class)->resolve($level));
 
         return $amount > 0 ? $amount : null;
     }
 
-    private function getTuitionFee(Student $student, int $semesterId): ?float
+    private function getTuitionFee(ProgramEnrollmentSummary $enrollment, int $semesterId): ?float
     {
-        return $this->studentChargeTimingResolver->getTuitionTermData($student, $semesterId)['amount'];
+        return $this->studentChargeTimingResolver->getTuitionTermData($enrollment, $semesterId)['amount'];
     }
 }

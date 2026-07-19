@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Egc;
 
-use App\Models\Student;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -20,11 +20,9 @@ class ApplyEgcCarryForwardAction
     {
         return DB::transaction(function () use ($studentId, $semesterId, $userId, $campusId) {
             if ($campusId !== null) {
-                $studentCampusId = Student::query()
-                    ->whereKey($studentId)
-                    ->value('campus_id');
+                $studentCampusId = app(StudentReferenceReader::class)->find($studentId)?->campusId;
 
-                if ((int) $studentCampusId !== $campusId) {
+                if ($studentCampusId !== $campusId) {
                     throw ValidationException::withMessages([
                         'student_id' => ['Student does not belong to the current campus.'],
                     ]);

@@ -4,48 +4,49 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Models\Semester;
-use App\Models\Student;
 use App\Models\TuitionPlan;
 use App\Models\TuitionPlanTerm;
 use App\Modules\Finance\Models\FinanceCharge;
-use Carbon\CarbonInterface;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\Academic\DTO\ProgramEnrollmentSummary;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 
 class StudentChargeTimingResolver
 {
-    /**
-     * @var array<int, Semester|null>
-     */
-    private array $semesterCache = [];
+    public function __construct(private readonly AcademicPeriodReader $academicPeriods) {}
 
-    public function shouldIncludeStudentForChargeGeneration(Student $student, int $semesterId, array $chargeTypes): bool
+    public function shouldIncludeStudentForChargeGeneration(mixed $enrollment, int $semesterId, array $chargeTypes): bool
     {
+        $enrollment = $this->pricingFacts($enrollment);
         $hasEgc = in_array(FinanceCharge::TYPE_EGC_LEVEL_FEE, $chargeTypes, true);
         $hasTuition = in_array(FinanceCharge::TYPE_TUITION_TERM, $chargeTypes, true);
 
-        if ($hasEgc && $this->shouldGenerateEgcForSemester($student, $semesterId)) {
+        if ($hasEgc && $this->shouldGenerateEgcForSemester($enrollment, $semesterId)) {
             return true;
         }
 
-        if ($hasTuition && $this->shouldGenerateTuitionForSemester($student, $semesterId)) {
+        if ($hasTuition && $this->shouldGenerateTuitionForSemester($enrollment, $semesterId)) {
             return true;
         }
 
         if (! $hasEgc && ! $hasTuition) {
-            return $this->hasStartedBySemester($student, $semesterId);
+            return $this->hasStartedBySemester($enrollment, $semesterId);
         }
 
         return false;
     }
 
-    public function shouldGenerateEgcForSemester(Student $student, int $semesterId): bool
+    public function shouldGenerateEgcForSemester(mixed $enrollment, int $semesterId): bool
     {
-        if (! $this->hasStartedBySemester($student, $semesterId)) {
+        $enrollment = $this->pricingFacts($enrollment);
+        if (! $this->hasStartedBySemester($enrollment, $semesterId)) {
             return false;
         }
 
-        $targetSemester = $this->getSemester($semesterId);
-        $intakeMajorSemester = $this->getSemester($student->intake_major);
+        $targetSemester = $this->academicPeriods->find($semesterId);
+        $intakeMajorSemester = $enrollment->intakeMajorSemesterId === null
+            ? null
+            : $this->academicPeriods->find($enrollment->intakeMajorSemesterId);
 
         if (! $targetSemester) {
             return false;
@@ -55,61 +56,74 @@ class StudentChargeTimingResolver
             return true;
         }
 
-        return $this->startDate($targetSemester)->lt($this->startDate($intakeMajorSemester));
+        return $targetSemester->start_date?->lt($intakeMajorSemester->start_date) ?? false;
     }
 
-    public function shouldGenerateTuitionForSemester(Student $student, int $semesterId): bool
+    public function shouldGenerateTuitionForSemester(mixed $enrollment, int $semesterId): bool
     {
-        if (! $this->hasStartedBySemester($student, $semesterId)) {
+        $enrollment = $this->pricingFacts($enrollment);
+        if (! $this->hasStartedBySemester($enrollment, $semesterId)) {
             return false;
         }
 
-        $targetSemester = $this->getSemester($semesterId);
-        $intakeMajorSemester = $this->getSemester($student->intake_major);
+        $targetSemester = $this->academicPeriods->find($semesterId);
+        $intakeMajorSemester = $enrollment->intakeMajorSemesterId === null
+            ? null
+            : $this->academicPeriods->find($enrollment->intakeMajorSemesterId);
 
         if (! $targetSemester || ! $intakeMajorSemester) {
             return false;
         }
 
-        return $this->startDate($targetSemester)->gte($this->startDate($intakeMajorSemester));
+        return $targetSemester->start_date?->gte($intakeMajorSemester->start_date) ?? false;
     }
 
-    public function hasStartedBySemester(Student $student, int $semesterId): bool
+    public function hasStartedBySemester(mixed $enrollment, int $semesterId): bool
     {
-        $targetSemester = $this->getSemester($semesterId);
-        $intakeSemester = $this->getSemester($student->intake_semester_id);
+        $enrollment = $this->pricingFacts($enrollment);
+        $targetSemester = $this->academicPeriods->find($semesterId);
+        $intakeSemester = $enrollment->intakeSemesterId === null
+            ? null
+            : $this->academicPeriods->find($enrollment->intakeSemesterId);
 
         if (! $targetSemester || ! $intakeSemester) {
             return false;
         }
 
-        return $this->startDate($targetSemester)->gte($this->startDate($intakeSemester));
+        return $targetSemester->start_date?->gte($intakeSemester->start_date) ?? false;
     }
 
     /**
      * @return array{term_number: int|null, amount: float|null, chargeable_term_index: int|null}
      */
-    public function getTuitionTermData(Student $student, int $semesterId): array
+    public function getTuitionTermData(mixed $enrollment, int $semesterId): array
     {
-        if (! $this->shouldGenerateTuitionForSemester($student, $semesterId)) {
+        $enrollment = $this->pricingFacts($enrollment);
+        if (! $this->shouldGenerateTuitionForSemester($enrollment, $semesterId)) {
             return ['term_number' => null, 'amount' => null, 'chargeable_term_index' => null];
         }
 
-        $intakeMajorSemester = $this->getSemester($student->intake_major);
-        $targetSemester = $this->getSemester($semesterId);
+        $intakeMajorSemester = $enrollment->intakeMajorSemesterId === null
+            ? null
+            : $this->academicPeriods->find($enrollment->intakeMajorSemesterId);
+        $targetSemester = $this->academicPeriods->find($semesterId);
 
         if (! $intakeMajorSemester || ! $targetSemester) {
             return ['term_number' => null, 'amount' => null, 'chargeable_term_index' => null];
         }
 
-        $termNumber = Semester::query()
-            ->where('start_date', '>=', $intakeMajorSemester->start_date)
-            ->where('start_date', '<=', $targetSemester->start_date)
-            ->count();
+        if ($intakeMajorSemester->start_date === null || $targetSemester->start_date === null) {
+            return ['term_number' => null, 'amount' => null, 'chargeable_term_index' => null];
+        }
+
+        $termNumber = $this->academicPeriods->countStartingBetween(
+            $intakeMajorSemester->start_date,
+            $targetSemester->start_date,
+        );
 
         $plan = TuitionPlan::query()
-            ->where('curriculum_version_id', $student->curriculum_version_id)
-            ->where('intake_semester_id', $student->intake_semester_id)
+            ->where('curriculum_version_id', $enrollment->curriculumVersionId)
+            ->where('intake_semester_id', $enrollment->intakeSemesterId)
             ->first();
 
         if (! $plan) {
@@ -138,21 +152,17 @@ class StudentChargeTimingResolver
         ];
     }
 
-    private function getSemester(?int $semesterId): ?Semester
+    private function pricingFacts(mixed $candidate): ProgramEnrollmentSummary
     {
-        if (! $semesterId) {
-            return null;
+        if ($candidate instanceof ProgramEnrollmentSummary) {
+            return $candidate;
         }
 
-        if (! array_key_exists($semesterId, $this->semesterCache)) {
-            $this->semesterCache[$semesterId] = Semester::query()->find($semesterId);
+        $studentId = is_object($candidate) ? (int) ($candidate->id ?? 0) : 0;
+        if ($studentId <= 0) {
+            throw new \InvalidArgumentException('Pricing requires a student identifier or ProgramEnrollmentSummary.');
         }
 
-        return $this->semesterCache[$semesterId];
-    }
-
-    private function startDate(Semester $semester): CarbonInterface
-    {
-        return $semester->start_date->copy()->startOfDay();
+        return app(ProgramEnrollmentReader::class)->forStudentId($studentId);
     }
 }

@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Egc;
 
-use App\Models\Student;
 use App\Modules\Finance\Actions\Egc\BuildEgcCarryForwardPlanAction;
 use App\Modules\Finance\Models\FinanceCharge;
-use App\Modules\Finance\Models\Payment;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 
 class ListEgcCarryForwardCandidatesQuery
 {
@@ -17,30 +16,16 @@ class ListEgcCarryForwardCandidatesQuery
 
     public function handle(int $semesterId, ?int $campusId = null): array
     {
-        $students = Student::query()
-            ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
-            ->whereHas('financeCharges', function ($query) use ($semesterId) {
-                $query->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
-                    ->where('status', FinanceCharge::STATUS_ACTIVE)
-                    ->where('semester_id', $semesterId)
-                    ->where('amount', '>', 0);
-            })
-            ->with([
-                'financeCharges' => fn ($query) => $query
-                    ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
-                    ->where('status', FinanceCharge::STATUS_ACTIVE)
-                    ->with([
-                        'semester:id,name',
-                        'invoiceLines.invoice:id,invoice_number,student_id,semester_id',
-                        'invoiceLines.paymentApplications',
-                        'invoiceLines.discountAllocations',
-                    ]),
-                'payments' => fn ($query) => $query
-                    ->where('status', Payment::STATUS_COMPLETED)
-                    ->with('applications'),
-            ])
-            ->orderBy('student_id')
-            ->get();
+        $studentIds = FinanceCharge::query()
+            ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->where('semester_id', $semesterId)
+            ->where('amount', '>', 0)
+            ->distinct()
+            ->pluck('student_id')
+            ->map(static fn (int|string $studentId): int => (int) $studentId)
+            ->all();
+        $references = app(StudentReferenceReader::class)->findMany($studentIds);
 
         $groups = [
             'eligible' => [],
@@ -48,8 +33,12 @@ class ListEgcCarryForwardCandidatesQuery
             'ineligible' => [],
         ];
 
-        foreach ($students as $student) {
-            $candidate = $this->buildPlanAction->run($student, $semesterId);
+        foreach ($references as $studentId => $reference) {
+            if ($campusId !== null && $reference->campusId !== $campusId) {
+                continue;
+            }
+
+            $candidate = $this->buildPlanAction->run((int) $studentId, $semesterId);
             $groups[$candidate['status']][] = $candidate;
         }
 

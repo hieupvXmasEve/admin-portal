@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Major;
 
 use App\Models\ScholarshipDefinition;
-use App\Models\Student;
 use App\Models\StudentScholarshipAward;
+use App\Models\VoucherApplication;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
+use App\Shared\Contracts\Academic\DTO\ProgramEnrollmentSummary;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentCollectionEligibilityReader;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
@@ -75,53 +80,75 @@ class PreviewMajorChargeGenerationQuery
             ->values()
             ->all();
 
-        $students = Student::query()
-            ->with(['scholarshipAward.scholarshipDefinition', 'voucherApplications.voucherDefinition'])
-            ->whereIn('status', ['intake_course', 'intake_major'])
-            ->when($studentIds !== [], fn ($query) => $query->whereIn('id', $studentIds))
-            ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
-            ->when($ignoredStudentIds !== [], fn ($query) => $query->whereNotIn('student_id', $ignoredStudentIds))
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($studentQuery) use ($search) {
-                    $studentQuery->where('full_name', 'like', "%{$search}%")
-                        ->orWhere('student_id', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
-                });
-            })
-            ->orderBy('student_id')
-            ->get();
+        $eligibleStudentIds = app(StudentCollectionEligibilityReader::class)->eligibleStudentIds(['tuition'], $campusId);
+        if ($studentIds !== []) {
+            $eligibleStudentIds = array_values(array_intersect($eligibleStudentIds, $studentIds));
+        }
+        if ($search !== '') {
+            $eligibleStudentIds = array_values(array_intersect(
+                $eligibleStudentIds,
+                app(StudentReferenceReader::class)->idsMatchingSearch($search, $campusId),
+            ));
+        }
 
-        return $students->map(fn (Student $student) => $this->classify($student, $semesterId));
+        $references = app(StudentReferenceReader::class)->findMany($eligibleStudentIds);
+        $enrollments = app(ProgramEnrollmentReader::class)->forStudentIds(array_keys($references));
+        $awards = StudentScholarshipAward::query()
+            ->with('scholarshipDefinition')
+            ->whereIn('student_id', array_keys($references))
+            ->get()
+            ->keyBy('student_id');
+        $vouchers = VoucherApplication::query()
+            ->with('voucherDefinition')
+            ->whereIn('student_id', array_keys($references))
+            ->get()
+            ->groupBy('student_id');
+
+        return collect($references)
+            ->filter(fn (StudentReference $reference): bool => ! in_array($reference->studentCode, $ignoredStudentIds, true))
+            ->sortBy(fn (StudentReference $reference): string => $reference->studentCode)
+            ->map(fn (StudentReference $reference): array => $this->classify(
+                $reference,
+                $enrollments[$reference->id] ?? app(ProgramEnrollmentReader::class)->forStudentId($reference->id),
+                $awards->get($reference->id),
+                $vouchers->get($reference->id, collect()),
+                $semesterId,
+            ));
     }
 
-    private function classify(Student $student, int $semesterId): array
-    {
+    private function classify(
+        StudentReference $student,
+        ProgramEnrollmentSummary $enrollment,
+        ?StudentScholarshipAward $award,
+        Collection $voucherApplications,
+        int $semesterId,
+    ): array {
         $base = $this->baseRow($student);
 
         // FIN-REV-020-02 (M2): a fully deferred semester enrollment is non-billable,
         // so it must not surface as expected/missing tuition (regardless of policy).
-        if ($this->deferChargeResolver->isSemesterEnrollmentDeferred($student, $semesterId)) {
+        if ($this->deferChargeResolver->isSemesterEnrollmentDeferred($student->id, $semesterId)) {
             return array_merge($base, [
                 'eligibility_status' => 'ineligible',
                 'eligibility_reason' => 'deferred',
             ]);
         }
 
-        if ($student->curriculum_version_id === null) {
+        if ($enrollment->curriculumVersionId === null) {
             return array_merge($base, [
                 'eligibility_status' => 'warning',
                 'eligibility_reason' => 'missing_curriculum_version',
             ]);
         }
 
-        if ($student->intake_semester_id === null) {
+        if ($enrollment->intakeSemesterId === null) {
             return array_merge($base, [
                 'eligibility_status' => 'warning',
                 'eligibility_reason' => 'missing_intake_semester',
             ]);
         }
 
-        if ($student->intake_major === null) {
+        if ($enrollment->intakeMajorSemesterId === null) {
             return array_merge($base, [
                 'eligibility_status' => 'warning',
                 'eligibility_reason' => 'missing_intake_major',
@@ -144,14 +171,14 @@ class PreviewMajorChargeGenerationQuery
             ]);
         }
 
-        if (! $this->timingResolver->shouldGenerateTuitionForSemester($student, $semesterId)) {
+        if (! $this->timingResolver->shouldGenerateTuitionForSemester($enrollment, $semesterId)) {
             return array_merge($base, [
                 'eligibility_status' => 'ineligible',
                 'eligibility_reason' => 'tuition_not_due_this_semester',
             ]);
         }
 
-        $termData = $this->timingResolver->getTuitionTermData($student, $semesterId);
+        $termData = $this->timingResolver->getTuitionTermData($enrollment, $semesterId);
         $amount = $termData['amount'];
         $termNumber = $termData['term_number'];
 
@@ -179,8 +206,8 @@ class PreviewMajorChargeGenerationQuery
             ]);
         }
 
-        $scholarship = $this->resolveScholarship($student->scholarshipAward, (float) $amount);
-        $voucher = $this->resolveVoucher($student, $semesterId);
+        $scholarship = $this->resolveScholarship($award, (float) $amount);
+        $voucher = $this->resolveVoucher($student->id, $voucherApplications, $semesterId);
 
         return array_merge($base, [
             'eligibility_status' => 'eligible',
@@ -204,12 +231,12 @@ class PreviewMajorChargeGenerationQuery
      *
      * @return array{codes: array<int, string>, amount: float}
      */
-    private function resolveVoucher(Student $student, int $semesterId): array
+    private function resolveVoucher(int $studentId, Collection $voucherApplications, int $semesterId): array
     {
         $codes = [];
         $amount = 0.0;
 
-        foreach ($student->voucherApplications as $voucherApp) {
+        foreach ($voucherApplications as $voucherApp) {
             // Rule: invoice_id IS NULL => not yet consumed.
             if ($voucherApp->invoice_id) {
                 continue;
@@ -220,7 +247,7 @@ class PreviewMajorChargeGenerationQuery
             if ($discountAmount <= 0 && $voucherApp->voucherDefinition) {
                 $resolved = $this->voucherDiscountAmountResolver->resolveAmounts(
                     $voucherApp->voucherDefinition,
-                    $student,
+                    $studentId,
                     $semesterId,
                 );
                 $discountAmount = (float) $resolved['discount_amount'];
@@ -277,12 +304,12 @@ class PreviewMajorChargeGenerationQuery
         ];
     }
 
-    private function baseRow(Student $student): array
+    private function baseRow(StudentReference $student): array
     {
         return [
             'student_id' => $student->id,
-            'student_name' => $student->full_name,
-            'student_code' => $student->student_id,
+            'student_name' => $student->fullName,
+            'student_code' => $student->studentCode,
             'student_email' => $student->email,
             'eligibility_status' => 'eligible',
             'eligibility_reason' => null,

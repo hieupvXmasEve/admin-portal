@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Egc;
 
-use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceCreditEntitlement;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
@@ -35,10 +35,10 @@ class ApplyEgcMajorEntryCreditAction
     public static function run(int $studentId, int $semesterId): FinanceCreditEntitlement
     {
         return DB::transaction(function () use ($studentId, $semesterId) {
-            $student = Student::findOrFail($studentId);
+            $enrollment = app(ProgramEnrollmentReader::class)->forStudentId($studentId);
 
             // Guard: student must have transitioned out of intake_pre_uni_gc
-            if ($student->status === 'intake_pre_uni_gc') {
+            if ($enrollment->studyStage === 'intake_pre_uni_gc') {
                 throw ValidationException::withMessages([
                     'student_id' => ['Student is still an active EGC student and has not transitioned to major entry.'],
                 ]);

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Egc;
 
-use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Modules\Finance\Support\EgcBlockGenerationClassifier;
@@ -12,6 +11,7 @@ use App\Modules\Finance\Support\EgcBlockGenerationState;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
 use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
 use App\Shared\Contracts\Academic\DTO\AcademicEgcBlockData;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -38,15 +38,9 @@ class GenerateEgcChargesAction
         foreach ($data['students'] as $studentData) {
             $studentId = (int) $studentData['student_id'];
             $blockCount = (int) ($studentData['block_count'] ?? 2);
-            $student = Student::query()
-                ->select(['id', 'gc_current_level', 'gc_total_levels'])
-                ->find($studentId);
-            $currentLevel = $student?->gc_current_level !== null
-                ? (int) $student->gc_current_level
-                : (int) ($studentData['current_level'] ?? 0);
-            $totalLevels = $student?->gc_total_levels !== null
-                ? (int) $student->gc_total_levels
-                : 0;
+            $enrollment = app(ProgramEnrollmentReader::class)->forStudentId($studentId);
+            $currentLevel = $enrollment->egcCurrentLevel ?? (int) ($studentData['current_level'] ?? 0);
+            $totalLevels = $enrollment->egcTotalLevels ?? 0;
 
             // Student đang học current level → phí dự kiến cho level tiếp theo
             // Student đã học xong → phí cho current level hiện tại
@@ -59,7 +53,7 @@ class GenerateEgcChargesAction
                 continue;
             }
 
-            $blockState = app(EgcBlockGenerationClassifier::class)->classify($student, $semesterId);
+            $blockState = app(EgcBlockGenerationClassifier::class)->classify($studentId, $semesterId);
 
             if ($blockState->isBlocked()) {
                 $results['skipped'] += $blockCount;

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Major;
 
-use App\Models\Student;
 use App\Models\VoucherApplication;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
@@ -13,6 +12,8 @@ use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -49,35 +50,40 @@ class GenerateMajorChargesAction
             return $stats;
         }
 
-        $students = Student::query()
-            ->with(['scholarshipAward.scholarshipDefinition', 'voucherApplications.voucherDefinition'])
-            ->whereIn('id', $studentIds)
-            ->whereIn('status', ['intake_course', 'intake_major'])
-            ->get();
+        $students = app(StudentReferenceReader::class)->findMany($studentIds->all());
+        $enrollments = app(ProgramEnrollmentReader::class)->forStudentIds(array_keys($students));
 
         DB::beginTransaction();
         try {
-            foreach ($students as $student) {
+            foreach ($students as $studentId => $student) {
                 try {
-                    if (self::hasActiveHpCharge($student->id, $semesterId)) {
+                    $enrollment = $enrollments[$studentId]
+                        ?? app(ProgramEnrollmentReader::class)->forStudentId((int) $studentId);
+                    if (! in_array($enrollment->studyStage, ['intake_course', 'intake_major'], true)) {
                         $stats['skipped']++;
 
                         continue;
                     }
 
-                    if (! $timingResolver->shouldGenerateTuitionForSemester($student, $semesterId)) {
+                    if (self::hasActiveHpCharge((int) $studentId, $semesterId)) {
                         $stats['skipped']++;
 
                         continue;
                     }
 
-                    if (! $submitTuition->isChargeable($student, $semesterId)) {
+                    if (! $timingResolver->shouldGenerateTuitionForSemester($enrollment, $semesterId)) {
                         $stats['skipped']++;
 
                         continue;
                     }
 
-                    $result = $submitTuition->handle($student, $semesterId, [
+                    if (! $submitTuition->isChargeable((int) $studentId, $semesterId)) {
+                        $stats['skipped']++;
+
+                        continue;
+                    }
+
+                    $result = $submitTuition->handle((int) $studentId, $semesterId, [
                         'source_kind' => SubmitTuitionTermDebitAction::SOURCE_KIND_BATCH_STUDIO,
                         'due_date' => $dueDate->toDateString(),
                     ]);
@@ -104,7 +110,7 @@ class GenerateMajorChargesAction
                             $invoiceService,
                             $voucherDiscountAmountResolver,
                             $invoice,
-                            $student,
+                            (int) $studentId,
                             $semesterId,
                         );
                     }
@@ -112,7 +118,7 @@ class GenerateMajorChargesAction
                     $stats['created']++;
                 } catch (\Throwable $e) {
                     $stats['failed']++;
-                    $stats['errors'][] = "Student {$student->student_id}: ".$e->getMessage();
+                    $stats['errors'][] = "Student {$student->studentCode}: ".$e->getMessage();
                 }
             }
             DB::commit();
@@ -142,10 +148,15 @@ class GenerateMajorChargesAction
         InvoiceGenerationService $invoiceService,
         VoucherDiscountAmountResolver $voucherDiscountAmountResolver,
         StudentInvoice $invoice,
-        Student $student,
+        int $studentId,
         int $semesterId,
     ): void {
-        foreach ($student->voucherApplications as $voucherApp) {
+        $voucherApplications = VoucherApplication::query()
+            ->with('voucherDefinition')
+            ->where('student_id', $studentId)
+            ->get();
+
+        foreach ($voucherApplications as $voucherApp) {
             if ($voucherApp->invoice_id) {
                 continue;
             }
@@ -155,7 +166,7 @@ class GenerateMajorChargesAction
             if ($discountAmount <= 0 && $voucherApp->voucherDefinition) {
                 $resolved = $voucherDiscountAmountResolver->resolveAmounts(
                     $voucherApp->voucherDefinition,
-                    $student,
+                    $studentId,
                     $semesterId,
                 );
                 $discountAmount = (float) $resolved['discount_amount'];

@@ -4,38 +4,44 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Egc;
 
-use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
 use App\Shared\Contracts\Academic\DTO\AcademicEgcBlockData;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 
 class BuildEgcCarryForwardPlanAction
 {
-    public function run(Student|int $student, int $semesterId): array
+    public function run(int|object $student, int $semesterId): array
     {
-        $student = $student instanceof Student
-            ? $student
-            : Student::query()
-                ->with([
-                    'financeCharges' => fn ($query) => $query
-                        ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
-                        ->where('status', FinanceCharge::STATUS_ACTIVE)
-                        ->with([
-                            'semester:id,name',
-                            'invoiceLines.invoice:id,invoice_number,student_id,semester_id',
-                            'invoiceLines.paymentApplications',
-                            'invoiceLines.discountAllocations',
-                        ]),
-                    'payments' => fn ($query) => $query
-                        ->where('status', Payment::STATUS_COMPLETED)
-                        ->with('applications'),
-                ])
-                ->findOrFail($student);
+        $studentId = is_int($student) ? $student : (int) ($student->id ?? 0);
+        $reference = app(StudentReferenceReader::class)->find($studentId);
+        if ($studentId <= 0 || $reference === null) {
+            throw new \InvalidArgumentException('Student reference was not found for EGC carry-forward.');
+        }
+
+        $enrollment = app(ProgramEnrollmentReader::class)->forStudentId($studentId);
+        $activeCharges = FinanceCharge::query()
+            ->where('student_id', $studentId)
+            ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->with([
+                'semester:id,name',
+                'invoiceLines.invoice:id,invoice_number,student_id,semester_id',
+                'invoiceLines.paymentApplications',
+                'invoiceLines.discountAllocations',
+            ])
+            ->get();
+        $payments = Payment::query()
+            ->where('student_id', $studentId)
+            ->where('status', Payment::STATUS_COMPLETED)
+            ->with('applications')
+            ->get();
 
         $academicSources = app(AcademicFinanceChargeSourceGateway::class);
-        $egcBlocks = collect($academicSources->egcBlocksForStudent((int) $student->id));
+        $egcBlocks = collect($academicSources->egcBlocksForStudent($studentId));
         $chargesByBlock = app(EgcBlockFinanceResolver::class)->chargesFor($egcBlocks);
         $consumedBlocks = $egcBlocks
             ->filter(function ($block) use ($chargesByBlock) {
@@ -53,13 +59,13 @@ class BuildEgcCarryForwardPlanAction
             ->values();
 
         $consumedChargeIds = $consumedBlocks
-            ->map(fn (EgcBlock $block): ?int => $chargesByBlock->get($block->id)?->id)
+            ->map(fn (AcademicEgcBlockData $block): ?int => $chargesByBlock->get($block->id)?->id)
             ->filter()
             ->values()
             ->all();
 
-        $activeCharges = $student->financeCharges
-            ->filter(fn ($charge) => $charge->amount > 0)
+        $activeCharges = $activeCharges
+            ->filter(fn (FinanceCharge $charge): bool => $charge->amount > 0)
             ->sortBy(['semester_id', 'id'])
             ->values();
 
@@ -111,14 +117,14 @@ class BuildEgcCarryForwardPlanAction
         }
 
         $eligibleReleaseAmount = collect($unusedChargeRows)->sum('releaseable_amount');
-        $currentUnappliedBalance = $student->payments->sum(function ($payment) {
+        $currentUnappliedBalance = $payments->sum(function (Payment $payment) {
             return max(0, (float) $payment->amount - (float) $payment->applications->sum('amount'));
         });
 
         $status = 'ineligible';
         $reason = 'No active EGC charges found for the selected semester.';
 
-        if ($student->status === 'intake_pre_uni_gc') {
+        if ($enrollment->studyStage === 'intake_pre_uni_gc') {
             $reason = 'Student is still an active EGC student.';
         } elseif (! empty($issues)) {
             $status = 'needs_data_repair';
@@ -133,10 +139,10 @@ class BuildEgcCarryForwardPlanAction
         }
 
         return [
-            'student_id' => $student->id,
-            'student_name' => $student->full_name,
-            'student_code' => $student->student_id,
-            'student_status' => $student->status,
+            'student_id' => $studentId,
+            'student_name' => $reference->fullName,
+            'student_code' => $reference->studentCode,
+            'student_status' => $enrollment->legacyCompatibleStatus(),
             'semester_id' => $semesterId,
             'charged_levels_count' => $activeCharges->count(),
             'consumed_levels_count' => $consumedBlocks->count(),

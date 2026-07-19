@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Egc;
 
-use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Modules\Finance\Support\EgcBlockGenerationClassifier;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
 use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
 use App\Shared\Contracts\Academic\DTO\AcademicEgcBlockData;
+use App\Shared\Contracts\Academic\DTO\ProgramEnrollmentSummary;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentCollectionEligibilityReader;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
@@ -86,44 +90,50 @@ class PreviewEgcChargeGenerationQuery
             ->values()
             ->all();
 
-        $students = Student::query()
-            ->where('status', 'intake_pre_uni_gc')
-            ->when($studentIds !== [], fn ($query) => $query->whereIn('id', $studentIds))
-            ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
-            ->when($ignoredStudentIds !== [], fn ($query) => $query->whereNotIn('student_id', $ignoredStudentIds))
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($studentQuery) use ($search) {
-                    $studentQuery->where('full_name', 'like', "%{$search}%")
-                        ->orWhere('student_id', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
-                });
-            })
-            ->orderBy('student_id')
-            ->get();
+        $eligibleStudentIds = app(StudentCollectionEligibilityReader::class)->eligibleStudentIds(['egc'], $campusId);
+        if ($studentIds !== []) {
+            $eligibleStudentIds = array_values(array_intersect($eligibleStudentIds, $studentIds));
+        }
+        if ($search !== '') {
+            $eligibleStudentIds = array_values(array_intersect(
+                $eligibleStudentIds,
+                app(StudentReferenceReader::class)->idsMatchingSearch($search, $campusId),
+            ));
+        }
 
-        return $students->map(fn (Student $student) => $this->classify($student, $semesterId));
+        $references = app(StudentReferenceReader::class)->findMany($eligibleStudentIds);
+        $enrollments = app(ProgramEnrollmentReader::class)->forStudentIds(array_keys($references));
+
+        return collect($references)
+            ->filter(fn (StudentReference $reference): bool => ! in_array($reference->studentCode, $ignoredStudentIds, true))
+            ->sortBy(fn (StudentReference $reference): string => $reference->studentCode)
+            ->map(fn (StudentReference $reference): array => $this->classify(
+                $reference,
+                $enrollments[$reference->id] ?? app(ProgramEnrollmentReader::class)->forStudentId($reference->id),
+                $semesterId,
+            ));
     }
 
-    private function classify(Student $student, int $semesterId): array
+    private function classify(StudentReference $student, ProgramEnrollmentSummary $enrollment, int $semesterId): array
     {
         $base = $this->baseRow($student);
 
-        if ($student->gc_current_level === null) {
+        if ($enrollment->egcCurrentLevel === null) {
             return array_merge($base, [
                 'eligibility_status' => 'warning',
                 'eligibility_reason' => 'missing_current_level',
             ]);
         }
 
-        if ($student->gc_total_levels === null) {
+        if ($enrollment->egcTotalLevels === null) {
             return array_merge($base, [
                 'eligibility_status' => 'warning',
                 'eligibility_reason' => 'missing_total_levels',
             ]);
         }
 
-        $currentLevel = (int) $student->gc_current_level;
-        $totalLevels = (int) $student->gc_total_levels;
+        $currentLevel = $enrollment->egcCurrentLevel;
+        $totalLevels = $enrollment->egcTotalLevels;
 
         if ($totalLevels <= 0) {
             return array_merge($base, [
@@ -155,7 +165,7 @@ class PreviewEgcChargeGenerationQuery
             ]);
         }
 
-        $blockState = $this->blockClassifier()->classify($student, $semesterId);
+        $blockState = $this->blockClassifier()->classify($student->id, $semesterId);
 
         if ($blockState->isBlocked()) {
             return array_merge($base, [
@@ -342,12 +352,12 @@ class PreviewEgcChargeGenerationQuery
         return $this->academicSources()->isEgcRetakeEligible($studentId, $levelNumber);
     }
 
-    private function baseRow(Student $student): array
+    private function baseRow(StudentReference $student): array
     {
         return [
             'student_id' => $student->id,
-            'student_name' => $student->full_name,
-            'student_code' => $student->student_id,
+            'student_name' => $student->fullName,
+            'student_code' => $student->studentCode,
             'student_email' => $student->email,
             'eligibility_status' => 'eligible',
             'eligibility_reason' => null,
