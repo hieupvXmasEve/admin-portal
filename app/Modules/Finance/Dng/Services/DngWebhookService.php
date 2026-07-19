@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Dng\Services;
 
-use App\Modules\Academic\Actions\AutoEnrollRetakeCourseAction;
 use App\Modules\Finance\Actions\CaptureDngProviderReceiptAction;
 use App\Modules\Finance\Actions\RegisterDngReceiptExceptionAction;
 use App\Modules\Finance\Actions\ResumeFinanceCancellationOnPaidEvidenceAction;
 use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
-use App\Modules\Finance\Models\FinanceCharge;
-use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
@@ -198,12 +195,14 @@ class DngWebhookService
 
             case 'already_progressed':
                 $this->recoverPaidState($request->fresh(), $payload);
+                $this->syncAcademicPaymentProjections($request->fresh());
                 $event->markSkipped('Request already progressed beyond this event');
 
                 return;
 
             case 'equivalent':
                 $this->recoverPaidState($request->fresh(), $payload);
+                $this->syncAcademicPaymentProjections($request->fresh());
                 $event->markSkipped('Equivalent event already applied');
 
                 return;
@@ -232,11 +231,7 @@ class DngWebhookService
             $this->settleInstallmentAction->handle($freshRequest);
             $this->resumeFinanceCancellationForRequest($freshRequest);
 
-            // Auto-enroll retake course registrations when payment confirmed.
-            $this->handleRetakeCourseAutoEnroll($freshRequest);
-
-            // Sync exam-resit (thi lại) HQ paid state from canonical Finance evidence.
-            $this->handleExamResitPaymentSync($freshRequest);
+            $this->syncAcademicPaymentProjections($freshRequest);
         }
 
         $event->markProcessed();
@@ -431,31 +426,15 @@ class DngWebhookService
     /** Handle auto-enrollment for retake course registrations after payment confirmation. */
     private function handleRetakeCourseAutoEnroll(DngPaymentRequest $request): void
     {
-        try {
-            // Only applicable to retake fee DNG requests
-            if ($request->fee_type !== 'HL') {
-                return;
-            }
+        if ($request->fee_type !== 'HL') {
+            return;
+        }
 
-            $chargeLinks = $request->chargeLinks()->get();
-            foreach ($chargeLinks as $link) {
-                $charge = FinanceCharge::find($link->finance_charge_id);
-                if ($charge) {
-                    $registrationId = $this->resolveRetakeRegistrationId($charge);
-                    if ($registrationId !== null) {
-                        AutoEnrollRetakeCourseAction::handlePaymentConfirmed($registrationId);
-                    }
-                }
-            }
-
-            // Legacy aggregate requests may not have pivot links. After payment bridge,
-            // settlement truth identifies every linked retake charge that is fully paid.
-            $this->retakeRegistrationPaymentSyncer->runForStudent((int) $request->student_id);
-        } catch (\Throwable $e) {
-            Log::warning('DNG webhook: retake course auto-enroll failed', [
-                'dng_payment_request_id' => $request->id,
-                'error' => $e->getMessage(),
-            ]);
+        // Settlement truth identifies every linked retake charge that is fully paid,
+        // including legacy aggregate requests without charge links.
+        $result = $this->retakeRegistrationPaymentSyncer->runForStudent((int) $request->student_id);
+        if ($result['failed'] > 0) {
+            throw new \RuntimeException('Academic retake payment sync failed.');
         }
     }
 
@@ -468,18 +447,20 @@ class DngWebhookService
      */
     private function handleExamResitPaymentSync(DngPaymentRequest $request): void
     {
-        try {
-            if ($request->fee_type !== 'PTL') {
-                return;
-            }
-
-            $this->examResitAttemptPaymentSyncer->runForStudent((int) $request->student_id);
-        } catch (\Throwable $e) {
-            Log::warning('DNG webhook: exam resit payment sync failed', [
-                'dng_payment_request_id' => $request->id,
-                'error' => $e->getMessage(),
-            ]);
+        if ($request->fee_type !== 'PTL') {
+            return;
         }
+
+        $result = $this->examResitAttemptPaymentSyncer->runForStudent((int) $request->student_id);
+        if ($result['failed'] > 0) {
+            throw new \RuntimeException('Academic exam resit payment sync failed.');
+        }
+    }
+
+    private function syncAcademicPaymentProjections(DngPaymentRequest $request): void
+    {
+        $this->handleRetakeCourseAutoEnroll($request);
+        $this->handleExamResitPaymentSync($request);
     }
 
     private function publishPaymentReceivedNotification(DngPaymentRequest $request): void
@@ -549,20 +530,5 @@ class DngWebhookService
             DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG => -2,
             default => 0,
         };
-    }
-
-    private function resolveRetakeRegistrationId(FinanceCharge $charge): ?int
-    {
-        if ($charge->finance_obligation_id) {
-            $obligation = FinanceObligation::query()->find($charge->finance_obligation_id);
-            if ($obligation && $obligation->source_kind === 'course_retake_registration') {
-                $ref = (string) $obligation->source_ref;
-                if (str_starts_with($ref, 'retake:')) {
-                    return (int) substr($ref, strlen('retake:'));
-                }
-            }
-        }
-
-        return null;
     }
 }

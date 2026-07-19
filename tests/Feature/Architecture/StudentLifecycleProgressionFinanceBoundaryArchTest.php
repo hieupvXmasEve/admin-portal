@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\File;
 
 it('keeps Academic lifecycle flows behind Progression and Finance owner boundaries', function (): void {
     $academicLifecycleFiles = [
-        'app/Modules/Academic/Actions/RecordStudentActionAction.php',
+        'app/Modules/Academic/Progression/Actions/RecordStudentActionAction.php',
         'app/Modules/Academic/Actions/ImportStudentActionsFromExcelAction.php',
         'app/Modules/Academic/Http/Requests/StoreStudentActionRequest.php',
         'app/Modules/Academic/Support/LifecycleFormOptions.php',
@@ -26,7 +26,7 @@ it('keeps Academic lifecycle flows behind Progression and Finance owner boundari
             ->not->toContain('App\\Modules\\Finance\\Models');
     }
 
-    $recordAction = file_get_contents(base_path('app/Modules/Academic/Actions/RecordStudentActionAction.php')) ?: '';
+    $recordAction = file_get_contents(base_path('app/Modules/Academic/Progression/Actions/RecordStudentActionAction.php')) ?: '';
 
     expect($recordAction)->toContain('TransitionProgramEnrollmentAction');
 
@@ -43,9 +43,11 @@ it('keeps Academic lifecycle flows behind Progression and Finance owner boundari
         ->values()
         ->all();
 
-    expect($directFinanceConsumers)->toBe([
-        'app/Modules/Academic/Actions/RemediateEgcAttendanceFailuresAction.php',
-    ]);
+    expect($directFinanceConsumers)->toBeEmpty();
+
+    $remediationAction = file_get_contents(base_path('app/Modules/Academic/Actions/RemediateEgcAttendanceFailuresAction.php')) ?: '';
+
+    expect($remediationAction)->toContain('EgcBlockResultReconciler');
 });
 
 it('binds narrow Finance lifecycle query and command contracts to Finance implementations', function (): void {

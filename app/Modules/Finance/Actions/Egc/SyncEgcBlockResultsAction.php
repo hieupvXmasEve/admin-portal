@@ -6,8 +6,9 @@ namespace App\Modules\Finance\Actions\Egc;
 
 use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
 use App\Shared\Contracts\Academic\DTO\AcademicEgcBlockData;
+use App\Shared\Contracts\Finance\EgcBlockResultReconciler;
 
-class SyncEgcBlockResultsAction
+class SyncEgcBlockResultsAction implements EgcBlockResultReconciler
 {
     /**
      * Sync EGC block results from academic_records for a given semester.
@@ -18,6 +19,24 @@ class SyncEgcBlockResultsAction
      * - attendance_percentage from the resolved record
      */
     public static function run(int $semesterId): array
+    {
+        return app(self::class)->syncSemester($semesterId);
+    }
+
+    public function reconcileSemester(int $semesterId): void
+    {
+        $this->syncSemester($semesterId);
+    }
+
+    /**
+     * @return array{
+     *     synced: int,
+     *     total: int,
+     *     skipped: list<array<string, mixed>>,
+     *     reconciliation: array<string, mixed>
+     * }
+     */
+    private function syncSemester(int $semesterId): array
     {
         $academicSources = app(AcademicFinanceChargeSourceGateway::class);
         $blocks = collect($academicSources->egcBlocksForSemester($semesterId));

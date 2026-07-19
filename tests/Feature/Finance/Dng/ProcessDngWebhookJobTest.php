@@ -24,6 +24,7 @@ use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\Payment;
 use App\Services\FinanceService\PaymentService;
+use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -184,6 +185,46 @@ it('processes callback 1 (no invoice) and transitions to paid_uninvoiced', funct
     expect($event->processing_status)->toBe(DngWebhookEvent::STATUS_PROCESSED);
     expect($event->attempt_count)->toBe(1);
     expect($event->is_valid_checksum)->toBeTrue();
+});
+
+it('retries a paid retake webhook when the Academic projection command reports a failure', function () {
+    $dngPaymentRequest = createDngPaymentRequest($this->student, 'PAY-RETRY-RETAKE', 5000000);
+    $dngPaymentRequest->update([
+        'fee_type' => 'HL',
+        'push_payload' => [
+            'StudentId' => 'STU001',
+            'CampusCode' => 'CAMPUS001',
+            'Type' => 'HL',
+            'Amount' => 5000000,
+            'ItemId' => 'ITEM001',
+        ],
+    ]);
+
+    $event = createWebhookEvent($dngPaymentRequest->fresh(), DngWebhookEvent::EVENT_PAYMENT_WITHOUT_INVOICE);
+
+    $paymentService = Mockery::mock(DngPaymentService::class);
+    $paymentService->shouldReceive('bridgeToPayment')->once();
+    app()->instance(DngPaymentService::class, $paymentService);
+
+    $syncer = Mockery::mock(RetakeRegistrationPaymentSyncer::class);
+    $syncer->shouldReceive('runForStudent')
+        ->once()
+        ->with($this->student->id)
+        ->andReturn([
+            'checked' => 1,
+            'eligible' => 1,
+            'synced' => 0,
+            'waiting_for_class' => 0,
+            'skipped' => 0,
+            'failed' => 1,
+            'details' => [],
+        ]);
+    app()->instance(RetakeRegistrationPaymentSyncer::class, $syncer);
+
+    expect(fn () => (new ProcessDngWebhookJob($event->id))->handle(app(DngWebhookService::class)))
+        ->toThrow(RuntimeException::class, 'Academic retake payment sync failed.');
+
+    expect($event->fresh()->processing_status)->toBe(DngWebhookEvent::STATUS_FAILED_RETRYABLE);
 });
 
 it('processes a verified receipt after a pushed request is held for settlement review', function () {

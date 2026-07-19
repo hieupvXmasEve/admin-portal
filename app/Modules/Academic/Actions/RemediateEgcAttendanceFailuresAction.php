@@ -10,8 +10,8 @@ use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\Student;
 use App\Modules\Academic\Support\FailureReasonClassifier;
-use App\Modules\Finance\Actions\Egc\SyncEgcBlockResultsAction;
 use App\Services\AttendanceService;
+use App\Shared\Contracts\Finance\EgcBlockResultReconciler;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +36,26 @@ final class RemediateEgcAttendanceFailuresAction
     ): array {
         $records = self::candidateQuery($studentIdentifier, $courseOfferingId)->get();
 
+        if ($dryRun) {
+            return self::remediateRecords($records, true);
+        }
+
+        return DB::transaction(fn (): array => self::remediateRecords($records, false));
+    }
+
+    /**
+     * @param  Collection<int, AcademicRecord>  $records
+     * @return array{
+     *     candidates: int,
+     *     remediated: int,
+     *     skipped: int,
+     *     attendances_flipped: int,
+     *     semesters_synced: int,
+     *     details: list<array<string, mixed>>
+     * }
+     */
+    private static function remediateRecords(Collection $records, bool $dryRun): array
+    {
         $stats = [
             'candidates' => $records->count(),
             'remediated' => 0,
@@ -66,7 +86,7 @@ final class RemediateEgcAttendanceFailuresAction
 
         if (! $dryRun && $affectedSemesterIds !== []) {
             foreach (array_keys($affectedSemesterIds) as $semesterId) {
-                SyncEgcBlockResultsAction::run((int) $semesterId);
+                app(EgcBlockResultReconciler::class)->reconcileSemester((int) $semesterId);
                 $stats['semesters_synced']++;
             }
         }
