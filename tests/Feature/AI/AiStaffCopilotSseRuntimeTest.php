@@ -662,7 +662,31 @@ it('retries a failed run without duplicating the original user message', functio
     $this->mock(AiFinanceMetricReader::class, function (MockInterface $mock): void {
         $mock->shouldReceive('collectionProgress')
             ->once()
+            ->ordered()
             ->andThrow(new RuntimeException('source unavailable'));
+        $mock->shouldReceive('collectionProgress')
+            ->once()
+            ->ordered()
+            ->andReturn([
+                'summary' => [
+                    'student_count' => 2,
+                    'billed_total' => 1000.0,
+                    'paid_total' => 700.0,
+                    'outstanding_total' => 300.0,
+                    'collection_rate' => 0.7,
+                ],
+                'breakdowns' => [
+                    'by_program' => [
+                        [
+                            'key' => 'IT',
+                            'label' => 'Information Technology',
+                            'student_count' => 2,
+                            'outstanding' => 300.0,
+                        ],
+                    ],
+                ],
+                'meta' => [],
+            ]);
     });
 
     $response = $this->actingAs($this->authorizedUser)
@@ -732,31 +756,6 @@ it('retries a failed run without duplicating the original user message', functio
             ->where('messages.1.run_status', AiChatRun::STATUS_FAILED)
             ->where('messages.2.role', 'assistant')
             ->where('messages.2.run_status', AiChatRun::STATUS_QUEUED));
-
-    $this->mock(AiFinanceMetricReader::class, function (MockInterface $mock): void {
-        $mock->shouldReceive('collectionProgress')
-            ->once()
-            ->andReturn([
-                'summary' => [
-                    'student_count' => 2,
-                    'billed_total' => 1000.0,
-                    'paid_total' => 700.0,
-                    'outstanding_total' => 300.0,
-                    'collection_rate' => 0.7,
-                ],
-                'breakdowns' => [
-                    'by_program' => [
-                        [
-                            'key' => 'IT',
-                            'label' => 'Information Technology',
-                            'student_count' => 2,
-                            'outstanding' => 300.0,
-                        ],
-                    ],
-                ],
-                'meta' => [],
-            ]);
-    });
 
     $retryResponse = $this->actingAs($this->authorizedUser)
         ->get(route('ai.copilot.runs.events', $retryRun))

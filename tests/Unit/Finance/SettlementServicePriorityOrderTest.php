@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
@@ -22,7 +23,34 @@ it('sorts outstanding lines by configured charge-type priority before due date',
         'status' => 'intake_course',
     ])->create();
 
+    $tuitionObligation = FinanceObligation::create([
+        'source_system' => 'test',
+        'source_kind' => 'settlement_priority',
+        'source_ref' => 'tuition',
+        'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 5000000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+
+    $retakeObligation = FinanceObligation::create([
+        'source_system' => 'test',
+        'source_kind' => 'settlement_priority',
+        'source_ref' => 'retake',
+        'obligation_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 1000000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+
     $tuitionCharge = FinanceCharge::create([
+        'finance_obligation_id' => $tuitionObligation->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
@@ -33,6 +61,7 @@ it('sorts outstanding lines by configured charge-type priority before due date',
     ]);
 
     $retakeCharge = FinanceCharge::create([
+        'finance_obligation_id' => $retakeObligation->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,

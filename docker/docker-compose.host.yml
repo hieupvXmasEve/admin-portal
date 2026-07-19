@@ -45,7 +45,7 @@ services:
     env_file:
       - ../.env
     working_dir: /app
-    command: php artisan queue:work --queue=${QUEUE_WORKER_QUEUES:-default,emails,notifications} --sleep=${QUEUE_WORKER_SLEEP:-1} --tries=${QUEUE_WORKER_TRIES:-3} --verbose
+    command: php artisan queue:work --queue=${QUEUE_WORKER_QUEUES:-default,emails,bulk-emails,notifications,finance,webhooks,reconciliation} --sleep=${QUEUE_WORKER_SLEEP:-1} --tries=${QUEUE_WORKER_TRIES:-3} --verbose
     environment:
       APP_ENV: production
       APP_DEBUG: 'false'

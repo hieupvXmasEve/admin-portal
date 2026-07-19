@@ -34,7 +34,7 @@ beforeEach(function (): void {
     ]);
 });
 
-function createSettlementObligation(float $amount = 1_000_000): array
+function createReaderSettlementObligation(float $amount = 1_000_000): array
 {
     $obligation = FinanceObligation::query()->create([
         'source_system' => 'academic',
@@ -138,7 +138,7 @@ it('returns missing_finance_obligation for absent source instead of cleared', fu
 });
 
 it('fails closed when an accepted obligation has no payable line', function (): void {
-    [, , $line] = createSettlementObligation();
+    [, , $line] = createReaderSettlementObligation();
     $line->delete();
 
     $settlement = readSettlement();
@@ -149,7 +149,7 @@ it('fails closed when an accepted obligation has no payable line', function (): 
 });
 
 it('derives unpaid settlement from active invoice lines and ignores stale invoice cache', function (): void {
-    [, , , $invoice] = createSettlementObligation(1_000_000);
+    [, , , $invoice] = createReaderSettlementObligation(1_000_000);
 
     $invoice->forceFill([
         'cached_total_amount' => 0,
@@ -168,7 +168,7 @@ it('derives unpaid settlement from active invoice lines and ignores stale invoic
 });
 
 it('derives partial and paid settlement from completed payment applications', function (): void {
-    [, , $line] = createSettlementObligation(1_000_000);
+    [, , $line] = createReaderSettlementObligation(1_000_000);
 
     applySettlementPayment($line, 400_000);
 
@@ -190,7 +190,7 @@ it('derives partial and paid settlement from completed payment applications', fu
 });
 
 it('ignores applications backed only by pending payments', function (): void {
-    [, , $line] = createSettlementObligation(1_000_000);
+    [, , $line] = createReaderSettlementObligation(1_000_000);
 
     applySettlementPayment($line, 1_000_000, Payment::STATUS_PENDING);
 
@@ -202,7 +202,7 @@ it('ignores applications backed only by pending payments', function (): void {
 });
 
 it('fails closed with canonical review evidence when completed applications exceed net payable', function (): void {
-    [, , $line] = createSettlementObligation(1_000_000);
+    [, , $line] = createReaderSettlementObligation(1_000_000);
 
     applySettlementPayment($line, 1_200_000);
 
@@ -216,7 +216,7 @@ it('fails closed with canonical review evidence when completed applications exce
 });
 
 it('derives settled_by_discount_or_credit when allocations cover the payable', function (): void {
-    [, , $line, $invoice] = createSettlementObligation(1_000_000);
+    [, , $line, $invoice] = createReaderSettlementObligation(1_000_000);
 
     applySettlementDiscount($invoice, $line, 1_000_000);
 
@@ -230,7 +230,7 @@ it('derives settled_by_discount_or_credit when allocations cover the payable', f
 });
 
 it('fails closed when a reversed discount leaves settlement residue', function (): void {
-    [, , $line, $invoice] = createSettlementObligation(1_000_000);
+    [, , $line, $invoice] = createReaderSettlementObligation(1_000_000);
 
     applySettlementDiscount($invoice, $line, 1_000_000, 'reversed');
 
