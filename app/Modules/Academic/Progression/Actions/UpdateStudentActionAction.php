@@ -2,24 +2,25 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Actions;
+namespace App\Modules\Academic\Progression\Actions;
 
 use App\Models\StudentActionLog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-class UpdateStudentActionAction
+final class UpdateStudentActionAction
 {
     /**
      * Update an existing student action log.
      *
-     * @param  StudentActionLog  $actionLog  The action log to update
-     * @param  array  $data  Updated data
-     * @return StudentActionLog The updated action log
+     * @param  array{action_log_id: int, fields: array<string, mixed>}  $data
      */
-    public static function run(StudentActionLog $actionLog, array $data): StudentActionLog
+    public static function run(array $data): StudentActionLog
     {
-        return DB::transaction(function () use ($actionLog, $data) {
+        $actionLog = StudentActionLog::query()->findOrFail($data['action_log_id']);
+        $fields = $data['fields'];
+
+        return DB::transaction(function () use ($actionLog, $fields) {
             // Filter updateable fields
             $fillable = [
                 'reason',
@@ -44,13 +45,13 @@ class UpdateStudentActionAction
             ];
 
             // Only update fields that are present in data and fillable
-            $updateData = array_intersect_key($data, array_flip($fillable));
+            $updateData = array_intersect_key($fields, array_flip($fillable));
 
             $actionLog->update($updateData);
 
             // Sync attachments if provided
-            if (isset($data['attachment_ids'])) {
-                $actionLog->attachments()->sync($data['attachment_ids']);
+            if (isset($fields['attachment_ids'])) {
+                $actionLog->attachments()->sync($fields['attachment_ids']);
             }
 
             Log::info('Student action updated', [

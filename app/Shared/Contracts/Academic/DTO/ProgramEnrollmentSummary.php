@@ -26,6 +26,9 @@ final readonly class ProgramEnrollmentSummary
         public string $enrollmentStatus,
         public ?string $studyStage,
         public ?string $legacyLifecycleStatus = null,
+        public ?int $egcStartingLevel = null,
+        public ?int $egcCurrentLevel = null,
+        public ?int $egcTotalLevels = null,
     ) {}
 
     public function legacyCompatibleStatus(): string

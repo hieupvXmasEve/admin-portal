@@ -27,6 +27,7 @@ final class MaterializeProgramEnrollmentAction
                 ->lockForUpdate()
                 ->first();
 
+            $isExistingEnrollment = $enrollment !== null;
             if ($enrollment === null) {
                 $enrollment = new ProgramEnrollment([
                     'source_type' => ProgramEnrollment::LEGACY_STUDENT_SOURCE,
@@ -35,8 +36,12 @@ final class MaterializeProgramEnrollmentAction
                 ]);
             }
 
-            $enrollmentStatus = self::enrollmentStatus($legacyStudent);
-            $studyStage = self::studyStage($legacyStudent);
+            $enrollmentStatus = $isExistingEnrollment
+                ? $enrollment->enrollment_status
+                : self::enrollmentStatus($legacyStudent);
+            $studyStage = $isExistingEnrollment
+                ? $enrollment->study_stage
+                : self::studyStage($legacyStudent);
 
             if ($enrollmentStatus === 'active' && $enrollment->is_primary) {
                 ProgramEnrollment::query()
@@ -55,9 +60,20 @@ final class MaterializeProgramEnrollmentAction
                 'program_id' => $legacyStudent->program_id,
                 'curriculum_version_id' => $legacyStudent->curriculum_version_id,
                 'intake_semester_id' => $legacyStudent->intake_semester_id,
-                'intake_major_semester_id' => $legacyStudent->intake_major,
+                'intake_major_semester_id' => $isExistingEnrollment
+                    ? $enrollment->intake_major_semester_id
+                    : $legacyStudent->intake_major,
                 'enrollment_status' => $enrollmentStatus,
                 'study_stage' => $studyStage,
+                'egc_starting_level' => $isExistingEnrollment
+                    ? $enrollment->egc_starting_level
+                    : $legacyStudent->gc_starting_level,
+                'egc_current_level' => $isExistingEnrollment
+                    ? $enrollment->egc_current_level
+                    : $legacyStudent->gc_current_level,
+                'egc_total_levels' => $isExistingEnrollment
+                    ? $enrollment->egc_total_levels
+                    : $legacyStudent->gc_total_levels,
                 'source_snapshot' => self::sourceSnapshot($legacyStudent),
                 'materialized_at' => now(),
             ]);

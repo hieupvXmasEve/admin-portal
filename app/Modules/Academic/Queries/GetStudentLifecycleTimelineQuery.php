@@ -11,6 +11,7 @@ use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
 use App\Models\User;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -228,9 +229,11 @@ class GetStudentLifecycleTimelineQuery
             ])
             ->all();
 
+        $enrollment = app(ProgramEnrollmentReader::class)->forStudentId((int) $student->id);
+
         return [
-            'current_level' => $student->gc_current_level !== null ? (int) $student->gc_current_level : null,
-            'starting_level' => $student->gc_starting_level !== null ? (int) $student->gc_starting_level : null,
+            'current_level' => $enrollment->egcCurrentLevel,
+            'starting_level' => $enrollment->egcStartingLevel,
             'history' => $history,
             'ielts' => $ielts,
         ];

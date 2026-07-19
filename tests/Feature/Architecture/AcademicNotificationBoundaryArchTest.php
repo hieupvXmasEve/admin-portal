@@ -10,7 +10,7 @@ it('keeps legacy Academic lifecycle services off Notification implementation typ
     $paths = [
         ...iterator_to_array(new RecursiveIteratorIterator(new RecursiveDirectoryIterator(dirname(__DIR__, 3).'/app/Modules/Academic'))),
         dirname(__DIR__, 3).'/app/Services/CourseCompletionService.php',
-        dirname(__DIR__, 3).'/app/Services/EgcLevelProgressionService.php',
+        dirname(__DIR__, 3).'/app/Modules/Academic/Progression/Actions/ProcessEgcCourseResultsAction.php',
     ];
 
     $violations = array_values(array_filter($paths, function (mixed $path): bool {
@@ -38,4 +38,14 @@ it('detects a deliberate Academic import of a Notification implementation type',
     PHP;
 
     expect(str_contains($fixture, 'App\\Modules\\Notification\\'))->toBeTrue();
+});
+
+it('keeps EGC progression on published Course Result inputs', function () {
+    $contents = file_get_contents(
+        dirname(__DIR__, 3).'/app/Modules/Academic/Progression/Actions/ProcessEgcCourseResultsAction.php',
+    );
+
+    expect($contents)->not->toContain('use App\\Models\\AcademicRecord;')
+        ->and($contents)->not->toContain('use App\\Models\\CourseOffering;')
+        ->and($contents)->not->toContain('use App\\Services\\CourseCompletionService;');
 });

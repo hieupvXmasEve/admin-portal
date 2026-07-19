@@ -14,6 +14,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Modules\Academic\Actions\MarkCourseOfferingCompletedAction;
+use App\Modules\Academic\Progression\Models\ProgramEnrollment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 /**
@@ -115,21 +116,31 @@ beforeEach(function () {
     $this->context = (object) ['campus' => $this->campus, 'semester' => $this->semester];
 });
 
-it('reverts gc_current_level and records a reversal event when a corrected grade flips a promoted student to failing', function () {
+function egcEnrollmentLevel(Student $student): ?int
+{
+    return ProgramEnrollment::query()
+        ->where('student_id', $student->id)
+        ->where('is_primary', true)
+        ->value('egc_current_level');
+}
+
+it('reverts the owned EGC level and records a reversal event when a corrected grade flips a promoted student to failing', function () {
     $offering = makeEgcRecalcOffering($this->context, unitLevel: 3);
     $student = makeEgcRecalcStudent($this->context, currentLevel: 3);
     $record = registerEgcRecalcStudent($this->context, $offering, $student, finalPercentage: 85);
 
     MarkCourseOfferingCompletedAction::run($offering, recalculate: false);
     $student->refresh();
-    expect($student->gc_current_level)->toBe(4);
+    expect(egcEnrollmentLevel($student))->toBe(4)
+        ->and($student->gc_current_level)->toBe(3);
     expect(AcademicProgressionEvent::where('student_id', $student->id)->count())->toBe(1);
 
     $record->update(['final_percentage' => 50]);
     $result = MarkCourseOfferingCompletedAction::run($offering, recalculate: true);
     $student->refresh();
 
-    expect($student->gc_current_level)->toBe(3)
+    expect(egcEnrollmentLevel($student))->toBe(3)
+        ->and($student->gc_current_level)->toBe(3)
         ->and($result['egc_progression']['failed_students'][0]['action'])->toContain('reverted');
 
     $events = AcademicProgressionEvent::where('student_id', $student->id)->orderBy('id')->get();
@@ -149,19 +160,23 @@ it('does not revert the level when the student has progressed further via anothe
 
     MarkCourseOfferingCompletedAction::run($offering, recalculate: false);
     $student->refresh();
-    expect($student->gc_current_level)->toBe(4);
+    expect(egcEnrollmentLevel($student))->toBe(4);
 
     // Student has since progressed to level 5 via an unrelated course.
-    $student->update(['gc_current_level' => 5]);
+    ProgramEnrollment::query()
+        ->where('student_id', $student->id)
+        ->where('is_primary', true)
+        ->update(['egc_current_level' => 5]);
 
     $record->update(['final_percentage' => 50]);
     $result = MarkCourseOfferingCompletedAction::run($offering, recalculate: true);
     $student->refresh();
 
-    // Exact-level-match guard: gc_current_level (5) no longer equals
+    // Exact-level-match guard: owned EGC level (5) no longer equals
     // unitLevel + 1 (4), so the demotion is skipped rather than clobbering
     // progress made elsewhere.
-    expect($student->gc_current_level)->toBe(5)
+    expect(egcEnrollmentLevel($student))->toBe(5)
+        ->and($student->gc_current_level)->toBe(3)
         ->and($result['egc_progression']['failed_students'][0]['action'])->toBe('Level unchanged (failed course)');
 
     expect(AcademicProgressionEvent::where('student_id', $student->id)->count())->toBe(1);
@@ -174,7 +189,7 @@ it('skips the revert and flags a conflict when the student already has a newer r
 
     MarkCourseOfferingCompletedAction::run($offering, recalculate: false);
     $student->refresh();
-    expect($student->gc_current_level)->toBe(4);
+    expect(egcEnrollmentLevel($student))->toBe(4);
 
     // Student is already enrolled in a level-4 unit elsewhere.
     $level4Unit = Unit::factory()->create(['unit_type' => 'egc', 'level' => 4]);
@@ -198,7 +213,7 @@ it('skips the revert and flags a conflict when the student already has a newer r
     $result = MarkCourseOfferingCompletedAction::run($offering, recalculate: true);
     $student->refresh();
 
-    expect($student->gc_current_level)->toBe(4)
+    expect(egcEnrollmentLevel($student))->toBe(4)
         ->and($result['egc_progression']['failed_students'][0]['action'])->toBe('Level unchanged (failed course)');
 
     // No reversal event recorded; only the original promotion event exists.
@@ -212,14 +227,14 @@ it('progresses the level exactly once when a corrected grade flips a failing stu
 
     MarkCourseOfferingCompletedAction::run($offering, recalculate: false);
     $student->refresh();
-    expect($student->gc_current_level)->toBe(3);
+    expect(egcEnrollmentLevel($student))->toBe(3);
     expect(AcademicProgressionEvent::where('student_id', $student->id)->count())->toBe(0);
 
     $record->update(['final_percentage' => 85]);
     MarkCourseOfferingCompletedAction::run($offering, recalculate: true);
     $student->refresh();
 
-    expect($student->gc_current_level)->toBe(4)
+    expect(egcEnrollmentLevel($student))->toBe(4)
         ->and(AcademicProgressionEvent::where('student_id', $student->id)->count())->toBe(1);
 });
 
@@ -230,11 +245,11 @@ it('does not double-progress when re-running recalculate with an unchanged passi
 
     MarkCourseOfferingCompletedAction::run($offering, recalculate: false);
     $student->refresh();
-    expect($student->gc_current_level)->toBe(4);
+    expect(egcEnrollmentLevel($student))->toBe(4);
 
     MarkCourseOfferingCompletedAction::run($offering, recalculate: true);
     $student->refresh();
 
-    expect($student->gc_current_level)->toBe(4)
+    expect(egcEnrollmentLevel($student))->toBe(4)
         ->and(AcademicProgressionEvent::where('student_id', $student->id)->count())->toBe(1);
 });

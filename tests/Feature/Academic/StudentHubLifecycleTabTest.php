@@ -10,13 +10,13 @@ use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
 use App\Models\User;
-use App\Modules\Academic\Actions\RecordStudentActionAction;
+use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
+use App\Modules\Academic\Progression\Exceptions\InvalidProgressionState;
 use App\Modules\Academic\Progression\Models\ProgramEnrollment;
 use App\Services\PermissionService;
 use App\Shared\Contracts\Finance\DTO\StudentLifecycleDeferData;
 use App\Shared\Contracts\Finance\StudentLifecycleFinanceCommand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia;
 
 use function Pest\Laravel\actingAs;
@@ -108,7 +108,7 @@ it('rejects recording an illogical transition (resume while intake_course) at th
         'reason' => 'Should be rejected',
         'changed_by_user_id' => $this->user->id,
         'return_semester_id' => $this->semester->id,
-    ]))->toThrow(ValidationException::class);
+    ]))->toThrow(InvalidProgressionState::class);
 
     expect($courseStudent->fresh()->status)->toBe('intake_course');
 });

@@ -7,7 +7,7 @@ use App\Http\Resources\Student\StudentResource;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
-use App\Modules\Academic\Actions\RecordStudentActionAction;
+use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

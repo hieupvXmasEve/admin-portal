@@ -12,7 +12,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\User;
-use App\Modules\Academic\Actions\RecordStudentActionAction;
+use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\FinanceCharge;

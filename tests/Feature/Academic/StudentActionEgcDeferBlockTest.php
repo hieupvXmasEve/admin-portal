@@ -9,13 +9,16 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\User;
-use App\Modules\Academic\Actions\RecordStudentActionAction;
 use App\Modules\Academic\Exports\StudentActionLogsExport;
+use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
+use App\Modules\Academic\Progression\Exceptions\InvalidProgressionState;
 use App\Modules\Academic\Queries\ListStudentActionLogsQuery;
 use App\Modules\Academic\Support\StudentActionExcelRowMapper;
 use App\Services\PermissionService;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\Academic\DTO\AcademicPeriodReference;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Validation\ValidationException;
 
 use function Pest\Laravel\actingAs;
 
@@ -121,7 +124,7 @@ it('requires an egc defer block for egc students', function () {
         'defer_scope_type' => 'FULL',
         'defer_fee_policy' => 'FORFEIT',
     ]);
-})->throws(ValidationException::class, 'EGC defer from block is required for EGC students.');
+})->throws(InvalidProgressionState::class, 'EGC defer from block is required for EGC students.');
 
 it('filters student action reports by from semester and egc block', function () {
     ['campus' => $campus, 'program' => $program, 'spring' => $spring, 'fall' => $fall, 'user' => $user] = studentActionEgcFixture();
@@ -190,8 +193,8 @@ it('rejects from semester before the active semester on store', function () {
     $activeSemester = Semester::factory()->active()->create([
         'code' => '2026SP',
         'name' => 'Spring 2026',
-        'start_date' => '2026-01-01',
-        'end_date' => '2026-05-31',
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => now()->addMonth()->toDateString(),
     ]);
     $futureSemester = Semester::factory()->create([
         'code' => '2026FA',
@@ -200,6 +203,21 @@ it('rejects from semester before the active semester on store', function () {
         'end_date' => '2026-12-31',
         'is_active' => false,
     ]);
+    Semester::query()->whereKeyNot($activeSemester->id)->update(['is_active' => false]);
+    $activeSemester->update(['is_active' => true]);
+
+    $academicPeriodReader = Mockery::mock(AcademicPeriodReader::class);
+    $academicPeriodReader->shouldReceive('current')->andReturn(new AcademicPeriodReference(
+        id: $activeSemester->id,
+        code: $activeSemester->code,
+        name: $activeSemester->name,
+        start_date: CarbonImmutable::parse($activeSemester->start_date),
+        end_date: CarbonImmutable::parse($activeSemester->end_date),
+        registration_start_date: null,
+        registration_end_date: null,
+        is_current: true,
+    ));
+    app()->instance(AcademicPeriodReader::class, $academicPeriodReader);
 
     $rejectedStudent = studentActionStudent($campus, $program, $activeSemester, 'EGC100010', 'intake_pre_uni_gc');
     $acceptedStudent = studentActionStudent($campus, $program, $activeSemester, 'EGC100011', 'intake_pre_uni_gc');

@@ -15,7 +15,7 @@ use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
 use App\Models\UploadRecord;
 use App\Models\User;
-use App\Modules\Academic\Actions\RecordStudentActionAction;
+use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
 use App\Modules\Academic\Queries\GetStudentLifecycleTimelineQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

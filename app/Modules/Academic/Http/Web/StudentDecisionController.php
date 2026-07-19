@@ -9,11 +9,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
-use App\Modules\Academic\Actions\BulkLinkStudentsToDecisionAction;
-use App\Modules\Academic\Actions\UnlinkStudentFromDecisionAction;
 use App\Modules\Academic\Http\Requests\BulkStudentDecisionStudentsRequest;
 use App\Modules\Academic\Http\Requests\StoreStudentDecisionRequest;
 use App\Modules\Academic\Http\Requests\UpdateStudentDecisionRequest;
+use App\Modules\Academic\Progression\Actions\BulkLinkStudentsToDecisionAction;
+use App\Modules\Academic\Progression\Actions\UnlinkStudentFromDecisionAction;
 use App\Modules\Academic\Queries\GetStudentDecisionDetailQuery;
 use App\Modules\Academic\Queries\ListStudentDecisionsQuery;
 use App\Modules\Academic\Queries\PreviewStudentDecisionBulkLinkQuery;
@@ -112,14 +112,14 @@ class StudentDecisionController extends Controller
         BulkStudentDecisionStudentsRequest $request,
         StudentDecision $studentDecision
     ): JsonResponse {
-        $result = BulkLinkStudentsToDecisionAction::run(
-            $studentDecision,
-            $request->studentCodes(),
-            $request->actionType(),
-            (int) $request->user()->id,
-            session('current_campus_id'),
-            $request->inputCodeCount()
-        );
+        $result = BulkLinkStudentsToDecisionAction::run([
+            'decision_id' => (int) $studentDecision->id,
+            'student_codes' => $request->studentCodes(),
+            'action_type' => $request->actionType(),
+            'user_id' => (int) $request->user()->id,
+            'campus_id' => session('current_campus_id'),
+            'input_code_count' => $request->inputCodeCount(),
+        ]);
 
         return ApiResponse::success($result, message: sprintf(
             'Linked %d action(s) to this decision.',
@@ -131,12 +131,12 @@ class StudentDecisionController extends Controller
         StudentDecision $studentDecision,
         StudentActionLog $actionLog
     ): JsonResponse {
-        $result = UnlinkStudentFromDecisionAction::run(
-            $studentDecision,
-            $actionLog,
-            (int) request()->user()?->id,
-            session('current_campus_id'),
-        );
+        $result = UnlinkStudentFromDecisionAction::run([
+            'decision_id' => (int) $studentDecision->id,
+            'action_log_id' => (int) $actionLog->id,
+            'user_id' => (int) request()->user()?->id,
+            'campus_id' => session('current_campus_id'),
+        ]);
 
         $message = $result['unlinked_action_count'] > 0
             ? 'Student action unlinked from decision.'

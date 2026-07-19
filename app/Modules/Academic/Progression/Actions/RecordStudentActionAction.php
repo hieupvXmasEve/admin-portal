@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Actions;
+namespace App\Modules\Academic\Progression\Actions;
 
 use App\Enums\AcademicProgressionEventType;
 use App\Enums\ProgressionTriggerSource;
@@ -12,13 +12,12 @@ use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\StudentChange;
 use App\Models\StudentDecision;
-use App\Modules\Academic\Progression\Actions\TransitionProgramEnrollmentAction;
+use App\Modules\Academic\Progression\Exceptions\InvalidProgressionState;
 use App\Shared\Contracts\Finance\DTO\StudentLifecycleDeferData;
 use App\Shared\Contracts\Finance\StudentLifecycleFinanceCommand;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\ValidationException;
 
 class RecordStudentActionAction
 {
@@ -28,7 +27,7 @@ class RecordStudentActionAction
      * @param  array  $data  Action data including student_id, action_type, reason, etc.
      * @return StudentActionLog The created action log
      *
-     * @throws ValidationException
+     * @throws InvalidProgressionState
      */
     public static function run(array $data): StudentActionLog
     {
@@ -205,16 +204,12 @@ class RecordStudentActionAction
         $toCampusId = $data['to_campus_id'] ?? null;
 
         if ($fromCampusId && $toCampusId && $fromCampusId === $toCampusId) {
-            throw ValidationException::withMessages([
-                'to_campus_id' => 'Target campus must be different from current campus.',
-            ]);
+            throw new InvalidProgressionState('to_campus_id', 'Target campus must be different from current campus.');
         }
 
         // Validate from_campus_id matches student's current campus
         if ($fromCampusId && $student->campus_id !== (int) $fromCampusId) {
-            throw ValidationException::withMessages([
-                'from_campus_id' => 'From campus does not match student\'s current campus.',
-            ]);
+            throw new InvalidProgressionState('from_campus_id', 'From campus does not match student\'s current campus.');
         }
     }
 

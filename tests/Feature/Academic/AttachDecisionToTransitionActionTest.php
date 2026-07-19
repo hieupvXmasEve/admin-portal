@@ -13,8 +13,8 @@ use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
 use App\Models\User;
-use App\Modules\Academic\Actions\AttachDecisionToTransitionAction;
-use App\Modules\Academic\Queries\GetMissingDecisionReportQuery;
+use App\Modules\Academic\Progression\Actions\AttachDecisionToTransitionAction;
+use App\Modules\Academic\Progression\Queries\GetMissingDecisionReportQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

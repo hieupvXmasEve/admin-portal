@@ -118,6 +118,9 @@ final class EloquentProgramEnrollmentReader implements ProgramEnrollmentReader
             enrollmentStatus: $enrollment->enrollment_status,
             studyStage: $enrollment->study_stage,
             legacyLifecycleStatus: $this->legacyLifecycleStatus($enrollment, $latestLifecycleStatus),
+            egcStartingLevel: $enrollment->egc_starting_level,
+            egcCurrentLevel: $enrollment->egc_current_level,
+            egcTotalLevels: $enrollment->egc_total_levels,
         );
     }
 
@@ -143,6 +146,9 @@ final class EloquentProgramEnrollmentReader implements ProgramEnrollmentReader
             enrollmentStatus: $student->academic_status ?? 'active',
             studyStage: $this->legacyStudyStage($student),
             legacyLifecycleStatus: $student->status,
+            egcStartingLevel: $student->gc_starting_level,
+            egcCurrentLevel: $student->gc_current_level,
+            egcTotalLevels: $student->gc_total_levels,
         );
     }
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Actions;
+namespace App\Modules\Academic\Progression\Actions;
 
 use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
@@ -10,13 +10,20 @@ use App\Modules\Academic\Queries\PreviewStudentDecisionBulkLinkQuery;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-class BulkLinkStudentsToDecisionAction
+final class BulkLinkStudentsToDecisionAction
 {
     /**
-     * @param  list<string>  $studentCodes
+     * @param  array{decision_id: int, student_codes: list<string>, action_type: string, user_id: int, campus_id?: int|null, input_code_count?: int|null}  $data
      */
-    public static function run(StudentDecision $decision, array $studentCodes, string $actionType, int $userId, ?int $campusId = null, ?int $inputCodeCount = null): array
+    public static function run(array $data): array
     {
+        $decision = StudentDecision::query()->findOrFail($data['decision_id']);
+        $studentCodes = $data['student_codes'];
+        $actionType = $data['action_type'];
+        $userId = $data['user_id'];
+        $campusId = $data['campus_id'] ?? null;
+        $inputCodeCount = $data['input_code_count'] ?? null;
+
         $preview = app(PreviewStudentDecisionBulkLinkQuery::class)
             ->handle($decision, $studentCodes, $actionType, $campusId, $inputCodeCount);
 

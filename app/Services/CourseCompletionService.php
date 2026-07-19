@@ -10,9 +10,12 @@ use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\Student;
+use App\Modules\Academic\Progression\Actions\ProcessEgcCourseResultsAction;
 use App\Modules\Academic\Support\AcademicLifecycleEventFactory;
 use App\Modules\Academic\Support\FailureReasonClassifier;
 use App\Modules\Academic\Support\Grading\GradingCalculatorResolver;
+use App\Shared\Contracts\Academic\DTO\CourseResult;
+use App\Shared\Contracts\Academic\DTO\CourseResultProgressionContext;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -32,7 +35,6 @@ class CourseCompletionService
     public const SCORE_CHANGE_EPSILON = 0.005;
 
     public function __construct(
-        protected EgcLevelProgressionService $egcService,
         protected CourseSurveyService $courseSurveyService,
         protected DomainEventPublisher $domainEventPublisher,
         protected GradingCalculatorResolver $gradingResolver,
@@ -95,8 +97,44 @@ class CourseCompletionService
             $this->updateCourseRegistrations($courseOffering);
         }
 
-        // 4. Process EGC level progression if applicable
-        $egcResult = $this->egcService->processEgcProgression($courseOffering, $recalculate, $previousStatusMap, $previousScoreMap, $dryRun, $records);
+        // 4. Hand final Course Results to the Progression owner. Assessment
+        // evidence remains inside Delivery; Progression receives only outcomes.
+        $egcResult = ProcessEgcCourseResultsAction::run([
+            'course_offering_id' => (int) $courseOffering->id,
+            'course_context' => new CourseResultProgressionContext(
+                courseOfferingId: (int) $courseOffering->id,
+                semesterId: (int) $courseOffering->semester_id,
+                unitType: (string) $courseOffering->unit->unit_type,
+                unitLevel: $courseOffering->unit->level,
+                unitCode: (string) $courseOffering->unit->code,
+                unitName: (string) $courseOffering->unit->name,
+            ),
+            'course_results' => $records->map(static fn (AcademicRecord $record): CourseResult => new CourseResult(
+                courseResultId: (int) $record->id,
+                studentId: (int) $record->student_id,
+                courseOfferingId: (int) $record->course_offering_id,
+                semesterId: (int) $record->semester_id,
+                unitId: (int) $record->unit_id,
+                programId: (int) $record->program_id,
+                campusId: (int) $record->campus_id,
+                attemptNumber: (int) ($record->attempt_number ?? 1),
+                finalPercentage: (float) $record->final_percentage,
+                finalLetterGrade: (string) $record->final_letter_grade,
+                creditPoints: (float) $record->credit_points,
+                creditPointsEarned: (float) $record->credit_points_earned,
+                qualityPoints: (float) $record->quality_points,
+                isPassed: (bool) $record->is_passed,
+                excludedFromGpa: (bool) $record->excluded_from_gpa,
+                affectsAcademicStanding: (bool) $record->affects_academic_standing,
+                affectsGraduationRequirement: (bool) $record->affects_graduation_requirement,
+                satisfiesPrerequisite: (bool) $record->satisfies_prerequisite,
+                finalizedAt: $record->grade_finalized_date?->toIso8601String(),
+            ))->all(),
+            'recalculate' => $recalculate,
+            'previous_statuses' => $previousStatusMap,
+            'previous_scores' => $previousScoreMap,
+            'dry_run' => $dryRun,
+        ]);
 
         // 5. Automatically attach survey to completed course (only if not already attached)
         if (! $recalculate && ! $dryRun) {
@@ -104,7 +142,7 @@ class CourseCompletionService
         }
 
         // 6. Send notifications to students for non-EGC courses
-        // (EGC courses send notifications in EgcLevelProgressionService)
+        // (EGC courses send notifications in Progression)
         $nonEgcResult = null;
         if (! $egcResult['processed']) {
             $nonEgcResult = $this->notifyStudentsNonEgcCompletion($courseOffering, $recalculate, $previousStatusMap, $previousScoreMap, $dryRun, $records);

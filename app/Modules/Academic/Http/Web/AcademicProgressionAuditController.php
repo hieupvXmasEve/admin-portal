@@ -9,7 +9,7 @@ use App\Enums\ProgressionTriggerSource;
 use App\Http\Controllers\Controller;
 use App\Models\Campus;
 use App\Models\Semester;
-use App\Modules\Academic\Queries\GetMissingDecisionReportQuery;
+use App\Modules\Academic\Progression\Queries\GetMissingDecisionReportQuery;
 use App\Modules\Academic\Queries\Placement\GetAcademicProgressionAuditQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;

@@ -23,6 +23,9 @@ class ProgramEnrollment extends Model
         'intake_major_semester_id',
         'enrollment_status',
         'study_stage',
+        'egc_starting_level',
+        'egc_current_level',
+        'egc_total_levels',
         'is_primary',
         'source_type',
         'source_id',
@@ -34,6 +37,9 @@ class ProgramEnrollment extends Model
     {
         return [
             'is_primary' => 'boolean',
+            'egc_starting_level' => 'integer',
+            'egc_current_level' => 'integer',
+            'egc_total_levels' => 'integer',
             'source_snapshot' => 'array',
             'materialized_at' => 'datetime',
         ];

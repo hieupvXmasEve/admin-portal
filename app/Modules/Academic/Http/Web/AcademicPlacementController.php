@@ -7,14 +7,15 @@ namespace App\Modules\Academic\Http\Web;
 use App\Http\Controllers\Controller;
 use App\Models\IeltsCertificate;
 use App\Models\Student;
-use App\Modules\Academic\Actions\Placement\InitializeStudentPlacementAction;
-use App\Modules\Academic\Actions\Placement\RecordIeltsCertificateAction;
-use App\Modules\Academic\Actions\Placement\TransitionToIntakeCourseAction;
-use App\Modules\Academic\Actions\Placement\UpdateStudentEnglishLevelAction;
 use App\Modules\Academic\Http\Requests\Placement\InitializePlacementRequest;
 use App\Modules\Academic\Http\Requests\Placement\RecordIeltsRequest;
 use App\Modules\Academic\Http\Requests\Placement\TransitionToIntakeCourseRequest;
 use App\Modules\Academic\Http\Requests\Placement\UpdateEnglishLevelRequest;
+use App\Modules\Academic\Progression\Actions\Placement\InitializeStudentPlacementAction;
+use App\Modules\Academic\Progression\Actions\Placement\RecordIeltsCertificateAction;
+use App\Modules\Academic\Progression\Actions\Placement\TransitionToIntakeCourseAction;
+use App\Modules\Academic\Progression\Actions\Placement\UpdateStudentEnglishLevelAction;
+use App\Modules\Academic\Progression\Exceptions\InvalidProgressionState;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -37,7 +38,11 @@ class AcademicPlacementController extends Controller
      */
     public function initializePlacement(InitializePlacementRequest $request): RedirectResponse
     {
-        $student = InitializeStudentPlacementAction::run($request->validatedWithUser());
+        try {
+            $student = InitializeStudentPlacementAction::run($request->validatedWithUser());
+        } catch (InvalidProgressionState $exception) {
+            return back()->withErrors([$exception->field => $exception->getMessage()]);
+        }
 
         return back()->with('success', sprintf(
             'Placement initialized. Student placed into %s.',
@@ -66,7 +71,11 @@ class AcademicPlacementController extends Controller
      */
     public function updateLevel(UpdateEnglishLevelRequest $request): RedirectResponse
     {
-        $student = UpdateStudentEnglishLevelAction::run($request->validatedWithUser());
+        try {
+            $student = UpdateStudentEnglishLevelAction::run($request->validatedWithUser());
+        } catch (InvalidProgressionState $exception) {
+            return back()->withErrors([$exception->field => $exception->getMessage()]);
+        }
 
         return back()->with('success', sprintf(
             'English level updated to %d.',
@@ -79,7 +88,11 @@ class AcademicPlacementController extends Controller
      */
     public function transitionToIntake(TransitionToIntakeCourseRequest $request): RedirectResponse
     {
-        TransitionToIntakeCourseAction::run($request->validatedWithUser());
+        try {
+            TransitionToIntakeCourseAction::run($request->validatedWithUser());
+        } catch (InvalidProgressionState $exception) {
+            return back()->withErrors([$exception->field => $exception->getMessage()]);
+        }
 
         return back()->with('success', 'Student successfully transitioned to Intake Course.');
     }

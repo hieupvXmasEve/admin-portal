@@ -12,9 +12,9 @@ use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
 use App\Models\User;
 use App\Modules\Academic\Actions\BackfillDecisionStudentRosterAction;
-use App\Modules\Academic\Actions\BulkLinkStudentsToDecisionAction;
-use App\Modules\Academic\Actions\RecordStudentActionAction;
-use App\Modules\Academic\Queries\GetMissingDecisionReportQuery;
+use App\Modules\Academic\Progression\Actions\BulkLinkStudentsToDecisionAction;
+use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
+use App\Modules\Academic\Progression\Queries\GetMissingDecisionReportQuery;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -137,13 +137,13 @@ it('covers many students on one decision roster through bulk link', function () 
         ]);
     }
 
-    $result = BulkLinkStudentsToDecisionAction::run(
-        $decision,
-        ['SE800010', 'SE800011'],
-        StudentActionType::ACADEMIC_DROPOUT->value,
-        $this->user->id,
-        $this->campus->id,
-    );
+    $result = BulkLinkStudentsToDecisionAction::run([
+        'decision_id' => $decision->id,
+        'student_codes' => ['SE800010', 'SE800011'],
+        'action_type' => StudentActionType::ACADEMIC_DROPOUT->value,
+        'user_id' => $this->user->id,
+        'campus_id' => $this->campus->id,
+    ]);
 
     expect($result['linked_action_count'])->toBe(2)
         ->and($decision->students()->count())->toBe(2)

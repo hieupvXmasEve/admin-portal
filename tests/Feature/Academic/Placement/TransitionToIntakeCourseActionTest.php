@@ -10,7 +10,8 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\User;
-use App\Modules\Academic\Actions\Placement\TransitionToIntakeCourseAction;
+use App\Modules\Academic\Progression\Actions\Placement\TransitionToIntakeCourseAction;
+use App\Modules\Academic\Progression\Models\ProgramEnrollment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -66,8 +67,12 @@ it('creates a major enrollment action log when transitioning to intake course', 
 
     $student->refresh();
 
-    expect($student->status)->toBe('intake_course')
-        ->and((int) $student->intake_major)->toBe($semester->id);
+    $enrollment = ProgramEnrollment::query()->sole();
+
+    expect($enrollment->study_stage)->toBe('intake_course')
+        ->and($enrollment->intake_major_semester_id)->toBe($semester->id)
+        ->and($student->status)->toBe('intake_pre_uni_gc')
+        ->and((int) $student->intake_major)->toBe(0);
 
     $actionLog = StudentActionLog::query()
         ->where('student_id', $student->id)

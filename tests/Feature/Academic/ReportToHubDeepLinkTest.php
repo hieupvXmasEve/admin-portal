@@ -8,7 +8,7 @@ use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
-use App\Modules\Academic\Actions\RecordStudentActionAction;
+use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
 use App\Modules\Academic\Queries\Reporting\GetStudentStatusBySemesterQuery;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;

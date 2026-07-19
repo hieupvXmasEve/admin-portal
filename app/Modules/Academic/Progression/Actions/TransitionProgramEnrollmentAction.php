@@ -7,11 +7,11 @@ namespace App\Modules\Academic\Progression\Actions;
 use App\Enums\StudentActionType;
 use App\Models\StudentActionLog;
 use App\Modules\Academic\Progression\DTO\ProgramEnrollmentTransition;
+use App\Modules\Academic\Progression\Exceptions\InvalidProgressionState;
 use App\Modules\Academic\Progression\Models\ProgramEnrollment;
 use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
 use App\Shared\Contracts\Finance\StudentLifecycleFinanceReader;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 final class TransitionProgramEnrollmentAction
 {
@@ -115,58 +115,42 @@ final class TransitionProgramEnrollmentAction
         array $data,
     ): void {
         if (in_array($currentStatus, ['dropout', 'dropout_transfer', 'graduated'], true)) {
-            throw ValidationException::withMessages([
-                'action_type' => sprintf(
-                    'Student status "%s" is terminal. No further status actions are allowed.',
-                    $currentStatus,
-                ),
-            ]);
+            throw new InvalidProgressionState('action_type', sprintf(
+                'Student status "%s" is terminal. No further status actions are allowed.',
+                $currentStatus,
+            ));
         }
 
         if ($currentStatus === 'deferred'
             && ! in_array($actionType, [StudentActionType::ACADEMIC_RESUME, StudentActionType::ACADEMIC_DEFER], true)) {
-            throw ValidationException::withMessages([
-                'action_type' => 'When status is deferred, only "Quay lại học" or "Bảo lưu tiếp" are allowed on this page.',
-            ]);
+            throw new InvalidProgressionState('action_type', 'When status is deferred, only "Quay lại học" or "Bảo lưu tiếp" are allowed on this page.');
         }
 
         if ($currentStatus === 'pending_course_opening'
             && ! in_array($actionType, [StudentActionType::ACADEMIC_RESUME, StudentActionType::ACADEMIC_DEFER, StudentActionType::ACADEMIC_DROPOUT], true)) {
-            throw ValidationException::withMessages([
-                'action_type' => 'From "Chờ mở môn", only resume to prior stage, additional defer, or dropout are allowed.',
-            ]);
+            throw new InvalidProgressionState('action_type', 'From "Chờ mở môn", only resume to prior stage, additional defer, or dropout are allowed.');
         }
 
         if ($actionType === StudentActionType::WAITING_COURSE_OPENING
             && ! in_array($currentStatus, ['intake_pre_uni_gc', 'intake_course'], true)) {
-            throw ValidationException::withMessages([
-                'action_type' => 'WAITING_COURSE_OPENING is only allowed when current status is intake_pre_uni_gc or intake_course.',
-            ]);
+            throw new InvalidProgressionState('action_type', 'WAITING_COURSE_OPENING is only allowed when current status is intake_pre_uni_gc or intake_course.');
         }
 
         if ($actionType === StudentActionType::ACADEMIC_RESUME
             && ! in_array($currentStatus, ['deferred', 'pending_course_opening'], true)) {
-            throw ValidationException::withMessages([
-                'action_type' => 'ACADEMIC_RESUME is only allowed when current status is deferred or pending_course_opening.',
-            ]);
+            throw new InvalidProgressionState('action_type', 'ACADEMIC_RESUME is only allowed when current status is deferred or pending_course_opening.');
         }
 
         if ($actionType === StudentActionType::ADMISSION_DEFERRAL && $currentStatus !== 'pending') {
-            throw ValidationException::withMessages([
-                'action_type' => 'ADMISSION_DEFERRAL is only allowed when current status is pending.',
-            ]);
+            throw new InvalidProgressionState('action_type', 'ADMISSION_DEFERRAL is only allowed when current status is pending.');
         }
 
         if ($actionType === StudentActionType::STUDENT_ENROLLMENT_NE && $currentStatus !== 'pending') {
-            throw ValidationException::withMessages([
-                'action_type' => 'STUDENT_ENROLLMENT_NE is only allowed when current status is pending.',
-            ]);
+            throw new InvalidProgressionState('action_type', 'STUDENT_ENROLLMENT_NE is only allowed when current status is pending.');
         }
 
         if ($actionType === StudentActionType::STUDENT_MAJOR_ENROLLMENT && $currentStatus !== 'intake_pre_uni_gc') {
-            throw ValidationException::withMessages([
-                'action_type' => 'STUDENT_MAJOR_ENROLLMENT is only allowed when current status is intake_pre_uni_gc.',
-            ]);
+            throw new InvalidProgressionState('action_type', 'STUDENT_MAJOR_ENROLLMENT is only allowed when current status is intake_pre_uni_gc.');
         }
 
         if ($actionType === StudentActionType::ACADEMIC_DEFER) {
@@ -182,33 +166,25 @@ final class TransitionProgramEnrollmentAction
         $hasBlock = $block !== null && $block !== '';
 
         if ($studyStage === 'intake_pre_uni_gc' && $scopeType !== 'FULL') {
-            throw ValidationException::withMessages(['defer_scope_type' => 'EGC defer must be full semester.']);
+            throw new InvalidProgressionState('defer_scope_type', 'EGC defer must be full semester.');
         }
 
         if ($studyStage === 'intake_pre_uni_gc' && ! $hasBlock) {
-            throw ValidationException::withMessages([
-                'egc_defer_from_block_number' => 'EGC defer from block is required for EGC students.',
-            ]);
+            throw new InvalidProgressionState('egc_defer_from_block_number', 'EGC defer from block is required for EGC students.');
         }
 
         if ($studyStage === 'intake_pre_uni_gc' && ! in_array((int) $block, [1, 2], true)) {
-            throw ValidationException::withMessages([
-                'egc_defer_from_block_number' => 'EGC defer from block must be 1 or 2.',
-            ]);
+            throw new InvalidProgressionState('egc_defer_from_block_number', 'EGC defer from block must be 1 or 2.');
         }
 
         if ($studyStage !== 'intake_pre_uni_gc' && $hasBlock) {
-            throw ValidationException::withMessages([
-                'egc_defer_from_block_number' => 'EGC defer from block is only available for EGC students.',
-            ]);
+            throw new InvalidProgressionState('egc_defer_from_block_number', 'EGC defer from block is only available for EGC students.');
         }
 
         $fromSemesterId = isset($data['from_semester_id']) ? (int) $data['from_semester_id'] : null;
         $returnSemesterId = isset($data['return_semester_id']) ? (int) $data['return_semester_id'] : null;
         if ($fromSemesterId && $returnSemesterId && $returnSemesterId < $fromSemesterId) {
-            throw ValidationException::withMessages([
-                'return_semester_id' => 'Return semester must be after the from semester.',
-            ]);
+            throw new InvalidProgressionState('return_semester_id', 'Return semester must be after the from semester.');
         }
 
         if ($scopeType === 'COURSES') {
@@ -226,25 +202,19 @@ final class TransitionProgramEnrollmentAction
         )));
 
         if ($semesterId === null || $registrationIds === []) {
-            throw ValidationException::withMessages([
-                'defer_course_registration_ids' => 'Course selection is required when scope is COURSES.',
-            ]);
+            throw new InvalidProgressionState('defer_course_registration_ids', 'Course selection is required when scope is COURSES.');
         }
 
         $alreadyDeferredIds = app(StudentLifecycleFinanceReader::class)
             ->deferredCourseRegistrationIds($studentId, $semesterId);
         if (array_intersect($registrationIds, $alreadyDeferredIds) !== []) {
-            throw ValidationException::withMessages([
-                'defer_course_registration_ids' => 'Course has already been deferred for this semester.',
-            ]);
+            throw new InvalidProgressionState('defer_course_registration_ids', 'Course has already been deferred for this semester.');
         }
 
         $deferableIds = app(StudentLifecycleCourseRegistrationGateway::class)
             ->deferableIds($studentId, $semesterId);
         if (array_diff($registrationIds, $deferableIds) !== []) {
-            throw ValidationException::withMessages([
-                'defer_course_registration_ids' => 'Selected course is not eligible for defer in this semester.',
-            ]);
+            throw new InvalidProgressionState('defer_course_registration_ids', 'Selected course is not eligible for defer in this semester.');
         }
     }
 
@@ -282,9 +252,7 @@ final class TransitionProgramEnrollmentAction
             }
         }
 
-        throw ValidationException::withMessages([
-            'action_type' => 'The prior study stage could not be resolved for this resume.',
-        ]);
+        throw new InvalidProgressionState('action_type', 'The prior study stage could not be resolved for this resume.');
     }
 
     /** @return array{enrollment_status: string, study_stage?: string} */

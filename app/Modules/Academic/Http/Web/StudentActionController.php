@@ -7,12 +7,13 @@ namespace App\Modules\Academic\Http\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Models\StudentActionLog;
-use App\Modules\Academic\Actions\RecordStudentActionAction;
-use App\Modules\Academic\Actions\UpdateStudentActionAction;
 use App\Modules\Academic\Actions\UploadActionAttachmentAction;
 use App\Modules\Academic\Http\Requests\StoreStudentActionRequest;
 use App\Modules\Academic\Http\Requests\UpdateStudentActionRequest;
 use App\Modules\Academic\Http\Requests\UploadActionAttachmentRequest;
+use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
+use App\Modules\Academic\Progression\Actions\UpdateStudentActionAction;
+use App\Modules\Academic\Progression\Exceptions\InvalidProgressionState;
 use App\Modules\Academic\Support\LifecycleFormOptions;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -36,7 +37,11 @@ class StudentActionController extends Controller
      */
     public function store(StoreStudentActionRequest $request): RedirectResponse
     {
-        $actionLog = RecordStudentActionAction::run($request->validatedWithUser());
+        try {
+            $actionLog = RecordStudentActionAction::run($request->validatedWithUser());
+        } catch (InvalidProgressionState $exception) {
+            return back()->withErrors([$exception->field => $exception->getMessage()]);
+        }
 
         return back()->with('success', sprintf(
             'Action "%s" recorded successfully.',
@@ -75,7 +80,10 @@ class StudentActionController extends Controller
      */
     public function update(UpdateStudentActionRequest $request, StudentActionLog $actionLog): RedirectResponse
     {
-        UpdateStudentActionAction::run($actionLog, $request->validated());
+        UpdateStudentActionAction::run([
+            'action_log_id' => (int) $actionLog->id,
+            'fields' => $request->validated(),
+        ]);
 
         return back()->with('success', 'Action updated successfully.');
     }
