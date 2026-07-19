@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Catalog\Support;
 
+use App\Models\CurriculumUnit;
 use App\Models\Semester;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
@@ -69,6 +70,17 @@ class EloquentCourseOfferingCatalogReader implements CourseOfferingCatalogReader
         $unit = Unit::query()->find($unitId, ['id', 'code', 'name', 'credit_points', 'level', 'unit_type']);
 
         return $unit === null ? null : $this->mapUnit($unit);
+    }
+
+    public function programIdForOfferingUnit(int $unitId): ?int
+    {
+        return CurriculumUnit::query()
+            ->where('unit_id', $unitId)
+            ->with('curriculumVersion:id,program_id')
+            ->orderBy('id')
+            ->first()
+            ?->curriculumVersion
+            ?->program_id;
     }
 
     /**

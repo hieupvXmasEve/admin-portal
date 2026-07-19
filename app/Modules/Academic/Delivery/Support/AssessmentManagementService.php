@@ -8,11 +8,17 @@ use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
-use App\Models\Student;
+use App\Models\User;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 class AssessmentManagementService
 {
+    public function __construct(private readonly StudentReferenceReader $studentReferences) {}
+
     /**
      * Retrieve the complete assessment structure for a course offering.
      */
@@ -361,7 +367,7 @@ class AssessmentManagementService
         );
 
         if (! $weightValidation['is_valid']) {
-            throw new \Exception('Weight validation failed: ' . implode(', ', $weightValidation['errors']));
+            throw new \Exception('Weight validation failed: '.implode(', ', $weightValidation['errors']));
         }
 
         return DB::transaction(function () use ($data) {
@@ -385,7 +391,7 @@ class AssessmentManagementService
             );
 
             if (! $weightValidation['is_valid']) {
-                throw new \Exception('Weight validation failed: ' . implode(', ', $weightValidation['errors']));
+                throw new \Exception('Weight validation failed: '.implode(', ', $weightValidation['errors']));
             }
         }
 
@@ -410,7 +416,7 @@ class AssessmentManagementService
         );
 
         if (! $weightValidation['is_valid']) {
-            throw new \Exception('Detail weight validation failed: ' . implode(', ', $weightValidation['errors']));
+            throw new \Exception('Detail weight validation failed: '.implode(', ', $weightValidation['errors']));
         }
 
         return DB::transaction(function () use ($data) {
@@ -434,7 +440,7 @@ class AssessmentManagementService
             );
 
             if (! $weightValidation['is_valid']) {
-                throw new \Exception('Detail weight validation failed: ' . implode(', ', $weightValidation['errors']));
+                throw new \Exception('Detail weight validation failed: '.implode(', ', $weightValidation['errors']));
             }
         }
 
@@ -448,8 +454,11 @@ class AssessmentManagementService
     /**
      * Get grading data for a specific student across all assessments.
      */
-    public function getGradingDataByStudent(CourseOffering $courseOffering, Student $student): array
+    public function getGradingDataByStudent(CourseOffering $courseOffering, int $studentId): array
     {
+        $student = $this->studentReferences->find($studentId)
+            ?? throw new \RuntimeException("Student reference #{$studentId} cannot be resolved.");
+
         // Verify student is enrolled
         $isEnrolled = $courseOffering->courseRegistrations()
             ->where('student_id', $student->id)
@@ -588,11 +597,13 @@ class AssessmentManagementService
         }
 
         // Get all enrolled students
-        $enrolledStudents = $courseOffering->courseRegistrations()
-            ->with('student')
+        $enrolledStudentIds = $courseOffering->courseRegistrations()
             ->get()
-            ->pluck('student')
-            ->sortBy('full_name');
+            ->pluck('student_id')
+            ->map(static fn (int|string $studentId): int => (int) $studentId)
+            ->all();
+        $enrolledStudents = collect($this->studentReferences->findMany($enrolledStudentIds))
+            ->sortBy('fullName');
 
         // Get assessment component details with all scores
         $assessmentDetails = $assessmentComponent->details()
@@ -700,12 +711,12 @@ class AssessmentManagementService
     /**
      * Format student data for API responses.
      */
-    private function formatStudentData(Student $student): array
+    private function formatStudentData(StudentReference $student): array
     {
         return [
             'id' => $student->id,
-            'student_id' => $student->student_id,
-            'full_name' => $student->full_name,
+            'student_id' => $student->studentCode,
+            'full_name' => $student->fullName,
             'email' => $student->email,
         ];
     }
@@ -752,7 +763,7 @@ class AssessmentManagementService
     /**
      * Calculate late penalty for a submission based on assessment component rules.
      */
-    public function calculateLatePenalty(AssessmentComponentDetailScore $score, \Carbon\Carbon $submissionTime): array
+    public function calculateLatePenalty(AssessmentComponentDetailScore $score, Carbon $submissionTime): array
     {
         $assessmentComponent = $score->assessmentComponentDetail->assessmentComponent;
 
@@ -808,7 +819,7 @@ class AssessmentManagementService
     /**
      * Process late submission and apply penalty if applicable.
      */
-    public function processLateSubmission(AssessmentComponentDetailScore $score, \Carbon\Carbon $submissionTime): array
+    public function processLateSubmission(AssessmentComponentDetailScore $score, Carbon $submissionTime): array
     {
         $penaltyCalculation = $this->calculateLatePenalty($score, $submissionTime);
 
@@ -853,7 +864,7 @@ class AssessmentManagementService
 
         // Set the reviewer ID if provided
         if ($reviewerId) {
-            auth()->setUser(\App\Models\User::find($reviewerId));
+            auth()->setUser(User::find($reviewerId));
         }
 
         $score->processLateExcuse($approved, $reviewerNotes);
@@ -912,7 +923,7 @@ class AssessmentManagementService
     /**
      * Get students with pending late excuse requests.
      */
-    public function getPendingLateExcuses(CourseOffering $courseOffering): \Illuminate\Database\Eloquent\Collection
+    public function getPendingLateExcuses(CourseOffering $courseOffering): Collection
     {
         return AssessmentComponentDetailScore::where('course_offering_id', $courseOffering->id)
             ->whereNotNull('late_excuse')
@@ -940,12 +951,12 @@ class AssessmentManagementService
             case 'per_hour':
                 $hoursLate = ceil($minutesLate / 60);
 
-                return "Submission is {$timeDelay} late ({$hoursLate} hour" . ($hoursLate > 1 ? 's' : '') . "), penalty: {$penaltyPercentage}%";
+                return "Submission is {$timeDelay} late ({$hoursLate} hour".($hoursLate > 1 ? 's' : '')."), penalty: {$penaltyPercentage}%";
 
             case 'per_day':
                 $daysLate = ceil($minutesLate / (24 * 60));
 
-                return "Submission is {$timeDelay} late ({$daysLate} day" . ($daysLate > 1 ? 's' : '') . "), penalty: {$penaltyPercentage}%";
+                return "Submission is {$timeDelay} late ({$daysLate} day".($daysLate > 1 ? 's' : '')."), penalty: {$penaltyPercentage}%";
 
             case 'fixed':
                 return "Submission is {$timeDelay} late, fixed penalty: {$penaltyPercentage}%";
@@ -961,16 +972,16 @@ class AssessmentManagementService
     private function formatTimeDelay(int $minutes): string
     {
         if ($minutes < 60) {
-            return "{$minutes} minute" . ($minutes > 1 ? 's' : '');
+            return "{$minutes} minute".($minutes > 1 ? 's' : '');
         }
 
         if ($minutes < 1440) { // Less than 24 hours
             $hours = floor($minutes / 60);
             $remainingMinutes = $minutes % 60;
 
-            $result = "{$hours} hour" . ($hours > 1 ? 's' : '');
+            $result = "{$hours} hour".($hours > 1 ? 's' : '');
             if ($remainingMinutes > 0) {
-                $result .= " and {$remainingMinutes} minute" . ($remainingMinutes > 1 ? 's' : '');
+                $result .= " and {$remainingMinutes} minute".($remainingMinutes > 1 ? 's' : '');
             }
 
             return $result;
@@ -979,9 +990,9 @@ class AssessmentManagementService
         $days = floor($minutes / 1440);
         $remainingHours = floor(($minutes % 1440) / 60);
 
-        $result = "{$days} day" . ($days > 1 ? 's' : '');
+        $result = "{$days} day".($days > 1 ? 's' : '');
         if ($remainingHours > 0) {
-            $result .= " and {$remainingHours} hour" . ($remainingHours > 1 ? 's' : '');
+            $result .= " and {$remainingHours} hour".($remainingHours > 1 ? 's' : '');
         }
 
         return $result;
@@ -1024,7 +1035,7 @@ class AssessmentManagementService
         ];
 
         if ($integrityStatus && ! in_array($integrityStatus, $validIntegrityStatuses)) {
-            throw new \Exception('Invalid integrity status. Valid values: ' . implode(', ', $validIntegrityStatuses));
+            throw new \Exception('Invalid integrity status. Valid values: '.implode(', ', $validIntegrityStatuses));
         }
 
         // Set default integrity status based on plagiarism flag
@@ -1203,11 +1214,11 @@ class AssessmentManagementService
     private function applyGradeFilters($query, array $filters): void
     {
         // Status filters
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
 
-        if (!empty($filters['score_status'])) {
+        if (! empty($filters['score_status'])) {
             $query->where('score_status', $filters['score_status']);
         }
 
@@ -1221,7 +1232,7 @@ class AssessmentManagementService
         }
 
         // Letter grade filter
-        if (!empty($filters['letter_grade'])) {
+        if (! empty($filters['letter_grade'])) {
             $query->where('letter_grade', $filters['letter_grade']);
         }
 
@@ -1243,29 +1254,29 @@ class AssessmentManagementService
         }
 
         // Date filters
-        if (!empty($filters['submitted_after'])) {
+        if (! empty($filters['submitted_after'])) {
             $query->where('submitted_at', '>=', $filters['submitted_after']);
         }
 
-        if (!empty($filters['submitted_before'])) {
+        if (! empty($filters['submitted_before'])) {
             $query->where('submitted_at', '<=', $filters['submitted_before']);
         }
 
-        if (!empty($filters['graded_after'])) {
+        if (! empty($filters['graded_after'])) {
             $query->where('graded_at', '>=', $filters['graded_after']);
         }
 
-        if (!empty($filters['graded_before'])) {
+        if (! empty($filters['graded_before'])) {
             $query->where('graded_at', '<=', $filters['graded_before']);
         }
 
         // Group filter
-        if (!empty($filters['group_id'])) {
+        if (! empty($filters['group_id'])) {
             $query->where('student_group_id', $filters['group_id']);
         }
 
         // Search filter (student name or ID)
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $search = $filters['search'];
             $query->whereHas('student', function ($q) use ($search) {
                 $q->where('student_id', 'like', "%{$search}%")
@@ -1381,6 +1392,7 @@ class AssessmentManagementService
         }
 
         $variance = $values->map(fn ($value) => pow($value - $mean, 2))->sum() / ($count - 1);
+
         return sqrt($variance);
     }
 
@@ -1425,7 +1437,7 @@ class AssessmentManagementService
     private function calculateGradeDistribution($scores)
     {
         $grades = ['A+' => 0, 'A' => 0, 'A-' => 0, 'B+' => 0, 'B' => 0, 'B-' => 0,
-                   'C+' => 0, 'C' => 0, 'C-' => 0, 'D+' => 0, 'D' => 0, 'F' => 0];
+            'C+' => 0, 'C' => 0, 'C-' => 0, 'D+' => 0, 'D' => 0, 'F' => 0];
 
         foreach ($scores as $score) {
             $letterGrade = $score->letter_grade ?? $this->calculateLetterGrade($score->percentage_score);
@@ -1453,17 +1465,40 @@ class AssessmentManagementService
      */
     private function calculateLetterGrade($percentage)
     {
-        if ($percentage >= 97) return 'A+';
-        if ($percentage >= 93) return 'A';
-        if ($percentage >= 90) return 'A-';
-        if ($percentage >= 87) return 'B+';
-        if ($percentage >= 83) return 'B';
-        if ($percentage >= 80) return 'B-';
-        if ($percentage >= 77) return 'C+';
-        if ($percentage >= 73) return 'C';
-        if ($percentage >= 70) return 'C-';
-        if ($percentage >= 67) return 'D+';
-        if ($percentage >= 60) return 'D';
+        if ($percentage >= 97) {
+            return 'A+';
+        }
+        if ($percentage >= 93) {
+            return 'A';
+        }
+        if ($percentage >= 90) {
+            return 'A-';
+        }
+        if ($percentage >= 87) {
+            return 'B+';
+        }
+        if ($percentage >= 83) {
+            return 'B';
+        }
+        if ($percentage >= 80) {
+            return 'B-';
+        }
+        if ($percentage >= 77) {
+            return 'C+';
+        }
+        if ($percentage >= 73) {
+            return 'C';
+        }
+        if ($percentage >= 70) {
+            return 'C-';
+        }
+        if ($percentage >= 67) {
+            return 'D+';
+        }
+        if ($percentage >= 60) {
+            return 'D';
+        }
+
         return 'F';
     }
 
@@ -1515,7 +1550,8 @@ class AssessmentManagementService
         if ($value === 100) {
             return '90-100';
         }
-        return $value . '-' . ($value + 9);
+
+        return $value.'-'.($value + 9);
     }
 
     /**
@@ -1548,12 +1584,13 @@ class AssessmentManagementService
         $bins = [];
         for ($i = 0; $i <= 100; $i += 5) {
             $bins[] = [
-                'range' => "{$i}-" . ($i + 4),
+                'range' => "{$i}-".($i + 4),
                 'min' => $i,
                 'max' => $i + 4,
                 'count' => $scores->filter(fn ($score) => $score >= $i && $score < $i + 5)->count(),
             ];
         }
+
         return $bins;
     }
 
@@ -1666,11 +1703,12 @@ class AssessmentManagementService
                 try {
                     $studentId = $gradeData['student_id'] ?? null;
 
-                    if (!$studentId) {
+                    if (! $studentId) {
                         $results['errors'][] = [
                             'data' => $gradeData,
                             'error' => 'Student ID is required',
                         ];
+
                         continue;
                     }
 
@@ -1679,11 +1717,12 @@ class AssessmentManagementService
                         ->where('student_id', $studentId)
                         ->exists();
 
-                    if (!$isEnrolled) {
+                    if (! $isEnrolled) {
                         $results['errors'][] = [
                             'student_id' => $studentId,
                             'error' => 'Student is not enrolled in this course',
                         ];
+
                         continue;
                     }
 
@@ -1694,7 +1733,7 @@ class AssessmentManagementService
                         'course_offering_id' => $courseOffering->id,
                     ]);
 
-                    $isNew = !$score->exists;
+                    $isNew = ! $score->exists;
 
                     // Update score data
                     $score->fill(array_merge($gradeData, [
@@ -1710,7 +1749,7 @@ class AssessmentManagementService
                     }
 
                     // Set letter grade if percentage provided
-                    if (isset($score->percentage_score) && !isset($gradeData['letter_grade'])) {
+                    if (isset($score->percentage_score) && ! isset($gradeData['letter_grade'])) {
                         $score->letter_grade = $this->calculateLetterGrade($score->percentage_score);
                     }
 
@@ -1778,7 +1817,7 @@ class AssessmentManagementService
      *
      * @param  string|null  $status  Filter by integrity status
      */
-    public function getFlaggedSubmissions(CourseOffering $courseOffering, ?string $status = null): \Illuminate\Database\Eloquent\Collection
+    public function getFlaggedSubmissions(CourseOffering $courseOffering, ?string $status = null): Collection
     {
         $query = AssessmentComponentDetailScore::where('course_offering_id', $courseOffering->id)
             ->where('plagiarism_suspected', true)
@@ -1812,7 +1851,7 @@ class AssessmentManagementService
         ];
 
         if (! in_array($newStatus, $validStatuses)) {
-            throw new \Exception('Invalid integrity status. Valid values: ' . implode(', ', $validStatuses));
+            throw new \Exception('Invalid integrity status. Valid values: '.implode(', ', $validStatuses));
         }
 
         $previousStatus = $score->integrity_status;
@@ -1948,7 +1987,7 @@ class AssessmentManagementService
         // Update score history
         $history = $score->score_history ?? [];
         $history[] = [
-            'action' => 'appeal_' . $decision,
+            'action' => 'appeal_'.$decision,
             'decision' => $decision,
             'reviewer_notes' => $reviewerNotes,
             'instructor_feedback' => $instructorFeedback,
@@ -2010,7 +2049,7 @@ class AssessmentManagementService
     /**
      * Get pending appeals for a course offering.
      */
-    public function getPendingAppeals(CourseOffering $courseOffering): \Illuminate\Database\Eloquent\Collection
+    public function getPendingAppeals(CourseOffering $courseOffering): Collection
     {
         return AssessmentComponentDetailScore::where('course_offering_id', $courseOffering->id)
             ->where('appeal_requested', true)
@@ -2028,7 +2067,7 @@ class AssessmentManagementService
      *
      * @param  string|null  $status  Filter by appeal status
      */
-    public function getAppeals(CourseOffering $courseOffering, ?string $status = null): \Illuminate\Database\Eloquent\Collection
+    public function getAppeals(CourseOffering $courseOffering, ?string $status = null): Collection
     {
         $query = AssessmentComponentDetailScore::where('course_offering_id', $courseOffering->id)
             ->where('appeal_requested', true)
@@ -2228,11 +2267,13 @@ class AssessmentManagementService
             ->get();
 
         // Get all enrolled students
-        $enrolledStudents = $courseOffering->courseRegistrations()
-            ->with('student')
+        $enrolledStudentIds = $courseOffering->courseRegistrations()
             ->get()
-            ->pluck('student')
-            ->sortBy('full_name');
+            ->pluck('student_id')
+            ->map(static fn (int|string $studentId): int => (int) $studentId)
+            ->all();
+        $enrolledStudents = collect($this->studentReferences->findMany($enrolledStudentIds))
+            ->sortBy('fullName');
 
         $studentScores = [];
         $componentWeights = [];
@@ -2374,7 +2415,7 @@ class AssessmentManagementService
      *
      * @param  string|null  $adjustmentType  Filter by adjustment type: 'bonus', 'excluded', 'penalty'
      */
-    public function getScoresWithAdjustments(CourseOffering $courseOffering, ?string $adjustmentType = null): \Illuminate\Database\Eloquent\Collection
+    public function getScoresWithAdjustments(CourseOffering $courseOffering, ?string $adjustmentType = null): Collection
     {
         $query = AssessmentComponentDetailScore::where('course_offering_id', $courseOffering->id)
             ->with([
@@ -2451,11 +2492,13 @@ class AssessmentManagementService
             ->get();
 
         // Get all enrolled students
-        $enrolledStudents = $courseOffering->courseRegistrations()
-            ->with('student')
+        $enrolledStudentIds = $courseOffering->courseRegistrations()
             ->get()
-            ->pluck('student')
-            ->sortBy('full_name');
+            ->pluck('student_id')
+            ->map(static fn (int|string $studentId): int => (int) $studentId)
+            ->all();
+        $enrolledStudents = collect($this->studentReferences->findMany($enrolledStudentIds))
+            ->sortBy('fullName');
 
         $studentGrades = [];
         $calculationSummary = [
@@ -2490,9 +2533,9 @@ class AssessmentManagementService
     /**
      * Calculate final grade for a single student with proper adjustments.
      *
-     * @param  \Illuminate\Database\Eloquent\Collection  $components
+     * @param  Collection  $components
      */
-    private function calculateStudentFinalGrade(Student $student, $components, CourseOffering $courseOffering, array $options): array
+    private function calculateStudentFinalGrade(StudentReference $student, $components, CourseOffering $courseOffering, array $options): array
     {
         $studentData = [
             'student' => $this->formatStudentData($student),
@@ -2571,7 +2614,7 @@ class AssessmentManagementService
     /**
      * Calculate grade for a single component for a student.
      */
-    private function calculateComponentGrade(Student $student, AssessmentComponent $component, array $options): array
+    private function calculateComponentGrade(StudentReference $student, AssessmentComponent $component, array $options): array
     {
         $componentData = [
             'component_id' => $component->id,

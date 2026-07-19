@@ -8,7 +8,6 @@ use App\Models\Attendance;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Models\Lecture;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -20,11 +19,11 @@ class LecturerAttendanceService
      * Get attendance sessions for lecturer with filtering
      */
     public function getAttendanceSessions(
-        Lecture $lecturer,
+        int $lecturerId,
         array $filters = [],
         int $perPage = 15
     ): LengthAwarePaginator {
-        $query = ClassSession::where('lecture_id', $lecturer->id)
+        $query = ClassSession::where('lecture_id', $lecturerId)
             ->with([
                 'courseOffering',
                 'courseOffering.semester',
@@ -42,9 +41,9 @@ class LecturerAttendanceService
     /**
      * Get session attendance details
      */
-    public function getSessionAttendance(Lecture $lecturer, int $sessionId): ?array
+    public function getSessionAttendance(int $lecturerId, int $sessionId): ?array
     {
-        $session = ClassSession::where('lecture_id', $lecturer->id)
+        $session = ClassSession::where('lecture_id', $lecturerId)
             ->with([
                 'courseOffering',
                 'courseOffering.semester',
@@ -159,11 +158,11 @@ class LecturerAttendanceService
      * Mark attendance for a session
      */
     public function markAttendance(
-        Lecture $lecturer,
+        int $lecturerId,
         int $sessionId,
         array $attendanceData
     ): array {
-        $session = ClassSession::where('lecture_id', $lecturer->id)
+        $session = ClassSession::where('lecture_id', $lecturerId)
             ->where('id', $sessionId)
             ->first();
 
@@ -171,14 +170,14 @@ class LecturerAttendanceService
             throw new \Exception('Session not found or access denied');
         }
 
-        return DB::transaction(function () use ($session, $attendanceData, $lecturer) {
+        return DB::transaction(function () use ($session, $attendanceData, $lecturerId) {
             $results = [];
             $totalMarked = 0;
             $errors = [];
 
             foreach ($attendanceData as $record) {
                 try {
-                    $attendance = $this->markStudentAttendance($session, $record, $lecturer);
+                    $attendance = $this->markStudentAttendance($session, $record, $lecturerId);
                     $results[] = [
                         'student_id' => $record['student_id'],
                         'status' => 'success',
@@ -211,9 +210,9 @@ class LecturerAttendanceService
     /**
      * Generate attendance records for all enrolled students in a session
      */
-    public function generateAttendanceRecords(Lecture $lecturer, int $sessionId): array
+    public function generateAttendanceRecords(int $lecturerId, int $sessionId): array
     {
-        $session = ClassSession::where('lecture_id', $lecturer->id)
+        $session = ClassSession::where('lecture_id', $lecturerId)
             ->with([
                 'courseOffering.activeClassRosterRegistrations.student',
             ])
@@ -235,7 +234,7 @@ class LecturerAttendanceService
             ];
         }
 
-        return DB::transaction(function () use ($enrolledStudents, $lecturer, $sessionId) {
+        return DB::transaction(function () use ($enrolledStudents, $lecturerId, $sessionId) {
             $createdRecords = [];
             $existingCount = 0;
 
@@ -253,7 +252,7 @@ class LecturerAttendanceService
                 $attendance = Attendance::create([
                     'class_session_id' => $sessionId,
                     'student_id' => $registration->student_id,
-                    'recorded_by_lecture_id' => $lecturer->id,
+                    'recorded_by_lecture_id' => $lecturerId,
                     'status' => 'absent', // Default status
                     'recording_method' => 'manual',
                     'affects_grade' => true,
@@ -290,19 +289,20 @@ class LecturerAttendanceService
      * Get attendance analytics for course
      */
     public function getCourseAttendanceAnalytics(
-        Lecture $lecturer,
+        int $lecturerId,
         int $courseOfferingId,
         array $filters = []
     ): array {
-        $courseOffering = $lecturer->courseOfferings()
-            ->where('id', $courseOfferingId)
+        $courseOffering = CourseOffering::query()
+            ->where('lecture_id', $lecturerId)
+            ->whereKey($courseOfferingId)
             ->first();
 
         if (! $courseOffering) {
             throw new \Exception('Course offering not found or access denied');
         }
 
-        $cacheKey = "lecturer-attendance-analytics:{$lecturer->id}:{$courseOfferingId}:".md5(serialize($filters));
+        $cacheKey = "lecturer-attendance-analytics:{$lecturerId}:{$courseOfferingId}:".md5(serialize($filters));
 
         return Cache::remember($cacheKey, 300, function () use ($courseOffering, $filters) {
             return [
@@ -319,12 +319,12 @@ class LecturerAttendanceService
     /**
      * Get attendance alerts for lecturer
      */
-    public function getAttendanceAlerts(Lecture $lecturer, array $filters = []): array
+    public function getAttendanceAlerts(int $lecturerId, array $filters = []): array
     {
         $alerts = [];
 
         // Sessions requiring attention (unmarked attendance)
-        $unmmarkedSessions = ClassSession::where('lecture_id', $lecturer->id)
+        $unmmarkedSessions = ClassSession::where('lecture_id', $lecturerId)
             ->where('session_date', '<', now()->subHours(2))
             ->where('status', 'completed')
             ->with(['courseOffering.unit', 'courseOffering.classRosterRegistrations', 'attendances'])
@@ -344,7 +344,7 @@ class LecturerAttendanceService
         }
 
         // Low attendance students
-        $lowAttendanceStudents = $this->getLowAttendanceStudents($lecturer, 75);
+        $lowAttendanceStudents = $this->getLowAttendanceStudents($lecturerId, 75);
         foreach ($lowAttendanceStudents as $student) {
             $alerts[] = [
                 'type' => 'low_attendance',
@@ -363,12 +363,14 @@ class LecturerAttendanceService
      * Export attendance data for course
      */
     public function exportAttendanceData(
-        Lecture $lecturer,
+        int $lecturerId,
         int $courseOfferingId,
-        string $format = 'csv'
+        string $format = 'csv',
+        ?string $lecturerName = null,
     ): array {
-        $courseOffering = $lecturer->courseOfferings()
-            ->where('id', $courseOfferingId)
+        $courseOffering = CourseOffering::query()
+            ->where('lecture_id', $lecturerId)
+            ->whereKey($courseOfferingId)
             ->first();
 
         if (! $courseOffering) {
@@ -382,7 +384,7 @@ class LecturerAttendanceService
             'export_format' => $format,
             'data' => $attendanceData,
             'generated_at' => now()->toISOString(),
-            'generated_by' => $lecturer->full_name,
+            'generated_by' => $lecturerName,
         ];
     }
 
@@ -428,7 +430,7 @@ class LecturerAttendanceService
     protected function markStudentAttendance(
         ClassSession $session,
         array $record,
-        Lecture $lecturer
+        int $lecturerId
     ): Attendance {
         $isRosterStudent = CourseRegistration::query()
             ->where('course_offering_id', $session->course_offering_id)
@@ -444,7 +446,7 @@ class LecturerAttendanceService
             'class_session_id' => $session->id,
             'student_id' => $record['student_id'],
             'status' => $record['status'],
-            'recorded_by_lecture_id' => $lecturer->id,
+            'recorded_by_lecture_id' => $lecturerId,
             'check_in_time' => $record['check_in_time'] ?? null,
             'minutes_late' => $record['minutes_late'] ?? 0,
             'participation_score' => $record['participation_score'] ?? null,
@@ -627,7 +629,7 @@ class LecturerAttendanceService
         return [];
     }
 
-    protected function getLowAttendanceStudents(Lecture $lecturer, float $threshold): array
+    protected function getLowAttendanceStudents(int $lecturerId, float $threshold): array
     {
         // Implementation would identify students with low attendance
         return [];

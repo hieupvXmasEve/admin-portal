@@ -21,6 +21,8 @@ interface CourseOfferingCatalogReader
 
     public function offeringUnit(int $unitId): ?CourseOfferingUnitReference;
 
+    public function programIdForOfferingUnit(int $unitId): ?int;
+
     /**
      * @return list<CourseOfferingSyllabusTemplateReference>
      */

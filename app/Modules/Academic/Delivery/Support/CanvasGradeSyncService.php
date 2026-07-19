@@ -12,10 +12,11 @@ use App\Models\AssessmentComponentDetailScore;
 use App\Models\CanvasCourseMapping;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Models\CurriculumUnit;
-use App\Models\Student;
-use App\Models\Unit;
 use App\Services\Canvas\CanvasApiService;
+use App\Shared\Contracts\Academic\CourseOfferingCatalogReader;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -23,7 +24,10 @@ use Illuminate\Support\Facades\Log;
 class CanvasGradeSyncService
 {
     public function __construct(
-        private CanvasApiService $apiService
+        private CanvasApiService $apiService,
+        private readonly StudentReferenceReader $studentReferences,
+        private readonly ProgramEnrollmentReader $programEnrollments,
+        private readonly CourseOfferingCatalogReader $catalog,
     ) {}
 
     /**
@@ -88,8 +92,8 @@ class CanvasGradeSyncService
             $studentsProcessed = [];
 
             foreach ($enrollments as $enrollment) {
-                $student = $enrollment->student;
-                $studentId = strtoupper(trim((string) $student->student_id));
+                $student = $this->studentReference((int) $enrollment->student_id);
+                $studentId = strtoupper(trim($student->studentCode));
 
                 $canvasStudent = $canvasStudentMap[$studentId] ?? null;
                 if (! $canvasStudent) {
@@ -97,7 +101,7 @@ class CanvasGradeSyncService
                     $studentsProcessed[] = [
                         'student_id' => $student->id,
                         'student_code' => $studentId,
-                        'student_name' => $student->full_name ?? $student->id,
+                        'student_name' => $student->fullName,
                         'status' => 'skipped',
                         'reason' => 'Not found in Canvas course',
                         'grades_synced' => 0,
@@ -114,7 +118,7 @@ class CanvasGradeSyncService
                     $studentsProcessed[] = [
                         'student_id' => $student->id,
                         'student_code' => $studentId,
-                        'student_name' => $student->full_name ?? $student->id,
+                        'student_name' => $student->fullName,
                         'canvas_user_id' => $canvasUserId,
                         'status' => 'success',
                         'grades_synced' => $result['synced'],
@@ -126,13 +130,13 @@ class CanvasGradeSyncService
                 } catch (\Exception $e) {
                     $errors[] = [
                         'student_id' => $student->id,
-                        'student_name' => $student->full_name ?? $student->id,
+                        'student_name' => $student->fullName,
                         'error' => $e->getMessage(),
                     ];
                     $studentsProcessed[] = [
                         'student_id' => $student->id,
                         'student_code' => $studentId,
-                        'student_name' => $student->full_name ?? $student->id,
+                        'student_name' => $student->fullName,
                         'status' => 'error',
                         'error' => $e->getMessage(),
                     ];
@@ -191,15 +195,15 @@ class CanvasGradeSyncService
         $studentsUnchanged = 0;
 
         foreach ($enrollments as $enrollment) {
-            $student = $enrollment->student;
-            $studentCode = strtoupper(trim((string) $student->student_id));
+            $student = $this->studentReference((int) $enrollment->student_id);
+            $studentCode = strtoupper(trim($student->studentCode));
 
             $canvasStudent = $canvasStudentMap[$studentCode] ?? null;
             if (! $canvasStudent) {
                 $unmatched[] = [
                     'student_id' => $student->id,
                     'student_code' => $studentCode,
-                    'student_name' => $student->full_name ?? $student->id,
+                    'student_name' => $student->fullName,
                     'reason' => 'Not found in Canvas course (SIS ID/login mismatch)',
                 ];
 
@@ -281,7 +285,6 @@ class CanvasGradeSyncService
         $enrollments = CourseRegistration::where('course_offering_id', $courseOffering->id)
             ->whereIn('registration_status', ['registered', 'confirmed', 'completed'])
             ->when($studentIds !== null, fn ($q) => $q->whereIn('student_id', $studentIds))
-            ->with('student')
             ->get();
 
         if ($enrollments->isEmpty()) {
@@ -353,13 +356,13 @@ class CanvasGradeSyncService
     /**
      * Sync grades for a specific student from bulk submission data
      *
-     * @param  Student  $student  Local student record
+     * @param  StudentReference  $student  Registry-owned student reference
      * @param  string  $canvasUserId  Canvas user ID
      * @param  array<string, array<string, array<string, mixed>>>  $submissionMap  Bulk submissions indexed by [user_id][assignment_id]
      * @param  Collection<int, AssessmentComponent>  $canvasComponents
      * @return array{success: bool, synced: int, created: int, updated: int}
      */
-    private function syncStudentGradesFromBulk(Student $student, string $canvasUserId, array $submissionMap, CanvasCourseMapping $mapping, Collection $canvasComponents): array
+    private function syncStudentGradesFromBulk(StudentReference $student, string $canvasUserId, array $submissionMap, CanvasCourseMapping $mapping, Collection $canvasComponents): array
     {
         $courseOffering = $mapping->courseOffering;
 
@@ -425,7 +428,7 @@ class CanvasGradeSyncService
      *   course_total: array{student_id: int, student_code: string, student_name: string, old_percentage: float|null, new_percentage: float, changed: bool}|null
      * }
      */
-    private function diffStudentGradesFromBulk(Student $student, string $canvasUserId, array $submissionMap, CanvasCourseMapping $mapping, CourseOffering $courseOffering, Collection $canvasComponents): array
+    private function diffStudentGradesFromBulk(StudentReference $student, string $canvasUserId, array $submissionMap, CanvasCourseMapping $mapping, CourseOffering $courseOffering, Collection $canvasComponents): array
     {
         $studentSubmissions = $submissionMap[$canvasUserId] ?? [];
         $cellChanges = [];
@@ -463,8 +466,8 @@ class CanvasGradeSyncService
 
                 $cellChanges[] = [
                     'student_id' => $student->id,
-                    'student_code' => strtoupper(trim((string) $student->student_id)),
-                    'student_name' => $student->full_name ?? $student->id,
+                    'student_code' => strtoupper(trim($student->studentCode)),
+                    'student_name' => $student->fullName,
                     'component_id' => $component->id,
                     'component_name' => $component->name,
                     'detail_id' => $detail->id,
@@ -523,7 +526,7 @@ class CanvasGradeSyncService
      * Fetch the student's Canvas course total and, unless a custom grading
      * engine is authoritative, write it to the AcademicRecord.
      */
-    private function syncCanvasCourseTotal(Student $student, string $canvasUserId, CanvasCourseMapping $mapping, CourseOffering $courseOffering): void
+    private function syncCanvasCourseTotal(StudentReference $student, string $canvasUserId, CanvasCourseMapping $mapping, CourseOffering $courseOffering): void
     {
         try {
             $canvasTotal = $this->fetchCanvasCourseTotal($canvasUserId, $mapping);
@@ -576,7 +579,7 @@ class CanvasGradeSyncService
      *
      * @return array{student_id: int, student_code: string, student_name: string, old_percentage: float|null, new_percentage: float, changed: bool}|null
      */
-    private function diffCanvasCourseTotal(Student $student, string $canvasUserId, CanvasCourseMapping $mapping, CourseOffering $courseOffering): ?array
+    private function diffCanvasCourseTotal(StudentReference $student, string $canvasUserId, CanvasCourseMapping $mapping, CourseOffering $courseOffering): ?array
     {
         try {
             $canvasTotal = $this->fetchCanvasCourseTotal($canvasUserId, $mapping);
@@ -594,8 +597,8 @@ class CanvasGradeSyncService
 
             return [
                 'student_id' => $student->id,
-                'student_code' => strtoupper(trim((string) $student->student_id)),
-                'student_name' => $student->full_name ?? $student->id,
+                'student_code' => strtoupper(trim($student->studentCode)),
+                'student_name' => $student->fullName,
                 'old_percentage' => $oldPercentage,
                 'new_percentage' => $newPercentage,
                 'changed' => $changed,
@@ -648,7 +651,7 @@ class CanvasGradeSyncService
             && $gradingScheme['engine'] !== 'default_weighted_percentage';
     }
 
-    private function createAcademicRecordWithCanvasTotal(Student $student, CourseOffering $courseOffering, float $canvasTotal): void
+    private function createAcademicRecordWithCanvasTotal(StudentReference $student, CourseOffering $courseOffering, float $canvasTotal): void
     {
         $finalPercentage = round($canvasTotal, 2);
         $academicRecordData = [
@@ -665,11 +668,7 @@ class CanvasGradeSyncService
             }
         }
 
-        $creditHours = $courseOffering->unit->credit_points ?? null;
-        if ($creditHours === null) {
-            $unit = Unit::find($courseOffering->unit_id);
-            $creditHours = $unit->credit_points ?? null;
-        }
+        $creditHours = $this->catalog->offeringUnit((int) $courseOffering->unit_id)?->credit_points;
 
         if ($creditHours === null || $creditHours < 0) {
             return;
@@ -678,13 +677,8 @@ class CanvasGradeSyncService
         $academicRecordData['credit_hours'] = $creditHours;
         $academicRecordData['credit_points'] = $creditHours;
 
-        $programId = $student->program_id ?? null;
-        if (! $programId && $courseOffering->unit_id) {
-            $curriculumUnit = CurriculumUnit::where('unit_id', $courseOffering->unit_id)
-                ->with('curriculumVersion')
-                ->first();
-            $programId = $curriculumUnit->curriculumVersion->program_id ?? null;
-        }
+        $programId = $this->programEnrollments->forStudentId($student->id)->programId
+            ?? $this->catalog->programIdForOfferingUnit((int) $courseOffering->unit_id);
 
         if (! $programId) {
             return;
@@ -711,6 +705,12 @@ class CanvasGradeSyncService
             'unsubmitted' => 'not_submitted',
             default => 'not_submitted',
         };
+    }
+
+    private function studentReference(int $studentId): StudentReference
+    {
+        return $this->studentReferences->find($studentId)
+            ?? throw new \RuntimeException("Student reference #{$studentId} cannot be resolved for Canvas grade sync.");
     }
 
     /**

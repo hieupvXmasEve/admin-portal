@@ -8,14 +8,16 @@ use App\Models\AcademicRecord;
 use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
-use App\Models\Student;
 use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Support\Collection;
 
 final class GetLecturerCourseGradebookQuery
 {
     public function __construct(
         private readonly GradeDisplayPresenter $gradeDisplayPresenter,
+        private readonly StudentReferenceReader $studentReferences,
     ) {}
 
     /**
@@ -38,13 +40,14 @@ final class GetLecturerCourseGradebookQuery
             ->get();
 
         $items = $this->buildItems($components);
-        $students = $courseOffering->courseRegistrations()
-            ->with('student')
+        $studentIds = $courseOffering->courseRegistrations()
             ->whereIn('registration_status', ['registered', 'confirmed', 'completed'])
             ->get()
-            ->pluck('student')
-            ->filter()
-            ->sortBy('student_id')
+            ->pluck('student_id')
+            ->map(static fn (int|string $studentId): int => (int) $studentId)
+            ->all();
+        $students = collect($this->studentReferences->findMany($studentIds))
+            ->sortBy('studentCode')
             ->values();
 
         $detailIds = collect($items)->pluck('detail_id')->all();
@@ -150,7 +153,7 @@ final class GetLecturerCourseGradebookQuery
 
     /**
      * @param  array<int, array<string, mixed>>  $items
-     * @param  Collection<int, Student>  $students
+     * @param  Collection<int, StudentReference>  $students
      * @param  Collection<int, Collection<int, AssessmentComponentDetailScore>>  $scores
      * @return array<int, array<string, mixed>>
      */
@@ -189,7 +192,7 @@ final class GetLecturerCourseGradebookQuery
     }
 
     /**
-     * @param  Collection<int, Student>  $students
+     * @param  Collection<int, StudentReference>  $students
      * @param  array<int, array<string, mixed>>  $items
      * @param  Collection<int, Collection<int, AssessmentComponentDetailScore>>  $scores
      * @param  Collection<int, AcademicRecord>  $academicRecords
@@ -207,8 +210,8 @@ final class GetLecturerCourseGradebookQuery
 
                 return [
                     'student_id' => $student->id,
-                    'student_code' => $student->student_id,
-                    'full_name' => $student->full_name,
+                    'student_code' => $student->studentCode,
+                    'full_name' => $student->fullName,
                     'email' => $student->email,
                     'cells' => collect($items)
                         ->map(function (array $item) use ($student, $scores) {

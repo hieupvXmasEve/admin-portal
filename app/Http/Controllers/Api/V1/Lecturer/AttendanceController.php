@@ -35,7 +35,7 @@ class AttendanceController extends Controller
             $perPage = (int) $request->query('per_page', 15);
             $perPage = min(max($perPage, 5), 50);
 
-            $sessions = $this->attendanceService->getAttendanceSessions($lecturer, $filters, $perPage);
+            $sessions = $this->attendanceService->getAttendanceSessions($lecturer->id, $filters, $perPage);
 
             return ApiResponse::paginated(
                 $sessions->through(fn ($session) => new AttendanceSessionResource($session)),
@@ -56,7 +56,7 @@ class AttendanceController extends Controller
 
         try {
             $filters = ['attendance_status' => 'unmarked'];
-            $sessions = $this->attendanceService->getAttendanceSessions($lecturer, $filters, 20);
+            $sessions = $this->attendanceService->getAttendanceSessions($lecturer->id, $filters, 20);
 
             return ApiResponse::success(
                 AttendanceSessionResource::collection($sessions->items()),
@@ -76,7 +76,7 @@ class AttendanceController extends Controller
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
         try {
-            $attendanceData = $this->attendanceService->getSessionAttendance($lecturer, $sessionId);
+            $attendanceData = $this->attendanceService->getSessionAttendance($lecturer->id, $sessionId);
 
             // Log::debug('attendanceData', ['attendanceData' => $attendanceData]);
             if (! $attendanceData) {
@@ -107,7 +107,7 @@ class AttendanceController extends Controller
             Log::debug('request', ['request' => $request->all()]);
             $attendanceData = $request->validated()['attendance_data'];
 
-            $result = $this->attendanceService->markAttendance($lecturer, $sessionId, $attendanceData);
+            $result = $this->attendanceService->markAttendance($lecturer->id, $sessionId, $attendanceData);
 
             Log::debug('result', ['result' => $result]);
 
@@ -158,7 +158,7 @@ class AttendanceController extends Controller
             foreach ($validated['sessions'] as $sessionData) {
                 try {
                     $result = $this->attendanceService->markAttendance(
-                        $lecturer,
+                        $lecturer->id,
                         $sessionData['session_id'],
                         $sessionData['attendance_data']
                     );
@@ -198,7 +198,7 @@ class AttendanceController extends Controller
             $filters = $request->only(['date_from', 'date_to', 'student_id']);
 
             $analytics = $this->attendanceService->getCourseAttendanceAnalytics(
-                $lecturer,
+                $lecturer->id,
                 $courseOfferingId,
                 $filters
             );
@@ -228,7 +228,7 @@ class AttendanceController extends Controller
         try {
             $filters = $request->only(['priority', 'type', 'course_offering_id']);
 
-            $alerts = $this->attendanceService->getAttendanceAlerts($lecturer, $filters);
+            $alerts = $this->attendanceService->getAttendanceAlerts($lecturer->id, $filters);
 
             return ApiResponse::success(
                 $alerts,
@@ -259,9 +259,10 @@ class AttendanceController extends Controller
             }
 
             $exportData = $this->attendanceService->exportAttendanceData(
-                $lecturer,
+                $lecturer->id,
                 $courseOfferingId,
-                $format
+                $format,
+                $lecturer->full_name,
             );
 
             return ApiResponse::success(
@@ -287,7 +288,7 @@ class AttendanceController extends Controller
         $lecturer = $request->user();
 
         try {
-            $result = $this->attendanceService->generateAttendanceRecords($lecturer, $session);
+            $result = $this->attendanceService->generateAttendanceRecords($lecturer->id, $session);
 
             return ApiResponse::success(
                 $result,
@@ -316,7 +317,7 @@ class AttendanceController extends Controller
             $filters = $semesterId ? ['semester_id' => $semesterId] : [];
 
             // Get recent sessions for summary
-            $sessions = $this->attendanceService->getAttendanceSessions($lecturer, $filters, 50);
+            $sessions = $this->attendanceService->getAttendanceSessions($lecturer->id, $filters, 50);
 
             $totalSessions = $sessions->total();
             $sessionsWithAttendance = $sessions->where('attendance_marked', true)->count();

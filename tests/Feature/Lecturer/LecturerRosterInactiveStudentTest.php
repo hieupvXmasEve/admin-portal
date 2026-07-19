@@ -11,8 +11,11 @@ use App\Models\Lecture;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Models\User;
+use App\Modules\Identity\Models\LecturerAccessGrant;
 use App\Services\V1\Lecturer\LecturerAttendanceService;
 use App\Services\V1\Lecturer\LecturerCourseService;
+use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Sanctum\Sanctum;
@@ -25,11 +28,26 @@ beforeEach(function () {
         'code' => 'TST2026',
         'name' => 'Test Semester 2026',
     ]);
+    $this->lecturerUser = User::factory()->create([
+        'type' => UserType::LECTURER,
+        'status' => User::STATUS_ACTIVE,
+    ]);
     $this->lecturer = Lecture::factory()->create([
+        'user_id' => $this->lecturerUser->id,
         'campus_id' => $this->campus->id,
         'employment_status' => 'active',
         'is_active' => true,
         'is_available_for_assignment' => true,
+    ]);
+    LecturerAccessGrant::query()->updateOrCreate([
+        'user_id' => $this->lecturerUser->id,
+    ], [
+        'lecturer_id' => $this->lecturer->id,
+        'token_subject_type' => Lecture::class,
+        'status' => LecturerAccessGrant::STATUS_ACTIVE,
+        'reason' => 'eligible_active_employment',
+        'eligibility_evaluated_at' => now(),
+        'granted_at' => now(),
     ]);
     $this->unit = Unit::factory()->create([
         'code' => 'COS10009',
@@ -88,7 +106,7 @@ it('includes deferred and dropout students in lecturer session attendance with i
         ]));
 
     $attendance = app(LecturerAttendanceService::class)
-        ->getSessionAttendance($this->lecturer, $this->session->id);
+        ->getSessionAttendance($this->lecturer->id, $this->session->id);
 
     $students = collect($attendance['students'])->keyBy('student_id');
 
@@ -118,7 +136,7 @@ it('rejects marking attendance for a DE student left in a stale client payload',
     lecturerRosterRegistration($activeStudent, $this->offering);
     lecturerRosterRegistration($deferredStudent, $this->offering);
 
-    $result = app(LecturerAttendanceService::class)->markAttendance($this->lecturer, $this->session->id, [
+    $result = app(LecturerAttendanceService::class)->markAttendance($this->lecturer->id, $this->session->id, [
         ['student_id' => $activeStudent->id, 'status' => 'present'],
         ['student_id' => $deferredStudent->id, 'status' => 'present'],
     ]);
@@ -155,7 +173,7 @@ it('generates default attendance records only for active EGC and Major roster st
         ->each(fn (Student $student) => lecturerRosterRegistration($student, $this->offering));
 
     $result = app(LecturerAttendanceService::class)
-        ->generateAttendanceRecords($this->lecturer, $this->session->id);
+        ->generateAttendanceRecords($this->lecturer->id, $this->session->id);
 
     expect($result['total_records_created'])->toBe(2);
 

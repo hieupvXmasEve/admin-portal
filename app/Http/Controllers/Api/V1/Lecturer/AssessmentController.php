@@ -604,7 +604,7 @@ class AssessmentController extends Controller
 
             // Use service to get grading data
             $assessmentService = app(AssessmentManagementService::class);
-            $gradingData = $assessmentService->getGradingDataByStudent($courseOffering, $student);
+            $gradingData = $assessmentService->getGradingDataByStudent($courseOffering, $student->id);
 
             return ApiResponse::success(
                 $gradingData,
