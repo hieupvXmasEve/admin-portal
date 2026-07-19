@@ -6,6 +6,7 @@ namespace App\Modules\Finance\Actions;
 
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
+use App\Modules\Finance\Dng\Services\DngReservationLifecycle;
 use App\Modules\Finance\Jobs\DispatchFinanceCancellationCompletionJob;
 use App\Modules\Finance\Models\FinanceCancellationCompletionOutbox;
 use App\Modules\Finance\Models\FinanceCancellationOperation;
@@ -58,6 +59,7 @@ class ProcessFinanceCancellationOperationAction
         private readonly VoidFinanceChargeAction $voidFinanceChargeAction,
         private readonly SettlementPositionReader $settlementPositionReader,
         private readonly SettlementMutationGuard $settlementMutationGuard,
+        private readonly DngReservationLifecycle $dngReservationLifecycle,
     ) {}
 
     public function handle(int $operationId): FinanceCancellationOperation
@@ -468,42 +470,12 @@ class ProcessFinanceCancellationOperationAction
             return;
         }
 
-        $this->settlementMutationGuard->handle((int) $cancelledRequest->billing_account_id, function () use ($cancelledRequest, $operation, $total, $replacementLinks): void {
-            $replacement = DngPaymentRequest::query()->firstOrCreate(
-                ['item_id' => $cancelledRequest->item_id.'-replacement-'.$operation->id],
-                [
-                    'student_id' => $cancelledRequest->student_id,
-                    'billing_account_id' => $cancelledRequest->billing_account_id,
-                    'campus_code' => $cancelledRequest->campus_code,
-                    'provider_rail' => $cancelledRequest->provider_rail,
-                    'student_code' => $cancelledRequest->student_code,
-                    'fee_type' => $cancelledRequest->fee_type,
-                    'description' => 'Replacement after cancellation of DNG #'.$cancelledRequest->id,
-                    'semester_id' => $cancelledRequest->semester_id,
-                    'due_date' => $cancelledRequest->due_date,
-                    'amount' => $total,
-                    'status' => DngPaymentRequest::STATUS_PENDING,
-                    'push_payload' => ['replacement_for_dng_payment_request_id' => $cancelledRequest->id],
-                ],
-            );
-
-            if ((string) $replacement->amount !== $total) {
-                $replacement->update(['amount' => $total]);
-            }
-
-            foreach ($replacementLinks as $link) {
-                DngPaymentRequestCharge::query()->updateOrCreate(
-                    [
-                        'dng_payment_request_id' => $replacement->id,
-                        'finance_charge_id' => $link['finance_charge_id'],
-                    ],
-                    [
-                        'amount' => $link['amount'],
-                        'finance_charge_installment_id' => $link['finance_charge_installment_id'],
-                    ],
-                );
-            }
-        });
+        $this->dngReservationLifecycle->createCancellationReplacement(
+            $cancelledRequest,
+            (int) $operation->id,
+            $total,
+            $replacementLinks,
+        );
     }
 
     /**

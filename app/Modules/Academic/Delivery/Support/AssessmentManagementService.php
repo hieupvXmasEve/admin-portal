@@ -12,8 +12,10 @@ use App\Models\User;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Fluent;
 
 class AssessmentManagementService
 {
@@ -608,8 +610,7 @@ class AssessmentManagementService
         // Get assessment component details with all scores
         $assessmentDetails = $assessmentComponent->details()
             ->with(['scores' => function ($query) use ($courseOffering) {
-                $query->where('course_offering_id', $courseOffering->id)
-                    ->with('student');
+                $query->where('course_offering_id', $courseOffering->id);
             }])
             ->orderBy('created_at')
             ->get();
@@ -925,15 +926,14 @@ class AssessmentManagementService
      */
     public function getPendingLateExcuses(CourseOffering $courseOffering): Collection
     {
-        return AssessmentComponentDetailScore::where('course_offering_id', $courseOffering->id)
+        $scores = AssessmentComponentDetailScore::where('course_offering_id', $courseOffering->id)
             ->whereNotNull('late_excuse')
             ->where('late_excuse_approved', false)
-            ->with([
-                'student',
-                'assessmentComponentDetail.assessmentComponent',
-            ])
+            ->with('assessmentComponentDetail.assessmentComponent')
             ->orderBy('created_at', 'desc')
             ->get();
+
+        return $this->withStudentReferences($scores);
     }
 
     /**
@@ -1101,15 +1101,17 @@ class AssessmentManagementService
         array $filters = []
     ): array {
         // Get enrolled students
-        $enrolledStudents = $courseOffering->courseRegistrations()
-            ->with('student')
+        $enrolledStudentIds = $courseOffering->courseRegistrations()
             ->get()
-            ->pluck('student');
+            ->pluck('student_id')
+            ->map(static fn (int|string $studentId): int => (int) $studentId)
+            ->all();
+        $enrolledStudents = collect($this->studentReferences->findMany($enrolledStudentIds));
 
         // Build query for scores
         $query = AssessmentComponentDetailScore::where('assessment_component_detail_id', $assessmentDetail->id)
             ->where('course_offering_id', $courseOffering->id)
-            ->with(['student', 'gradedBy', 'lastModifiedBy']);
+            ->with(['gradedBy', 'lastModifiedBy']);
 
         // Apply filters
         $this->applyGradeFilters($query, $filters);
@@ -1119,13 +1121,9 @@ class AssessmentManagementService
         $sortOrder = $filters['sort_order'] ?? 'asc';
 
         if ($sortBy === 'student_name') {
-            $query->join('students', 'assessment_component_detail_scores.student_id', '=', 'students.id')
-                ->orderBy('students.full_name', $sortOrder)
-                ->select('assessment_component_detail_scores.*');
+            $this->orderScoresByStudentReference($query, 'fullName', $sortOrder);
         } elseif ($sortBy === 'student_id') {
-            $query->join('students', 'assessment_component_detail_scores.student_id', '=', 'students.id')
-                ->orderBy('students.student_id', $sortOrder)
-                ->select('assessment_component_detail_scores.*');
+            $this->orderScoresByStudentReference($query, 'studentCode', $sortOrder);
         } else {
             $query->orderBy($sortBy, $sortOrder);
         }
@@ -1135,11 +1133,20 @@ class AssessmentManagementService
         $page = $filters['page'] ?? 1;
 
         $scores = $query->paginate($perPage, ['*'], 'page', $page);
+        $scoreStudentReferences = $this->studentReferences->findMany(
+            collect($scores->items())
+                ->pluck('student_id')
+                ->map(static fn (int|string $studentId): int => (int) $studentId)
+                ->all(),
+        );
 
         // Format the response
         $formattedScores = [];
         foreach ($scores->items() as $score) {
-            $student = $score->student;
+            $student = $scoreStudentReferences[(int) $score->student_id] ?? null;
+            if (! $student instanceof StudentReference) {
+                continue;
+            }
             $formattedScores[] = [
                 'score_id' => $score->id,
                 'student' => $this->formatStudentData($student),
@@ -1174,7 +1181,11 @@ class AssessmentManagementService
         }
 
         // Add students without scores
-        $studentsWithScores = $scores->pluck('student_id')->toArray();
+        $studentsWithScores = AssessmentComponentDetailScore::query()
+            ->where('assessment_component_detail_id', $assessmentDetail->id)
+            ->where('course_offering_id', $courseOffering->id)
+            ->pluck('student_id')
+            ->all();
         $studentsWithoutScores = $enrolledStudents->whereNotIn('id', $studentsWithScores);
 
         foreach ($studentsWithoutScores as $student) {
@@ -1277,13 +1288,61 @@ class AssessmentManagementService
 
         // Search filter (student name or ID)
         if (! empty($filters['search'])) {
-            $search = $filters['search'];
-            $query->whereHas('student', function ($q) use ($search) {
-                $q->where('student_id', 'like', "%{$search}%")
-                    ->orWhere('full_name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
+            $studentIds = $this->studentReferences->idsMatchingSearch((string) $filters['search']);
+            $studentIds === []
+                ? $query->whereRaw('1 = 0')
+                : $query->whereIn('student_id', $studentIds);
         }
+    }
+
+    private function orderScoresByStudentReference(Builder $query, string $property, string $direction): void
+    {
+        $studentIds = (clone $query)
+            ->distinct()
+            ->pluck('student_id')
+            ->map(static fn (int|string $studentId): int => (int) $studentId)
+            ->all();
+        $references = collect($this->studentReferences->findMany($studentIds))
+            ->sortBy(static fn (StudentReference $student): string => mb_strtolower((string) $student->{$property}));
+
+        if (strtolower($direction) === 'desc') {
+            $references = $references->reverse();
+        }
+
+        $orderedIds = $references->pluck('id')->values()->all();
+        if ($orderedIds === []) {
+            $query->orderBy('student_id', $direction);
+
+            return;
+        }
+
+        $cases = collect($orderedIds)
+            ->keys()
+            ->map(static fn (int $index): string => "WHEN ? THEN {$index}")
+            ->implode(' ');
+
+        $query->orderByRaw(
+            "CASE student_id {$cases} ELSE ".count($orderedIds).' END',
+            $orderedIds,
+        );
+    }
+
+    private function withStudentReferences(Collection $scores): Collection
+    {
+        $references = $this->studentReferences->findMany(
+            $scores->pluck('student_id')
+                ->map(static fn (int|string $studentId): int => (int) $studentId)
+                ->all(),
+        );
+
+        foreach ($scores as $score) {
+            $reference = $references[(int) $score->student_id] ?? null;
+            if ($reference instanceof StudentReference) {
+                $score->setRelation('student', new Fluent($this->formatStudentData($reference)));
+            }
+        }
+
+        return $scores;
     }
 
     /**
@@ -1821,16 +1880,13 @@ class AssessmentManagementService
     {
         $query = AssessmentComponentDetailScore::where('course_offering_id', $courseOffering->id)
             ->where('plagiarism_suspected', true)
-            ->with([
-                'student',
-                'assessmentComponentDetail.assessmentComponent',
-            ]);
+            ->with('assessmentComponentDetail.assessmentComponent');
 
         if ($status) {
             $query->where('integrity_status', $status);
         }
 
-        return $query->orderBy('created_at', 'desc')->get();
+        return $this->withStudentReferences($query->orderBy('created_at', 'desc')->get());
     }
 
     /**
@@ -2051,15 +2107,14 @@ class AssessmentManagementService
      */
     public function getPendingAppeals(CourseOffering $courseOffering): Collection
     {
-        return AssessmentComponentDetailScore::where('course_offering_id', $courseOffering->id)
+        $scores = AssessmentComponentDetailScore::where('course_offering_id', $courseOffering->id)
             ->where('appeal_requested', true)
             ->where('appeal_status', 'pending')
-            ->with([
-                'student',
-                'assessmentComponentDetail.assessmentComponent',
-            ])
+            ->with('assessmentComponentDetail.assessmentComponent')
             ->orderBy('appeal_requested_at', 'asc')
             ->get();
+
+        return $this->withStudentReferences($scores);
     }
 
     /**
@@ -2071,16 +2126,13 @@ class AssessmentManagementService
     {
         $query = AssessmentComponentDetailScore::where('course_offering_id', $courseOffering->id)
             ->where('appeal_requested', true)
-            ->with([
-                'student',
-                'assessmentComponentDetail.assessmentComponent',
-            ]);
+            ->with('assessmentComponentDetail.assessmentComponent');
 
         if ($status) {
             $query->where('appeal_status', $status);
         }
 
-        return $query->orderBy('appeal_requested_at', 'desc')->get();
+        return $this->withStudentReferences($query->orderBy('appeal_requested_at', 'desc')->get());
     }
 
     /**
@@ -2418,10 +2470,7 @@ class AssessmentManagementService
     public function getScoresWithAdjustments(CourseOffering $courseOffering, ?string $adjustmentType = null): Collection
     {
         $query = AssessmentComponentDetailScore::where('course_offering_id', $courseOffering->id)
-            ->with([
-                'student',
-                'assessmentComponentDetail.assessmentComponent',
-            ]);
+            ->with('assessmentComponentDetail.assessmentComponent');
 
         switch ($adjustmentType) {
             case 'bonus':
@@ -2446,7 +2495,7 @@ class AssessmentManagementService
                 break;
         }
 
-        return $query->orderBy('created_at', 'desc')->get();
+        return $this->withStudentReferences($query->orderBy('created_at', 'desc')->get());
     }
 
     /**

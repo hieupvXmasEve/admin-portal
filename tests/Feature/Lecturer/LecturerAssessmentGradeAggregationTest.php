@@ -16,6 +16,7 @@ use App\Models\Student;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\User;
+use App\Modules\Academic\Delivery\Support\AssessmentManagementService;
 use App\Modules\Academic\Queries\GetCourseOfferingScoresQuery;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -150,6 +151,107 @@ beforeEach(function () {
             'grade_breakdown' => ['engine' => 'default_weighted_percentage'],
         ]);
     };
+});
+
+it('sorts the lecturer grade table through Student Registry references', function (): void {
+    $syllabus = ($this->makeSyllabus)();
+    $offering = ($this->makeOffering)($syllabus);
+    $detail = ($this->makeAssignmentDetail)($syllabus);
+    $this->student->update(['student_id' => 'STU-Z', 'full_name' => 'Zed Student']);
+    ($this->enrollStudentWithStaleRecord)($offering);
+
+    $anotherStudent = Student::factory()->forCampus($this->campus)->create([
+        'student_id' => 'STU-A',
+        'full_name' => 'Ana Student',
+        'status' => 'intake_course',
+        'intake' => 1,
+        'intake_mode' => 'sequential',
+        'intake_semester_id' => $this->semester->id,
+    ]);
+    CourseRegistration::query()->create([
+        'student_id' => $anotherStudent->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $offering->semester_id,
+        'registration_status' => 'confirmed',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3.0,
+        'credit_points' => 3.0,
+        'attempt_number' => 1,
+        'is_retake' => false,
+        'retake_fee' => 0.00,
+        'is_retake_paid' => 'no',
+    ]);
+
+    foreach ([$this->student, $anotherStudent] as $student) {
+        AssessmentComponentDetailScore::query()->create([
+            'assessment_component_detail_id' => $detail->id,
+            'student_id' => $student->id,
+            'course_offering_id' => $offering->id,
+            'points_earned' => 80,
+            'percentage_score' => 80,
+            'status' => 'graded',
+            'score_status' => 'final',
+        ]);
+    }
+
+    Sanctum::actingAs($this->lecturer);
+
+    $this->getJson("/api/v1/lecturer/courses/{$offering->id}/assessments/details/{$detail->id}/grades?per_page=5&sort_by=student_name&sort_order=asc")
+        ->assertOk()
+        ->assertJsonPath('data.data.0.student.student_id', 'STU-A')
+        ->assertJsonPath('data.data.1.student.student_id', 'STU-Z');
+});
+
+it('resolves lecturer grading data from the student route identifier', function (): void {
+    $syllabus = ($this->makeSyllabus)();
+    $offering = ($this->makeOffering)($syllabus);
+    ($this->makeAssignmentDetail)($syllabus);
+    ($this->enrollStudentWithStaleRecord)($offering);
+
+    Sanctum::actingAs($this->lecturer);
+
+    $this->getJson("/api/v1/lecturer/courses/{$offering->id}/assessments/grade/student/{$this->student->id}")
+        ->assertOk()
+        ->assertJsonPath('data.student.student_id', $this->student->student_id);
+});
+
+it('returns not found for missing or malformed lecturer grading student identifiers', function (): void {
+    $syllabus = ($this->makeSyllabus)();
+    $offering = ($this->makeOffering)($syllabus);
+
+    Sanctum::actingAs($this->lecturer);
+
+    $this->getJson("/api/v1/lecturer/courses/{$offering->id}/assessments/grade/student/999999999")
+        ->assertNotFound();
+    $this->getJson("/api/v1/lecturer/courses/{$offering->id}/assessments/grade/student/not-a-number")
+        ->assertNotFound();
+});
+
+it('serializes Student Registry references on assessment exception rows', function (): void {
+    $syllabus = ($this->makeSyllabus)();
+    $offering = ($this->makeOffering)($syllabus);
+    $detail = ($this->makeAssignmentDetail)($syllabus);
+    $score = AssessmentComponentDetailScore::query()->create([
+        'assessment_component_detail_id' => $detail->id,
+        'student_id' => $this->student->id,
+        'course_offering_id' => $offering->id,
+        'points_earned' => 80,
+        'percentage_score' => 80,
+        'status' => 'graded',
+        'score_status' => 'final',
+        'late_excuse' => 'Transport disruption',
+        'late_excuse_approved' => false,
+    ]);
+
+    $rows = app(AssessmentManagementService::class)->getPendingLateExcuses($offering);
+
+    expect($rows->first()?->id)->toBe($score->id)
+        ->and($rows->first()?->toArray()['student'] ?? null)->toMatchArray([
+            'id' => $this->student->id,
+            'student_id' => $this->student->student_id,
+            'full_name' => $this->student->full_name,
+        ]);
 });
 
 it('refreshes assignment grade display after lecturer bulk grading an in-progress manual course', function () {

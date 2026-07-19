@@ -12,25 +12,26 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\SettlementMutationGuard;
-use App\Modules\Notification\Actions\PublishDomainEventAction;
-use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
+use App\Shared\Contracts\DomainEvents\DomainEvent;
+use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class DngWebhookService
 {
     public function __construct(
         protected DngPaymentService $dngPaymentService,
         protected DngChecksumService $checksumService,
-        protected PublishDomainEventAction $publishDomainEventAction,
+        protected DomainEventPublisher $domainEventPublisher,
         protected SettleInstallmentFromDngAction $settleInstallmentAction,
         protected RetakeRegistrationPaymentSyncer $retakeRegistrationPaymentSyncer,
         protected ExamResitAttemptPaymentSyncer $examResitAttemptPaymentSyncer,
+        protected AcademicPeriodReader $academicPeriods,
         protected ?BillingAccountProvisioner $billingAccountProvisioner = null,
         protected ?SettlementMutationGuard $settlementMutationGuard = null,
         protected ?StudentReferenceReader $studentReferences = null,
@@ -470,10 +471,9 @@ class DngWebhookService
             $studentName = $student?->fullName ?? '';
             $formattedAmount = number_format((float) $request->amount, 0, ',', '.').' VNĐ';
 
-            $envelope = new DomainEventEnvelope(
-                eventId: (string) Str::uuid(),
-                eventName: 'finance.dng_payment_received',
-                eventVersion: 1,
+            $event = new DomainEvent(
+                name: 'finance.dng_payment_received',
+                deduplicationKey: 'finance.dng_payment_received:'.$request->id,
                 occurredAt: CarbonImmutable::now(),
                 aggregateType: 'dng_payment_request',
                 aggregateId: (string) $request->id,
@@ -494,13 +494,15 @@ class DngWebhookService
                         'student_name' => $studentName,
                         'student_code' => $request->student_code,
                         'amount_formatted' => $formattedAmount,
-                        'semester_code' => $request->semester?->code ?? '',
+                        'semester_code' => $request->semester_id === null
+                            ? ''
+                            : ($this->academicPeriods->find((int) $request->semester_id)?->code ?? ''),
                         'paid_at' => $request->paid_at?->toISOString(),
                     ],
                 ],
             );
 
-            $this->publishDomainEventAction->run($envelope);
+            $this->domainEventPublisher->publish($event);
         } catch (\Throwable $e) {
             Log::warning('Failed to publish DNG payment received notification', [
                 'dng_payment_request_id' => $request->id,

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Notification\Actions;
 
-use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use App\Modules\Notification\Domain\Contracts\NotificationIntent;
 use App\Modules\Notification\EmailContent\EmailContentRegistry;
@@ -16,6 +15,7 @@ use App\Modules\Notification\Support\EventIntentMapper;
 use App\Modules\Notification\Support\NotificationAuditLogger;
 use App\Modules\Notification\Support\NotificationMetrics;
 use App\Modules\Notification\Support\RecipientResolver;
+use App\Shared\Contracts\Finance\DngPaymentNotificationContextReader;
 use Illuminate\Support\Facades\Log;
 
 class HandleOutboxEventAction
@@ -28,6 +28,7 @@ class HandleOutboxEventAction
         private readonly NotificationAuditLogger $auditLogger,
         private readonly NotificationMetrics $metrics,
         private readonly EmailContentRegistry $emailContentRegistry,
+        private readonly DngPaymentNotificationContextReader $dngPaymentNotificationContexts,
     ) {}
 
     public function run(NotificationEventOutbox $outbox): int
@@ -201,17 +202,16 @@ class HandleOutboxEventAction
         $requestId = $data['dng_payment_request_id'] ?? null;
 
         if ($requestId !== null) {
-            $request = DngPaymentRequest::with(['semester', 'student.program'])->find((int) $requestId);
+            $context = $this->dngPaymentNotificationContexts->find((int) $requestId);
 
-            if ($request !== null) {
-                $student = $request->student;
-                $data['student_name'] = $student?->full_name ?? $data['student_name'] ?? '';
-                $data['student_code'] = $request->student_code;
-                $data['semester_code'] = $request->semester?->code ?? '';
-                $data['program_name'] = $student?->program?->name ?? '';
-                $data['invoice_code'] = $request->item_id;
-                $data['amount_formatted'] = number_format((float) $request->amount, 0, ',', '.').' VNĐ';
-                $data['due_date'] = $request->due_date?->format('d/m/Y') ?? null;
+            if ($context !== null) {
+                $data['student_name'] = $context->studentName !== '' ? $context->studentName : ($data['student_name'] ?? '');
+                $data['student_code'] = $context->studentCode;
+                $data['semester_code'] = $context->semesterCode;
+                $data['program_name'] = $context->programName;
+                $data['invoice_code'] = $context->invoiceCode;
+                $data['amount_formatted'] = $context->amountFormatted;
+                $data['due_date'] = $context->dueDate;
             }
         }
 

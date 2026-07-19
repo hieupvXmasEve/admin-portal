@@ -11,9 +11,8 @@ use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\DngInstallmentContextResolver;
 use App\Modules\Finance\Support\ExamResitDngLinkResolver;
 use App\Modules\Finance\Support\LifecycleDueItemPredicate;
-use App\Modules\Notification\EmailContent\EmailContentRegistry;
-use App\Modules\Notification\Models\NotificationEmailTemplate;
 use App\Services\EmailService;
+use App\Shared\Contracts\Notification\EmailContentResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -30,7 +29,7 @@ class SendDueItemParentRemindersAction
 
         $settlementService = app(SettlementService::class);
         $emailService = app(EmailService::class);
-        $registry = app(EmailContentRegistry::class);
+        $registry = app(EmailContentResolver::class);
         $installmentResolver = app(DngInstallmentContextResolver::class);
         $emailContent = $registry->resolve('parent_payment_reminder');
         $installmentEmailContent = $registry->resolve('parent_installment_payment_reminder');
@@ -294,10 +293,8 @@ class SendDueItemParentRemindersAction
             return self::$templateExistsCache[$cacheKey];
         }
 
-        return self::$templateExistsCache[$cacheKey] = NotificationEmailTemplate::query()
-            ->where('campus_id', $campusId)
-            ->where('type_key', $typeKey)
-            ->exists();
+        return self::$templateExistsCache[$cacheKey] = app(EmailContentResolver::class)
+            ->isConfiguredForCampus($typeKey, $campusId);
     }
 
     private static function buildSummaryMessage(

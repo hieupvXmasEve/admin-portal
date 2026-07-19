@@ -13,6 +13,7 @@ use App\Modules\Finance\Dng\Services\DngChecksumService;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Dng\Services\DngWebhookService;
 use App\Modules\Notification\Models\NotificationEventOutbox;
+use App\Shared\Contracts\Finance\DngPaymentNotificationContextReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -109,6 +110,7 @@ function makeWebhookEventForNotification(
 
 it('publishes finance.dng_payment_received outbox event on first PAID transition', function () {
     $request = makeWebhookRequest($this->student, 'PAY001', 5000000);
+    $request->update(['semester_id' => $this->semester->id]);
 
     $event = makeWebhookEventForNotification(
         $request,
@@ -128,7 +130,27 @@ it('publishes finance.dng_payment_received outbox event on first PAID transition
     expect($outbox->payload['type_key'])->toBe('dng_payment_received')
         ->and($outbox->payload['channels'])->toContain('realtime', 'email')
         ->and($outbox->payload['recipient_targets'][0]['type'])->toBe('student')
-        ->and($outbox->payload['recipient_targets'][0]['id'])->toBe($this->student->id);
+        ->and($outbox->payload['recipient_targets'][0]['id'])->toBe($this->student->id)
+        ->and($outbox->payload['data']['semester_code'])->toBe($this->semester->code);
+});
+
+it('builds DNG notification context through owner contracts', function () {
+    $request = makeWebhookRequest($this->student, 'PAY-CONTEXT', 5000000);
+    $request->update([
+        'semester_id' => $this->semester->id,
+        'due_date' => '2026-08-31',
+    ]);
+
+    $context = app(DngPaymentNotificationContextReader::class)->find((int) $request->id);
+
+    expect($context)->not->toBeNull()
+        ->and($context->studentName)->toBe($this->student->full_name)
+        ->and($context->studentCode)->toBe('STU001')
+        ->and($context->semesterCode)->toBe($this->semester->code)
+        ->and($context->programName)->toBe($this->program->name)
+        ->and($context->invoiceCode)->toBe('ITEM001')
+        ->and($context->amountFormatted)->toBe('5.000.000 VNĐ')
+        ->and($context->dueDate)->toBe('31/08/2026');
 });
 
 it('publishes the payment-received notification exactly once across Call 1 then Call 2 (P2)', function () {

@@ -137,11 +137,8 @@ it('allows DNG payment-request creation only at canonical reservation or cancell
     $appRoot = dirname(__DIR__, 3).'/app';
     $pattern = '/DngPaymentRequest::(?:query\(\)->)?(?:create|firstOrCreate)\s*\(/';
     $violations = scanPhpFilesForPattern($appRoot, $pattern, [
-        // The durable reservation lifecycle is the canonical write seam; its
-        // public entrypoints are invoked by both single-fee and installment flows.
+        // The durable reservation lifecycle is the sole DNG request writer.
         'DngReservationLifecycle.php',
-        'ReserveAndPushSingleFeeDngAction.php',
-        'ProcessFinanceCancellationOperationAction.php',
     ]);
 
     expect($violations)->toBe(

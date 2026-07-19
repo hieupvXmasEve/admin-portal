@@ -12,14 +12,13 @@ use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Queries\GetStudentBalanceQuery;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\SettlementMutationGuard;
-use App\Modules\Notification\Actions\PublishDomainEventAction;
-use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
+use App\Shared\Contracts\DomainEvents\DomainEvent;
+use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class PaymentService
 {
@@ -37,7 +36,7 @@ class PaymentService
 
     public function __construct(
         protected GetStudentBalanceQuery $getStudentBalanceQuery,
-        protected PublishDomainEventAction $publishDomainEventAction,
+        protected DomainEventPublisher $domainEventPublisher,
         protected SettlementService $settlementService,
         private readonly BillingAccountProvisioner $billingAccountProvisioner,
         private readonly SettlementMutationGuard $settlementMutationGuard,
@@ -89,10 +88,9 @@ class PaymentService
             return;
         }
 
-        $envelope = new DomainEventEnvelope(
-            eventId: (string) Str::uuid(),
-            eventName: 'finance.invoice_paid',
-            eventVersion: 1,
+        $event = new DomainEvent(
+            name: 'finance.invoice_paid',
+            deduplicationKey: 'finance.invoice_paid:'.$payment->id,
             occurredAt: CarbonImmutable::now(),
             aggregateType: 'payment',
             aggregateId: (string) $payment->id,
@@ -116,7 +114,7 @@ class PaymentService
             ],
         );
 
-        $this->publishDomainEventAction->runAfterCommit($envelope);
+        $this->domainEventPublisher->publishAfterCommit($event);
     }
 
     /**

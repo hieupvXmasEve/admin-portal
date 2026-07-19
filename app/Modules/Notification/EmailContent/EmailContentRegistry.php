@@ -10,7 +10,9 @@ use App\Modules\Notification\EmailContent\Types\DngPaymentReceivedEmailContent;
 use App\Modules\Notification\EmailContent\Types\ParentPaymentReminderEmailContent;
 use App\Modules\Notification\EmailContent\Types\PaymentReminderEmailContent;
 use App\Modules\Notification\Enums\NotificationTemplateTypeKey;
+use App\Modules\Notification\Models\NotificationEmailTemplate;
 use App\Shared\Contracts\Notification\EmailContentProvider;
+use App\Shared\Contracts\Notification\EmailContentResolver;
 use InvalidArgumentException;
 
 /**
@@ -35,7 +37,7 @@ use InvalidArgumentException;
  * and `JobProcessed` events. The reset clears the local memo and forwards
  * `reset()` to any cached provider that implements it.
  */
-final class EmailContentRegistry
+final class EmailContentRegistry implements EmailContentResolver
 {
     /** @var array<string, class-string<EmailContentProvider>> */
     private array $legacyMap = [
@@ -73,6 +75,14 @@ final class EmailContentRegistry
         }
 
         return $this->resolved[$cacheKey] = $this->build($typeKey);
+    }
+
+    public function isConfiguredForCampus(string $typeKey, int $campusId): bool
+    {
+        return NotificationEmailTemplate::query()
+            ->where('campus_id', $campusId)
+            ->where('type_key', $typeKey)
+            ->exists();
     }
 
     /**

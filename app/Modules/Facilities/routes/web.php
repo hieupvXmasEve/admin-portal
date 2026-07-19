@@ -2,8 +2,46 @@
 
 declare(strict_types=1);
 
+use App\Modules\Facilities\Http\Web\BuildingController;
 use App\Modules\Facilities\Http\Web\RoomBookingController;
 use Illuminate\Support\Facades\Route;
+
+Route::middleware(['web', 'auth', 'verified'])->group(function () {
+    Route::prefix('buildings')->name('buildings.')->group(function () {
+        Route::get('/', [BuildingController::class, 'index'])
+            ->middleware('can:view_building')
+            ->name('index');
+
+        Route::get('/api', [BuildingController::class, 'api'])
+            ->name('api');
+
+        Route::get('/{building}', [BuildingController::class, 'show'])
+            ->middleware('can:view_building')
+            ->name('show');
+    });
+
+    Route::prefix('campuses/{campus}/buildings')->name('campuses.buildings.')->group(function () {
+        Route::get('/create', [BuildingController::class, 'create'])
+            ->middleware('can:create_building')
+            ->name('create');
+
+        Route::post('/', [BuildingController::class, 'store'])
+            ->middleware('can:create_building')
+            ->name('store');
+
+        Route::get('/{building}/edit', [BuildingController::class, 'edit'])
+            ->middleware('can:edit_building')
+            ->name('edit');
+
+        Route::put('/{building}', [BuildingController::class, 'update'])
+            ->middleware('can:edit_building')
+            ->name('update');
+
+        Route::delete('/{building}', [BuildingController::class, 'destroy'])
+            ->middleware('can:delete_building')
+            ->name('destroy');
+    });
+});
 
 Route::middleware(['web', 'auth', 'verified', 'campus.selected'])->group(function () {
     Route::get('room-bookings', [RoomBookingController::class, 'index'])

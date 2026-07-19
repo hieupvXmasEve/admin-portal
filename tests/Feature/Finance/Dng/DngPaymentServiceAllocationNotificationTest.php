@@ -15,8 +15,8 @@ use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Services\PaymentService;
-use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Models\NotificationEventOutbox;
+use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 
@@ -93,7 +93,7 @@ function makeBridgingDngPaymentService(
     return new DngPaymentService(
         $dngClientMock,
         $paymentServiceMock,
-        app(PublishDomainEventAction::class),
+        app(DomainEventPublisher::class),
     );
 }
 

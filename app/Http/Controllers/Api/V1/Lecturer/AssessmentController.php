@@ -20,11 +20,11 @@ use App\Models\AssessmentComponentDetail;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
 use App\Models\Lecture;
-use App\Models\Student;
 use App\Modules\Academic\Delivery\Support\AssessmentManagementService;
 use App\Modules\Academic\Delivery\Support\AssessmentWeightValidationService;
 use App\Services\AssessmentGradeExcelService;
 use App\Services\CourseCompletionService;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -587,7 +587,7 @@ class AssessmentController extends Controller
     /**
      * Get grading data by student
      */
-    public function gradeByStudent(Request $request, CourseOffering $courseOffering, Student $student): JsonResponse
+    public function gradeByStudent(Request $request, CourseOffering $courseOffering, string $student): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
@@ -602,9 +602,14 @@ class AssessmentController extends Controller
                 );
             }
 
+            $studentId = ctype_digit($student) ? (int) $student : 0;
+            if ($studentId < 1 || app(StudentReferenceReader::class)->find($studentId) === null) {
+                return ApiResponse::error('Student not found', [], 404);
+            }
+
             // Use service to get grading data
             $assessmentService = app(AssessmentManagementService::class);
-            $gradingData = $assessmentService->getGradingDataByStudent($courseOffering, $student->id);
+            $gradingData = $assessmentService->getGradingDataByStudent($courseOffering, $studentId);
 
             return ApiResponse::success(
                 $gradingData,
@@ -614,7 +619,7 @@ class AssessmentController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to retrieve student grading data', [
                 'course_offering_id' => $courseOffering->id,
-                'student_id' => $student->student_id,
+                'student_id' => (int) $student,
                 'lecturer_id' => $lecturer->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -713,7 +718,7 @@ class AssessmentController extends Controller
             $this->aggregateManualGradesForOpenManualCourse($courseOffering);
 
             // Load fresh data with relationships
-            $score->load('assessmentComponentDetail', 'student');
+            $score->load('assessmentComponentDetail');
 
             // Use service to format response
             $assessmentService = app(AssessmentManagementService::class);

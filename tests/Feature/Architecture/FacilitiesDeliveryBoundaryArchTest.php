@@ -45,7 +45,7 @@ it('keeps Delivery exam scheduling on the Facilities reservation contract', func
 });
 
 it('serves legacy building URLs from the Facilities owner', function (): void {
-    $routes = file_get_contents(dirname(__DIR__, 3).'/app/Modules/Academic/routes/web.php') ?: '';
+    $routes = file_get_contents(dirname(__DIR__, 3).'/app/Modules/Facilities/routes/web.php') ?: '';
     $roomRoutes = file_get_contents(dirname(__DIR__, 3).'/routes/web/rooms.php') ?: '';
 
     expect($routes)->toContain('App\\Modules\\Facilities\\Http\\Web\\BuildingController')

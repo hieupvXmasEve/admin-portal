@@ -69,3 +69,20 @@ it('keeps Delivery implementations independent of legacy delivery classes', func
         'Delivery must own its attendance, gradebook, readiness, and Canvas implementations rather than delegate to legacy classes.',
     );
 });
+
+it('keeps Delivery assessment reads off Student Registry persistence', function (): void {
+    $files = [
+        base_path('app/Modules/Academic/Delivery/Support/AssessmentManagementService.php'),
+        base_path('app/Http/Controllers/Api/V1/Lecturer/AssessmentController.php'),
+    ];
+
+    foreach ($files as $file) {
+        $contents = file_get_contents($file) ?: '';
+
+        expect($contents)
+            ->not->toMatch('/use App\\\\Models\\\\Student;/')
+            ->not->toMatch('/(?:with|whereHas|load)\(\s*[\'\"]student[\'\"]/')
+            ->not->toMatch('/->with\(\s*\[[^\]]*[\'\"]student[\'\"]\s*,/s')
+            ->not->toMatch('/join\(\s*[\'\"]students[\'\"]/');
+    }
+});

@@ -10,20 +10,19 @@ use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Services\PaymentService;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\SettlementMutationGuard;
-use App\Modules\Notification\Actions\PublishDomainEventAction;
-use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
+use App\Shared\Contracts\DomainEvents\DomainEvent;
+use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class DngPaymentService
 {
     public function __construct(
         protected DngClient $dngClient,
         protected PaymentService $paymentService,
-        protected PublishDomainEventAction $publishDomainEventAction,
+        protected DomainEventPublisher $domainEventPublisher,
         protected ?BillingAccountProvisioner $billingAccountProvisioner = null,
         protected ?SettlementMutationGuard $settlementMutationGuard = null,
         protected ?StudentReferenceReader $studentReferences = null,
@@ -89,10 +88,9 @@ class DngPaymentService
         try {
             $formattedAmount = number_format((float) $amount, 0, ',', '.').' VNĐ';
 
-            $envelope = new DomainEventEnvelope(
-                eventId: (string) Str::uuid(),
-                eventName: 'finance.dng_payment_pushed',
-                eventVersion: 1,
+            $event = new DomainEvent(
+                name: 'finance.dng_payment_pushed',
+                deduplicationKey: 'finance.dng_payment_pushed:'.$requestId,
                 occurredAt: CarbonImmutable::now(),
                 aggregateType: 'dng_payment_request',
                 aggregateId: (string) $requestId,
@@ -118,7 +116,7 @@ class DngPaymentService
                 ],
             );
 
-            $this->publishDomainEventAction->run($envelope);
+            $this->domainEventPublisher->publish($event);
         } catch (\Throwable $e) {
             Log::warning('Failed to publish DNG push notification', [
                 'student_id' => $studentId,
@@ -158,10 +156,9 @@ class DngPaymentService
                 $body = "Cảnh báo: Thanh toán {$formattedAmount} của SV {$studentName} ({$studentCode}) nhận được nhưng không tìm thấy khoản phí tồn đọng để phân bổ";
             }
 
-            $envelope = new DomainEventEnvelope(
-                eventId: (string) Str::uuid(),
-                eventName: 'finance.dng_payment_allocated',
-                eventVersion: 1,
+            $event = new DomainEvent(
+                name: 'finance.dng_payment_allocated',
+                deduplicationKey: 'finance.dng_payment_allocated:'.$request->id.':'.$payment->id,
                 occurredAt: CarbonImmutable::now(),
                 aggregateType: 'dng_payment_request',
                 aggregateId: (string) $request->id,
@@ -187,7 +184,7 @@ class DngPaymentService
                 ],
             );
 
-            $this->publishDomainEventAction->runAfterCommit($envelope);
+            $this->domainEventPublisher->publishAfterCommit($event);
         } catch (\Throwable $e) {
             Log::warning('Failed to publish DNG allocation notification', [
                 'dng_payment_request_id' => $request->id,

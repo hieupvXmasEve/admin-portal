@@ -179,6 +179,55 @@ final class DngReservationLifecycle
         });
     }
 
+    /**
+     * @param  list<array{finance_charge_id: int, amount: string, finance_charge_installment_id: int|null}>  $replacementLinks
+     */
+    public function createCancellationReplacement(
+        DngPaymentRequest $cancelledRequest,
+        int $operationId,
+        string $total,
+        array $replacementLinks,
+    ): DngPaymentRequest {
+        return $this->guard()->handle((int) $cancelledRequest->billing_account_id, function () use ($cancelledRequest, $operationId, $total, $replacementLinks): DngPaymentRequest {
+            $replacement = DngPaymentRequest::query()->firstOrCreate(
+                ['item_id' => $cancelledRequest->item_id.'-replacement-'.$operationId],
+                [
+                    'student_id' => $cancelledRequest->student_id,
+                    'billing_account_id' => $cancelledRequest->billing_account_id,
+                    'campus_code' => $cancelledRequest->campus_code,
+                    'provider_rail' => $cancelledRequest->provider_rail,
+                    'student_code' => $cancelledRequest->student_code,
+                    'fee_type' => $cancelledRequest->fee_type,
+                    'description' => 'Replacement after cancellation of DNG #'.$cancelledRequest->id,
+                    'semester_id' => $cancelledRequest->semester_id,
+                    'due_date' => $cancelledRequest->due_date,
+                    'amount' => $total,
+                    'status' => DngPaymentRequest::STATUS_PENDING,
+                    'push_payload' => ['replacement_for_dng_payment_request_id' => $cancelledRequest->id],
+                ],
+            );
+
+            if ((string) $replacement->amount !== $total) {
+                $replacement->update(['amount' => $total]);
+            }
+
+            foreach ($replacementLinks as $link) {
+                DngPaymentRequestCharge::query()->updateOrCreate(
+                    [
+                        'dng_payment_request_id' => $replacement->id,
+                        'finance_charge_id' => $link['finance_charge_id'],
+                    ],
+                    [
+                        'amount' => $link['amount'],
+                        'finance_charge_installment_id' => $link['finance_charge_installment_id'],
+                    ],
+                );
+            }
+
+            return $replacement;
+        });
+    }
+
     /** @param array{description: string, semester_id: int, due_date: string, estimate_time: string} $details */
     public function push(int $studentId, DngPaymentRequest $reservation, array $details): DngPaymentRequest
     {

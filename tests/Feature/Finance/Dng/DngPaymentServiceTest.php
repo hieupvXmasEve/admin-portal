@@ -9,7 +9,7 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Services\PaymentService;
-use App\Modules\Notification\Actions\PublishDomainEventAction;
+use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -19,7 +19,7 @@ function guardedDngService(DngClient $client): DngPaymentService
     return new DngPaymentService(
         $client,
         Mockery::mock(PaymentService::class),
-        Mockery::mock(PublishDomainEventAction::class),
+        Mockery::mock(DomainEventPublisher::class),
     );
 }
 

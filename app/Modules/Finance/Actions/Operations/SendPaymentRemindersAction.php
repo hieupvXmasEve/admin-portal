@@ -6,8 +6,8 @@ namespace App\Modules\Finance\Actions\Operations;
 
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
-use App\Modules\Notification\EmailContent\EmailContentRegistry;
 use App\Services\EmailService;
+use App\Shared\Contracts\Notification\EmailContentResolver;
 
 class SendPaymentRemindersAction
 {
@@ -26,7 +26,7 @@ class SendPaymentRemindersAction
 
         $settlementService = app(SettlementService::class);
         $emailService = app(EmailService::class);
-        $emailContent = app(EmailContentRegistry::class)->resolve('payment_reminder');
+        $emailContent = app(EmailContentResolver::class)->resolve('payment_reminder');
         $now = now();
 
         foreach ($invoices as $invoice) {
