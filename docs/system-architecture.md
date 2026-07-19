@@ -94,6 +94,42 @@ Client (Web SPA / API)
     - Support: `EventIntentMapper`, `RecipientResolver`, `NotificationAuditLogger`, `NotificationMetrics`, `PolicyResolver`
     - Email SMTP resolution: `EmailConfiguration` table is campus-scoped; `getActiveForCampus(?int)` resolves campus-specific config (priority) or falls back to global; `SendSingleEmailJob` threads `campus_id` through the dispatch chain
 
+#### Target bounded-context map
+
+The physical Modules above describe current code placement. The accepted target is a modular monolith whose business ownership is divided as follows; a Bounded Context may remain an internal namespace during migration and does not need an immediate top-level Module.
+
+| Bounded Context | Owns |
+|---|---|
+| Identity & Access | Accounts, Account Status, Actors, roles, permissions, and access grants |
+| Institution & Organization | Institution Campuses, departments, and organizational reference data |
+| Student Registry | Student Identity, Student Reference, contact and campus affiliation, Student–Guardian Relationships |
+| Admissions | Applicants, Applications, Applicant Guardians, admission documents, Approve, Reject, and Revoke |
+| Faculty Workforce | Faculty Member employment, contracts, rank, qualifications, pay terms, Teaching Eligibility, and Faculty Access Eligibility |
+| Academic Catalog & Calendar | Programs, Curriculum Versions, Units, syllabi, Academic Periods, and Campus Period Schedules |
+| Course Delivery & Assessment | Course Offerings, rosters, sessions, attendance, assessments, exams, Instructor Assignments, and Course Results |
+| Academic Progression & Lifecycle | Program Enrollments, Study Stages, Transcript Entries, GPA, standing, EGC progression, lifecycle actions, and graduation |
+| Finance | Billing accounts, obligations, charges, invoices, payments, settlement, pricing, and DNG integration mappings |
+| Facilities | Buildings, Rooms, physical capacity, Space Availability, and reservations |
+| Notification | Event intake, templates, message and delivery lifecycle, email, and realtime channels |
+| AI & Reporting | Read-only orchestration through owner readers and Cross-context Read Projections; no source business data |
+
+Student, guardian/parent, and lecturer are Actors or business profiles, not portal-shaped Bounded Contexts. Semester is the current model name for the institution-wide Academic Period, not a separate domain or a campus-specific identity.
+
+Cross-context interaction follows ADR-0043: synchronous contracts for fresh decisions and atomic commands, durable events/outbox for post-commit reactions, and projections for stale-tolerant reporting. Shared Eloquent business models and direct imports of another context's concrete Actions are transitional coupling, not approved integration mechanisms.
+
+#### Domain-boundary migration order
+
+1. Add boundary safety nets: Shared Contracts, neutral references, adapters, and architecture tests. Prioritize Student Reference, Academic Period, faculty access, and Notification publishing seams.
+2. Establish Institution references and extract Academic Catalog & Calendar as the first complete Academic context. Move DNG provider mapping toward Finance and Building/Room ownership toward Facilities without changing public routes or portal contracts.
+3. Establish Student Registry and clean Identity access decisions so other contexts stop reading Student or faculty lifecycle state directly.
+4. Refactor Admissions approval and revocation into atomic orchestration through Registry, Identity, and Progression contracts.
+5. Establish Faculty Workforce while keeping Instructor Assignment and timetable conflicts in Course Delivery & Assessment.
+6. Extract Course Delivery & Assessment around Course Offering, roster, attendance, gradebook, exams, Course Result, and the Facilities availability boundary.
+7. Extract Academic Progression & Lifecycle around Program Enrollment, Transcript Entry, GPA, EGC, Decisions, and lifecycle actions after its upstream result and identity seams are stable.
+8. Build supporting engagement and cross-context reporting projections only when their independent rules justify a boundary; then retire legacy services and adapters slice by slice.
+
+Initial slices preserve table names, routes, and student/lecturer portal contracts. Moving `Student.php`, renaming Semester tables, or creating many empty top-level Modules before boundary tests exist is explicitly not the first step.
+
 ### 2.3 Academic Progression and Status Logging
 
 Current academic progression baseline:

@@ -1,5 +1,7 @@
 # Approve is a single atomic step that creates the Student
 
+> Context ownership and orchestration are refined by ADR-0042; the atomic business outcome remains unchanged.
+
 In the redesigned admissions flow, **Approve** is one transactional action that turns a `pending` Application into a Student (creates the User + Student + roles, links Guardians). There is no separate "review" step, because the admissions CRM already does the screening upstream — Swinx's job is to confirm enrollment, not re-review.
 
 Approve/Reject/Revoke are **staff-only** actions (web UI), guarded by campus-scoped permissions (`approve_student_application`, etc.); the CRM API never approves.
