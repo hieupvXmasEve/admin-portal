@@ -6,7 +6,6 @@ namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Semester;
-use App\Models\Student;
 use App\Modules\Finance\Actions\CreateStaffDebitAction;
 use App\Modules\Finance\Actions\PushNextInstallmentAction;
 use App\Modules\Finance\Actions\SplitChargeIntoInstallmentsAction;
@@ -23,6 +22,8 @@ use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Queries\Lookup\ListFinanceChargesQuery;
 use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
 use App\Modules\Finance\Support\FinanceSemesterContextResolver;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -46,6 +47,7 @@ class FinanceChargeController extends Controller
     public function __construct(
         private CreateStaffDebitAction $createStaffDebitAction,
         private VoidFinanceChargeAction $voidChargeAction,
+        private StudentReferenceReader $studentReferences,
     ) {}
 
     /**
@@ -64,20 +66,23 @@ class FinanceChargeController extends Controller
     public function studentCharges(
         FilterFinanceChargesRequest $request,
         ListFinanceChargesQuery $query,
-        Student $student,
+        int $student,
     ): Response {
-        return $this->renderIndex($request, $query, $student);
+        $studentReference = $this->studentReferences->find($student);
+        abort_if($studentReference === null, 404);
+
+        return $this->renderIndex($request, $query, $studentReference);
     }
 
     private function renderIndex(
         FilterFinanceChargesRequest $request,
         ListFinanceChargesQuery $query,
-        ?Student $student = null,
+        ?StudentReference $student = null,
     ): Response {
         $selectedStudent = $student;
 
         if (! $selectedStudent && $request->filled('student_id')) {
-            $selectedStudent = Student::query()->find((int) $request->input('student_id'));
+            $selectedStudent = $this->studentReferences->find((int) $request->input('student_id'));
         }
 
         $result = $query->handle($request, $selectedStudent?->id);
@@ -95,8 +100,8 @@ class FinanceChargeController extends Controller
             'chargeTypes' => $chargeTypes,
             'student' => $selectedStudent ? [
                 'id' => $selectedStudent->id,
-                'full_name' => $selectedStudent->full_name,
-                'student_id' => $selectedStudent->student_id,
+                'full_name' => $selectedStudent->fullName,
+                'student_id' => $selectedStudent->studentCode,
             ] : null,
             'filters' => [
                 'search' => $request->input('search', ''),
@@ -117,7 +122,6 @@ class FinanceChargeController extends Controller
     public function show(FinanceCharge $charge): Response
     {
         $charge->load([
-            'student',
             'semester',
             'billingCycle',
             'createdBy',
@@ -132,6 +136,7 @@ class FinanceChargeController extends Controller
         return Inertia::render('Finance/Charges/Show', [
             'charge' => [
                 ...$charge->toArray(),
+                'student' => $this->studentPayload($this->studentReferences->find((int) $charge->student_id)),
                 'created_by' => $charge->createdBy ? [
                     'id' => $charge->createdBy->id,
                     'name' => $charge->createdBy->name,
@@ -233,7 +238,7 @@ class FinanceChargeController extends Controller
         $student = null;
 
         if ($request->has('student_id')) {
-            $student = Student::find($request->get('student_id'));
+            $student = $this->studentReferences->find((int) $request->get('student_id'));
         }
 
         $adjustmentIntents = collect(CreateStaffDebitAction::ADJUSTMENT_INTENTS)->map(fn (string $intent) => [
@@ -251,7 +256,7 @@ class FinanceChargeController extends Controller
             'semesters' => $semesters,
             'chargeTypes' => $chargeTypes,
             'adjustmentIntents' => $adjustmentIntents,
-            'student' => $student,
+            'student' => $this->studentPayload($student),
         ]);
     }
 
@@ -272,6 +277,23 @@ class FinanceChargeController extends Controller
             FinanceCharge::TYPE_ADJUSTMENT => 'Điều chỉnh',
             default => ucwords(str_replace('_', ' ', $type)),
         };
+    }
+
+    /**
+     * @return array{id: int, full_name: string, student_id: string, email: string|null}|null
+     */
+    private function studentPayload(?StudentReference $student): ?array
+    {
+        if ($student === null) {
+            return null;
+        }
+
+        return [
+            'id' => $student->id,
+            'full_name' => $student->fullName,
+            'student_id' => $student->studentCode,
+            'email' => $student->email,
+        ];
     }
 
     /**

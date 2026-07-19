@@ -5,18 +5,19 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Operations;
 
 use App\Models\DeferCase;
-use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\FinanceOperationsStudentScope;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistPresenter;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistReader;
-use Illuminate\Database\Eloquent\Builder;
 
 final class GetBillingDashboardStatsQuery
 {
     public function __construct(
         private readonly SettlementPositionWorklistReader $positionReader,
         private readonly SettlementPositionWorklistPresenter $positionPresenter,
+        private readonly FinanceOperationsStudentScope $studentScope,
     ) {}
 
     /** @return array<string,int|float> */
@@ -44,24 +45,13 @@ final class GetBillingDashboardStatsQuery
             ];
         }
 
-        $eligibleQuery = Student::query()
-            ->where('intake_semester_id', '<=', $semesterId)
-            ->when($campusId, fn ($q) => $q->where('campus_id', $campusId))
-            ->where(function (Builder $q) use ($semesterId): void {
-                $q->whereHas('courseRegistrations', fn ($sq) => $sq->where('semester_id', $semesterId)->whereNotIn('registration_status', ['defer', 'dropped', 'withdrawn']))
-                    ->orWhereHas('deferCases', fn ($sq) => $sq->where('semester_id', $semesterId))
-                    ->orWhereHas('invoices', fn ($sq) => $sq->where('semester_id', $semesterId));
-            });
-
-        $eligibleCount = $eligibleQuery->count();
+        $eligibleStudentIds = array_keys($this->studentScope->dashboardStudents($semesterId, $campusId === null ? null : (int) $campusId));
+        $eligibleCount = count($eligibleStudentIds);
         $lines = InvoiceLine::query()
             ->with('invoice')
             ->where('status', 'active')
             ->whereHas('charge', fn ($query) => $query->where('status', FinanceCharge::STATUS_ACTIVE)->where('amount', '>', 0))
-            ->whereHas('invoice', function ($query) use ($semesterId, $campusId): void {
-                $query->where('semester_id', $semesterId)
-                    ->when($campusId, fn ($q) => $q->whereHas('student', fn ($sq) => $sq->where('campus_id', $campusId)));
-            })
+            ->whereHas('invoice', fn ($query) => $query->where('semester_id', $semesterId)->whereIn('student_id', $eligibleStudentIds))
             ->get();
 
         $lineIdsByStudent = $lines->groupBy(fn (InvoiceLine $line): int => (int) $line->invoice->student_id)
@@ -105,24 +95,27 @@ final class GetBillingDashboardStatsQuery
             }
         }
 
-        $deferPreserveCount = DeferCase::query()
+        $deferCases = $this->studentScope->deferCases($semesterId, $campusId === null ? null : (int) $campusId);
+        $deferPreserveCount = count(array_filter($deferCases, static fn (array $deferCase): bool => $deferCase['fee_policy'] === DeferCase::POLICY_PRESERVE));
+        $deferForfeitCount = count(array_filter($deferCases, static fn (array $deferCase): bool => $deferCase['fee_policy'] === DeferCase::POLICY_FORFEIT));
+        $retakeStudentIds = $this->studentScope->retakeStudentIds($semesterId, $campusId === null ? null : (int) $campusId);
+        $retakeStudentIdsWithInvoices = StudentInvoice::query()
             ->where('semester_id', $semesterId)
-            ->where('fee_policy', DeferCase::POLICY_PRESERVE)
-            ->when($campusId, fn ($q) => $q->whereHas('student', fn ($sq) => $sq->where('campus_id', $campusId)))
-            ->count();
-        $deferForfeitCount = DeferCase::query()
+            ->whereIn('student_id', $retakeStudentIds)
+            ->pluck('student_id')
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->all();
+        $unsettledRetakeStudentIds = StudentInvoice::query()
             ->where('semester_id', $semesterId)
-            ->where('fee_policy', DeferCase::POLICY_FORFEIT)
-            ->when($campusId, fn ($q) => $q->whereHas('student', fn ($sq) => $sq->where('campus_id', $campusId)))
-            ->count();
-        $retakeUnpaidCount = Student::query()
-            ->when($campusId, fn ($q) => $q->where('campus_id', $campusId))
-            ->whereHas('courseRegistrations', fn ($q) => $q->where('semester_id', $semesterId)->where('is_retake', true))
-            ->where(function ($query) use ($semesterId): void {
-                $query->whereDoesntHave('invoices', fn ($invoiceQuery) => $invoiceQuery->where('semester_id', $semesterId))
-                    ->orWhereHas('invoices', fn ($invoiceQuery) => $invoiceQuery->where('semester_id', $semesterId)->whereNotIn('status', ['paid', 'cancelled']));
-            })
-            ->count();
+            ->whereIn('student_id', $retakeStudentIds)
+            ->whereNotIn('status', ['paid', 'cancelled'])
+            ->pluck('student_id')
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->all();
+        $retakeUnpaidCount = count(array_unique([
+            ...array_diff($retakeStudentIds, $retakeStudentIdsWithInvoices),
+            ...$unsettledRetakeStudentIds,
+        ]));
 
         return [
             'eligible_count' => $eligibleCount,

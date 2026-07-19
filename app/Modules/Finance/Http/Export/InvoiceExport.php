@@ -10,6 +10,8 @@ use App\Modules\Finance\Support\Reporting\SettlementReportAsOfContext;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionScope;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -20,6 +22,9 @@ final class InvoiceExport implements FromQuery, WithHeadings, WithMapping
     /** @var array<int, SettlementPosition> */
     private array $positions = [];
 
+    /** @var array<int, StudentReference> */
+    private array $studentReferences = [];
+
     public function __construct(
         private readonly array $filters,
         private readonly SettlementPositionReader $settlementPositionReader,
@@ -29,11 +34,20 @@ final class InvoiceExport implements FromQuery, WithHeadings, WithMapping
 
     public function query(): Builder
     {
+        /** @var StudentReferenceReader $studentReferences */
+        $studentReferences = app(StudentReferenceReader::class);
+        $campusId = app()->bound('campus') ? app('campus')?->id : null;
+        $campusStudentIds = $campusId === null ? null : $studentReferences->idsForCampus((int) $campusId);
+        $search = trim((string) ($this->filters['search'] ?? ''));
+        $matchingStudentIds = $search === '' ? [] : $studentReferences->idsMatchingSearch($search, $campusId === null ? null : (int) $campusId);
+
         return StudentInvoice::query()
-            ->with(['student', 'semester'])
-            ->when(app()->bound('campus') && app('campus')?->id, fn (Builder $query) => $query->forCampus((int) app('campus')->id))
+            ->with('semester')
+            ->when($campusStudentIds !== null, fn (Builder $query) => $query->whereIn('student_id', $campusStudentIds))
             ->when(! empty($this->filters['semester_id']), fn (Builder $query) => $query->forSemester((int) $this->filters['semester_id']))
-            ->when(! empty($this->filters['search']), fn (Builder $query) => $query->search((string) $this->filters['search']))
+            ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query
+                ->where('invoice_number', 'like', "%{$search}%")
+                ->orWhereIn('student_id', $matchingStudentIds)))
             ->latest();
     }
 
@@ -45,6 +59,11 @@ final class InvoiceExport implements FromQuery, WithHeadings, WithMapping
     {
         $rows = collect($rows);
         $this->positions = [];
+        /** @var StudentReferenceReader $studentReferences */
+        $studentReferences = app(StudentReferenceReader::class);
+        $this->studentReferences = $studentReferences->findMany(
+            $rows->pluck('student_id')->map(static fn (int|string $studentId): int => (int) $studentId)->all(),
+        );
 
         if ($rows->isNotEmpty()) {
             $positions = $this->settlementPositionReader->batch(
@@ -98,6 +117,7 @@ final class InvoiceExport implements FromQuery, WithHeadings, WithMapping
 
     public function map($invoice): array
     {
+        $student = $this->studentReferences[(int) $invoice->student_id] ?? null;
         $position = $this->positions[(int) $invoice->id] ?? null;
         $amounts = $position?->amounts;
         $valid = $position?->isValid() && $amounts !== null;
@@ -107,8 +127,8 @@ final class InvoiceExport implements FromQuery, WithHeadings, WithMapping
 
         return [
             $invoice->invoice_number,
-            $invoice->student->full_name,
-            $invoice->student->student_id,
+            $student?->fullName,
+            $student?->studentCode,
             $invoice->semester->name,
             $valid ? $amounts->gross->amount : null,
             $valid ? $amounts->discount->amount : null,

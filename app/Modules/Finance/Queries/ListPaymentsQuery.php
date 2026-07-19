@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries;
 
-use App\Models\Student;
 use App\Modules\Finance\Models\Payment;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class ListPaymentsQuery
 {
+    public function __construct(private readonly StudentReferenceReader $studentReferences) {}
+
     public function handle(Request $request): array
     {
         $query = $this->buildFilteredQuery($request)
-            ->with(['student', 'receivedBy'])
+            ->with('receivedBy')
             ->withSum('applications as applied_amount_total', 'amount');
 
         $stats = $this->buildStats($this->buildFilteredQuery($request));
@@ -23,13 +26,25 @@ class ListPaymentsQuery
         $direction = $request->input('direction', 'desc');
         $direction = $direction === 'asc' ? 'asc' : 'desc';
 
-        $this->applySorting($query, is_string($sort) ? $sort : 'paid_at', $direction);
+        $sort = is_string($sort) ? $sort : 'paid_at';
+        if (in_array($sort, ['student_id', 'student_name'], true)) {
+            $this->applyStudentSorting($query, $sort, $direction);
+        } else {
+            $this->applySorting($query, $sort, $direction);
+        }
 
         $payments = $query->paginate($request->input('per_page', 15))
             ->withQueryString();
+        $studentReferences = $this->studentReferences->findMany(
+            $payments->getCollection()
+                ->pluck('student_id')
+                ->map(static fn (int|string $studentId): int => (int) $studentId)
+                ->all(),
+        );
 
-        $payments->through(function (Payment $payment): array {
+        $payments->through(function (Payment $payment) use ($studentReferences): array {
             $allocatedAmount = max(0.0, (float) ($payment->applied_amount_total ?? 0));
+            $student = $studentReferences[(int) $payment->student_id] ?? null;
 
             return [
                 'id' => $payment->id,
@@ -41,10 +56,10 @@ class ListPaymentsQuery
                 'method' => $payment->method,
                 'allocated_amount' => (float) $allocatedAmount,
                 'unapplied_amount' => (float) max(0.0, (float) $payment->amount - $allocatedAmount),
-                'student' => $payment->student ? [
-                    'id' => $payment->student->id,
-                    'full_name' => $payment->student->full_name,
-                    'student_id' => $payment->student->student_id,
+                'student' => $student ? [
+                    'id' => $student->id,
+                    'full_name' => $student->fullName,
+                    'student_id' => $student->studentCode,
                 ] : null,
             ];
         });
@@ -58,19 +73,17 @@ class ListPaymentsQuery
     private function buildFilteredQuery(Request $request): Builder
     {
         $campusId = app('campus')?->id;
+        $search = trim((string) $request->input('search', ''));
+        $campusStudentIds = $campusId === null ? null : $this->studentReferences->idsForCampus((int) $campusId);
+        $matchingStudentIds = $search === '' ? [] : $this->studentReferences->idsMatchingSearch($search, $campusId === null ? null : (int) $campusId);
 
         $query = Payment::query()
-            ->when($campusId, fn (Builder $builder) => $builder->whereHas('student', fn (Builder $studentQuery) => $studentQuery->where('campus_id', $campusId)));
+            ->when($campusStudentIds !== null, fn (Builder $builder) => $builder->whereIn('student_id', $campusStudentIds));
 
-        if ($request->filled('search')) {
-            $term = $request->input('search');
-            $query->where(function ($q) use ($term) {
-                $q->where('external_ref', 'like', "%{$term}%")
-                    ->orWhereHas('student', function ($subQ) use ($term) {
-                        $subQ->where('full_name', 'like', "%{$term}%")
-                            ->orWhere('student_id', 'like', "%{$term}%")
-                            ->orWhere('email', 'like', "%{$term}%");
-                    });
+        if ($search !== '') {
+            $query->where(function (Builder $query) use ($search, $matchingStudentIds): void {
+                $query->where('external_ref', 'like', "%{$search}%")
+                    ->orWhereIn('student_id', $matchingStudentIds);
             });
         }
 
@@ -119,26 +132,44 @@ class ListPaymentsQuery
     {
         match ($sort) {
             'amount', 'paid_at', 'status', 'created_at' => $query->orderBy("payments.{$sort}", $direction),
-            'student_id' => $query->orderBy(
-                Student::query()
-                    ->select('student_id')
-                    ->whereColumn('students.id', 'payments.student_id')
-                    ->limit(1),
-                $direction
-            ),
-            'student_name' => $query->orderBy(
-                Student::query()
-                    ->select('full_name')
-                    ->whereColumn('students.id', 'payments.student_id')
-                    ->limit(1),
-                $direction
-            ),
             'unapplied_amount' => $query->orderByRaw(
                 sprintf('(payments.amount - COALESCE(applied_amount_total, 0)) %s', $direction)
             ),
             default => $query->orderBy('payments.paid_at', 'desc'),
         };
 
+        $query->orderBy('payments.id', 'desc');
+    }
+
+    private function applyStudentSorting(Builder $query, string $sort, string $direction): void
+    {
+        $studentIds = (clone $query)
+            ->select('student_id')
+            ->distinct()
+            ->pluck('student_id')
+            ->map(static fn (int|string $studentId): int => (int) $studentId)
+            ->all();
+        $studentReferences = $this->studentReferences->findMany($studentIds);
+
+        uasort($studentReferences, static function (StudentReference $left, StudentReference $right) use ($sort, $direction): int {
+            $leftValue = $sort === 'student_id' ? $left->studentCode : $left->fullName;
+            $rightValue = $sort === 'student_id' ? $right->studentCode : $right->fullName;
+            $comparison = strnatcasecmp($leftValue, $rightValue);
+
+            return $direction === 'asc' ? $comparison : -$comparison;
+        });
+        $orderedStudentIds = array_keys($studentReferences);
+        if ($orderedStudentIds === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $cases = implode(' ', array_map(
+            static fn (int $index): string => 'WHEN ? THEN '.$index,
+            array_keys($orderedStudentIds),
+        ));
+        $query->orderByRaw('CASE payments.student_id '.$cases.' ELSE '.count($orderedStudentIds).' END', $orderedStudentIds);
         $query->orderBy('payments.id', 'desc');
     }
 }

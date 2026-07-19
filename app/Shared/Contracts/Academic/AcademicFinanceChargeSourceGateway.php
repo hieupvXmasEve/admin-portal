@@ -41,6 +41,12 @@ interface AcademicFinanceChargeSourceGateway
      */
     public function retakeStudentIdsWithExpectedFees(int $semesterId, ?int $campusId = null): array;
 
+    /** @return list<int> */
+    public function billingDashboardStudentIds(int $semesterId): array;
+
+    /** @return list<int> */
+    public function billingDashboardRetakeStudentIds(int $semesterId): array;
+
     /**
      * @return list<int>
      */

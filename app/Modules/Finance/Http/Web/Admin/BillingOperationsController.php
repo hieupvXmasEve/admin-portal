@@ -53,6 +53,10 @@ class BillingOperationsController extends Controller
             'students' => $students,
             'semesters' => $semesters,
             'currentSemester' => $currentSemesterObj,
+            'freshness' => [
+                'mode' => 'live_owner_reads',
+                'as_of' => now()->toIso8601String(),
+            ],
             'filters' => [
                 'status' => $validated['status'] ?? 'all',
                 'stage' => $validated['stage'] ?? 'all',

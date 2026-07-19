@@ -19,6 +19,14 @@ interface StudentReferenceReader
     public function findByStudentCode(string $studentCode, int $campusId): ?StudentReference;
 
     /**
+     * Resolve a student code without applying a campus scope.
+     *
+     * Callers that act on a campus must still compare the returned reference's
+     * campus ID with their current campus context.
+     */
+    public function findByStudentCodeAnywhere(string $studentCode): ?StudentReference;
+
+    /**
      * @return list<int>
      */
     public function idsForCampus(int $campusId): array;

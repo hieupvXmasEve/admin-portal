@@ -49,6 +49,16 @@ final class EloquentStudentReferenceReader implements StudentReferenceReader
         return $student !== null ? $this->reference($student) : null;
     }
 
+    public function findByStudentCodeAnywhere(string $studentCode): ?StudentReference
+    {
+        $student = Student::query()
+            ->select(['id', 'student_id', 'user_id', 'full_name', 'campus_id', 'email', 'current_address_line', 'address', 'national_id'])
+            ->where('student_id', $studentCode)
+            ->first();
+
+        return $student !== null ? $this->reference($student) : null;
+    }
+
     /** @return list<int> */
     public function idsForCampus(int $campusId): array
     {

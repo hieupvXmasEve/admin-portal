@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Support;
 
 use App\Models\AcademicRecord;
+use App\Models\CourseRegistration;
 use App\Models\CourseRetakeRegistration;
 use App\Models\EgcBlock;
 use App\Models\ExamResitAttempt;
@@ -232,6 +233,30 @@ final class AcademicFinanceChargeSourceGateway implements AcademicFinanceChargeS
             ->distinct()
             ->pluck('student_id')
             ->map(fn (mixed $id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    public function billingDashboardStudentIds(int $semesterId): array
+    {
+        return array_values(array_unique(array_merge(
+            CourseRegistration::query()
+                ->where('semester_id', $semesterId)
+                ->whereNotIn('registration_status', ['defer', 'dropped', 'withdrawn'])
+                ->pluck('student_id')
+                ->map(static fn (int|string $id): int => (int) $id)
+                ->all(),
+        )));
+    }
+
+    public function billingDashboardRetakeStudentIds(int $semesterId): array
+    {
+        return CourseRegistration::query()
+            ->where('semester_id', $semesterId)
+            ->where('is_retake', true)
+            ->pluck('student_id')
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->unique()
             ->values()
             ->all();
     }

@@ -5,14 +5,16 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries;
 
 use App\Modules\Finance\Models\Payment;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 
 class GetPaymentDetailsQuery
 {
+    public function __construct(private readonly StudentReferenceReader $studentReferences) {}
+
     public function handle(int $paymentId): array
     {
         $payment = Payment::query()
             ->with([
-                'student',
                 'receivedBy',
                 'applications' => fn ($query) => $query->orderByDesc('applied_at')->orderByDesc('id'),
                 'applications.invoiceLine.charge.semester',
@@ -22,6 +24,7 @@ class GetPaymentDetailsQuery
             ->findOrFail($paymentId);
 
         $allocatedAmount = max(0, (float) ($payment->applied_amount_total ?? 0));
+        $student = $this->studentReferences->find((int) $payment->student_id);
 
         return [
             'id' => $payment->id,
@@ -34,10 +37,10 @@ class GetPaymentDetailsQuery
             'notes' => $payment->notes,
             'unapplied_amount' => max(0, (float) $payment->amount - $allocatedAmount),
             'allocated_amount' => $allocatedAmount,
-            'student' => $payment->student ? [
-                'id' => $payment->student->id,
-                'full_name' => $payment->student->full_name,
-                'student_id' => $payment->student->student_id,
+            'student' => $student ? [
+                'id' => $student->id,
+                'full_name' => $student->fullName,
+                'student_id' => $student->studentCode,
             ] : null,
             'received_by' => $payment->receivedBy ? [
                 'name' => $payment->receivedBy->name,

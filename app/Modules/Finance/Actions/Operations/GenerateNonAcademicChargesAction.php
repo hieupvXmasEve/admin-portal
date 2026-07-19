@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Operations;
 
-use App\Models\Student;
 use App\Modules\Finance\Enums\NonAcademicChargeTypeEnum;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Support\FinanceOwnedObligationSource;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -64,18 +64,22 @@ class GenerateNonAcademicChargesAction
         }
         $campusId = app('campus')->id;
 
-        // Load students in the CSV list scoped to current campus.
-        $query = Student::whereIn('student_id', $studentCodes)
-            ->where('campus_id', $campusId);
-        // Keyed by student_id code for O(1) lookup.
-        $foundStudents = $query->get()->keyBy('student_id');
+        /** @var StudentReferenceReader $studentReferences */
+        $studentReferences = app(StudentReferenceReader::class);
 
-        // Load ALL students matching the codes regardless of campus,
-        // so we can distinguish "not found at all" from "wrong campus".
-        $existsAnywhere = Student::whereIn('student_id', $studentCodes)
-            ->pluck('student_id')
-            ->flip()
-            ->all();
+        // Registry owns both code resolution and campus membership. Keep the
+        // two lookups so the legacy skip reasons remain externally stable.
+        $studentsByCode = collect($studentCodes)
+            ->unique()
+            ->mapWithKeys(static function (string $studentCode) use ($studentReferences, $campusId): array {
+                $campusStudent = $studentReferences->findByStudentCode($studentCode, (int) $campusId);
+
+                return [$studentCode => [
+                    'student' => $campusStudent,
+                    'exists' => $campusStudent !== null
+                        || $studentReferences->findByStudentCodeAnywhere($studentCode) !== null,
+                ]];
+            });
 
         $created = [];
         $skipped = [];
@@ -95,20 +99,20 @@ class GenerateNonAcademicChargesAction
                     }
 
                     // Skip: student not found in system at all.
-                    if (! isset($existsAnywhere[$code])) {
+                    $studentLookup = $studentsByCode->get($code);
+                    if (! $studentLookup['exists']) {
                         $skipped[] = ['student_code' => $code, 'reason' => 'student_not_found'];
 
                         continue;
                     }
 
                     // Skip: student exists but belongs to a different campus.
-                    if (! isset($foundStudents[$code])) {
+                    $student = $studentLookup['student'];
+                    if ($student === null) {
                         $skipped[] = ['student_code' => $code, 'reason' => 'wrong_campus'];
 
                         continue;
                     }
-
-                    $student = $foundStudents[$code];
 
                     // Skip: duplicate active charge for same (student, type, semester).
                     // lockForUpdate reduces double-submit races under the outer batch txn.
@@ -139,13 +143,13 @@ class GenerateNonAcademicChargesAction
                         source_kind: FinanceOwnedObligationSource::NON_ACADEMIC_BATCH,
                         source_ref: FinanceOwnedObligationSource::nonAcademicBatchRef(
                             $feeType,
-                            (int) $student->id,
+                            $student->id,
                             $semesterId,
                         ),
                         financial_effect: FinancialEffect::Debit,
                         obligation_type: $feeType,
                         facts: [
-                            'student_id' => (int) $student->id,
+                            'student_id' => $student->id,
                             'semester_id' => $semesterId,
                             'amount' => $amount,
                             'description' => $description,

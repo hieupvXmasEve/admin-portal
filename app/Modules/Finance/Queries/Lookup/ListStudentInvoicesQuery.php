@@ -10,6 +10,8 @@ use App\Modules\Finance\Support\Reporting\CurrentSettlementPositionPresenter;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionScope;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -21,6 +23,7 @@ final class ListStudentInvoicesQuery
     public function __construct(
         private readonly SettlementPositionReader $settlementPositionReader,
         private readonly CurrentSettlementPositionPresenter $positionPresenter,
+        private readonly StudentReferenceReader $studentReferences,
     ) {}
 
     /** @return array{items: LengthAwarePaginator} */
@@ -31,17 +34,29 @@ final class ListStudentInvoicesQuery
             ? (int) $request->input('semester_id')
             : FinanceSemesterContextResolver::selectedId();
 
+        $campusStudentIds = $campusId === null ? null : $this->studentReferences->idsForCampus((int) $campusId);
+        $search = trim((string) $request->input('search', ''));
+        $matchingStudentIds = $search === '' ? [] : $this->studentReferences->idsMatchingSearch($search, $campusId === null ? null : (int) $campusId);
+
         $invoices = StudentInvoice::query()
-            ->with(['student', 'semester', 'invoiceLines.charge'])
-            ->when($campusId !== null, fn ($query) => $query->forCampus((int) $campusId))
+            ->with(['semester', 'invoiceLines.charge'])
+            ->when($campusStudentIds !== null, fn ($query) => $query->whereIn('student_id', $campusStudentIds))
             ->when($semesterId !== null, fn ($query) => $query->forSemester($semesterId))
-            ->when($request->filled('search'), fn ($query) => $query->search((string) $request->input('search')))
+            ->when($search !== '', function ($query) use ($search, $matchingStudentIds): void {
+                $query->where(fn ($query) => $query
+                    ->where('invoice_number', 'like', "%{$search}%")
+                    ->orWhereIn('student_id', $matchingStudentIds));
+            })
             ->latest()
             ->get();
 
         $positions = $this->settlementPositions($invoices);
+        $studentReferences = $this->studentReferences->findMany(
+            $invoices->pluck('student_id')->map(static fn (int|string $studentId): int => (int) $studentId)->all(),
+        );
         $rows = $invoices->map(fn (StudentInvoice $invoice, int $index): array => $this->mapInvoice(
             $invoice,
+            $studentReferences[(int) $invoice->student_id] ?? null,
             $positions[$index] ?? null,
         ));
 
@@ -85,7 +100,7 @@ final class ListStudentInvoicesQuery
     }
 
     /** @return array<string, mixed> */
-    private function mapInvoice(StudentInvoice $invoice, ?SettlementPosition $position): array
+    private function mapInvoice(StudentInvoice $invoice, ?StudentReference $student, ?SettlementPosition $position): array
     {
         $amounts = $position?->amounts;
         $valid = $position?->isValid() && $amounts !== null;
@@ -100,9 +115,9 @@ final class ListStudentInvoicesQuery
             'invoice_number' => (string) $invoice->invoice_number,
             'student_id' => (int) $invoice->student_id,
             'student' => [
-                'id' => (int) $invoice->student->id,
-                'full_name' => (string) $invoice->student->full_name,
-                'student_id' => (string) $invoice->student->student_id,
+                'id' => $student?->id,
+                'full_name' => $student?->fullName,
+                'student_id' => $student?->studentCode,
             ],
             'semester' => ['id' => (int) $invoice->semester->id, 'name' => (string) $invoice->semester->name],
             'created_at' => $invoice->created_at?->toIso8601String(),

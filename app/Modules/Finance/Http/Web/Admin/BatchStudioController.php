@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Student;
 use App\Modules\Finance\Actions\CreateBatchDngFromChargesAction;
 use App\Modules\Finance\Actions\Egc\GenerateEgcChargesAction;
 use App\Modules\Finance\Actions\Major\GenerateMajorChargesAction;
@@ -26,6 +25,7 @@ use App\Modules\Finance\Services\Batch\BatchPreviewTokenService;
 use App\Modules\Finance\Support\Batch\BatchChargeCampusScope;
 use App\Modules\Finance\Support\Batch\BatchJobType;
 use App\Modules\Finance\Support\Batch\BatchPreviewLine;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -37,6 +37,8 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class BatchStudioController extends Controller
 {
+    public function __construct(private readonly StudentReferenceReader $studentReferences) {}
+
     public function hub(Request $request): Response
     {
         $user = $request->user();
@@ -356,13 +358,10 @@ class BatchStudioController extends Controller
      */
     private function studentCodesForIds(array $studentIds): array
     {
-        $studentsById = Student::query()
-            ->whereKey($studentIds)
-            ->get(['id', 'student_id'])
-            ->keyBy('id');
+        $studentsById = $this->studentReferences->findMany($studentIds);
 
         return collect($studentIds)
-            ->map(fn (int $id): ?string => $studentsById->get($id)?->student_id)
+            ->map(fn (int $id): ?string => $studentsById[$id]->studentCode ?? null)
             ->filter()
             ->values()
             ->all();

@@ -49,6 +49,8 @@ it('publishes a campus-scoped student reference without lifecycle or finance sta
         ->and($reader->idsMatchingSearch('Registry', (int) $campus->id))->toBe([(int) $student->id])
         ->and($reader->findByStudentCode('REG-1001', (int) $campus->id)?->id)->toBe($student->id)
         ->and($reader->findByStudentCode('REG-1001', (int) $otherCampus->id))->toBeNull()
+        ->and($reader->findByStudentCodeAnywhere('REG-1001')?->id)->toBe($student->id)
+        ->and($reader->findByStudentCodeAnywhere('MISSING'))->toBeNull()
         ->and(array_map(static fn (StudentReference $match): int => $match->id, $reader->search('Registry', (int) $campus->id)))
         ->toBe([$student->id]);
 });

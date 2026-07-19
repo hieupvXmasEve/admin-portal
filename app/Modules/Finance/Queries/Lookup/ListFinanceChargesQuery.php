@@ -6,11 +6,15 @@ namespace App\Modules\Finance\Queries\Lookup;
 
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Support\FinanceSemesterContextResolver;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 final class ListFinanceChargesQuery
 {
+    public function __construct(private readonly StudentReferenceReader $studentReferences) {}
+
     /** Columns the client may sort by (anything else falls back to the default). */
     private const SORTABLE = ['amount', 'effective_at', 'status', 'charge_type', 'created_at'];
 
@@ -19,7 +23,7 @@ final class ListFinanceChargesQuery
      */
     public function handle(Request $request, ?int $studentId = null): array
     {
-        $query = FinanceCharge::query()->with(['student', 'semester', 'createdBy']);
+        $query = FinanceCharge::query()->with(['semester', 'createdBy']);
 
         $resolvedStudentId = $studentId ?? ($request->filled('student_id') ? (int) $request->input('student_id') : null);
         if ($resolvedStudentId !== null) {
@@ -28,11 +32,10 @@ final class ListFinanceChargesQuery
 
         if ($request->filled('search')) {
             $term = (string) $request->input('search');
-            $query->where(function ($q) use ($term) {
-                $q->where('description', 'like', "%{$term}%")
-                    ->orWhereHas('student', fn ($s) => $s->where('full_name', 'like', "%{$term}%")
-                        ->orWhere('student_id', 'like', "%{$term}%")
-                        ->orWhere('email', 'like', "%{$term}%"));
+            $studentIds = $this->studentReferences->idsMatchingSearch($term);
+            $query->where(function ($query) use ($term, $studentIds): void {
+                $query->where('description', 'like', "%{$term}%")
+                    ->orWhereIn('student_id', $studentIds);
             });
         }
 
@@ -64,6 +67,39 @@ final class ListFinanceChargesQuery
 
         $perPage = (int) $request->input('per_page', 20);
 
-        return ['items' => $query->paginate($perPage)->withQueryString()];
+        $items = $query->paginate($perPage)->withQueryString();
+        $studentReferences = $this->studentReferences->findMany(
+            $items->getCollection()
+                ->pluck('student_id')
+                ->map(static fn (int|string $studentId): int => (int) $studentId)
+                ->all(),
+        );
+
+        $items->setCollection($items->getCollection()->map(
+            static function (FinanceCharge $charge) use ($studentReferences): FinanceCharge {
+                $charge->setRelation('student', self::studentPayload($studentReferences[(int) $charge->student_id] ?? null));
+
+                return $charge;
+            },
+        ));
+
+        return ['items' => $items];
+    }
+
+    /**
+     * @return array{id: int, full_name: string, student_id: string, email: string|null}|null
+     */
+    private static function studentPayload(?StudentReference $student): ?array
+    {
+        if ($student === null) {
+            return null;
+        }
+
+        return [
+            'id' => $student->id,
+            'full_name' => $student->fullName,
+            'student_id' => $student->studentCode,
+            'email' => $student->email,
+        ];
     }
 }

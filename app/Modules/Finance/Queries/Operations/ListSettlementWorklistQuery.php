@@ -11,6 +11,8 @@ use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistPresenter;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistReader;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -29,6 +31,8 @@ final class ListSettlementWorklistQuery
     public function __construct(
         private readonly SettlementPositionWorklistReader $positionReader,
         private readonly SettlementPositionWorklistPresenter $positionPresenter,
+        private readonly StudentReferenceReader $studentReferences,
+        private readonly ProgramEnrollmentReader $programEnrollments,
     ) {}
 
     /** @return array<string,mixed> */
@@ -53,37 +57,38 @@ final class ListSettlementWorklistQuery
         $page = (int) ($validated['page'] ?? 1);
         $sort = self::SORTABLE[$validated['sort'] ?? 'active_due'] ?? self::SORTABLE['active_due'];
         $direction = ($validated['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+        $campusId = app()->bound('campus') ? app('campus')->id : null;
+
+        $campusStudentIds = $campusId === null ? null : $this->studentReferences->idsForCampus((int) $campusId);
+        $matchingStudentIds = $search === '' ? [] : $this->studentReferences->idsMatchingSearch($search, $campusId === null ? null : (int) $campusId);
 
         $invoiceQuery = StudentInvoice::query()
             ->with([
-                'student',
                 'semester',
                 'invoiceLines' => fn ($query) => $query->where('status', 'active')->with('charge.financeObligation'),
             ])
             ->whereNotIn('status', ['cancelled'])
             ->orderBy('due_date');
 
-        $campusId = app()->bound('campus') ? app('campus')->id : null;
-
-        if ($campusId) {
-            $invoiceQuery->forCampus($campusId);
+        if ($campusStudentIds !== null) {
+            $invoiceQuery->whereIn('student_id', $campusStudentIds);
         }
 
         if ($search !== '') {
-            $invoiceQuery->where(function ($query) use ($search): void {
+            $invoiceQuery->where(function ($query) use ($search, $matchingStudentIds): void {
                 $query->where('invoice_number', 'like', "%{$search}%")
-                    ->orWhereHas('student', function ($studentQuery) use ($search): void {
-                        $studentQuery->where('student_id', 'like', "%{$search}%")
-                            ->orWhere('full_name', 'like', "%{$search}%");
-                    });
+                    ->orWhereIn('student_id', $matchingStudentIds);
             });
         }
 
-        if ($studentStatus !== '') {
-            $invoiceQuery->whereHas('student', fn ($query) => $query->where('status', $studentStatus));
-        }
-
         $invoices = $invoiceQuery->get();
+        $studentIds = $invoices->pluck('student_id')->map(static fn (int|string $id): int => (int) $id)->unique()->values()->all();
+        $studentReferences = $this->studentReferences->findMany($studentIds);
+        $enrollments = $this->programEnrollments->forStudentIds($studentIds);
+
+        if ($studentStatus !== '') {
+            $invoices = $invoices->filter(static fn (StudentInvoice $invoice): bool => ($enrollments[(int) $invoice->student_id] ?? null)?->legacyCompatibleStatus() === $studentStatus)->values();
+        }
         $lineIdsByStudent = [];
         $lineIdsByInvoice = [];
         $lineIdsByStudentFeeType = [];
@@ -140,9 +145,12 @@ final class ListSettlementWorklistQuery
                 $paymentsByStudent,
                 $latestDngRequestsByStudent,
                 $activeDngByStudentAndFeeType,
+                $studentReferences,
+                $enrollments,
             ): array {
                 $studentId = (int) $studentId;
-                $student = $studentInvoices->first()?->student;
+                $student = $studentReferences[$studentId] ?? null;
+                $enrollment = $enrollments[$studentId] ?? null;
                 $position = $positionsByStudent[$studentId] ?? null;
                 $payments = $paymentsByStudent->get($studentId, collect());
                 $unappliedBalance = $this->positionPresenter->unappliedCash($payments);
@@ -155,9 +163,9 @@ final class ListSettlementWorklistQuery
 
                 return [
                     'student_id' => $studentId,
-                    'student_code' => $student?->student_id,
-                    'student_name' => $student?->full_name,
-                    'student_status' => $student?->status,
+                    'student_code' => $student?->studentCode,
+                    'student_name' => $student?->fullName,
+                    'student_status' => $enrollment?->legacyCompatibleStatus(),
                     'invoice_count' => $studentInvoices->count(),
                     'overdue_invoice_count' => $studentInvoices->filter(fn (StudentInvoice $invoice): bool => $invoice->due_date?->isPast() ?? false)->count(),
                     'active_due' => $activeDue,

@@ -22,7 +22,9 @@ use App\Modules\Finance\Support\SettlementPosition\Money;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionAmounts;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionIssue;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -40,6 +42,8 @@ class BillingInvoiceController extends Controller
     public function __construct(
         private readonly SettlementPositionReader $settlementPositionReader,
         private readonly GetStudentFinancePaymentHistoryQuery $paymentHistoryQuery,
+        private readonly StudentReferenceReader $studentReferences,
+        private readonly ProgramEnrollmentReader $programEnrollments,
     ) {}
 
     public function index(
@@ -57,15 +61,19 @@ class BillingInvoiceController extends Controller
 
     public function show(StudentInvoice $invoice)
     {
+        $student = $this->studentReferences->find((int) $invoice->student_id);
+        abort_if($student === null, 404);
+
         // Ensure campus check
         if ($campusId = app('campus')?->id) {
-            if ($invoice->student->campus_id !== $campusId) {
+            if ($student->campusId !== (int) $campusId) {
                 abort(403, 'This invoice does not belong to your campus.');
             }
         }
 
+        $enrollment = $this->programEnrollments->forStudentId($student->id);
+
         $invoice->load([
-            'student.program',
             'semester',
             'invoiceLines.charge',
             'invoiceLines.paymentApplications.payment',
@@ -82,12 +90,12 @@ class BillingInvoiceController extends Controller
                 'id' => $invoice->id,
                 'invoice_number' => $invoice->invoice_number,
                 'student' => [
-                    'id' => $invoice->student->id,
-                    'full_name' => $invoice->student->full_name,
-                    'student_id' => $invoice->student->student_id,
-                    'email' => $invoice->student->email,
-                    'program' => $invoice->student->program ? [
-                        'name' => $invoice->student->program->name,
+                    'id' => $student->id,
+                    'full_name' => $student->fullName,
+                    'student_id' => $student->studentCode,
+                    'email' => $student->email,
+                    'program' => $enrollment->programName !== null ? [
+                        'name' => $enrollment->programName,
                     ] : null,
                 ],
                 'semester' => [
