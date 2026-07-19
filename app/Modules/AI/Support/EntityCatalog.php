@@ -4,11 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\AI\Support;
 
-use App\Models\CourseOffering;
-use App\Models\Program;
-use App\Models\Semester;
-use App\Models\Student;
-
 class EntityCatalog
 {
     public const VERSION = 'entity-catalog:v1';
@@ -112,7 +107,6 @@ class EntityCatalog
                 'key' => 'student',
                 'aliases' => ['student', 'sinh vien', 'sv'],
                 'business_meaning' => 'A learner record in the current campus.',
-                'model' => Student::class,
                 'required_permission' => 'view_student',
                 'campus_scope_rule' => 'current_campus_only',
                 'search_fields' => ['student_id', 'full_name'],
@@ -127,7 +121,6 @@ class EntityCatalog
                 'key' => 'program',
                 'aliases' => ['program', 'major', 'nganh'],
                 'business_meaning' => 'Academic program reference data.',
-                'model' => Program::class,
                 'required_permission' => 'view_program',
                 'campus_scope_rule' => 'global_reference',
                 'search_fields' => ['code', 'name'],
@@ -142,7 +135,6 @@ class EntityCatalog
                 'key' => 'semester',
                 'aliases' => ['semester', 'term', 'ky'],
                 'business_meaning' => 'Academic term reference data.',
-                'model' => Semester::class,
                 'required_permission' => 'view_semester',
                 'campus_scope_rule' => 'global_reference',
                 'search_fields' => ['code', 'name'],
@@ -157,7 +149,6 @@ class EntityCatalog
                 'key' => 'course_offering',
                 'aliases' => ['class', 'section', 'lop hoc'],
                 'business_meaning' => 'Course offering section in a semester.',
-                'model' => CourseOffering::class,
                 'required_permission' => 'view_course_offering',
                 'campus_scope_rule' => 'current_campus_only',
                 'search_fields' => ['section_code', 'unit.code', 'unit.name', 'semester.code'],

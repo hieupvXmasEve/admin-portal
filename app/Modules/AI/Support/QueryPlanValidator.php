@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\AI\Support;
 
 use App\Models\Campus;
-use App\Models\Semester;
 use App\Models\User;
 use App\Services\PermissionService;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\Academic\DTO\AcademicPeriodReference;
 
 class QueryPlanValidator
 {
@@ -219,16 +219,14 @@ class QueryPlanValidator
         return $normalized;
     }
 
-    private function resolveSemester(mixed $value): ?Semester
+    private function resolveSemester(mixed $value): ?AcademicPeriodReference
     {
         if ($value === 'current') {
-            $currentPeriodId = $this->academicPeriods->current()?->id;
-
-            return $currentPeriodId === null ? null : Semester::query()->find($currentPeriodId);
+            return $this->academicPeriods->current();
         }
 
         if (is_numeric($value)) {
-            return Semester::query()->find((int) $value);
+            return $this->academicPeriods->find((int) $value);
         }
 
         return null;
