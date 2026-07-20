@@ -19,6 +19,7 @@ use App\Shared\Contracts\Finance\SettlementPositionReader;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Closure;
+use Illuminate\Validation\ValidationException;
 
 /** Coordinates the durable DNG reservation lifecycle around an external provider call. */
 final class DngReservationLifecycle
@@ -48,6 +49,7 @@ final class DngReservationLifecycle
         }
 
         $student = $this->studentReference($studentId);
+        $this->assertRequiredPayerProfile($student);
         $billingAccountId = (int) BillingAccount::query()->where('student_id', $studentId)->sole()->id;
 
         return $this->guard()->handleIfChanged($billingAccountId, function (BillingAccount $billingAccount, Closure $markChanged) use ($student, $studentId, $feeType, $chargeTypes, $details, $requestedLineIds, $targetAmounts, $installmentIdsByLine): DngPaymentRequest {
@@ -518,5 +520,24 @@ final class DngReservationLifecycle
     {
         return ($this->studentReferences ?? app(StudentReferenceReader::class))->find($studentId)
             ?? throw new \RuntimeException("Student reference #{$studentId} cannot be resolved for the DNG payment request.");
+    }
+
+    private function assertRequiredPayerProfile(StudentReference $student): void
+    {
+        $errors = [];
+
+        if (blank($student->studentCode)) {
+            $errors['student_code'] = 'Không thể tạo yêu cầu DNG vì sinh viên chưa có mã sinh viên.';
+        }
+        if (blank($student->nationalId)) {
+            $errors['cccd'] = 'Không thể tạo yêu cầu DNG vì sinh viên chưa có CCCD.';
+        }
+        if (blank($student->address)) {
+            $errors['student_address'] = 'Không thể tạo yêu cầu DNG vì sinh viên chưa có địa chỉ.';
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
     }
 }
