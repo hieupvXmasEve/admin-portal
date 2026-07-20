@@ -100,7 +100,6 @@ class GetStudentFinanceReviewSignalsQuery
                     ->orWhereNotNull('paid_at');
             })
             ->with([
-                'financeCharge',
                 'chargeLinks.financeCharge',
                 'payment.applications.invoiceLine.charge',
             ])
@@ -135,7 +134,8 @@ class GetStudentFinanceReviewSignalsQuery
             ->filter(fn (?FinanceCharge $charge): bool => $this->chargeIsVoided($charge))
             ->map(fn (FinanceCharge $charge): int => (int) $charge->id)
             ->unique()
-            ->values();
+            ->values()
+            ->toBase();
         $payment = $request->payment;
         $voidedLineApplicationGroups = $payment?->applications
             ->groupBy('invoice_line_id')
@@ -160,7 +160,8 @@ class GetStudentFinanceReviewSignalsQuery
             );
         $coveredTargetChargeIds = $relevantVoidedApplicationGroups
             ->map(fn (Collection $applications): int => (int) $applications->first()?->invoiceLine?->charge_id)
-            ->unique();
+            ->unique()
+            ->toBase();
 
         if ($relevantVoidedApplicationGroups->isEmpty()
             || $voidedTargetChargeIds->diff($coveredTargetChargeIds)->isNotEmpty()

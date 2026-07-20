@@ -8,6 +8,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
@@ -639,19 +640,23 @@ it('keeps the paid DNG voided-fee signal when the payment bridge evidence is mis
         'void',
     );
 
-    DngPaymentRequest::create([
+    $dngRequest = DngPaymentRequest::create([
         'student_id' => $student->id,
         'campus_code' => 'CAMPUS001',
         'student_code' => $student->student_id,
         'fee_type' => 'HP',
         'description' => 'Paid DNG without canonical Payment bridge',
         'semester_id' => $this->semester->id,
-        'finance_charge_id' => $voided['charge']->id,
         'due_date' => now()->addDays(7),
         'item_id' => 'UNBRIDGED-001',
         'amount' => 15_000_000,
         'status' => DngPaymentRequest::STATUS_PAID_INVOICED,
         'paid_at' => now()->subDay(),
+    ]);
+    DngPaymentRequestCharge::create([
+        'dng_payment_request_id' => $dngRequest->id,
+        'finance_charge_id' => $voided['charge']->id,
+        'amount' => 15_000_000,
     ]);
 
     actingAs($user)->get("/finance/students/{$student->id}")
@@ -709,20 +714,24 @@ it('does not accept reversal evidence from a different voided charge', function 
         'applied_at' => now(),
         'created_by' => $user->id,
     ]);
-    DngPaymentRequest::create([
+    $dngRequest = DngPaymentRequest::create([
         'student_id' => $student->id,
         'campus_code' => 'CAMPUS001',
         'student_code' => $student->student_id,
         'fee_type' => 'HP',
         'description' => 'DNG target lacks its own reversal evidence',
         'semester_id' => $this->semester->id,
-        'finance_charge_id' => $dngTarget['charge']->id,
         'due_date' => now()->addDays(7),
         'item_id' => 'WRONG-REVERSAL-001',
         'amount' => 15_000_000,
         'status' => DngPaymentRequest::STATUS_PAID_INVOICED,
         'payment_id' => $payment->id,
         'paid_at' => now()->subDay(),
+    ]);
+    DngPaymentRequestCharge::create([
+        'dng_payment_request_id' => $dngRequest->id,
+        'finance_charge_id' => $dngTarget['charge']->id,
+        'amount' => 15_000_000,
     ]);
 
     actingAs($user)->get("/finance/students/{$student->id}")

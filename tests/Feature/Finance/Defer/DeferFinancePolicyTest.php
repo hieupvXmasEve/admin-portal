@@ -331,7 +331,7 @@ it('cancels a pivot-linked DNG locally before voiding a deferred obligation', fu
         ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID);
 });
 
-it('does not treat the retired DNG header pointer as a supported charge link', function () {
+it('does not cancel a DNG request without a supported charge link', function () {
     [$student, $case] = deferPolicyCase($this->semester, $this->campus, $this->program, $this->user, 'DNG-HEADER', DeferCase::POLICY_FORFEIT);
     $charge = deferObligation($student->id, $this->semester->id, 45_000_000);
 
@@ -343,7 +343,6 @@ it('does not treat the retired DNG header pointer as a supported charge link', f
         'item_id' => 'ITEM-'.uniqid(),
         'amount' => 45_000_000,
         'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
-        'finance_charge_id' => $charge->id,
     ]);
 
     $result = app(ApplyDeferFinancePolicyAction::class)->handle($case, $this->user->id);
