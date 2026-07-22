@@ -180,13 +180,16 @@ class CompleteFinanceCancellationOperationAction implements FinanceCancellationC
     private function sendExamResitCancellationNotice(ExamResitAttempt $attempt): void
     {
         try {
-            $emailLog = $this->sendExamResitCancellationNoticeAction->run($attempt);
+            $this->sendExamResitCancellationNoticeAction->run($attempt);
 
             ExamResitAttempt::query()
                 ->whereKey($attempt->id)
                 ->update([
                     'cancellation_notice_sent_at' => now(),
-                    'cancellation_notice_email_log_id' => $emailLog->id,
+                    // EmailLog is created by the V2 delivery worker, after this
+                    // source-side operation commits. The legacy column remains
+                    // nullable for history compatibility.
+                    'cancellation_notice_email_log_id' => null,
                     'cancellation_notice_error' => null,
                 ]);
         } catch (\Throwable $exception) {

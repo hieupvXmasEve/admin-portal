@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Notification\Providers;
 
 use App\Models\Campus;
+use App\Modules\Notification\Actions\PublishExternalEmailNotificationAction;
 use App\Modules\Notification\Console\ProcessNotificationOutboxCommand;
 use App\Modules\Notification\EmailContent\EmailContentRegistry;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
@@ -14,6 +15,7 @@ use App\Modules\Notification\Support\NotificationDomainEventPublisher;
 use App\Modules\Notification\Support\NotificationMetrics;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use App\Shared\Contracts\Notification\EmailContentResolver;
+use App\Shared\Contracts\Notification\ExternalEmailPublisher;
 use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Support\Facades\Event;
@@ -25,6 +27,7 @@ class NotificationServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(DomainEventPublisher::class, NotificationDomainEventPublisher::class);
+        $this->app->bind(ExternalEmailPublisher::class, PublishExternalEmailNotificationAction::class);
         $this->app->singleton(NotificationMetrics::class);
         $this->app->singleton(EmailContentRegistry::class);
         $this->app->alias(EmailContentRegistry::class, EmailContentResolver::class);

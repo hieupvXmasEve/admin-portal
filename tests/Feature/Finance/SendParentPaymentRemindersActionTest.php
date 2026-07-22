@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\EmailLog;
 use App\Models\ParentProfile;
 use App\Models\Program;
 use App\Models\Semester;
@@ -11,14 +10,24 @@ use App\Models\Student;
 use App\Models\User;
 use App\Modules\Finance\Actions\Operations\SendParentPaymentRemindersAction;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
-use App\Services\EmailService;
+use App\Modules\Notification\Models\NotificationEventOutbox;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    config([
+        'notification.v2_enabled' => true,
+        'notification.write_mode' => 'v2',
+    ]);
+    Queue::fake();
+});
 
 function makeParentReminderStudent(Campus $campus, Program $program, Semester $semester, string $studentId, string $fullName = 'Student'): Student
 {
@@ -41,7 +50,21 @@ function makeParentReminderStudent(Campus $campus, Program $program, Semester $s
 
 function addParentReminderInvoiceLine(StudentInvoice $invoice, Student $student, Semester $semester, float $amount, string $description): void
 {
+    $obligation = FinanceObligation::query()->create([
+        'source_system' => 'test',
+        'source_kind' => 'parent_payment_reminder',
+        'source_ref' => 'parent-payment-reminder:'.uniqid('', true),
+        'obligation_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => $amount,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'test',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+
     $charge = FinanceCharge::create([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
@@ -98,17 +121,6 @@ it('sends reminders to all linked parent emails for unpaid invoices and updates 
     $student->parentProfiles()->attach($parentOne->id, ['relationship' => 'father']);
     $student->parentProfiles()->attach($parentTwo->id, ['relationship' => 'mother']);
 
-    $emailService = Mockery::mock(EmailService::class);
-    $emailService->shouldReceive('sendSingleEmail')
-        ->once()
-        ->withArgs(fn (...$args) => $args[0] === 'parent.one@example.com')
-        ->andReturn(Mockery::mock(EmailLog::class));
-    $emailService->shouldReceive('sendSingleEmail')
-        ->once()
-        ->withArgs(fn (...$args) => $args[0] === 'parent.two@example.com')
-        ->andReturn(Mockery::mock(EmailLog::class));
-    app()->instance(EmailService::class, $emailService);
-
     $result = SendParentPaymentRemindersAction::run([
         'invoice_ids' => [$invoice->id],
     ]);
@@ -118,7 +130,8 @@ it('sends reminders to all linked parent emails for unpaid invoices and updates 
         ->and($result['skipped_no_debt_count'])->toBe(0)
         ->and($result['skipped_no_parent_email_count'])->toBe(0);
 
-    expect($invoice->fresh()->last_reminder_at)->not->toBeNull();
+    expect($invoice->fresh()->last_reminder_at)->not->toBeNull()
+        ->and(NotificationEventOutbox::query()->count())->toBe(2);
 });
 
 it('routes campus_id to the db email provider and renders campus-specific template text', function () {
@@ -157,20 +170,10 @@ it('routes campus_id to the db email provider and renders campus-specific templa
     $parentProfile = ParentProfile::factory()->create(['user_id' => $parentUser->id]);
     $student->parentProfiles()->attach($parentProfile->id, ['relationship' => 'father']);
 
-    $capturedContent = null;
-    $emailService = Mockery::mock(EmailService::class);
-    $emailService->shouldReceive('sendSingleEmail')
-        ->once()
-        ->andReturnUsing(function ($recipient, $subject, $content) use (&$capturedContent) {
-            $capturedContent = $content;
-
-            return Mockery::mock(EmailLog::class);
-        });
-    app()->instance(EmailService::class, $emailService);
-
     SendParentPaymentRemindersAction::run(['invoice_ids' => [$invoice->id]]);
 
-    expect($capturedContent)->toContain('campus_id_ok');
+    expect(NotificationEventOutbox::query()->sole()->campus_id)->toBe($campus->id)
+        ->and(NotificationEventOutbox::query()->sole()->payload['data']['parent_name'])->toBe('Quý Phụ Huynh');
 });
 
 it('skips parent reminders when invoice has no parent email or no outstanding balance', function () {
@@ -206,12 +209,6 @@ it('skips parent reminders when invoice has no parent email or no outstanding ba
         'total_amount' => 0,
         'paid_amount' => 0,
     ]);
-
-    addParentReminderInvoiceLine($invoiceWithoutDebt, $studentWithoutDebt, $semester, 0, 'Paid invoice');
-
-    $emailService = Mockery::mock(EmailService::class);
-    $emailService->shouldNotReceive('sendSingleEmail');
-    app()->instance(EmailService::class, $emailService);
 
     $result = SendParentPaymentRemindersAction::run([
         'invoice_ids' => [$invoiceWithoutParent->id, $invoiceWithoutDebt->id],
@@ -277,25 +274,15 @@ it('dedupes duplicate parent emails and still updates reminder marker when one d
     $student->parentProfiles()->attach($profileTwo->id, ['relationship' => 'guardian']);
     $student->parentProfiles()->attach($profileThree->id, ['relationship' => 'guardian']);
 
-    $emailService = Mockery::mock(EmailService::class);
-    $emailService->shouldReceive('sendSingleEmail')
-        ->once()
-        ->withArgs(fn (...$args) => $args[0] === 'shared-parent@example.com')
-        ->andThrow(new RuntimeException('SMTP failure'));
-    $emailService->shouldReceive('sendSingleEmail')
-        ->once()
-        ->withArgs(fn (...$args) => $args[0] === 'active-parent@example.com')
-        ->andReturn(Mockery::mock(EmailLog::class));
-    app()->instance(EmailService::class, $emailService);
-
     $result = SendParentPaymentRemindersAction::run([
         'invoice_ids' => [$invoice->id],
     ]);
 
-    expect($result['sent_count'])->toBe(1)
-        ->and($result['failed_count'])->toBe(1)
+    expect($result['sent_count'])->toBe(2)
+        ->and($result['failed_count'])->toBe(0)
         ->and($result['skipped_no_debt_count'])->toBe(0)
         ->and($result['skipped_no_parent_email_count'])->toBe(0);
 
-    expect($invoice->fresh()->last_reminder_at)->not->toBeNull();
+    expect($invoice->fresh()->last_reminder_at)->not->toBeNull()
+        ->and(NotificationEventOutbox::query()->count())->toBe(2);
 });

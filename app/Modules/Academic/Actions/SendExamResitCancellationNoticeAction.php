@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Actions;
 
-use App\Models\EmailLog;
 use App\Models\ExamResitAttempt;
-use App\Services\EmailService;
+use App\Shared\Contracts\Notification\ExternalEmailNotification;
+use App\Shared\Contracts\Notification\ExternalEmailPublisher;
 use RuntimeException;
 
 class SendExamResitCancellationNoticeAction
 {
     public function __construct(
-        private readonly EmailService $emailService,
+        private readonly ExternalEmailPublisher $externalEmailPublisher,
     ) {}
 
-    public function run(ExamResitAttempt $attempt): EmailLog
+    public function run(ExamResitAttempt $attempt): string
     {
         $attempt->loadMissing(['student:id,student_id,full_name,email', 'unit:id,code,name']);
 
@@ -24,12 +24,16 @@ class SendExamResitCancellationNoticeAction
             throw new RuntimeException('Student email is missing.');
         }
 
-        return $this->emailService->sendSingleEmail(
-            recipient: trim($student->email),
+        return $this->externalEmailPublisher->publishAfterCommit(new ExternalEmailNotification(
+            recipientEmails: [trim($student->email)],
             subject: $this->subject($attempt),
-            content: $this->htmlBody($attempt),
+            html: $this->htmlBody($attempt),
             campusId: $attempt->campus_id,
-        );
+            aggregateType: 'exam_resit_attempt',
+            aggregateId: (string) $attempt->id,
+            typeKey: 'exam_resit_cancellation',
+            deduplicationKey: 'exam_resit_attempt:'.$attempt->id.':cancellation_notice',
+        ));
     }
 
     private function subject(ExamResitAttempt $attempt): string

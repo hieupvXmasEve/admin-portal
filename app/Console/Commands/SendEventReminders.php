@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Console\Commands;
 
 use App\Services\EventNotificationService;
@@ -35,17 +37,17 @@ class SendEventReminders extends Command
             $this->info("Successfully sent {$remindersSent} event reminders.");
 
             Log::info('Event reminders command completed', [
-                'reminders_sent' => $remindersSent
+                'reminders_sent' => $remindersSent,
             ]);
 
             return Command::SUCCESS;
 
         } catch (\Exception $e) {
-            $this->error('Failed to send event reminders: ' . $e->getMessage());
+            $this->error('Failed to send event reminders: '.$e->getMessage());
 
             Log::error('Event reminders command failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return Command::FAILURE;

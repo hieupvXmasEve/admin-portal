@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\EmailLog;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
@@ -14,10 +13,19 @@ use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
-use App\Services\EmailService;
+use App\Modules\Notification\Models\NotificationEventOutbox;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    config([
+        'notification.v2_enabled' => true,
+        'notification.write_mode' => 'v2',
+    ]);
+    Queue::fake();
+});
 
 function makeDueItemStudent(Campus $campus, Program $program, Semester $semester, string $studentId, string $email = 'student@example.com'): Student
 {
@@ -113,13 +121,6 @@ it('sends reminder for a DNG payment request branch and updates last_reminder_at
         ['subject' => 'Reminder {{balance_formatted}}', 'body_html' => '<p>Dear {{student_name}}</p>'],
     );
 
-    $emailService = Mockery::mock(EmailService::class);
-    $emailService->shouldReceive('sendSingleEmail')
-        ->once()
-        ->withArgs(fn (...$args) => $args[0] === 'dng.student@example.com' && $args[1] === 'Reminder 2.000.000')
-        ->andReturn(Mockery::mock(EmailLog::class));
-    app()->instance(EmailService::class, $emailService);
-
     $result = SendDueItemRemindersAction::run([
         'item_ids' => ['dng_request:'.$dngRequest->id],
     ]);
@@ -127,7 +128,9 @@ it('sends reminder for a DNG payment request branch and updates last_reminder_at
     expect($result['sent_count'])->toBe(1)
         ->and($result['failed_count'])->toBe(0);
 
-    expect($dngRequest->fresh()->last_reminder_at)->not->toBeNull();
+    expect($dngRequest->fresh()->last_reminder_at)->not->toBeNull()
+        ->and(NotificationEventOutbox::query()->sole()->payload['type_key'])->toBe('payment_reminder')
+        ->and(NotificationEventOutbox::query()->sole()->campus_id)->toBe($campus->id);
 });
 
 it('does not send a DNG reminder without canonical reservation targets', function () {
@@ -147,10 +150,6 @@ it('does not send a DNG reminder without canonical reservation targets', functio
         'amount' => 2_000_000,
         'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
     ]);
-
-    $emailService = Mockery::mock(EmailService::class);
-    $emailService->shouldNotReceive('sendSingleEmail');
-    app()->instance(EmailService::class, $emailService);
 
     $result = SendDueItemRemindersAction::run([
         'item_ids' => ['dng_request:'.$dngRequest->id],
@@ -189,13 +188,6 @@ it('sends reminder for an invoice branch with outstanding balance and updates la
         ['subject' => 'Reminder {{student_name}}', 'body_html' => '<p>Dear {{student_name}}</p>'],
     );
 
-    $emailService = Mockery::mock(EmailService::class);
-    $emailService->shouldReceive('sendSingleEmail')
-        ->once()
-        ->withArgs(fn (...$args) => $args[0] === 'inv.student@example.com')
-        ->andReturn(Mockery::mock(EmailLog::class));
-    app()->instance(EmailService::class, $emailService);
-
     $result = SendDueItemRemindersAction::run([
         'item_ids' => ['invoice:'.$invoice->id],
     ]);
@@ -204,5 +196,6 @@ it('sends reminder for an invoice branch with outstanding balance and updates la
         ->and($result['failed_count'])->toBe(0)
         ->and($result['skipped_no_debt_count'])->toBe(0);
 
-    expect($invoice->fresh()->last_reminder_at)->not->toBeNull();
+    expect($invoice->fresh()->last_reminder_at)->not->toBeNull()
+        ->and(NotificationEventOutbox::query()->sole()->payload['type_key'])->toBe('payment_reminder');
 });

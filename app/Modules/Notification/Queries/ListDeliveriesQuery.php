@@ -26,7 +26,7 @@ class ListDeliveriesQuery
         $sortDirection = strtolower((string) ($filters['direction'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
 
         return NotificationDelivery::query()
-            ->with(['message:id,event_id,type_key,title,recipient_user_id,campus_id', 'message.recipient:id,name,email'])
+            ->with(['message:id,event_id,type_key,title,recipient_user_id,recipient_email,campus_id', 'message.recipient:id,name,email'])
             ->select('notification_deliveries.*')
             ->when($filters['search'] ?? null, function (Builder $query, string $search): void {
                 $query->whereHas('message', function (Builder $q) use ($search): void {

@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Notification\Actions;
 
-use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
+use App\Shared\Contracts\DomainEvents\DomainEvent;
+use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -12,7 +13,7 @@ use Illuminate\Support\Str;
 class SendManualNotificationV2Action
 {
     public function __construct(
-        private PublishDomainEventAction $publishAction
+        private readonly DomainEventPublisher $domainEventPublisher,
     ) {}
 
     /**
@@ -31,16 +32,15 @@ class SendManualNotificationV2Action
      */
     public function run(array $data): string
     {
-        $eventId = (string) Str::uuid();
+        $deduplicationKey = sprintf('manual.notification_sent:%s', Str::uuid());
         $actorUserId = $data['actor_user_id'] ?? Auth::id();
 
-        $envelope = new DomainEventEnvelope(
-            eventId: $eventId,
-            eventName: 'manual.notification_sent',
-            eventVersion: 1,
+        $event = new DomainEvent(
+            name: 'manual.notification_sent',
+            deduplicationKey: $deduplicationKey,
             occurredAt: CarbonImmutable::now(),
             aggregateType: 'manual_notification',
-            aggregateId: $eventId,
+            aggregateId: $deduplicationKey,
             campusId: (int) $data['campus_id'],
             actorUserId: $actorUserId,
             payload: [
@@ -61,9 +61,9 @@ class SendManualNotificationV2Action
             ],
         );
 
-        $this->publishAction->run($envelope);
+        $this->domainEventPublisher->publishAfterCommit($event);
 
-        return $eventId;
+        return $event->eventId();
     }
 
     /**

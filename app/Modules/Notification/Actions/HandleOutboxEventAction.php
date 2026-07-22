@@ -80,7 +80,7 @@ class HandleOutboxEventAction
                 ]);
             }
 
-            if ($resolved['resolved_user_ids'] === []) {
+            if ($resolved['resolved_recipients'] === []) {
                 continue;
             }
 
@@ -89,7 +89,7 @@ class HandleOutboxEventAction
             $deliveries = $this->persistIntentAction->run(
                 $envelope,
                 $intent,
-                $resolved['resolved_user_ids'],
+                $resolved['resolved_recipients'],
                 $allowChannels,
                 $renderedEmail,
             );

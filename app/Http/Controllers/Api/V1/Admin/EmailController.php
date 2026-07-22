@@ -1,27 +1,31 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Campus;
 use App\Models\EmailLog;
-use App\Models\EmailTemplate;
+use App\Models\Role;
 use App\Services\EmailService;
 use App\Services\NotificationService;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\ValidationException;
+use App\Shared\Contracts\Notification\ExternalEmailNotification;
+use App\Shared\Contracts\Notification\ExternalEmailPublisher;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class EmailController extends Controller
 {
     public function __construct(
-        protected EmailService        $emailService,
-        protected NotificationService $notificationService
-    )
-    {
-    }
+        protected EmailService $emailService,
+        protected NotificationService $notificationService,
+        protected ExternalEmailPublisher $externalEmailPublisher,
+    ) {}
 
     /**
      * Send a single email.
@@ -33,45 +37,27 @@ class EmailController extends Controller
                 'recipient' => 'required|email',
                 'subject' => 'required|string|max:255',
                 'content' => 'required|string',
-                'template_id' => 'nullable|exists:email_templates,id',
                 'template_variables' => 'nullable|array',
-                'attachments' => 'nullable|array',
-                'attachments.*' => 'file|max:10240', // 10MB max per file
+                'attachments' => 'prohibited',
             ]);
 
-            $template = null;
-            if (!empty($validated['template_id'])) {
-                $template = EmailTemplate::find($validated['template_id']);
-            }
-
-            $attachmentPaths = [];
-            if ($request->hasFile('attachments')) {
-                // Ensure the target directory exists on the configured 'local' disk
-                Storage::disk('local')->makeDirectory('email-attachments');
-
-                foreach ($request->file('attachments') as $file) {
-                    $path = $file->store('email-attachments', 'local');
-                    // Resolve the absolute path according to the disk's root
-                    $attachmentPaths[] = Storage::disk('local')->path($path);
-                }
-            }
-
-            $emailLog = $this->emailService->sendSingleEmail(
-                $validated['recipient'],
-                $validated['subject'],
-                $validated['content'],
-                $template,
-                $attachmentPaths,
-                Auth::user(),
-                $validated['template_variables'] ?? []
-            );
+            $eventId = $this->externalEmailPublisher->publishAfterCommit(new ExternalEmailNotification(
+                recipientEmails: [$validated['recipient']],
+                subject: $this->replaceVariables($validated['subject'], $validated['template_variables'] ?? []),
+                html: $this->replaceVariables($validated['content'], $validated['template_variables'] ?? []),
+                campusId: session('current_campus_id') ? (int) session('current_campus_id') : null,
+                actorUserId: Auth::id(),
+                aggregateType: 'admin_single_email',
+                typeKey: 'admin_single_email',
+            ));
 
             return response()->json([
                 'success' => true,
                 'message' => 'Email queued for sending',
                 'data' => [
-                    'email_log_id' => $emailLog->id,
-                    'status' => $emailLog->status,
+                    'email_log_id' => null,
+                    'status' => 'queued',
+                    'event_id' => $eventId,
                 ],
             ]);
         } catch (ValidationException $e) {
@@ -100,44 +86,42 @@ class EmailController extends Controller
                 'recipients.*' => 'email',
                 'subject' => 'required|string|max:255',
                 'content' => 'required|string',
-                'template_id' => 'nullable|exists:email_templates,id',
                 'template_variables' => 'nullable|array',
                 'template_variables_per_recipient' => 'nullable|array',
-                'attachments' => 'nullable|array',
-                'attachments.*' => 'file|max:10240',
+                'attachments' => 'prohibited',
                 'chunk_size' => 'nullable|integer|min:10|max:500',
             ]);
 
-            $template = null;
-            if (!empty($validated['template_id'])) {
-                $template = EmailTemplate::find($validated['template_id']);
+            $batchId = (string) Str::uuid();
+            $eventIds = [];
+            foreach ($validated['recipients'] as $recipient) {
+                $variables = array_merge(
+                    $validated['template_variables'] ?? [],
+                    $validated['template_variables_per_recipient'][$recipient] ?? [],
+                );
+                $eventIds[] = $this->externalEmailPublisher->publishAfterCommit(new ExternalEmailNotification(
+                    recipientEmails: [$recipient],
+                    subject: $this->replaceVariables($validated['subject'], $variables),
+                    html: $this->replaceVariables($validated['content'], $variables),
+                    campusId: session('current_campus_id') ? (int) session('current_campus_id') : null,
+                    actorUserId: Auth::id(),
+                    aggregateType: 'admin_bulk_email',
+                    aggregateId: $batchId,
+                    typeKey: 'admin_bulk_email',
+                    deduplicationKey: 'admin_bulk_email:'.$batchId.':'.mb_strtolower($recipient),
+                ));
             }
 
-            $attachmentPaths = [];
-            if ($request->hasFile('attachments')) {
-                // Ensure the target directory exists on the configured 'local' disk
-                Storage::disk('local')->makeDirectory('email-attachments');
-
-                foreach ($request->file('attachments') as $file) {
-                    $path = $file->store('email-attachments', 'local');
-                    // Resolve the absolute path according to the disk's root
-                    $attachmentPaths[] = Storage::disk('local')->path($path);
-                }
-            }
-
-            $result = $this->emailService->sendBulkEmail(
-                $validated['recipients'],
-                $validated['subject'],
-                $validated['content'],
-                $template,
-                $attachmentPaths,
-                Auth::user(),
-                $validated['template_variables'] ?? [], // templateVariables (global)
-                $validated['chunk_size'] ?? 100, // chunkSize
-                [
-                    'template_variables_per_recipient' => $validated['template_variables_per_recipient'] ?? null,
-                ]
-            );
+            $result = [
+                'batch_id' => $batchId,
+                'laravel_batch_id' => null,
+                'total_recipients' => count($validated['recipients']),
+                'invalid_recipients' => 0,
+                'invalid_emails' => [],
+                'chunks' => count($eventIds),
+                'event_ids' => $eventIds,
+                'estimated_completion' => null,
+            ];
 
             return response()->json([
                 'success' => true,
@@ -157,6 +141,19 @@ class EmailController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /** @param array<string, mixed> $variables */
+    private function replaceVariables(string $content, array $variables): string
+    {
+        $replacements = [];
+        foreach ($variables as $key => $value) {
+            if (is_scalar($value) || $value instanceof \Stringable) {
+                $replacements['{{'.$key.'}}'] = (string) $value;
+            }
+        }
+
+        return strtr($content, $replacements);
     }
 
     /**
@@ -336,7 +333,7 @@ class EmailController extends Controller
     public function retryEmail(EmailLog $emailLog): JsonResponse
     {
         try {
-            if (!$emailLog->canRetry()) {
+            if (! $emailLog->canRetry()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Email cannot be retried',
@@ -350,7 +347,7 @@ class EmailController extends Controller
             $this->emailService->sendSingleEmail(
                 $emailLog->recipient,
                 $emailLog->subject,
-                'Retry: ' . $emailLog->subject,
+                'Retry: '.$emailLog->subject,
                 $emailLog->template,
                 [],
                 Auth::user()
@@ -376,7 +373,7 @@ class EmailController extends Controller
     {
         try {
             // This would typically come from a RoleService or similar
-            $roles = \App\Models\Role::withCount('users')->get();
+            $roles = Role::withCount('users')->get();
 
             return response()->json([
                 'success' => true,
@@ -398,7 +395,7 @@ class EmailController extends Controller
     {
         try {
             // This would typically come from a CampusService or similar
-            $campuses = \App\Models\Campus::withCount('users')->get();
+            $campuses = Campus::withCount('users')->get();
 
             return response()->json([
                 'success' => true,

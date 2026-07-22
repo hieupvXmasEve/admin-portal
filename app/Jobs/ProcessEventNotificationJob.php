@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Jobs;
 
 use App\Models\Event;
@@ -53,11 +55,12 @@ class ProcessEventNotificationJob implements ShouldQueue
         try {
             $event = Event::find($this->eventId);
 
-            if (!$event) {
+            if (! $event) {
                 Log::warning('Event not found for notification job', [
                     'event_id' => $this->eventId,
-                    'type' => $this->notificationType
+                    'type' => $this->notificationType,
                 ]);
+
                 return;
             }
 
@@ -70,7 +73,7 @@ class ProcessEventNotificationJob implements ShouldQueue
                 'completion' => $eventNotificationService->notifyEventCompletion($event),
                 default => Log::warning('Unknown notification type', [
                     'type' => $this->notificationType,
-                    'event_id' => $this->eventId
+                    'event_id' => $this->eventId,
                 ])
             };
 

@@ -2,20 +2,23 @@
 
 declare(strict_types=1);
 
-use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Actions\SendManualNotificationV2Action;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
+use App\Modules\Notification\Support\EventIntentMapper;
+use App\Shared\Contracts\DomainEvents\DomainEvent;
+use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
+use Carbon\CarbonImmutable;
 
-it('creates domain event envelope with correct structure', function () {
-    $publishAction = Mockery::mock(PublishDomainEventAction::class);
-    $action = new SendManualNotificationV2Action($publishAction);
+it('publishes a shared domain event after commit with the correct structure', function () {
+    $publisher = Mockery::mock(DomainEventPublisher::class);
+    $action = new SendManualNotificationV2Action($publisher);
 
-    $capturedEnvelope = null;
-    $publishAction
-        ->shouldReceive('run')
+    $capturedEvent = null;
+    $publisher
+        ->shouldReceive('publishAfterCommit')
         ->once()
-        ->withArgs(function (DomainEventEnvelope $envelope) use (&$capturedEnvelope) {
-            $capturedEnvelope = $envelope;
+        ->withArgs(function (DomainEvent $event) use (&$capturedEvent) {
+            $capturedEvent = $event;
 
             return true;
         });
@@ -36,28 +39,28 @@ it('creates domain event envelope with correct structure', function () {
     $eventId = $action->run($data);
 
     expect($eventId)->toBeString()->not->toBeEmpty();
-    expect($capturedEnvelope)->not->toBeNull();
-    expect($capturedEnvelope->eventName)->toBe('manual.notification_sent');
-    expect($capturedEnvelope->campusId)->toBe(1);
-    expect($capturedEnvelope->payload['type_key'])->toBe('manual_notification');
-    expect($capturedEnvelope->payload['recipient_targets'])->toBe([
+    expect($capturedEvent)->not->toBeNull();
+    expect($capturedEvent->name)->toBe('manual.notification_sent');
+    expect($capturedEvent->campusId)->toBe(1);
+    expect($capturedEvent->payload['type_key'])->toBe('manual_notification');
+    expect($capturedEvent->payload['recipient_targets'])->toBe([
         ['type' => 'student', 'id' => 100],
         ['type' => 'student', 'id' => 200],
     ]);
-    expect($capturedEnvelope->payload['channels'])->toBe(['realtime']);
-    expect($capturedEnvelope->payload['data']['title'])->toBe('Test Notification');
-    expect($capturedEnvelope->payload['data']['body'])->toBe('This is a test message');
-    expect($capturedEnvelope->payload['data']['is_important'])->toBeTrue();
+    expect($capturedEvent->payload['channels'])->toBe(['realtime']);
+    expect($capturedEvent->payload['data']['title'])->toBe('Test Notification');
+    expect($capturedEvent->payload['data']['body'])->toBe('This is a test message');
+    expect($capturedEvent->payload['data']['is_important'])->toBeTrue();
 });
 
 it('filters invalid notifiable ids', function () {
-    $publishAction = Mockery::mock(PublishDomainEventAction::class);
-    $action = new SendManualNotificationV2Action($publishAction);
+    $publisher = Mockery::mock(DomainEventPublisher::class);
+    $action = new SendManualNotificationV2Action($publisher);
 
-    $capturedEnvelope = null;
-    $publishAction->shouldReceive('run')->once()
-        ->withArgs(function (DomainEventEnvelope $envelope) use (&$capturedEnvelope) {
-            $capturedEnvelope = $envelope;
+    $capturedEvent = null;
+    $publisher->shouldReceive('publishAfterCommit')->once()
+        ->withArgs(function (DomainEvent $event) use (&$capturedEvent) {
+            $capturedEvent = $event;
 
             return true;
         });
@@ -74,20 +77,20 @@ it('filters invalid notifiable ids', function () {
 
     $action->run($data);
 
-    expect($capturedEnvelope->payload['recipient_targets'])->toBe([
+    expect($capturedEvent->payload['recipient_targets'])->toBe([
         ['type' => 'user', 'id' => 1],
         ['type' => 'user', 'id' => 2],
     ]);
 });
 
 it('sets default values for optional fields', function () {
-    $publishAction = Mockery::mock(PublishDomainEventAction::class);
-    $action = new SendManualNotificationV2Action($publishAction);
+    $publisher = Mockery::mock(DomainEventPublisher::class);
+    $action = new SendManualNotificationV2Action($publisher);
 
-    $capturedEnvelope = null;
-    $publishAction->shouldReceive('run')->once()
-        ->withArgs(function (DomainEventEnvelope $envelope) use (&$capturedEnvelope) {
-            $capturedEnvelope = $envelope;
+    $capturedEvent = null;
+    $publisher->shouldReceive('publishAfterCommit')->once()
+        ->withArgs(function (DomainEvent $event) use (&$capturedEvent) {
+            $capturedEvent = $event;
 
             return true;
         });
@@ -104,9 +107,9 @@ it('sets default values for optional fields', function () {
 
     $action->run($data);
 
-    expect($capturedEnvelope->payload['data']['is_important'])->toBeFalse();
-    expect($capturedEnvelope->payload['data']['action_url'])->toBeNull();
-    expect($capturedEnvelope->payload['data']['action_text'])->toBeNull();
+    expect($capturedEvent->payload['data']['is_important'])->toBeFalse();
+    expect($capturedEvent->payload['data']['action_url'])->toBeNull();
+    expect($capturedEvent->payload['data']['action_text'])->toBeNull();
 });
 
 it('maps manual event in EventIntentMapper', function () {
@@ -114,7 +117,7 @@ it('maps manual event in EventIntentMapper', function () {
         eventId: 'evt-manual-1',
         eventName: 'manual.notification_sent',
         eventVersion: 1,
-        occurredAt: \Carbon\CarbonImmutable::now(),
+        occurredAt: CarbonImmutable::now(),
         aggregateType: 'manual_notification',
         aggregateId: 'evt-manual-1',
         campusId: 1,
@@ -132,7 +135,7 @@ it('maps manual event in EventIntentMapper', function () {
         ],
     );
 
-    $intents = app(\App\Modules\Notification\Support\EventIntentMapper::class)->map($event);
+    $intents = app(EventIntentMapper::class)->map($event);
 
     expect($intents)->toHaveCount(1)
         ->and($intents[0]->typeKey)->toBe('manual_notification')

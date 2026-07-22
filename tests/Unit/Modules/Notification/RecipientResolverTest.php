@@ -32,7 +32,10 @@ describe('department target type', function () {
             ['type' => 'department', 'id' => $dept->id],
         ], null);
 
-        expect($result['resolved_user_ids'])->toContain($user1->id, $user2->id)
+        expect($result['resolved_recipients'])->toContain(
+            ['key' => 'user:'.$user1->id, 'user_id' => $user1->id, 'email' => null],
+            ['key' => 'user:'.$user2->id, 'user_id' => $user2->id, 'email' => null],
+        )
             ->and($result['unresolved'])->toBeEmpty();
     });
 
@@ -50,7 +53,7 @@ describe('department target type', function () {
             ['type' => 'department', 'id' => $dept->id],
         ], null);
 
-        expect($result['resolved_user_ids'])->toBeEmpty()
+        expect($result['resolved_recipients'])->toBeEmpty()
             ->and($result['unresolved'])->toBeEmpty();
     });
 
@@ -59,7 +62,7 @@ describe('department target type', function () {
             ['type' => 'department', 'id' => 99999],
         ], null);
 
-        expect($result['resolved_user_ids'])->toBeEmpty()
+        expect($result['resolved_recipients'])->toBeEmpty()
             ->and($result['unresolved'])->toHaveCount(1)
             ->and($result['unresolved'][0]['reason'])->toBe('department_not_found');
     });
@@ -79,6 +82,27 @@ describe('department target type', function () {
             ['type' => 'department', 'id' => $dept->id],
         ], null);
 
-        expect($result['resolved_user_ids'])->toHaveCount(1);
+        expect($result['resolved_recipients'])->toHaveCount(1);
+    });
+});
+
+describe('external email target type', function () {
+    it('normalizes and resolves valid email targets without an internal user', function () {
+        $result = $this->resolver->resolve([
+            ['type' => 'email', 'email' => 'EXTERNAL@Example.test'],
+        ], 123);
+
+        expect($result['resolved_recipients'])->toBe([
+            ['key' => 'email:external@example.test', 'user_id' => null, 'email' => 'external@example.test'],
+        ])->and($result['unresolved'])->toBeEmpty();
+    });
+
+    it('rejects invalid external email targets', function () {
+        $result = $this->resolver->resolve([
+            ['type' => 'email', 'email' => 'not-an-email'],
+        ], null);
+
+        expect($result['resolved_recipients'])->toBeEmpty()
+            ->and($result['unresolved'][0]['reason'])->toBe('invalid_email_target');
     });
 });

@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\EmailLog;
 use App\Models\ParentProfile;
 use App\Models\Program;
 use App\Models\Semester;
@@ -16,7 +15,7 @@ use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
-use App\Services\EmailService;
+use App\Modules\Notification\Models\NotificationEventOutbox;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -43,6 +42,11 @@ function makeDueItemParentStudent(Campus $campus, Program $program, Semester $se
 }
 
 it('sends parent reminder for a DNG request and updates last_reminder_at', function () {
+    config([
+        'notification.v2_enabled' => true,
+        'notification.write_mode' => 'v2',
+        'notification.outbox.push_enabled' => false,
+    ]);
     $campus = Campus::factory()->create();
     $semester = Semester::factory()->active()->create();
     $program = Program::factory()->create();
@@ -118,13 +122,6 @@ it('sends parent reminder for a DNG request and updates last_reminder_at', funct
         ['subject' => 'Reminder for {{parent_name}}', 'body_html' => '<p>Dear {{parent_name}}, student: {{student_name}}</p>'],
     );
 
-    $emailService = Mockery::mock(EmailService::class);
-    $emailService->shouldReceive('sendSingleEmail')
-        ->once()
-        ->withArgs(fn (...$args) => $args[0] === 'parent.dng@example.com')
-        ->andReturn(Mockery::mock(EmailLog::class));
-    app()->instance(EmailService::class, $emailService);
-
     $result = SendDueItemParentRemindersAction::run([
         'item_ids' => ['dng_request:'.$dngRequest->id],
     ]);
@@ -134,4 +131,9 @@ it('sends parent reminder for a DNG request and updates last_reminder_at', funct
         ->and($result['skipped_no_parent_email_count'])->toBe(0);
 
     expect($dngRequest->fresh()->last_reminder_at)->not->toBeNull();
+
+    $outbox = NotificationEventOutbox::query()->sole();
+    expect($outbox->payload['recipient_targets'])->toBe([
+        ['type' => 'email', 'email' => 'parent.dng@example.com'],
+    ]);
 });

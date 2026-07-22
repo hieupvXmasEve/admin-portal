@@ -10,8 +10,8 @@ use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\DngInstallmentContextResolver;
 use App\Modules\Finance\Support\ExamResitDngLinkResolver;
 use App\Modules\Finance\Support\LifecycleDueItemPredicate;
-use App\Services\EmailService;
 use App\Shared\Contracts\Notification\EmailContentResolver;
+use Illuminate\Support\Facades\DB;
 
 class SendDueItemRemindersAction
 {
@@ -25,11 +25,8 @@ class SendDueItemRemindersAction
         $skippedLifecycleExceptionCount = 0;
 
         $settlementService = app(SettlementService::class);
-        $emailService = app(EmailService::class);
         $registry = app(EmailContentResolver::class);
         $installmentResolver = app(DngInstallmentContextResolver::class);
-        $emailContent = $registry->resolve('payment_reminder');
-        $installmentEmailContent = $registry->resolve('installment_payment_reminder');
         $now = now();
 
         foreach ($itemIds as $itemId) {
@@ -115,7 +112,7 @@ class SendDueItemRemindersAction
                     );
                 }
 
-                $providerForDng = $useInstallment ? $installmentEmailContent : $emailContent;
+                $typeKeyForDng = $useInstallment ? 'installment_payment_reminder' : 'payment_reminder';
 
                 $contentData = [
                     'campus_id' => $student->campus_id,
@@ -132,16 +129,19 @@ class SendDueItemRemindersAction
                 }
 
                 try {
-                    $emailService->sendSingleEmail(
-                        recipient: $student->email,
-                        subject: $providerForDng->subject($contentData),
-                        content: $providerForDng->htmlBody($contentData),
-                        campusId: $student->campus_id,
-                    );
-
-                    // Update last_reminder_at for DNG request
-                    $dngRequest->update(['last_reminder_at' => $now]);
-                    self::mirrorExamResitReminder($dngRequest, $now);
+                    DB::transaction(function () use ($dngRequest, $student, $contentData, $now, $typeKeyForDng): void {
+                        $dngRequest->update(['last_reminder_at' => $now]);
+                        self::mirrorExamResitReminder($dngRequest, $now);
+                        PublishReminderNotificationAction::run([
+                            'type_key' => $typeKeyForDng,
+                            'aggregate_type' => 'dng_payment_request',
+                            'aggregate_id' => $dngRequest->id,
+                            'campus_id' => (int) $student->campus_id,
+                            'recipient_type' => 'student',
+                            'recipient_id' => (int) $student->id,
+                            'data' => $contentData,
+                        ]);
+                    });
 
                     $sentCount++;
                 } catch (\Throwable $e) {
@@ -203,14 +203,19 @@ class SendDueItemRemindersAction
                 ];
 
                 try {
-                    $emailService->sendSingleEmail(
-                        recipient: $student->email,
-                        subject: $emailContent->subject($contentData),
-                        content: $emailContent->htmlBody($contentData),
-                        campusId: $student->campus_id,
-                    );
+                    DB::transaction(function () use ($invoice, $student, $contentData, $now): void {
+                        $invoice->update(['last_reminder_at' => $now]);
+                        PublishReminderNotificationAction::run([
+                            'type_key' => 'payment_reminder',
+                            'aggregate_type' => 'student_invoice',
+                            'aggregate_id' => $invoice->id,
+                            'campus_id' => (int) $student->campus_id,
+                            'recipient_type' => 'student',
+                            'recipient_id' => (int) $student->id,
+                            'data' => $contentData,
+                        ]);
+                    });
 
-                    $invoice->update(['last_reminder_at' => $now]);
                     $sentCount++;
                 } catch (\Throwable $e) {
                     \Log::error('Failed to send invoice reminder', [

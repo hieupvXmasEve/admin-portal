@@ -6,8 +6,7 @@ namespace App\Modules\Finance\Actions\Operations;
 
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
-use App\Services\EmailService;
-use App\Shared\Contracts\Notification\EmailContentResolver;
+use Illuminate\Support\Facades\DB;
 
 class SendPaymentRemindersAction
 {
@@ -25,8 +24,6 @@ class SendPaymentRemindersAction
             ->get();
 
         $settlementService = app(SettlementService::class);
-        $emailService = app(EmailService::class);
-        $emailContent = app(EmailContentResolver::class)->resolve('payment_reminder');
         $now = now();
 
         foreach ($invoices as $invoice) {
@@ -57,14 +54,19 @@ class SendPaymentRemindersAction
             ];
 
             try {
-                $emailService->sendSingleEmail(
-                    recipient: $student->email,
-                    subject: $emailContent->subject($contentData),
-                    content: $emailContent->htmlBody($contentData),
-                    campusId: $student->campus_id,
-                );
+                DB::transaction(function () use ($invoice, $student, $contentData, $now): void {
+                    $invoice->update(['last_reminder_at' => $now]);
+                    PublishReminderNotificationAction::run([
+                        'type_key' => 'payment_reminder',
+                        'aggregate_type' => 'student_invoice',
+                        'aggregate_id' => $invoice->id,
+                        'campus_id' => (int) $student->campus_id,
+                        'recipient_type' => 'student',
+                        'recipient_id' => (int) $student->id,
+                        'data' => $contentData,
+                    ]);
+                });
 
-                $invoice->update(['last_reminder_at' => $now]);
                 $sentCount++;
             } catch (\Throwable $e) {
                 $failedCount++;

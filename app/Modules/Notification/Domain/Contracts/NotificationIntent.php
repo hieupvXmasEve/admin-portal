@@ -7,7 +7,7 @@ namespace App\Modules\Notification\Domain\Contracts;
 final class NotificationIntent
 {
     /**
-     * @param  array<int, array{type:string,id:int}>  $recipientTargets
+     * @param  array<int, array{type:string,id?:int,email?:string}>  $recipientTargets
      * @param  array<int, string>  $channels
      * @param  array<string, mixed>  $data
      * @param  array<string, string>  $templateKeys

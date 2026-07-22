@@ -7,9 +7,8 @@ namespace App\Modules\Finance\Actions\Operations;
 use App\Models\ParentProfile;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
-use App\Services\EmailService;
-use App\Shared\Contracts\Notification\EmailContentResolver;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class SendParentPaymentRemindersAction
 {
@@ -31,8 +30,6 @@ class SendParentPaymentRemindersAction
             ->get();
 
         $settlementService = app(SettlementService::class);
-        $emailService = app(EmailService::class);
-        $emailContent = app(EmailContentResolver::class)->resolve('parent_payment_reminder');
         $now = now();
 
         foreach ($invoices as $invoice) {
@@ -45,7 +42,6 @@ class SendParentPaymentRemindersAction
 
                 continue;
             }
-
             // Pair each parent profile with their email + display name so the
             // greeting addresses the actual recipient (not just the first
             // parent in the relation). Previously parent_name was hard-coded
@@ -68,29 +64,29 @@ class SendParentPaymentRemindersAction
                 'due_date' => $invoice->due_date?->format('d/m/Y') ?? '',
             ];
 
-            $sentAnyParent = false;
-
             foreach ($parentRecipients as $recipient) {
                 $contentData = $sharedContentData + ['parent_name' => $recipient['name']];
 
                 try {
-                    $emailService->sendSingleEmail(
-                        recipient: $recipient['email'],
-                        subject: $emailContent->subject($contentData),
-                        content: $emailContent->htmlBody($contentData),
-                        campusId: $student->campus_id,
-                    );
+                    DB::transaction(function () use ($invoice, $student, $recipient, $contentData, $now): void {
+                        $invoice->update(['last_reminder_at' => $now]);
+                        PublishReminderNotificationAction::run([
+                            'type_key' => 'parent_payment_reminder',
+                            'aggregate_type' => 'student_invoice',
+                            'aggregate_id' => $invoice->id,
+                            'campus_id' => (int) $student->campus_id,
+                            'recipient_type' => 'user',
+                            'recipient_id' => $recipient['user_id'],
+                            'data' => $contentData,
+                        ]);
+                    });
 
                     $sentCount++;
-                    $sentAnyParent = true;
                 } catch (\Throwable $e) {
                     $failedCount++;
                 }
             }
 
-            if ($sentAnyParent) {
-                $invoice->update(['last_reminder_at' => $now]);
-            }
         }
 
         return [
@@ -108,12 +104,12 @@ class SendParentPaymentRemindersAction
     }
 
     /**
-     * Build a deduped collection of {email, name} pairs from a student's active
-     * parent profiles. Pairing the name with the email avoids the bug where a
+     * Build a deduped collection of {user_id, name} pairs from a student's active
+     * parent profiles. Pairing the name with the user avoids the bug where a
      * shared parent_name (taken from $parentProfiles->first()) addresses the
      * wrong parent when a student has multiple profiles.
      *
-     * @return Collection<int, array{email: string, name: string}>
+     * @return Collection<int, array{user_id: int, email: string, name: string}>
      */
     private static function extractParentRecipients(?Collection $parentProfiles): Collection
     {
@@ -143,6 +139,7 @@ class SendParentPaymentRemindersAction
                     : 'Quý Phụ Huynh';
 
                 return [
+                    'user_id' => (int) $profile->user_id,
                     'email' => mb_strtolower(trim($email)),
                     'name' => $name,
                 ];

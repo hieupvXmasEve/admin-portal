@@ -6,13 +6,13 @@ namespace App\Modules\Notification\Channels;
 
 use App\Modules\Notification\Channels\Contracts\ChannelAdapter;
 use App\Modules\Notification\Models\NotificationDelivery;
-use App\Services\EmailService;
+use App\Modules\Notification\Support\SmtpEmailTransport;
 use RuntimeException;
 
 class RenderedEmailChannelAdapter implements ChannelAdapter
 {
     public function __construct(
-        private readonly EmailService $emailService,
+        private readonly SmtpEmailTransport $smtpEmailTransport,
     ) {}
 
     public function send(NotificationDelivery $delivery): array
@@ -24,20 +24,17 @@ class RenderedEmailChannelAdapter implements ChannelAdapter
         $message = $delivery->message()->with('recipient')->firstOrFail();
         $recipient = $message->recipient;
 
-        if (! $recipient || ! $recipient->email) {
+        $recipientEmail = $message->recipient_email ?? $recipient?->email;
+        if (! is_string($recipientEmail) || $recipientEmail === '') {
             throw new RuntimeException('Notification recipient email is missing.');
         }
 
-        $emailLog = $this->emailService->sendSingleEmail(
-            (string) $recipient->email,
+        return $this->smtpEmailTransport->send(
+            $delivery,
+            $recipientEmail,
             $delivery->rendered_subject,
             $delivery->rendered_html,
-            campusId: $message->campus_id,
+            $delivery->rendered_text,
         );
-
-        return [
-            'provider_message_id' => null,
-            'email_log_id' => (int) $emailLog->id,
-        ];
     }
 }

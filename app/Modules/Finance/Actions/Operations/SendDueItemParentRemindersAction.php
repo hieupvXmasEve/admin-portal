@@ -11,8 +11,9 @@ use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\DngInstallmentContextResolver;
 use App\Modules\Finance\Support\ExamResitDngLinkResolver;
 use App\Modules\Finance\Support\LifecycleDueItemPredicate;
-use App\Services\EmailService;
 use App\Shared\Contracts\Notification\EmailContentResolver;
+use App\Shared\Contracts\Notification\ExternalEmailNotification;
+use App\Shared\Contracts\Notification\ExternalEmailPublisher;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -28,7 +29,7 @@ class SendDueItemParentRemindersAction
         $skippedLifecycleExceptionCount = 0;
 
         $settlementService = app(SettlementService::class);
-        $emailService = app(EmailService::class);
+        $externalEmailPublisher = app(ExternalEmailPublisher::class);
         $registry = app(EmailContentResolver::class);
         $installmentResolver = app(DngInstallmentContextResolver::class);
         $emailContent = $registry->resolve('parent_payment_reminder');
@@ -138,12 +139,15 @@ class SendDueItemParentRemindersAction
 
                 foreach ($parentEmails as $parentEmail) {
                     try {
-                        $emailService->sendSingleEmail(
-                            recipient: $parentEmail,
+                        $externalEmailPublisher->publishAfterCommit(new ExternalEmailNotification(
+                            recipientEmails: [$parentEmail],
                             subject: $providerForDng->subject($contentData),
-                            content: $providerForDng->htmlBody($contentData),
+                            html: $providerForDng->htmlBody($contentData),
                             campusId: $student->campus_id,
-                        );
+                            aggregateType: 'dng_payment_request',
+                            aggregateId: (string) $dngRequest->id,
+                            typeKey: $useInstallment ? 'parent_installment_payment_reminder' : 'parent_payment_reminder',
+                        ));
 
                         $sentCount++;
                         $sentAnyParent = true;
@@ -205,12 +209,15 @@ class SendDueItemParentRemindersAction
                 ];
 
                 try {
-                    $emailService->sendSingleEmail(
-                        recipient: $student->parent_email,
+                    $externalEmailPublisher->publishAfterCommit(new ExternalEmailNotification(
+                        recipientEmails: [trim($student->parent_email)],
                         subject: $emailContent->subject($contentData),
-                        content: $emailContent->htmlBody($contentData),
+                        html: $emailContent->htmlBody($contentData),
                         campusId: $student->campus_id,
-                    );
+                        aggregateType: 'student_invoice',
+                        aggregateId: (string) $invoice->id,
+                        typeKey: 'parent_payment_reminder',
+                    ));
 
                     $invoice->update(['last_reminder_at' => $now]);
                     $sentCount++;

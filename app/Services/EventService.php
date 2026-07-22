@@ -177,7 +177,7 @@ class EventService
             ]);
 
             // Queue notification job for better performance with large student populations
-            ProcessEventNotificationJob::dispatch($event->id, 'publication');
+            ProcessEventNotificationJob::dispatch($event->id, 'publication')->afterCommit();
 
             Log::info('Event published', [
                 'event_id' => $event->id,
@@ -207,7 +207,7 @@ class EventService
             ]);
 
             // Queue notification job for better performance
-            ProcessEventNotificationJob::dispatch($event->id, 'cancellation', ['reason' => $reason]);
+            ProcessEventNotificationJob::dispatch($event->id, 'cancellation', ['reason' => $reason])->afterCommit();
 
             // Cancel all active participations
             $event->participants()
@@ -255,12 +255,12 @@ class EventService
 
             $goldAwardedCount = 0;
             $participationService = app(EventParticipationService::class);
-            
+
             foreach ($checkedInParticipants as $participant) {
                 $participant->update(['status' => 'completed']);
-                
+
                 // Award gold if event has gold rewards
-                if ($event->gold_reward_amount > 0 && !$participant->gold_awarded) {
+                if ($event->gold_reward_amount > 0 && ! $participant->gold_awarded) {
                     try {
                         $participationService->awardGoldReward($participant);
                         $goldAwardedCount++;
@@ -268,14 +268,14 @@ class EventService
                         Log::error('Failed to award gold during event completion', [
                             'event_id' => $event->id,
                             'participant_id' => $participant->id,
-                            'error' => $e->getMessage()
+                            'error' => $e->getMessage(),
                         ]);
                     }
                 }
             }
 
             // Queue completion notifications
-            ProcessEventNotificationJob::dispatch($event->id, 'completion');
+            ProcessEventNotificationJob::dispatch($event->id, 'completion')->afterCommit();
 
             Log::info('Event completed', [
                 'event_id' => $event->id,

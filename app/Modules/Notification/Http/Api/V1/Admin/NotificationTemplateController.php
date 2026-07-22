@@ -6,11 +6,11 @@ namespace App\Modules\Notification\Http\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
-use App\Modules\Notification\Actions\PublishDomainEventAction;
-use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use App\Modules\Notification\Enums\NotificationTemplateTypeKey;
 use App\Modules\Notification\Http\Requests\UpdateNotificationTemplateRequest;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
+use App\Shared\Contracts\DomainEvents\DomainEvent;
+use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -160,10 +160,9 @@ class NotificationTemplateController extends Controller
 
         $rendered = $transient->render($sampleVariables);
 
-        $envelope = new DomainEventEnvelope(
-            eventId: (string) Str::uuid(),
-            eventName: 'notification.test_send_requested',
-            eventVersion: 1,
+        $event = new DomainEvent(
+            name: 'notification.test_send_requested',
+            deduplicationKey: sprintf('notification.test_send_requested:%s', Str::uuid()),
             occurredAt: CarbonImmutable::now(),
             aggregateType: 'notification_template',
             aggregateId: (string) $template->id,
@@ -182,7 +181,7 @@ class NotificationTemplateController extends Controller
             ],
         );
 
-        app(PublishDomainEventAction::class)->run($envelope);
+        app(DomainEventPublisher::class)->publishAfterCommit($event);
 
         return ApiResponse::success(['sent_to' => $request->user()->email, 'queued' => true]);
     }

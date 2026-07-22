@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\AcademicRecord;
 use App\Models\Campus;
 use App\Models\CourseOffering;
-use App\Models\EmailLog;
 use App\Models\ExamResitAttempt;
 use App\Models\ExamResitSession;
 use App\Models\ExamRoomSlot;
@@ -30,6 +29,7 @@ use App\Modules\Finance\Models\FinanceCancellationOperation;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\PaymentApplication;
+use App\Modules\Notification\Models\NotificationEventOutbox;
 use App\Shared\Contracts\Finance\FinanceCancellationCompletionContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -181,7 +181,10 @@ it('requests finance cancellation and completes only through the durable outbox'
         ->and($attempt->cancellation_notice_error)->toBeNull()
         ->and($attempt->cancelled_at)->not->toBeNull();
 
-    expect(EmailLog::query()->where('recipient', $this->student->email)->exists())->toBeTrue();
+    expect(NotificationEventOutbox::query()
+        ->where('event_name', 'notification.external_email_requested')
+        ->where('aggregate_type', 'exam_resit_attempt')
+        ->exists())->toBeTrue();
 });
 
 it('cancels a target-path charge-created attempt through the finance cancellation operation', function () {

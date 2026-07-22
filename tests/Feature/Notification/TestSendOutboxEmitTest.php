@@ -16,7 +16,7 @@ use App\Modules\Notification\Models\NotificationDelivery;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
 use App\Modules\Notification\Models\NotificationEventOutbox;
 use App\Modules\Notification\Models\NotificationMessage;
-use App\Services\EmailService;
+use App\Modules\Notification\Support\SmtpEmailTransport;
 use App\Services\PermissionService;
 use Database\Seeders\InitialSetup\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -43,7 +43,9 @@ beforeEach(function () {
     ]);
 
     $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn([]);
+    $permissionService->shouldReceive('getUserPermissions')->andReturn([
+        'test_send_notification_email_template',
+    ]);
     $this->app->singleton(PermissionService::class, fn () => $permissionService);
 
     RateLimiter::clear('notification-template-test-send');
@@ -86,11 +88,11 @@ function makeOutboxEmitTemplate(Campus $campus): NotificationEmailTemplate
 }
 
 /**
- * Run SendNotificationDeliveryJob synchronously with an EmailService spy injected.
+ * Run SendNotificationDeliveryJob synchronously with an SMTP transport spy injected.
  * Uses the global app() helper so this works in Pest closure-based tests.
  * Returns the spy so callers can assert invocations.
  */
-function runDeliveryJobWithSpy(int $deliveryId): EmailService
+function runDeliveryJobWithSpy(int $deliveryId): SmtpEmailTransport
 {
     // Create a real EmailLog row so the FK on notification_deliveries.email_log_id
     // is satisfied when SendNotificationDeliveryJob writes the result back.
@@ -100,12 +102,16 @@ function runDeliveryJobWithSpy(int $deliveryId): EmailService
         'status' => EmailLog::STATUS_SENT,
     ]);
 
-    $spy = Mockery::spy(EmailService::class);
-    $spy->shouldReceive('sendSingleEmail')
-        ->andReturn($emailLog);
+    $spy = Mockery::spy(SmtpEmailTransport::class);
+    $spy->shouldReceive('send')
+        ->andReturn([
+            'provider_message_id' => null,
+            'email_log_id' => $emailLog->id,
+        ]);
 
     // Bind the spy and clear cached adapter so constructor injection picks it up.
-    app()->instance(EmailService::class, $spy);
+    app()->instance(SmtpEmailTransport::class, $spy);
+    app()->forgetInstance(EmailChannelAdapter::class);
     app()->forgetInstance(RenderedEmailChannelAdapter::class);
 
     app(SendNotificationDeliveryJob::class, ['deliveryId' => $deliveryId])->handle(
@@ -124,7 +130,7 @@ function runDeliveryJobWithSpy(int $deliveryId): EmailService
 /**
  * Full pipeline for two distinct test-sends:
  *   endpoint → outbox row → HandleOutboxEventAction → delivery row →
- *   SendNotificationDeliveryJob → EmailService::sendSingleEmail called once per send.
+ *   SendNotificationDeliveryJob → Notification-owned SMTP transport called once per send.
  *
  * Critical Pattern #1: unsafe chars (<>&"', <script>) in both draft payloads.
  * Critical Pattern #7: endpoint called twice, producing two independent outbox rows.
@@ -235,18 +241,18 @@ it('test-send emits outbox event and delivery pipeline carries pre-rendered draf
         ->and($delivery2->rendered_subject)->toStartWith('[TEST] ');
 
     // -------------------------------------------------------------------------
-    // Run SendNotificationDeliveryJob for first delivery — assert EmailService called once
+    // Run SendNotificationDeliveryJob for first delivery — assert SMTP transport called once
     // -------------------------------------------------------------------------
     $spy1 = runDeliveryJobWithSpy($delivery1->id);
-    $spy1->shouldHaveReceived('sendSingleEmail')->once();
+    $spy1->shouldHaveReceived('send')->once();
 
     expect($delivery1->fresh()->status->value)->toBe('sent');
 
     // -------------------------------------------------------------------------
-    // Run SendNotificationDeliveryJob for second delivery — assert EmailService called once
+    // Run SendNotificationDeliveryJob for second delivery — assert SMTP transport called once
     // -------------------------------------------------------------------------
     $spy2 = runDeliveryJobWithSpy($delivery2->id);
-    $spy2->shouldHaveReceived('sendSingleEmail')->once();
+    $spy2->shouldHaveReceived('send')->once();
 
     expect($delivery2->fresh()->status->value)->toBe('sent');
 });
@@ -257,6 +263,10 @@ it('test-send emits outbox event and delivery pipeline carries pre-rendered draf
 
 it('non-super-admin receives 403 on test-send outbox path', function () {
     $this->seed(RoleAndPermissionSeeder::class);
+
+    $permissionService = Mockery::mock(PermissionService::class);
+    $permissionService->shouldReceive('getUserPermissions')->andReturn([]);
+    $this->app->instance(PermissionService::class, $permissionService);
 
     $user = User::factory()->create();
     $template = makeOutboxEmitTemplate(Campus::factory()->create());

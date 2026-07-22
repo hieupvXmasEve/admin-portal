@@ -30,7 +30,8 @@ class ListMessagesQuery
                 $query->where(function (Builder $q) use ($search): void {
                     $q->where('event_id', 'like', "%{$search}%")
                         ->orWhere('title', 'like', "%{$search}%")
-                        ->orWhere('type_key', 'like', "%{$search}%");
+                        ->orWhere('type_key', 'like', "%{$search}%")
+                        ->orWhere('recipient_email', 'like', "%{$search}%");
                 });
             })
             ->when($filters['status'] ?? null, fn (Builder $q, string $s) => $q->where('status', $s))

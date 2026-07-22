@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\EmailLog;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
@@ -13,7 +12,6 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Queries\Operations\ListDueItemsQuery;
 use App\Modules\Finance\Queries\Operations\ListExamResitHandoffQuery;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
-use App\Services\EmailService;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -156,13 +154,6 @@ it('mirrors last_reminded_at onto the linked exam-resit attempt only after a suc
         ['subject' => 'Reminder {{student_name}}', 'body_html' => '<p>Dear {{student_name}}</p>'],
     );
 
-    $emailService = Mockery::mock(EmailService::class);
-    $emailService->shouldReceive('sendSingleEmail')
-        ->once()
-        ->withArgs(fn (...$args) => $args[0] === 'ptl.send@example.com')
-        ->andReturn(Mockery::mock(EmailLog::class));
-    app()->instance(EmailService::class, $emailService);
-
     $result = SendDueItemRemindersAction::run(['item_ids' => ['dng_request:'.$dng->id]]);
 
     expect($result['sent_count'])->toBe(1)
@@ -176,10 +167,6 @@ it('does not touch the attempt timestamp when the row is skipped for missing ema
     $charge = createExamResitChargeFor($attempt);
     scheduleExamResitAttemptInSlot($attempt->fresh(), now()->subDays(30));
     $dng = createPushedDngForExamResitCharge($charge, ['semester_id' => $this->semester->id]);
-
-    $emailService = Mockery::mock(EmailService::class);
-    $emailService->shouldNotReceive('sendSingleEmail');
-    app()->instance(EmailService::class, $emailService);
 
     $result = SendDueItemRemindersAction::run(['item_ids' => ['dng_request:'.$dng->id]]);
 

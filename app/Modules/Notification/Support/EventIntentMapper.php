@@ -90,7 +90,7 @@ class EventIntentMapper
     }
 
     /**
-     * @return array<int, array{type:string,id:int}>
+     * @return array<int, array{type:string,id?:int,email?:string}>
      */
     private function resolveTargets(DomainEventEnvelope $event): array
     {
@@ -103,6 +103,12 @@ class EventIntentMapper
 
                 $type = (string) ($target['type'] ?? '');
                 $id = (int) ($target['id'] ?? 0);
+                $email = isset($target['email']) ? mb_strtolower(trim((string) $target['email'])) : null;
+
+                if ($type === 'email' && $email !== null && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    return ['type' => 'email', 'email' => $email];
+                }
+
                 if ($type === '' || $id <= 0) {
                     return null;
                 }
