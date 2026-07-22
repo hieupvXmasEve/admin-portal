@@ -100,6 +100,14 @@ Local note:
 ./scripts/dev.sh test
 ```
 
+Migration debt guard:
+
+```bash
+./scripts/dev.sh artisan migration-debt:inventory --check --format=table
+```
+
+Run this before and after migration work. It is read-only and fails when an approved debt baseline, frozen path, or architecture boundary regresses. The JSON form is available with `--format=json`.
+
 ## Current Quality Gates Status
 
 - GitHub deploy workflow is active for branch-based Ubuntu host deploys:
