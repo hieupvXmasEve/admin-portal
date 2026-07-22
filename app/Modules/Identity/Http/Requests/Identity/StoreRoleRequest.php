@@ -1,10 +1,12 @@
 <?php
 
-namespace App\Http\Requests\Role;
+declare(strict_types=1);
+
+namespace App\Modules\Identity\Http\Requests\Identity;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreRoleRequest extends FormRequest
+final class StoreRoleRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -15,7 +17,6 @@ class StoreRoleRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:255|unique:roles,name',
-            'description' => 'nullable|string|max:255',
             'permissions' => 'sometimes|array',
             'permissions.*' => 'exists:permissions,id',
         ];

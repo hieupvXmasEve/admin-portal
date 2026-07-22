@@ -2,29 +2,20 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Requests\Api;
+namespace App\Modules\Identity\Http\Requests\Identity;
 
 use App\Http\Responses\ApiResponse;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Contracts\Validation\Validator;
 
-class AdminLecturerImpersonationRequest extends FormRequest
+final class AdminLecturerImpersonationRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
-        // Check if the user has permission to impersonate lecturers
-        // This should be configured in your permission system
-//        return $this->user()?->can('impersonate-lecturers') ?? false;
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     */
     public function rules(): array
     {
         return [
@@ -34,9 +25,6 @@ class AdminLecturerImpersonationRequest extends FormRequest
         ];
     }
 
-    /**
-     * Get custom messages for validator errors.
-     */
     public function messages(): array
     {
         return [
@@ -49,25 +37,15 @@ class AdminLecturerImpersonationRequest extends FormRequest
         ];
     }
 
-    /**
-     * Handle a failed validation attempt.
-     */
     protected function failedValidation(Validator $validator): void
     {
-        throw new HttpResponseException(
-            ApiResponse::validationError($validator->errors()->toArray())
-        );
+        throw new HttpResponseException(ApiResponse::validationError($validator->errors()->toArray()));
     }
 
-    /**
-     * Handle a failed authorization attempt.
-     */
     protected function failedAuthorization(): void
     {
-        throw new HttpResponseException(
-            ApiResponse::authorizationError(
-                'You do not have permission to impersonate lecturers. Please contact your administrator.'
-            )
-        );
+        throw new HttpResponseException(ApiResponse::authorizationError(
+            'You do not have permission to impersonate lecturers. Please contact your administrator.',
+        ));
     }
 }

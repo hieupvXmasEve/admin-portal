@@ -86,7 +86,6 @@ require __DIR__.'/web/settings.php';
 require __DIR__.'/web/auth.php';
 // @deprecated User routes migrated to App\Modules\Identity\routes\web.php. Remove after 2024-12-31.
 // require __DIR__ . '/web/user.php';
-require __DIR__.'/web/role.php';
 require __DIR__.'/web/semester.php';
 require __DIR__.'/web/units.php';
 require __DIR__.'/web/programs.php';

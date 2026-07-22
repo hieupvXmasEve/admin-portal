@@ -2,12 +2,20 @@
 
 declare(strict_types=1);
 
+use App\Modules\Identity\Http\Api\Admin\ImpersonationController;
 use App\Modules\Identity\Http\Api\Lecturer\LecturerAuthController;
 use App\Modules\Identity\Http\Api\Parent\ParentAuthController;
 use App\Modules\Identity\Http\Api\Parent\ParentContextController;
 use App\Modules\Identity\Http\Api\Student\StudentAuthController;
 use App\Modules\Identity\Http\Api\Student\StudentContextController;
 use Illuminate\Support\Facades\Route;
+
+Route::middleware(['web', 'auth'])->name('api.admin.')->group(function () {
+    Route::post('/students/impersonate', [ImpersonationController::class, 'impersonateStudent'])->name('students.impersonate');
+    Route::get('/students/impersonation-sessions', [ImpersonationController::class, 'studentSessions'])->name('students.impersonation-sessions');
+    Route::post('/lecturers/impersonate', [ImpersonationController::class, 'impersonateLecturer'])->name('lecturers.impersonate');
+    Route::get('/lecturers/impersonation-sessions', [ImpersonationController::class, 'lecturerSessions'])->name('lecturers.impersonation-sessions');
+});
 
 /**
  * Student API Routes

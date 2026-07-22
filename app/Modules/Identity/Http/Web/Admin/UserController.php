@@ -9,11 +9,11 @@ use App\Models\User;
 use App\Modules\Identity\Actions\CreateUserAction;
 use App\Modules\Identity\Actions\DeleteUserAction;
 use App\Modules\Identity\Actions\UpdateUserAction;
+use App\Modules\Identity\Http\Requests\Identity\ListUsersRequest;
 use App\Modules\Identity\Http\Requests\Identity\StoreUserRequest;
 use App\Modules\Identity\Http\Requests\Identity\UpdateUserRequest;
 use App\Modules\Identity\Queries\GetUsersQuery;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -23,22 +23,11 @@ class UserController extends Controller
         private GetUsersQuery $getUsersQuery
     ) {}
 
-    public function index(Request $request): Response
+    public function index(ListUsersRequest $request): Response
     {
-        // Get raw input and cast manually to avoid validation issues
-        $pageInput = $request->input('page', 1);
-        $perPageInput = $request->input('per_page', 10);
-        
-        // Ensure these are integers
-        $page = is_numeric($pageInput) ? (int) $pageInput : 1;
-        $perPage = is_numeric($perPageInput) ? (int) $perPageInput : 10;
-        
-        // Validate other inputs
-        $validated = $request->validate([
-            'search' => 'string|max:255',
-            'role_id' => 'nullable|integer|exists:roles,id',
-            'type' => 'nullable|string|in:staff,student,lecturer,parent',
-        ]);
+        $validated = $request->validated();
+        $page = $validated['page'] ?? 1;
+        $perPage = $validated['per_page'] ?? 10;
 
         $filters = [
             'search' => $validated['search'] ?? null,

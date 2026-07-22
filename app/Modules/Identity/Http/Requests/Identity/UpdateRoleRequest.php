@@ -1,11 +1,13 @@
 <?php
 
-namespace App\Http\Requests\Role;
+declare(strict_types=1);
+
+namespace App\Modules\Identity\Http\Requests\Identity;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class UpdateRoleRequest extends FormRequest
+final class UpdateRoleRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -14,7 +16,7 @@ class UpdateRoleRequest extends FormRequest
 
     public function rules(): array
     {
-        $roleId = $this->route('role')->id;
+        $roleId = (int) $this->route('role');
 
         return [
             'name' => [
@@ -23,7 +25,6 @@ class UpdateRoleRequest extends FormRequest
                 'max:255',
                 Rule::unique('roles')->ignore($roleId),
             ],
-            'description' => 'nullable|string|max:255',
             'permissions' => 'sometimes|array',
             'permissions.*' => 'exists:permissions,id',
         ];

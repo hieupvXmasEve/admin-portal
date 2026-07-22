@@ -2,55 +2,26 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Requests\Api;
+namespace App\Modules\Identity\Http\Requests\Identity;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class AdminStudentImpersonationRequest extends FormRequest
+final class AdminStudentImpersonationRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
-        // Check if the user is authenticated and has the necessary permissions
-        if (!$this->user()) {
-            return false;
-        }
-
-        // Check if the user has the permission to impersonate students
-        // This uses the existing permission system from the codebase
-        return true;
+        return $this->user() !== null;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     */
     public function rules(): array
     {
         return [
-            'email' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-            'device_name' => [
-                'sometimes',
-                'string',
-                'max:100',
-            ],
-            'purpose' => [
-                'sometimes',
-                'string',
-                'max:255',
-                'in:support,debugging,testing,demonstration,troubleshooting',
-            ],
+            'email' => ['required', 'string', 'max:255'],
+            'device_name' => ['sometimes', 'string', 'max:100'],
+            'purpose' => ['sometimes', 'string', 'max:255', 'in:support,debugging,testing,demonstration,troubleshooting'],
         ];
     }
 
-    /**
-     * Get custom messages for validator errors.
-     */
     public function messages(): array
     {
         return [
@@ -65,9 +36,6 @@ class AdminStudentImpersonationRequest extends FormRequest
         ];
     }
 
-    /**
-     * Get custom attributes for validator errors.
-     */
     public function attributes(): array
     {
         return [
@@ -77,10 +45,7 @@ class AdminStudentImpersonationRequest extends FormRequest
         ];
     }
 
-    /**
-     * Handle a failed authorization attempt.
-     */
-    protected function failedAuthorization()
+    protected function failedAuthorization(): void
     {
         abort(403, 'You do not have permission to impersonate students. Please contact your administrator if you need access.');
     }

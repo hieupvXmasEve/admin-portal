@@ -2,6 +2,7 @@
 
 use App\Modules\Identity\Http\Web\Admin\CampusSelectionController;
 use App\Modules\Identity\Http\Web\Admin\LoginController;
+use App\Modules\Identity\Http\Web\Admin\RoleController;
 use App\Modules\Identity\Http\Web\Admin\SocialAuthController;
 use App\Modules\Identity\Http\Web\Admin\UserController;
 use Illuminate\Support\Facades\Route;
@@ -32,6 +33,14 @@ Route::middleware('web')->group(function () {
             Route::put('users/{user}', [UserController::class, 'update'])->name('identity.users.update')->middleware('can:edit_user');
             Route::delete('users/{user}', [UserController::class, 'destroy'])->name('identity.users.destroy')->middleware('can:delete_user');
         });
+
+        Route::get('roles', [RoleController::class, 'index'])->name('roles.index')->middleware('can:view_role');
+        Route::get('roles/create', [RoleController::class, 'create'])->name('roles.create')->middleware('can:create_role');
+        Route::post('roles', [RoleController::class, 'store'])->name('roles.store')->middleware('can:create_role');
+        Route::get('roles/{role}', [RoleController::class, 'show'])->name('roles.show')->middleware('can:view_role');
+        Route::get('roles/{role}/edit', [RoleController::class, 'edit'])->name('roles.edit')->middleware('can:edit_role');
+        Route::put('roles/{role}', [RoleController::class, 'update'])->name('roles.update')->middleware('can:edit_role');
+        Route::delete('roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy')->middleware('can:delete_role');
 
         Route::post('logout', [LoginController::class, 'destroy'])->name('logout');
     });

@@ -16,6 +16,7 @@ class DeleteUserAction
         if ($currentCampusId) {
             // Remove user roles from current campus
             $user->campusRoles()->wherePivot('campus_id', $currentCampusId)->detach();
+            ClearUserPermissionCacheAction::run(['user_id' => (int) $user->id]);
         }
 
         // If user has no roles in any campus, delete the user
