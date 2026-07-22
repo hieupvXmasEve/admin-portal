@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Web\Admin;
 
 use App\Actions\Query\AssignQueryAction;
@@ -9,7 +11,7 @@ use App\Models\Department;
 use App\Models\FormResponse;
 use App\Models\QueryTicket;
 use App\Models\User;
-use App\Services\ImageUploadService;
+use App\Modules\Upload\Support\UploadPlatform;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rules\File;
@@ -17,7 +19,7 @@ use Inertia\Inertia;
 
 class QueryController extends Controller
 {
-    public function __construct(private ImageUploadService $imageUploadService)
+    public function __construct(private UploadPlatform $imageUploadService)
     {
         $this->middleware('can:view_queries')->only('index');
         $this->middleware('can:detail_queries')->only(['show', 'assign', 'reply', 'updateStatus']);

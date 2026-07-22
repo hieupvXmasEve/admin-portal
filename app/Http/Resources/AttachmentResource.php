@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Resources;
 
-use App\Services\ImageUploadService;
+use App\Modules\Upload\Support\UploadPlatform;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -15,7 +17,7 @@ class AttachmentResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $uploadService = app(ImageUploadService::class);
+        $uploadService = app(UploadPlatform::class);
 
         $originalName = $this->original_name ?? $this->filename ?? $this->file_name;
 

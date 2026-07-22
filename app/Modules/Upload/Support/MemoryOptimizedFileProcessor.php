@@ -1,12 +1,14 @@
 <?php
 
-namespace App\Services;
+declare(strict_types=1);
+
+namespace App\Modules\Upload\Support;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
-class MemoryOptimizedFileService
+class MemoryOptimizedFileProcessor
 {
     /**
      * Buffer size for file operations (default 8KB).
@@ -91,7 +93,7 @@ class MemoryOptimizedFileService
     {
         $handle = fopen($file->getRealPath(), 'rb');
 
-        if (!$handle) {
+        if (! $handle) {
             throw new RuntimeException('Unable to open file for streaming');
         }
 
@@ -110,14 +112,19 @@ class MemoryOptimizedFileService
         $sourceHandle = fopen($source, 'rb');
         $destHandle = fopen($destination, 'wb');
 
-        if (!$sourceHandle || !$destHandle) {
-            if ($sourceHandle) fclose($sourceHandle);
-            if ($destHandle) fclose($destHandle);
+        if (! $sourceHandle || ! $destHandle) {
+            if ($sourceHandle) {
+                fclose($sourceHandle);
+            }
+            if ($destHandle) {
+                fclose($destHandle);
+            }
+
             return false;
         }
 
         try {
-            while (!feof($sourceHandle)) {
+            while (! feof($sourceHandle)) {
                 $chunk = fread($sourceHandle, $this->bufferSize);
                 if ($chunk === false) {
                     return false;
@@ -149,12 +156,12 @@ class MemoryOptimizedFileService
         $context = hash_init($algorithm);
         $handle = fopen($filePath, 'rb');
 
-        if (!$handle) {
+        if (! $handle) {
             throw new RuntimeException('Unable to open file for hashing');
         }
 
         try {
-            while (!feof($handle)) {
+            while (! feof($handle)) {
                 $chunk = fread($handle, $this->bufferSize);
                 if ($chunk === false) {
                     throw new RuntimeException('Error reading file for hashing');
@@ -203,11 +210,12 @@ class MemoryOptimizedFileService
                 if (is_resource($content)) {
                     // Streaming mode - verify we can read the entire file
                     $bytesRead = 0;
-                    while (!feof($content)) {
+                    while (! feof($content)) {
                         $chunk = fread($content, $this->bufferSize);
                         if ($chunk === false) {
                             $results['valid'] = false;
                             $results['errors'][] = 'Error reading file content';
+
                             return;
                         }
                         $bytesRead += strlen($chunk);
@@ -221,7 +229,7 @@ class MemoryOptimizedFileService
                     // In-memory mode - verify content length
                     if (strlen($content) !== $results['file_size']) {
                         $results['valid'] = false;
-                        $results['errors'][] = "Content length mismatch";
+                        $results['errors'][] = 'Content length mismatch';
                     }
                 }
             });
@@ -246,14 +254,19 @@ class MemoryOptimizedFileService
         $sourceHandle = fopen($sourcePath, 'rb');
         $destHandle = gzopen($destinationPath, "wb{$compressionLevel}");
 
-        if (!$sourceHandle || !$destHandle) {
-            if ($sourceHandle) fclose($sourceHandle);
-            if ($destHandle) gzclose($destHandle);
+        if (! $sourceHandle || ! $destHandle) {
+            if ($sourceHandle) {
+                fclose($sourceHandle);
+            }
+            if ($destHandle) {
+                gzclose($destHandle);
+            }
+
             return false;
         }
 
         try {
-            while (!feof($sourceHandle)) {
+            while (! feof($sourceHandle)) {
                 $chunk = fread($sourceHandle, $this->bufferSize);
                 if ($chunk === false) {
                     return false;
@@ -285,14 +298,19 @@ class MemoryOptimizedFileService
         $sourceHandle = gzopen($sourcePath, 'rb');
         $destHandle = fopen($destinationPath, 'wb');
 
-        if (!$sourceHandle || !$destHandle) {
-            if ($sourceHandle) gzclose($sourceHandle);
-            if ($destHandle) fclose($destHandle);
+        if (! $sourceHandle || ! $destHandle) {
+            if ($sourceHandle) {
+                gzclose($sourceHandle);
+            }
+            if ($destHandle) {
+                fclose($destHandle);
+            }
+
             return false;
         }
 
         try {
-            while (!gzeof($sourceHandle)) {
+            while (! gzeof($sourceHandle)) {
                 $chunk = gzread($sourceHandle, $this->bufferSize);
                 if ($chunk === false) {
                     return false;

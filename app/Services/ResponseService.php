@@ -1,25 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
+use App\Models\Answer;
+use App\Models\Campus;
 use App\Models\Form;
-use App\Models\FormVersion;
 use App\Models\FormResponse;
+use App\Models\FormVersion;
+use App\Models\QueryTicket;
 use App\Models\Student;
 use App\Models\User;
-use App\Models\Campus;
-use App\Models\Answer;
-use App\Models\QueryTicket;
+use App\Modules\Upload\Support\UploadPlatform;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Http\UploadedFile;
-use App\Services\ImageUploadService;
 
 class ResponseService
 {
-    public function __construct(private ImageUploadService $imageUploadService)
-    {
-    }
+    public function __construct(private UploadPlatform $imageUploadService) {}
+
     /**
      * Submit a form response.
      */
@@ -70,7 +71,7 @@ class ResponseService
     {
         $question = $response->formVersion->questions()->find($questionId);
 
-        if (!$question) {
+        if (! $question) {
             throw new \InvalidArgumentException("Question {$questionId} not found in form version");
         }
 
@@ -183,7 +184,7 @@ class ResponseService
                     $query->whereHas('role', function ($q) use ($user) {
                         $q->whereIn('id', $user->campusUserRoles()->pluck('role_id'));
                     })
-                    ->where('visibility_level', 'full_detail');
+                        ->where('visibility_level', 'full_detail');
                 });
             });
 
@@ -220,7 +221,7 @@ class ResponseService
         string $action,
         ?string $notes = null
     ): FormResponse {
-        if (!$response->canBeReviewedBy($reviewer)) {
+        if (! $response->canBeReviewedBy($reviewer)) {
             throw new \Exception('You do not have permission to review this response');
         }
 
@@ -400,8 +401,8 @@ class ResponseService
         $output = '';
         foreach ($csv as $row) {
             $output .= implode(',', array_map(function ($value) {
-                return '"' . str_replace('"', '""', $value) . '"';
-            }, $row)) . "\n";
+                return '"'.str_replace('"', '""', $value).'"';
+            }, $row))."\n";
         }
 
         return $output;

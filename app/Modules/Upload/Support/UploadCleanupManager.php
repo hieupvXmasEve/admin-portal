@@ -1,42 +1,19 @@
 <?php
 
-namespace App\Jobs;
+declare(strict_types=1);
+
+namespace App\Modules\Upload\Support;
 
 use App\Models\UploadRecord;
-use App\Services\ChunkedUploadService;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
-class CleanupOrphanedFilesJob implements ShouldQueue
+class UploadCleanupManager
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
-    /**
-     * The number of times the job may be attempted.
-     */
-    public int $tries = 3;
-
-    /**
-     * The maximum number of seconds the job can run.
-     */
-    public int $timeout = 300; // 5 minutes
-
-    /**
-     * Cleanup configuration.
-     */
     protected array $config;
 
-    /**
-     * Create a new job instance.
-     */
-    public function __construct(array $config = [])
+    public function cleanup(UploadPlatform $uploadPlatform, array $config = []): array
     {
         $this->config = array_merge([
             'orphaned_file_age_hours' => 24,
@@ -45,24 +22,20 @@ class CleanupOrphanedFilesJob implements ShouldQueue
             'batch_size' => 100,
             'dry_run' => false,
         ], $config);
-    }
 
-    /**
-     * Execute the job.
-     */
-    public function handle(ChunkedUploadService $chunkedUploadService): void
-    {
-        Log::info('Starting orphaned files cleanup job', $this->config);
+        Log::info('Starting upload cleanup', $this->config);
 
         $results = [
             'orphaned_files' => $this->cleanupOrphanedFiles(),
             'expired_records' => $this->cleanupExpiredRecords(),
-            'chunked_uploads' => $chunkedUploadService->cleanupExpiredSessions(),
+            'chunked_uploads' => $uploadPlatform->cleanupExpiredSessions(),
             'temporary_files' => $this->cleanupTemporaryFiles(),
             'empty_directories' => $this->cleanupEmptyDirectories(),
         ];
 
-        Log::info('Orphaned files cleanup job completed', $results);
+        Log::info('Upload cleanup completed', $results);
+
+        return $results;
     }
 
     /**
@@ -145,10 +118,10 @@ class CleanupOrphanedFilesJob implements ShouldQueue
                     ->where('path', $filePath)
                     ->exists();
 
-                if (!$hasRecord) {
+                if (! $hasRecord) {
                     $results['orphaned_files']++;
 
-                    if (!$this->config['dry_run']) {
+                    if (! $this->config['dry_run']) {
                         $fileSize = Storage::disk($disk)->size($filePath);
 
                         if (Storage::disk($disk)->delete($filePath)) {
@@ -216,7 +189,7 @@ class CleanupOrphanedFilesJob implements ShouldQueue
 
             $results['expired_records'] = $query->count();
 
-            if (!$this->config['dry_run']) {
+            if (! $this->config['dry_run']) {
                 $query->chunk($this->config['batch_size'], function ($records) use (&$results) {
                     foreach ($records as $record) {
                         try {
@@ -284,7 +257,7 @@ class CleanupOrphanedFilesJob implements ShouldQueue
         $cutoffTime = Carbon::now()->subHours($this->config['chunked_upload_age_hours']);
 
         try {
-            $pattern = $tempDir . '/*_assembled';
+            $pattern = $tempDir.'/*_assembled';
             $tempFiles = glob($pattern);
 
             foreach ($tempFiles as $tempFile) {
@@ -294,7 +267,7 @@ class CleanupOrphanedFilesJob implements ShouldQueue
                     if ($lastModified->isBefore($cutoffTime)) {
                         $results['temp_files']++;
 
-                        if (!$this->config['dry_run']) {
+                        if (! $this->config['dry_run']) {
                             $fileSize = filesize($tempFile);
 
                             if (unlink($tempFile)) {
@@ -399,7 +372,7 @@ class CleanupOrphanedFilesJob implements ShouldQueue
             if (empty($files) && empty($directories)) {
                 $results['empty_directories']++;
 
-                if (!$this->config['dry_run']) {
+                if (! $this->config['dry_run']) {
                     if (Storage::disk($disk)->deleteDirectory($directory)) {
                         $results['cleaned_directories']++;
 
@@ -431,17 +404,5 @@ class CleanupOrphanedFilesJob implements ShouldQueue
                 'error' => $e->getMessage(),
             ];
         }
-    }
-
-    /**
-     * Handle job failure.
-     */
-    public function failed(\Throwable $exception): void
-    {
-        Log::error('Orphaned files cleanup job failed', [
-            'error' => $exception->getMessage(),
-            'trace' => $exception->getTraceAsString(),
-            'config' => $this->config,
-        ]);
     }
 }

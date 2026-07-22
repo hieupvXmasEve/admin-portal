@@ -1,13 +1,25 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+declare(strict_types=1);
+
+namespace App\Modules\Upload\Http\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\ImageUploadRequest;
-use App\Models\UploadRecord;
 use App\Models\Student;
+use App\Models\UploadRecord;
 use App\Models\User;
-use App\Services\ImageUploadService;
+use App\Modules\Upload\Actions\DeleteUploadAction;
+use App\Modules\Upload\Actions\StoreMultipleUploadsAction;
+use App\Modules\Upload\Actions\StoreUploadAction;
+use App\Modules\Upload\Http\Requests\Upload\ListUploadsRequest;
+use App\Modules\Upload\Http\Requests\Upload\UploadMultipleRequest;
+use App\Modules\Upload\Http\Requests\Upload\UploadRequest;
+use App\Modules\Upload\Queries\GetUploadConfigurationQuery;
+use App\Modules\Upload\Queries\GetUploadContextsQuery;
+use App\Modules\Upload\Queries\ListUploadsQuery;
+use App\Modules\Upload\Support\UploadActor;
+use App\Modules\Upload\Support\UploadPlatform;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,14 +27,14 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
-class ImageUploadController extends Controller
+class UploadController extends Controller
 {
     /**
      * Image upload service.
      */
-    protected ImageUploadService $uploadService;
+    protected UploadPlatform $uploadService;
 
-    public function __construct(ImageUploadService $uploadService)
+    public function __construct(UploadPlatform $uploadService)
     {
         $this->uploadService = $uploadService;
     }
@@ -30,14 +42,11 @@ class ImageUploadController extends Controller
     /**
      * Upload a single image file.
      */
-    public function upload(ImageUploadRequest $request): JsonResponse
+    public function upload(UploadRequest $request): JsonResponse
     {
         try {
             $file = $request->file('file');
             $context = $request->input('context');
-            $authUser = Auth::user();
-            $userId = $authUser instanceof User ? $authUser->id : null;
-
             // Prepare metadata from request
             $metadata = array_filter([
                 'alt_text' => $request->input('alt_text'),
@@ -46,12 +55,12 @@ class ImageUploadController extends Controller
             ]);
 
             // Upload the file
-            $uploadRecord = $this->uploadService->upload(
+            $uploadRecord = StoreUploadAction::run(
+                $this->uploadService,
                 $file,
                 $context,
-                $userId,
-                $authUser instanceof Student ? $authUser->id : null,
-                $metadata
+                $this->actor(),
+                $metadata,
             );
 
             return response()->json([
@@ -75,12 +84,12 @@ class ImageUploadController extends Controller
                 'context' => $request->input('context'),
                 'filename' => $request->file('file')?->getClientOriginalName(),
                 'error' => $e->getMessage(),
-                'user_id' => $userId,
+                'user_id' => Auth::id(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Upload failed: ' . $e->getMessage(),
+                'message' => 'Upload failed: '.$e->getMessage(),
                 'errors' => [$e->getMessage()],
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -89,20 +98,11 @@ class ImageUploadController extends Controller
     /**
      * Upload multiple image files.
      */
-    public function uploadMultiple(Request $request): JsonResponse
+    public function uploadMultiple(UploadMultipleRequest $request): JsonResponse
     {
         try {
-            // Validate basic requirements
-            $request->validate([
-                'files' => 'required|array|min:1|max:10',
-                'files.*' => 'required|file',
-                'context' => 'required|string|in:' . implode(',', array_keys(config('uploads.contexts'))),
-            ]);
-
             $files = $request->file('files');
             $context = $request->input('context');
-            $authUser = Auth::user();
-            $userId = $authUser instanceof User ? $authUser->id : null;
 
             // Prepare metadata from request
             $metadata = array_filter([
@@ -112,12 +112,12 @@ class ImageUploadController extends Controller
             ]);
 
             // Upload multiple files
-            $result = $this->uploadService->uploadMultiple(
+            $result = StoreMultipleUploadsAction::run(
+                $this->uploadService,
                 $files,
                 $context,
-                $userId,
-                $authUser instanceof Student ? $authUser->id : null,
-                $metadata
+                $this->actor(),
+                $metadata,
             );
 
             // Format successful uploads
@@ -137,7 +137,7 @@ class ImageUploadController extends Controller
 
             $response = [
                 'success' => true,
-                'message' => count($result['successful']) . ' files uploaded successfully',
+                'message' => count($result['successful']).' files uploaded successfully',
                 'data' => [
                     'successful' => $successfulUploads,
                     'failed' => $result['failed'],
@@ -158,12 +158,12 @@ class ImageUploadController extends Controller
                 'context' => $request->input('context'),
                 'file_count' => count($request->file('files', [])),
                 'error' => $e->getMessage(),
-                'user_id' => $userId,
+                'user_id' => Auth::id(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Multiple upload failed: ' . $e->getMessage(),
+                'message' => 'Multiple upload failed: '.$e->getMessage(),
                 'errors' => [$e->getMessage()],
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -175,13 +175,7 @@ class ImageUploadController extends Controller
     public function show(UploadRecord $uploadRecord): JsonResponse
     {
         try {
-            // Check if user has access to this upload
-            if (!$this->canAccessUpload($uploadRecord)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Access denied to this upload',
-                ], Response::HTTP_FORBIDDEN);
-            }
+            $this->authorize('view', $uploadRecord);
 
             return response()->json([
                 'success' => true,
@@ -200,6 +194,11 @@ class ImageUploadController extends Controller
                 ],
             ]);
 
+        } catch (AuthorizationException) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Access denied to this upload',
+            ], Response::HTTP_FORBIDDEN);
         } catch (\Exception $e) {
             Log::error('Failed to retrieve upload information', [
                 'upload_id' => $uploadRecord->id,
@@ -221,15 +220,8 @@ class ImageUploadController extends Controller
     public function destroy(UploadRecord $uploadRecord): JsonResponse
     {
         try {
-            // Check if user has access to delete this upload
-            if (!$this->canDeleteUpload($uploadRecord)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Access denied to delete this upload',
-                ], Response::HTTP_FORBIDDEN);
-            }
-
-            $deleted = $this->uploadService->delete($uploadRecord);
+            $this->authorize('delete', $uploadRecord);
+            $deleted = DeleteUploadAction::run($this->uploadService, $uploadRecord);
 
             if ($deleted) {
                 return response()->json([
@@ -243,6 +235,11 @@ class ImageUploadController extends Controller
                 'message' => 'Failed to delete upload',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
 
+        } catch (AuthorizationException) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Access denied to delete this upload',
+            ], Response::HTTP_FORBIDDEN);
         } catch (\Exception $e) {
             Log::error('Failed to delete upload', [
                 'upload_id' => $uploadRecord->id,
@@ -261,69 +258,14 @@ class ImageUploadController extends Controller
     /**
      * Get user's uploads with pagination and filtering.
      */
-    public function index(Request $request): JsonResponse
+    public function index(ListUploadsRequest $request, ListUploadsQuery $query): JsonResponse
     {
         try {
-            $request->validate([
-                'context' => 'nullable|string|in:' . implode(',', array_keys(config('uploads.contexts'))),
-                'per_page' => 'nullable|integer|min:1|max:100',
-                'search' => 'nullable|string|max:255',
-            ]);
-
-            $query = UploadRecord::query();
-
-            // Filter by user if not admin
-            if (!Auth::user()?->hasRole('admin')) {
-                $query->where('user_id', Auth::id());
-            }
-
-            // Filter by context
-            if ($request->filled('context')) {
-                $query->where('context', $request->input('context'));
-            }
-
-            // Search by filename or original name
-            if ($request->filled('search')) {
-                $search = $request->input('search');
-                $query->where(function ($q) use ($search) {
-                    $q->where('filename', 'like', "%{$search}%")
-                      ->orWhere('original_name', 'like', "%{$search}%");
-                });
-            }
-
-            // Order by creation date (newest first)
-            $query->orderBy('created_at', 'desc');
-
-            // Paginate results
-            $perPage = $request->input('per_page', 15);
-            $uploads = $query->paginate($perPage);
-
-            // Transform the data
-            $uploads->getCollection()->transform(function ($uploadRecord) {
-                return [
-                    'id' => $uploadRecord->id,
-                    'filename' => $uploadRecord->filename,
-                    'original_name' => $uploadRecord->original_name,
-                    'mime_type' => $uploadRecord->mime_type,
-                    'size' => $uploadRecord->size,
-                    'context' => $uploadRecord->context,
-                    'url' => $this->uploadService->getUrl($uploadRecord),
-                    'metadata' => $uploadRecord->metadata,
-                    'created_at' => $uploadRecord->created_at,
-                ];
-            });
+            $uploads = $query->handle($request->validated(), Auth::user());
 
             return response()->json([
                 'success' => true,
-                'data' => $uploads->items(),
-                'meta' => [
-                    'current_page' => $uploads->currentPage(),
-                    'last_page' => $uploads->lastPage(),
-                    'per_page' => $uploads->perPage(),
-                    'total' => $uploads->total(),
-                    'from' => $uploads->firstItem(),
-                    'to' => $uploads->lastItem(),
-                ],
+                ...$uploads,
             ]);
 
         } catch (\Exception $e) {
@@ -347,7 +289,7 @@ class ImageUploadController extends Controller
     {
         try {
             // Verify using Laravel's signed URL validation
-            if (!$request->hasValidSignature()) {
+            if (! $request->hasValidSignature()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid or expired signature',
@@ -357,7 +299,7 @@ class ImageUploadController extends Controller
             $uploadRecord = UploadRecord::findOrFail($id);
 
             // Check if file exists
-            if (!Storage::disk($uploadRecord->disk)->exists($uploadRecord->path)) {
+            if (! Storage::disk($uploadRecord->disk)->exists($uploadRecord->path)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'File not found',
@@ -386,33 +328,12 @@ class ImageUploadController extends Controller
     /**
      * Get comprehensive upload configuration.
      */
-    public function config(): JsonResponse
+    public function config(GetUploadConfigurationQuery $query): JsonResponse
     {
         try {
-            $contexts = [];
-
-            foreach ($this->uploadService->getAvailableContexts() as $context) {
-                $config = $this->uploadService->getContextConfiguration($context);
-
-                $contexts[$context] = [
-                    'max_size' => $config['max_size'],
-                    'allowed_types' => $config['allowed_types'],
-                    'allowed_extensions' => $config['allowed_extensions'] ?? [],
-                    'directory' => $config['directory'],
-                    'generate_thumbnails' => $config['generate_thumbnails'] ?? false,
-                    'public' => $config['public'] ?? true,
-                    'disk' => $config['disk'] ?? 'images',
-                ];
-            }
-
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'contexts' => $contexts,
-                    'defaults' => config('uploads.defaults'),
-                    'security' => config('uploads.security'),
-                    'performance' => config('uploads.performance'),
-                ],
+                'data' => $query->handle(),
             ]);
 
         } catch (\Exception $e) {
@@ -431,27 +352,12 @@ class ImageUploadController extends Controller
     /**
      * Get upload contexts and their configurations.
      */
-    public function contexts(): JsonResponse
+    public function contexts(GetUploadContextsQuery $query): JsonResponse
     {
         try {
-            $contexts = [];
-
-            foreach ($this->uploadService->getAvailableContexts() as $context) {
-                $config = $this->uploadService->getContextConfiguration($context);
-
-                $contexts[$context] = [
-                    'max_size' => $config['max_size'],
-                    'max_size_mb' => round($config['max_size'] / 1024, 2),
-                    'allowed_types' => $config['allowed_types'],
-                    'allowed_extensions' => $config['allowed_extensions'] ?? [],
-                    'public' => $config['public'] ?? true,
-                    'directory' => $config['directory'],
-                ];
-            }
-
             return response()->json([
                 'success' => true,
-                'data' => $contexts,
+                'data' => $query->handle(),
             ]);
 
         } catch (\Exception $e) {
@@ -470,7 +376,7 @@ class ImageUploadController extends Controller
     /**
      * Validate a file before upload.
      */
-    public function validateFile(ImageUploadRequest $request): JsonResponse
+    public function validateFile(UploadRequest $request): JsonResponse
     {
         try {
             $file = $request->file('file');
@@ -499,40 +405,13 @@ class ImageUploadController extends Controller
         }
     }
 
-    /**
-     * Check if the current user can access the upload.
-     */
-    protected function canAccessUpload(UploadRecord $uploadRecord): bool
+    private function actor(): UploadActor
     {
-        $user = Auth::user();
+        $actor = Auth::user();
 
-        // Admin can access all uploads
-        if ($user?->hasRole('admin')) {
-            return true;
-        }
-
-        // Users can access their own uploads
-        if ($uploadRecord->user_id === Auth::id()) {
-            return true;
-        }
-
-        // Check if upload is in a public context
-        return $this->uploadService->isContextPublic($uploadRecord->context);
-    }
-
-    /**
-     * Check if the current user can delete the upload.
-     */
-    protected function canDeleteUpload(UploadRecord $uploadRecord): bool
-    {
-        $user = Auth::user();
-
-        // Admin can delete all uploads
-        if ($user?->hasRole('admin')) {
-            return true;
-        }
-
-        // Users can only delete their own uploads
-        return $uploadRecord->user_id === Auth::id();
+        return new UploadActor(
+            userId: $actor instanceof User ? $actor->id : null,
+            studentId: $actor instanceof Student ? $actor->id : null,
+        );
     }
 }

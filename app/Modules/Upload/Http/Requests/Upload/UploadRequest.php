@@ -1,13 +1,17 @@
 <?php
 
-namespace App\Http\Requests;
+declare(strict_types=1);
 
+namespace App\Modules\Upload\Http\Requests\Upload;
+
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\File;
+use Illuminate\Validation\Validator;
 
-class ImageUploadRequest extends FormRequest
+class UploadRequest extends FormRequest
 {
     /**
      * Holds a detailed upload error message when PHP reports a failure.
@@ -26,7 +30,7 @@ class ImageUploadRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -48,11 +52,11 @@ class ImageUploadRequest extends FormRequest
             'required',
             'file',
             function ($attribute, $value, $fail) {
-                if (!$value || !($value instanceof UploadedFile)) {
+                if (! $value || ! ($value instanceof UploadedFile)) {
                     return;
                 }
 
-                if (!$value->isValid()) {
+                if (! $value->isValid()) {
                     $message = $this->resolveUploadErrorMessage($value);
                     $this->uploadErrorMessage = $message;
                     $fail($message);
@@ -61,24 +65,24 @@ class ImageUploadRequest extends FormRequest
             File::types($allowedExtensions)->max($maxSizeKilobytes),
         ];
 
-        if (!empty($allowedExtensions)) {
-            $fileRules[] = 'mimes:' . implode(',', $allowedExtensions);
+        if (! empty($allowedExtensions)) {
+            $fileRules[] = 'mimes:'.implode(',', $allowedExtensions);
         }
 
-        if (!empty($allowedMimeTypes)) {
-            $fileRules[] = 'mimetypes:' . implode(',', $allowedMimeTypes);
+        if (! empty($allowedMimeTypes)) {
+            $fileRules[] = 'mimetypes:'.implode(',', $allowedMimeTypes);
         }
 
         $fileRules[] = function ($attribute, $value, $fail) {
-            if (!config('uploads.security.validate_file_signature')) {
+            if (! config('uploads.security.validate_file_signature')) {
                 return;
             }
 
-            if (!$value) {
+            if (! $value) {
                 return;
             }
 
-            if (!$this->validateFileSignature($value)) {
+            if (! $this->validateFileSignature($value)) {
                 $fail('The file signature does not match the file extension.');
             }
         };
@@ -128,11 +132,11 @@ class ImageUploadRequest extends FormRequest
             'file.required' => 'Please select a file to upload.',
             'file.file' => 'The uploaded file is not valid.',
             'file.max' => "The file size cannot exceed {$maxSizeMB}MB for {$context} uploads.",
-            'file.mimes' => 'The file must be one of the following types: ' . implode(', ', $allowedExtensions) . '.',
+            'file.mimes' => 'The file must be one of the following types: '.implode(', ', $allowedExtensions).'.',
             'file.mimetypes' => 'The file MIME type is not allowed for this context.',
             'file.uploaded' => $this->getUploadFailureMessage(),
             'context.required' => 'Upload context is required.',
-            'context.in' => 'Invalid upload context. Allowed contexts: ' . implode(', ', array_keys(config('uploads.contexts'))) . '.',
+            'context.in' => 'Invalid upload context. Allowed contexts: '.implode(', ', array_keys(config('uploads.contexts'))).'.',
             'alt_text.max' => 'Alt text cannot exceed 255 characters.',
             'description.max' => 'Description cannot exceed 1000 characters.',
             'expires_at.date' => 'Expiration date must be a valid date.',
@@ -161,7 +165,7 @@ class ImageUploadRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         // Set default context if not provided
-        if (!$this->has('context')) {
+        if (! $this->has('context')) {
             $this->merge(['context' => 'general']);
         }
 
@@ -178,7 +182,7 @@ class ImageUploadRequest extends FormRequest
     /**
      * Configure the validator instance.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
+     * @param  Validator  $validator
      * @return void
      */
     public function withValidator($validator)
@@ -192,19 +196,18 @@ class ImageUploadRequest extends FormRequest
     /**
      * Validate file signature against allowed MIME types.
      *
-     * @param  \Illuminate\Http\UploadedFile  $file
+     * @param  UploadedFile  $file
      * @param  array  $allowedMimeTypes
-     * @return bool
      */
     protected function validateFileSignature($file): bool
     {
-        if (!$file || !$file->isValid()) {
+        if (! $file || ! $file->isValid()) {
             return false;
         }
 
         // Get file signature (magic bytes)
         $handle = fopen($file->getPathname(), 'rb');
-        if (!$handle) {
+        if (! $handle) {
             return false;
         }
 
@@ -220,21 +223,21 @@ class ImageUploadRequest extends FormRequest
                 "\x89\x50\x4E\x47\x0D\x0A\x1A\x0A", // PNG
             ],
             'image/gif' => [
-                "GIF87a", // GIF87a
-                "GIF89a", // GIF89a
+                'GIF87a', // GIF87a
+                'GIF89a', // GIF89a
             ],
             'image/webp' => [
-                "RIFF", // WebP (first 4 bytes, followed by file size, then "WEBP")
+                'RIFF', // WebP (first 4 bytes, followed by file size, then "WEBP")
             ],
             'image/svg+xml' => [
-                "<?xml", // SVG
-                "<svg", // SVG without XML declaration
+                '<?xml', // SVG
+                '<svg', // SVG without XML declaration
             ],
         ];
 
         $mimeType = $file->getMimeType();
 
-        if (!$mimeType || !isset($signatures[$mimeType])) {
+        if (! $mimeType || ! isset($signatures[$mimeType])) {
             // No signature validation available for this type
             return true;
         }
@@ -258,9 +261,6 @@ class ImageUploadRequest extends FormRequest
 
     /**
      * Get file extensions from MIME types.
-     *
-     * @param  array  $mimeTypes
-     * @return array
      */
     protected function getExtensionsFromMimeTypes(array $mimeTypes): array
     {
@@ -285,15 +285,14 @@ class ImageUploadRequest extends FormRequest
     /**
      * Perform context-specific validation.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
-     * @return void
+     * @param  Validator  $validator
      */
     protected function validateContextSpecificRules($validator): void
     {
         $context = $this->input('context');
         $file = $this->file('file');
 
-        if (!$file || !$file->isValid()) {
+        if (! $file || ! $file->isValid()) {
             return;
         }
 
@@ -313,9 +312,8 @@ class ImageUploadRequest extends FormRequest
     /**
      * Validate avatar-specific rules.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
-     * @param  \Illuminate\Http\UploadedFile  $file
-     * @return void
+     * @param  Validator  $validator
+     * @param  UploadedFile  $file
      */
     protected function validateAvatarRules($validator, $file): void
     {
@@ -342,9 +340,8 @@ class ImageUploadRequest extends FormRequest
     /**
      * Validate assignment-specific rules.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
-     * @param  \Illuminate\Http\UploadedFile  $file
-     * @return void
+     * @param  Validator  $validator
+     * @param  UploadedFile  $file
      */
     protected function validateAssignmentRules($validator, $file): void
     {
@@ -370,9 +367,8 @@ class ImageUploadRequest extends FormRequest
     /**
      * Validate general upload rules.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
-     * @param  \Illuminate\Http\UploadedFile  $file
-     * @return void
+     * @param  Validator  $validator
+     * @param  UploadedFile  $file
      */
     protected function validateGeneralRules($validator, $file): void
     {
@@ -426,7 +422,7 @@ class ImageUploadRequest extends FormRequest
         }
 
         $file = $this->file('file');
-        if ($file instanceof UploadedFile && !$file->isValid()) {
+        if ($file instanceof UploadedFile && ! $file->isValid()) {
             return $this->resolveUploadErrorMessage($file);
         }
 
@@ -438,34 +434,31 @@ class ImageUploadRequest extends FormRequest
 
     /**
      * Get the context configuration for the current request.
-     *
-     * @return array
      */
     public function getContextConfig(): array
     {
         $context = $this->input('context', 'general');
+
         return config("uploads.contexts.{$context}", config('uploads.defaults'));
     }
 
     /**
      * Check if the current context allows public access.
-     *
-     * @return bool
      */
     public function isPublicContext(): bool
     {
         $config = $this->getContextConfig();
+
         return $config['public'] ?? true;
     }
 
     /**
      * Get the storage disk for the current context.
-     *
-     * @return string
      */
     public function getStorageDisk(): string
     {
         $config = $this->getContextConfig();
+
         return $config['disk'] ?? 'images';
     }
 }

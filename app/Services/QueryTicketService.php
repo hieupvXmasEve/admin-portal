@@ -1,21 +1,23 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Models\Campus;
 use App\Models\QueryReply;
 use App\Models\QueryTicket;
 use App\Models\Student;
-use App\Models\User;
 use App\Models\UploadRecord;
-use App\Services\ImageUploadService;
+use App\Models\User;
+use App\Modules\Upload\Support\UploadPlatform;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
 class QueryTicketService
 {
-    public function __construct(private ImageUploadService $imageUploadService) {}
+    public function __construct(private UploadPlatform $imageUploadService) {}
 
     /**
      * Get paginated query tickets for a campus with optional filters.
@@ -59,11 +61,11 @@ class QueryTicketService
                     });
             });
 
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
 
-        if (!empty($filters['question_id'])) {
+        if (! empty($filters['question_id'])) {
             $query->whereHas('response.answers', function ($answersQuery) use ($filters) {
                 $answersQuery->where('question_id', $filters['question_id']);
             });
@@ -105,7 +107,7 @@ class QueryTicketService
                 $responseQuery->where('submitted_by_student_id', $student->id);
             });
 
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
 
@@ -145,7 +147,7 @@ class QueryTicketService
 
             if ($reply->is_official_answer) {
                 $ticket->markAsAnswered();
-            } elseif (!empty($data['set_pending'])) {
+            } elseif (! empty($data['set_pending'])) {
                 $ticket->update(['status' => QueryTicket::STATUS_PENDING, 'closed_at' => null]);
             }
 
@@ -203,7 +205,7 @@ class QueryTicketService
             $response = $ticket->load('response')->response;
         }
 
-        if (!$response || (int) $response->submitted_by_student_id !== (int) $student->id) {
+        if (! $response || (int) $response->submitted_by_student_id !== (int) $student->id) {
             abort(404, 'Ticket not found');
         }
 
@@ -215,7 +217,7 @@ class QueryTicketService
      */
     public function updateStatus(QueryTicket $ticket, string $status): QueryTicket
     {
-        if (!in_array($status, QueryTicket::STATUSES, true)) {
+        if (! in_array($status, QueryTicket::STATUSES, true)) {
             throw new \InvalidArgumentException("Unsupported status [{$status}]");
         }
 
@@ -241,7 +243,7 @@ class QueryTicketService
         ?User $user = null,
         ?Student $student = null
     ): ?UploadRecord {
-        if (!$file) {
+        if (! $file) {
             return null;
         }
 

@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\GoldTransactionController;
-use App\Http\Controllers\Api\ImageUploadController;
 use App\Http\Controllers\Api\StudentWalletController;
 use App\Http\Controllers\Api\V1\NotificationPreferenceController;
 use App\Http\Controllers\Api\V1\Student\AcademicRecordController;
@@ -24,6 +23,7 @@ use App\Http\Controllers\Api\V1\Student\ProfileController;
 use App\Http\Controllers\Api\V1\Student\QueryTicketController;
 use App\Http\Controllers\Api\V1\Student\TimetableController;
 use App\Modules\Finance\Http\Api\Student\StudentFinanceController;
+use App\Modules\Upload\Http\Api\UploadController;
 use Illuminate\Support\Facades\Route;
 
 // Protected student API routes
@@ -214,7 +214,7 @@ Route::middleware([
 
         // Student-controlled uploads
         Route::prefix('uploads')->name('uploads.')->group(function () {
-            Route::post('/', [ImageUploadController::class, 'upload'])
+            Route::post('/', [UploadController::class, 'upload'])
                 // ->middleware(['throttle:uploads-single'])
                 ->name('store');
         });

@@ -1,14 +1,16 @@
 <?php
 
-namespace App\Services;
+declare(strict_types=1);
+
+namespace App\Modules\Upload\Support;
 
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use RuntimeException;
 
-class FileValidationService
+class FileValidator
 {
     /**
      * File signature mappings for validation.
@@ -26,18 +28,18 @@ class FileValidationService
             "\x89\x50\x4E\x47\x0D\x0A\x1A\x0A", // PNG
         ],
         'image/gif' => [
-            "GIF87a", // GIF87a
-            "GIF89a", // GIF89a
+            'GIF87a', // GIF87a
+            'GIF89a', // GIF89a
         ],
         'image/webp' => [
-            "RIFF", // WebP (needs additional validation)
+            'RIFF', // WebP (needs additional validation)
         ],
         'image/svg+xml' => [
-            "<?xml", // XML declaration
-            "<svg",  // SVG root element
+            '<?xml', // XML declaration
+            '<svg',  // SVG root element
         ],
         'image/bmp' => [
-            "BM", // BMP
+            'BM', // BMP
         ],
         'image/tiff' => [
             "II*\x00", // TIFF little-endian
@@ -132,15 +134,15 @@ class FileValidationService
      */
     protected function validateBasicFile(UploadedFile $file): void
     {
-        if (!$file->isValid()) {
-            throw new InvalidArgumentException('Invalid file upload: ' . $file->getErrorMessage());
+        if (! $file->isValid()) {
+            throw new InvalidArgumentException('Invalid file upload: '.$file->getErrorMessage());
         }
 
         if ($file->getSize() === 0) {
             throw new InvalidArgumentException('Empty file is not allowed');
         }
 
-        if (!is_readable($file->getRealPath())) {
+        if (! is_readable($file->getRealPath())) {
             throw new RuntimeException('Unable to read uploaded file');
         }
     }
@@ -175,9 +177,9 @@ class FileValidationService
 
         $mimeType = $file->getMimeType();
 
-        if (!in_array($mimeType, $allowedTypes)) {
+        if (! in_array($mimeType, $allowedTypes)) {
             throw new InvalidArgumentException(
-                "File type '{$mimeType}' is not allowed. Allowed types: " . implode(', ', $allowedTypes)
+                "File type '{$mimeType}' is not allowed. Allowed types: ".implode(', ', $allowedTypes)
             );
         }
     }
@@ -202,9 +204,9 @@ class FileValidationService
             );
         }
 
-        if (!in_array($extension, $allowedExtensions)) {
+        if (! in_array($extension, $allowedExtensions)) {
             throw new InvalidArgumentException(
-                "File extension '{$extension}' is not allowed. Allowed extensions: " . implode(', ', $allowedExtensions)
+                "File extension '{$extension}' is not allowed. Allowed extensions: ".implode(', ', $allowedExtensions)
             );
         }
     }
@@ -216,7 +218,7 @@ class FileValidationService
     {
         $mimeType = $file->getMimeType();
 
-        if (!isset($this->fileSignatures[$mimeType])) {
+        if (! isset($this->fileSignatures[$mimeType])) {
             // If we don't have signature validation for this type, skip
             return;
         }
@@ -224,7 +226,7 @@ class FileValidationService
         $filePath = $file->getRealPath();
         $fileHandle = fopen($filePath, 'rb');
 
-        if (!$fileHandle) {
+        if (! $fileHandle) {
             throw new RuntimeException('Unable to read uploaded file for signature validation');
         }
 
@@ -253,7 +255,7 @@ class FileValidationService
             $validSignature = (strpos($content, '<?xml') === 0 || strpos($content, '<svg') !== false);
         }
 
-        if (!$validSignature) {
+        if (! $validSignature) {
             throw new InvalidArgumentException(
                 "File signature does not match the declared MIME type: {$mimeType}. This may indicate a malicious file."
             );
@@ -441,7 +443,7 @@ class FileValidationService
         $filePath = $file->getRealPath();
         $fileHandle = fopen($filePath, 'rb');
 
-        if (!$fileHandle) {
+        if (! $fileHandle) {
             return ['error' => 'Unable to read file'];
         }
 
@@ -491,7 +493,7 @@ class FileValidationService
         $filePath = $file->getRealPath();
         $fileHandle = fopen($filePath, 'rb');
 
-        if (!$fileHandle) {
+        if (! $fileHandle) {
             throw new RuntimeException('Unable to read file for malicious signature check');
         }
 
@@ -855,7 +857,7 @@ class FileValidationService
      */
     protected function scanForViruses(UploadedFile $file): void
     {
-        if (!$this->virusScanConfig['enabled']) {
+        if (! $this->virusScanConfig['enabled']) {
             return;
         }
 
@@ -892,13 +894,14 @@ class FileValidationService
      */
     protected function scanWithClamAV(string $filePath, UploadedFile $file): void
     {
-        if (!$this->isClamAVAvailable()) {
+        if (! $this->isClamAVAvailable()) {
             Log::warning('ClamAV not available for virus scanning');
+
             return;
         }
 
         $timeout = $this->virusScanConfig['timeout'];
-        $command = "timeout {$timeout} clamscan --no-summary --infected " . escapeshellarg($filePath);
+        $command = "timeout {$timeout} clamscan --no-summary --infected ".escapeshellarg($filePath);
 
         $output = [];
         $returnCode = 0;
@@ -913,7 +916,7 @@ class FileValidationService
             throw new RuntimeException('Virus scan timed out');
         } elseif ($returnCode !== 0) {
             // Other error
-            throw new RuntimeException('Virus scan failed with code: ' . $returnCode);
+            throw new RuntimeException('Virus scan failed with code: '.$returnCode);
         }
 
         Log::info('File passed virus scan', [
@@ -931,6 +934,7 @@ class FileValidationService
 
         return Cache::remember($cacheKey, 300, function () {
             exec('which clamscan', $output, $returnCode);
+
             return $returnCode === 0;
         });
     }
@@ -978,11 +982,11 @@ class FileValidationService
         try {
             $quarantineDir = storage_path('quarantine');
 
-            if (!is_dir($quarantineDir)) {
+            if (! is_dir($quarantineDir)) {
                 mkdir($quarantineDir, 0700, true);
             }
 
-            $quarantinePath = $quarantineDir . '/' . date('Y-m-d_H-i-s') . '_' . $file->getClientOriginalName();
+            $quarantinePath = $quarantineDir.'/'.date('Y-m-d_H-i-s').'_'.$file->getClientOriginalName();
 
             if (copy($filePath, $quarantinePath)) {
                 Log::info('Infected file quarantined', [
@@ -1006,7 +1010,7 @@ class FileValidationService
         $filePath = $file->getRealPath();
         $fileHandle = fopen($filePath, 'rb');
 
-        if (!$fileHandle) {
+        if (! $fileHandle) {
             return ['error' => 'Unable to read file'];
         }
 
@@ -1039,7 +1043,7 @@ class FileValidationService
                 $imageInfo = @getimagesize($filePath);
                 if ($imageInfo !== false) {
                     $analysis['image_analysis'] = [
-                        'dimensions' => $imageInfo[0] . 'x' . $imageInfo[1],
+                        'dimensions' => $imageInfo[0].'x'.$imageInfo[1],
                         'estimated_size' => $this->estimateImageSize($imageInfo[0], $imageInfo[1], $file->getMimeType()),
                         'size_ratio' => $file->getSize() / $this->estimateImageSize($imageInfo[0], $imageInfo[1], $file->getMimeType()),
                     ];

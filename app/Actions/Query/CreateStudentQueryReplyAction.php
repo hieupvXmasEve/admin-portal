@@ -12,7 +12,7 @@ use App\Models\UploadRecord;
 use App\Modules\Notification\Actions\PublishDomainEventAction;
 use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use App\Modules\Notification\Support\NotificationPayloadBuilder;
-use App\Services\ImageUploadService;
+use App\Modules\Upload\Support\UploadPlatform;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +22,7 @@ use Illuminate\Validation\ValidationException;
 class CreateStudentQueryReplyAction
 {
     public function __construct(
-        private ImageUploadService $imageUploadService,
+        private UploadPlatform $imageUploadService,
         private PublishDomainEventAction $publishDomainEventAction,
         private NotificationPayloadBuilder $payloadBuilder
     ) {}
@@ -71,7 +71,7 @@ class CreateStudentQueryReplyAction
         });
     }
 
-    private function storeReplyUpload(QueryTicket $ticket, UploadedFile|null $file, Student $student): ?UploadRecord
+    private function storeReplyUpload(QueryTicket $ticket, ?UploadedFile $file, Student $student): ?UploadRecord
     {
         if (! $file) {
             return null;
@@ -122,15 +122,15 @@ class CreateStudentQueryReplyAction
         }
 
         $recipientTargets = array_map(
-            fn(int $id) => ['type' => 'user', 'id' => $id],
+            fn (int $id) => ['type' => 'user', 'id' => $id],
             $userIds
         );
 
         $topicTitle = $ticket->topic?->title ?? $ticket->custom_topic_text ?? 'General';
 
         $payload = $this->payloadBuilder->build('query_reply_created', [
-            'title' => 'New Reply: ' . $topicTitle,
-            'body' => $student->full_name . ' replied: "' . Str::limit($reply->message, 80) . '"',
+            'title' => 'New Reply: '.$topicTitle,
+            'body' => $student->full_name.' replied: "'.Str::limit($reply->message, 80).'"',
             'action_type' => 'query.admin_inbox',
             'action_params' => ['id' => $ticket->response_id],
         ]);

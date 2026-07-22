@@ -1,20 +1,20 @@
 <?php
 
-namespace App\Services;
+declare(strict_types=1);
+
+namespace App\Modules\Upload\Support;
 
 use App\Models\UploadRecord;
-use App\Services\FileValidationService;
-use App\Services\UploadUrlService;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
-use Illuminate\Support\Arr;
 use InvalidArgumentException;
 use RuntimeException;
 
-class ImageUploadService
+class UploadManager
 {
     /**
      * Upload contexts configuration.
@@ -39,22 +39,22 @@ class ImageUploadService
     /**
      * File validation service.
      */
-    protected FileValidationService $validationService;
+    protected FileValidator $validationService;
 
     /**
      * Upload URL service.
      */
-    protected UploadUrlService $urlService;
+    protected UploadUrlGenerator $urlService;
 
     /**
      * Memory optimized file service.
      */
-    protected MemoryOptimizedFileService $memoryService;
+    protected MemoryOptimizedFileProcessor $memoryService;
 
     public function __construct(
-        FileValidationService $validationService,
-        UploadUrlService $urlService,
-        MemoryOptimizedFileService $memoryService
+        FileValidator $validationService,
+        UploadUrlGenerator $urlService,
+        MemoryOptimizedFileProcessor $memoryService
     ) {
         $this->contexts = config('uploads.contexts', []);
         $this->defaults = config('uploads.defaults', []);
@@ -73,7 +73,8 @@ class ImageUploadService
         string $context,
         ?int $userId = null,
         ?int $studentId = null,
-        array $metadata = []
+        array $metadata = [],
+        ?string $filename = null,
     ): UploadRecord {
         // Validate context
         $this->validateContext($context);
@@ -84,7 +85,9 @@ class ImageUploadService
         $this->validationService->validateFile($file, $config);
 
         // Generate filename and path
-        $filename = $this->generateFilename($file, $config);
+        $filename = $filename === null
+            ? $this->generateFilename($file, $config)
+            : $this->sanitizeFilename($filename);
         $path = $this->generatePath($filename, $config);
 
         // Store file
@@ -95,7 +98,7 @@ class ImageUploadService
             basename($path)
         );
 
-        if (!$storedPath) {
+        if (! $storedPath) {
             throw new RuntimeException('Failed to store uploaded file');
         }
         // Generate URL
@@ -201,7 +204,7 @@ class ImageUploadService
      */
     protected function sanitizeFilename(string $filename): string
     {
-        if (!($this->security['sanitize_filename'] ?? true)) {
+        if (! ($this->security['sanitize_filename'] ?? true)) {
             return $filename;
         }
 
@@ -216,7 +219,7 @@ class ImageUploadService
 
         // Ensure filename is not empty
         if (empty($filename)) {
-            $filename = 'file_' . Str::random(8);
+            $filename = 'file_'.Str::random(8);
         }
 
         return $filename;
@@ -253,7 +256,7 @@ class ImageUploadService
      */
     protected function validateContext(string $context): void
     {
-        if (!isset($this->contexts[$context])) {
+        if (! isset($this->contexts[$context])) {
             throw new InvalidArgumentException("Invalid upload context: {$context}");
         }
     }
@@ -283,6 +286,7 @@ class ImageUploadService
     public function getContextConfiguration(string $context): array
     {
         $this->validateContext($context);
+
         return $this->getContextConfig($context);
     }
 
@@ -292,6 +296,7 @@ class ImageUploadService
     public function isContextPublic(string $context): bool
     {
         $config = $this->getContextConfig($context);
+
         return $config['public'] ?? true;
     }
 
@@ -301,6 +306,7 @@ class ImageUploadService
     public function getMaxFileSize(string $context): int
     {
         $config = $this->getContextConfig($context);
+
         return ($config['max_size'] ?? 10240) * 1024; // Convert KB to bytes
     }
 
@@ -310,6 +316,7 @@ class ImageUploadService
     public function getAllowedMimeTypes(string $context): array
     {
         $config = $this->getContextConfig($context);
+
         return $config['allowed_types'] ?? [];
     }
 
@@ -319,6 +326,7 @@ class ImageUploadService
     public function getAllowedExtensions(string $context): array
     {
         $config = $this->getContextConfig($context);
+
         return $config['allowed_extensions'] ?? [];
     }
 
@@ -413,11 +421,11 @@ class ImageUploadService
             }
 
             $uploadRecord = UploadRecord::find($uploadId);
-            if (!$uploadRecord) {
+            if (! $uploadRecord) {
                 return false;
             }
 
-            $expectedSignature = hash_hmac('sha256', $uploadId . $uploadRecord->path . $expires, config('app.key'));
+            $expectedSignature = hash_hmac('sha256', $uploadId.$uploadRecord->path.$expires, config('app.key'));
 
             return hash_equals($expectedSignature, $signature);
         } catch (\Exception $e) {
@@ -467,6 +475,7 @@ class ImageUploadService
     {
         try {
             $driver = Storage::disk($disk);
+
             return method_exists($driver, 'temporaryUrl');
         } catch (\Exception $e) {
             return false;
@@ -565,7 +574,7 @@ class ImageUploadService
                         ->where('path', $file)
                         ->exists();
 
-                    if (!$exists) {
+                    if (! $exists) {
                         Storage::disk($disk)->delete($file);
                         $results['orphaned_files']++;
                     }
@@ -654,6 +663,11 @@ class ImageUploadService
     public function generateUrlForRecord(UploadRecord $uploadRecord, array $options = []): string
     {
         return $this->urlService->generateUrl($uploadRecord, $options);
+    }
+
+    public function generatePublicUrlForRecord(UploadRecord $uploadRecord, array $options = []): string
+    {
+        return $this->urlService->generatePublicUrl($uploadRecord, $options);
     }
 
     /**
@@ -753,11 +767,12 @@ class ImageUploadService
     {
         $chunkedConfig = $this->getChunkedUploadConfig();
 
-        if (!$chunkedConfig['enabled']) {
+        if (! $chunkedConfig['enabled']) {
             return false;
         }
 
         $threshold = config('uploads.chunked.threshold', 10 * 1024 * 1024); // 10MB default
+
         return $fileSize > $threshold;
     }
 }

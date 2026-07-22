@@ -1,17 +1,20 @@
 <?php
 
-namespace App\Services;
+declare(strict_types=1);
+
+namespace App\Modules\Upload\Support;
 
 use App\Models\UploadRecord;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
 
-class ChunkedUploadService
+class ChunkedUploadManager
 {
     /**
      * Chunk size in bytes (default 5MB).
@@ -36,16 +39,16 @@ class ChunkedUploadService
     /**
      * Image upload service.
      */
-    protected ImageUploadService $imageUploadService;
+    protected UploadManager $imageUploadService;
 
     /**
      * File validation service.
      */
-    protected FileValidationService $validationService;
+    protected FileValidator $validationService;
 
     public function __construct(
-        ImageUploadService $imageUploadService,
-        FileValidationService $validationService
+        UploadManager $imageUploadService,
+        FileValidator $validationService
     ) {
         $this->chunkSize = config('uploads.chunked.chunk_size', 5 * 1024 * 1024); // 5MB
         $this->maxFileSize = config('uploads.chunked.max_file_size', 100 * 1024 * 1024); // 100MB
@@ -69,8 +72,8 @@ class ChunkedUploadService
         // Validate file size
         if ($fileSize > $this->maxFileSize) {
             throw new InvalidArgumentException(
-                'File size exceeds maximum allowed size for chunked uploads: ' .
-                number_format($this->maxFileSize / (1024 * 1024), 2) . 'MB'
+                'File size exceeds maximum allowed size for chunked uploads: '.
+                number_format($this->maxFileSize / (1024 * 1024), 2).'MB'
             );
         }
 
@@ -125,13 +128,16 @@ class ChunkedUploadService
     public function uploadChunk(
         string $uploadId,
         int $chunkIndex,
-        UploadedFile $chunkFile
+        UploadedFile $chunkFile,
+        UploadActor $actor,
     ): array {
         $sessionData = $this->getSessionData($uploadId);
 
-        if (!$sessionData) {
+        if (! $sessionData) {
             throw new InvalidArgumentException('Invalid or expired upload session');
         }
+
+        $this->authorizeActor($sessionData, $actor);
 
         // Validate chunk index
         if ($chunkIndex < 0 || $chunkIndex >= $sessionData['total_chunks']) {
@@ -164,7 +170,7 @@ class ChunkedUploadService
             basename($chunkPath)
         );
 
-        if (!$storedPath) {
+        if (! $storedPath) {
             throw new RuntimeException('Failed to store chunk');
         }
 
@@ -202,13 +208,15 @@ class ChunkedUploadService
     /**
      * Get upload session status.
      */
-    public function getUploadStatus(string $uploadId): array
+    public function getUploadStatus(string $uploadId, UploadActor $actor): array
     {
         $sessionData = $this->getSessionData($uploadId);
 
-        if (!$sessionData) {
+        if (! $sessionData) {
             return ['error' => 'Invalid or expired upload session'];
         }
+
+        $this->authorizeActor($sessionData, $actor);
 
         return [
             'upload_id' => $uploadId,
@@ -225,13 +233,15 @@ class ChunkedUploadService
     /**
      * Cancel chunked upload and cleanup.
      */
-    public function cancelUpload(string $uploadId): bool
+    public function cancelUpload(string $uploadId, UploadActor $actor): bool
     {
         $sessionData = $this->getSessionData($uploadId);
 
-        if (!$sessionData) {
+        if (! $sessionData) {
             return false;
         }
+
+        $this->authorizeActor($sessionData, $actor);
 
         // Clean up stored chunks
         $this->cleanupChunks($uploadId, $sessionData['uploaded_chunks']);
@@ -245,6 +255,15 @@ class ChunkedUploadService
         ]);
 
         return true;
+    }
+
+    /** @param array{user_id: int|null, student_id?: int|null} $sessionData */
+    private function authorizeActor(array $sessionData, UploadActor $actor): void
+    {
+        if (($sessionData['user_id'] ?? null) !== $actor->userId
+            || ($sessionData['student_id'] ?? null) !== $actor->studentId) {
+            throw new AuthorizationException('Access denied to this upload session');
+        }
     }
 
     /**
@@ -302,10 +321,10 @@ class ChunkedUploadService
      */
     protected function createTemporaryFile(string $uploadId, array $sessionData): string
     {
-        $tempFilePath = sys_get_temp_dir() . '/' . $uploadId . '_assembled';
+        $tempFilePath = sys_get_temp_dir().'/'.$uploadId.'_assembled';
         $tempFile = fopen($tempFilePath, 'wb');
 
-        if (!$tempFile) {
+        if (! $tempFile) {
             throw new RuntimeException('Unable to create temporary file for assembly');
         }
 
@@ -314,7 +333,7 @@ class ChunkedUploadService
             for ($i = 0; $i < $sessionData['total_chunks']; $i++) {
                 $chunkPath = $this->getChunkPath($uploadId, $i);
 
-                if (!Storage::disk($this->chunkDisk)->exists($chunkPath)) {
+                if (! Storage::disk($this->chunkDisk)->exists($chunkPath)) {
                     throw new RuntimeException("Missing chunk: {$i}");
                 }
 
@@ -380,6 +399,7 @@ class ChunkedUploadService
     protected function getSessionData(string $uploadId): ?array
     {
         $cacheKey = "chunked_upload:{$uploadId}";
+
         return Cache::get($cacheKey);
     }
 
@@ -448,7 +468,7 @@ class ChunkedUploadService
                 $sessionData = $this->getSessionData($uploadId);
 
                 // If session data doesn't exist or is expired, clean up
-                if (!$sessionData || now()->isAfter($sessionData['expires_at'])) {
+                if (! $sessionData || now()->isAfter($sessionData['expires_at'])) {
                     try {
                         // Get chunk files before deletion
                         $chunkFiles = Storage::disk($this->chunkDisk)->files($directory);

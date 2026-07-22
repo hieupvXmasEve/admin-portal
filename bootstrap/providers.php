@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Modules\Academic\Providers\AcademicServiceProvider;
 use App\Modules\Admissions\Providers\AdmissionsServiceProvider;
 use App\Modules\AI\Providers\AIServiceProvider;
@@ -9,6 +11,7 @@ use App\Modules\Identity\Providers\IdentityServiceProvider;
 use App\Modules\Institution\Providers\InstitutionServiceProvider;
 use App\Modules\Notification\Providers\NotificationServiceProvider;
 use App\Modules\StudentRegistry\Providers\StudentRegistryServiceProvider;
+use App\Modules\Upload\Providers\UploadServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\EventServiceProvider;
 use App\Providers\PermissionServiceProvider;
@@ -27,6 +30,7 @@ return [
     FacilitiesServiceProvider::class,
     FinanceServiceProvider::class,
     NotificationServiceProvider::class,
+    UploadServiceProvider::class,
     // App\Providers\TelescopeServiceProvider::class,
     ServiceProvider::class,
 ];

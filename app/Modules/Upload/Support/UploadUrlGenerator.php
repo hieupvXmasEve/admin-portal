@@ -1,13 +1,15 @@
 <?php
 
-namespace App\Services;
+declare(strict_types=1);
+
+namespace App\Modules\Upload\Support;
 
 use App\Models\UploadRecord;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 
-class UploadUrlService
+class UploadUrlGenerator
 {
     /**
      * Generate appropriate URL based on upload record configuration.
@@ -121,7 +123,7 @@ class UploadUrlService
         $context = $uploadRecord->context;
         $config = config("uploads.contexts.{$context}", []);
 
-        if (!($config['generate_thumbnails'] ?? false)) {
+        if (! ($config['generate_thumbnails'] ?? false)) {
             return $this->generateUrl($uploadRecord);
         }
 
@@ -205,7 +207,7 @@ class UploadUrlService
     protected function shouldUseTemporaryUrl(array $config, array $options): bool
     {
         return ($options['force_temporary'] ?? false) ||
-               !($config['public'] ?? true);
+               ! ($config['public'] ?? true);
     }
 
     /**
@@ -214,7 +216,7 @@ class UploadUrlService
     protected function shouldUsePublicUrl(array $config, array $options): bool
     {
         return ($config['public'] ?? true) &&
-               !($options['force_temporary'] ?? false);
+               ! ($options['force_temporary'] ?? false);
     }
 
     /**
@@ -227,6 +229,7 @@ class UploadUrlService
         }
 
         $config = config("filesystems.disks.{$disk}");
+
         return isset($config['cdn_url']) || isset($config['url_transformer']);
     }
 
@@ -272,7 +275,7 @@ class UploadUrlService
             $dimensions['format'] ?? $extension
         );
 
-        return $directory . '/thumbnails/' . $thumbnailName;
+        return $directory.'/thumbnails/'.$thumbnailName;
     }
 
     /**

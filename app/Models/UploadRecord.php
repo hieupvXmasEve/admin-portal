@@ -1,17 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use App\Modules\Upload\Support\UploadPlatform;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
-use App\Models\Student;
-use App\Models\FormResponse;
-use App\Models\Answer;
-use App\Models\QueryReply;
-use App\Models\QueryTicket;
 
 class UploadRecord extends Model
 {
@@ -117,7 +115,7 @@ class UploadRecord extends Model
     {
         // Always generate URL from service to ensure it's correct
         // This fixes cases where URL in database might be incorrect
-        return app(\App\Services\UploadUrlService::class)->generateUrl($this);
+        return app(UploadPlatform::class)->generateUrl($this);
     }
 
     /**
@@ -125,7 +123,7 @@ class UploadRecord extends Model
      */
     public function getPublicUrlAttribute(): string
     {
-        return app(\App\Services\UploadUrlService::class)->generatePublicUrl($this);
+        return app(UploadPlatform::class)->generatePublicUrl($this);
     }
 
     /**
@@ -168,7 +166,7 @@ class UploadRecord extends Model
             $bytes /= 1024;
         }
 
-        return round($bytes, 2) . ' ' . $units[$i];
+        return round($bytes, 2).' '.$units[$i];
     }
 
     /**

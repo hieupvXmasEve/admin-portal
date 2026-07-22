@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Resources;
 
+use App\Modules\Upload\Support\UploadPlatform;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use App\Services\ImageUploadService;
 
 class QueryReplyResource extends JsonResource
 {
@@ -22,7 +24,7 @@ class QueryReplyResource extends JsonResource
             'is_official_answer' => $this->is_official_answer,
             'attachment' => $this->when(
                 $this->relationLoaded('uploadRecord') && $this->uploadRecord,
-                fn() => $this->formatUploadRecord($this->uploadRecord)
+                fn () => $this->formatUploadRecord($this->uploadRecord)
             ),
             'created_at' => $this->created_at,
         ];
@@ -34,21 +36,21 @@ class QueryReplyResource extends JsonResource
             return [
                 'type' => 'student',
                 'id' => $this->author_student_id,
-                'name' => $this->whenLoaded('authorStudent', fn() => $this->authorStudent->full_name),
-                'student_id' => $this->whenLoaded('authorStudent', fn() => $this->authorStudent->student_id),
+                'name' => $this->whenLoaded('authorStudent', fn () => $this->authorStudent->full_name),
+                'student_id' => $this->whenLoaded('authorStudent', fn () => $this->authorStudent->student_id),
             ];
         }
 
         return [
             'type' => 'staff',
             'id' => $this->author_user_id,
-            'name' => $this->whenLoaded('author', fn() => $this->author->name),
+            'name' => $this->whenLoaded('author', fn () => $this->author->name),
         ];
     }
 
     protected function formatUploadRecord($uploadRecord): array
     {
-        $uploadService = app(\App\Services\ImageUploadService::class);
+        $uploadService = app(UploadPlatform::class);
 
         $originalName = $uploadRecord->original_name ?? $uploadRecord->filename;
 

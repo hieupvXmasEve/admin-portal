@@ -1,22 +1,32 @@
 <?php
 
-namespace App\Http\Controllers;
+declare(strict_types=1);
 
-use App\Services\ChunkedUploadService;
-use App\Http\Requests\ChunkedUploadRequest;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Log;
+namespace App\Modules\Upload\Http\Api;
+
+use App\Http\Controllers\Controller;
 use App\Models\Student;
+use App\Models\User;
+use App\Modules\Upload\Actions\CancelChunkedUploadAction;
+use App\Modules\Upload\Actions\InitializeChunkedUploadAction;
+use App\Modules\Upload\Actions\StoreUploadChunkAction;
+use App\Modules\Upload\Http\Requests\Upload\InitializeChunkedUploadRequest;
+use App\Modules\Upload\Http\Requests\Upload\UploadChunkRequest;
+use App\Modules\Upload\Support\UploadActor;
+use App\Modules\Upload\Support\UploadPlatform;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ChunkedUploadController extends Controller
 {
     /**
      * Chunked upload service.
      */
-    protected ChunkedUploadService $chunkedUploadService;
+    protected UploadPlatform $chunkedUploadService;
 
-    public function __construct(ChunkedUploadService $chunkedUploadService)
+    public function __construct(UploadPlatform $chunkedUploadService)
     {
         $this->chunkedUploadService = $chunkedUploadService;
     }
@@ -24,33 +34,13 @@ class ChunkedUploadController extends Controller
     /**
      * Initialize a chunked upload session.
      */
-    public function initialize(Request $request): JsonResponse
+    public function initialize(InitializeChunkedUploadRequest $request): JsonResponse
     {
-        $request->validate([
-            'filename' => 'required|string|max:255',
-            'file_size' => 'required|integer|min:1',
-            'context' => 'required|string|max:50',
-            'metadata' => 'sometimes|array',
-        ]);
-
         try {
-            $authUser = auth()->user();
-            $userId = null;
-            $studentId = null;
-
-            if ($authUser instanceof Student) {
-                $studentId = $authUser->id;
-            } else {
-                $userId = $authUser?->id;
-            }
-
-            $result = $this->chunkedUploadService->initializeUpload(
-                $request->input('filename'),
-                $request->input('file_size'),
-                $request->input('context'),
-                $userId,
-                $studentId,
-                $request->input('metadata', [])
+            $result = InitializeChunkedUploadAction::run(
+                $this->chunkedUploadService,
+                $request->validated(),
+                $this->actor(),
             );
 
             return response()->json([
@@ -76,26 +66,18 @@ class ChunkedUploadController extends Controller
     /**
      * Upload a file chunk.
      */
-    public function uploadChunk(Request $request): JsonResponse
+    public function uploadChunk(UploadChunkRequest $request): JsonResponse
     {
-        $request->validate([
-            'upload_id' => 'required|string|uuid',
-            'chunk_index' => 'required|integer|min:0',
-            'chunk' => 'required|file',
-        ]);
-
         try {
-            $result = $this->chunkedUploadService->uploadChunk(
-                $request->input('upload_id'),
-                $request->input('chunk_index'),
-                $request->file('chunk')
-            );
+            $result = StoreUploadChunkAction::run($this->chunkedUploadService, $request->validated(), $this->actor());
 
             return response()->json([
                 'success' => true,
                 'data' => $result,
             ]);
 
+        } catch (AuthorizationException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
         } catch (\Exception $e) {
             Log::error('Failed to upload chunk', [
                 'upload_id' => $request->input('upload_id'),
@@ -116,7 +98,7 @@ class ChunkedUploadController extends Controller
     public function status(Request $request, string $uploadId): JsonResponse
     {
         try {
-            $status = $this->chunkedUploadService->getUploadStatus($uploadId);
+            $status = $this->chunkedUploadService->getUploadStatus($uploadId, $this->actor());
 
             if (isset($status['error'])) {
                 return response()->json([
@@ -130,6 +112,8 @@ class ChunkedUploadController extends Controller
                 'data' => $status,
             ]);
 
+        } catch (AuthorizationException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
         } catch (\Exception $e) {
             Log::error('Failed to get upload status', [
                 'upload_id' => $uploadId,
@@ -149,9 +133,9 @@ class ChunkedUploadController extends Controller
     public function cancel(Request $request, string $uploadId): JsonResponse
     {
         try {
-            $result = $this->chunkedUploadService->cancelUpload($uploadId);
+            $result = CancelChunkedUploadAction::run($this->chunkedUploadService, $uploadId, $this->actor());
 
-            if (!$result) {
+            if (! $result) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Upload session not found or already completed',
@@ -163,6 +147,8 @@ class ChunkedUploadController extends Controller
                 'message' => 'Upload cancelled successfully',
             ]);
 
+        } catch (AuthorizationException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
         } catch (\Exception $e) {
             Log::error('Failed to cancel upload', [
                 'upload_id' => $uploadId,
@@ -199,5 +185,15 @@ class ChunkedUploadController extends Controller
                 'message' => 'Failed to get statistics',
             ], 500);
         }
+    }
+
+    private function actor(): UploadActor
+    {
+        $actor = auth()->user();
+
+        return new UploadActor(
+            userId: $actor instanceof User ? $actor->id : null,
+            studentId: $actor instanceof Student ? $actor->id : null,
+        );
     }
 }
