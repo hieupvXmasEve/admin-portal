@@ -23,7 +23,6 @@ use App\Models\Student;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Modules\Academic\Delivery\Actions\EnrollStudentInCourseOfferingAction;
-use App\Modules\Academic\Delivery\Actions\RemoveCourseOfferingRosterAction;
 use App\Modules\Academic\Delivery\Actions\SplitCourseOfferingAction;
 use App\Modules\Academic\Delivery\Exceptions\CourseOfferingSplitException;
 use App\Modules\Academic\Delivery\Exceptions\InstructorAssignmentException;
@@ -605,72 +604,6 @@ class CourseOfferingController extends Controller
 
             return Redirect::back()
                 ->with('error', 'Failed to update course offering: '.$th->getMessage());
-        }
-    }
-
-    /**
-     * Remove the specified course offering
-     */
-    public function destroy(CourseOffering $courseOffering): RedirectResponse
-    {
-        // Ensure the course offering belongs to current campus
-        if ($courseOffering->campus_id !== app('campus')->id) {
-            abort(404);
-        }
-
-        // Restrict deleting for completed courses
-        if ($courseOffering->isCourseCompleted()) {
-            return Redirect::back()
-                ->with('error', 'Cannot delete a completed course. You can only view or duplicate it.');
-        }
-
-        // Check if course offering has scheduled sessions
-        $scheduledSessionsCount = $courseOffering->classSessions()->count();
-
-        // Check if course offering has enrolled students
-        $enrolledStudentsCount = $courseOffering->current_enrollment;
-
-        if ($scheduledSessionsCount > 0 || $enrolledStudentsCount > 0) {
-            $reasons = [];
-            if ($scheduledSessionsCount > 0) {
-                $reasons[] = "{$scheduledSessionsCount} scheduled session(s)";
-            }
-            if ($enrolledStudentsCount > 0) {
-                $reasons[] = "{$enrolledStudentsCount} enrolled student(s)";
-            }
-
-            $reasonText = implode(' and ', $reasons);
-
-            return Redirect::back()
-                ->with('error', "Cannot delete course offering because it has {$reasonText}. Please cancel the course offering instead or remove all sessions and students first.");
-        }
-
-        try {
-            DB::beginTransaction();
-
-            // Get registration count for notification
-            $registrationCount = $courseOffering->courseRegistrations()->count();
-
-            RemoveCourseOfferingRosterAction::run(['course_offering_id' => $courseOffering->id]);
-
-            // Delete the course offering
-            $courseOffering->delete();
-
-            DB::commit();
-
-            $message = 'Course offering deleted successfully.';
-            if ($registrationCount > 0) {
-                $message .= " {$registrationCount} associated registration(s) were also removed.";
-            }
-
-            return Redirect::route(CourseOfferingRoutes::INDEX)
-                ->with('success', $message);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to delete course offering: '.$e->getMessage());
-
-            return Redirect::back()
-                ->with('error', 'Failed to delete course offering: '.$e->getMessage());
         }
     }
 

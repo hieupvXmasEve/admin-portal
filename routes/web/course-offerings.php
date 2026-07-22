@@ -26,10 +26,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:view_course_offering')
             ->name(CourseOfferingRoutes::SHOW);
 
-        Route::delete('/{courseOffering}', [CourseOfferingController::class, 'destroy'])
-            ->middleware('can:delete_course_offering')
-            ->name(CourseOfferingRoutes::DESTROY);
-
         Route::post('/{courseOffering}/finalize', FinalizeCourseOfferingController::class)
             ->middleware('can:complete_course_offering')
             ->name(CourseOfferingRoutes::FINALIZE);

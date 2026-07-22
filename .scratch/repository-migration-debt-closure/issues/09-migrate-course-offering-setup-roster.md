@@ -32,6 +32,7 @@ Move Course Offering setup, instructor assignment, enrollment, registration, ros
 - 2026-07-22: Delivery now gets student identity through `StudentReferenceReader` and delegates course-offering attempt moves/removals to Progression through `CourseOfferingAttemptWriter`. `CourseOffering` and `CourseRegistration` are recorded as Delivery-owned models; `AcademicRecord` is recorded as Progression-owned.
 - 2026-07-22: The existing staff roster-removal behavior permanently removes matching active and soft-deleted attempt records. It is characterized at action and HTTP levels. No data migration, backfill, cleanup, or portal API contract change was run; the student and lecturer portals were left untouched.
 - 2026-07-22: This issue remains `ready-for-agent`: offering setup/cockpit, registration discovery and bulk enrollment, room-related behavior, and their dependency cutovers are still blocked by issues 06, 08, and 14. Completion/statistics compatibility remains in its legacy path and must not be extended; Course Delivery & Assessment owns its retirement once its remaining cockpit callers have a module query/action replacement and corresponding characterization coverage.
+- 2026-07-22: The staff `course-offerings.destroy` route now dispatches through a Delivery action and module controller. It preserves the route name, URL, permission, cross-campus 404 behavior, deletion constraints, redirect, and flash message. The remaining bulk-delete path is intentionally unchanged because its per-unit error output requires the Catalog dependency cutover.
 
 ## Verification
 
@@ -39,3 +40,4 @@ Move Course Offering setup, instructor assignment, enrollment, registration, ros
 - `./scripts/dev.sh test tests/Feature/Architecture/CourseDeliveryAssessmentBoundaryArchTest.php tests/Feature/Architecture/TeachingEligibilityAssignmentBoundaryTest.php tests/Feature/Architecture/CourseOfferingCatalogBoundaryArchTest.php tests/Feature/Architecture/CourseRosterDeliveryBoundaryArchTest.php --compact`
 - `./scripts/dev.sh test tests/Feature/Architecture/MigrationDebtInventoryTest.php --compact`
 - `./scripts/dev.sh artisan migration-debt:inventory --check --format=table`
+- `./scripts/dev.sh test tests/Feature/CourseOffering/CourseRosterDeliveryActionTest.php tests/Feature/CourseOffering/CourseOfferingRosterRouteCutoverTest.php --compact` — passed: 17 tests, 58 assertions.

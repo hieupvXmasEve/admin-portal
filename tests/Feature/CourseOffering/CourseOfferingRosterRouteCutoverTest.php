@@ -9,6 +9,7 @@ use App\Models\CourseRegistration;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Modules\Academic\Http\Web\Admin\CourseOfferingDeletionController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingRosterController;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Auth\Middleware\Authorize;
@@ -35,6 +36,63 @@ it('keeps staff roster and instructor-assignment route names while dispatching t
             ->not->toBeNull("Expected {$routeName} to remain registered.")
             ->and($route?->getActionName())->toContain(CourseOfferingRosterController::class);
     }
+});
+
+it('keeps the course-offering deletion route name while dispatching through Delivery', function (): void {
+    $route = Route::getRoutes()->getByName('course-offerings.destroy');
+
+    expect($route)
+        ->not->toBeNull()
+        ->and($route?->getActionName())->toContain(CourseOfferingDeletionController::class);
+});
+
+it('preserves the course-offering deletion redirect and flash response', function (): void {
+    $this->withoutMiddleware([
+        Authenticate::class,
+        Authorize::class,
+        EnsureEmailIsVerified::class,
+        PreventRequestForgery::class,
+        VerifyCsrfToken::class,
+    ]);
+
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $offering = CourseOffering::factory()->create([
+        'campus_id' => $campus->id,
+        'semester_id' => $semester->id,
+        'current_enrollment' => 0,
+    ]);
+    app()->instance('campus', $campus);
+
+    $this->delete(route('course-offerings.destroy', $offering))
+        ->assertRedirect(route('course-offerings.index'))
+        ->assertSessionHas('inertia.flash_data.success', 'Course offering deleted successfully.');
+
+    expect(CourseOffering::query()->find($offering->id))->toBeNull();
+});
+
+it('does not expose course-offering deletion across campuses', function (): void {
+    $this->withoutMiddleware([
+        Authenticate::class,
+        Authorize::class,
+        EnsureEmailIsVerified::class,
+        PreventRequestForgery::class,
+        VerifyCsrfToken::class,
+    ]);
+
+    $currentCampus = Campus::factory()->create();
+    $otherCampus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $offering = CourseOffering::factory()->create([
+        'campus_id' => $otherCampus->id,
+        'semester_id' => $semester->id,
+        'current_enrollment' => 0,
+    ]);
+    app()->instance('campus', $currentCampus);
+
+    $this->delete(route('course-offerings.destroy', $offering))->assertNotFound();
+
+    expect(CourseOffering::query()->find($offering->id))->not->toBeNull();
 });
 
 it('preserves the roster-removal JSON envelope while delegating attempt removal to Progression', function (): void {

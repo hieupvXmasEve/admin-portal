@@ -7,6 +7,7 @@ use App\Constants\StudentRoutes;
 use App\Modules\Academic\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\AcademicProgressionAuditController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingCatalogFormController;
+use App\Modules\Academic\Http\Web\Admin\CourseOfferingDeletionController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingRosterController;
 use App\Modules\Academic\Http\Web\CampusDetailController;
 use App\Modules\Academic\Http\Web\ExamResitAttemptController;
@@ -50,6 +51,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/{courseOffering}', [CourseOfferingCatalogFormController::class, 'update'])
             ->middleware('can:edit_course_offering')
             ->name(CourseOfferingRoutes::UPDATE);
+
+        Route::delete('/{courseOffering}', CourseOfferingDeletionController::class)
+            ->middleware('can:delete_course_offering')
+            ->name(CourseOfferingRoutes::DESTROY);
 
         Route::post('/{courseOffering}/delete-student-registration', [CourseOfferingRosterController::class, 'removeStudent'])
             ->middleware('can:delete_student_registration')

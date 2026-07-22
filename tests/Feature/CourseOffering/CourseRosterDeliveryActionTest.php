@@ -4,20 +4,108 @@ declare(strict_types=1);
 
 use App\Models\AcademicRecord;
 use App\Models\Campus;
+use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Modules\Academic\Delivery\Actions\DeleteCourseOfferingAction;
 use App\Modules\Academic\Delivery\Actions\EnrollStudentInCourseOfferingAction;
 use App\Modules\Academic\Delivery\Actions\MoveStudentBetweenCourseOfferingSectionsAction;
 use App\Modules\Academic\Delivery\Actions\RemoveCourseOfferingRosterMemberAction;
 use App\Modules\Academic\Delivery\Actions\RemoveStudentFromCourseOfferingAction;
+use App\Modules\Academic\Delivery\Exceptions\CourseOfferingDeletionException;
 use App\Shared\Contracts\Academic\CourseRosterReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
+
+it('deletes an empty course offering through Delivery and removes its registrations', function (): void {
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $student = Student::factory()->forCampus($campus)->create([
+        'intake' => 1,
+        'intake_mode' => 'sequential',
+        'intake_semester_id' => $semester->id,
+    ]);
+    $offering = CourseOffering::factory()->create([
+        'campus_id' => $campus->id,
+        'semester_id' => $semester->id,
+        'current_enrollment' => 0,
+    ]);
+    CourseRegistration::query()->create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $semester->id,
+        'registration_status' => 'dropped',
+        'registration_date' => now(),
+        'credit_hours' => 3,
+    ]);
+
+    $registrationCount = DeleteCourseOfferingAction::run([
+        'course_offering_id' => (int) $offering->id,
+        'campus_id' => (int) $campus->id,
+    ]);
+
+    expect($registrationCount)->toBe(1)
+        ->and(CourseOffering::query()->find($offering->id))->toBeNull()
+        ->and(CourseRegistration::query()->where('course_offering_id', $offering->id)->exists())->toBeFalse();
+});
+
+it('does not delete a course offering that still has enrolled students', function (): void {
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $offering = CourseOffering::factory()->create([
+        'campus_id' => $campus->id,
+        'semester_id' => $semester->id,
+        'current_enrollment' => 1,
+    ]);
+
+    expect(fn (): int => DeleteCourseOfferingAction::run([
+        'course_offering_id' => (int) $offering->id,
+        'campus_id' => (int) $campus->id,
+    ]))->toThrow(CourseOfferingDeletionException::class, 'Cannot delete course offering because it has 1 enrolled student(s).');
+
+    expect(CourseOffering::query()->find($offering->id))->not->toBeNull();
+});
+
+it('does not delete a completed course offering', function (): void {
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $offering = CourseOffering::factory()->create([
+        'campus_id' => $campus->id,
+        'semester_id' => $semester->id,
+        'course_status' => 'completed',
+        'current_enrollment' => 0,
+    ]);
+
+    expect(fn (): int => DeleteCourseOfferingAction::run([
+        'course_offering_id' => (int) $offering->id,
+        'campus_id' => (int) $campus->id,
+    ]))->toThrow(CourseOfferingDeletionException::class, 'Cannot delete a completed course. You can only view or duplicate it.');
+
+    expect(CourseOffering::query()->find($offering->id))->not->toBeNull();
+});
+
+it('does not delete a course offering with scheduled sessions', function (): void {
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $offering = CourseOffering::factory()->create([
+        'campus_id' => $campus->id,
+        'semester_id' => $semester->id,
+        'current_enrollment' => 0,
+    ]);
+    ClassSession::factory()->create(['course_offering_id' => $offering->id]);
+
+    expect(fn (): int => DeleteCourseOfferingAction::run([
+        'course_offering_id' => (int) $offering->id,
+        'campus_id' => (int) $campus->id,
+    ]))->toThrow(CourseOfferingDeletionException::class, 'Cannot delete course offering because it has 1 scheduled session(s).');
+
+    expect(CourseOffering::query()->find($offering->id))->not->toBeNull();
+});
 
 it('enrols a student through Delivery and closes an offering when its final seat is taken', function (): void {
     $campus = Campus::factory()->create();
