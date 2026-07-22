@@ -119,6 +119,153 @@ it('lists deferred enrolled students separately from missing charge exceptions',
         );
 });
 
+it('lists the default all-filter queue without calling Eloquent methods on query builders', function () {
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'EXC-ALL-RET-01',
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+            'status' => 'intake_course',
+        ])
+        ->create();
+
+    $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
+
+    $registration = CourseRegistration::create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $this->semester->id,
+        'registration_status' => 'confirmed',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 2,
+        'is_retake' => true,
+        'retake_fee' => 1_500_000,
+    ]);
+
+    $counts = app(GetBillingExceptionCountsQuery::class)->handle($this->semester->id);
+    $list = app(ListBillingExceptionsQuery::class)
+        ->handle($this->semester->id, 'all', 'http://localhost/exceptions');
+    $retake = collect($list->items())->firstWhere('type', 'retake_no_charge');
+    $missing = collect($list->items())->firstWhere('type', 'missing_charge');
+
+    expect($counts['missing_charge'])->toBe(1)
+        ->and($counts['retake_no_charge'])->toBe(1)
+        ->and($list->total())->toBe(2)
+        ->and($missing['fixable'])->toBeTrue()
+        ->and($retake['student_code'])->toBe('EXC-ALL-RET-01')
+        ->and($retake['fixable'])->toBeTrue()
+        ->and($retake['id'])->toBe(
+            BillingExceptionIdentifier::encode('retake_no_charge', $registration->id)
+        );
+});
+
+it('keeps all-filter campus scope, ordering, and pagination stable', function () {
+    $otherCampus = Campus::factory()->create();
+    $otherSemester = Semester::factory()->create();
+    $currentOffering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
+    $otherSemesterOffering = CourseOffering::factory()->create(['semester_id' => $otherSemester->id]);
+
+    $createMissingRegistration = function (Campus $campus, CourseOffering $offering, string $studentCode, int $age): void {
+        $student = Student::factory()
+            ->forCampus($campus)
+            ->forProgram($this->program)
+            ->state([
+                'student_id' => $studentCode,
+                'intake_semester_id' => $this->semester->id,
+                'intake' => 1,
+                'intake_mode' => 'sequential',
+                'status' => 'intake_course',
+            ])
+            ->create();
+
+        $registration = CourseRegistration::create([
+            'student_id' => $student->id,
+            'course_offering_id' => $offering->id,
+            'semester_id' => $offering->semester_id,
+            'registration_status' => 'confirmed',
+            'registration_date' => now(),
+            'registration_method' => 'admin_override',
+            'credit_hours' => 3,
+            'credit_points' => 3,
+            'attempt_number' => 1,
+        ]);
+
+        DB::table('course_registrations')
+            ->where('id', $registration->id)
+            ->update(['created_at' => now()->subMinutes($age)]);
+    };
+
+    foreach (range(1, 21) as $index) {
+        $createMissingRegistration(
+            $this->campus,
+            $currentOffering,
+            sprintf('EXC-ALL-SCOPE-%02d', $index),
+            21 - $index,
+        );
+    }
+
+    $createMissingRegistration($otherCampus, $currentOffering, 'EXC-OTHER-CAMP', 0);
+    $createMissingRegistration($this->campus, $otherSemesterOffering, 'EXC-OTHER-SEM', 0);
+
+    $counts = app(GetBillingExceptionCountsQuery::class)->handle($this->semester->id);
+    $pageOne = app(ListBillingExceptionsQuery::class)
+        ->handle($this->semester->id, 'all', 'http://localhost/exceptions');
+
+    request()->merge(['page' => 2]);
+    $pageTwo = app(ListBillingExceptionsQuery::class)
+        ->handle($this->semester->id, 'all', 'http://localhost/exceptions');
+
+    $codes = array_column(array_merge($pageOne->items(), $pageTwo->items()), 'student_code');
+
+    expect($counts['missing_charge'])->toBe(21)
+        ->and($pageOne->total())->toBe(21)
+        ->and($pageOne->count())->toBe(20)
+        ->and($pageOne->items()[0]['student_code'])->toBe('EXC-ALL-SCOPE-21')
+        ->and($pageTwo->count())->toBe(1)
+        ->and($codes)->not->toContain('EXC-OTHER-CAMP', 'EXC-OTHER-SEM');
+});
+
+it('lists defer actions that have no defer case', function () {
+    $user = User::factory()->create();
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'EXC-DEFER-NO-CASE-01',
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+            'status' => 'deferred',
+        ])
+        ->create();
+
+    $actionLog = StudentActionLog::create([
+        'student_id' => $student->id,
+        'action_type' => StudentActionType::ACADEMIC_DEFER,
+        'reason' => 'Deferred without case',
+        'from_semester_id' => $this->semester->id,
+        'changed_by_user_id' => $user->id,
+    ]);
+
+    $counts = app(GetBillingExceptionCountsQuery::class)->handle($this->semester->id);
+    $list = app(ListBillingExceptionsQuery::class)
+        ->handle($this->semester->id, 'defer_no_case', 'http://localhost/exceptions');
+
+    expect($counts['defer_no_case'])->toBe(1)
+        ->and($list->total())->toBe(1)
+        ->and($list->items()[0]['type'])->toBe('defer_no_case')
+        ->and($list->items()[0]['student_code'])->toBe('EXC-DEFER-NO-CASE-01')
+        ->and($list->items()[0]['id'])->toBe(
+            BillingExceptionIdentifier::encode('defer_no_case', $actionLog->id)
+        );
+});
+
 it('lists zero tuition waived students separately from missing charge exceptions', function () {
     $fallSemester = Semester::factory()->create([
         'name' => 'FALL2025',

@@ -6,9 +6,9 @@ namespace App\Modules\Finance\Support;
 
 use App\Enums\StudentActionType;
 use App\Models\DeferCase;
-use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder;
@@ -329,8 +329,11 @@ final class BillingExceptionCollector
     private function retakeNoChargeUnionQuery(?int $semesterId, ?int $campusId): Builder
     {
         return $this->retakeNoChargeBaseQuery($semesterId, $campusId)
-            ->selectRaw("'retake_no_charge' as exception_type, course_registrations.id as source_id, course_registrations.created_at")
-            ->toBase();
+            ->select([
+                DB::raw("'retake_no_charge' as exception_type"),
+                'course_registrations.id as source_id',
+                'course_registrations.created_at',
+            ]);
     }
 
     private function deferNoCaseUnionQuery(?int $semesterId, ?int $campusId): Builder
@@ -520,17 +523,11 @@ final class BillingExceptionCollector
         $termNumber = null;
 
         if ($registration->student_id && $resolvedSemesterId) {
-            $student = new Student([
-                'id' => (int) $registration->student_id,
-                'student_id' => $registration->student_code,
-                'full_name' => $registration->student_name,
-                'curriculum_version_id' => $registration->curriculum_version_id,
-                'intake_semester_id' => $registration->intake_semester_id,
-                'intake_major' => $registration->intake_major,
-            ]);
+            $enrollment = app(ProgramEnrollmentReader::class)
+                ->forStudentId((int) $registration->student_id);
 
             $termData = app(StudentChargeTimingResolver::class)
-                ->getTuitionTermData($student, (int) $resolvedSemesterId);
+                ->getTuitionTermData($enrollment, (int) $resolvedSemesterId);
             $termNumber = $termData['term_number'];
         }
 
