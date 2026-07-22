@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Academic\Providers\AcademicServiceProvider;
+use App\Modules\Admissions\Providers\AdmissionsServiceProvider;
 use App\Modules\AI\Providers\AIServiceProvider;
 use App\Modules\Facilities\Providers\FacilitiesServiceProvider;
 use App\Modules\Finance\Providers\FinanceServiceProvider;
@@ -21,6 +22,7 @@ return [
     IdentityServiceProvider::class,
     InstitutionServiceProvider::class,
     StudentRegistryServiceProvider::class,
+    AdmissionsServiceProvider::class,
     AcademicServiceProvider::class,
     FacilitiesServiceProvider::class,
     FinanceServiceProvider::class,

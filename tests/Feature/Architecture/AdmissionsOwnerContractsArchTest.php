@@ -3,20 +3,33 @@
 declare(strict_types=1);
 
 it('orchestrates Admissions approval and revoke only through owner contracts', function (): void {
-    $service = file_get_contents(base_path('app/Services/StudentApplicationService.php')) ?: '';
+    $action = file_get_contents(base_path('app/Modules/Admissions/Actions/ApproveApplicationAction.php')) ?: '';
+    $revokeAction = file_get_contents(base_path('app/Modules/Admissions/Actions/RevokeApplicationAction.php')) ?: '';
 
-    expect($service)
+    expect($action)
         ->toContain('StudentIdentityWriter')
         ->toContain('StudentAccessWriter')
         ->toContain('StudentGuardianRelationshipWriter')
         ->toContain('GuardianAccessGrantWriter')
         ->toContain('ProgramEnrollmentWriter')
-        ->toContain('BillingAccountRollbackWriter')
         ->toContain('AdmittedStudentIdentity')
         ->not->toContain('Student::create')
         ->not->toContain('User::create')
-        ->not->toContain('CampusUserRole::')
+        ->not->toContain('CampusUserRole::');
+
+    expect($revokeAction)
+        ->toContain('StudentIdentityWriter')
+        ->toContain('StudentAccessWriter')
+        ->toContain('ProgramEnrollmentWriter')
+        ->toContain('BillingAccountRollbackWriter')
         ->not->toContain('->delete();');
+});
+
+it('routes supported Admissions workflows through the Admissions module', function (): void {
+    expect(base_path('app/Modules/Admissions/Http/Web/StudentApplicationController.php'))->toBeFile()
+        ->and(base_path('app/Modules/Admissions/Http/Api/IngestionController.php'))->toBeFile()
+        ->and(base_path('app/Modules/Admissions/routes/web.php'))->toBeFile()
+        ->and(base_path('app/Modules/Admissions/routes/api.php'))->toBeFile();
 });
 
 it('keeps Admissions command contracts scalar and free of Eloquent models', function (): void {

@@ -162,14 +162,7 @@ final class MigrationDebtInventory
         }
 
         if (str_starts_with($path, 'app/Modules/') && str_ends_with($path, '.php')) {
-            $this->collectMatches(
-                $findings,
-                'shared_model_imports',
-                $path,
-                $contents,
-                '/^use\s+App\\\\Models\\\\[^;]+;/m',
-                'Module still imports a shared Eloquent model.',
-            );
+            $this->collectSharedModelImports($path, $contents, $findings);
             $this->collectSharedModelReferences($path, $contents, $findings);
 
             $this->collectCrossContextImports($path, $contents, $findings);
@@ -329,6 +322,34 @@ final class MigrationDebtInventory
                 $index + 1,
             );
         }
+    }
+
+    /** @param list<Finding> $findings */
+    private function collectSharedModelImports(string $path, string $contents, array &$findings): void
+    {
+        foreach (preg_split('/\R/', $contents) ?: [] as $index => $line) {
+            if (preg_match('/^use\s+App\\\\Models\\\\([^;]+);/', $line, $match) !== 1
+                || $this->isOwnedSharedModel($path, $match[1])) {
+                continue;
+            }
+
+            $this->addFinding(
+                $findings,
+                'shared_model_imports',
+                $path,
+                'Module still imports a shared Eloquent model.',
+                $index + 1,
+            );
+        }
+    }
+
+    private function isOwnedSharedModel(string $path, string $model): bool
+    {
+        if (preg_match('#^app/Modules/([^/]+)/#', $path, $match) !== 1) {
+            return false;
+        }
+
+        return in_array($model, config("migration_debt.owned_shared_models.{$match[1]}", []), true);
     }
 
     private function isMigrationCommand(string $contents): bool

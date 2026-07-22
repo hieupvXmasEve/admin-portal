@@ -4,6 +4,20 @@ declare(strict_types=1);
 
 return [
     /*
+    | Models remain physically shared during staged extraction. This map records
+    | the module that owns each legacy table so its own references are not
+    | misclassified as cross-context shared-model debt.
+    */
+    'owned_shared_models' => [
+        'Admissions' => [
+            'ApplicationDocument',
+            'ApplicationDocumentType',
+            'ApplicationGuardian',
+            'StudentApplication',
+        ],
+    ],
+
+    /*
     | The scanner deliberately reads source roots only. Runtime output, package
     | dependencies, and the separately versioned portal repositories are not
     | application debt in this inventory.
