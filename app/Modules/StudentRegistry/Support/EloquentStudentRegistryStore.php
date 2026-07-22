@@ -6,11 +6,17 @@ namespace App\Modules\StudentRegistry\Support;
 
 use App\Models\Student;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentProfilePersistenceWriter;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Database\Eloquent\Builder;
 
-final class EloquentStudentReferenceReader implements StudentReferenceReader
+final class EloquentStudentRegistryStore implements StudentProfilePersistenceWriter, StudentReferenceReader
 {
+    public function update(int $studentId, array $attributes): bool
+    {
+        return Student::query()->findOrFail($studentId)->update($attributes);
+    }
+
     public function find(int $studentId): ?StudentReference
     {
         $student = Student::query()
@@ -84,9 +90,7 @@ final class EloquentStudentReferenceReader implements StudentReferenceReader
             ->all();
     }
 
-    /**
-     * @return list<StudentReference>
-     */
+    /** @return list<StudentReference> */
     public function search(string $query, int $campusId): array
     {
         return Student::query()

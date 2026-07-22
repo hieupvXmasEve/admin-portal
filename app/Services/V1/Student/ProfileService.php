@@ -7,14 +7,16 @@ namespace App\Services\V1\Student;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\StudentRegistry\StudentProfileWriter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class ProfileService
 {
+    public function __construct(private readonly StudentProfileWriter $studentProfileWriter) {}
+
     /**
      * Get student profile information
      */
@@ -39,15 +41,13 @@ class ProfileService
      */
     public function updateProfile(Student $student, array $data): bool
     {
-        return DB::transaction(function () use ($student, $data) {
-            $updated = $student->update($this->filterUpdateableFields($data));
+        $updated = $this->studentProfileWriter->update((int) $student->id, $this->filterUpdateableFields($data));
 
-            if ($updated) {
-                $this->clearProfileCache($student);
-            }
+        if ($updated) {
+            $this->clearProfileCache($student);
+        }
 
-            return $updated;
-        });
+        return $updated;
     }
 
     /**
@@ -68,7 +68,7 @@ class ProfileService
         $path = $file->store('avatars', 'public');
         $avatarUrl = Storage::disk('public')->url($path);
 
-        $student->update(['avatar_url' => $avatarUrl]);
+        $this->studentProfileWriter->update((int) $student->id, ['avatar_url' => $avatarUrl]);
         $this->clearProfileCache($student);
 
         return [

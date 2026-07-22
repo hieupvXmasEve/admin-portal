@@ -9,12 +9,15 @@ use App\Modules\StudentRegistry\Support\EloquentStudentGuardianRelationshipReade
 use App\Modules\StudentRegistry\Support\EloquentStudentGuardianRelationshipWriter;
 use App\Modules\StudentRegistry\Support\EloquentStudentIdentityWriter;
 use App\Modules\StudentRegistry\Support\EloquentStudentImpersonationTokenIssuer;
-use App\Modules\StudentRegistry\Support\EloquentStudentReferenceReader;
+use App\Modules\StudentRegistry\Support\EloquentStudentProfileWriter;
+use App\Modules\StudentRegistry\Support\EloquentStudentRegistryStore;
 use App\Shared\Contracts\StudentRegistry\StudentCollectionEligibilityReader;
 use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipReader;
 use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
 use App\Shared\Contracts\StudentRegistry\StudentIdentityWriter;
 use App\Shared\Contracts\StudentRegistry\StudentImpersonationTokenIssuer;
+use App\Shared\Contracts\StudentRegistry\StudentProfilePersistenceWriter;
+use App\Shared\Contracts\StudentRegistry\StudentProfileWriter;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Support\ServiceProvider;
 
@@ -22,10 +25,12 @@ class StudentRegistryServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(StudentReferenceReader::class, EloquentStudentReferenceReader::class);
+        $this->app->bind(StudentReferenceReader::class, EloquentStudentRegistryStore::class);
         $this->app->bind(StudentCollectionEligibilityReader::class, EloquentStudentCollectionEligibilityReader::class);
         $this->app->bind(StudentGuardianRelationshipWriter::class, EloquentStudentGuardianRelationshipWriter::class);
         $this->app->bind(StudentIdentityWriter::class, EloquentStudentIdentityWriter::class);
+        $this->app->bind(StudentProfileWriter::class, EloquentStudentProfileWriter::class);
+        $this->app->bind(StudentProfilePersistenceWriter::class, EloquentStudentRegistryStore::class);
         $this->app->bind(StudentImpersonationTokenIssuer::class, EloquentStudentImpersonationTokenIssuer::class);
         $this->app->bind(StudentGuardianRelationshipReader::class, EloquentStudentGuardianRelationshipReader::class);
     }
