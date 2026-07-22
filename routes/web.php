@@ -3,7 +3,6 @@
 use App\Http\Controllers\Api\ElectiveController;
 use App\Http\Controllers\Web\CurriculumVersionController;
 use App\Http\Controllers\Web\DashboardController;
-use App\Http\Controllers\Web\SemesterContextController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Mcp\Facades\Mcp;
 
@@ -27,10 +26,6 @@ Route::get('/', function () {
 Route::get('dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
-
-Route::post('semester-context', [SemesterContextController::class, 'update'])
-    ->middleware(['auth', 'verified'])
-    ->name('semester-context.update');
 
 // Identity routes are now registered via IdentityServiceProvider from app/Modules/Identity/routes/web.php
 
@@ -88,7 +83,6 @@ require __DIR__.'/web/auth.php';
 // require __DIR__ . '/web/user.php';
 require __DIR__.'/web/semester.php';
 require __DIR__.'/web/units.php';
-require __DIR__.'/web/programs.php';
 require __DIR__.'/web/specializations.php';
 require __DIR__.'/web/curriculum.php';
 require __DIR__.'/web/course-offerings.php';

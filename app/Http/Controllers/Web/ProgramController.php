@@ -13,16 +13,17 @@ use App\Services\ProgramService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
+/**
+ * @deprecated Program management routes now resolve to Academic Catalog.
+ *             Retain only until the approved compatibility-path removal.
+ */
 class ProgramController extends Controller
 {
-    public function __construct(protected ProgramService $programService)
-    {
-    }
+    public function __construct(protected ProgramService $programService) {}
 
     public function index(Request $request): Response
     {
@@ -33,7 +34,7 @@ class ProgramController extends Controller
             'per_page' => 'nullable|integer|min:5|max:100',
         ]);
 
-        $page = (int)$request->query('page', 1);
+        $page = (int) $request->query('page', 1);
 
         $programs = Program::query()
             ->when($validated['search'] ?? null, function ($query, $search) {
@@ -70,7 +71,7 @@ class ProgramController extends Controller
                 ->route(ProgramRoutes::INDEX)
                 ->with('success', 'Program created successfully.');
         } catch (\Exception $e) {
-            Log::error('Program creation failed: ' . $e->getMessage());
+            Log::error('Program creation failed: '.$e->getMessage());
 
             return back()
                 ->withInput()
@@ -98,7 +99,6 @@ class ProgramController extends Controller
             'totalCurriculumVersions' => $prog->curriculumVersions()->count(),
         ];
 
-
         return Inertia::render('programs/Show', [
             'program' => $prog,
             'stats' => $statsLocal,
@@ -117,7 +117,7 @@ class ProgramController extends Controller
                 ->route(ProgramRoutes::INDEX)
                 ->with('success', 'Program updated successfully.');
         } catch (\Exception $e) {
-            Log::error('Program update failed: ' . $e->getMessage());
+            Log::error('Program update failed: '.$e->getMessage());
 
             return back()
                 ->withInput()
@@ -137,7 +137,7 @@ class ProgramController extends Controller
                 ->route(ProgramRoutes::INDEX)
                 ->with('success', 'Program deleted successfully.');
         } catch (\Exception $e) {
-            Log::error('Program deletion failed: ' . $e->getMessage());
+            Log::error('Program deletion failed: '.$e->getMessage());
 
             return back()->withErrors(['error' => $e->getMessage()]);
         }

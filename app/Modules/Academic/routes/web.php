@@ -20,6 +20,8 @@ use App\Modules\Academic\Http\Web\StudentLifecycleYearlyAnalysisController;
 use App\Modules\Academic\Http\Web\StudentStatusController;
 use Illuminate\Support\Facades\Route;
 
+require __DIR__.'/../Catalog/routes/web.php';
+
 /*
 |--------------------------------------------------------------------------
 | Student Management Routes

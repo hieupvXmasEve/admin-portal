@@ -349,7 +349,23 @@ final class MigrationDebtInventory
             return false;
         }
 
-        return in_array($model, config("migration_debt.owned_shared_models.{$match[1]}", []), true);
+        $module = $match[1];
+        $nestedOwner = null;
+
+        if ($module === 'Academic'
+            && preg_match('#^app/Modules/Academic/([A-Za-z0-9_]+)/#', $path, $nestedMatch) === 1) {
+            $nestedOwner = $nestedMatch[1];
+        }
+
+        if ($nestedOwner !== null) {
+            return in_array(
+                $model,
+                config("migration_debt.owned_shared_models.{$module}.{$nestedOwner}", []),
+                true,
+            );
+        }
+
+        return in_array($model, config("migration_debt.owned_shared_models.{$module}", []), true);
     }
 
     private function isMigrationCommand(string $contents): bool

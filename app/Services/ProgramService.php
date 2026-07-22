@@ -6,6 +6,10 @@ use App\Models\Program;
 use Exception;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * @deprecated Program writes now resolve through Academic Catalog actions.
+ *             Retain only until the approved compatibility-path removal.
+ */
 class ProgramService
 {
     /**

@@ -9,6 +9,11 @@ return [
     | misclassified as cross-context shared-model debt.
     */
     'owned_shared_models' => [
+        'Academic' => [
+            'Catalog' => [
+                'Program',
+            ],
+        ],
         'Admissions' => [
             'ApplicationDocument',
             'ApplicationDocumentType',

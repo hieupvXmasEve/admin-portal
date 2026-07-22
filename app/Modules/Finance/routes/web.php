@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Web\SemesterContextController;
 use App\Modules\Finance\Http\Web\Admin\BatchStudioController;
 use App\Modules\Finance\Http\Web\Admin\BillingInvoiceController;
 use App\Modules\Finance\Http\Web\Admin\BillingOperationsController;
@@ -180,10 +179,6 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
     Route::get('/search', [FinanceGlobalSearchController::class, 'search'])
         ->middleware('can:view_finance_student_overview')
         ->name('search');
-
-    // Operator semester selection (single source; reflected via shared prop)
-    Route::post('/semester-context', [SemesterContextController::class, 'update'])
-        ->name('semester-context.update');
 
     // =====================
     // Pricing Operations (immutable rule versions + coverage warning)
