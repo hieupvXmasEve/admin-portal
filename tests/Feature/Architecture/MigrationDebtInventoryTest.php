@@ -44,12 +44,13 @@ it('requires ownership, replacement, reason, and retirement metadata for every a
 it('rejects a simulated increase in an approved debt baseline', function (): void {
     $inventory = app(MigrationDebtInventory::class);
     $report = $inventory->scan();
-    $report['debt']['counts']['frozen_services']++;
+    $baseline = (int) config('migration_debt.allowlists.frozen_services.baseline');
+    $report['debt']['counts']['frozen_services'] = $baseline + 1;
 
     $result = app(MigrationDebtGuard::class)->evaluate($report);
 
     expect($result['passed'])->toBeFalse()
-        ->and($result['errors'])->toContain("Debt rule 'frozen_services' changed from approved baseline 119 to 120 (max).");
+        ->and($result['errors'])->toContain("Debt rule 'frozen_services' changed from approved baseline {$baseline} to ".($baseline + 1).' (max).');
 });
 
 it('rejects an unapproved frozen path even when its aggregate count is unchanged', function (): void {

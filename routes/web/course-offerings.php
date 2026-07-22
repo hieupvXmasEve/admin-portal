@@ -62,13 +62,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // ============================================
         // Student Registration Management
         // ============================================
-        Route::post('/{courseOffering}/delete-student-registration', [CourseOfferingController::class, 'deleteStudentRegistration'])
-            ->middleware('can:delete_student_registration')
-            ->name('course-offerings.delete-student-registration');
-
-        Route::post('/{courseOffering}/move-student', [CourseOfferingController::class, 'moveStudent'])
-            ->middleware('can:edit_course_offering')
-            ->name('course-offerings.move-student');
     });
 
     Route::prefix('api/course-offerings')->group(function () {
@@ -83,20 +76,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:add_student_registration')
             ->name(CourseOfferingRoutes::API_BULK_REGISTER_STUDENTS);
 
-        Route::post('/{courseOffering}/bulk-update-status', [CourseOfferingController::class, 'bulkUpdateRegistrationStatus'])
-            ->middleware('can:edit_course_offering')
-            ->name(CourseOfferingRoutes::API_BULK_UPDATE_STATUS);
-
         // ============================================
         // Instructor Assignment
         // ============================================
         Route::get('/check-instructor-assignments', [CourseOfferingController::class, 'checkInstructorAssignments'])
             ->middleware('can:view_course_offering')
             ->name(CourseOfferingRoutes::API_CHECK_INSTRUCTOR_ASSIGNMENTS);
-
-        Route::post('/bulk-assign-lectures', [CourseOfferingController::class, 'bulkAssignLectures'])
-            ->middleware('can:edit_course_offering')
-            ->name(CourseOfferingRoutes::API_BULK_ASSIGN_LECTURES);
 
         // ============================================
         // Bulk Operations & Statistics

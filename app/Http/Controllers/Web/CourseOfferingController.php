@@ -22,19 +22,13 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
-use App\Modules\Academic\Delivery\Actions\BulkAssignInstructorsAction;
-use App\Modules\Academic\Delivery\Actions\BulkUpdateCourseRegistrationStatusAction;
 use App\Modules\Academic\Delivery\Actions\EnrollStudentInCourseOfferingAction;
-use App\Modules\Academic\Delivery\Actions\MoveStudentBetweenCourseOfferingSectionsAction;
 use App\Modules\Academic\Delivery\Actions\RemoveCourseOfferingRosterAction;
-use App\Modules\Academic\Delivery\Actions\RemoveStudentFromCourseOfferingAction;
 use App\Modules\Academic\Delivery\Actions\SplitCourseOfferingAction;
 use App\Modules\Academic\Delivery\Exceptions\CourseOfferingSplitException;
 use App\Modules\Academic\Delivery\Exceptions\InstructorAssignmentException;
 use App\Modules\Academic\Delivery\Queries\GetCourseOfferingOperationalStateQuery;
-use App\Modules\Academic\Http\Requests\CourseDelivery\BulkAssignInstructorsRequest;
 use App\Modules\Academic\Http\Requests\CourseDelivery\SplitCourseOfferingRequest;
-use App\Modules\Academic\Http\Requests\MoveStudentRequest;
 use App\Modules\Academic\Queries\GetCourseOfferingScoresQuery;
 use App\Modules\Academic\Queries\GetCourseOfferingSurveyQuery;
 use App\Modules\Academic\Queries\ListCourseOfferingModuleOptionsQuery;
@@ -538,29 +532,6 @@ class CourseOfferingController extends Controller
                 'survey'
             ),
         ]);
-    }
-
-    /**
-     * Move a student to another section
-     */
-    public function moveStudent(MoveStudentRequest $request, CourseOffering $courseOffering)
-    {
-        // Ensure the course offering belongs to current campus
-        if ($courseOffering->campus_id !== app('campus')->id) {
-            abort(404);
-        }
-
-        try {
-            MoveStudentBetweenCourseOfferingSectionsAction::run($request->validated());
-
-            return ApiResponse::success(null, [], 'Student moved successfully.');
-        } catch (ValidationException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            Log::error('Failed to move student: '.$e->getMessage());
-
-            return ApiResponse::error('Failed to move student: '.$e->getMessage(), [], 500);
-        }
     }
 
     /**
@@ -1859,130 +1830,6 @@ class CourseOfferingController extends Controller
                 ? 'Classes have started but some course offerings do not have assigned instructors!'
                 : null,
         ]);
-    }
-
-    /**
-     * Bulk assign instructors to course offerings
-     */
-    public function bulkAssignLectures(BulkAssignInstructorsRequest $request): RedirectResponse
-    {
-        try {
-            $assignmentsCount = BulkAssignInstructorsAction::run([
-                'campus_id' => (int) app('campus')->id,
-                'assignments' => $request->validated('assignments'),
-            ]);
-
-            return Redirect::back()
-                ->with('success', "Successfully assigned lectures to {$assignmentsCount} course offerings.");
-        } catch (InstructorAssignmentException $exception) {
-            throw ValidationException::withMessages([
-                $exception->field => [$exception->getMessage()],
-            ]);
-        } catch (ValidationException $exception) {
-            throw $exception;
-        } catch (\Exception $e) {
-            return Redirect::back()
-                ->with('error', 'Failed to assign lectures: '.$e->getMessage());
-        }
-    }
-
-    /**
-     * Delete individual student registration from a course offering
-     */
-    public function deleteStudentRegistration(Request $request, CourseOffering $courseOffering)
-    {
-        // Ensure the course offering belongs to current campus
-        if ($courseOffering->campus_id !== app('campus')->id) {
-            abort(404);
-        }
-
-        $request->validate([
-            'registration_id' => 'required|exists:course_registrations,id',
-        ]);
-
-        try {
-            DB::beginTransaction();
-
-            $registration = CourseRegistration::where('id', $request->registration_id)
-                ->where('course_offering_id', $courseOffering->id)
-                ->with('student')
-                ->first();
-
-            if (! $registration) {
-                return ApiResponse::error('Registration not found or does not belong to this course offering.', [], 404);
-            }
-
-            $studentName = $registration->student->full_name ?? 'Unknown Student';
-            $studentId = $registration->student->student_id ?? 'Unknown ID';
-            $studentDbId = $registration->student->id;
-
-            // Force delete ALL academic records for this student + offering (including soft-deleted ones)
-            // After removing unique constraints, there might be multiple records
-            $academicRecords = AcademicRecord::withTrashed()
-                ->where('course_offering_id', $courseOffering->id)
-                ->where('student_id', $studentDbId)
-                ->get();
-
-            foreach ($academicRecords as $record) {
-                $record->forceDelete();
-            }
-
-            RemoveStudentFromCourseOfferingAction::run($registration->id);
-
-            DB::commit();
-
-            return ApiResponse::success([
-                'deleted_registration_id' => $request->registration_id,
-                'student_name' => $studentName,
-                'student_id' => $studentId,
-            ], [], "Successfully removed {$studentName} ({$studentId}) from the course.");
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to delete student registration: '.$e->getMessage());
-
-            return ApiResponse::error('Failed to remove student from course: '.$e->getMessage(), [], 500);
-        }
-    }
-
-    /**
-     * Bulk update registration status for students
-     */
-    public function bulkUpdateRegistrationStatus(Request $request, CourseOffering $courseOffering)
-    {
-        // Ensure the course offering belongs to current campus
-        if ($courseOffering->campus_id !== app('campus')->id) {
-            abort(404);
-        }
-
-        $request->validate([
-            'from_status' => 'required|in:registered,confirmed,dropped,withdrawn,completed',
-            'to_status' => 'required|in:registered,confirmed,dropped,withdrawn,completed',
-            'student_ids' => 'required|array',
-            'student_ids.*' => 'exists:students,id',
-        ]);
-
-        try {
-            DB::beginTransaction();
-
-            $updatedCount = BulkUpdateCourseRegistrationStatusAction::run([
-                'course_offering_id' => $courseOffering->id,
-                'from_status' => $request->from_status,
-                'to_status' => $request->to_status,
-                'student_ids' => array_map('intval', $request->student_ids),
-            ]);
-
-            DB::commit();
-
-            return ApiResponse::success([
-                'updated_count' => $updatedCount,
-                'from_status' => $request->from_status,
-                'to_status' => $request->to_status,
-            ], [], "Successfully updated {$updatedCount} student registration(s) from {$request->from_status} to {$request->to_status}.");
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            return ApiResponse::error('Failed to update registration status: '.$e->getMessage(), [], 500);
-        }
     }
 
     /**

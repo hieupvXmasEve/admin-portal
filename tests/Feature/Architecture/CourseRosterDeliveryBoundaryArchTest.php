@@ -41,3 +41,12 @@ it('keeps Delivery roster commands off Student and Catalog persistence', functio
         'Delivery must obtain Student identity and Catalog facts through owner contracts, not their persistence models.',
     );
 });
+
+it('keeps Delivery roster moves off Progression attempt persistence', function (): void {
+    $action = base_path('app/Modules/Academic/Delivery/Actions/MoveStudentBetweenCourseOfferingSectionsAction.php');
+    $contents = file_get_contents($action) ?: '';
+
+    expect($contents)
+        ->not->toContain('App\\Models\\AcademicRecord')
+        ->toContain('CourseOfferingAttemptWriter');
+});

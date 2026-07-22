@@ -11,6 +11,7 @@ use App\Models\Student;
 use App\Models\Unit;
 use App\Modules\Academic\Delivery\Actions\EnrollStudentInCourseOfferingAction;
 use App\Modules\Academic\Delivery\Actions\MoveStudentBetweenCourseOfferingSectionsAction;
+use App\Modules\Academic\Delivery\Actions\RemoveCourseOfferingRosterMemberAction;
 use App\Modules\Academic\Delivery\Actions\RemoveStudentFromCourseOfferingAction;
 use App\Shared\Contracts\Academic\CourseRosterReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -257,6 +258,45 @@ it('removes a roster member through Delivery and releases their counted seat', f
     expect(CourseRegistration::query()->find($registration->id))->toBeNull()
         ->and($offering->fresh()->current_enrollment)->toBe(0)
         ->and($offering->fresh()->enrollment_status)->toBe('open');
+});
+
+it('removes the roster member attempt history through the Progression contract', function (): void {
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $unit = Unit::factory()->create();
+    $student = Student::factory()->forCampus($campus)->create([
+        'intake' => 1,
+        'intake_mode' => 'sequential',
+        'intake_semester_id' => $semester->id,
+    ]);
+    $offering = CourseOffering::factory()->create([
+        'campus_id' => $campus->id,
+        'semester_id' => $semester->id,
+        'unit_id' => $unit->id,
+        'current_enrollment' => 1,
+    ]);
+    $registration = CourseRegistration::query()->create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $semester->id,
+        'registration_status' => 'confirmed',
+        'registration_date' => now(),
+        'credit_hours' => 3,
+    ]);
+    $attempt = AcademicRecord::factory()->create([
+        'student_id' => $student->id,
+        'campus_id' => $campus->id,
+        'semester_id' => $semester->id,
+        'unit_id' => $unit->id,
+        'course_offering_id' => $offering->id,
+    ]);
+
+    RemoveCourseOfferingRosterMemberAction::run([
+        'course_registration_id' => $registration->id,
+    ]);
+
+    expect(CourseRegistration::query()->find($registration->id))->toBeNull()
+        ->and(AcademicRecord::withTrashed()->find($attempt->id))->toBeNull();
 });
 
 it('uses the Delivery roster reader for active members in registration order', function (): void {

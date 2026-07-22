@@ -13,6 +13,13 @@ return [
             'Catalog' => [
                 'Program',
             ],
+            'Delivery' => [
+                'CourseOffering',
+                'CourseRegistration',
+            ],
+            'Progression' => [
+                'AcademicRecord',
+            ],
         ],
         'Admissions' => [
             'ApplicationDocument',

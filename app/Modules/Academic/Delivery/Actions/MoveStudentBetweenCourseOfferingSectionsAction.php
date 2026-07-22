@@ -4,23 +4,36 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Delivery\Actions;
 
-use App\Models\AcademicRecord;
 use App\Models\Attendance;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
+use App\Shared\Contracts\Academic\CourseOfferingAttemptWriter;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 final class MoveStudentBetweenCourseOfferingSectionsAction
 {
+    public function __construct(
+        private readonly StudentReferenceReader $students,
+        private readonly CourseOfferingAttemptWriter $courseOfferingAttempts,
+    ) {}
+
     /**
      * @param  array{student_id: int, target_course_offering_id: int, force_move?: bool}  $data
      */
     public static function run(array $data): void
     {
-        $student = app(StudentReferenceReader::class)->find($data['student_id']);
+        app(self::class)->handle($data);
+    }
+
+    /**
+     * @param  array{student_id: int, target_course_offering_id: int, force_move?: bool}  $data
+     */
+    public function handle(array $data): void
+    {
+        $student = $this->students->find($data['student_id']);
         if ($student === null) {
             throw ValidationException::withMessages([
                 'student_id' => 'The selected student does not exist.',
@@ -82,13 +95,12 @@ final class MoveStudentBetweenCourseOfferingSectionsAction
             );
 
             $registration->update(['course_offering_id' => $targetOffering->id]);
-            AcademicRecord::query()
-                ->where('student_id', $student->id)
-                ->where('course_offering_id', $sourceOffering->id)
-                ->update([
-                    'course_offering_id' => $targetOffering->id,
-                    'instructor_id' => $targetOffering->lecture_id,
-                ]);
+            $this->courseOfferingAttempts->moveToOffering(
+                $student->id,
+                (int) $sourceOffering->id,
+                (int) $targetOffering->id,
+                $targetOffering->lecture_id === null ? null : (int) $targetOffering->lecture_id,
+            );
             self::migrateAttendance($student->id, $sourceOffering, $targetOffering);
 
             $sourceOffering->decrement('current_enrollment');

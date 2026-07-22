@@ -7,6 +7,7 @@ use App\Constants\StudentRoutes;
 use App\Modules\Academic\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\AcademicProgressionAuditController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingCatalogFormController;
+use App\Modules\Academic\Http\Web\Admin\CourseOfferingRosterController;
 use App\Modules\Academic\Http\Web\CampusDetailController;
 use App\Modules\Academic\Http\Web\ExamResitAttemptController;
 use App\Modules\Academic\Http\Web\ExamScheduleController;
@@ -49,6 +50,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/{courseOffering}', [CourseOfferingCatalogFormController::class, 'update'])
             ->middleware('can:edit_course_offering')
             ->name(CourseOfferingRoutes::UPDATE);
+
+        Route::post('/{courseOffering}/delete-student-registration', [CourseOfferingRosterController::class, 'removeStudent'])
+            ->middleware('can:delete_student_registration')
+            ->name('course-offerings.delete-student-registration');
+
+        Route::post('/{courseOffering}/move-student', [CourseOfferingRosterController::class, 'moveStudent'])
+            ->middleware('can:edit_course_offering')
+            ->name('course-offerings.move-student');
+    });
+
+    Route::prefix('api/course-offerings')->group(function () {
+        Route::post('/{courseOffering}/bulk-update-status', [CourseOfferingRosterController::class, 'bulkUpdateStatus'])
+            ->middleware('can:edit_course_offering')
+            ->name(CourseOfferingRoutes::API_BULK_UPDATE_STATUS);
+
+        Route::post('/bulk-assign-lectures', [CourseOfferingRosterController::class, 'bulkAssignInstructors'])
+            ->middleware('can:edit_course_offering')
+            ->name(CourseOfferingRoutes::API_BULK_ASSIGN_LECTURES);
     });
 
     Route::get('campuses/{campus}', [CampusDetailController::class, 'show'])

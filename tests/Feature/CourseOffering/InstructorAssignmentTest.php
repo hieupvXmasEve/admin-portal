@@ -222,7 +222,7 @@ it('keeps the staff bulk-assignment route and redirect response compatible', fun
             ]],
         ])
         ->assertRedirect('/course-offerings')
-        ->assertSessionHas('success', 'Successfully assigned lectures to 1 course offerings.');
+        ->assertSessionHas('inertia.flash_data.success', 'Successfully assigned lectures to 1 course offerings.');
 
     expect($offering->fresh()->lecture_id)->toBe($lecturer->id);
 });
