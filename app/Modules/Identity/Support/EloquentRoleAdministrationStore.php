@@ -6,6 +6,7 @@ namespace App\Modules\Identity\Support;
 
 use App\Models\Role;
 use App\Shared\Contracts\Identity\RoleAdministrationStore;
+use Illuminate\Support\Facades\DB;
 
 final class EloquentRoleAdministrationStore implements RoleAdministrationStore
 {
@@ -35,6 +36,7 @@ final class EloquentRoleAdministrationStore implements RoleAdministrationStore
     {
         Role::query()->getConnection()->transaction(function () use ($data): void {
             $role = Role::query()->findOrFail($data['role_id']);
+            DB::table('campus_user_roles')->where('role_id', $role->id)->delete();
             $role->permissions()->detach();
             $role->delete();
         });

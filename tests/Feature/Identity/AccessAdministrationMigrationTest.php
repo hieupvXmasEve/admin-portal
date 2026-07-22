@@ -77,6 +77,20 @@ it('keeps normalized role codes unique through the established staff route', fun
     expect(Role::query()->where('name', 'A-B')->value('code'))->toBe('a_b_1');
 });
 
+it('deletes a role after removing its campus user assignments', function (): void {
+    $role = Role::factory()->create();
+    $staff = User::factory()->create();
+    $staff->campusRoles()->attach($role, ['campus_id' => $this->campus->id]);
+
+    $this->actingAs($this->administrator)
+        ->withHeader('X-CSRF-TOKEN', 'identity-access-test-token')
+        ->delete(route('roles.destroy', $role))
+        ->assertRedirect(route('roles.index'));
+
+    expect(Role::query()->whereKey($role->id)->exists())->toBeFalse()
+        ->and(DB::table('campus_user_roles')->where('role_id', $role->id)->exists())->toBeFalse();
+});
+
 it('issues a student impersonation token with the established API envelope and audit evidence', function (): void {
     $semester = Semester::factory()->create();
     $student = Student::factory()->create([
