@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Catalog\Http\Web;
 
 use App\Constants\CurriculumRoutes;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\DuplicateCurriculumVersionRequest;
 use App\Http\Requests\StoreCurriculumVersionRequest;
 use App\Http\Requests\UpdateCurriculumVersionRequest;
@@ -27,10 +28,9 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Catalog owns mutations while summary projections remain a compatibility
- * boundary during their staged query extraction.
+ * Catalog owns Curriculum Version staff and API workflows.
  */
-class CurriculumVersionController extends \App\Http\Controllers\Web\CurriculumVersionController
+class CurriculumVersionController extends Controller
 {
     public function index(Request $request): Response
     {

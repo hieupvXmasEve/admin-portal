@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Catalog\Http\Web;
 
-use App\Actions\SyllabusTemplate\CreateSyllabusTemplateAction;
-use App\Actions\SyllabusTemplate\GetSyllabusTemplateListAction;
-use App\Actions\SyllabusTemplate\UpdateSyllabusTemplateAction;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\SyllabusTemplate\PreviewGradingSchemeRequest;
 use App\Http\Requests\SyllabusTemplate\StoreSyllabusTemplateRequest;
 use App\Http\Requests\SyllabusTemplate\UpdateSyllabusTemplateRequest;
@@ -14,9 +12,10 @@ use App\Http\Responses\ApiResponse;
 use App\Models\AssessmentComponent;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
-use App\Modules\Academic\Actions\PreviewSyllabusGradingSchemeAction;
+use App\Modules\Academic\Catalog\Actions\CreateSyllabusTemplateAction;
 use App\Modules\Academic\Catalog\Actions\ManageSyllabusTemplateAction;
 use App\Modules\Academic\Catalog\Actions\PreviewSyllabusGradingSchemeAction as CatalogPreviewSyllabusGradingSchemeAction;
+use App\Modules\Academic\Catalog\Actions\UpdateSyllabusTemplateAction;
 use App\Modules\Academic\Catalog\Http\Requests\ListSyllabusTemplatesRequest;
 use App\Modules\Academic\Catalog\Queries\ListSyllabusTemplatesQuery;
 use Illuminate\Http\JsonResponse;
@@ -26,10 +25,9 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Catalog owns template listing, pages, and mutations. Grading-scheme
- * projections remain inherited during the staged migration.
+ * Catalog owns Syllabus Template staff and API workflows.
  */
-class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTemplateController
+class SyllabusTemplateController extends Controller
 {
     public function index(Unit $unit): JsonResponse
     {
@@ -44,7 +42,7 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
         return ApiResponse::success($templates);
     }
 
-    public function pageIndex(Request $request, GetSyllabusTemplateListAction $legacyList): Response
+    public function pageIndex(Request $request): Response
     {
         $filters = $request->validate((new ListSyllabusTemplatesRequest)->rules());
 
@@ -101,11 +99,9 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
         ]);
     }
 
-    public function store(
-        StoreSyllabusTemplateRequest $request,
-        CreateSyllabusTemplateAction $legacyCreate,
-    ): JsonResponse|RedirectResponse {
-        $template = app(\App\Modules\Academic\Catalog\Actions\CreateSyllabusTemplateAction::class)->handle([
+    public function store(StoreSyllabusTemplateRequest $request): JsonResponse|RedirectResponse
+    {
+        $template = app(CreateSyllabusTemplateAction::class)->handle([
             ...$request->validated(),
             'created_by' => auth()->id(),
         ]);
@@ -134,12 +130,9 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
         ]);
     }
 
-    public function update(
-        UpdateSyllabusTemplateRequest $request,
-        SyllabusTemplate $syllabusTemplate,
-        UpdateSyllabusTemplateAction $legacyUpdate,
-    ): JsonResponse|RedirectResponse {
-        $template = app(\App\Modules\Academic\Catalog\Actions\UpdateSyllabusTemplateAction::class)->handle($syllabusTemplate, $request->validated());
+    public function update(UpdateSyllabusTemplateRequest $request, SyllabusTemplate $syllabusTemplate): JsonResponse|RedirectResponse
+    {
+        $template = app(UpdateSyllabusTemplateAction::class)->handle($syllabusTemplate, $request->validated());
 
         if ($request->wantsJson()) {
             return ApiResponse::success($template);
@@ -221,10 +214,8 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
         ]);
     }
 
-    public function previewGradingScheme(
-        PreviewGradingSchemeRequest $request,
-        PreviewSyllabusGradingSchemeAction $legacyAction,
-    ): JsonResponse {
+    public function previewGradingScheme(PreviewGradingSchemeRequest $request): JsonResponse
+    {
         $result = app(CatalogPreviewSyllabusGradingSchemeAction::class)->handle(
             $request->validated('grading_scheme'),
             $request->validated('component_scores') ?? [],
@@ -242,12 +233,9 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
         return ApiResponse::success($result);
     }
 
-    public function previewExistingGradingScheme(
-        PreviewGradingSchemeRequest $request,
-        SyllabusTemplate $syllabusTemplate,
-        PreviewSyllabusGradingSchemeAction $legacyAction,
-    ): JsonResponse {
-        return $this->previewGradingScheme($request, $legacyAction);
+    public function previewExistingGradingScheme(PreviewGradingSchemeRequest $request, SyllabusTemplate $syllabusTemplate): JsonResponse
+    {
+        return $this->previewGradingScheme($request);
     }
 
     private function loadTemplate(SyllabusTemplate $syllabusTemplate): SyllabusTemplate
