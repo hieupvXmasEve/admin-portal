@@ -1,6 +1,6 @@
 # Migrate Student Registry identity and Guardian relationships
 
-Status: ready-for-agent
+Status: completed
 
 Portal impact: both
 
@@ -14,11 +14,11 @@ Cut Student identity, profile, contact, campus affiliation, and Student–Guardi
 
 ## Acceptance criteria
 
-- [ ] Student Registry owns supported identity/profile/contact and Student–Guardian Relationship mutations and reads.
-- [ ] Guardians without accounts remain durable relationships, while access revocation never deletes the relationship.
-- [ ] Downstream contexts use Student References or owner contracts and do not infer Program Enrollment or Account Status from Student identity.
-- [ ] Existing staff, student, and guardian routes/API contracts remain compatible.
-- [ ] Any data backfill or legacy-column cleanup stops at the parent issue's approval gate before execution.
+- [x] Student Registry owns supported identity/profile/contact and Student–Guardian Relationship mutations and reads.
+- [x] Guardians without accounts remain durable relationships, while access revocation never deletes the relationship.
+- [x] Downstream contexts use Student References or owner contracts and do not infer Program Enrollment or Account Status from Student identity.
+- [x] Existing staff, student, and guardian routes/API contracts remain compatible.
+- [x] Any data backfill or legacy-column cleanup stops at the parent issue's approval gate before execution.
 
 ## Blocked by
 
@@ -39,3 +39,18 @@ Cut Student identity, profile, contact, campus affiliation, and Student–Guardi
 - 2026-07-23: Partial Finance DNG reminder cutover. `SendDueItemParentRemindersAction` now resolves DNG Guardian email recipients through the same Identity contract instead of `ParentProfile`; its invoice branch remains on the pre-existing legacy student snapshot fields. Delivery shape and data commands are unchanged. Rollback is a revert of this caller cutover; `SendDueItemParentRemindersActionTest` passed. The issue remains `ready-for-agent`.
 - 2026-07-23: Staff Guardian mutation cutover. `StudentService` now preserves and selects primary Guardians through `StudentGuardianRelationshipWriter`/Reader and delegates access provisioning, revocation, and compatibility-projection removal to Identity `GuardianAccessGrantWriter`. It no longer mutates `ParentProfile` or `parent_student` itself. Identity revocation continues to preserve the durable Registry relationship; projection removal is an explicit staff replacement/clear operation. Legacy primary projections without a materialized Registry relationship are removed through the Identity contract for compatibility. No routes, portal payloads, or data backfill changed. Rollback is a revert of this cutover; student update, Identity Guardian grant, and Guardian architecture suites passed. The issue remains `ready-for-agent`.
 - 2026-07-23: Guardian mutation compatibility hardening. Identity now retains the legacy one-student-per-Guardian-account invariant for grant provisioning, owns removal of legacy primary projections during staff clear/replacement even when no active grant exists, and exposes account-existence through its reader so password setup links are sent only for newly created accounts. The staff request validation also checks cross-student Guardian relationships through Identity rather than the pivot. No data backfill or cleanup ran; the issue remains `ready-for-agent`.
+
+## Completion notes
+
+- Student Registry owns the supported profile/contact reads and writes and the durable Student–Guardian relationship. Identity owns optional Guardian access grants and the compatibility projection. Staff and Finance callers use the narrow owner contracts rather than `ParentProfile` or `parent_student` directly.
+- Revoking a Guardian access grant leaves the Registry relationship intact. Staff replacement and clear flows remove only the Identity-owned compatibility projection, preserving the established staff form payload and legacy one-student-per-Guardian-account constraint.
+- No public route, URL, permission, Inertia payload, or `api/v1/student/*` contract changed. Both ignored portal repositories were clean, so no portal source change or portal build was needed.
+- No data-affecting command, backfill, or legacy cleanup was designed or run. The remaining `CleanupParentDataCommand` is a future data slice and remains behind the parent issue's explicit approval gate.
+
+## Verification
+
+- `./scripts/dev.sh artisan test --compact tests/Feature/Academic/StudentUpdateTest.php tests/Feature/Identity/GuardianAccessGrantTest.php tests/Feature/Architecture/GuardianOwnershipBoundaryArchTest.php` — 29 passed, 133 assertions.
+- Finance Guardian-recipient suites passed: `SendParentPaymentRemindersActionTest` (4 tests, 18 assertions) and `SendDueItemParentRemindersActionTest` (1 test, 5 assertions).
+- `./scripts/dev.sh artisan migration-debt:inventory --check --format=table` — passed without increasing any baseline.
+- PHP Pint and `git diff --check` passed for the implementation changes. `./scripts/portal-status.sh` confirmed clean student and lecturer portals.
+- `./scripts/dev.sh artisan test --compact --stop-on-failure` reached 557 passing tests, 1,596 pending tests, and then failed outside this slice in `tests/Feature/Academic/StudentAcademicSummaryScoresSchemeDisplayTest.php:156`: the Academic Summary Scores request returned 409 where the test expects 200. This does not touch the Registry/Identity Guardian paths changed by this issue.
