@@ -20,4 +20,6 @@ interface GuardianAccessGrantWriter
     public function changeAccessLevel(int $guardianRelationshipId, string $accessLevel): GuardianAccessGrant;
 
     public function revoke(int $guardianRelationshipId): GuardianAccessGrant;
+
+    public function revokeLegacyPrimaryForStudent(int $studentId): void;
 }

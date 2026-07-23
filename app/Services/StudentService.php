@@ -8,7 +8,6 @@ use App\Models\Campus;
 use App\Models\CampusUserRole;
 use App\Models\CurriculumVersion;
 use App\Models\GraduationRequirement;
-use App\Models\ParentProfile;
 use App\Models\Program;
 use App\Models\Role;
 use App\Models\Specialization;
@@ -173,38 +172,36 @@ class StudentService
             // Filter data to only include allowed fields
             $filteredData = array_intersect_key($data, array_flip($allowedFields));
 
-            // Handle parent user update/creation
-            // Parent linking is handled via parents + parent_student tables
             if ($parentEmail !== null) {
                 $parentEmail = strtolower(trim($parentEmail));
-                $currentPrimaryParent = $student->primaryParentProfile();
-                $parentUserAlreadyExists = User::query()
-                    ->where('email', $parentEmail)
-                    ->exists();
-                $assignedParent = $this->handleParentAssignment($student, $parentEmail, $parentName);
+                $currentPrimaryGuardian = $this->primaryGuardianRelationship($student);
+                $parentAccountAlreadyExists = app(GuardianAccessGrantReader::class)->accountExistsForEmail($parentEmail);
 
-                if ($currentPrimaryParent && $currentPrimaryParent->id !== $assignedParent->id) {
-                    $this->detachAndRevokeParentAccess($currentPrimaryParent, $student);
+                if ($currentPrimaryGuardian !== null && $currentPrimaryGuardian->email !== $parentEmail) {
+                    $this->revokeGuardianAccess($currentPrimaryGuardian);
                 }
 
-                if (! $parentUserAlreadyExists) {
+                $this->handleParentAssignment($student, $parentEmail, $parentName);
+
+                if (! $parentAccountAlreadyExists) {
                     $newParentEmail = $parentEmail;
                 }
             } elseif ($parentEmailWasProvided) {
-                $currentPrimaryParent = $student->primaryParentProfile();
+                $currentPrimaryGuardian = $this->primaryGuardianRelationship($student);
 
-                if ($currentPrimaryParent) {
-                    $this->detachAndRevokeParentAccess($currentPrimaryParent, $student);
+                if ($currentPrimaryGuardian !== null) {
+                    $this->revokeGuardianAccess($currentPrimaryGuardian);
+                } else {
+                    app(GuardianAccessGrantWriter::class)->revokeLegacyPrimaryForStudent((int) $student->id);
                 }
             } elseif ($parentName !== null) {
-                // If only name provided, update name of existing parent profile linked to this student
-                $parentProfile = $student->primaryParentProfile();
-                if ($parentProfile) {
-                    $parentProfile->update(['full_name' => $parentName]);
-                    // Also update the user name
-                    if ($parentProfile->user) {
-                        $parentProfile->user->update(['name' => $parentName]);
-                    }
+                $currentPrimaryGuardian = $this->primaryGuardianRelationship($student);
+                if ($currentPrimaryGuardian !== null && $currentPrimaryGuardian->email !== null) {
+                    $this->handleParentAssignment(
+                        $student,
+                        $currentPrimaryGuardian->email ?? '',
+                        $parentName,
+                    );
                 }
             }
 
@@ -810,13 +807,7 @@ class StudentService
     }
 
     /**
-     * Handle parent assignment to student
-     * Creates User, ParentProfile, and parent_student pivot record
-     *
-     * Cases handled:
-     * 1. Student has no parent linked yet -> Create new parent
-     * 2. Student already has a parent -> Update or replace
-     * 3. Parent email already used by another user -> Various validation checks
+     * Preserve a Guardian relationship and provision its optional portal access.
      */
     public function handleParentAssignment(
         Student $student,
@@ -825,7 +816,7 @@ class StudentService
         string $relationship = 'guardian',
         bool $isPrimary = true,
         ?string $parentPhone = null,
-    ): ParentProfile {
+    ): GuardianRelationship {
         // Normalize email
         $parentEmail = strtolower(trim($parentEmail));
 
@@ -848,7 +839,7 @@ class StudentService
     }
 
     /**
-     * Internal helper to assign parent by email (find existing or create new)
+     * Internal helper to assign a Guardian by email.
      */
     private function assignParentByEmail(
         Student $student,
@@ -857,31 +848,7 @@ class StudentService
         string $relationship = 'guardian',
         bool $isPrimary = true,
         ?string $parentPhone = null,
-    ): ParentProfile {
-        $parentUser = User::where('email', $parentEmail)->first();
-
-        if ($parentUser) {
-            $this->validateExistingUserAsParent($student, $parentUser);
-
-            if ($parentName !== null) {
-                $parentUser->update(['name' => $parentName]);
-            }
-
-            if (! $parentUser->isParent()) {
-                $parentUser->update(['type' => UserType::PARENT]);
-            }
-        } else {
-            $parentUser = User::create([
-                'name' => $parentName ?? 'Parent',
-                'email' => $parentEmail,
-                'status' => User::STATUS_ACTIVE,
-                'type' => UserType::PARENT,
-            ]);
-        }
-
-        $parentProfile = $this->ensureParentProfile($parentUser, $parentName, $parentEmail, $parentPhone);
-        $this->linkParentToStudent($parentProfile, $student, $relationship, $isPrimary);
-
+    ): GuardianRelationship {
         $registryRelationships = app(StudentGuardianRelationshipReader::class)->forStudent((int) $student->id);
         $registryRelationship = collect($registryRelationships)
             ->first(
@@ -892,7 +859,7 @@ class StudentService
         $registryRelationship = app(StudentGuardianRelationshipWriter::class)->preserveForStudent(
             (int) $student->id,
             [[
-                'full_name' => $parentName ?? $registryRelationship?->fullName ?? $parentProfile->full_name,
+                'full_name' => $parentName ?? $registryRelationship?->fullName ?? 'Parent',
                 'relationship_type' => $relationship,
                 'phone' => $parentPhone ?? $registryRelationship?->phone,
                 'email' => $parentEmail,
@@ -907,130 +874,24 @@ class StudentService
             accountName: $parentName,
         );
 
-        return $parentProfile;
+        return $registryRelationship;
     }
 
-    /**
-     * Validate that existing user can be assigned as parent
-     */
-    private function validateExistingUserAsParent(Student $student, User $parentUser): void
+    private function primaryGuardianRelationship(Student $student): ?GuardianRelationship
     {
-        // Prevent using a student account as parent
-        if ($parentUser->isStudent()) {
-            throw new Exception(
-                'Không thể sử dụng email này làm phụ huynh. Email này thuộc về tài khoản sinh viên.'
-            );
-        }
-
-        // Prevent student from assigning themselves as parent
-        if ($student->user_id && $parentUser->id === $student->user_id) {
-            throw new Exception(
-                'Sinh viên không thể tự gán chính mình làm phụ huynh.'
-            );
-        }
-
-        // Check if user is a lecturer
-        if ($parentUser->isLecturer()) {
-            throw new Exception(
-                'Không thể sử dụng email này làm phụ huynh. Email này thuộc về tài khoản giảng viên.'
-            );
-        }
-
-        // Check if user is staff
-        if ($parentUser->isStaff()) {
-            throw new Exception(
-                'Không thể sử dụng email này làm phụ huynh. Email này thuộc về tài khoản nhân viên.'
-            );
-        }
-
-        if ($parentUser->isService()) {
-            throw new Exception(
-                'Không thể sử dụng email này làm phụ huynh. Email này thuộc về tài khoản dịch vụ.'
-            );
-        }
-
-        // Check if this parent already exists and is linked to another student (via parent_student table)
-        $parentProfile = ParentProfile::withTrashed()->where('user_id', $parentUser->id)->first();
-        if ($parentProfile) {
-            $existingStudentViaParentStudent = DB::table('parent_student')
-                ->where('parent_id', $parentProfile->id)
-                ->where('student_id', '!=', $student->id)
-                ->first();
-
-            if ($existingStudentViaParentStudent) {
-                $linkedStudent = Student::find($existingStudentViaParentStudent->student_id);
-                throw new Exception(
-                    'Email này đã được liên kết với sinh viên khác (Mã SV: '.($linkedStudent?->student_id ?? 'N/A').'). '.
-                    'Mỗi phụ huynh chỉ có thể liên kết với một sinh viên qua hệ thống này.'
-                );
-            }
-        }
+        return collect(app(StudentGuardianRelationshipReader::class)->forStudent((int) $student->id))
+            ->first(static fn (GuardianRelationship $guardian): bool => $guardian->isPrimary);
     }
 
-    /**
-     * Ensure ParentProfile exists for the user
-     */
-    private function ensureParentProfile(User $parentUser, ?string $parentName, string $parentEmail, ?string $parentPhone = null): ParentProfile
+    private function revokeGuardianAccess(GuardianRelationship $guardian): void
     {
-        $parentProfile = ParentProfile::withTrashed()->where('user_id', $parentUser->id)->first();
+        $activeRelationshipIds = app(GuardianAccessGrantReader::class)->activeRelationshipIds([$guardian->id]);
 
-        if (! $parentProfile) {
-            // Create new ParentProfile
-            $parentProfile = ParentProfile::create([
-                'user_id' => $parentUser->id,
-                'full_name' => $parentName ?? $parentUser->name ?? 'Parent',
-                'email_snapshot' => $parentEmail,
-                'phone' => $parentPhone,
-                'status' => 'active',
-            ]);
-
-            Log::info('Created new parent profile', [
-                'parent_profile_id' => $parentProfile->id,
-                'user_id' => $parentUser->id,
-            ]);
-        } else {
-            if ($parentProfile->trashed()) {
-                $parentProfile->restore();
-            }
-
-            // Keep the snapshot current and reactivate profiles reused for a new assignment.
-            $updates = array_filter([
-                'full_name' => $parentName,
-                'phone' => $parentPhone,
-            ], fn ($value) => $value !== null);
-            $updates['email_snapshot'] = $parentEmail;
-            $updates['status'] = 'active';
-
-            $parentProfile->update($updates);
+        if (in_array($guardian->id, $activeRelationshipIds, true)) {
+            app(GuardianAccessGrantWriter::class)->revoke($guardian->id);
         }
 
-        return $parentProfile;
-    }
-
-    /**
-     * Remove a primary parent from this student and revoke their portal access
-     * when they are no longer linked to any student.
-     */
-    private function detachAndRevokeParentAccess(ParentProfile $parentProfile, Student $student): void
-    {
-        $userId = $parentProfile->user_id;
-        $grant = $userId !== null
-            ? collect(app(GuardianAccessGrantReader::class)->activeForUser((int) $userId))
-                ->first(static fn ($accessGrant): bool => $accessGrant->studentId === (int) $student->id)
-            : null;
-
-        if ($grant !== null) {
-            app(GuardianAccessGrantWriter::class)->revoke($grant->guardianRelationshipId);
-        }
-
-        $parentProfile->students()->detach($student->id);
-
-        if ($parentProfile->students()->exists()) {
-            return;
-        }
-
-        $parentProfile->user?->tokens()->delete();
-        $parentProfile->update(['status' => 'inactive']);
+        app(GuardianAccessGrantWriter::class)->revokeLegacyPrimaryForStudent($guardian->studentId);
     }
 
     /**
@@ -1054,61 +915,5 @@ class StudentService
                 'error' => $exception->getMessage(),
             ]);
         }
-    }
-
-    /**
-     * Link a parent to a student via the parent_student pivot.
-     *
-     * A student may have several guardians, of which exactly one is primary.
-     * When linking a primary parent, any existing primary is demoted first so a
-     * second primary never coexists. The (parent, student) pair is upserted, so
-     * re-linking the same parent updates the existing row instead of duplicating.
-     */
-    private function linkParentToStudent(
-        ParentProfile $parentProfile,
-        Student $student,
-        string $relationship = 'guardian',
-        bool $isPrimary = true,
-    ): void {
-        if ($isPrimary) {
-            // Demote the student's current primary parent (if any) before this
-            // one takes over, keeping "exactly one primary" intact.
-            DB::table('parent_student')
-                ->where('student_id', $student->id)
-                ->where('parent_id', '!=', $parentProfile->id)
-                ->where('is_primary', true)
-                ->update(['is_primary' => false, 'updated_at' => now()]);
-        }
-
-        $existing = DB::table('parent_student')
-            ->where('parent_id', $parentProfile->id)
-            ->where('student_id', $student->id)
-            ->first();
-
-        if ($existing) {
-            DB::table('parent_student')
-                ->where('id', $existing->id)
-                ->update([
-                    'relationship' => $relationship,
-                    'is_primary' => $isPrimary,
-                    'updated_at' => now(),
-                ]);
-        } else {
-            DB::table('parent_student')->insert([
-                'parent_id' => $parentProfile->id,
-                'student_id' => $student->id,
-                'relationship' => $relationship,
-                'is_primary' => $isPrimary,
-                'access_level' => 'read_only',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
-
-        Log::info('Linked parent to student', [
-            'parent_profile_id' => $parentProfile->id,
-            'student_id' => $student->id,
-            'is_primary' => $isPrimary,
-        ]);
     }
 }

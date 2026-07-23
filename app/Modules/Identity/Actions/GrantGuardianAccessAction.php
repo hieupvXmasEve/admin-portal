@@ -63,6 +63,15 @@ final class GrantGuardianAccessAction
                 $parentProfile->restore();
             }
 
+            $legacyRelationshipExists = DB::table('parent_student')
+                ->where('parent_id', $parentProfile->id)
+                ->where('student_id', '!=', $relationship->studentId)
+                ->exists();
+
+            if ($legacyRelationshipExists) {
+                throw new DomainException('This Guardian account already has a Student access grant.');
+            }
+
             $conflictingGrant = GuardianAccessGrant::query()
                 ->where('parent_id', $parentProfile->id)
                 ->where('guardian_relationship_id', '!=', $data['guardian_relationship_id'])
@@ -86,6 +95,14 @@ final class GrantGuardianAccessAction
 
             // Transitional compatibility projection. Runtime access decisions use
             // guardian_access_grants; this row remains for unmigrated consumers.
+            if ((bool) ($data['is_primary_portal_account'] ?? false)) {
+                DB::table('parent_student')
+                    ->where('student_id', $relationship->studentId)
+                    ->where('parent_id', '!=', $parentProfile->id)
+                    ->where('is_primary', true)
+                    ->update(['is_primary' => false, 'updated_at' => now()]);
+            }
+
             DB::table('parent_student')->updateOrInsert(
                 [
                     'parent_id' => $parentProfile->id,

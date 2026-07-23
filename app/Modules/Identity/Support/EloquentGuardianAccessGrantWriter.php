@@ -52,4 +52,9 @@ final class EloquentGuardianAccessGrantWriter implements GuardianAccessGrantWrit
             'guardian_relationship_id' => $guardianRelationshipId,
         ]);
     }
+
+    public function revokeLegacyPrimaryForStudent(int $studentId): void
+    {
+        RevokeGuardianAccessAction::revokeLegacyPrimaryForStudent($studentId);
+    }
 }

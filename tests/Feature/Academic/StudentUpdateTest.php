@@ -240,7 +240,6 @@ it('shows the primary parent after assigning a new parent email', function () {
         'created_at' => now(),
         'updated_at' => now(),
     ]);
-
     app(StudentService::class)->updateStudent($student, [
         'full_name' => 'Student',
         'email' => 'student@example.com',
@@ -287,7 +286,6 @@ it('shows the legacy primary parent account while its Registry relationship is n
         'created_at' => now(),
         'updated_at' => now(),
     ]);
-
     actingAs($this->authorizedUser)
         ->withSession(['current_campus_id' => $this->campus->id])
         ->get(route(StudentRoutes::EDIT, $student))
@@ -550,6 +548,11 @@ it('removes and revokes the current primary parent when parent email is cleared'
         'created_at' => now(),
         'updated_at' => now(),
     ]);
+    app(StudentGuardianRelationshipWriter::class)->preserveForStudent((int) $student->id, [[
+        'full_name' => $parentProfile->full_name,
+        'email' => $parentUser->email,
+        'is_primary' => true,
+    ]]);
 
     app(StudentService::class)->updateStudent($student, [
         'full_name' => $student->full_name,
@@ -620,6 +623,7 @@ it('rejects using the student or a service account email as the parent email', f
 });
 
 it('allows an existing parent account that is not linked to another student', function () {
+    Notification::fake();
     $student = Student::factory()->create([
         'email' => 'student@example.com',
         'campus_id' => $this->campus->id,
@@ -655,6 +659,8 @@ it('allows an existing parent account that is not linked to another student', fu
         ->where('student_id', $student->id)
         ->where('is_primary', true)
         ->exists())->toBeTrue();
+
+    Notification::assertNotSentTo($parentUser, ResetPassword::class);
 });
 
 it('rejects a parent account that is linked to another student', function () {

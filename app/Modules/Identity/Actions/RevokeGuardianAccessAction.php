@@ -11,6 +11,30 @@ use Illuminate\Support\Facades\DB;
 
 final class RevokeGuardianAccessAction
 {
+    public static function revokeLegacyPrimaryForStudent(int $studentId): void
+    {
+        DB::transaction(function () use ($studentId): void {
+            $projection = DB::table('parent_student')
+                ->where('student_id', $studentId)
+                ->where('is_primary', true)
+                ->first(['id', 'parent_id']);
+
+            if ($projection === null) {
+                return;
+            }
+
+            DB::table('parent_student')->where('id', $projection->id)->delete();
+            $parentProfile = ParentProfile::query()->with('user')->find($projection->parent_id);
+
+            if ($parentProfile === null || $parentProfile->students()->exists()) {
+                return;
+            }
+
+            $parentProfile->user?->tokens()->delete();
+            $parentProfile->update(['status' => 'inactive']);
+        });
+    }
+
     /** @param array{guardian_relationship_id: int} $data */
     public static function run(array $data): GuardianAccessGrantDto
     {

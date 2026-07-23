@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Identity\Support;
 
+use App\Models\User;
 use App\Modules\Identity\Models\GuardianAccessGrant;
 use App\Shared\Contracts\Identity\DTO\GuardianAccessAccount;
 use App\Shared\Contracts\Identity\DTO\GuardianAccessGrant as GuardianAccessGrantDto;
@@ -142,6 +143,30 @@ final class EloquentGuardianAccessGrantReader implements GuardianAccessGrantRead
             ->unique()
             ->values()
             ->all();
+    }
+
+    public function hasRelationshipForOtherStudent(int $accountId, int $studentId): bool
+    {
+        $hasGrant = GuardianAccessGrant::query()
+            ->join('parents', 'parents.id', '=', 'guardian_access_grants.parent_id')
+            ->where('parents.user_id', $accountId)
+            ->where('guardian_access_grants.student_id', '!=', $studentId)
+            ->exists();
+
+        if ($hasGrant) {
+            return true;
+        }
+
+        return DB::table('parent_student')
+            ->join('parents', 'parents.id', '=', 'parent_student.parent_id')
+            ->where('parents.user_id', $accountId)
+            ->where('parent_student.student_id', '!=', $studentId)
+            ->exists();
+    }
+
+    public function accountExistsForEmail(string $email): bool
+    {
+        return User::query()->where('email', $email)->exists();
     }
 
     public function activeRelationshipIds(array $guardianRelationshipIds): array

@@ -69,3 +69,13 @@ it('reads the staff edit form primary Guardian through the Registry contract', f
         ->not->toContain("'parentProfiles.user'")
         ->not->toContain('primaryParentProfile');
 });
+
+it('keeps staff Guardian mutations behind Registry and Identity contracts', function (): void {
+    $contents = file_get_contents(base_path('app/Services/StudentService.php')) ?: '';
+
+    expect($contents)
+        ->toContain('StudentGuardianRelationshipWriter')
+        ->toContain('GuardianAccessGrantWriter')
+        ->not->toContain('ParentProfile')
+        ->not->toContain('parent_student');
+});

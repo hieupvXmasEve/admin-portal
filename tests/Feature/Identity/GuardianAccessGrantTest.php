@@ -13,6 +13,7 @@ use App\Modules\Identity\Queries\GetParentContextQuery;
 use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
 use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
+use App\Shared\Support\Enums\UserType;
 use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -59,6 +60,34 @@ it('does not grant portal access to a Guardian without an email', function (): v
         ->toThrow(DomainException::class)
         ->and(DB::table('student_guardian_relationships')->where('id', $relationship->id)->exists())->toBeTrue()
         ->and(DB::table('guardian_access_grants')->count())->toBe(0);
+});
+
+it('rejects grant provisioning for an account linked to another student only by the legacy projection', function (): void {
+    $semester = Semester::factory()->create();
+    $firstStudent = Student::factory()->state(['intake' => $semester->id, 'intake_semester_id' => $semester->id])->create();
+    $secondStudent = Student::factory()->state(['intake' => $semester->id, 'intake_semester_id' => $semester->id])->create();
+    $user = User::factory()->create([
+        'email' => 'legacy-linked@example.test',
+        'type' => UserType::PARENT,
+    ]);
+    $profile = ParentProfile::factory()->create(['user_id' => $user->id]);
+    DB::table('parent_student')->insert([
+        'parent_id' => $profile->id,
+        'student_id' => $firstStudent->id,
+        'relationship' => 'guardian',
+        'is_primary' => true,
+        'access_level' => 'read_only',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $relationship = app(StudentGuardianRelationshipWriter::class)->preserveForStudent((int) $secondStudent->id, [[
+        'full_name' => 'Legacy Linked Guardian',
+        'email' => $user->email,
+        'is_primary' => true,
+    ]])[0];
+
+    expect(fn () => app(GuardianAccessGrantWriter::class)->grant($relationship))
+        ->toThrow(DomainException::class, 'This Guardian account already has a Student access grant.');
 });
 
 it('evaluates active Student access from Identity grants', function (): void {

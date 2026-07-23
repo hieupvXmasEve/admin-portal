@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Student;
 
-use App\Models\ParentProfile;
 use App\Models\Student;
 use App\Models\User;
+use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class UpdateStudentRequest extends FormRequest
@@ -138,18 +137,8 @@ class UpdateStudentRequest extends FormRequest
                     return;
                 }
 
-                // Check if this user already has a ParentProfile linked to another student
-                $parentProfile = ParentProfile::withTrashed()->where('user_id', $user->id)->first();
-
-                if ($parentProfile) {
-                    $existingLink = DB::table('parent_student')
-                        ->where('parent_id', $parentProfile->id)
-                        ->where('student_id', '!=', $studentId)
-                        ->first();
-
-                    if ($existingLink) {
-                        $fail('Email này đã được liên kết với sinh viên khác làm phụ huynh.');
-                    }
+                if (app(GuardianAccessGrantReader::class)->hasRelationshipForOtherStudent((int) $user->id, (int) $studentId)) {
+                    $fail('Email này đã được liên kết với sinh viên khác làm phụ huynh.');
                 }
             }
         };

@@ -29,6 +29,10 @@ interface GuardianAccessGrantReader
     /** @param list<int> $studentIds @return list<int> */
     public function studentIdsWithAccounts(array $studentIds): array;
 
+    public function hasRelationshipForOtherStudent(int $accountId, int $studentId): bool;
+
+    public function accountExistsForEmail(string $email): bool;
+
     /**
      * @param  list<int>  $guardianRelationshipIds
      * @return list<int>
