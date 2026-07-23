@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Catalog\Actions;
 
 use App\Services\UnitExcelImportService;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
@@ -16,7 +17,7 @@ class ProcessUnitImportAction
      * @param  array{duplicate_handling: 'skip'|'update'|'error', create_prerequisites: bool, create_equivalents: bool}  $options
      * @return array<string, mixed>
      */
-    public function handle(string $path, array $options): array
+    public function handle(string $path, array $options, ?int $actorId = null): array
     {
         $absolutePath = $this->absolutePath($path);
         $startedAt = microtime(true);
@@ -35,6 +36,11 @@ class ProcessUnitImportAction
                 ? $this->imports->importCombinedUnitsWithSyllabus($absolutePath, $options)
                 : $this->imports->importUnitsFromExcel($absolutePath, $options);
             $result['summary']['processing_time'] = round(microtime(true) - $startedAt, 2).' seconds';
+
+            Log::info('Catalog unit import completed.', [
+                'actor_id' => $actorId,
+                'summary' => $result['summary'],
+            ]);
 
             return $result;
         } finally {

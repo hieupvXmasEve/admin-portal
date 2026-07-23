@@ -72,6 +72,7 @@ class UnitImportController extends \App\Http\Controllers\Web\Units\UnitImportCon
                     'create_prerequisites' => $validated['create_prerequisites'] ?? false,
                     'create_equivalents' => $validated['create_equivalents'] ?? false,
                 ],
+                auth()->id(),
             );
 
             return ApiResponse::success(['result' => $result]);
