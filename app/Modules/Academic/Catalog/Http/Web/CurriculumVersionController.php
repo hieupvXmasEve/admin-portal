@@ -9,10 +9,16 @@ use App\Http\Requests\DuplicateCurriculumVersionRequest;
 use App\Http\Requests\StoreCurriculumVersionRequest;
 use App\Http\Requests\UpdateCurriculumVersionRequest;
 use App\Models\CurriculumVersion;
+use App\Models\Program;
+use App\Models\Semester;
+use App\Models\Specialization;
 use App\Modules\Academic\Catalog\Actions\CreateCurriculumVersionAction;
 use App\Modules\Academic\Catalog\Actions\ModifyCurriculumVersionAction;
+use App\Modules\Academic\Catalog\Queries\ListCurriculumVersionsQuery;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Inertia\Response;
 
 /**
  * Catalog owns mutations while summary projections remain a compatibility
@@ -20,6 +26,28 @@ use Inertia\Inertia;
  */
 class CurriculumVersionController extends \App\Http\Controllers\Web\CurriculumVersionController
 {
+    public function index(Request $request): Response
+    {
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'program_id' => ['nullable', 'exists:programs,id'],
+            'specialization_id' => ['nullable', 'exists:specializations,id'],
+            'sort' => ['nullable', 'in:version_code,program_name,specialization_name,created_at,units_count'],
+            'direction' => ['nullable', 'in:asc,desc'],
+            'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
+        ]);
+        $result = app(ListCurriculumVersionsQuery::class)->handle($filters);
+
+        return Inertia::render('curriculum-versions/Index', [
+            'curriculumVersions' => $result['items'],
+            'statistics' => $result['statistics'],
+            'filters' => $filters,
+            'programs' => Program::query()->select('id', 'name', 'code')->orderBy('name')->get(),
+            'specializations' => Specialization::query()->select('id', 'name', 'code', 'program_id')->orderBy('name')->get(),
+            'semesters' => Semester::query()->select('id', 'name', 'code')->orderBy('name')->get(),
+        ]);
+    }
+
     public function store(StoreCurriculumVersionRequest $request): RedirectResponse
     {
         $curriculumVersion = app(CreateCurriculumVersionAction::class)->handle($request->validated());
