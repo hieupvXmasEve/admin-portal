@@ -7,13 +7,16 @@ namespace App\Modules\Academic\Catalog\Http\Web;
 use App\Actions\SyllabusTemplate\CreateSyllabusTemplateAction;
 use App\Actions\SyllabusTemplate\GetSyllabusTemplateListAction;
 use App\Actions\SyllabusTemplate\UpdateSyllabusTemplateAction;
+use App\Http\Requests\SyllabusTemplate\PreviewGradingSchemeRequest;
 use App\Http\Requests\SyllabusTemplate\StoreSyllabusTemplateRequest;
 use App\Http\Requests\SyllabusTemplate\UpdateSyllabusTemplateRequest;
 use App\Http\Responses\ApiResponse;
 use App\Models\AssessmentComponent;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
+use App\Modules\Academic\Actions\PreviewSyllabusGradingSchemeAction;
 use App\Modules\Academic\Catalog\Actions\ManageSyllabusTemplateAction;
+use App\Modules\Academic\Catalog\Actions\PreviewSyllabusGradingSchemeAction as CatalogPreviewSyllabusGradingSchemeAction;
 use App\Modules\Academic\Catalog\Http\Requests\ListSyllabusTemplatesRequest;
 use App\Modules\Academic\Catalog\Queries\ListSyllabusTemplatesQuery;
 use Illuminate\Http\JsonResponse;
@@ -205,6 +208,46 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
         Inertia::flash('success', 'Template cloned');
 
         return back();
+    }
+
+    public function gradingSchemeOptions(): JsonResponse
+    {
+        return ApiResponse::success([
+            'engines' => [
+                ['value' => 'default', 'label' => 'Default weighted percentage'],
+                ['value' => 'metropolia_v1', 'label' => 'Metropolia v1'],
+                ['value' => 'metropolia_v2', 'label' => 'Metropolia v2 (formula)'],
+            ],
+        ]);
+    }
+
+    public function previewGradingScheme(
+        PreviewGradingSchemeRequest $request,
+        PreviewSyllabusGradingSchemeAction $legacyAction,
+    ): JsonResponse {
+        $result = app(CatalogPreviewSyllabusGradingSchemeAction::class)->handle(
+            $request->validated('grading_scheme'),
+            $request->validated('component_scores') ?? [],
+        );
+
+        if (($result['valid'] ?? false) === false) {
+            $errors = array_map(
+                static fn (string $detail): array => ['code' => 'INVALID_SCHEME', 'detail' => $detail],
+                $result['errors'] ?? [],
+            );
+
+            return ApiResponse::error('Invalid grading scheme.', $errors, 422);
+        }
+
+        return ApiResponse::success($result);
+    }
+
+    public function previewExistingGradingScheme(
+        PreviewGradingSchemeRequest $request,
+        SyllabusTemplate $syllabusTemplate,
+        PreviewSyllabusGradingSchemeAction $legacyAction,
+    ): JsonResponse {
+        return $this->previewGradingScheme($request, $legacyAction);
     }
 
     private function loadTemplate(SyllabusTemplate $syllabusTemplate): SyllabusTemplate
