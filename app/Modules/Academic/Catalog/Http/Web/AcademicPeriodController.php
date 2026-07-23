@@ -14,11 +14,15 @@ use App\Modules\Academic\Catalog\Actions\CreateAcademicPeriodAction;
 use App\Modules\Academic\Catalog\Actions\DeactivateAcademicPeriodAction;
 use App\Modules\Academic\Catalog\Actions\DeleteAcademicPeriodAction;
 use App\Modules\Academic\Catalog\Actions\UpdateAcademicPeriodAction;
+use App\Modules\Academic\Catalog\Actions\UpsertCampusPeriodScheduleAction;
 use App\Modules\Academic\Catalog\Http\Requests\ListAcademicPeriodsRequest;
 use App\Modules\Academic\Catalog\Http\Requests\StoreAcademicPeriodRequest;
 use App\Modules\Academic\Catalog\Http\Requests\UpdateAcademicPeriodRequest;
+use App\Modules\Academic\Catalog\Http\Requests\UpsertCampusPeriodScheduleRequest;
+use App\Modules\Academic\Catalog\Models\CampusPeriodSchedule;
 use App\Modules\Academic\Catalog\Queries\ListAcademicPeriodActivationStatusesQuery;
 use App\Modules\Academic\Catalog\Queries\ListAcademicPeriodsQuery;
+use App\Shared\Contracts\Institution\CampusReferenceReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -30,14 +34,36 @@ class AcademicPeriodController extends Controller
     public function __construct(
         private readonly ListAcademicPeriodActivationStatusesQuery $activationStatuses,
         private readonly ListAcademicPeriodsQuery $listAcademicPeriods,
+        private readonly CampusReferenceReader $campuses,
     ) {}
 
     public function index(ListAcademicPeriodsRequest $request): Response
     {
         $filters = $request->validated();
 
+        $semesters = $this->listAcademicPeriods->handle($filters);
+        $campuses = array_map(fn ($campus): array => $campus->toArray(), $this->campuses->all());
+        $campusNames = collect($campuses)->keyBy('id')->map->name;
+        $schedules = CampusPeriodSchedule::query()
+            ->whereIn('semester_id', $semesters->getCollection()->pluck('id'))
+            ->orderBy('campus_id')
+            ->get()
+            ->map(fn (CampusPeriodSchedule $schedule): array => [
+                'id' => $schedule->id,
+                'semester_id' => $schedule->semester_id,
+                'campus_id' => $schedule->campus_id,
+                'campus_name' => $campusNames->get($schedule->campus_id),
+                'operating_start_date' => $schedule->operating_start_date?->format('Y-m-d'),
+                'operating_end_date' => $schedule->operating_end_date?->format('Y-m-d'),
+                'registration_start_date' => $schedule->registration_start_date?->format('Y-m-d'),
+                'registration_end_date' => $schedule->registration_end_date?->format('Y-m-d'),
+            ])
+            ->groupBy('semester_id');
+
         return Inertia::render('semesters/Index', [
-            'semesters' => $this->listAcademicPeriods->handle($filters),
+            'semesters' => $semesters,
+            'campuses' => $campuses,
+            'campus_period_schedules' => $schedules,
             'filters' => [
                 'search' => $filters['search'] ?? null,
                 'name' => $filters['filter']['name'] ?? null,
@@ -143,5 +169,25 @@ class AcademicPeriodController extends Controller
         }
 
         return ApiResponse::success($result['academic_period'], message: $result['message']);
+    }
+
+    public function upsertCampusSchedule(
+        UpsertCampusPeriodScheduleRequest $request,
+        Semester $semester,
+        UpsertCampusPeriodScheduleAction $upsert,
+    ): JsonResponse {
+        $this->authorize('update', $semester);
+
+        $schedule = $upsert->handle($semester, $request->validated());
+
+        return ApiResponse::success([
+            'id' => $schedule->id,
+            'semester_id' => $schedule->semester_id,
+            'campus_id' => $schedule->campus_id,
+            'operating_start_date' => $schedule->operating_start_date?->format('Y-m-d'),
+            'operating_end_date' => $schedule->operating_end_date?->format('Y-m-d'),
+            'registration_start_date' => $schedule->registration_start_date?->format('Y-m-d'),
+            'registration_end_date' => $schedule->registration_end_date?->format('Y-m-d'),
+        ], message: 'Campus schedule saved successfully.');
     }
 }

@@ -13,6 +13,7 @@ export const SEMESTER_ROUTE_NAMES = {
     UPDATE: 'semesters.update',
     DESTROY: 'semesters.destroy',
     API_UPDATE: 'api.semesters.update',
+    CAMPUS_SCHEDULE_UPSERT: 'semesters.campus-schedules.upsert',
 
     // Activation
     ACTIVATE: 'semesters.activate',

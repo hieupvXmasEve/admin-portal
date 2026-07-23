@@ -14,7 +14,7 @@ import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { fromDate } from '@internationalized/date';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { Edit, Plus } from 'lucide-vue-next';
+import { CalendarPlus, Edit, Plus } from 'lucide-vue-next';
 import { computed, h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -32,8 +32,27 @@ interface Semester {
     updated_at: string;
 }
 
+interface Campus {
+    id: number;
+    name: string;
+    code: string;
+}
+
+interface CampusPeriodSchedule {
+    id: number;
+    semester_id: number;
+    campus_id: number;
+    campus_name: string | null;
+    operating_start_date: string | null;
+    operating_end_date: string | null;
+    registration_start_date: string | null;
+    registration_end_date: string | null;
+}
+
 interface Props {
     semesters: PaginatedResponse<Semester>;
+    campuses: Campus[];
+    campus_period_schedules: Record<string, CampusPeriodSchedule[]>;
     filters: {
         search: string | null;
         name: string | null;
@@ -70,7 +89,9 @@ watch(isArchivedFilterString, (newValue) => {
 const showCreateModal = ref(false);
 const showEditModal = ref(false);
 const showDeleteModal = ref(false);
+const showCampusScheduleModal = ref(false);
 const selectedSemester = ref<Semester | null>(null);
+const selectedCampusSchedule = ref<CampusPeriodSchedule | null>(null);
 
 // Forms
 const createForm = useForm({
@@ -95,6 +116,42 @@ const editFormErrors = ref<Record<string, string[]>>({});
 const editFormProcessing = ref(false);
 
 const deleteForm = useForm({});
+const campusScheduleForm = useForm({
+    campus_id: '',
+    operating_date_range: { start: null, end: null } as { start: string | null; end: string | null },
+    registration_date_range: { start: null, end: null } as { start: string | null; end: string | null },
+});
+
+const schedulesFor = (semesterId: number) => props.campus_period_schedules[String(semesterId)] ?? [];
+
+const openCampusScheduleModal = (semester: Semester, schedule: CampusPeriodSchedule | null = null) => {
+    selectedSemester.value = semester;
+    selectedCampusSchedule.value = schedule;
+    campusScheduleForm.clearErrors();
+    campusScheduleForm.campus_id = schedule?.campus_id.toString() ?? '';
+    campusScheduleForm.operating_date_range = { start: schedule?.operating_start_date ?? null, end: schedule?.operating_end_date ?? null };
+    campusScheduleForm.registration_date_range = { start: schedule?.registration_start_date ?? null, end: schedule?.registration_end_date ?? null };
+    showCampusScheduleModal.value = true;
+};
+
+const submitCampusSchedule = () => {
+    if (!selectedSemester.value) return;
+
+    campusScheduleForm.transform((data) => ({
+        campus_id: Number(data.campus_id),
+        operating_start_date: data.operating_date_range.start,
+        operating_end_date: data.operating_date_range.end,
+        registration_start_date: data.registration_date_range.start,
+        registration_end_date: data.registration_date_range.end,
+    })).put(systemRoutes.semesters.upsertCampusSchedule(selectedSemester.value.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            toast.success('Campus schedule saved successfully');
+            showCampusScheduleModal.value = false;
+            router.reload({ only: ['campus_period_schedules'] });
+        },
+    });
+};
 
 // Apply filters with debounce
 // const applyFilters = () => {
@@ -222,6 +279,15 @@ const columns: ColumnDef<Semester>[] = [
                         onClick: () => navigateToEnrollment(semester),
                     },
                     () => ['Manage Enrollment'],
+                ),
+                h(
+                    Button,
+                    {
+                        size: 'sm',
+                        variant: 'outline',
+                        onClick: () => openCampusScheduleModal(semester),
+                    },
+                    () => [h(CalendarPlus, { class: 'h-4 w-4' })],
                 ),
                 // h(
                 //     Button,
@@ -487,6 +553,38 @@ const handlePageSizeChange = (pageSize: number) => {
     <!-- Pagination -->
     <DataPagination :pagination-data="semesters" item-name="semesters" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" class="mt-4" />
 
+    <section class="mt-8 space-y-3">
+        <div>
+            <h2 class="text-base font-semibold">Campus schedules</h2>
+            <p class="text-muted-foreground text-sm">Campus-specific operating and registration windows; Academic Period remains institution-wide.</p>
+        </div>
+        <div v-for="semester in semesters.data" :key="`schedules-${semester.id}`" class="rounded-lg border p-4">
+            <div class="mb-3 flex items-center justify-between gap-3">
+                <div>
+                    <p class="font-medium">{{ semester.name }}</p>
+                    <p class="text-muted-foreground text-sm">{{ semester.code }}</p>
+                </div>
+                <Button size="sm" variant="outline" @click="openCampusScheduleModal(semester)">
+                    <CalendarPlus class="mr-2 h-4 w-4" />
+                    Add campus schedule
+                </Button>
+            </div>
+            <div v-if="schedulesFor(semester.id).length" class="grid gap-2 md:grid-cols-2">
+                <div v-for="schedule in schedulesFor(semester.id)" :key="schedule.id" class="rounded-md bg-muted/50 p-3 text-sm">
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <p class="font-medium">{{ schedule.campus_name ?? `Campus #${schedule.campus_id}` }}</p>
+                            <p class="text-muted-foreground">Operating: {{ schedule.operating_start_date ? `${formatDateToShort(schedule.operating_start_date)} – ${formatDateToShort(schedule.operating_end_date!)}` : 'Not set' }}</p>
+                            <p class="text-muted-foreground">Registration: {{ schedule.registration_start_date ? `${formatDateToShort(schedule.registration_start_date)} – ${formatDateToShort(schedule.registration_end_date!)}` : 'Not set' }}</p>
+                        </div>
+                        <Button size="sm" variant="ghost" @click="openCampusScheduleModal(semester, schedule)">Edit</Button>
+                    </div>
+                </div>
+            </div>
+            <p v-else class="text-muted-foreground text-sm">No campus schedules have been configured.</p>
+        </div>
+    </section>
+
     <!-- Create Modal -->
     <Dialog v-model:open="showCreateModal">
         <DialogContent class="max-w-2xl">
@@ -540,6 +638,37 @@ const handlePageSizeChange = (pageSize: number) => {
                 <Button @click="submitCreate" :disabled="createForm.processing">
                     {{ createForm.processing ? 'Creating...' : 'Create Semester' }}
                 </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="showCampusScheduleModal">
+        <DialogContent class="max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>{{ selectedCampusSchedule ? 'Edit campus schedule' : 'Add campus schedule' }}</DialogTitle>
+                <DialogDescription>Configure campus-specific windows for {{ selectedSemester?.name }} without creating a separate Academic Period.</DialogDescription>
+            </DialogHeader>
+            <div class="space-y-4 py-4">
+                <div>
+                    <Label for="campus-schedule-campus">Campus *</Label>
+                    <select id="campus-schedule-campus" v-model="campusScheduleForm.campus_id" class="border-input bg-background mt-1 flex h-9 w-full rounded-md border px-3 text-sm" :disabled="selectedCampusSchedule !== null">
+                        <option value="" disabled>Select a campus</option>
+                        <option v-for="campus in campuses" :key="campus.id" :value="campus.id.toString()">{{ campus.name }} ({{ campus.code }})</option>
+                    </select>
+                    <p v-if="campusScheduleForm.errors.campus_id" class="mt-1 text-sm text-destructive">{{ campusScheduleForm.errors.campus_id }}</p>
+                </div>
+                <div>
+                    <Label>Operating window</Label>
+                    <DateRangePicker v-model="campusScheduleForm.operating_date_range" placeholder="Select operating dates" />
+                </div>
+                <div>
+                    <Label>Registration window</Label>
+                    <DateRangePicker v-model="campusScheduleForm.registration_date_range" placeholder="Select registration dates" />
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" @click="showCampusScheduleModal = false">Cancel</Button>
+                <Button :disabled="campusScheduleForm.processing" @click="submitCampusSchedule">{{ campusScheduleForm.processing ? 'Saving...' : 'Save schedule' }}</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>

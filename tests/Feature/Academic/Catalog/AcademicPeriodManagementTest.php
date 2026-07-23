@@ -29,7 +29,7 @@ beforeEach(function (): void {
     $this->user = User::factory()->create();
     $this->campus = Campus::factory()->create();
 
-    foreach (['view_semester', 'create_semester'] as $permission) {
+    foreach (['view_semester', 'create_semester', 'edit_semester'] as $permission) {
         grantAcademicPeriodPermission($this->user, $this->campus, $permission);
     }
 
@@ -95,4 +95,41 @@ it('creates an institution-wide academic period through the existing staff contr
         ->assertRedirect(route(SemesterRoutes::INDEX));
 
     expect(Semester::query()->where('code', '2027-SUMMER')->value('name'))->toBe('Summer 2027');
+});
+
+it('stores one campus schedule per academic period without duplicating the period', function (): void {
+    $academicPeriod = Semester::factory()->create();
+    $secondCampus = Campus::factory()->create();
+
+    actingAs($this->user)
+        ->put(route('semesters.campus-schedules.upsert', $academicPeriod), [
+            'campus_id' => $this->campus->id,
+            'operating_start_date' => '2027-01-02',
+            'operating_end_date' => '2027-04-30',
+            'registration_start_date' => '2026-12-01',
+            'registration_end_date' => '2027-01-01',
+        ])
+        ->assertOk()
+        ->assertJsonPath('success', true);
+
+    actingAs($this->user)
+        ->put(route('semesters.campus-schedules.upsert', $academicPeriod), [
+            'campus_id' => $this->campus->id,
+            'operating_start_date' => '2027-01-03',
+            'operating_end_date' => '2027-05-01',
+        ])
+        ->assertOk();
+
+    actingAs($this->user)
+        ->put(route('semesters.campus-schedules.upsert', $academicPeriod), [
+            'campus_id' => $secondCampus->id,
+            'registration_start_date' => '2026-12-02',
+            'registration_end_date' => '2027-01-02',
+        ])
+        ->assertOk();
+
+    expect(\App\Modules\Academic\Catalog\Models\CampusPeriodSchedule::query()
+        ->where('semester_id', $academicPeriod->id)
+        ->count())->toBe(2)
+        ->and(Semester::query()->whereKey($academicPeriod)->count())->toBe(1);
 });

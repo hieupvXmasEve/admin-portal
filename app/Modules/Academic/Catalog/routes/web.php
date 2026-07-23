@@ -44,6 +44,9 @@ Route::middleware(['auth', 'web'])->group(function (): void {
     Route::get('api/semesters/activation-statuses', [AcademicPeriodController::class, 'activationStatuses'])
         ->middleware('can:view_semester')
         ->name(SemesterRoutes::ACTIVATION_STATUSES);
+    Route::put('api/semesters/{semester}/campus-schedules', [AcademicPeriodController::class, 'upsertCampusSchedule'])
+        ->middleware('can:edit_semester')
+        ->name('semesters.campus-schedules.upsert');
 
     Route::post('semester-context', [SelectedAcademicPeriodController::class, 'update'])
         ->middleware('verified')

@@ -56,6 +56,7 @@ export const systemRoutes = {
         show: (id: number) => route(SEMESTER_ROUTE_NAMES.SHOW, { semester: id }),
         enrollment: (id: number) => route(SEMESTER_ROUTE_NAMES.ENROLLMENT_SHOW, { semester: id }),
         apiUpdate: (id: number) => route(SEMESTER_ROUTE_NAMES.API_UPDATE, { semester: id }),
+        upsertCampusSchedule: (id: number) => route(SEMESTER_ROUTE_NAMES.CAMPUS_SCHEDULE_UPSERT, { semester: id }),
     },
     // Campus Management Routes
     campuses: {
