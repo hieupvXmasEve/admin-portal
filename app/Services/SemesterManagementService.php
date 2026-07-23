@@ -14,6 +14,10 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * @deprecated Academic Period management now resolves through Catalog actions and queries.
+ *             Retain delivery-oriented calendar helpers until their owning slice is cut over.
+ */
 class SemesterManagementService
 {
     /**
@@ -465,9 +469,9 @@ class SemesterManagementService
         // If semester starts in fall (Aug-Dec), academic year is current-next
         // If semester starts in spring/summer (Jan-Jul), academic year is previous-current
         if ($date->month >= 8) {
-            return "{$year}-" . ($year + 1);
+            return "{$year}-".($year + 1);
         } else {
-            return ($year - 1) . "-{$year}";
+            return ($year - 1)."-{$year}";
         }
     }
 

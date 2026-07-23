@@ -1,42 +1,10 @@
 <?php
 
 use App\Constants\SemesterRoutes;
-use App\Http\Controllers\Web\SemesterController;
 use App\Http\Controllers\Web\SemesterEnrollmentController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
-    Route::get('semesters', [SemesterController::class, 'index'])
-        ->middleware('can:view_semester')
-        ->name(SemesterRoutes::INDEX);
-
-    Route::post('semesters', [SemesterController::class, 'store'])
-        ->middleware('can:create_semester')
-        ->name(SemesterRoutes::STORE);
-
-    Route::put('semesters/{semester}', [SemesterController::class, 'update'])
-        ->middleware('can:edit_semester')
-        ->name(SemesterRoutes::UPDATE);
-    Route::delete('semesters/{semester}', [SemesterController::class, 'destroy'])
-        ->middleware('can:delete_semester')
-        ->name(SemesterRoutes::DESTROY);
-
-    // API semester update
-    Route::put('api/semesters/{semester}', [SemesterController::class, 'apiUpdate'])
-        ->middleware('can:edit_semester')
-        ->name(SemesterRoutes::API_UPDATE);
-
-    // API routes for semester activation (using edit permission for safety)
-    Route::post('api/semesters/{semester}/activate', [SemesterController::class, 'activate'])
-        ->middleware('can:edit_semester')
-        ->name(SemesterRoutes::ACTIVATE);
-    Route::post('api/semesters/{semester}/deactivate', [SemesterController::class, 'deactivate'])
-        ->middleware('can:edit_semester')
-        ->name(SemesterRoutes::DEACTIVATE);
-    Route::get('api/semesters/activation-statuses', [SemesterController::class, 'activationStatuses'])
-        ->middleware('can:view_semester')
-        ->name(SemesterRoutes::ACTIVATION_STATUSES);
-
     // Admin enrollment management routes
     Route::get('semesters/{semester}/enrollment', [SemesterEnrollmentController::class, 'show'])
         ->middleware('can:edit_semester')

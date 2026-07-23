@@ -12,6 +12,7 @@ return [
         'Academic' => [
             'Catalog' => [
                 'Program',
+                'Semester',
             ],
             'Delivery' => [
                 'CourseOffering',

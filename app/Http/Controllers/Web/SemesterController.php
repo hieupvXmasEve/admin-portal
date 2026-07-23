@@ -17,6 +17,10 @@ use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
+/**
+ * @deprecated Academic Period management routes now resolve to Academic Catalog.
+ *             Retain only until the approved compatibility-path removal.
+ */
 class SemesterController extends Controller
 {
     public function index(Request $request): Response

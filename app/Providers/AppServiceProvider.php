@@ -17,6 +17,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentApplication;
 use App\Models\User;
+use App\Modules\Academic\Catalog\Policies\AcademicPeriodPolicy;
 use App\Modules\Academic\Catalog\Policies\ProgramPolicy;
 use App\Modules\Academic\FacultyWorkforce\Observers\SyncLecturerAccessEligibility;
 use App\Modules\Academic\FacultyWorkforce\Support\EloquentLecturerTokenIssuer;
@@ -156,6 +157,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Gate::policy(StudentApplication::class, StudentApplicationPolicy::class);
         Gate::policy(CourseOffering::class, CourseOfferingPolicy::class);
+        Gate::policy(Semester::class, AcademicPeriodPolicy::class);
         Gate::policy(Program::class, ProgramPolicy::class);
     }
 
