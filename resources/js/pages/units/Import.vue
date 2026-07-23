@@ -149,15 +149,16 @@ const uploadFile = async () => {
         });
 
         const result = await response.json();
+        const payload = result.data ?? result;
 
         if (result.success) {
-            uploadedFilePath.value = result.file_path;
-            uploadedFileName.value = result.filename;
-            previewData.value = result.preview;
+            uploadedFilePath.value = payload.file_path;
+            uploadedFileName.value = payload.filename;
+            previewData.value = payload.preview;
             currentStep.value = 'configure';
             toast.success('File uploaded successfully');
         } else {
-            throw new Error(result.error || 'Upload failed');
+            throw new Error(result.message || result.error || 'Upload failed');
         }
     } catch (error) {
         console.error('Upload error:', error);
@@ -196,13 +197,18 @@ const startImport = async () => {
         });
 
         const result = await response.json();
-        importResult.value = result;
+        const payload = result.data ?? result;
+        importResult.value = {
+            success: result.success,
+            result: payload.result,
+            error: result.message || result.error,
+        };
 
         if (result.success) {
             currentStep.value = 'complete';
             toast.success('Import completed successfully');
         } else {
-            throw new Error(result.error || 'Import failed');
+            throw new Error(result.message || result.error || 'Import failed');
         }
     } catch (error) {
         console.error('Import error:', error);
