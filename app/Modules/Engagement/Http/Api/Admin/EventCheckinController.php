@@ -11,12 +11,12 @@ use App\Models\EventParticipant;
 use App\Modules\Engagement\Actions\EventParticipationOperations;
 use App\Modules\Engagement\Http\Requests\EventCheckinRequest;
 use App\Modules\Engagement\Http\Requests\EventParticipantSearchRequest;
+use App\Modules\Engagement\Http\Requests\ListEventParticipantsRequest;
 use App\Services\QRCodeService;
 use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -65,20 +65,14 @@ class EventCheckinController extends Controller
                     ];
                 });
 
-            return response()->json([
-                'success' => true,
-                'data' => $studentsWithStatus,
-            ]);
+            return ApiResponse::success($studentsWithStatus);
         } catch (\Exception $e) {
             Log::error('Student search failed', [
                 'request' => $request->all(),
                 'error' => $e->getMessage(),
             ]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to search students',
-            ], 500);
+            return ApiResponse::serverError('Failed to search students');
         }
     }
 
@@ -95,10 +89,7 @@ class EventCheckinController extends Controller
             $qrData = $this->qrCodeService->parseQRCode($request->qr_code);
 
             if (! $qrData) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid QR code format',
-                ], 400);
+                return ApiResponse::error('Invalid QR code format');
             }
 
             $student = null;
@@ -110,46 +101,33 @@ class EventCheckinController extends Controller
 
                 // Verify QR belongs to the selected event
                 if ($qrData['event_id'] !== (int) $request->event_id) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'QR code is for a different event',
-                    ], 400);
+                    return ApiResponse::error('QR code is for a different event');
                 }
 
                 // Find participation record
                 $participation = EventParticipant::find($qrData['participation_id']);
 
                 if (! $participation) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Participation record not found',
-                    ], 404);
+                    return ApiResponse::notFound('Participation record not found');
                 }
 
                 // Validate participation is active
                 if (! $participation->isActive()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Participation is not active',
-                    ], 400);
-                }
-
-                // Check if already checked in
-                if ($participation->isCheckedIn() || $participation->isCompleted()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Student is already checked in',
-                        'data' => [
-                            'already_checked_in' => true,
-                            'checkin_time' => $participation->checkin_time,
-                            'student' => $participation->student,
-                        ],
-                    ], 200);
+                    return ApiResponse::error('Participation is not active');
                 }
 
                 $student = $this->studentReferenceReader->find((int) $participation->student_id);
                 if ($student === null) {
                     return ApiResponse::notFound('Student not found');
+                }
+
+                // Check if already checked in
+                if ($participation->isCheckedIn() || $participation->isCompleted()) {
+                    return ApiResponse::error('Student is already checked in', [], 200, [
+                        'already_checked_in' => true,
+                        'checkin_time' => $participation->checkin_time,
+                        'student' => $this->studentPayload($student),
+                    ]);
                 }
 
             } elseif ($qrData['type'] === 'student_id') {
@@ -162,52 +140,36 @@ class EventCheckinController extends Controller
                 );
 
                 if (! $student) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Student not found or not in the same campus as event',
-                    ], 404);
+                    return ApiResponse::notFound('Student not found or not in the same campus as event');
                 }
 
                 // Validate student is active
                 if (! $this->isStudentActive($student->id)) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Student account is not active',
-                    ], 400);
+                    return ApiResponse::error('Student account is not active');
                 }
 
                 // Check if student already has participation
                 $existingParticipation = $event->getStudentParticipation($student->id);
 
                 if ($existingParticipation && ($existingParticipation->isCheckedIn() || $existingParticipation->isCompleted())) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Student is already checked in',
-                        'data' => [
-                            'already_checked_in' => true,
-                            'checkin_time' => $existingParticipation->checkin_time,
-                            'student' => $student,
-                        ],
-                    ], 200);
+                    return ApiResponse::error('Student is already checked in', [], 200, [
+                        'already_checked_in' => true,
+                        'checkin_time' => $existingParticipation->checkin_time,
+                        'student' => $this->studentPayload($student),
+                    ]);
                 }
 
                 // Check if event requires registration and student is NOT registered
                 if ($event->requiresRegistration()) {
                     if (! $existingParticipation || ! $existingParticipation->isActive()) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'This event requires prior registration. Student must register before check-in.',
-                        ], 400);
+                        return ApiResponse::error('This event requires prior registration. Student must register before check-in.');
                     }
                     // Student is registered, continue to check-in
                 }
 
                 // For walk-in events, check capacity
                 if (! $event->requiresRegistration() && $event->hasReachedCapacity()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Event has reached maximum capacity',
-                    ], 400);
+                    return ApiResponse::error('Event has reached maximum capacity');
                 }
             }
 
@@ -227,39 +189,23 @@ class EventCheckinController extends Controller
                 $deviceInfo
             );
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Student checked in successfully',
-                'data' => [
-                    'participant' => [
-                        'id' => $participant->id,
-                        'status' => $participant->status,
-                        'checkin_time' => $participant->checkin_time,
-                        'student' => [
-                            'id' => $student->id,
-                            'student_id' => $student->studentCode,
-                            'full_name' => $student->fullName,
-                            'email' => $student->email,
-                        ],
-                        'event' => [
-                            'id' => $event->id,
-                            'title' => $event->title,
-                            'gold_reward_amount' => $event->gold_reward_amount,
-                        ],
+            return ApiResponse::success([
+                'participant' => [
+                    'id' => $participant->id,
+                    'status' => $participant->status,
+                    'checkin_time' => $participant->checkin_time,
+                    'student' => $this->studentPayload($student),
+                    'event' => [
+                        'id' => $event->id,
+                        'title' => $event->title,
+                        'gold_reward_amount' => $event->gold_reward_amount,
                     ],
                 ],
-            ]);
+            ], message: 'Student checked in successfully');
         } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'errors' => $e->errors(),
-            ], 422);
+            return ApiResponse::validationError($e->errors(), $e->getMessage());
         } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 400);
+            return ApiResponse::error($e->getMessage());
         } catch (\Exception $e) {
             Log::error('Student check-in failed', [
                 'event_id' => $request->event_id,
@@ -268,21 +214,23 @@ class EventCheckinController extends Controller
                 'error' => $e->getMessage(),
             ]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to check in student',
-            ], 500);
+            return ApiResponse::serverError('Failed to check in student');
         }
     }
 
     /**
      * Get event participants with check-in status
      */
-    public function getParticipants(Request $request, Event $event): JsonResponse
+    public function getParticipants(ListEventParticipantsRequest $request, Event $event): JsonResponse
     {
         try {
-            $filters = $request->only(['status', 'search', 'gold_awarded']);
-            $perPage = min($request->get('per_page', 15), 50);
+            $validated = $request->validated();
+            $filters = array_filter([
+                'status' => $validated['status'] ?? null,
+                'search' => $validated['search'] ?? null,
+                'gold_awarded' => $validated['gold_awarded'] ?? null,
+            ], static fn (mixed $value): bool => $value !== null);
+            $perPage = $validated['per_page'] ?? 15;
 
             $participants = $this->participationService->getEventParticipants(
                 $event,
@@ -290,10 +238,9 @@ class EventCheckinController extends Controller
                 $perPage
             );
 
-            return response()->json([
-                'success' => true,
-                'data' => $participants->items(),
-                'meta' => [
+            return ApiResponse::success(
+                $participants->items(),
+                [
                     'current_page' => $participants->currentPage(),
                     'last_page' => $participants->lastPage(),
                     'per_page' => $participants->perPage(),
@@ -301,17 +248,14 @@ class EventCheckinController extends Controller
                     'from' => $participants->firstItem(),
                     'to' => $participants->lastItem(),
                 ],
-            ]);
+            );
         } catch (\Exception $e) {
             Log::error('Failed to get event participants', [
                 'event_id' => $event->id,
                 'error' => $e->getMessage(),
             ]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to get event participants',
-            ], 500);
+            return ApiResponse::serverError('Failed to get event participants');
         }
     }
 
@@ -323,20 +267,14 @@ class EventCheckinController extends Controller
         try {
             $statistics = $this->participationService->getEventStatistics($event);
 
-            return response()->json([
-                'success' => true,
-                'data' => $statistics,
-            ]);
+            return ApiResponse::success($statistics);
         } catch (\Exception $e) {
             Log::error('Failed to get event statistics', [
                 'event_id' => $event->id,
                 'error' => $e->getMessage(),
             ]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to get event statistics',
-            ], 500);
+            return ApiResponse::serverError('Failed to get event statistics');
         }
     }
 
@@ -367,5 +305,16 @@ class EventCheckinController extends Controller
         $status = $this->studentLifecycleStatusReader->statusesFor([$studentId])[$studentId] ?? null;
 
         return ! in_array($status, ['inactive', 'dropout', 'dropout_transfer', 'graduated', 'pending'], true);
+    }
+
+    /** @return array{id: int, student_id: string, full_name: string, email: string|null} */
+    private function studentPayload(StudentReference $student): array
+    {
+        return [
+            'id' => $student->id,
+            'student_id' => $student->studentCode,
+            'full_name' => $student->fullName,
+            'email' => $student->email,
+        ];
     }
 }

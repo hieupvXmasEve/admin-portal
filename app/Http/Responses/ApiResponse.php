@@ -45,14 +45,21 @@ final class ApiResponse
     public static function error(
         string $message,
         array $errors = [], // each item: ['code' => ?, 'field' => ?, 'detail' => ?]
-        int $status = Response::HTTP_BAD_REQUEST
+        int $status = Response::HTTP_BAD_REQUEST,
+        mixed $data = null,
     ): JsonResponse {
-        return response()->json([
+        $body = [
             'success' => false,
             'message' => $message,
             'errors' => array_values($errors), // normalize to indexed array
             'timestamp' => now()->toISOString(),
-        ], $status);
+        ];
+
+        if ($data !== null) {
+            $body['data'] = $data;
+        }
+
+        return response()->json($body, $status);
     }
 
     /**

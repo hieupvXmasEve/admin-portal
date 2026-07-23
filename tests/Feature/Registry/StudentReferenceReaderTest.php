@@ -43,6 +43,9 @@ it('publishes a campus-scoped student reference without lifecycle or finance sta
             'full_name' => $student->full_name,
             'campus_id' => $campus->id,
         ])
+        ->and($reference?->programId)->toBe($program->id)
+        ->and($reference?->programCode)->toBe($program->code)
+        ->and($reference?->programName)->toBe($program->name)
         ->and($reader->find(999_999))->toBeNull()
         ->and($reader->findMany([(int) $student->id, 999_999]))->toHaveKey((int) $student->id)
         ->and($reader->idsForCampus((int) $campus->id))->toBe([(int) $student->id])

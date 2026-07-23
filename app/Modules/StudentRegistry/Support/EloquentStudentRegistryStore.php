@@ -22,7 +22,8 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
     public function find(int $studentId): ?StudentReference
     {
         $student = Student::query()
-            ->select(['id', 'student_id', 'user_id', 'full_name', 'campus_id', 'email', 'current_address_line', 'address', 'national_id'])
+            ->with(['program:id,code,name', 'specialization:id,code,name'])
+            ->select($this->referenceColumns())
             ->find($studentId);
 
         return $student !== null ? $this->reference($student) : null;
@@ -114,7 +115,8 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
         }
 
         return Student::query()
-            ->select(['id', 'student_id', 'user_id', 'full_name', 'campus_id', 'email', 'current_address_line', 'address', 'national_id'])
+            ->with(['program:id,code,name', 'specialization:id,code,name'])
+            ->select($this->referenceColumns())
             ->whereIn('id', $studentIds)
             ->get()
             ->mapWithKeys(fn (Student $student): array => [(int) $student->id => $this->reference($student)])
@@ -124,7 +126,8 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
     public function findByStudentCode(string $studentCode, int $campusId): ?StudentReference
     {
         $student = Student::query()
-            ->select(['id', 'student_id', 'user_id', 'full_name', 'campus_id', 'email', 'current_address_line', 'address', 'national_id'])
+            ->with(['program:id,code,name', 'specialization:id,code,name'])
+            ->select($this->referenceColumns())
             ->where('student_id', $studentCode)
             ->where('campus_id', $campusId)
             ->first();
@@ -135,7 +138,8 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
     public function findByStudentCodeAnywhere(string $studentCode): ?StudentReference
     {
         $student = Student::query()
-            ->select(['id', 'student_id', 'user_id', 'full_name', 'campus_id', 'email', 'current_address_line', 'address', 'national_id'])
+            ->with(['program:id,code,name', 'specialization:id,code,name'])
+            ->select($this->referenceColumns())
             ->where('student_id', $studentCode)
             ->first();
 
@@ -171,7 +175,8 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
     public function search(string $query, int $campusId, int $limit = 10): array
     {
         return Student::query()
-            ->select(['id', 'student_id', 'user_id', 'full_name', 'campus_id', 'email', 'current_address_line', 'address', 'national_id'])
+            ->with(['program:id,code,name', 'specialization:id,code,name'])
+            ->select($this->referenceColumns())
             ->where('campus_id', $campusId)
             ->where(function (Builder $students) use ($query): void {
                 $students->where('student_id', 'like', "%{$query}%")
@@ -196,6 +201,30 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             address: $student->current_address_line ?? $student->address,
             nationalId: $student->national_id === null ? null : (string) $student->national_id,
             userId: $student->user_id === null ? null : (int) $student->user_id,
+            programId: $student->program_id === null ? null : (int) $student->program_id,
+            programCode: $student->program?->code,
+            programName: $student->program?->name,
+            specializationId: $student->specialization_id === null ? null : (int) $student->specialization_id,
+            specializationCode: $student->specialization?->code,
+            specializationName: $student->specialization?->name,
         );
+    }
+
+    /** @return list<string> */
+    private function referenceColumns(): array
+    {
+        return [
+            'id',
+            'student_id',
+            'user_id',
+            'full_name',
+            'campus_id',
+            'email',
+            'current_address_line',
+            'address',
+            'national_id',
+            'program_id',
+            'specialization_id',
+        ];
     }
 }

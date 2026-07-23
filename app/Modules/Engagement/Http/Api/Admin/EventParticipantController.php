@@ -6,10 +6,16 @@ namespace App\Modules\Engagement\Http\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\EventParticipantResource;
+use App\Http\Responses\ApiResponse;
 use App\Models\Event;
 use App\Models\Program;
 use App\Models\Specialization;
 use App\Modules\Engagement\Actions\EventParticipationOperations;
+use App\Modules\Engagement\Http\Requests\AddManualEventParticipantsRequest;
+use App\Modules\Engagement\Http\Requests\BulkUpdateEventParticipantsRequest;
+use App\Modules\Engagement\Http\Requests\ListEventParticipantsRequest;
+use App\Modules\Engagement\Http\Requests\ManualEventParticipantSearchRequest;
+use App\Modules\Engagement\Http\Requests\RemoveManualEventParticipantsRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -49,20 +55,17 @@ class EventParticipantController extends Controller
             ['value' => 'suspension', 'label' => 'Academic Suspension'],
         ];
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'programs' => $programs,
-                'specializations' => $specializations,
-                'academic_statuses' => $academicStatuses,
-            ],
+        return ApiResponse::success([
+            'programs' => $programs,
+            'specializations' => $specializations,
+            'academic_statuses' => $academicStatuses,
         ]);
     }
 
     /**
      * Search for students by student IDs for manual event participation
      */
-    public function searchStudents(Request $request, Event $event): JsonResponse
+    public function searchStudents(ManualEventParticipantSearchRequest $request, Event $event): JsonResponse
     {
         $campus = session('current_campus_id');
         if (! $campus || (int) $event->campus_id !== (int) $campus) {
@@ -73,27 +76,18 @@ class EventParticipantController extends Controller
         //     abort(403, 'Student selection is only available for manual events');
         // }
 
-        $validated = $request->validate([
-            'student_ids' => ['required', 'string'],
-        ]);
-
         $students = $this->participationService->searchStudentsForManualEvent(
             $event,
-            $validated['student_ids']
+            $request->validated('student_ids')
         );
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'students' => $students,
-            ],
-        ]);
+        return ApiResponse::success(['students' => $students]);
     }
 
     /**
      * Add students to manual event
      */
-    public function addParticipants(Request $request, Event $event): JsonResponse
+    public function addParticipants(AddManualEventParticipantsRequest $request, Event $event): JsonResponse
     {
         $campus = session('current_campus_id');
         if (! $campus || (int) $event->campus_id !== (int) $campus) {
@@ -104,50 +98,40 @@ class EventParticipantController extends Controller
         //     abort(403, 'Can only add participants to manual events');
         // }
 
-        $request->validate([
-            'student_ids' => 'required|array|min:1|max:100',
-            'student_ids.*' => 'required|integer|exists:students,id',
-            'status' => 'required|in:registered,completed',
-            'bonus_gold_amount' => 'nullable|numeric|min:0|max:999999.99',
-            'description' => 'nullable|string|max:500',
-        ]);
-
         try {
+            $validated = $request->validated();
             $results = $this->participationService->addManualParticipants(
                 $event,
-                $request->student_ids,
-                $request->status,
+                $validated['student_ids'],
+                $validated['status'],
                 $request->user(),
-                $request->bonus_gold_amount,
-                $request->description
+                $validated['bonus_gold_amount'] ?? null,
+                $validated['description'] ?? null,
             );
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Participants processed successfully',
-                'data' => $results,
-            ]);
+            return ApiResponse::success($results, message: 'Participants processed successfully');
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to add participants: '.$e->getMessage(),
-                'errors' => ['general' => [$e->getMessage()]],
-            ], 422);
+            return ApiResponse::error('Failed to add participants: '.$e->getMessage(), [], 422);
         }
     }
 
     /**
      * Get event participants with filtering
      */
-    public function getParticipants(Request $request, Event $event): JsonResponse
+    public function getParticipants(ListEventParticipantsRequest $request, Event $event): JsonResponse
     {
         $campus = session('current_campus_id');
         if (! $campus || (int) $event->campus_id !== (int) $campus) {
             abort(403, 'You are not authorized to manage this event');
         }
 
-        $filters = $request->only(['status', 'search', 'gold_awarded']);
-        $perPage = min($request->get('per_page', 15), 50);
+        $validated = $request->validated();
+        $filters = array_filter([
+            'status' => $validated['status'] ?? null,
+            'search' => $validated['search'] ?? null,
+            'gold_awarded' => $validated['gold_awarded'] ?? null,
+        ], static fn (mixed $value): bool => $value !== null);
+        $perPage = $validated['per_page'] ?? 15;
 
         $participants = $this->participationService->getEventParticipants(
             $event,
@@ -155,10 +139,9 @@ class EventParticipantController extends Controller
             $perPage
         );
 
-        return response()->json([
-            'success' => true,
-            'data' => EventParticipantResource::collection($participants->items()),
-            'meta' => [
+        return ApiResponse::success(
+            EventParticipantResource::collection($participants->items()),
+            [
                 'current_page' => $participants->currentPage(),
                 'last_page' => $participants->lastPage(),
                 'per_page' => $participants->perPage(),
@@ -166,13 +149,13 @@ class EventParticipantController extends Controller
                 'from' => $participants->firstItem(),
                 'to' => $participants->lastItem(),
             ],
-        ]);
+        );
     }
 
     /**
      * Bulk update participant status
      */
-    public function bulkUpdateStatus(Request $request, Event $event): JsonResponse
+    public function bulkUpdateStatus(BulkUpdateEventParticipantsRequest $request, Event $event): JsonResponse
     {
         $campus = session('current_campus_id');
         if (! $campus || (int) $event->campus_id !== (int) $campus) {
@@ -183,38 +166,25 @@ class EventParticipantController extends Controller
             abort(403, 'Can only bulk update participants for manual events');
         }
 
-        $request->validate([
-            'participant_ids' => 'required|array|min:1|max:50',
-            'participant_ids.*' => 'required|integer|exists:event_participants,id',
-            'status' => 'required|in:registered,completed,cancelled',
-        ]);
-
         try {
+            $validated = $request->validated();
             $results = $this->participationService->bulkUpdateParticipantStatus(
                 $event,
-                $request->participant_ids,
-                $request->status,
-                $request->user()
+                $validated['participant_ids'],
+                $validated['status'],
+                $request->user(),
             );
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Participant statuses updated successfully',
-                'data' => $results,
-            ]);
+            return ApiResponse::success($results, message: 'Participant statuses updated successfully');
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update participant statuses: '.$e->getMessage(),
-                'errors' => ['general' => [$e->getMessage()]],
-            ], 422);
+            return ApiResponse::error('Failed to update participant statuses: '.$e->getMessage(), [], 422);
         }
     }
 
     /**
      * Remove participants from manual event
      */
-    public function removeParticipants(Request $request, Event $event): JsonResponse
+    public function removeParticipants(RemoveManualEventParticipantsRequest $request, Event $event): JsonResponse
     {
         $campus = session('current_campus_id');
         if (! $campus || (int) $event->campus_id !== (int) $campus) {
@@ -225,29 +195,17 @@ class EventParticipantController extends Controller
             abort(403, 'Can only remove participants from manual events');
         }
 
-        $request->validate([
-            'participant_ids' => 'required|array|min:1|max:50',
-            'participant_ids.*' => 'required|integer|exists:event_participants,id',
-        ]);
-
         try {
+            $validated = $request->validated();
             $results = $this->participationService->removeManualParticipants(
                 $event,
-                $request->participant_ids,
-                $request->user()
+                $validated['participant_ids'],
+                $request->user(),
             );
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Participants removed successfully',
-                'data' => $results,
-            ]);
+            return ApiResponse::success($results, message: 'Participants removed successfully');
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to remove participants: '.$e->getMessage(),
-                'errors' => ['general' => [$e->getMessage()]],
-            ], 422);
+            return ApiResponse::error('Failed to remove participants: '.$e->getMessage(), [], 422);
         }
     }
 
@@ -267,9 +225,6 @@ class EventParticipantController extends Controller
 
         $statistics = $this->participationService->getManualEventStatistics($event);
 
-        return response()->json([
-            'success' => true,
-            'data' => $statistics,
-        ]);
+        return ApiResponse::success($statistics);
     }
 }

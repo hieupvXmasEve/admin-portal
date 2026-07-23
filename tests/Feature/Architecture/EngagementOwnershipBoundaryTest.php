@@ -76,3 +76,24 @@ it('keeps supported event and club runtime callers off frozen implementations', 
         'Supported event and club callers must use the Engagement owner boundary: '.implode(', ', $violations),
     );
 });
+
+it('uses Student Registry contracts and API primitives for manual event participants', function (): void {
+    $root = base_path();
+    $participationOperations = file_get_contents($root.'/app/Modules/Engagement/Actions/EventParticipationOperations.php') ?: '';
+    $adminControllers = [
+        file_get_contents($root.'/app/Modules/Engagement/Http/Api/Admin/EventCheckinController.php') ?: '',
+        file_get_contents($root.'/app/Modules/Engagement/Http/Api/Admin/EventParticipantController.php') ?: '',
+    ];
+
+    expect($participationOperations)
+        ->toContain('StudentReferenceReader')
+        ->not->toContain('use App\\Models\\Student;')
+        ->not->toContain('Student::');
+
+    foreach ($adminControllers as $controller) {
+        expect($controller)
+            ->toContain('ApiResponse::')
+            ->not->toContain('response()->json')
+            ->not->toContain('->validate(');
+    }
+});

@@ -15,6 +15,12 @@ final readonly class StudentReference
         public ?string $address = null,
         public ?string $nationalId = null,
         public ?int $userId = null,
+        public ?int $programId = null,
+        public ?string $programCode = null,
+        public ?string $programName = null,
+        public ?int $specializationId = null,
+        public ?string $specializationCode = null,
+        public ?string $specializationName = null,
     ) {}
 
     /**

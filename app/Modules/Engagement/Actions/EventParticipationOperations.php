@@ -7,7 +7,6 @@ namespace App\Modules\Engagement\Actions;
 use App\Models\Event;
 use App\Models\EventParticipant;
 use App\Models\GoldTransaction;
-use App\Models\Student;
 use App\Models\User;
 use App\Services\GoldService;
 use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
@@ -867,10 +866,7 @@ final class EventParticipationOperations
                 continue;
             }
 
-            $student = Student::where('student_id', $studentId)
-                ->where('campus_id', $event->campus_id)
-                ->with(['program:id,code,name', 'specialization:id,code,name'])
-                ->first();
+            $student = $this->studentReferenceReader->findByStudentCode($studentId, (int) $event->campus_id);
 
             if (! $student) {
                 $eligibilityInfo['eligibility_reasons'][] = 'Student ID not found in this campus';
@@ -882,19 +878,19 @@ final class EventParticipationOperations
             $eligibilityInfo['exists'] = true;
             $eligibilityInfo['student_data'] = [
                 'id' => $student->id,
-                'student_id' => $student->student_id,
-                'full_name' => $student->full_name,
+                'student_id' => $student->studentCode,
+                'full_name' => $student->fullName,
                 'email' => $student->email,
-                'program' => $student->program ? [
-                    'code' => $student->program->code,
-                    'name' => $student->program->name,
+                'program' => $student->programCode !== null ? [
+                    'code' => $student->programCode,
+                    'name' => $student->programName,
                 ] : null,
-                'specialization' => $student->specialization ? [
-                    'code' => $student->specialization->code,
-                    'name' => $student->specialization->name,
+                'specialization' => $student->specializationCode !== null ? [
+                    'code' => $student->specializationCode,
+                    'name' => $student->specializationName,
                 ] : null,
             ];
-            $eligibilityInfo['major_code'] = $student->specialization?->code ?? $student->program?->code ?? 'N/A';
+            $eligibilityInfo['major_code'] = $student->specializationCode ?? $student->programCode ?? 'N/A';
 
             $participant = $event->getStudentParticipation($student->id);
             if ($participant && ($participant->isCompleted() || $participant->isCheckedIn())) {
@@ -908,9 +904,10 @@ final class EventParticipationOperations
             $isEligible = true;
             $reasons = [];
 
-            if (! $student->isActive()) {
+            if (! $this->isStudentActive($student->id)) {
                 $isEligible = false;
-                $reasons[] = "Student status is '{$student->status}' (must be 'active')";
+                $studentStatus = $this->studentStatus($student->id) ?? 'unknown';
+                $reasons[] = "Student status is '{$studentStatus}' (must be 'active')";
             }
 
             if ($event->hasReachedCapacity()) {
@@ -956,11 +953,9 @@ final class EventParticipationOperations
             foreach ($studentIds as $studentId) {
                 try {
                     // Validate student exists and belongs to same campus
-                    $student = Student::where('id', $studentId)
-                        ->where('campus_id', $event->campus_id)
-                        ->first();
+                    $student = $this->studentReferenceReader->find((int) $studentId);
 
-                    if (! $student) {
+                    if ($student === null || $student->campusId !== (int) $event->campus_id) {
                         $results['errors'][] = [
                             'student_id' => $studentId,
                             'error' => 'Student not found or not in same campus',
@@ -974,7 +969,7 @@ final class EventParticipationOperations
                     if ($existingParticipation && $existingParticipation->isCompleted() && $existingParticipation->isCheckedIn()) {
                         $results['skipped'][] = [
                             'student_id' => $studentId,
-                            'student_name' => $student->full_name,
+                            'student_name' => $student->fullName,
                             'reason' => 'Already registered',
                         ];
 
@@ -982,10 +977,10 @@ final class EventParticipationOperations
                     }
 
                     // Validate student is active
-                    if (! $student->isActive()) {
+                    if (! $this->isStudentActive($student->id)) {
                         $results['errors'][] = [
                             'student_id' => $studentId,
-                            'student_name' => $student->full_name,
+                            'student_name' => $student->fullName,
                             'error' => 'Student is not active',
                         ];
 
@@ -993,7 +988,7 @@ final class EventParticipationOperations
                     }
 
                     // Create participation record
-                    $participant = $this->createOrUpdateParticipation($event, $student, $status);
+                    $participant = $this->createOrUpdateParticipation($event, $student->id, $status);
 
                     // If status is completed, award gold immediately
                     if ($status === 'completed' && $event->gold_reward_amount > 0) {
@@ -1010,7 +1005,7 @@ final class EventParticipationOperations
 
                     $results['added'][] = [
                         'student_id' => $studentId,
-                        'student_name' => $student->full_name,
+                        'student_name' => $student->fullName,
                         'status' => $status,
                         'gold_awarded' => $status === 'completed' && $event->gold_reward_amount > 0,
                         'total_gold_amount' => $totalGold,
@@ -1053,43 +1048,46 @@ final class EventParticipationOperations
         array $filters = [],
         int $perPage = 50
     ): LengthAwarePaginator {
-        $query = Student::where('campus_id', $event->campus_id)
-            ->whereIn('status', ['intake_course', 'intake_pre_uni_gc'])
-            ->whereNotIn('id', function ($subQuery) use ($event) {
-                $subQuery->select('student_id')
-                    ->from('event_participants')
-                    ->where('event_id', $event->id)
-                    ->whereIn('status', ['registered', 'checked_in', 'completed']);
-            });
+        $participatingStudentIds = EventParticipant::query()
+            ->where('event_id', $event->id)
+            ->whereIn('status', ['registered', 'checked_in', 'completed'])
+            ->pluck('student_id')
+            ->map(static fn (int|string $studentId): int => (int) $studentId)
+            ->all();
+        $students = $this->studentReferenceReader->findMany(
+            array_values(array_diff(
+                $this->studentReferenceReader->idsForCampus((int) $event->campus_id),
+                $participatingStudentIds,
+            )),
+        );
+        $statuses = $this->studentLifecycleStatusReader->statusesFor(array_keys($students));
+        $academicStatuses = $this->studentLifecycleStatusReader->academicStatusesFor(array_keys($students));
+        $search = strtolower((string) ($filters['search'] ?? ''));
 
-        // Apply search filter
-        if (isset($filters['search']) && ! empty($filters['search'])) {
-            $search = $filters['search'];
-            $query->where(function ($q) use ($search) {
-                $q->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('student_id', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
+        $availableStudents = collect($students)
+            ->filter(function (StudentReference $student) use ($filters, $statuses, $academicStatuses, $search): bool {
+                if (! in_array($statuses[$student->id] ?? null, ['intake_course', 'intake_pre_uni_gc'], true)) {
+                    return false;
+                }
 
-        // Apply program filter
-        if (isset($filters['program_id']) && ! empty($filters['program_id'])) {
-            $query->where('program_id', $filters['program_id']);
-        }
+                if ($search !== '' && ! str_contains(strtolower("{$student->fullName} {$student->studentCode} {$student->email}"), $search)) {
+                    return false;
+                }
 
-        // Apply specialization filter
-        if (isset($filters['specialization_id']) && ! empty($filters['specialization_id'])) {
-            $query->where('specialization_id', $filters['specialization_id']);
-        }
+                return (! isset($filters['program_id']) || (int) $filters['program_id'] === $student->programId)
+                    && (! isset($filters['specialization_id']) || (int) $filters['specialization_id'] === $student->specializationId)
+                    && (! isset($filters['academic_status']) || $filters['academic_status'] === ($academicStatuses[$student->id] ?? null));
+            })
+            ->sortBy(static fn (StudentReference $student): string => $student->fullName)
+            ->values();
+        $page = LengthAwarePaginator::resolveCurrentPage();
 
-        // Apply academic status filter
-        if (isset($filters['academic_status']) && ! empty($filters['academic_status'])) {
-            $query->where('academic_status', $filters['academic_status']);
-        }
-
-        return $query->with(['program', 'specialization'])
-            ->orderBy('full_name')
-            ->paginate($perPage);
+        return new LengthAwarePaginator(
+            $availableStudents->forPage($page, $perPage)->values(),
+            $availableStudents->count(),
+            $perPage,
+            $page,
+        );
     }
 
     /**
@@ -1565,9 +1563,14 @@ final class EventParticipationOperations
 
     private function isStudentActive(int $studentId): bool
     {
-        $status = $this->studentLifecycleStatusReader->statusesFor([$studentId])[$studentId] ?? null;
+        $status = $this->studentStatus($studentId);
 
         return ! in_array($status, ['inactive', 'dropout', 'dropout_transfer', 'graduated', 'pending'], true);
+    }
+
+    private function studentStatus(int $studentId): ?string
+    {
+        return $this->studentLifecycleStatusReader->statusesFor([$studentId])[$studentId] ?? null;
     }
 
     /**
