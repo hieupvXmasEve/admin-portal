@@ -63,8 +63,6 @@ Route::middleware(['auth'])->group(function () {
     // Curriculum Versions API routes
     Route::post('api/curriculum-versions', [CurriculumVersionController::class, 'apiStore'])
         ->name(CurriculumRoutes::API_VERSION_STORE);
-    Route::delete('api/curriculum-versions/{curriculumVersion}', [CurriculumVersionController::class, 'apiDestroy'])
-        ->name(CurriculumRoutes::API_VERSION_DESTROY);
     Route::get('api/curriculum-versions/specializations-by-program', [CurriculumVersionController::class, 'getSpecializationsByProgram'])
         ->name(CurriculumRoutes::API_VERSION_SPECIALIZATIONS_BY_PROGRAM);
     Route::get('api/curriculum-versions/by-program-specialization', [CurriculumVersionController::class, 'getCurriculumVersionsByProgramSpecialization'])
@@ -73,5 +71,8 @@ Route::middleware(['auth'])->group(function () {
         ->name(CurriculumRoutes::API_VERSION_BULK_DELETE);
     Route::post('api/curriculum-versions/bulk-operations', [CurriculumVersionController::class, 'bulkOperations'])
         ->name(CurriculumRoutes::API_VERSION_BULK_OPERATIONS);
+    Route::delete('api/curriculum-versions/{curriculumVersion}', [CurriculumVersionController::class, 'apiDestroy'])
+        ->whereNumber('curriculumVersion')
+        ->name(CurriculumRoutes::API_VERSION_DESTROY);
 
 });
