@@ -17,6 +17,7 @@ use App\Modules\Academic\Catalog\Actions\CreateCurriculumVersionAction;
 use App\Modules\Academic\Catalog\Actions\ManageCurriculumVersionApiAction;
 use App\Modules\Academic\Catalog\Actions\ModifyCurriculumVersionAction;
 use App\Modules\Academic\Catalog\Queries\GetCurriculumVersionPageDataQuery;
+use App\Modules\Academic\Catalog\Queries\GetCurriculumVersionSummaryQuery;
 use App\Modules\Academic\Catalog\Queries\ListCurriculumVersionsQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -111,6 +112,47 @@ class CurriculumVersionController extends \App\Http\Controllers\Web\CurriculumVe
                 ],
             ],
         ]);
+    }
+
+    public function summaryOverview(CurriculumVersion $curriculumVersion): Response
+    {
+        return Inertia::render(
+            'curriculum-versions/summary/Overview',
+            app(GetCurriculumVersionSummaryQuery::class)->overview($curriculumVersion),
+        );
+    }
+
+    public function summaryUnits(Request $request, CurriculumVersion $curriculumVersion): Response
+    {
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'unit_scope' => ['nullable', 'in:program,common,specialization_specific,cross_program'],
+            'year_level' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'semester_number' => ['nullable', 'integer', 'min:1', 'max:9'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:5', 'max:50'],
+        ]);
+
+        return Inertia::render(
+            'curriculum-versions/summary/Units',
+            app(GetCurriculumVersionSummaryQuery::class)->units($curriculumVersion, $filters),
+        );
+    }
+
+    public function summaryModules(CurriculumVersion $curriculumVersion): Response
+    {
+        return Inertia::render(
+            'curriculum-versions/summary/Modules',
+            app(GetCurriculumVersionSummaryQuery::class)->modules($curriculumVersion),
+        );
+    }
+
+    public function summaryRoadmap(Request $request, CurriculumVersion $curriculumVersion): Response
+    {
+        return Inertia::render(
+            'curriculum-versions/summary/Roadmap',
+            app(GetCurriculumVersionSummaryQuery::class)->roadmap($curriculumVersion),
+        );
     }
 
     public function update(

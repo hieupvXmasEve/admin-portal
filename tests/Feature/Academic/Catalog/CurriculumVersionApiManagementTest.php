@@ -93,3 +93,16 @@ it('renders the Catalog-owned curriculum version create page', function (): void
             ->has('specializations')
             ->has('semesters'));
 });
+
+it('renders the Catalog-owned curriculum overview summary', function (): void {
+    $this->withoutMiddleware(Authorize::class);
+    $version = CurriculumVersion::factory()->create(['version_code' => 'CAT-SUMMARY']);
+
+    $this->get(route('curriculum_versions.summary.overview', $version))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('curriculum-versions/summary/Overview')
+            ->where('curriculumVersion.id', $version->id)
+            ->where('curriculumVersion.version_code', 'CAT-SUMMARY')
+            ->where('data.totalUnits', 0));
+});
