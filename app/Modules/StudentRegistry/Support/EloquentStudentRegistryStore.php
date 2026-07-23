@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\StudentRegistry\Support;
 
 use App\Models\Student;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentProfile;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentProfilePersistenceWriter;
+use App\Shared\Contracts\StudentRegistry\StudentProfileReader;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Database\Eloquent\Builder;
 
-final class EloquentStudentRegistryStore implements StudentProfilePersistenceWriter, StudentReferenceReader
+final class EloquentStudentRegistryStore implements StudentProfilePersistenceWriter, StudentProfileReader, StudentReferenceReader
 {
     public function update(int $studentId, array $attributes): bool
     {
@@ -24,6 +26,81 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             ->find($studentId);
 
         return $student !== null ? $this->reference($student) : null;
+    }
+
+    public function findProfile(int $studentId): ?StudentProfile
+    {
+        $student = Student::query()
+            ->select([
+                'id',
+                'student_id',
+                'user_id',
+                'full_name',
+                'campus_id',
+                'phone',
+                'date_of_birth',
+                'gender',
+                'nationality',
+                'ethnicity',
+                'avatar_url',
+                'national_id',
+                'address',
+                'current_address_line',
+                'current_ward',
+                'current_province',
+                'current_country',
+                'cccd_address',
+                'cccd_address_line',
+                'cccd_ward',
+                'cccd_province',
+                'cccd_country',
+                'email',
+                'emergency_contact_name',
+                'emergency_contact_phone',
+                'emergency_contact_relationship',
+                'emergency_contact_email',
+                'emergency_contact_name_1',
+                'emergency_contact_email_1',
+                'emergency_contact_phone_1',
+                'emergency_contact_relationship_1',
+                'high_school_name',
+            ])
+            ->find($studentId);
+
+        return $student === null ? null : new StudentProfile(
+            id: (int) $student->id,
+            studentCode: (string) $student->student_id,
+            userId: $student->user_id === null ? null : (int) $student->user_id,
+            fullName: (string) $student->full_name,
+            campusId: (int) $student->campus_id,
+            phone: $student->phone,
+            dateOfBirth: $student->date_of_birth?->toDateString(),
+            gender: $student->gender,
+            nationality: $student->nationality,
+            ethnicity: $student->ethnicity,
+            avatarUrl: $student->avatar_url,
+            nationalId: $student->national_id,
+            address: $student->address,
+            currentAddressLine: $student->current_address_line,
+            currentWard: $student->current_ward,
+            currentProvince: $student->current_province,
+            currentCountry: $student->current_country,
+            cccdAddress: $student->cccd_address,
+            cccdAddressLine: $student->cccd_address_line,
+            cccdWard: $student->cccd_ward,
+            cccdProvince: $student->cccd_province,
+            cccdCountry: $student->cccd_country,
+            email: $student->email,
+            emergencyContactName: $student->emergency_contact_name,
+            emergencyContactPhone: $student->emergency_contact_phone,
+            emergencyContactRelationship: $student->emergency_contact_relationship,
+            emergencyContactEmail: $student->emergency_contact_email,
+            emergencyContactName1: $student->emergency_contact_name_1,
+            emergencyContactEmail1: $student->emergency_contact_email_1,
+            emergencyContactPhone1: $student->emergency_contact_phone_1,
+            emergencyContactRelationship1: $student->emergency_contact_relationship_1,
+            highSchoolName: $student->high_school_name,
+        );
     }
 
     /**

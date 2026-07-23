@@ -17,6 +17,7 @@ use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
 use App\Shared\Contracts\StudentRegistry\StudentIdentityWriter;
 use App\Shared\Contracts\StudentRegistry\StudentImpersonationTokenIssuer;
 use App\Shared\Contracts\StudentRegistry\StudentProfilePersistenceWriter;
+use App\Shared\Contracts\StudentRegistry\StudentProfileReader;
 use App\Shared\Contracts\StudentRegistry\StudentProfileWriter;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Support\ServiceProvider;
@@ -31,6 +32,7 @@ class StudentRegistryServiceProvider extends ServiceProvider
         $this->app->bind(StudentIdentityWriter::class, EloquentStudentIdentityWriter::class);
         $this->app->bind(StudentProfileWriter::class, EloquentStudentProfileWriter::class);
         $this->app->bind(StudentProfilePersistenceWriter::class, EloquentStudentRegistryStore::class);
+        $this->app->bind(StudentProfileReader::class, EloquentStudentRegistryStore::class);
         $this->app->bind(StudentImpersonationTokenIssuer::class, EloquentStudentImpersonationTokenIssuer::class);
         $this->app->bind(StudentGuardianRelationshipReader::class, EloquentStudentGuardianRelationshipReader::class);
     }

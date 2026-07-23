@@ -7,7 +7,10 @@ namespace App\Services\V1\Student;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentProfile;
+use App\Shared\Contracts\StudentRegistry\StudentProfileReader;
 use App\Shared\Contracts\StudentRegistry\StudentProfileWriter;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -15,23 +18,32 @@ use Illuminate\Support\Facades\Storage;
 
 class ProfileService
 {
-    public function __construct(private readonly StudentProfileWriter $studentProfileWriter) {}
+    public function __construct(
+        private readonly StudentProfileWriter $studentProfileWriter,
+        private readonly StudentProfileReader $studentProfileReader,
+    ) {}
 
     /**
      * Get student profile information
      */
     public function getProfile(Student $student): array
     {
+        $profile = $this->studentProfileReader->findProfile((int) $student->id);
+
+        if ($profile === null) {
+            throw new ModelNotFoundException;
+        }
+
         // $cacheKey = "profile:student:{$student->id}";
 
         // return Cache::remember($cacheKey, 1, function () use ($student) {
         return [
-            'info' => $this->getPersonalInfo($student),
+            'info' => $this->getPersonalInfo($profile, $student),
             //                'academic_info' => $this->getAcademicInfo($student),
             //                'contact_info' => $this->getContactInfo($student),
             // 'enrollment_info' => $this->getEnrollmentInfo($student),
             'preferences' => $this->getPreferences($student),
-            'profile_completion' => $this->calculateProfileCompletion($student),
+            'profile_completion' => $this->calculateProfileCompletion($profile),
         ];
         // });
     }
@@ -131,48 +143,47 @@ class ProfileService
     /**
      * Get personal information
      */
-    protected function getPersonalInfo(Student $student): array
+    protected function getPersonalInfo(StudentProfile $profile, Student $student): array
     {
         // Parse first and last name from full_name if they don't exist as separate fields
-        $nameParts = $student->full_name ? explode(' ', $student->full_name, 2) : ['', ''];
+        $nameParts = explode(' ', $profile->fullName, 2);
         $firstName = $nameParts[0] ?? '';
         $lastName = $nameParts[1] ?? '';
 
         return [
-            'id' => $student->id,
-            'student_id' => $student->student_id,
-            'user_id' => $student->user_id,
+            'id' => $profile->id,
+            'student_id' => $profile->studentCode,
+            'user_id' => $profile->userId,
             'first_name' => $firstName,
             'last_name' => $lastName,
-            'full_name' => $student->full_name,
-            'date_of_birth' => $student->date_of_birth?->toDateString(),
-            'gender' => $student->gender,
-            'nationality' => $student->nationality,
-            'ethnicity' => $student->ethnicity,
-            'avatar_url' => $student->avatar_url,
-            'national_id' => $student->national_id,
-            'address' => $student->address,
-            'current_address_line' => $student->current_address_line,
-            'current_ward' => $student->current_ward,
-            'current_province' => $student->current_province,
-            'current_country' => $student->current_country,
-            'cccd_address' => $student->cccd_address,
-            'cccd_address_line' => $student->cccd_address_line,
-            'cccd_ward' => $student->cccd_ward,
-            'cccd_province' => $student->cccd_province,
-            'cccd_country' => $student->cccd_country,
-
-            'email' => $student->email,
-            'phone' => $student->phone,
-            'emergency_contact_name' => $student->emergency_contact_name,
-            'emergency_contact_phone' => $student->emergency_contact_phone,
-            'emergency_contact_relationship' => $student->emergency_contact_relationship,
-            'emergency_contact_email' => $student->emergency_contact_email,
-            'emergency_contact_name_1' => $student->emergency_contact_name_1,
-            'emergency_contact_email_1' => $student->emergency_contact_email_1,
-            'emergency_contact_phone_1' => $student->emergency_contact_phone_1,
-            'emergency_contact_relationship_1' => $student->emergency_contact_relationship_1,
-            'high_school_name' => $student->high_school_name,
+            'full_name' => $profile->fullName,
+            'date_of_birth' => $profile->dateOfBirth,
+            'gender' => $profile->gender,
+            'nationality' => $profile->nationality,
+            'ethnicity' => $profile->ethnicity,
+            'avatar_url' => $profile->avatarUrl,
+            'national_id' => $profile->nationalId,
+            'address' => $profile->address,
+            'current_address_line' => $profile->currentAddressLine,
+            'current_ward' => $profile->currentWard,
+            'current_province' => $profile->currentProvince,
+            'current_country' => $profile->currentCountry,
+            'cccd_address' => $profile->cccdAddress,
+            'cccd_address_line' => $profile->cccdAddressLine,
+            'cccd_ward' => $profile->cccdWard,
+            'cccd_province' => $profile->cccdProvince,
+            'cccd_country' => $profile->cccdCountry,
+            'email' => $profile->email,
+            'phone' => $profile->phone,
+            'emergency_contact_name' => $profile->emergencyContactName,
+            'emergency_contact_phone' => $profile->emergencyContactPhone,
+            'emergency_contact_relationship' => $profile->emergencyContactRelationship,
+            'emergency_contact_email' => $profile->emergencyContactEmail,
+            'emergency_contact_name_1' => $profile->emergencyContactName1,
+            'emergency_contact_email_1' => $profile->emergencyContactEmail1,
+            'emergency_contact_phone_1' => $profile->emergencyContactPhone1,
+            'emergency_contact_relationship_1' => $profile->emergencyContactRelationship1,
+            'high_school_name' => $profile->highSchoolName,
 
             'program' => [
                 'id' => $student->program?->id,
@@ -305,40 +316,40 @@ class ProfileService
     /**
      * Calculate profile completion percentage
      */
-    protected function calculateProfileCompletion(Student $student): array
+    protected function calculateProfileCompletion(StudentProfile $profile): array
     {
         // Parse first and last name from full_name for completion check
-        $nameParts = $student->full_name ? explode(' ', $student->full_name, 2) : ['', ''];
+        $nameParts = explode(' ', $profile->fullName, 2);
         $firstName = $nameParts[0] ?? '';
         $lastName = $nameParts[1] ?? '';
 
         $fields = [
-            'full_name' => ! empty($student->full_name),
-            'email' => ! empty($student->email),
-            'phone' => ! empty($student->phone),
-            'date_of_birth' => ! empty($student->date_of_birth),
-            'address' => ! empty($student->address),
-            'current_address_line' => ! empty($student->current_address_line),
-            'current_ward' => ! empty($student->current_ward),
-            'current_province' => ! empty($student->current_province),
-            'current_country' => ! empty($student->current_country),
-            'cccd_address' => ! empty($student->cccd_address),
-            'cccd_address_line' => ! empty($student->cccd_address_line),
-            'cccd_ward' => ! empty($student->cccd_ward),
-            'cccd_province' => ! empty($student->cccd_province),
-            'cccd_country' => ! empty($student->cccd_country),
-            'national_id' => ! empty($student->national_id),
-            'ethnicity' => ! empty($student->ethnicity),
-            'emergency_contact_name' => ! empty($student->emergency_contact_name),
-            'emergency_contact_phone' => ! empty($student->emergency_contact_phone),
-            'emergency_contact_email' => ! empty($student->emergency_contact_email),
-            'emergency_contact_name_1' => ! empty($student->emergency_contact_name_1),
-            'emergency_contact_email_1' => ! empty($student->emergency_contact_email_1),
-            'emergency_contact_phone_1' => ! empty($student->emergency_contact_phone_1),
-            'emergency_contact_relationship_1' => ! empty($student->emergency_contact_relationship_1),
+            'full_name' => $profile->fullName !== '',
+            'email' => ! empty($profile->email),
+            'phone' => ! empty($profile->phone),
+            'date_of_birth' => ! empty($profile->dateOfBirth),
+            'address' => ! empty($profile->address),
+            'current_address_line' => ! empty($profile->currentAddressLine),
+            'current_ward' => ! empty($profile->currentWard),
+            'current_province' => ! empty($profile->currentProvince),
+            'current_country' => ! empty($profile->currentCountry),
+            'cccd_address' => ! empty($profile->cccdAddress),
+            'cccd_address_line' => ! empty($profile->cccdAddressLine),
+            'cccd_ward' => ! empty($profile->cccdWard),
+            'cccd_province' => ! empty($profile->cccdProvince),
+            'cccd_country' => ! empty($profile->cccdCountry),
+            'national_id' => ! empty($profile->nationalId),
+            'ethnicity' => ! empty($profile->ethnicity),
+            'emergency_contact_name' => ! empty($profile->emergencyContactName),
+            'emergency_contact_phone' => ! empty($profile->emergencyContactPhone),
+            'emergency_contact_email' => ! empty($profile->emergencyContactEmail),
+            'emergency_contact_name_1' => ! empty($profile->emergencyContactName1),
+            'emergency_contact_email_1' => ! empty($profile->emergencyContactEmail1),
+            'emergency_contact_phone_1' => ! empty($profile->emergencyContactPhone1),
+            'emergency_contact_relationship_1' => ! empty($profile->emergencyContactRelationship1),
             // 'avatar_url' => ! empty($student->avatar_url),
-            'gender' => ! empty($student->gender),
-            'nationality' => ! empty($student->nationality),
+            'gender' => ! empty($profile->gender),
+            'nationality' => ! empty($profile->nationality),
         ];
 
         $completedFields = array_filter($fields);
