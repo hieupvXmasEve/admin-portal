@@ -33,7 +33,6 @@ it('updates Registry-owned profile and contact data without changing lifecycle f
 
     $updated = app(StudentProfileWriter::class)->update((int) $student->id, [
         'full_name' => 'Updated Registry Student',
-        'email' => 'student.updated@example.test',
         'phone' => '+84 900 123 456',
         'current_address_line' => '1 Registry Street',
         'emergency_contact_name' => 'Durable Guardian Contact',
@@ -43,7 +42,7 @@ it('updates Registry-owned profile and contact data without changing lifecycle f
 
     expect($updated)->toBeTrue()
         ->and($student->fresh()->full_name)->toBe('UPDATED REGISTRY STUDENT')
-        ->and($student->fresh()->email)->toBe('student.updated@example.test')
+        ->and($student->fresh()->email)->toBe('student.old@example.test')
         ->and($student->fresh()->phone)->toBe('+84 900 123 456')
         ->and($student->fresh()->current_address_line)->toBe('1 Registry Street')
         ->and($student->fresh()->emergency_contact_name)->toBe('Durable Guardian Contact')

@@ -2,7 +2,6 @@
 
 use App\Constants\CurriculumRoutes;
 use App\Http\Controllers\Web\CurriculumModuleController;
-use App\Http\Controllers\Web\CurriculumUnitController;
 use App\Http\Controllers\Web\CurriculumVersionController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,7 +19,7 @@ Route::middleware('auth')->group(function () {
         Route::post('', [CurriculumVersionController::class, 'store'])
             ->middleware('can:create_curriculum_version')
             ->name(CurriculumRoutes::VERSION_STORE);
-  
+
         // Tab-based detail routes
         Route::get('/{curriculum_version}/overview', [CurriculumVersionController::class, 'summaryOverview'])
             ->middleware('can:view_curriculum_version')
@@ -67,28 +66,6 @@ Route::middleware('auth')->group(function () {
         ->middleware('can:export_curriculum_version')
         ->name(CurriculumRoutes::VERSION_EXPORT_FILTERED);
 
-    // Curriculum Units routes
-    Route::get('curriculum-units', [CurriculumUnitController::class, 'index'])
-        ->middleware('can:view_curriculum_unit')
-        ->name(CurriculumRoutes::UNIT_INDEX);
-    Route::get('curriculum-units/create', [CurriculumUnitController::class, 'create'])
-        ->middleware('can:create_curriculum_unit')
-        ->name(CurriculumRoutes::UNIT_CREATE);
-    Route::post('curriculum-units', [CurriculumUnitController::class, 'store'])
-        ->middleware('can:create_curriculum_unit')
-        ->name(CurriculumRoutes::UNIT_STORE);
-    Route::get('curriculum-units/{curriculum_unit}', [CurriculumUnitController::class, 'show'])
-        ->middleware('can:view_curriculum_unit')
-        ->name(CurriculumRoutes::UNIT_SHOW);
-    Route::get('curriculum-units/{curriculum_unit}/edit', [CurriculumUnitController::class, 'edit'])
-        ->middleware('can:edit_curriculum_unit')
-        ->name(CurriculumRoutes::UNIT_EDIT);
-    Route::put('curriculum-units/{curriculum_unit}', [CurriculumUnitController::class, 'update'])
-        ->middleware('can:edit_curriculum_unit')
-        ->name(CurriculumRoutes::UNIT_UPDATE);
-    Route::delete('curriculum-units/{curriculum_unit}', [CurriculumUnitController::class, 'destroy'])
-        ->middleware('can:delete_curriculum_unit')
-        ->name(CurriculumRoutes::UNIT_DESTROY);
 });
 
 // API routes for AJAX calls
@@ -108,15 +85,4 @@ Route::middleware(['auth'])->group(function () {
     Route::post('api/curriculum-versions/bulk-operations', [CurriculumVersionController::class, 'bulkOperations'])
         ->name(CurriculumRoutes::API_VERSION_BULK_OPERATIONS);
 
-    // Curriculum Units API routes
-    Route::post('api/curriculum-units', [CurriculumUnitController::class, 'apiStore'])
-        ->name(CurriculumRoutes::API_UNIT_STORE);
-    Route::put('api/curriculum-units/{curriculumUnit}', [CurriculumUnitController::class, 'apiUpdate'])
-        ->name(CurriculumRoutes::API_UNIT_UPDATE);
-    Route::delete('api/curriculum-units/{curriculumUnit}', [CurriculumUnitController::class, 'apiDestroy'])
-        ->name(CurriculumRoutes::API_UNIT_DESTROY);
-    Route::get('api/curriculum-units/by-curriculum-version', [CurriculumUnitController::class, 'getUnitsByCurriculumVersion'])
-        ->name(CurriculumRoutes::API_UNIT_BY_CURRICULUM_VERSION);
-    Route::delete('api/curriculum-units/bulk-delete', [CurriculumUnitController::class, 'bulkDelete'])
-        ->name(CurriculumRoutes::API_UNIT_BULK_DELETE);
 });

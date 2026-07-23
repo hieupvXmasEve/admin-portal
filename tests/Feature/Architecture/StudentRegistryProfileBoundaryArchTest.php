@@ -25,9 +25,10 @@ it('keeps staff profile edits on Registry and Identity contracts', function (): 
 
     expect($studentService)
         ->toContain('StudentProfileWriter')
-        ->toContain('StudentAccessWriter')
+        ->toContain('StudentIdentityWriter')
         ->toContain('studentProfileWriter->update')
-        ->toContain('studentAccessWriter->updateEmail')
+        ->toContain('studentIdentityWriter->updateEmail')
+        ->toContain('$student->update($academicBackgroundAttributes)')
         ->not->toContain('$student->update($filteredData)')
         ->not->toContain('$student->user->update');
 });

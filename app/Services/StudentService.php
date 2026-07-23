@@ -17,10 +17,10 @@ use App\Models\User;
 use App\Shared\Contracts\Academic\StudentLifecycleStatusFilter;
 use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
-use App\Shared\Contracts\Identity\StudentAccessWriter;
 use App\Shared\Contracts\StudentRegistry\DTO\GuardianRelationship;
 use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipReader;
 use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
+use App\Shared\Contracts\StudentRegistry\StudentIdentityWriter;
 use App\Shared\Contracts\StudentRegistry\StudentProfileWriter;
 use App\Shared\Support\Enums\UserType;
 use Exception;
@@ -36,7 +36,7 @@ class StudentService
 {
     public function __construct(
         private readonly StudentProfileWriter $studentProfileWriter,
-        private readonly StudentAccessWriter $studentAccessWriter,
+        private readonly StudentIdentityWriter $studentIdentityWriter,
     ) {}
 
     /**
@@ -208,11 +208,22 @@ class StudentService
                 }
             }
 
-            // Registry owns identity, profile, and contact persistence.
-            $this->studentProfileWriter->update((int) $student->id, $filteredData);
+            $academicBackgroundAttributes = array_intersect_key($filteredData, array_flip([
+                'high_school_graduation_year',
+                'entrance_exam_score',
+                'admission_notes',
+            ]));
+            $profileAttributes = array_diff_key($filteredData, $academicBackgroundAttributes, ['email' => true]);
 
-            if (array_key_exists('email', $filteredData) && $student->user_id !== null) {
-                $this->studentAccessWriter->updateEmail((int) $student->user_id, (string) $filteredData['email']);
+            // Registry owns identity, profile, and contact persistence.
+            $this->studentProfileWriter->update((int) $student->id, $profileAttributes);
+
+            if ($academicBackgroundAttributes !== []) {
+                $student->update($academicBackgroundAttributes);
+            }
+
+            if (array_key_exists('email', $filteredData)) {
+                $this->studentIdentityWriter->updateEmail((int) $student->id, (string) $filteredData['email']);
             }
 
             $student->refresh();

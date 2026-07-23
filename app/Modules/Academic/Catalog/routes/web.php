@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Constants\CurriculumRoutes;
 use App\Constants\ProgramRoutes;
 use App\Constants\SemesterRoutes;
 use App\Constants\UnitRoutes;
@@ -9,6 +10,7 @@ use App\Http\Controllers\Web\UnitController as LegacyUnitController;
 use App\Http\Controllers\Web\Units\UnitExportController;
 use App\Http\Controllers\Web\Units\UnitImportController;
 use App\Modules\Academic\Catalog\Http\Web\AcademicPeriodController;
+use App\Modules\Academic\Catalog\Http\Web\CurriculumUnitController;
 use App\Modules\Academic\Catalog\Http\Web\ProgramController;
 use App\Modules\Academic\Catalog\Http\Web\SelectedAcademicPeriodController;
 use App\Modules\Academic\Catalog\Http\Web\UnitController;
@@ -85,4 +87,27 @@ Route::middleware(['auth', 'web'])->group(function (): void {
     Route::get('units/{unit}/edit', [UnitController::class, 'edit'])->middleware('can:edit_unit')->name(UnitRoutes::EDIT);
     Route::put('units/{unit}', [UnitController::class, 'update'])->middleware('can:edit_unit')->name(UnitRoutes::UPDATE);
     Route::delete('units/{unit}', [UnitController::class, 'destroy'])->middleware('can:delete_unit')->name(UnitRoutes::DESTROY);
+
+    Route::get('curriculum-units', [CurriculumUnitController::class, 'index'])
+        ->middleware('can:view_curriculum_unit')->name(CurriculumRoutes::UNIT_INDEX);
+    Route::get('curriculum-units/create', [CurriculumUnitController::class, 'create'])
+        ->middleware('can:create_curriculum_unit')->name(CurriculumRoutes::UNIT_CREATE);
+    Route::post('curriculum-units', [CurriculumUnitController::class, 'store'])
+        ->middleware('can:create_curriculum_unit')->name(CurriculumRoutes::UNIT_STORE);
+    Route::get('curriculum-units/{curriculum_unit}', [CurriculumUnitController::class, 'show'])
+        ->middleware('can:view_curriculum_unit')->name(CurriculumRoutes::UNIT_SHOW);
+    Route::get('curriculum-units/{curriculum_unit}/edit', [CurriculumUnitController::class, 'edit'])
+        ->middleware('can:edit_curriculum_unit')->name(CurriculumRoutes::UNIT_EDIT);
+    Route::put('curriculum-units/{curriculum_unit}', [CurriculumUnitController::class, 'update'])
+        ->middleware('can:edit_curriculum_unit')->name(CurriculumRoutes::UNIT_UPDATE);
+    Route::delete('curriculum-units/{curriculum_unit}', [CurriculumUnitController::class, 'destroy'])
+        ->middleware('can:delete_curriculum_unit')->name(CurriculumRoutes::UNIT_DESTROY);
+
+    Route::post('api/curriculum-units', [CurriculumUnitController::class, 'apiStore'])->name(CurriculumRoutes::API_UNIT_STORE);
+    Route::put('api/curriculum-units/{curriculumUnit}', [CurriculumUnitController::class, 'apiUpdate'])->name(CurriculumRoutes::API_UNIT_UPDATE);
+    Route::delete('api/curriculum-units/{curriculumUnit}', [CurriculumUnitController::class, 'apiDestroy'])->name(CurriculumRoutes::API_UNIT_DESTROY);
+    Route::get('api/curriculum-units/by-curriculum-version', [CurriculumUnitController::class, 'getUnitsByCurriculumVersion'])
+        ->name(CurriculumRoutes::API_UNIT_BY_CURRICULUM_VERSION);
+    Route::delete('api/curriculum-units/bulk-delete', [CurriculumUnitController::class, 'bulkDelete'])
+        ->name(CurriculumRoutes::API_UNIT_BULK_DELETE);
 });

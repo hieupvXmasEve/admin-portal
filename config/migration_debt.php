@@ -17,6 +17,7 @@ return [
                 'EquivalentUnit',
                 'UnitPrerequisiteCondition',
                 'UnitPrerequisiteGroup',
+                'CurriculumUnit',
             ],
             'Delivery' => [
                 'CourseOffering',

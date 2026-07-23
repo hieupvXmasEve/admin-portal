@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
+/** @deprecated Curriculum unit management is owned by Academic Catalog. */
 class CurriculumUnitController extends Controller
 {
     public function index(Request $request): Response

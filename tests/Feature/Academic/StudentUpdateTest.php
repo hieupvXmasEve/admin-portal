@@ -14,6 +14,7 @@ use App\Services\PermissionService;
 use App\Services\StudentService;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
 use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
+use App\Shared\Contracts\StudentRegistry\StudentIdentityWriter;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Auth\Middleware\Authorize;
@@ -24,6 +25,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
+use RuntimeException;
 
 use function Pest\Laravel\actingAs;
 
@@ -87,6 +89,80 @@ it('syncs the linked user email when updating a student email', function () {
     expect($updatedStudent->email)->toBe('student.new@example.com')
         ->and($student->fresh()->email)->toBe('student.new@example.com')
         ->and($studentUser->fresh()->email)->toBe('student.new@example.com');
+});
+
+it('updates identity email through the staff endpoint', function () {
+    $studentUser = User::factory()->create([
+        'email' => 'student.old@example.com',
+        'name' => 'student old',
+    ]);
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'user_id' => $studentUser->id,
+            'full_name' => 'student old',
+            'email' => 'student.old@example.com',
+            'curriculum_version_id' => $this->curriculumVersion->id,
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+        ])
+        ->create();
+    $csrfToken = 'student-update-csrf-token';
+
+    $response = actingAs($this->authorizedUser)
+        ->withSession([
+            'current_campus_id' => $this->campus->id,
+            '_token' => $csrfToken,
+        ])
+        ->withHeader('X-CSRF-TOKEN', $csrfToken)
+        ->put(route(StudentRoutes::UPDATE, $student), [
+            'full_name' => 'student renamed',
+            'email' => 'student.new@example.com',
+        ]);
+
+    $response
+        ->assertRedirect(route(StudentRoutes::ACADEMIC_SUMMARY_SHOW, $student))
+        ->assertSessionHasNoErrors();
+
+    expect($student->fresh()->full_name)->toBe('STUDENT RENAMED')
+        ->and($student->fresh()->email)->toBe('student.new@example.com')
+        ->and($studentUser->fresh()->email)->toBe('student.new@example.com');
+});
+
+it('rolls back profile changes when linked account email update fails', function () {
+    $studentUser = User::factory()->create([
+        'email' => 'student.old@example.com',
+        'name' => 'student old',
+    ]);
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'user_id' => $studentUser->id,
+            'full_name' => 'student old',
+            'email' => 'student.old@example.com',
+            'curriculum_version_id' => $this->curriculumVersion->id,
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+        ])
+        ->create();
+    $identityWriter = Mockery::mock(StudentIdentityWriter::class);
+    $identityWriter->shouldReceive('updateEmail')
+        ->once()
+        ->andThrow(new RuntimeException('Unable to update linked account email.'));
+    app()->instance(StudentIdentityWriter::class, $identityWriter);
+
+    expect(fn () => app(StudentService::class)->updateStudent($student, [
+        'full_name' => 'student renamed',
+        'email' => 'student.new@example.com',
+    ]))->toThrow(RuntimeException::class, 'Unable to update linked account email.');
+
+    expect($student->fresh()->full_name)->toBe('STUDENT OLD')
+        ->and($student->fresh()->email)->toBe('student.old@example.com')
+        ->and($studentUser->fresh()->email)->toBe('student.old@example.com');
 });
 
 it('rejects a student email that is already used by another user account', function () {

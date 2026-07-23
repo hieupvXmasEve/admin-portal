@@ -11,6 +11,8 @@ interface StudentIdentityWriter
 {
     public function register(AdmittedStudentIdentity $identity): StudentReference;
 
+    public function updateEmail(int $studentId, string $email): void;
+
     public function requireRevocable(int $studentId): StudentReference;
 
     public function revoke(int $studentId): void;
