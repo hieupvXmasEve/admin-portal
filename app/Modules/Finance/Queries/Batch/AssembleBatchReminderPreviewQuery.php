@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Batch;
 
-use App\Models\ParentProfile;
 use App\Modules\Finance\Queries\Operations\ListDueItemsQuery;
 use App\Modules\Finance\Support\Batch\BatchPreviewLine;
+use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class AssembleBatchReminderPreviewQuery
@@ -88,11 +88,8 @@ class AssembleBatchReminderPreviewQuery
             return [];
         }
 
-        return ParentProfile::query()
-            ->whereIn('student_id', $studentIds)
-            ->whereHas('user', fn ($q) => $q->whereNotNull('email')->where('email', '!=', ''))
-            ->pluck('student_id')
-            ->mapWithKeys(fn (int $id) => [$id => true])
+        return collect(app(GuardianAccessGrantReader::class)->studentIdsWithAccounts($studentIds))
+            ->mapWithKeys(static fn (int $studentId): array => [$studentId => true])
             ->all();
     }
 }

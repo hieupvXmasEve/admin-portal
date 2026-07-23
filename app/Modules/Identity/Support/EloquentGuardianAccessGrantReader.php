@@ -109,6 +109,41 @@ final class EloquentGuardianAccessGrantReader implements GuardianAccessGrantRead
             ->all();
     }
 
+    public function studentIdsWithAccounts(array $studentIds): array
+    {
+        if ($studentIds === []) {
+            return [];
+        }
+
+        $grantStudentIds = GuardianAccessGrant::query()
+            ->join('parents', 'parents.id', '=', 'guardian_access_grants.parent_id')
+            ->join('users', 'users.id', '=', 'parents.user_id')
+            ->whereIn('guardian_access_grants.student_id', $studentIds)
+            ->where('guardian_access_grants.status', GuardianAccessGrant::STATUS_ACTIVE)
+            ->where('users.type', UserType::PARENT->value)
+            ->where('users.status', 'active')
+            ->whereNotNull('users.email')
+            ->where('users.email', '!=', '')
+            ->pluck('guardian_access_grants.student_id');
+        $legacyStudentIds = DB::table('parent_student')
+            ->join('parents', 'parents.id', '=', 'parent_student.parent_id')
+            ->join('users', 'users.id', '=', 'parents.user_id')
+            ->whereIn('parent_student.student_id', $studentIds)
+            ->where('parents.status', 'active')
+            ->where('users.type', UserType::PARENT->value)
+            ->where('users.status', 'active')
+            ->whereNotNull('users.email')
+            ->where('users.email', '!=', '')
+            ->pluck('parent_student.student_id');
+
+        return $grantStudentIds
+            ->merge($legacyStudentIds)
+            ->map(static fn (int|string $studentId): int => (int) $studentId)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function activeRelationshipIds(array $guardianRelationshipIds): array
     {
         if ($guardianRelationshipIds === []) {

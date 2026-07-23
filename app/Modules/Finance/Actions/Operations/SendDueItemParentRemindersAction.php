@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Operations;
 
-use App\Models\ParentProfile;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\DngInstallmentContextResolver;
 use App\Modules\Finance\Support\ExamResitDngLinkResolver;
 use App\Modules\Finance\Support\LifecycleDueItemPredicate;
+use App\Shared\Contracts\Identity\DTO\GuardianAccessAccount;
+use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use App\Shared\Contracts\Notification\EmailContentResolver;
 use App\Shared\Contracts\Notification\ExternalEmailNotification;
 use App\Shared\Contracts\Notification\ExternalEmailPublisher;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 class SendDueItemParentRemindersAction
@@ -95,7 +95,8 @@ class SendDueItemParentRemindersAction
                     continue;
                 }
 
-                $parentEmails = self::extractParentEmails($student?->parentProfiles);
+                $parentEmails = collect(app(GuardianAccessGrantReader::class)->accountsForStudent((int) $student->id))
+                    ->map(static fn (GuardianAccessAccount $account): string => mb_strtolower(trim($account->email)));
 
                 if ($parentEmails->isEmpty()) {
                     Log::info('Skipping DNG parent reminder - no parent emails', [
@@ -266,28 +267,6 @@ class SendDueItemParentRemindersAction
                 'recipient' => 'parent',
             ]);
         }
-    }
-
-    private static function extractParentEmails(?Collection $parentProfiles): Collection
-    {
-        if ($parentProfiles === null) {
-            return collect();
-        }
-
-        return $parentProfiles
-            ->filter(function (ParentProfile $profile): bool {
-                $user = $profile->user;
-
-                return $profile->status === 'active'
-                    && $user !== null
-                    && $user->isParent()
-                    && $user->isActive();
-            })
-            ->map(fn (ParentProfile $profile) => $profile->user?->email)
-            ->filter(fn ($email) => is_string($email) && trim($email) !== '')
-            ->map(fn (string $email) => mb_strtolower(trim($email)))
-            ->unique()
-            ->values();
     }
 
     /** @var array<string, bool> */
