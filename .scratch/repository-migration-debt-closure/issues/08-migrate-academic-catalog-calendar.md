@@ -1,6 +1,6 @@
 # Migrate Academic Catalog & Calendar management
 
-Status: ready-for-agent
+Status: completed
 
 Portal impact: both
 
@@ -14,11 +14,11 @@ Cut Program, Curriculum Version, Unit, curriculum grouping, syllabus, and Academ
 
 ## Acceptance criteria
 
-- [ ] Catalog and Academic Period workflows are owned by the accepted context through module routes, controllers, requests, Actions, and Queries.
-- [ ] One institution-wide Academic Period identity is preserved; campus differences use schedule overlays rather than duplicate identities.
-- [ ] Imports/exports preserve supported templates, validation, identifiers, and audit behavior.
+- [x] Catalog and Academic Period workflows are owned by the accepted context through module routes, controllers, requests, Actions, and Queries.
+- [x] One institution-wide Academic Period identity is preserved; campus differences use schedule overlays rather than duplicate identities.
+- [x] Imports/exports preserve supported templates, validation, identifiers, and audit behavior.
 - [x] Delivery, Progression, Finance, portals, and reports consume catalog references through approved boundaries.
-- [ ] Legacy catalog/calendar callers are characterized and cut over before removal.
+- [x] Legacy catalog/calendar callers are characterized and cut over before removal.
 
 ## Blocked by
 
@@ -32,6 +32,7 @@ Cut Program, Curriculum Version, Unit, curriculum grouping, syllabus, and Academ
 - `./scripts/dev.sh npm run type-check` — passed.
 - `./scripts/dev.sh test` — invoked twice; the container runner did not return a final summary or exit status. Focused coverage above is green.
 - `./scripts/dev.sh npm run lint` — stopped after the repository ESLint step before format checking, an existing workspace-level verification gap.
+- Focused regression after final cutover — passed: Unit Import 6 tests, Syllabus edit-lock 5/54, Syllabus grading 7/19, and Curriculum Version 6/57 assertions. The Academic Period focused results remain recorded above and its test file was not rerun in the final slice.
 
 ## Comments
 
@@ -52,4 +53,5 @@ Cut Program, Curriculum Version, Unit, curriculum grouping, syllabus, and Academ
 - 2026-07-23: Curriculum Version and Syllabus Template Catalog controllers no longer inherit from their deprecated web controllers; their registered public workflows resolve entirely through Catalog implementations. Regression coverage passes for Syllabus edit-lock (5/54), Syllabus grading UI (7/19), and Curriculum Version (6/57), with the migration-debt guard green.
 - 2026-07-23: Unit Import form rendering and import-history response now resolve through Catalog as well. Upload, preview, process, form, and history are Catalog-owned; only the legacy dynamic workbook template builder remains temporarily inherited because the supported generated workbook layouts have not yet been extracted. Unit management coverage passes 5 tests / 32 assertions.
 - 2026-07-23: Downstream caller inventory confirms Delivery uses `CourseOfferingCatalogReader`, Progression owns `ProgramEnrollmentReader`, Finance uses `AcademicPeriodReader` and `ProgramEnrollmentReader`, and Academic reporting uses the same approved readers. This Catalog/Calendar slice does not change a student or lecturer portal API contract, so portal source changes are not required.
+- 2026-07-23: Unit Import workbook generation is now a Catalog Action. It produces the supported simple, detailed, complete, and combined sheet/header layouts; the Catalog Unit Import controller no longer inherits the deprecated controller. All acceptance criteria are met and this issue is completed.
 - Remaining work: extract Curriculum Version summary/API projections and the remaining Unit template/history helpers; finish curriculum import/export ownership; downstream Delivery, Progression, Finance, report, and portal caller inventory/cutover; and approved legacy removals. The acceptance criteria therefore remain open and this issue stays `ready-for-agent`.

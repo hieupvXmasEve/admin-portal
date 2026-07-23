@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Catalog\Http\Web;
 
+use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
+use App\Modules\Academic\Catalog\Actions\GenerateUnitImportTemplateAction;
 use App\Modules\Academic\Catalog\Actions\PreviewUnitImportAction;
 use App\Modules\Academic\Catalog\Actions\ProcessUnitImportAction;
 use App\Modules\Academic\Catalog\Actions\UploadUnitImportFileAction;
@@ -12,12 +14,12 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
- * Catalog owns the import workflow. The historic spreadsheet template builder
- * remains temporarily inherited while its workbook layouts are extracted.
+ * Catalog owns the Unit import workflow and generated workbook templates.
  */
-class UnitImportController extends \App\Http\Controllers\Web\Units\UnitImportController
+class UnitImportController extends Controller
 {
     public function showImportForm(): Response
     {
@@ -102,5 +104,21 @@ class UnitImportController extends \App\Http\Controllers\Web\Units\UnitImportCon
     public function getImportHistory(): JsonResponse
     {
         return ApiResponse::success(['history' => []]);
+    }
+
+    public function downloadTemplate(string $format): BinaryFileResponse
+    {
+        $filename = match ($format) {
+            'simple' => 'units_simple_template.xlsx',
+            'detailed' => 'units_detailed_template.xlsx',
+            'complete' => 'units_complete_template.xlsx',
+            'combined' => 'units_syllabus_combined_template.xlsx',
+            default => abort(404, 'Template not found'),
+        };
+        $path = app(GenerateUnitImportTemplateAction::class)->handle($format);
+
+        return response()->download($path, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
     }
 }

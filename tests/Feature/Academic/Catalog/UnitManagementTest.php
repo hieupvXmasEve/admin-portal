@@ -10,11 +10,13 @@ use App\Models\Role;
 use App\Models\RolePermission;
 use App\Models\Unit;
 use App\Models\User;
+use App\Modules\Academic\Catalog\Actions\GenerateUnitImportTemplateAction;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 use function Pest\Laravel\actingAs;
 
@@ -109,4 +111,21 @@ it('rejects unit import previews outside the temporary import directory', functi
         ->assertStatus(400)
         ->assertJsonPath('success', false)
         ->assertJsonPath('message', 'Invalid import file path.');
+});
+
+it('generates supported Catalog import workbook layouts', function (): void {
+    $path = app(GenerateUnitImportTemplateAction::class)->handle('combined');
+    $spreadsheet = IOFactory::load($path);
+
+    expect($spreadsheet->getSheetNames())->toBe([
+        'Units',
+        'Prerequisites',
+        'Equivalents',
+        'Syllabus',
+        'Assessment Components',
+        'Assessment Details',
+        'Instructions',
+    ])
+        ->and($spreadsheet->getSheetByName('Units')?->getCell('A1')->getValue())->toBe('Code*')
+        ->and($spreadsheet->getSheetByName('Prerequisites')?->getCell('D1')->getValue())->toBe('Condition Type*');
 });
