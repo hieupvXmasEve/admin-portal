@@ -85,7 +85,8 @@ it('validates prerequisite expressions through the Catalog endpoint without pers
     actingAs($this->user)
         ->post(route('units.validate-prerequisite-expression'), ['expression' => $prerequisite->code])
         ->assertOk()
-        ->assertJsonPath('valid', true)
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.valid', true)
         ->assertJsonPath('message', 'Expression is valid');
 
     expect($prerequisite->prerequisiteGroups()->count())->toBe(0);

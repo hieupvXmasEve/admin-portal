@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Catalog\Http\Web;
 
 use App\Http\Controllers\Controller;
+use App\Http\Responses\ApiResponse;
 use App\Modules\Academic\Catalog\Actions\ExportUnitsToExcelAction;
 use App\Modules\Academic\Catalog\Http\Requests\ExportUnitsRequest;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -39,9 +39,7 @@ class UnitExportController extends Controller
                 'user_id' => Auth::id(),
             ]);
 
-            return response()->json([
-                'error' => 'Export failed. Please try again later.',
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return ApiResponse::serverError('Export failed. Please try again later.');
         }
     }
 }

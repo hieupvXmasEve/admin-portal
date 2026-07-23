@@ -10,6 +10,7 @@ use App\Models\Role;
 use App\Models\RolePermission;
 use App\Models\Semester;
 use App\Models\User;
+use App\Modules\Academic\Catalog\Models\CampusPeriodSchedule;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -128,7 +129,7 @@ it('stores one campus schedule per academic period without duplicating the perio
         ])
         ->assertOk();
 
-    expect(\App\Modules\Academic\Catalog\Models\CampusPeriodSchedule::query()
+    expect(CampusPeriodSchedule::query()
         ->where('semester_id', $academicPeriod->id)
         ->count())->toBe(2)
         ->and(Semester::query()->whereKey($academicPeriod)->count())->toBe(1);
@@ -136,7 +137,7 @@ it('stores one campus schedule per academic period without duplicating the perio
 
 it('exposes campus schedules alongside the institution-wide academic period list', function (): void {
     $academicPeriod = Semester::factory()->create();
-    $schedule = \App\Modules\Academic\Catalog\Models\CampusPeriodSchedule::query()->create([
+    $schedule = CampusPeriodSchedule::query()->create([
         'semester_id' => $academicPeriod->id,
         'campus_id' => $this->campus->id,
         'operating_start_date' => '2027-01-02',

@@ -18,8 +18,8 @@ use App\Modules\Academic\Catalog\Http\Requests\ListUnitsRequest;
 use App\Modules\Academic\Catalog\Http\Requests\SearchUnitsRequest;
 use App\Modules\Academic\Catalog\Http\Requests\StoreUnitRequest;
 use App\Modules\Academic\Catalog\Http\Requests\UpdateUnitRequest;
-use App\Modules\Academic\Catalog\Http\Requests\ValidateUnitCodeRequest;
 use App\Modules\Academic\Catalog\Http\Requests\ValidatePrerequisiteExpressionRequest;
+use App\Modules\Academic\Catalog\Http\Requests\ValidateUnitCodeRequest;
 use App\Modules\Academic\Catalog\Queries\GetUnitDetailQuery;
 use App\Modules\Academic\Catalog\Queries\ListUnitsQuery;
 use App\Modules\Academic\Catalog\Queries\SearchUnitsQuery;
@@ -167,10 +167,9 @@ class UnitController extends Controller
     ): JsonResponse {
         $result = $validateExpression->handle($request->validated('expression'));
 
-        return response()->json([
+        return ApiResponse::success([
             'valid' => $result['success'],
-            'message' => $result['message'],
-        ], $result['success'] ? 200 : 400);
+        ], message: $result['message']);
     }
 
     public function bulkDelete(BulkDeleteUnitsRequest $request, BulkDeleteUnitsAction $bulkDelete): JsonResponse
