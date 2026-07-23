@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\StudentRegistry\Providers;
 
+use App\Modules\StudentRegistry\Support\EloquentCurriculumStudentSummaryReader;
 use App\Modules\StudentRegistry\Support\EloquentStudentCollectionEligibilityReader;
 use App\Modules\StudentRegistry\Support\EloquentStudentGuardianRelationshipReader;
 use App\Modules\StudentRegistry\Support\EloquentStudentGuardianRelationshipWriter;
@@ -11,6 +12,7 @@ use App\Modules\StudentRegistry\Support\EloquentStudentIdentityWriter;
 use App\Modules\StudentRegistry\Support\EloquentStudentImpersonationTokenIssuer;
 use App\Modules\StudentRegistry\Support\EloquentStudentProfileWriter;
 use App\Modules\StudentRegistry\Support\EloquentStudentRegistryStore;
+use App\Shared\Contracts\StudentRegistry\CurriculumStudentSummaryReader;
 use App\Shared\Contracts\StudentRegistry\StudentCollectionEligibilityReader;
 use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipReader;
 use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
@@ -27,6 +29,7 @@ class StudentRegistryServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(StudentReferenceReader::class, EloquentStudentRegistryStore::class);
+        $this->app->bind(CurriculumStudentSummaryReader::class, EloquentCurriculumStudentSummaryReader::class);
         $this->app->bind(StudentCollectionEligibilityReader::class, EloquentStudentCollectionEligibilityReader::class);
         $this->app->bind(StudentGuardianRelationshipWriter::class, EloquentStudentGuardianRelationshipWriter::class);
         $this->app->bind(StudentIdentityWriter::class, EloquentStudentIdentityWriter::class);

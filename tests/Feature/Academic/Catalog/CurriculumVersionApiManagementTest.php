@@ -106,3 +106,16 @@ it('renders the Catalog-owned curriculum overview summary', function (): void {
             ->where('curriculumVersion.version_code', 'CAT-SUMMARY')
             ->where('data.totalUnits', 0));
 });
+
+it('renders student summary data through the Student Registry boundary', function (): void {
+    $this->withoutMiddleware(Authorize::class);
+    $version = CurriculumVersion::factory()->create();
+
+    $this->get(route('curriculum_versions.summary.students', $version))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('curriculum-versions/summary/Students')
+            ->where('curriculumVersion.id', $version->id)
+            ->where('data.total', 0)
+            ->where('data.counts.active', 0));
+});

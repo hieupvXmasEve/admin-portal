@@ -19,6 +19,7 @@ use App\Modules\Academic\Catalog\Actions\ModifyCurriculumVersionAction;
 use App\Modules\Academic\Catalog\Queries\GetCurriculumVersionPageDataQuery;
 use App\Modules\Academic\Catalog\Queries\GetCurriculumVersionSummaryQuery;
 use App\Modules\Academic\Catalog\Queries\ListCurriculumVersionsQuery;
+use App\Shared\Contracts\StudentRegistry\CurriculumStudentSummaryReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -153,6 +154,39 @@ class CurriculumVersionController extends \App\Http\Controllers\Web\CurriculumVe
             'curriculum-versions/summary/Roadmap',
             app(GetCurriculumVersionSummaryQuery::class)->roadmap($curriculumVersion),
         );
+    }
+
+    public function summaryStudents(CurriculumVersion $curriculumVersion): Response
+    {
+        $curriculumVersion->load([
+            'program:id,name,code',
+            'specialization:id,name,code',
+            'effectiveFromSemester:id,name,code',
+        ]);
+        $studentStats = app(CurriculumStudentSummaryReader::class)->summaryForCurriculumVersion(
+            $curriculumVersion->id,
+            app('campus')->id,
+        );
+
+        return Inertia::render('curriculum-versions/summary/Students', [
+            'curriculumVersion' => [
+                'id' => $curriculumVersion->id,
+                'version_code' => $curriculumVersion->version_code,
+                'program' => $curriculumVersion->program,
+                'specialization' => $curriculumVersion->specialization,
+                'effective_from_semester' => $curriculumVersion->effectiveFromSemester,
+            ],
+            'data' => $studentStats,
+            'meta' => ['lastUpdatedAt' => now()->toISOString()],
+            'links' => [
+                'drillDown' => collect(['active', 'inactive', 'graduated', 'suspended', 'withdrawn'])
+                    ->mapWithKeys(static fn (string $status): array => [$status => route('students.index', [
+                        'curriculum_version_id' => $curriculumVersion->id,
+                        'academic_status' => $status,
+                    ])])
+                    ->all(),
+            ],
+        ]);
     }
 
     public function update(
