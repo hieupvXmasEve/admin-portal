@@ -100,3 +100,13 @@ it('validates Catalog unit export filters before generating a spreadsheet', func
         ]))
         ->assertInvalid(['credit_points_to']);
 });
+
+it('rejects unit import previews outside the temporary import directory', function (): void {
+    actingAs($this->user)
+        ->post(route(UnitRoutes::IMPORT_PREVIEW), [
+            'file_path' => '../sensitive.xlsx',
+        ])
+        ->assertStatus(400)
+        ->assertJsonPath('success', false)
+        ->assertJsonPath('message', 'Invalid import file path.');
+});
