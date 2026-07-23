@@ -19,6 +19,9 @@ use App\Models\Student;
 use App\Modules\Academic\Queries\ExportStudentsQuery;
 use App\Modules\Academic\Queries\ListStudentsQuery;
 use App\Services\StudentService;
+use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
+use App\Shared\Contracts\StudentRegistry\DTO\GuardianRelationship;
+use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,7 +38,9 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class StudentController extends Controller
 {
     public function __construct(
-        private StudentService $studentService
+        private StudentService $studentService,
+        private StudentGuardianRelationshipReader $guardianRelationshipReader,
+        private GuardianAccessGrantReader $guardianAccessGrantReader,
     ) {}
 
     public function index(Request $request, ListStudentsQuery $listStudentsQuery): Response|RedirectResponse
@@ -170,7 +175,7 @@ class StudentController extends Controller
 
     public function edit(Student $student): Response
     {
-        $student->load(['campus', 'program', 'specialization', 'parentProfiles.user']);
+        $student->load(['campus', 'program', 'specialization']);
 
         $campuses = Campus::orderBy('name')->get(['id', 'name', 'code']);
         $programs = Program::with('specializations')->orderBy('name')->get();
@@ -183,9 +188,12 @@ class StudentController extends Controller
             ->orderBy('created_at', 'desc')
             ->get(['id', 'version_code']);
 
-        // Get primary parent info for the form
-        $primaryParent = $student->primaryParentProfile();
-        $student->setRelation('parentUser', $primaryParent?->user);
+        $primaryGuardian = collect($this->guardianRelationshipReader->forStudent((int) $student->id))
+            ->first(static fn (GuardianRelationship $relationship): bool => $relationship->isPrimary);
+        $parentAccount = $primaryGuardian === null
+            ? $this->guardianAccessGrantReader->primaryAccountForStudent((int) $student->id)
+            : $this->guardianAccessGrantReader->activeAccountForRelationship($primaryGuardian->id);
+        $student->setAttribute('parent_user', $parentAccount?->toArray());
 
         return Inertia::render('students/Edit', [
             'student' => $student,

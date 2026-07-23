@@ -59,3 +59,13 @@ it('keeps Guardian authentication and Student context decisions on Identity gran
 
     expect($violations)->toBeEmpty('Guardian login and Student context must not evaluate the legacy relationship pivot.');
 });
+
+it('reads the staff edit form primary Guardian through the Registry contract', function (): void {
+    $contents = file_get_contents(base_path('app/Modules/Academic/Http/Web/StudentController.php')) ?: '';
+
+    expect($contents)
+        ->toContain('StudentGuardianRelationshipReader')
+        ->toContain('guardianRelationshipReader->forStudent')
+        ->not->toContain("'parentProfiles.user'")
+        ->not->toContain('primaryParentProfile');
+});

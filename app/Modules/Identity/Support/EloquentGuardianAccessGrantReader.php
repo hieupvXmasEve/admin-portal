@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Identity\Support;
 
 use App\Modules\Identity\Models\GuardianAccessGrant;
+use App\Shared\Contracts\Identity\DTO\GuardianAccessAccount;
 use App\Shared\Contracts\Identity\DTO\GuardianAccessGrant as GuardianAccessGrantDto;
 use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
+use Illuminate\Support\Facades\DB;
 
 final class EloquentGuardianAccessGrantReader implements GuardianAccessGrantReader
 {
@@ -49,6 +51,32 @@ final class EloquentGuardianAccessGrantReader implements GuardianAccessGrantRead
             ->exists();
     }
 
+    public function activeAccountForRelationship(int $guardianRelationshipId): ?GuardianAccessAccount
+    {
+        $account = GuardianAccessGrant::query()
+            ->join('parents', 'parents.id', '=', 'guardian_access_grants.parent_id')
+            ->join('users', 'users.id', '=', 'parents.user_id')
+            ->where('guardian_access_grants.guardian_relationship_id', $guardianRelationshipId)
+            ->where('guardian_access_grants.status', GuardianAccessGrant::STATUS_ACTIVE)
+            ->orderBy('guardian_access_grants.id')
+            ->first(['users.id', 'users.name', 'users.email']);
+
+        return $account === null ? null : $this->toAccountDto($account);
+    }
+
+    public function primaryAccountForStudent(int $studentId): ?GuardianAccessAccount
+    {
+        $account = DB::table('parent_student')
+            ->join('parents', 'parents.id', '=', 'parent_student.parent_id')
+            ->join('users', 'users.id', '=', 'parents.user_id')
+            ->where('parent_student.student_id', $studentId)
+            ->where('parent_student.is_primary', true)
+            ->orderBy('parent_student.id')
+            ->first(['users.id', 'users.name', 'users.email']);
+
+        return $account === null ? null : $this->toAccountDto($account);
+    }
+
     public function activeRelationshipIds(array $guardianRelationshipIds): array
     {
         if ($guardianRelationshipIds === []) {
@@ -73,6 +101,16 @@ final class EloquentGuardianAccessGrantReader implements GuardianAccessGrantRead
             studentId: (int) $grant->student_id,
             accessLevel: (string) $grant->access_level,
             status: (string) $grant->status,
+        );
+    }
+
+    /** @param object{id: int|string, name: string|null, email: string|null} $account */
+    private function toAccountDto(object $account): GuardianAccessAccount
+    {
+        return new GuardianAccessAccount(
+            id: (int) $account->id,
+            name: (string) ($account->name ?? ''),
+            email: (string) ($account->email ?? ''),
         );
     }
 }

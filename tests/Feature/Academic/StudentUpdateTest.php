@@ -247,6 +247,7 @@ it('shows the primary parent after assigning a new parent email', function () {
         'parent_name' => 'New Primary Parent',
         'parent_email' => 'new-primary-parent@example.com',
     ]);
+    $newParentUser = User::query()->where('email', 'new-primary-parent@example.com')->firstOrFail();
 
     actingAs($this->authorizedUser)
         ->withSession(['current_campus_id' => $this->campus->id])
@@ -254,8 +255,144 @@ it('shows the primary parent after assigning a new parent email', function () {
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('students/Edit')
+            ->where('student.parent_user.id', $newParentUser->id)
+            ->where('student.parent_user.name', 'New Primary Parent')
             ->where('student.parent_user.email', 'new-primary-parent@example.com')
         );
+});
+
+it('shows the legacy primary parent account while its Registry relationship is not materialized', function () {
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'curriculum_version_id' => $this->curriculumVersion->id,
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+        ])
+        ->create();
+    $parentUser = User::factory()->create([
+        'name' => 'Legacy Primary Parent',
+        'email' => 'legacy-parent@example.com',
+        'type' => UserType::PARENT,
+    ]);
+    $parentProfile = ParentProfile::factory()->create(['user_id' => $parentUser->id]);
+    DB::table('parent_student')->insert([
+        'parent_id' => $parentProfile->id,
+        'student_id' => $student->id,
+        'relationship' => 'guardian',
+        'is_primary' => true,
+        'access_level' => 'read_only',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    actingAs($this->authorizedUser)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->get(route(StudentRoutes::EDIT, $student))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('students/Edit')
+            ->where('student.parent_user.id', $parentUser->id)
+            ->where('student.parent_user.name', 'Legacy Primary Parent')
+            ->where('student.parent_user.email', 'legacy-parent@example.com')
+        );
+});
+
+it('does not expose a legacy account when the primary Registry Guardian has no access grant', function () {
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'curriculum_version_id' => $this->curriculumVersion->id,
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+        ])
+        ->create();
+    $legacyParentUser = User::factory()->create([
+        'email' => 'legacy-parent@example.com',
+        'type' => UserType::PARENT,
+    ]);
+    $legacyParentProfile = ParentProfile::factory()->create(['user_id' => $legacyParentUser->id]);
+    DB::table('parent_student')->insert([
+        'parent_id' => $legacyParentProfile->id,
+        'student_id' => $student->id,
+        'relationship' => 'guardian',
+        'is_primary' => true,
+        'access_level' => 'read_only',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    app(StudentGuardianRelationshipWriter::class)->preserveForStudent((int) $student->id, [[
+        'full_name' => 'Guardian Without Account',
+        'email' => 'guardian-without-account@example.com',
+        'is_primary' => true,
+    ]]);
+
+    actingAs($this->authorizedUser)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->get(route(StudentRoutes::EDIT, $student))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('students/Edit')
+            ->where('student.parent_user', null)
+        );
+});
+
+it('marks an existing Registry Guardian as primary when the staff form selects it again', function () {
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'email' => 'student@example.com',
+            'curriculum_version_id' => $this->curriculumVersion->id,
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+        ])
+        ->create();
+    app(StudentGuardianRelationshipWriter::class)->preserveForStudent((int) $student->id, [
+        [
+            'full_name' => 'Existing Primary Guardian',
+            'email' => 'primary-guardian@example.com',
+            'is_primary' => true,
+        ],
+        [
+            'full_name' => 'Previous Guardian Name',
+            'email' => 'selected-guardian@example.com',
+            'is_primary' => false,
+        ],
+    ]);
+    $selectedParentUser = User::factory()->create([
+        'email' => 'selected-guardian@example.com',
+        'type' => UserType::PARENT,
+    ]);
+    ParentProfile::factory()->create(['user_id' => $selectedParentUser->id]);
+
+    app(StudentService::class)->updateStudent($student, [
+        'full_name' => $student->full_name,
+        'email' => $student->email,
+        'parent_name' => 'Selected Guardian',
+        'parent_email' => 'selected-guardian@example.com',
+    ]);
+
+    expect(DB::table('student_guardian_relationships')
+        ->where('student_id', $student->id)
+        ->where('email', 'selected-guardian@example.com')
+        ->value('is_primary'))->toBe(1)
+        ->and(DB::table('student_guardian_relationships')
+            ->where('student_id', $student->id)
+            ->where('email', 'selected-guardian@example.com')
+            ->value('full_name'))->toBe('Selected Guardian')
+        ->and(DB::table('student_guardian_relationships')
+            ->where('student_id', $student->id)
+            ->count())->toBe(2)
+        ->and(DB::table('student_guardian_relationships')
+            ->where('student_id', $student->id)
+            ->where('email', 'primary-guardian@example.com')
+            ->value('is_primary'))->toBe(0);
 });
 
 it('allows saving again with the current primary parent email', function () {

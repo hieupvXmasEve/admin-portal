@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Contracts\Identity;
 
+use App\Shared\Contracts\Identity\DTO\GuardianAccessAccount;
 use App\Shared\Contracts\Identity\DTO\GuardianAccessGrant;
 
 interface GuardianAccessGrantReader
@@ -17,6 +18,10 @@ interface GuardianAccessGrantReader
     public function hasActiveGrant(int $userId, int $studentId): bool;
 
     public function hasAnyActiveGrant(int $userId): bool;
+
+    public function activeAccountForRelationship(int $guardianRelationshipId): ?GuardianAccessAccount;
+
+    public function primaryAccountForStudent(int $studentId): ?GuardianAccessAccount;
 
     /**
      * @param  list<int>  $guardianRelationshipIds

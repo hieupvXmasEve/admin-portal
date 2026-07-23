@@ -889,18 +889,16 @@ class StudentService
                     && strtolower($guardian->email) === $parentEmail,
             );
 
-        if ($registryRelationship === null) {
-            $registryRelationship = app(StudentGuardianRelationshipWriter::class)->preserveForStudent(
-                (int) $student->id,
-                [[
-                    'full_name' => $parentName ?? $parentProfile->full_name,
-                    'relationship_type' => $relationship,
-                    'phone' => $parentPhone,
-                    'email' => $parentEmail,
-                    'is_primary' => $isPrimary,
-                ]],
-            )[0];
-        }
+        $registryRelationship = app(StudentGuardianRelationshipWriter::class)->preserveForStudent(
+            (int) $student->id,
+            [[
+                'full_name' => $parentName ?? $registryRelationship?->fullName ?? $parentProfile->full_name,
+                'relationship_type' => $relationship,
+                'phone' => $parentPhone ?? $registryRelationship?->phone,
+                'email' => $parentEmail,
+                'is_primary' => $isPrimary,
+            ]],
+        )[0];
 
         app(GuardianAccessGrantWriter::class)->grant(
             $registryRelationship,

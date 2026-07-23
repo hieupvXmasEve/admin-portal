@@ -31,20 +31,28 @@ final class PreserveStudentGuardianRelationshipsAction
 
             foreach ($guardians as $guardian) {
                 $sourceGuardianId = $guardian['source_application_guardian_id'] ?? null;
+                $email = isset($guardian['email']) && trim((string) $guardian['email']) !== ''
+                    ? strtolower(trim((string) $guardian['email']))
+                    : null;
                 $lookup = $sourceGuardianId !== null
                     ? ['source_application_guardian_id' => $sourceGuardianId]
-                    : [
-                        'student_id' => $studentId,
-                        'full_name' => $guardian['full_name'],
-                        'email' => $guardian['email'] ?? null,
-                    ];
+                    : ($email === null
+                        ? [
+                            'student_id' => $studentId,
+                            'full_name' => $guardian['full_name'],
+                            'email' => null,
+                        ]
+                        : [
+                            'student_id' => $studentId,
+                            'email' => $email,
+                        ]);
 
                 $relationship = StudentGuardianRelationship::query()->updateOrCreate($lookup, [
                     'student_id' => $studentId,
                     'full_name' => $guardian['full_name'],
                     'relationship_type' => $guardian['relationship_type'] ?? null,
                     'phone' => $guardian['phone'] ?? null,
-                    'email' => $guardian['email'] ?? null,
+                    'email' => $email,
                     'occupation' => $guardian['occupation'] ?? null,
                     'address' => $guardian['address'] ?? null,
                     'is_primary' => (bool) ($guardian['is_primary'] ?? false),
