@@ -18,6 +18,7 @@ return [
                 'UnitPrerequisiteCondition',
                 'UnitPrerequisiteGroup',
                 'CurriculumUnit',
+                'CurriculumModule',
             ],
             'Delivery' => [
                 'CourseOffering',

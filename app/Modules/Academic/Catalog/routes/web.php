@@ -10,6 +10,7 @@ use App\Http\Controllers\Web\UnitController as LegacyUnitController;
 use App\Http\Controllers\Web\Units\UnitExportController;
 use App\Http\Controllers\Web\Units\UnitImportController;
 use App\Modules\Academic\Catalog\Http\Web\AcademicPeriodController;
+use App\Modules\Academic\Catalog\Http\Web\CurriculumModuleController;
 use App\Modules\Academic\Catalog\Http\Web\CurriculumUnitController;
 use App\Modules\Academic\Catalog\Http\Web\ProgramController;
 use App\Modules\Academic\Catalog\Http\Web\SelectedAcademicPeriodController;
@@ -110,4 +111,14 @@ Route::middleware(['auth', 'web'])->group(function (): void {
         ->name(CurriculumRoutes::API_UNIT_BY_CURRICULUM_VERSION);
     Route::delete('api/curriculum-units/bulk-delete', [CurriculumUnitController::class, 'bulkDelete'])
         ->name(CurriculumRoutes::API_UNIT_BULK_DELETE);
+
+    Route::post('curriculum-versions/{curriculum_version}/modules/attach', [CurriculumModuleController::class, 'attach'])
+        ->middleware('can:edit_curriculum_version')
+        ->name('curriculum-versions.modules.attach');
+    Route::post('curriculum-versions/{curriculum_version}/modules/detach', [CurriculumModuleController::class, 'detach'])
+        ->middleware('can:edit_curriculum_version')
+        ->name('curriculum-versions.modules.detach');
+    Route::put('curriculum-modules/{curriculum_module}', [CurriculumModuleController::class, 'update'])
+        ->middleware('can:edit_curriculum_version')
+        ->name('curriculum-modules.update');
 });

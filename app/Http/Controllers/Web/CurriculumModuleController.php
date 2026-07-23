@@ -10,6 +10,7 @@ use App\Models\CurriculumVersion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
+/** @deprecated Curriculum module grouping is owned by Academic Catalog. */
 class CurriculumModuleController extends Controller
 {
     public function attach(Request $request, CurriculumVersion $curriculumVersion): RedirectResponse
