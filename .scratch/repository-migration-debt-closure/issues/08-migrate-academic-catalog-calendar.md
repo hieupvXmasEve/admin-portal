@@ -17,7 +17,7 @@ Cut Program, Curriculum Version, Unit, curriculum grouping, syllabus, and Academ
 - [ ] Catalog and Academic Period workflows are owned by the accepted context through module routes, controllers, requests, Actions, and Queries.
 - [ ] One institution-wide Academic Period identity is preserved; campus differences use schedule overlays rather than duplicate identities.
 - [ ] Imports/exports preserve supported templates, validation, identifiers, and audit behavior.
-- [ ] Delivery, Progression, Finance, portals, and reports consume catalog references through approved boundaries.
+- [x] Delivery, Progression, Finance, portals, and reports consume catalog references through approved boundaries.
 - [ ] Legacy catalog/calendar callers are characterized and cut over before removal.
 
 ## Blocked by
@@ -51,4 +51,5 @@ Cut Program, Curriculum Version, Unit, curriculum grouping, syllabus, and Academ
 - 2026-07-23: Curriculum Version student summary now resolves through the Student Registry `CurriculumStudentSummaryReader` contract and its Eloquent adapter, keeping Catalog free of direct Student model imports. The focused Curriculum Version suite passes 6 tests / 57 assertions and the migration-debt guard passes.
 - 2026-07-23: Curriculum Version and Syllabus Template Catalog controllers no longer inherit from their deprecated web controllers; their registered public workflows resolve entirely through Catalog implementations. Regression coverage passes for Syllabus edit-lock (5/54), Syllabus grading UI (7/19), and Curriculum Version (6/57), with the migration-debt guard green.
 - 2026-07-23: Unit Import form rendering and import-history response now resolve through Catalog as well. Upload, preview, process, form, and history are Catalog-owned; only the legacy dynamic workbook template builder remains temporarily inherited because the supported generated workbook layouts have not yet been extracted. Unit management coverage passes 5 tests / 32 assertions.
+- 2026-07-23: Downstream caller inventory confirms Delivery uses `CourseOfferingCatalogReader`, Progression owns `ProgramEnrollmentReader`, Finance uses `AcademicPeriodReader` and `ProgramEnrollmentReader`, and Academic reporting uses the same approved readers. This Catalog/Calendar slice does not change a student or lecturer portal API contract, so portal source changes are not required.
 - Remaining work: extract Curriculum Version summary/API projections and the remaining Unit template/history helpers; finish curriculum import/export ownership; downstream Delivery, Progression, Finance, report, and portal caller inventory/cutover; and approved legacy removals. The acceptance criteria therefore remain open and this issue stays `ready-for-agent`.
