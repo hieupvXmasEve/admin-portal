@@ -43,6 +43,13 @@ return [
             'RoomBooking',
             'RoomBookingAction',
         ],
+        'Engagement' => [
+            'Club',
+            'ClubMember',
+            'ClubMemberRoleHistory',
+            'Event',
+            'EventParticipant',
+        ],
     ],
 
     /*

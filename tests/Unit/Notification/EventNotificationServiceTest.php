@@ -3,18 +3,17 @@
 declare(strict_types=1);
 
 use App\Models\Event;
-use App\Models\Student;
-use App\Services\EventNotificationService;
+use App\Modules\Engagement\Actions\EventNotificationPublisher;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use App\Shared\Contracts\DomainEvents\DomainEvent;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Carbon\CarbonImmutable;
 
 it('publishes event registration confirmations through the shared publisher', function (): void {
     $publisher = Mockery::mock(DomainEventPublisher::class);
-    $service = new EventNotificationService($publisher);
+    $service = eventNotificationPublisher($publisher);
     $event = eventFixture();
-    $student = new Student;
-    $student->id = 42;
 
     $capturedEvent = null;
     $publisher->shouldReceive('publishAfterCommit')
@@ -25,7 +24,7 @@ it('publishes event registration confirmations through the shared publisher', fu
             return true;
         });
 
-    $service->sendEventRegistrationConfirmation($student, $event);
+    $service->sendEventRegistrationConfirmation(42, $event);
 
     expect($capturedEvent)->not->toBeNull()
         ->and($capturedEvent->name)->toBe('event.registration_confirmed')
@@ -40,10 +39,8 @@ it('publishes event registration confirmations through the shared publisher', fu
 
 it('keeps gold notification types distinct for idempotency and user preferences', function (): void {
     $publisher = Mockery::mock(DomainEventPublisher::class);
-    $service = new EventNotificationService($publisher);
+    $service = eventNotificationPublisher($publisher);
     $event = eventFixture();
-    $student = new Student;
-    $student->id = 42;
 
     $capturedEvent = null;
     $publisher->shouldReceive('publishAfterCommit')
@@ -54,7 +51,7 @@ it('keeps gold notification types distinct for idempotency and user preferences'
             return true;
         });
 
-    $service->sendGoldRewardNotification($student, 100.0, $event);
+    $service->sendGoldRewardNotification(42, 100.0, $event);
 
     expect($capturedEvent->name)->toBe('event.gold_earned')
         ->and($capturedEvent->deduplicationKey)->toBe('event:7:student:42:gold:earned:100')
@@ -77,4 +74,13 @@ function eventFixture(): Event
     $event->id = 7;
 
     return $event;
+}
+
+function eventNotificationPublisher(DomainEventPublisher $publisher): EventNotificationPublisher
+{
+    return new EventNotificationPublisher(
+        $publisher,
+        Mockery::mock(StudentReferenceReader::class),
+        Mockery::mock(StudentLifecycleStatusReader::class),
+    );
 }

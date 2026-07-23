@@ -4,18 +4,15 @@ namespace App\Services;
 
 use App\Models\Event;
 use App\Models\Student;
-use App\Models\User;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Notification;
+use App\Modules\Engagement\Actions\EventNotificationPublisher;
 
 class NotificationService
 {
-    protected EventNotificationService $eventNotificationService;
+    protected EventNotificationPublisher $eventNotificationPublisher;
 
-    public function __construct(EventNotificationService $eventNotificationService)
+    public function __construct(EventNotificationPublisher $eventNotificationPublisher)
     {
-        $this->eventNotificationService = $eventNotificationService;
+        $this->eventNotificationPublisher = $eventNotificationPublisher;
     }
 
     /**
@@ -23,7 +20,7 @@ class NotificationService
      */
     public function notifyEventPublication(Event $event): void
     {
-        $this->eventNotificationService->notifyEventPublication($event);
+        $this->eventNotificationPublisher->notifyEventPublication($event);
     }
 
     /**
@@ -31,7 +28,7 @@ class NotificationService
      */
     public function notifyEventCancellation(Event $event, ?string $reason = null): void
     {
-        $this->eventNotificationService->notifyEventCancellation($event, $reason);
+        $this->eventNotificationPublisher->notifyEventCancellation($event, $reason);
     }
 
     /**
@@ -39,7 +36,7 @@ class NotificationService
      */
     public function notifyEventUpdate(Event $event, Student $student): void
     {
-        $this->eventNotificationService->notifyEventUpdate($event, $student);
+        $this->eventNotificationPublisher->notifyEventUpdate($event, (int) $student->id);
     }
 
     /**
@@ -47,7 +44,7 @@ class NotificationService
      */
     public function sendEventReminders(): int
     {
-        return $this->eventNotificationService->sendEventReminders();
+        return $this->eventNotificationPublisher->sendEventReminders();
     }
 
     /**
@@ -55,7 +52,7 @@ class NotificationService
      */
     public function notifyEventCompletion(Event $event): void
     {
-        $this->eventNotificationService->notifyEventCompletion($event);
+        $this->eventNotificationPublisher->notifyEventCompletion($event);
     }
 
     /**
@@ -63,7 +60,7 @@ class NotificationService
      */
     public function sendEventRegistrationConfirmation(Student $student, Event $event): void
     {
-        $this->eventNotificationService->sendEventRegistrationConfirmation($student, $event);
+        $this->eventNotificationPublisher->sendEventRegistrationConfirmation((int) $student->id, $event);
     }
 
     /**
@@ -71,7 +68,7 @@ class NotificationService
      */
     public function sendEventCancellationConfirmation(Student $student, Event $event): void
     {
-        $this->eventNotificationService->sendEventCancellationConfirmation($student, $event);
+        $this->eventNotificationPublisher->sendEventCancellationConfirmation((int) $student->id, $event);
     }
 
     /**
@@ -79,7 +76,7 @@ class NotificationService
      */
     public function sendEventCheckinConfirmation(Student $student, Event $event): void
     {
-        $this->eventNotificationService->sendEventCheckinConfirmation($student, $event);
+        $this->eventNotificationPublisher->sendEventCheckinConfirmation((int) $student->id, $event);
     }
 
     /**
@@ -87,7 +84,7 @@ class NotificationService
      */
     public function sendGoldRewardNotification(Student $student, float $amount, Event $event): void
     {
-        $this->eventNotificationService->sendGoldRewardNotification($student, $amount, $event);
+        $this->eventNotificationPublisher->sendGoldRewardNotification((int) $student->id, $amount, $event);
     }
 
     /**
@@ -95,6 +92,6 @@ class NotificationService
      */
     public function sendGoldReclaimNotification(Student $student, float $amount, Event $event): void
     {
-        $this->eventNotificationService->sendGoldReclaimNotification($student, $amount, $event);
+        $this->eventNotificationPublisher->sendGoldReclaimNotification((int) $student->id, $amount, $event);
     }
 }

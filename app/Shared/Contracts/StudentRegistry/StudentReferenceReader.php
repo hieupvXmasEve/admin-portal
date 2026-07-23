@@ -39,5 +39,5 @@ interface StudentReferenceReader
     /**
      * @return list<StudentReference>
      */
-    public function search(string $query, int $campusId): array;
+    public function search(string $query, int $campusId, int $limit = 10): array;
 }

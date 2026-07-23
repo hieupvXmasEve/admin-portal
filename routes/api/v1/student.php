@@ -8,12 +8,9 @@ use App\Http\Controllers\Api\V1\NotificationPreferenceController;
 use App\Http\Controllers\Api\V1\Student\AcademicRecordController;
 use App\Http\Controllers\Api\V1\Student\AttendanceController;
 use App\Http\Controllers\Api\V1\Student\CalendarController;
-use App\Http\Controllers\Api\V1\Student\ClubController;
-use App\Http\Controllers\Api\V1\Student\ClubManagementController;
 use App\Http\Controllers\Api\V1\Student\CourseRegistrationController;
 use App\Http\Controllers\Api\V1\Student\CurriculumController;
 use App\Http\Controllers\Api\V1\Student\DashboardController;
-use App\Http\Controllers\Api\V1\Student\EventController;
 use App\Http\Controllers\Api\V1\Student\FinanceController;
 use App\Http\Controllers\Api\V1\Student\FormController;
 use App\Http\Controllers\Api\V1\Student\GradeController;
@@ -255,37 +252,6 @@ Route::middleware([
             Route::get('/{semester}', [FinanceController::class, 'semester'])->name('semester');
         });
 
-        // Club endpoints
-        Route::prefix('clubs')->name('clubs.')->group(function () {
-            // General club operations (available to all students)
-            Route::get('/', [ClubController::class, 'index'])->name('index');
-            Route::get('/my-memberships', [ClubController::class, 'myMemberships'])->name('my-memberships');
-            Route::get('/{club}', [ClubController::class, 'show'])->name('show');
-            Route::post('/{club}/apply', [ClubController::class, 'apply'])->name('apply');
-
-            // Club management operations (president only)
-            Route::get('/{club}/manage', [ClubManagementController::class, 'managementDashboard'])->name('manage');
-            Route::put('/{club}', [ClubManagementController::class, 'update'])->name('update');
-            Route::get('/{club}/members', [ClubManagementController::class, 'members'])->name('members');
-            Route::put('/{club}/members/{member}/approve', [ClubManagementController::class, 'approveMember'])->name('approve-member');
-            Route::put('/{club}/members/{member}/reject', [ClubManagementController::class, 'rejectMember'])->name('reject-member');
-            Route::put('/{club}/members/{member}/role', [ClubManagementController::class, 'updateMemberRole'])->name('update-member-role');
-        });
-
-        // Event endpoints
-        Route::prefix('events')->name('events.')->group(function () {
-            // Event discovery and details
-            Route::get('/', [EventController::class, 'index'])->name('index');
-            Route::get('/{event}', [EventController::class, 'show'])->name('show');
-
-            // Event registration
-            Route::post('/{event}/register', [EventController::class, 'register'])->name('register');
-            Route::delete('/{event}/register', [EventController::class, 'unregister'])->name('unregister');
-
-            // Student participation history
-            Route::get('/my/participations', [EventController::class, 'myEvents'])->name('my-events');
-            Route::get('/my/{event}', [EventController::class, 'myEventDetails'])->name('my-event-details');
-        });
     }); // End either middleware group
 
 }); // End auth:sanctum group

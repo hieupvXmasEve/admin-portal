@@ -2,13 +2,11 @@
 
 use App\Http\Controllers\Api\AdminScheduleController;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\EventCheckinController;
 use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\StudentWalletController;
 use App\Http\Controllers\Api\V1\Admin\EmailConfigurationController;
 use App\Http\Controllers\Api\V1\Admin\EmailController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
-use App\Http\Controllers\Api\V1\EventParticipantController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\FormController;
 use App\Http\Controllers\Web\LectureController;
@@ -106,25 +104,6 @@ Route::middleware(['web', 'auth'])->name('api.admin.')->group(function () {
 
             // Target management
             Route::post('/targets', [FormController::class, 'createTarget'])->name('targets.store');
-        });
-    });
-
-    // Event Check-in Management (Admin)
-    Route::prefix('events')->name('events.')->group(function () {
-        Route::post('/search-student', [EventCheckinController::class, 'searchStudent'])->name('search-student');
-        Route::post('/checkin', [EventCheckinController::class, 'checkinStudent'])->name('checkin');
-        Route::get('/{event}/participants', [EventCheckinController::class, 'getParticipants'])->name('participants');
-        Route::get('/{event}/statistics', [EventCheckinController::class, 'getStatistics'])->name('statistics');
-
-        // Manual participant management
-        Route::prefix('{event}/manual-participants')->name('manual-participants.')->group(function () {
-            Route::get('/filter-options', [EventParticipantController::class, 'getFilterOptions'])->name('filter-options');
-            Route::post('/search-students', [EventParticipantController::class, 'searchStudents'])->name('search-students');
-            Route::post('/add', [EventParticipantController::class, 'addParticipants'])->name('add');
-            Route::get('/list', [EventParticipantController::class, 'getParticipants'])->name('list');
-            Route::put('/bulk-update-status', [EventParticipantController::class, 'bulkUpdateStatus'])->name('bulk-update-status');
-            Route::delete('/remove', [EventParticipantController::class, 'removeParticipants'])->name('remove');
-            Route::get('/statistics', [EventParticipantController::class, 'getStatistics'])->name('statistics');
         });
     });
 

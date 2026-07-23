@@ -168,7 +168,7 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
     }
 
     /** @return list<StudentReference> */
-    public function search(string $query, int $campusId): array
+    public function search(string $query, int $campusId, int $limit = 10): array
     {
         return Student::query()
             ->select(['id', 'student_id', 'user_id', 'full_name', 'campus_id', 'email', 'current_address_line', 'address', 'national_id'])
@@ -179,7 +179,7 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
                     ->orWhere('email', 'like', "%{$query}%");
             })
             ->orderBy('full_name')
-            ->limit(10)
+            ->limit($limit)
             ->get()
             ->map(fn (Student $student): StudentReference => $this->reference($student))
             ->all();
