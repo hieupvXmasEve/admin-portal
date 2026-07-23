@@ -173,7 +173,7 @@ it('routes campus_id to the db email provider and renders campus-specific templa
     SendParentPaymentRemindersAction::run(['invoice_ids' => [$invoice->id]]);
 
     expect(NotificationEventOutbox::query()->sole()->campus_id)->toBe($campus->id)
-        ->and(NotificationEventOutbox::query()->sole()->payload['data']['parent_name'])->toBe('Quý Phụ Huynh');
+        ->and(NotificationEventOutbox::query()->sole()->payload['data']['parent_name'])->toBe($parentUser->name);
 });
 
 it('skips parent reminders when invoice has no parent email or no outstanding balance', function () {

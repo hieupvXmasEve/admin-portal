@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions\Operations;
 
-use App\Models\ParentProfile;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
-use Illuminate\Support\Collection;
+use App\Shared\Contracts\Identity\DTO\GuardianAccessAccount;
+use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use Illuminate\Support\Facades\DB;
 
 class SendParentPaymentRemindersAction
@@ -24,7 +24,6 @@ class SendParentPaymentRemindersAction
             ->whereIn('id', $invoiceIds)
             ->with([
                 'student:id,student_id,full_name,campus_id',
-                'student.parentProfiles.user:id,email,status,type',
                 'semester:id,code',
             ])
             ->get();
@@ -42,11 +41,14 @@ class SendParentPaymentRemindersAction
 
                 continue;
             }
-            // Pair each parent profile with their email + display name so the
-            // greeting addresses the actual recipient (not just the first
-            // parent in the relation). Previously parent_name was hard-coded
-            // to the first profile regardless of which email was sent.
-            $parentRecipients = self::extractParentRecipients($student?->parentProfiles);
+            $parentRecipients = $student === null
+                ? collect()
+                : collect(app(GuardianAccessGrantReader::class)->accountsForStudent((int) $student->id))
+                    ->map(static fn (GuardianAccessAccount $account): array => [
+                        'user_id' => $account->id,
+                        'email' => mb_strtolower(trim($account->email)),
+                        'name' => trim($account->name) !== '' ? $account->name : 'Quý Phụ Huynh',
+                    ]);
 
             if ($parentRecipients->isEmpty()) {
                 $skippedNoParentEmailCount++;
@@ -101,52 +103,6 @@ class SendParentPaymentRemindersAction
                 $skippedNoParentEmailCount,
             ),
         ];
-    }
-
-    /**
-     * Build a deduped collection of {user_id, name} pairs from a student's active
-     * parent profiles. Pairing the name with the user avoids the bug where a
-     * shared parent_name (taken from $parentProfiles->first()) addresses the
-     * wrong parent when a student has multiple profiles.
-     *
-     * @return Collection<int, array{user_id: int, email: string, name: string}>
-     */
-    private static function extractParentRecipients(?Collection $parentProfiles): Collection
-    {
-        if ($parentProfiles === null) {
-            return collect();
-        }
-
-        return $parentProfiles
-            ->filter(function (ParentProfile $profile): bool {
-                $user = $profile->user;
-
-                return $profile->status === 'active'
-                    && $user !== null
-                    && $user->isParent()
-                    && $user->isActive();
-            })
-            ->map(function (ParentProfile $profile): ?array {
-                $email = $profile->user?->email;
-
-                if (! is_string($email) || trim($email) === '') {
-                    return null;
-                }
-
-                $name = $profile->user?->full_name;
-                $name = (is_string($name) && trim($name) !== '')
-                    ? trim($name)
-                    : 'Quý Phụ Huynh';
-
-                return [
-                    'user_id' => (int) $profile->user_id,
-                    'email' => mb_strtolower(trim($email)),
-                    'name' => $name,
-                ];
-            })
-            ->filter()
-            ->unique('email')
-            ->values();
     }
 
     private static function buildSummaryMessage(

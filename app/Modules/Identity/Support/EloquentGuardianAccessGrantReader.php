@@ -8,6 +8,7 @@ use App\Modules\Identity\Models\GuardianAccessGrant;
 use App\Shared\Contracts\Identity\DTO\GuardianAccessAccount;
 use App\Shared\Contracts\Identity\DTO\GuardianAccessGrant as GuardianAccessGrantDto;
 use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
+use App\Shared\Support\Enums\UserType;
 use Illuminate\Support\Facades\DB;
 
 final class EloquentGuardianAccessGrantReader implements GuardianAccessGrantReader
@@ -75,6 +76,37 @@ final class EloquentGuardianAccessGrantReader implements GuardianAccessGrantRead
             ->first(['users.id', 'users.name', 'users.email']);
 
         return $account === null ? null : $this->toAccountDto($account);
+    }
+
+    public function accountsForStudent(int $studentId): array
+    {
+        $accounts = GuardianAccessGrant::query()
+            ->join('parents', 'parents.id', '=', 'guardian_access_grants.parent_id')
+            ->join('users', 'users.id', '=', 'parents.user_id')
+            ->where('guardian_access_grants.student_id', $studentId)
+            ->where('guardian_access_grants.status', GuardianAccessGrant::STATUS_ACTIVE)
+            ->where('users.type', UserType::PARENT->value)
+            ->where('users.status', 'active')
+            ->orderBy('guardian_access_grants.id')
+            ->get(['users.id', 'users.name', 'users.email']);
+
+        $legacyAccounts = DB::table('parent_student')
+            ->join('parents', 'parents.id', '=', 'parent_student.parent_id')
+            ->join('users', 'users.id', '=', 'parents.user_id')
+            ->where('parent_student.student_id', $studentId)
+            ->where('parents.status', 'active')
+            ->where('users.type', UserType::PARENT->value)
+            ->where('users.status', 'active')
+            ->orderBy('parent_student.id')
+            ->get(['users.id', 'users.name', 'users.email']);
+
+        return $accounts
+            ->concat($legacyAccounts)
+            ->filter(static fn (object $account): bool => is_string($account->email) && trim($account->email) !== '')
+            ->map(fn (object $account): GuardianAccessAccount => $this->toAccountDto($account))
+            ->unique(static fn (GuardianAccessAccount $account): string => strtolower($account->email))
+            ->values()
+            ->all();
     }
 
     public function activeRelationshipIds(array $guardianRelationshipIds): array

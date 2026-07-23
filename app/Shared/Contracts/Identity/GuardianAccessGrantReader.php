@@ -23,6 +23,9 @@ interface GuardianAccessGrantReader
 
     public function primaryAccountForStudent(int $studentId): ?GuardianAccessAccount;
 
+    /** @return list<GuardianAccessAccount> */
+    public function accountsForStudent(int $studentId): array;
+
     /**
      * @param  list<int>  $guardianRelationshipIds
      * @return list<int>
