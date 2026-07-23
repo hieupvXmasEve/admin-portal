@@ -90,3 +90,12 @@ it('validates prerequisite expressions through the Catalog endpoint without pers
 
     expect($prerequisite->prerequisiteGroups()->count())->toBe(0);
 });
+
+it('validates Catalog unit export filters before generating a spreadsheet', function (): void {
+    actingAs($this->user)
+        ->get(route(UnitRoutes::EXPORT_EXCEL, [
+            'credit_points_from' => 10,
+            'credit_points_to' => 5,
+        ]))
+        ->assertInvalid(['credit_points_to']);
+});
