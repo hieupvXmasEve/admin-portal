@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Catalog\Http\Web;
 
+use App\Actions\SyllabusTemplate\CreateSyllabusTemplateAction;
+use App\Actions\SyllabusTemplate\GetSyllabusTemplateListAction;
+use App\Actions\SyllabusTemplate\UpdateSyllabusTemplateAction;
 use App\Http\Requests\SyllabusTemplate\StoreSyllabusTemplateRequest;
 use App\Http\Requests\SyllabusTemplate\UpdateSyllabusTemplateRequest;
 use App\Http\Responses\ApiResponse;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
-use App\Modules\Academic\Catalog\Actions\CreateSyllabusTemplateAction;
 use App\Modules\Academic\Catalog\Actions\ManageSyllabusTemplateAction;
-use App\Modules\Academic\Catalog\Actions\UpdateSyllabusTemplateAction;
 use App\Modules\Academic\Catalog\Http\Requests\ListSyllabusTemplatesRequest;
-use App\Modules\Academic\Catalog\Queries\ListSyllabusTemplatesQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,9 +26,9 @@ use Inertia\Response;
  */
 class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTemplateController
 {
-    public function pageIndex(ListSyllabusTemplatesRequest $request, ListSyllabusTemplatesQuery $list): Response
+    public function pageIndex(Request $request, GetSyllabusTemplateListAction $legacyList): Response
     {
-        $filters = $request->validated();
+        $filters = $request->validate((new ListSyllabusTemplatesRequest)->rules());
 
         return Inertia::render('syllabus/TemplatesIndex', [
             'items' => $list->handle($filters),
@@ -46,9 +46,9 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
 
     public function store(
         StoreSyllabusTemplateRequest $request,
-        CreateSyllabusTemplateAction $create,
+        CreateSyllabusTemplateAction $legacyCreate,
     ): JsonResponse|RedirectResponse {
-        $template = $create->handle([
+        $template = app(\App\Modules\Academic\Catalog\Actions\CreateSyllabusTemplateAction::class)->handle([
             ...$request->validated(),
             'created_by' => auth()->id(),
         ]);
@@ -65,9 +65,9 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
     public function update(
         UpdateSyllabusTemplateRequest $request,
         SyllabusTemplate $syllabusTemplate,
-        UpdateSyllabusTemplateAction $update,
+        UpdateSyllabusTemplateAction $legacyUpdate,
     ): JsonResponse|RedirectResponse {
-        $template = $update->handle($syllabusTemplate, $request->validated());
+        $template = app(\App\Modules\Academic\Catalog\Actions\UpdateSyllabusTemplateAction::class)->handle($syllabusTemplate, $request->validated());
 
         if ($request->wantsJson()) {
             return ApiResponse::success($template);
@@ -81,9 +81,8 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
     public function destroy(
         Request $request,
         SyllabusTemplate $syllabusTemplate,
-        ManageSyllabusTemplateAction $manage,
     ): JsonResponse|RedirectResponse {
-        $manage->delete($syllabusTemplate);
+        app(ManageSyllabusTemplateAction::class)->delete($syllabusTemplate);
 
         if ($request->wantsJson()) {
             return ApiResponse::success(message: 'Deleted');
@@ -97,9 +96,8 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
     public function toggleActive(
         Request $request,
         SyllabusTemplate $syllabusTemplate,
-        ManageSyllabusTemplateAction $manage,
     ): JsonResponse|RedirectResponse {
-        $template = $manage->toggleActive($syllabusTemplate);
+        $template = app(ManageSyllabusTemplateAction::class)->toggleActive($syllabusTemplate);
 
         if ($request->wantsJson()) {
             return ApiResponse::success($template);
@@ -113,9 +111,8 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
     public function setDefault(
         Request $request,
         SyllabusTemplate $syllabusTemplate,
-        ManageSyllabusTemplateAction $manage,
     ): JsonResponse|RedirectResponse {
-        $template = $manage->setDefault($syllabusTemplate);
+        $template = app(ManageSyllabusTemplateAction::class)->setDefault($syllabusTemplate);
 
         if ($request->wantsJson()) {
             return ApiResponse::success($template);
@@ -129,9 +126,8 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
     public function clone(
         Request $request,
         SyllabusTemplate $syllabusTemplate,
-        ManageSyllabusTemplateAction $manage,
     ): JsonResponse|RedirectResponse {
-        $template = $manage->clone($syllabusTemplate, auth()->id());
+        $template = app(ManageSyllabusTemplateAction::class)->clone($syllabusTemplate, auth()->id());
 
         if ($request->wantsJson()) {
             return ApiResponse::success($template, status: 201);
