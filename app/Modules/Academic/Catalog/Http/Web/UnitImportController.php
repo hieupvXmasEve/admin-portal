@@ -10,13 +10,29 @@ use App\Modules\Academic\Catalog\Actions\ProcessUnitImportAction;
 use App\Modules\Academic\Catalog\Actions\UploadUnitImportFileAction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 
 /**
- * Catalog owns the file upload, preview, and processing operations. Template
- * generation remains inherited while its spreadsheet builders are extracted.
+ * Catalog owns the import workflow. The historic spreadsheet template builder
+ * remains temporarily inherited while its workbook layouts are extracted.
  */
 class UnitImportController extends \App\Http\Controllers\Web\Units\UnitImportController
 {
+    public function showImportForm(): Response
+    {
+        return Inertia::render('units/Import', [
+            'maxFileSize' => config('import.max_file_size', '10MB'),
+            'allowedExtensions' => config('import.allowed_extensions', ['xlsx', 'xls']),
+            'availableFormats' => [
+                'simple' => 'Simple Format (Units only)',
+                'detailed' => 'Detailed Format (Units with Prerequisites)',
+                'complete' => 'Complete Format (Units with all relationships)',
+                'combined' => 'Combined Format (Units and Syllabus)',
+            ],
+        ]);
+    }
+
     public function uploadFile(Request $request): JsonResponse
     {
         $validated = validator($request->all(), [
@@ -81,5 +97,10 @@ class UnitImportController extends \App\Http\Controllers\Web\Units\UnitImportCon
 
             return ApiResponse::serverError('Unit import failed: '.$exception->getMessage());
         }
+    }
+
+    public function getImportHistory(): JsonResponse
+    {
+        return ApiResponse::success(['history' => []]);
     }
 }
