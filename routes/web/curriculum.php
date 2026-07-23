@@ -1,7 +1,7 @@
 <?php
 
 use App\Constants\CurriculumRoutes;
-use App\Http\Controllers\Web\CurriculumVersionController;
+use App\Modules\Academic\Catalog\Http\Web\CurriculumVersionController;
 use Illuminate\Support\Facades\Route;
 
 // Web routes for Inertia.js pages

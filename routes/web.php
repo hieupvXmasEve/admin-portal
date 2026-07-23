@@ -1,8 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\ElectiveController;
-use App\Http\Controllers\Web\CurriculumVersionController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Modules\Academic\Catalog\Http\Web\CurriculumVersionController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Mcp\Facades\Mcp;
 
