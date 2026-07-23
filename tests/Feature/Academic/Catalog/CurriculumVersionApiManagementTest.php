@@ -8,6 +8,7 @@ use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Specialization;
 use App\Models\User;
+use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -78,4 +79,17 @@ it('bulk deletes empty curriculum versions with the established result details',
         ->assertJsonPath('data.failed', []);
 
     expect(CurriculumVersion::query()->find($version->id))->toBeNull();
+});
+
+it('renders the Catalog-owned curriculum version create page', function (): void {
+    $this->withoutMiddleware(Authorize::class);
+    Program::factory()->create(['code' => 'CAT']);
+
+    $this->get(route('curriculum_versions.create'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('curriculum-versions/Create')
+            ->has('programs', 1)
+            ->has('specializations')
+            ->has('semesters'));
 });

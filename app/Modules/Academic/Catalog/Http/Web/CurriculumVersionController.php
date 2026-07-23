@@ -16,6 +16,7 @@ use App\Models\Specialization;
 use App\Modules\Academic\Catalog\Actions\CreateCurriculumVersionAction;
 use App\Modules\Academic\Catalog\Actions\ManageCurriculumVersionApiAction;
 use App\Modules\Academic\Catalog\Actions\ModifyCurriculumVersionAction;
+use App\Modules\Academic\Catalog\Queries\GetCurriculumVersionPageDataQuery;
 use App\Modules\Academic\Catalog\Queries\ListCurriculumVersionsQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -57,6 +58,59 @@ class CurriculumVersionController extends \App\Http\Controllers\Web\CurriculumVe
         Inertia::flash('success', 'Curriculum version created successfully');
 
         return redirect()->route(CurriculumRoutes::VERSION_SUMMARY_OVERVIEW, $curriculumVersion);
+    }
+
+    public function create(): Response
+    {
+        return Inertia::render('curriculum-versions/Create', app(GetCurriculumVersionPageDataQuery::class)->create());
+    }
+
+    public function showWithModules(CurriculumVersion $curriculumVersion): Response
+    {
+        return Inertia::render('curriculum-versions/Show', app(GetCurriculumVersionPageDataQuery::class)->show($curriculumVersion));
+    }
+
+    public function edit(CurriculumVersion $curriculumVersion): Response|RedirectResponse
+    {
+        $data = app(GetCurriculumVersionPageDataQuery::class)->edit($curriculumVersion);
+
+        if (! $data['editable']) {
+            Inertia::flash('error', 'Cannot edit a curriculum version that is already active or has passed.');
+
+            return redirect()->route(CurriculumRoutes::VERSION_INDEX);
+        }
+
+        unset($data['editable']);
+
+        return Inertia::render('curriculum-versions/Edit', $data);
+    }
+
+    public function electiveManagement(CurriculumVersion $curriculumVersion): Response
+    {
+        $data = app(GetCurriculumVersionPageDataQuery::class)->electives($curriculumVersion);
+        $availableElectives = $data['availableElectives'];
+
+        return Inertia::render('curriculum-versions/ElectiveManagement', [
+            'curriculumVersion' => $data['curriculumVersion'],
+            'electiveSlots' => $data['electiveSlots'],
+            'availableElectives' => [
+                'same_program_other_specializations' => [
+                    'label' => 'Units from other specializations in the same program',
+                    'units' => $availableElectives['same_program_other_specializations']->take(20),
+                    'total_count' => $availableElectives['same_program_other_specializations']->count(),
+                ],
+                'cross_program_electives' => [
+                    'label' => 'Units from other programs',
+                    'units' => $availableElectives['cross_program_electives']->take(20),
+                    'total_count' => $availableElectives['cross_program_electives']->count(),
+                ],
+                'general_electives' => [
+                    'label' => 'General elective units',
+                    'units' => $availableElectives['general_electives']->take(20),
+                    'total_count' => $availableElectives['general_electives']->count(),
+                ],
+            ],
+        ]);
     }
 
     public function update(
