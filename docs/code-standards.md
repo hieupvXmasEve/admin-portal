@@ -132,11 +132,16 @@ Current status:
 - Local quality scripts exist.
 - GitHub workflow enforcement is disabled; quality workflows are not currently present as active CI merge gates.
 
-Minimum expected checks before merge:
+Minimum expected checks for an issue:
 
-- `./scripts/dev.sh test`
-- `./scripts/dev.sh npm run type-check`
-- `./scripts/dev.sh npm run lint`
+- Run the smallest relevant PHP test file(s) or Pest filter(s) for changed behavior.
+- Run frontend checks only for changed frontend file(s): component tests where they exist, otherwise file-level lint and formatting checks.
+- Run formatter checks for changed PHP files.
+
+Do not run `./scripts/dev.sh test`, `./scripts/dev.sh npm run type-check`, or
+global frontend lint by default for a single issue. These repository-wide checks
+are appropriate only when explicitly requested, for cross-cutting changes, or
+in a release/merge validation window.
 
 Transition policy while CI is inactive:
 

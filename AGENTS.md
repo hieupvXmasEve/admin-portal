@@ -50,6 +50,18 @@ Quality checks:
 ./scripts/dev.sh composer exec pint -- --test
 ```
 
+### Scoped verification (mandatory)
+
+For an issue or task, run checks only for the files and behavior changed by that
+issue. This applies equally to PHP and frontend work: use the relevant Pest
+file(s), test filter(s), and file-level frontend lint/format or component tests.
+
+Do not run repository-wide PHP tests, `npm run type-check`, or global frontend
+lint merely by default for an individual issue. Run those broader checks only
+when explicitly requested, when the change is cross-cutting, or for a release/
+merge validation window. Record any intentionally unrun broader check as a
+scope decision, not as a failure of the issue.
+
 ## Backend Rules (summary — full rules in `docs/rules/backend.md`)
 
 - Controllers orchestrate only: validate → call Action/Query → return response.
@@ -152,7 +164,7 @@ These are the top mistakes AI tools make in this codebase:
 Before final response:
 
 - [ ] Code compiles / targeted checks were run
-- [ ] Tests were run for behavior changes (or gap is explicit)
+- [ ] Tests for the changed behavior and files were run (or the targeted gap is explicit)
 - [ ] Docs updated when routes, contracts, auth, or architecture changed
 - [ ] Final answer summarizes changed files, validation result, and unresolved questions
 
