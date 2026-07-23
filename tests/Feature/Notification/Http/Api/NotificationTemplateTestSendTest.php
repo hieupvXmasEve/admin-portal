@@ -12,6 +12,7 @@ use App\Services\PermissionService;
 use Database\Seeders\InitialSetup\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 
@@ -20,6 +21,8 @@ uses(RefreshDatabase::class);
 const TEST_SEND_CSRF = 'test-send-csrf';
 
 beforeEach(function () {
+    Cache::flush();
+
     // Replicate A-batch middleware setup
     $campus = Campus::factory()->create();
     $this->app->singleton('campus', fn () => $campus);
@@ -29,10 +32,6 @@ beforeEach(function () {
         'current_campus_id' => $campus->id,
     ]);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn([]);
-    $this->app->singleton(PermissionService::class, fn () => $permissionService);
-
     // Clear rate limiter hits before each test so tests are isolated
     RateLimiter::clear('notification-template-test-send');
 });
@@ -40,7 +39,7 @@ beforeEach(function () {
 function makeTestSendSuperAdmin(): User
 {
     $user = User::factory()->create(['email' => 'admin-test@example.com']);
-    $campus = Campus::factory()->create();
+    $campus = app('campus');
     $role = Role::where('code', 'super_admin')->firstOrFail();
 
     DB::table('campus_user_roles')->insert([
@@ -51,12 +50,15 @@ function makeTestSendSuperAdmin(): User
         'updated_at' => now(),
     ]);
 
+    app(PermissionService::class)->clearUserPermissionsCache($user);
+    RateLimiter::clear('notification-template-test-send:'.$user->id);
+
     return $user;
 }
 
 function makeTestSendTemplate(): NotificationEmailTemplate
 {
-    $campus = Campus::factory()->create();
+    $campus = app('campus');
 
     return NotificationEmailTemplate::updateOrCreate(
         ['campus_id' => $campus->id, 'type_key' => 'payment_reminder'],

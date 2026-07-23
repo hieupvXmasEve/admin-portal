@@ -10,6 +10,7 @@ use App\Modules\Notification\Models\NotificationEmailTemplate;
 use App\Services\PermissionService;
 use Database\Seeders\InitialSetup\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
@@ -21,6 +22,8 @@ uses(RefreshDatabase::class);
 const API_TEST_CSRF = 'test-csrf-token';
 
 beforeEach(function () {
+    Cache::flush();
+
     // API admin routes use ['web', 'auth'] middleware. The web stack includes:
     //  - CheckCampusSelected (redirects to campus selection when no campus in session)
     //  - HandleInertiaRequests (calls PermissionService + app('campus'))
@@ -36,9 +39,6 @@ beforeEach(function () {
         'current_campus_id' => $campus->id,
     ]);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn([]);
-    $this->app->singleton(PermissionService::class, fn () => $permissionService);
 });
 
 /**
@@ -49,7 +49,7 @@ beforeEach(function () {
 function makeApiSuperAdmin(): User
 {
     $user = User::factory()->create();
-    $campus = Campus::factory()->create();
+    $campus = app('campus');
     $role = Role::where('code', 'super_admin')->firstOrFail();
 
     DB::table('campus_user_roles')->insert([
@@ -59,6 +59,8 @@ function makeApiSuperAdmin(): User
         'created_at' => now(),
         'updated_at' => now(),
     ]);
+
+    app(PermissionService::class)->clearUserPermissionsCache($user);
 
     return $user;
 }
@@ -70,7 +72,7 @@ function makeApiSuperAdmin(): User
  */
 function makeApiTemplate(): NotificationEmailTemplate
 {
-    $campus = Campus::factory()->create();
+    $campus = app('campus');
 
     return NotificationEmailTemplate::updateOrCreate(
         ['campus_id' => $campus->id, 'type_key' => 'payment_reminder'],
@@ -128,8 +130,8 @@ it('returns available variables for a valid type_key', function () {
     $this->seed(RoleAndPermissionSeeder::class);
 
     $user = makeApiSuperAdmin();
-
     $response = $this->actingAs($user)
+        ->withSession(['current_campus_id' => app('campus')->id])
         ->getJson(route('api.admin.notification-templates.variables', ['type_key' => 'payment_reminder']));
 
     $response->assertOk();

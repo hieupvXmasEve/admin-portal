@@ -9,6 +9,7 @@ use App\Modules\Notification\Models\NotificationEmailTemplate;
 use App\Services\PermissionService;
 use Database\Seeders\InitialSetup\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Inertia\Support\SessionKey;
 
@@ -17,11 +18,7 @@ const WEB_TEST_CSRF = 'web-test-csrf-token';
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    // HandleInertiaRequests calls PermissionService + app('campus') in share().
-    // Mock both to keep web tests isolated from infrastructure concerns.
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn([]);
-    $this->app->singleton(PermissionService::class, fn () => $permissionService);
+    Cache::flush();
 
     $campus = Campus::factory()->create();
     $this->app->singleton('campus', fn () => $campus);
@@ -40,7 +37,7 @@ beforeEach(function () {
 function makeWebSuperAdmin(): User
 {
     $user = User::factory()->create();
-    $campus = Campus::factory()->create();
+    $campus = app('campus');
     $role = Role::where('code', 'super_admin')->firstOrFail();
 
     DB::table('campus_user_roles')->insert([
@@ -50,6 +47,8 @@ function makeWebSuperAdmin(): User
         'created_at' => now(),
         'updated_at' => now(),
     ]);
+
+    app(PermissionService::class)->clearUserPermissionsCache($user);
 
     return $user;
 }
@@ -61,7 +60,7 @@ function makeWebSuperAdmin(): User
  */
 function makeWebTemplate(): NotificationEmailTemplate
 {
-    $campus = Campus::factory()->create();
+    $campus = app('campus');
 
     return NotificationEmailTemplate::updateOrCreate(
         ['campus_id' => $campus->id, 'type_key' => 'payment_reminder'],
