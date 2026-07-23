@@ -19,6 +19,7 @@ return [
                 'UnitPrerequisiteGroup',
                 'CurriculumUnit',
                 'CurriculumModule',
+                'SyllabusTemplate',
             ],
             'Delivery' => [
                 'CourseOffering',

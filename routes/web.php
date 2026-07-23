@@ -96,7 +96,7 @@ require __DIR__.'/web/failed-students.php';
 require __DIR__.'/web/class-schedule.php';
 require __DIR__.'/web/systems.php';
 require __DIR__.'/web/email-monitoring.php';
-require __DIR__.'/web/syllabus-templates.php';
+// @deprecated Syllabus template routes migrated to Academic Catalog.
 require __DIR__.'/web/forms.php';
 require __DIR__.'/web/clubs.php';
 require __DIR__.'/web/events.php';

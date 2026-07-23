@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
+/** @deprecated Syllabus template HTTP ownership is Academic Catalog. */
 class SyllabusTemplateController extends Controller
 {
     // Inertia pages

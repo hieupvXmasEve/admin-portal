@@ -17,6 +17,8 @@ use App\Modules\Academic\Catalog\Http\Web\SelectedAcademicPeriodController;
 use App\Modules\Academic\Catalog\Http\Web\UnitController;
 use Illuminate\Support\Facades\Route;
 
+require __DIR__.'/syllabus.php';
+
 Route::middleware(['auth', 'web'])->group(function (): void {
     Route::get('semesters', [AcademicPeriodController::class, 'index'])
         ->middleware('can:view_semester')
