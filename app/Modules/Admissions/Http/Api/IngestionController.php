@@ -10,7 +10,7 @@ use App\Models\ApplicationDocument;
 use App\Models\ApplicationGuardian;
 use App\Models\StudentApplication;
 use App\Modules\Admissions\Actions\UpsertCrmApplicationAction;
-use App\Modules\Admissions\Http\Requests\IngestApplicationRequest;
+use App\Modules\Admissions\Http\Requests\Admissions\IngestApplicationRequest;
 use App\Services\Admissions\Exceptions\ApplicationFrozenException;
 use App\Shared\Support\Admissions\AdmissionsIngestion;
 use Illuminate\Http\JsonResponse;

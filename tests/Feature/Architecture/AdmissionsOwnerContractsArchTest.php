@@ -30,6 +30,10 @@ it('routes supported Admissions workflows through the Admissions module', functi
         ->and(base_path('app/Modules/Admissions/Http/Api/IngestionController.php'))->toBeFile()
         ->and(base_path('app/Modules/Admissions/routes/web.php'))->toBeFile()
         ->and(base_path('app/Modules/Admissions/routes/api.php'))->toBeFile();
+
+    expect(file_get_contents(base_path('app/Modules/Admissions/Http/Web/StudentApplicationController.php')) ?: '')
+        ->not->toContain('LegacyStudentApplicationController')
+        ->not->toContain('StudentApplicationService');
 });
 
 it('keeps Admissions command contracts scalar and free of Eloquent models', function (): void {

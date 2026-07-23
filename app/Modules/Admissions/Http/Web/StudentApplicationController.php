@@ -5,22 +5,28 @@ declare(strict_types=1);
 namespace App\Modules\Admissions\Http\Web;
 
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Web\StudentApplicationController as LegacyStudentApplicationController;
-use App\Http\Requests\StoreStudentApplicationRequest;
-use App\Http\Requests\UpdateStudentApplicationRequest;
 use App\Models\ApplicationGuardian;
 use App\Models\StudentApplication;
 use App\Modules\Admissions\Actions\ApproveApplicationAction;
+use App\Modules\Admissions\Actions\CreateApplicationAction;
+use App\Modules\Admissions\Actions\DeleteApplicationAction;
+use App\Modules\Admissions\Actions\ExportApplicationsAction;
 use App\Modules\Admissions\Actions\RejectApplicationAction;
 use App\Modules\Admissions\Actions\RevokeApplicationAction;
+use App\Modules\Admissions\Actions\UpdateApplicationAction;
 use App\Modules\Admissions\Exceptions\ApplicationLifecycleException;
-use App\Modules\Admissions\Http\Requests\ApproveApplicationRequest;
-use App\Modules\Admissions\Http\Requests\RejectApplicationRequest;
+use App\Modules\Admissions\Http\Requests\Admissions\ApproveApplicationRequest;
+use App\Modules\Admissions\Http\Requests\Admissions\ExportApplicationsRequest;
+use App\Modules\Admissions\Http\Requests\Admissions\ListApplicationsRequest;
+use App\Modules\Admissions\Http\Requests\Admissions\RejectApplicationRequest;
+use App\Modules\Admissions\Http\Requests\Admissions\RevokeApplicationRequest;
+use App\Modules\Admissions\Http\Requests\Admissions\StoreApplicationRequest;
+use App\Modules\Admissions\Http\Requests\Admissions\UpdateApplicationRequest;
 use App\Modules\Admissions\Queries\GetApplicantDocumentChecklistQuery;
-use App\Services\StudentApplicationService;
+use App\Modules\Admissions\Queries\ListApplicationsQuery;
+use App\Shared\Contracts\Admissions\ApplicationProgramMappingReader;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Throwable;
@@ -28,20 +34,24 @@ use Throwable;
 /** Admissions-owned staff adapter for lifecycle mutations. */
 final class StudentApplicationController extends Controller
 {
-    private readonly LegacyStudentApplicationController $legacyController;
-
     public function __construct(
-        StudentApplicationService $legacyService,
-        private readonly ApproveApplicationAction $approveApplication,
-        private readonly RejectApplicationAction $rejectApplication,
-        private readonly RevokeApplicationAction $revokeApplication,
-    ) {
-        $this->legacyController = new LegacyStudentApplicationController($legacyService);
-    }
+        private readonly ApplicationProgramMappingReader $programMappingReader,
+    ) {}
 
-    public function index(Request $request): mixed
+    public function index(ListApplicationsRequest $request, ListApplicationsQuery $applications): mixed
     {
-        return $this->legacyController->index($request);
+        $filters = [
+            'search' => $request->validated('search'),
+            'status' => $request->validated('status'),
+            'intake' => $request->validated('intake'),
+            'per_page' => $request->validated('per_page', 15),
+            'sort' => $request->validated('sort', 'created_at'),
+            'direction' => $request->validated('direction', 'desc'),
+        ];
+        $campus = app()->bound('campus') ? app('campus') : null;
+        $lists = $applications->filters($campus?->code);
+
+        return Inertia::render('student-applications/index', ['applications' => $applications->handle($filters, $campus?->code), 'filters' => $filters, 'currentCampus' => $campus === null ? null : ['code' => $campus->code, 'name' => $campus->name], 'documentTypes' => $lists['document_types'], 'intakes' => $lists['intakes'], 'statusOptions' => [['value' => StudentApplication::STATUS_PENDING, 'label' => 'Pending'], ['value' => StudentApplication::STATUS_ENROLLED, 'label' => 'Enrolled'], ['value' => StudentApplication::STATUS_REJECTED, 'label' => 'Rejected']]]);
     }
 
     public function documents(StudentApplication $studentApplication, GetApplicantDocumentChecklistQuery $documentChecklist): mixed
@@ -63,12 +73,15 @@ final class StudentApplicationController extends Controller
 
     public function create(): mixed
     {
-        return $this->legacyController->create();
+        return Inertia::render('student-applications/create', $this->programMappingReader->formOptions());
     }
 
-    public function store(StoreStudentApplicationRequest $request): mixed
+    public function store(StoreApplicationRequest $request): RedirectResponse
     {
-        return $this->legacyController->store($request);
+        $application = CreateApplicationAction::run($request->validated());
+        $this->flash('success', 'Student application created successfully.');
+
+        return redirect()->route('student-applications.show', $application);
     }
 
     public function show(StudentApplication $studentApplication, GetApplicantDocumentChecklistQuery $documentChecklist): mixed
@@ -91,22 +104,43 @@ final class StudentApplicationController extends Controller
 
     public function edit(StudentApplication $studentApplication): mixed
     {
-        return $this->legacyController->edit($studentApplication);
+        return Inertia::render('student-applications/edit', ['application' => $studentApplication, ...$this->programMappingReader->formOptions()]);
     }
 
-    public function update(UpdateStudentApplicationRequest $request, StudentApplication $studentApplication): mixed
+    public function update(UpdateApplicationRequest $request, StudentApplication $studentApplication): RedirectResponse
     {
-        return $this->legacyController->update($request, $studentApplication);
+        UpdateApplicationAction::run(['application' => $studentApplication, 'attributes' => $request->validated()]);
+        $this->flash('success', 'Student application updated successfully.');
+
+        return redirect()->route('student-applications.show', $studentApplication);
     }
 
     public function destroy(StudentApplication $studentApplication): mixed
     {
-        return $this->legacyController->destroy($studentApplication);
+        try {
+            DeleteApplicationAction::run(['application' => $studentApplication]);
+        } catch (ApplicationLifecycleException $exception) {
+            $this->flash('error', $exception->getMessage());
+
+            return redirect()->route('student-applications.index');
+        }
+        $this->flash('success', 'Student application deleted successfully.');
+
+        return redirect()->route('student-applications.index');
     }
 
-    public function export(Request $request): mixed
+    public function export(ExportApplicationsRequest $request): mixed
     {
-        return $this->legacyController->export($request);
+        $campus = app()->bound('campus') ? app('campus') : null;
+
+        try {
+            return ExportApplicationsAction::run([...$request->validated(), 'sort' => $request->validated('sort', 'created_at'), 'direction' => $request->validated('direction', 'desc'), 'current_campus_code' => $campus?->code]);
+        } catch (Throwable $exception) {
+            Log::error('Export failed: '.$exception->getMessage());
+            $this->flash('error', 'Export failed. Please try again.');
+
+            return redirect()->back();
+        }
     }
 
     public function approve(ApproveApplicationRequest $request, StudentApplication $studentApplication): RedirectResponse
@@ -165,7 +199,7 @@ final class StudentApplicationController extends Controller
         return redirect()->back();
     }
 
-    public function revoke(Request $request, StudentApplication $studentApplication): RedirectResponse
+    public function revoke(RevokeApplicationRequest $request, StudentApplication $studentApplication): RedirectResponse
     {
         try {
             RevokeApplicationAction::run(['application' => $studentApplication, 'actor_id' => (int) $request->user()->id]);

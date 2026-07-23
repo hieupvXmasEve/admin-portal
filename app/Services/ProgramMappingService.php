@@ -57,6 +57,16 @@ class ProgramMappingService
         ];
     }
 
+    /** @return array{campuses: list<array{id: int, code: string, name: string}>, programs: list<array{id: int, code: string, name: string}>, semesters: list<array{id: int, code: string, name: string}>} */
+    public function applicationFormOptions(): array
+    {
+        return [
+            'campuses' => Campus::query()->select('id', 'code', 'name')->orderBy('name')->get()->map(fn (Campus $campus): array => ['id' => $campus->id, 'code' => $campus->code, 'name' => $campus->name])->all(),
+            'programs' => Program::query()->select('id', 'code', 'name')->orderBy('name')->get()->map(fn (Program $program): array => ['id' => $program->id, 'code' => $program->code, 'name' => $program->name])->all(),
+            'semesters' => Semester::query()->select('id', 'code', 'name')->orderBy('code')->get()->map(fn (Semester $semester): array => ['id' => $semester->id, 'code' => $semester->code, 'name' => $semester->name])->all(),
+        ];
+    }
+
     /**
      * Resolve the Curriculum Version for a program + semester, optionally narrowed
      * by specialization. Returns `[id, matchCount, specializationId]`; the id and

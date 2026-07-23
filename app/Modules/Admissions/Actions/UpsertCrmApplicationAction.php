@@ -7,13 +7,14 @@ namespace App\Modules\Admissions\Actions;
 use App\Models\ApplicationDocument;
 use App\Models\ApplicationDocumentType;
 use App\Models\StudentApplication;
+use App\Modules\Admissions\Support\ApplicantGuardianManager;
 use App\Services\Admissions\Exceptions\ApplicationFrozenException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 final class UpsertCrmApplicationAction
 {
-    public function __construct(private readonly ManageApplicantGuardianAction $guardians) {}
+    public function __construct(private readonly ApplicantGuardianManager $guardians) {}
 
     /** @param array<string, mixed> $data
      * @return array{application: StudentApplication, created: bool}

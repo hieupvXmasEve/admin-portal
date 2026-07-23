@@ -20,6 +20,7 @@ return [
                 'CurriculumUnit',
                 'CurriculumModule',
                 'CurriculumVersion',
+                'Specialization',
                 'SyllabusTemplate',
             ],
             'Delivery' => [

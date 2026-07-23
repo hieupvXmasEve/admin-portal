@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Admissions\Http\Requests;
+namespace App\Modules\Admissions\Http\Requests\Admissions;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-final class RejectApplicationRequest extends FormRequest
+final class RevokeApplicationRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -15,6 +15,6 @@ final class RejectApplicationRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['rejected_reason' => ['required', 'string', 'max:1000']];
+        return [];
     }
 }

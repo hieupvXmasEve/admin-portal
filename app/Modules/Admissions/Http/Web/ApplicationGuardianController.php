@@ -7,23 +7,25 @@ namespace App\Modules\Admissions\Http\Web;
 use App\Http\Controllers\Controller;
 use App\Models\ApplicationGuardian;
 use App\Models\StudentApplication;
-use App\Modules\Admissions\Actions\ManageApplicantGuardianAction;
-use App\Modules\Admissions\Http\Requests\StoreApplicantGuardianRequest;
-use App\Modules\Admissions\Http\Requests\UpdateApplicantGuardianRequest;
+use App\Modules\Admissions\Actions\CreateApplicantGuardianAction;
+use App\Modules\Admissions\Actions\DeleteApplicantGuardianAction;
+use App\Modules\Admissions\Actions\UpdateApplicantGuardianAction;
+use App\Modules\Admissions\Exceptions\ApplicationLifecycleException;
+use App\Modules\Admissions\Http\Requests\Admissions\StoreApplicantGuardianRequest;
+use App\Modules\Admissions\Http\Requests\Admissions\UpdateApplicantGuardianRequest;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 final class ApplicationGuardianController extends Controller
 {
-    public function __construct(private readonly ManageApplicantGuardianAction $guardians) {}
-
     public function store(StoreApplicantGuardianRequest $request, StudentApplication $studentApplication): RedirectResponse
     {
-        if (! $studentApplication->isPending()) {
-            return $this->frozen($studentApplication);
+        try {
+            CreateApplicantGuardianAction::run(['application' => $studentApplication, 'attributes' => $request->validated()]);
+        } catch (ApplicationLifecycleException $exception) {
+            return $this->failure($studentApplication, $exception->getMessage());
         }
-        ManageApplicantGuardianAction::run(['operation' => 'create', 'application' => $studentApplication, 'attributes' => $request->validated()]);
 
         $this->flash('success', 'Guardian added.');
 
@@ -33,10 +35,11 @@ final class ApplicationGuardianController extends Controller
     public function update(UpdateApplicantGuardianRequest $request, StudentApplication $studentApplication, ApplicationGuardian $guardian): RedirectResponse
     {
         $this->belongsToApplication($studentApplication, $guardian);
-        if (! $studentApplication->isPending()) {
-            return $this->frozen($studentApplication);
+        try {
+            UpdateApplicantGuardianAction::run(['guardian' => $guardian, 'attributes' => $request->validated()]);
+        } catch (ApplicationLifecycleException $exception) {
+            return $this->failure($studentApplication, $exception->getMessage());
         }
-        ManageApplicantGuardianAction::run(['operation' => 'update', 'guardian' => $guardian, 'attributes' => $request->validated()]);
 
         $this->flash('success', 'Guardian updated.');
 
@@ -46,10 +49,11 @@ final class ApplicationGuardianController extends Controller
     public function destroy(StudentApplication $studentApplication, ApplicationGuardian $guardian): RedirectResponse
     {
         $this->belongsToApplication($studentApplication, $guardian);
-        if (! $studentApplication->isPending()) {
-            return $this->frozen($studentApplication);
+        try {
+            DeleteApplicantGuardianAction::run(['guardian' => $guardian]);
+        } catch (ApplicationLifecycleException $exception) {
+            return $this->failure($studentApplication, $exception->getMessage());
         }
-        ManageApplicantGuardianAction::run(['operation' => 'delete', 'guardian' => $guardian]);
 
         $this->flash('success', 'Guardian removed.');
 
@@ -63,9 +67,9 @@ final class ApplicationGuardianController extends Controller
         }
     }
 
-    private function frozen(StudentApplication $application): RedirectResponse
+    private function failure(StudentApplication $application, string $message): RedirectResponse
     {
-        $this->flash('error', 'Guardians can only be changed while the application is pending.');
+        $this->flash('error', $message);
 
         return redirect()->route('student-applications.show', $application);
     }

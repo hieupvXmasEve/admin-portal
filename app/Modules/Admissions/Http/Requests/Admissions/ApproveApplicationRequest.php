@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Admissions\Http\Requests;
+namespace App\Modules\Admissions\Http\Requests\Admissions;
 
 use Illuminate\Foundation\Http\FormRequest;
 

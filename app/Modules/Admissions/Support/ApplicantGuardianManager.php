@@ -2,26 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Admissions\Actions;
+namespace App\Modules\Admissions\Support;
 
 use App\Models\ApplicationGuardian;
 use App\Models\StudentApplication;
 use Illuminate\Support\Facades\DB;
 
-final class ManageApplicantGuardianAction
+final class ApplicantGuardianManager
 {
-    /** @param array{operation: 'create'|'update'|'delete', application?: StudentApplication, guardian?: ApplicationGuardian, attributes?: array<string, mixed>} $data */
-    public static function run(array $data): ?ApplicationGuardian
-    {
-        $action = app(self::class);
-
-        return match ($data['operation']) {
-            'create' => $action->create($data['application'], $data['attributes'] ?? []),
-            'update' => $action->update($data['guardian'], $data['attributes'] ?? []),
-            'delete' => ($action->delete($data['guardian']) ?? null),
-        };
-    }
-
     /** @param array<string, mixed> $data */
     public function create(StudentApplication $application, array $data): ApplicationGuardian
     {
