@@ -7,14 +7,14 @@ use App\Constants\ProgramRoutes;
 use App\Constants\SemesterRoutes;
 use App\Constants\UnitRoutes;
 use App\Http\Controllers\Web\UnitController as LegacyUnitController;
-use App\Http\Controllers\Web\Units\UnitExportController;
-use App\Http\Controllers\Web\Units\UnitImportController;
 use App\Modules\Academic\Catalog\Http\Web\AcademicPeriodController;
 use App\Modules\Academic\Catalog\Http\Web\CurriculumModuleController;
 use App\Modules\Academic\Catalog\Http\Web\CurriculumUnitController;
 use App\Modules\Academic\Catalog\Http\Web\ProgramController;
 use App\Modules\Academic\Catalog\Http\Web\SelectedAcademicPeriodController;
 use App\Modules\Academic\Catalog\Http\Web\UnitController;
+use App\Modules\Academic\Catalog\Http\Web\UnitExportController;
+use App\Modules\Academic\Catalog\Http\Web\UnitImportController;
 use Illuminate\Support\Facades\Route;
 
 require __DIR__.'/syllabus.php';
