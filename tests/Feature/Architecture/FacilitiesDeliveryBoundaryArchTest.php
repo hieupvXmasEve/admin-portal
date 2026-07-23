@@ -44,11 +44,30 @@ it('keeps Delivery exam scheduling on the Facilities reservation contract', func
         ->and($request)->not->toContain('exists:rooms');
 });
 
-it('serves legacy building URLs from the Facilities owner', function (): void {
+it('serves building and room URLs from the Facilities owner', function (): void {
     $routes = file_get_contents(dirname(__DIR__, 3).'/app/Modules/Facilities/routes/web.php') ?: '';
-    $roomRoutes = file_get_contents(dirname(__DIR__, 3).'/routes/web/rooms.php') ?: '';
 
     expect($routes)->toContain('App\\Modules\\Facilities\\Http\\Web\\BuildingController')
         ->not->toContain('App\\Modules\\Academic\\Http\\Web\\BuildingController')
-        ->and($roomRoutes)->toContain('App\\Modules\\Facilities\\Http\\Web\\RoomController');
+        ->and($routes)->toContain('App\\Modules\\Facilities\\Http\\Web\\RoomController');
+});
+
+it('keeps the supported room and room-booking path entirely in Facilities', function (): void {
+    $root = dirname(__DIR__, 3);
+    $facilitiesController = file_get_contents($root.'/app/Modules/Facilities/Http/Web/RoomBookingController.php') ?: '';
+    $facilitiesRoomController = file_get_contents($root.'/app/Modules/Facilities/Http/Web/RoomController.php') ?: '';
+    $facilitiesRoutes = file_get_contents($root.'/app/Modules/Facilities/routes/web.php') ?: '';
+
+    expect($facilitiesController)
+        ->not->toContain('App\\Services\\RoomBookingService')
+        ->and($facilitiesRoomController)
+        ->not->toContain('App\\Http\\Controllers\\Web\\RoomController')
+        ->and($facilitiesRoutes)
+        ->toContain("Route::resource('rooms'")
+        ->and(file_exists($root.'/app/Services/RoomService.php'))->toBeFalse()
+        ->and(file_exists($root.'/app/Services/RoomBookingService.php'))->toBeFalse()
+        ->and(file_exists($root.'/app/Http/Controllers/Web/RoomController.php'))->toBeFalse()
+        ->and(file_exists($root.'/app/Http/Controllers/Web/RoomBookingController.php'))->toBeFalse()
+        ->and(file_exists($root.'/routes/web/rooms.php'))->toBeFalse()
+        ->and(file_exists($root.'/routes/web/room-bookings.php'))->toBeFalse();
 });

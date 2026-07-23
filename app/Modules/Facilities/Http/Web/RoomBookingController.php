@@ -22,7 +22,7 @@ use App\Modules\Facilities\Queries\GetRoomAvailabilityBoardQuery;
 use App\Modules\Facilities\Queries\GetRoomBookingCloneDraftQuery;
 use App\Modules\Facilities\Queries\PreviewRoomBookingSeriesAvailabilityQuery;
 use App\Modules\Facilities\Support\RoomBookingOccurrenceNormalizer;
-use App\Services\RoomBookingService;
+use App\Modules\Facilities\Support\RoomBookingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;

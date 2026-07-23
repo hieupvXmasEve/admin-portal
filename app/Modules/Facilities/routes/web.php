@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Facilities\Http\Web\BuildingController;
 use App\Modules\Facilities\Http\Web\RoomBookingController;
+use App\Modules\Facilities\Http\Web\RoomController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'auth', 'verified'])->group(function () {
@@ -44,6 +45,8 @@ Route::middleware(['web', 'auth', 'verified'])->group(function () {
 });
 
 Route::middleware(['web', 'auth', 'verified', 'campus.selected'])->group(function () {
+    Route::resource('rooms', RoomController::class);
+
     Route::get('room-bookings', [RoomBookingController::class, 'index'])
         ->name('room-bookings.index');
     Route::get('room-bookings/create', [RoomBookingController::class, 'create'])
@@ -88,3 +91,7 @@ Route::middleware(['web', 'auth', 'verified', 'campus.selected'])->group(functio
             ->name('preview-series');
     });
 });
+
+Route::middleware(['web', 'auth', 'verified', 'campus.selected', 'can:view_room'])
+    ->get('api/rooms', [RoomController::class, 'apiIndex'])
+    ->name('api.admin.rooms.api-index');

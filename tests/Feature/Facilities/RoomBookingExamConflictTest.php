@@ -14,7 +14,7 @@ use App\Modules\Facilities\Actions\CreateRoomBookingSeriesAction;
 use App\Modules\Facilities\Exceptions\RoomBookingSeriesConflictException;
 use App\Modules\Facilities\Queries\PreviewRoomBookingSeriesAvailabilityQuery;
 use App\Modules\Facilities\Support\ExamSlotBookingConflictChecker;
-use App\Services\RoomBookingService;
+use App\Modules\Facilities\Support\RoomBookingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

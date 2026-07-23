@@ -76,7 +76,6 @@ Route::get('/health', function () {
 // @deprecated Campus routes migrated to App\Modules\Academic\routes\web.php. Remove after 2026-06-01.
 // require __DIR__ . '/web/campuses.php';
 
-require __DIR__.'/web/rooms.php';
 require __DIR__.'/web/settings.php';
 require __DIR__.'/web/auth.php';
 // @deprecated User routes migrated to App\Modules\Identity\routes\web.php. Remove after 2024-12-31.
@@ -107,7 +106,5 @@ require __DIR__.'/web/student-scholarships.php';
 require __DIR__.'/web/tuition-plans.php';
 require __DIR__.'/web/vouchers.php';
 // require __DIR__ . '/web/surveys.php';
-// @deprecated Room booking routes migrated to App\Modules\Facilities\routes\web.php.
-// require __DIR__ . '/web/room-bookings.php';
 require __DIR__.'/web/notifications.php';
 require __DIR__.'/web/academic.php';

@@ -8,7 +8,6 @@ use App\Models\ClassSession;
 use App\Models\ExamResitAttempt;
 use App\Models\ExamRoomSlot;
 use App\Models\ExamRoomSlotInvigilator;
-use App\Models\RoomBooking;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Validation\ValidationException;
 
@@ -29,58 +28,6 @@ class ExamScheduleConflictChecker
 {
     /** Class-session statuses that no longer occupy a room. */
     private const INACTIVE_CLASS_SESSION_STATUSES = ['cancelled', 'postponed', 'moved'];
-
-    /**
-     * A room block (slot) must not overlap any live class session, active room
-     * booking, or other scheduled exam room slot in the same room.
-     */
-    public function assertRoomBlockAvailable(
-        int $roomId,
-        string $date,
-        string $startTime,
-        string $endTime,
-        ?int $excludeSlotId = null,
-    ): void {
-        $classConflict = ClassSession::query()
-            ->where('room_id', $roomId)
-            ->whereDate('session_date', $date)
-            ->whereNotIn('status', self::INACTIVE_CLASS_SESSION_STATUSES)
-            ->where(fn (Builder $q) => $this->whereTimeOverlaps($q, $startTime, $endTime))
-            ->exists();
-
-        if ($classConflict) {
-            throw ValidationException::withMessages([
-                'room_id' => ['Phòng đã có lịch học (class session) trùng khung giờ này.'],
-            ]);
-        }
-
-        $bookingConflict = RoomBooking::query()
-            ->where('room_id', $roomId)
-            ->whereDate('booking_date', $date)
-            ->whereIn('status', [RoomBooking::STATUS_PENDING, RoomBooking::STATUS_APPROVED])
-            ->where(fn (Builder $q) => $this->whereTimeOverlaps($q, $startTime, $endTime))
-            ->exists();
-
-        if ($bookingConflict) {
-            throw ValidationException::withMessages([
-                'room_id' => ['Phòng đã có đặt phòng (room booking) khác trùng khung giờ này.'],
-            ]);
-        }
-
-        $slotConflict = ExamRoomSlot::query()
-            ->where('room_id', $roomId)
-            ->whereDate('exam_date', $date)
-            ->where('status', ExamRoomSlot::STATUS_SCHEDULED)
-            ->when($excludeSlotId !== null, fn (Builder $q) => $q->where('id', '!=', $excludeSlotId))
-            ->where(fn (Builder $q) => $this->whereTimeOverlaps($q, $startTime, $endTime))
-            ->exists();
-
-        if ($slotConflict) {
-            throw ValidationException::withMessages([
-                'room_id' => ['Phòng đã có ca thi lại khác trùng khung giờ này.'],
-            ]);
-        }
-    }
 
     /**
      * An assigned student must not have an overlapping enrolled class session or

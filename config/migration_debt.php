@@ -37,6 +37,12 @@ return [
             'ApplicationGuardian',
             'StudentApplication',
         ],
+        'Facilities' => [
+            'Building',
+            'Room',
+            'RoomBooking',
+            'RoomBookingAction',
+        ],
     ],
 
     /*

@@ -13,7 +13,6 @@ use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\FormController;
 use App\Http\Controllers\Web\LectureController;
 use App\Modules\Academic\Http\Web\StudentController as WebStudentController;
-use App\Modules\Facilities\Http\Web\RoomController;
 use App\Modules\Notification\Http\Api\V1\Admin\NotificationTemplateController as NotificationTemplateApiController;
 use Illuminate\Support\Facades\Route;
 
@@ -80,9 +79,6 @@ Route::middleware(['web', 'auth'])->name('api.admin.')->group(function () {
         Route::get('/{session}', [AdminScheduleController::class, 'show'])->name('show');
         Route::put('/{session}', [AdminScheduleController::class, 'update'])->name('update');
     });
-
-    // Rooms API - for dropdowns and quick edits
-    Route::get('/rooms', [RoomController::class, 'apiIndex'])->name('rooms.api-index');
 
     // Lectures API - for dropdowns and quick edits
     Route::get('/lectures', [LectureController::class, 'apiIndex'])->name('lectures.api-index');

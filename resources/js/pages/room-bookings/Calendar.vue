@@ -9,7 +9,7 @@ import { computed, ref } from 'vue';
 
 interface CalendarItem {
     id: string;
-    type: 'room_booking' | 'class_session';
+    type: 'room_booking' | 'class_session' | 'exam_room_slot';
     room_id: number;
     room?: {
         id: number;
@@ -157,6 +157,10 @@ const getItemColor = (item: CalendarItem) => {
         return 'bg-indigo-100 text-indigo-800 border-indigo-300 hover:bg-indigo-150';
     }
 
+    if (item.type === 'exam_room_slot') {
+        return 'bg-violet-100 text-violet-800 border-violet-300';
+    }
+
     // Room bookings - based on status
     switch (item.status) {
         case 'approved':
@@ -197,6 +201,9 @@ const isToday = (date: Date) => {
 const getItemTooltip = (item: CalendarItem) => {
     if (item.type === 'class_session') {
         return `${item.title}\n${item.description || ''}\nInstructor: ${item.instructor || 'N/A'}\n(Class Session - Not editable)`;
+    }
+    if (item.type === 'exam_room_slot') {
+        return `${item.title}\n(Exam reservation - Not editable)`;
     }
     return `${item.title}\n${item.description || ''}\nBooked by: ${item.booker_name || 'N/A'}\nStatus: ${item.status}`;
 };

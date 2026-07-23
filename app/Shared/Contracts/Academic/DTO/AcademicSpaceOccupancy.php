@@ -16,6 +16,9 @@ final readonly class AcademicSpaceOccupancy
         public string $title,
         public string $status,
         public ?int $reservationId = null,
+        public ?string $description = null,
+        public ?string $instructor = null,
+        public ?int $courseOfferingId = null,
     ) {}
 
     /**

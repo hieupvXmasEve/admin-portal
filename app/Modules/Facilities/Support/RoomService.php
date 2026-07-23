@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Modules\Facilities\Support;
 
 use App\Models\Room;
 use Illuminate\Database\Eloquent\Builder;

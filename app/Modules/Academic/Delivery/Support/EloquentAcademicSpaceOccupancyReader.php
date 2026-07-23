@@ -37,6 +37,9 @@ class EloquentAcademicSpaceOccupancyReader implements AcademicSpaceOccupancyRead
                 endTime: $this->formatTime($session->end_time),
                 title: ($session->courseOffering?->unit?->code ?? 'Class').' - '.($session->courseOffering?->unit?->name ?? $session->session_title),
                 status: $session->status,
+                description: $session->session_title,
+                instructor: $session->lecture?->name,
+                courseOfferingId: $session->course_offering_id,
             ));
 
         $examSlots = ExamRoomSlot::query()
