@@ -26,6 +26,19 @@ use Inertia\Response;
  */
 class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTemplateController
 {
+    public function index(Unit $unit): JsonResponse
+    {
+        $templates = SyllabusTemplate::query()
+            ->where('unit_id', $unit->getKey())
+            ->with(['unit', 'applicableProgram', 'applicableCampus', 'creator', 'sourceTemplate'])
+            ->orderByDesc('is_default')
+            ->orderByDesc('is_active')
+            ->orderByDesc('created_at')
+            ->get();
+
+        return ApiResponse::success($templates);
+    }
+
     public function pageIndex(Request $request, GetSyllabusTemplateListAction $legacyList): Response
     {
         $filters = $request->validate((new ListSyllabusTemplatesRequest)->rules());
