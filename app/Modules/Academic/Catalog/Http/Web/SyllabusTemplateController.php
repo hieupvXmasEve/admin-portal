@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Catalog\Http\Web;
 
 use App\Http\Requests\SyllabusTemplate\StoreSyllabusTemplateRequest;
+use App\Http\Requests\SyllabusTemplate\UpdateSyllabusTemplateRequest;
 use App\Http\Responses\ApiResponse;
+use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Modules\Academic\Catalog\Actions\CreateSyllabusTemplateAction;
+use App\Modules\Academic\Catalog\Actions\ManageSyllabusTemplateAction;
+use App\Modules\Academic\Catalog\Actions\UpdateSyllabusTemplateAction;
 use App\Modules\Academic\Catalog\Http\Requests\ListSyllabusTemplatesRequest;
 use App\Modules\Academic\Catalog\Queries\ListSyllabusTemplatesQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -52,6 +57,88 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
             return ApiResponse::success($template, status: 201);
         }
 
-        return redirect()->route('syllabus_templates.index')->with('success', 'Template created');
+        Inertia::flash('success', 'Template created');
+
+        return redirect()->route('syllabus_templates.index');
+    }
+
+    public function update(
+        UpdateSyllabusTemplateRequest $request,
+        SyllabusTemplate $syllabusTemplate,
+        UpdateSyllabusTemplateAction $update,
+    ): JsonResponse|RedirectResponse {
+        $template = $update->handle($syllabusTemplate, $request->validated());
+
+        if ($request->wantsJson()) {
+            return ApiResponse::success($template);
+        }
+
+        Inertia::flash('success', 'Template updated');
+
+        return redirect()->route('syllabus_templates.edit', $syllabusTemplate);
+    }
+
+    public function destroy(
+        Request $request,
+        SyllabusTemplate $syllabusTemplate,
+        ManageSyllabusTemplateAction $manage,
+    ): JsonResponse|RedirectResponse {
+        $manage->delete($syllabusTemplate);
+
+        if ($request->wantsJson()) {
+            return ApiResponse::success(message: 'Deleted');
+        }
+
+        Inertia::flash('success', 'Template deleted');
+
+        return redirect()->route('syllabus_templates.index');
+    }
+
+    public function toggleActive(
+        Request $request,
+        SyllabusTemplate $syllabusTemplate,
+        ManageSyllabusTemplateAction $manage,
+    ): JsonResponse|RedirectResponse {
+        $template = $manage->toggleActive($syllabusTemplate);
+
+        if ($request->wantsJson()) {
+            return ApiResponse::success($template);
+        }
+
+        Inertia::flash('success', 'Status updated');
+
+        return back();
+    }
+
+    public function setDefault(
+        Request $request,
+        SyllabusTemplate $syllabusTemplate,
+        ManageSyllabusTemplateAction $manage,
+    ): JsonResponse|RedirectResponse {
+        $template = $manage->setDefault($syllabusTemplate);
+
+        if ($request->wantsJson()) {
+            return ApiResponse::success($template);
+        }
+
+        Inertia::flash('success', 'Default set');
+
+        return back();
+    }
+
+    public function clone(
+        Request $request,
+        SyllabusTemplate $syllabusTemplate,
+        ManageSyllabusTemplateAction $manage,
+    ): JsonResponse|RedirectResponse {
+        $template = $manage->clone($syllabusTemplate, auth()->id());
+
+        if ($request->wantsJson()) {
+            return ApiResponse::success($template, status: 201);
+        }
+
+        Inertia::flash('success', 'Template cloned');
+
+        return back();
     }
 }
