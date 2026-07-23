@@ -13,6 +13,10 @@ return [
             'Catalog' => [
                 'Program',
                 'Semester',
+                'Unit',
+                'EquivalentUnit',
+                'UnitPrerequisiteCondition',
+                'UnitPrerequisiteGroup',
             ],
             'Delivery' => [
                 'CourseOffering',

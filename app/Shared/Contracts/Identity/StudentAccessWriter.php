@@ -10,5 +10,7 @@ interface StudentAccessWriter
 {
     public function provision(int $campusId, string $fullName, string $email): StudentAccessAccount;
 
+    public function updateEmail(int $accountId, string $email): void;
+
     public function revoke(int $accountId): void;
 }

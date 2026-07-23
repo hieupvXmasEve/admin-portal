@@ -19,6 +19,10 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
+/**
+ * @deprecated Unit management routes are owned by Academic Catalog. Retained only
+ * for the uncut import/export compatibility endpoints until their adapter cutover.
+ */
 class UnitController extends Controller
 {
     public function __construct(
@@ -107,7 +111,7 @@ class UnitController extends Controller
             return redirect()->route(UnitRoutes::INDEX)->with('success', 'Unit created successfully.');
         } catch (\Exception $e) {
             return redirect()->back()
-                ->withErrors(['error' => 'Failed to create unit: ' . $e->getMessage()])
+                ->withErrors(['error' => 'Failed to create unit: '.$e->getMessage()])
                 ->withInput();
         }
     }
@@ -126,7 +130,6 @@ class UnitController extends Controller
         $unit->prerequisite_groups = $unit->prerequisiteGroups->map(function ($group) {
             return $this->transformPrerequisiteGroup($group);
         });
-
 
         // Get all equivalent units (both direct and transitive relationships)
         $allEquivalentUnits = $this->relationshipService->getAllEquivalentUnits($unit);
@@ -234,7 +237,7 @@ class UnitController extends Controller
             return redirect()->route(UnitRoutes::INDEX)->with('success', 'Unit updated successfully.');
         } catch (\Exception $e) {
             return redirect()->back()
-                ->withErrors(['error' => 'Failed to update unit: ' . $e->getMessage()])
+                ->withErrors(['error' => 'Failed to update unit: '.$e->getMessage()])
                 ->withInput();
         }
     }
@@ -262,11 +265,11 @@ class UnitController extends Controller
             // Always redirect to return URL or index on error
             $returnUrl = $request->input('return');
             if ($returnUrl && $this->isValidReturnUrl($returnUrl)) {
-                return redirect($returnUrl)->with('error', 'Failed to delete unit: ' . $e->getMessage());
+                return redirect($returnUrl)->with('error', 'Failed to delete unit: '.$e->getMessage());
             }
 
             return redirect()->route(UnitRoutes::INDEX)
-                ->with('error', 'Failed to delete unit: ' . $e->getMessage());
+                ->with('error', 'Failed to delete unit: '.$e->getMessage());
         }
     }
 
@@ -284,7 +287,7 @@ class UnitController extends Controller
         if (! empty($validated['exclude'])) {
             $excludeIds = array_filter(
                 array_map('intval', explode(',', $validated['exclude'])),
-                fn($id) => $id > 0
+                fn ($id) => $id > 0
             );
         }
 
@@ -328,7 +331,7 @@ class UnitController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'valid' => false,
-                'message' => 'Error validating expression: ' . $e->getMessage(),
+                'message' => 'Error validating expression: '.$e->getMessage(),
             ], 400);
         }
     }
@@ -338,7 +341,7 @@ class UnitController extends Controller
      */
     private function isValidReturnUrl(?string $url): bool
     {
-        if (!$url) {
+        if (! $url) {
             return false;
         }
 
@@ -348,6 +351,7 @@ class UnitController extends Controller
         // Only allow relative URLs or URLs from the same domain
         if (isset($parsed['host'])) {
             $currentHost = parse_url(config('app.url'), PHP_URL_HOST);
+
             return $parsed['host'] === $currentHost;
         }
 
@@ -411,14 +415,14 @@ class UnitController extends Controller
                 'success' => true,
                 'deleted' => $deleted,
                 'failed' => $failed,
-                'message' => count($deleted) . ' units deleted successfully.',
+                'message' => count($deleted).' units deleted successfully.',
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
 
             return response()->json([
                 'success' => false,
-                'message' => 'Bulk delete failed: ' . $e->getMessage(),
+                'message' => 'Bulk delete failed: '.$e->getMessage(),
             ], 500);
         }
     }

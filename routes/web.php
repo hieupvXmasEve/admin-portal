@@ -82,7 +82,7 @@ require __DIR__.'/web/auth.php';
 // @deprecated User routes migrated to App\Modules\Identity\routes\web.php. Remove after 2024-12-31.
 // require __DIR__ . '/web/user.php';
 require __DIR__.'/web/semester.php';
-require __DIR__.'/web/units.php';
+// @deprecated Unit routes migrated to App\Modules\Academic\Catalog\routes\web.php.
 require __DIR__.'/web/specializations.php';
 require __DIR__.'/web/curriculum.php';
 require __DIR__.'/web/course-offerings.php';

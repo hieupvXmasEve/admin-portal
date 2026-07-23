@@ -17,9 +17,11 @@ use App\Models\User;
 use App\Shared\Contracts\Academic\StudentLifecycleStatusFilter;
 use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
+use App\Shared\Contracts\Identity\StudentAccessWriter;
 use App\Shared\Contracts\StudentRegistry\DTO\GuardianRelationship;
 use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipReader;
 use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
+use App\Shared\Contracts\StudentRegistry\StudentProfileWriter;
 use App\Shared\Support\Enums\UserType;
 use Exception;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -32,6 +34,11 @@ use Throwable;
 
 class StudentService
 {
+    public function __construct(
+        private readonly StudentProfileWriter $studentProfileWriter,
+        private readonly StudentAccessWriter $studentAccessWriter,
+    ) {}
+
     /**
      * Create a new student (legacy method - use createAdmittedStudent for new implementations)
      */
@@ -201,13 +208,11 @@ class StudentService
                 }
             }
 
-            // Update student data with only allowed fields
-            $student->update($filteredData);
+            // Registry owns identity, profile, and contact persistence.
+            $this->studentProfileWriter->update((int) $student->id, $filteredData);
 
-            if (array_key_exists('email', $filteredData) && $student->user) {
-                $student->user->update([
-                    'email' => $filteredData['email'],
-                ]);
+            if (array_key_exists('email', $filteredData) && $student->user_id !== null) {
+                $this->studentAccessWriter->updateEmail((int) $student->user_id, (string) $filteredData['email']);
             }
 
             $student->refresh();

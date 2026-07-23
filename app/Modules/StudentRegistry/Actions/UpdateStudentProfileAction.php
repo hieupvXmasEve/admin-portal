@@ -10,12 +10,12 @@ final class UpdateStudentProfileAction
 {
     /** @var list<string> */
     private const PROFILE_FIELDS = [
-        'full_name', 'phone', 'avatar_url', 'date_of_birth', 'gender', 'nationality', 'ethnicity',
+        'full_name', 'email', 'phone', 'avatar_url', 'date_of_birth', 'gender', 'nationality', 'ethnicity',
         'national_id', 'address', 'current_address_line', 'current_ward', 'current_province', 'current_country',
         'cccd_address', 'cccd_address_line', 'cccd_ward', 'cccd_province', 'cccd_country',
         'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_email', 'emergency_contact_relationship',
         'emergency_contact_name_1', 'emergency_contact_phone_1', 'emergency_contact_email_1', 'emergency_contact_relationship_1',
-        'high_school_name',
+        'high_school_name', 'high_school_graduation_year', 'entrance_exam_score', 'admission_notes',
     ];
 
     /** @param array{student_id: int, attributes: array<string, mixed>} $data */
