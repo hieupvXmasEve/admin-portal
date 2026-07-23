@@ -43,7 +43,9 @@ class AcademicPeriodController extends Controller
 
         $semesters = $this->listAcademicPeriods->handle($filters);
         $campuses = array_map(fn ($campus): array => $campus->toArray(), $this->campuses->all());
-        $campusNames = collect($campuses)->keyBy('id')->map->name;
+        $campusNames = collect($campuses)
+            ->keyBy('id')
+            ->map(static fn (array $campus): string => $campus['name']);
         $schedules = CampusPeriodSchedule::query()
             ->whereIn('semester_id', $semesters->getCollection()->pluck('id'))
             ->orderBy('campus_id')

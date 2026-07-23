@@ -78,3 +78,15 @@ it('creates and validates a unit through the Catalog-owned routes', function ():
         ->assertJsonPath('success', true)
         ->assertJsonPath('data.valid', false);
 });
+
+it('validates prerequisite expressions through the Catalog endpoint without persisting conditions', function (): void {
+    $prerequisite = Unit::factory()->create(['code' => 'ABC12345']);
+
+    actingAs($this->user)
+        ->post(route('units.validate-prerequisite-expression'), ['expression' => $prerequisite->code])
+        ->assertOk()
+        ->assertJsonPath('valid', true)
+        ->assertJsonPath('message', 'Expression is valid');
+
+    expect($prerequisite->prerequisiteGroups()->count())->toBe(0);
+});

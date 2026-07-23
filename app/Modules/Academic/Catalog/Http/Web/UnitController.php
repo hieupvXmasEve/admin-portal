@@ -12,12 +12,14 @@ use App\Modules\Academic\Catalog\Actions\BulkDeleteUnitsAction;
 use App\Modules\Academic\Catalog\Actions\CreateUnitAction;
 use App\Modules\Academic\Catalog\Actions\DeleteUnitAction;
 use App\Modules\Academic\Catalog\Actions\UpdateUnitAction;
+use App\Modules\Academic\Catalog\Actions\ValidatePrerequisiteExpressionAction;
 use App\Modules\Academic\Catalog\Http\Requests\BulkDeleteUnitsRequest;
 use App\Modules\Academic\Catalog\Http\Requests\ListUnitsRequest;
 use App\Modules\Academic\Catalog\Http\Requests\SearchUnitsRequest;
 use App\Modules\Academic\Catalog\Http\Requests\StoreUnitRequest;
 use App\Modules\Academic\Catalog\Http\Requests\UpdateUnitRequest;
 use App\Modules\Academic\Catalog\Http\Requests\ValidateUnitCodeRequest;
+use App\Modules\Academic\Catalog\Http\Requests\ValidatePrerequisiteExpressionRequest;
 use App\Modules\Academic\Catalog\Queries\GetUnitDetailQuery;
 use App\Modules\Academic\Catalog\Queries\ListUnitsQuery;
 use App\Modules\Academic\Catalog\Queries\SearchUnitsQuery;
@@ -157,6 +159,18 @@ class UnitController extends Controller
             'valid' => ! $exists,
             'message' => $exists ? 'Unit code already exists' : 'Unit code is available',
         ]);
+    }
+
+    public function validatePrerequisiteExpression(
+        ValidatePrerequisiteExpressionRequest $request,
+        ValidatePrerequisiteExpressionAction $validateExpression,
+    ): JsonResponse {
+        $result = $validateExpression->handle($request->validated('expression'));
+
+        return response()->json([
+            'valid' => $result['success'],
+            'message' => $result['message'],
+        ], $result['success'] ? 200 : 400);
     }
 
     public function bulkDelete(BulkDeleteUnitsRequest $request, BulkDeleteUnitsAction $bulkDelete): JsonResponse

@@ -124,11 +124,13 @@ const campusScheduleForm = useForm({
 
 const schedulesFor = (semesterId: number) => props.campus_period_schedules[String(semesterId)] ?? [];
 
-const openCampusScheduleModal = (semester: Semester, schedule: CampusPeriodSchedule | null = null) => {
+const scheduleForCampus = (semesterId: number, campusId: number) => schedulesFor(semesterId).find((schedule) => schedule.campus_id === campusId) ?? null;
+
+const openCampusScheduleModal = (semester: Semester, schedule: CampusPeriodSchedule | null = null, campusId: number | null = null) => {
     selectedSemester.value = semester;
     selectedCampusSchedule.value = schedule;
     campusScheduleForm.clearErrors();
-    campusScheduleForm.campus_id = schedule?.campus_id.toString() ?? '';
+    campusScheduleForm.campus_id = schedule?.campus_id.toString() ?? campusId?.toString() ?? '';
     campusScheduleForm.operating_date_range = { start: schedule?.operating_start_date ?? null, end: schedule?.operating_end_date ?? null };
     campusScheduleForm.registration_date_range = { start: schedule?.registration_start_date ?? null, end: schedule?.registration_end_date ?? null };
     showCampusScheduleModal.value = true;
@@ -559,29 +561,37 @@ const handlePageSizeChange = (pageSize: number) => {
             <p class="text-muted-foreground text-sm">Campus-specific operating and registration windows; Academic Period remains institution-wide.</p>
         </div>
         <div v-for="semester in semesters.data" :key="`schedules-${semester.id}`" class="rounded-lg border p-4">
-            <div class="mb-3 flex items-center justify-between gap-3">
+            <div class="mb-3">
                 <div>
                     <p class="font-medium">{{ semester.name }}</p>
                     <p class="text-muted-foreground text-sm">{{ semester.code }}</p>
                 </div>
-                <Button size="sm" variant="outline" @click="openCampusScheduleModal(semester)">
-                    <CalendarPlus class="mr-2 h-4 w-4" />
-                    Add campus schedule
-                </Button>
             </div>
-            <div v-if="schedulesFor(semester.id).length" class="grid gap-2 md:grid-cols-2">
-                <div v-for="schedule in schedulesFor(semester.id)" :key="schedule.id" class="rounded-md bg-muted/50 p-3 text-sm">
-                    <div class="flex items-start justify-between gap-2">
-                        <div>
-                            <p class="font-medium">{{ schedule.campus_name ?? `Campus #${schedule.campus_id}` }}</p>
-                            <p class="text-muted-foreground">Operating: {{ schedule.operating_start_date ? `${formatDateToShort(schedule.operating_start_date)} – ${formatDateToShort(schedule.operating_end_date!)}` : 'Not set' }}</p>
-                            <p class="text-muted-foreground">Registration: {{ schedule.registration_start_date ? `${formatDateToShort(schedule.registration_start_date)} – ${formatDateToShort(schedule.registration_end_date!)}` : 'Not set' }}</p>
+            <div v-if="campuses.length" class="grid gap-2 md:grid-cols-2">
+                <div v-for="campus in campuses" :key="campus.id" class="rounded-md bg-muted/50 p-3 text-sm">
+                    <template v-if="scheduleForCampus(semester.id, campus.id)">
+                        <div v-for="schedule in [scheduleForCampus(semester.id, campus.id)]" :key="schedule.id" class="flex items-start justify-between gap-2">
+                            <div>
+                                <p class="font-medium">{{ campus.name }}</p>
+                                <p class="text-muted-foreground">Operating: {{ schedule.operating_start_date ? `${formatDateToShort(schedule.operating_start_date)} – ${formatDateToShort(schedule.operating_end_date!)}` : 'Not set' }}</p>
+                                <p class="text-muted-foreground">Registration: {{ schedule.registration_start_date ? `${formatDateToShort(schedule.registration_start_date)} – ${formatDateToShort(schedule.registration_end_date!)}` : 'Not set' }}</p>
+                            </div>
+                            <Button size="sm" variant="ghost" @click="openCampusScheduleModal(semester, schedule)">Edit</Button>
                         </div>
-                        <Button size="sm" variant="ghost" @click="openCampusScheduleModal(semester, schedule)">Edit</Button>
+                    </template>
+                    <div v-else class="flex items-center justify-between gap-2">
+                        <div>
+                            <p class="font-medium">{{ campus.name }}</p>
+                            <p class="text-muted-foreground">No schedule configured.</p>
+                        </div>
+                        <Button size="sm" variant="outline" @click="openCampusScheduleModal(semester, null, campus.id)">
+                            <CalendarPlus class="mr-2 h-4 w-4" />
+                            Add schedule
+                        </Button>
                     </div>
                 </div>
             </div>
-            <p v-else class="text-muted-foreground text-sm">No campus schedules have been configured.</p>
+            <p v-else class="text-muted-foreground text-sm">No campuses are available to configure.</p>
         </div>
     </section>
 

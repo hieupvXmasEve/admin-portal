@@ -6,7 +6,6 @@ use App\Constants\CurriculumRoutes;
 use App\Constants\ProgramRoutes;
 use App\Constants\SemesterRoutes;
 use App\Constants\UnitRoutes;
-use App\Http\Controllers\Web\UnitController as LegacyUnitController;
 use App\Modules\Academic\Catalog\Http\Web\AcademicPeriodController;
 use App\Modules\Academic\Catalog\Http\Web\CurriculumModuleController;
 use App\Modules\Academic\Catalog\Http\Web\CurriculumUnitController;
@@ -85,7 +84,7 @@ Route::middleware(['auth', 'web'])->group(function (): void {
     Route::get('units/create', [UnitController::class, 'create'])->middleware('can:create_unit')->name(UnitRoutes::CREATE);
     Route::get('units/search', [UnitController::class, 'search'])->middleware('can:view_unit')->name('units.search');
     Route::post('units/validate-code', [UnitController::class, 'validateCode'])->name('units.validate-code');
-    Route::post('units/validate-prerequisite-expression', [LegacyUnitController::class, 'validatePrerequisiteExpression'])
+    Route::post('units/validate-prerequisite-expression', [UnitController::class, 'validatePrerequisiteExpression'])
         ->name('units.validate-prerequisite-expression');
     Route::delete('units/bulk-delete', [UnitController::class, 'bulkDelete'])->name('units.bulk-delete');
     Route::post('units', [UnitController::class, 'store'])->middleware('can:create_unit')->name(UnitRoutes::STORE);

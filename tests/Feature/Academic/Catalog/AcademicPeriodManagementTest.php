@@ -133,3 +133,21 @@ it('stores one campus schedule per academic period without duplicating the perio
         ->count())->toBe(2)
         ->and(Semester::query()->whereKey($academicPeriod)->count())->toBe(1);
 });
+
+it('exposes campus schedules alongside the institution-wide academic period list', function (): void {
+    $academicPeriod = Semester::factory()->create();
+    $schedule = \App\Modules\Academic\Catalog\Models\CampusPeriodSchedule::query()->create([
+        'semester_id' => $academicPeriod->id,
+        'campus_id' => $this->campus->id,
+        'operating_start_date' => '2027-01-02',
+        'operating_end_date' => '2027-04-30',
+    ]);
+
+    actingAs($this->user)
+        ->get(route(SemesterRoutes::INDEX))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('campuses.0.id', $this->campus->id)
+            ->where("campus_period_schedules.{$academicPeriod->id}.0.id", $schedule->id)
+            ->where("campus_period_schedules.{$academicPeriod->id}.0.campus_id", $this->campus->id));
+});
