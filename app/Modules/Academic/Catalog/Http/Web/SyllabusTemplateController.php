@@ -10,10 +10,12 @@ use App\Actions\SyllabusTemplate\UpdateSyllabusTemplateAction;
 use App\Http\Requests\SyllabusTemplate\StoreSyllabusTemplateRequest;
 use App\Http\Requests\SyllabusTemplate\UpdateSyllabusTemplateRequest;
 use App\Http\Responses\ApiResponse;
+use App\Models\AssessmentComponent;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Modules\Academic\Catalog\Actions\ManageSyllabusTemplateAction;
 use App\Modules\Academic\Catalog\Http\Requests\ListSyllabusTemplatesRequest;
+use App\Modules\Academic\Catalog\Queries\ListSyllabusTemplatesQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,8 +23,8 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Catalog owns the list and creation flow; inherited endpoints remain during
- * the staged migration of update, clone, and grading-scheme operations.
+ * Catalog owns template listing, pages, and mutations. Grading-scheme
+ * projections remain inherited during the staged migration.
  */
 class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTemplateController
 {
@@ -44,7 +46,7 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
         $filters = $request->validate((new ListSyllabusTemplatesRequest)->rules());
 
         return Inertia::render('syllabus/TemplatesIndex', [
-            'items' => $list->handle($filters),
+            'items' => app(ListSyllabusTemplatesQuery::class)->handle($filters),
             'filters' => [
                 'search' => $filters['search'] ?? null,
                 'unit_id' => $filters['unit_id'] ?? 'all',
@@ -54,6 +56,45 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
                 'per_page' => $filters['per_page'] ?? 10,
             ],
             'units' => Unit::query()->orderBy('code')->get(['id', 'code', 'name']),
+        ]);
+    }
+
+    public function pageCreate(): Response
+    {
+        return Inertia::render('syllabus/TemplatesCreate', [
+            'assessmentTypes' => AssessmentComponent::TYPES,
+            'units' => Unit::query()->orderBy('code')->get(['id', 'code', 'name']),
+        ]);
+    }
+
+    public function pageEdit(SyllabusTemplate $syllabusTemplate): Response|RedirectResponse
+    {
+        if ($syllabusTemplate->isLockedForEditing()) {
+            Inertia::flash(
+                'error',
+                'This syllabus template cannot be edited because it is assigned to a course offering with completed class sessions.',
+            );
+
+            return redirect()->route('syllabus_templates.show', $syllabusTemplate);
+        }
+
+        return Inertia::render('syllabus/TemplatesEdit', [
+            'unit' => $syllabusTemplate->unit,
+            'syllabusTemplate' => $this->loadTemplate($syllabusTemplate),
+            'assessmentTypes' => AssessmentComponent::TYPES,
+            'units' => Unit::query()->orderBy('code')->get(['id', 'code', 'name']),
+            'can_edit' => true,
+        ]);
+    }
+
+    public function pageShow(SyllabusTemplate $syllabusTemplate): Response
+    {
+        $template = $this->loadTemplate($syllabusTemplate);
+
+        return Inertia::render('syllabus/TemplatesShow', [
+            'unit' => $template->unit,
+            'template' => $template,
+            'can_edit' => ! $template->isLockedForEditing(),
         ]);
     }
 
@@ -73,6 +114,21 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
         Inertia::flash('success', 'Template created');
 
         return redirect()->route('syllabus_templates.index');
+    }
+
+    public function show(Request $request, SyllabusTemplate $syllabusTemplate): JsonResponse|Response
+    {
+        $template = $this->loadTemplate($syllabusTemplate);
+
+        if ($request->wantsJson()) {
+            return ApiResponse::success($template);
+        }
+
+        return Inertia::render('syllabus/TemplatesShow', [
+            'unit' => $template->unit,
+            'template' => $template,
+            'can_edit' => ! $template->isLockedForEditing(),
+        ]);
     }
 
     public function update(
@@ -149,5 +205,17 @@ class SyllabusTemplateController extends \App\Http\Controllers\Web\SyllabusTempl
         Inertia::flash('success', 'Template cloned');
 
         return back();
+    }
+
+    private function loadTemplate(SyllabusTemplate $syllabusTemplate): SyllabusTemplate
+    {
+        return $syllabusTemplate->load([
+            'unit',
+            'applicableProgram',
+            'applicableCampus',
+            'creator',
+            'sourceTemplate',
+            'assessmentComponents.details',
+        ]);
     }
 }

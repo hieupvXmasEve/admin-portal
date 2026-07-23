@@ -24,8 +24,9 @@ class ClassSessionFactory extends Factory
      */
     public function definition(): array
     {
-        $startTime = $this->faker->time('H:i:s');
-        $endTime = date('H:i:s', strtotime($startTime) + 7200); // Add 2 hours
+        $startHour = $this->faker->numberBetween(8, 20);
+        $startTime = sprintf('%02d:00:00', $startHour);
+        $endTime = sprintf('%02d:00:00', $startHour + 2);
 
         return [
             'course_offering_id' => CourseOffering::factory(),
