@@ -1,16 +1,16 @@
 <?php
 
-use App\Http\Controllers\Web\SurveySettingsController;
 use App\Http\Controllers\Web\SurveyManagementController;
+use App\Http\Controllers\Web\SurveySettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'campus.selected'])->group(function () {
     // Settings
     Route::get('/surveys/settings', [SurveySettingsController::class, 'index'])
-        ->middleware('can:view_survey')
+        ->middleware(['can:view_survey', 'can:view_system_config'])
         ->name('surveys.settings.index');
     Route::post('/surveys/settings', [SurveySettingsController::class, 'update'])
-        ->middleware('can:edit_survey')
+        ->middleware(['can:edit_survey', 'can:manage_system_config'])
         ->name('surveys.settings.update');
 
     // Survey Management

@@ -51,7 +51,6 @@ Health endpoints in code:
 - Refresh rotation pattern is currently "issue new token, then revoke old token" in controllers.
 
 Known open security drift (not fixed in this update):
-- `routes/api.php` exposes public `system-config` endpoints (GET/PUT/POST).
 - Finance API auth style differs (`web` + `auth` in `app/Modules/Finance/routes/api.php`) from Sanctum + actor model.
 
 ## Student Action Import (Academic Module)
@@ -138,6 +137,5 @@ Run this before and after migration work. It is read-only and fails when an appr
 
 ## Unresolved Questions
 
-- Should `/api/system-config*` move behind authenticated admin middleware?
 - Should Finance API routes migrate from `web` + `auth` to Sanctum + actor model?
 - Which deploy script becomes canonical (`scripts/prod.sh`, `scripts/deploy.sh`, or `scripts/deploy-production.sh`)?

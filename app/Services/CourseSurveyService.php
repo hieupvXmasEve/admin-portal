@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\CourseOffering;
-use App\Models\Form;
 use App\Actions\Form\CreateFormTargetAction;
 use App\Actions\Form\GenerateStudentAssignmentsAction;
+use App\Models\CourseOffering;
+use App\Models\Form;
+use App\Shared\Contracts\Platform\SystemConfigurationReader;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
 
 class CourseSurveyService
 {
     public function __construct(
-        protected SystemConfigService $systemConfigService,
+        protected SystemConfigurationReader $systemConfiguration,
         protected CreateFormTargetAction $createFormTargetAction,
         protected GenerateStudentAssignmentsAction $generateStudentAssignmentsAction
     ) {}
@@ -27,11 +28,12 @@ class CourseSurveyService
     public function attachSurveyToCompletedCourse(CourseOffering $courseOffering): bool
     {
         // Check if survey feature is enabled
-        $surveyEnabled = $this->systemConfigService->get('survey_enabled', false);
+        $surveyEnabled = $this->systemConfiguration->get('survey_enabled', false);
         if (! $surveyEnabled) {
             Log::info('Survey feature is disabled, skipping survey attachment', [
                 'course_offering_id' => $courseOffering->id,
             ]);
+
             return false;
         }
 
@@ -42,6 +44,7 @@ class CourseSurveyService
                 'course_offering_id' => $courseOffering->id,
                 'unit_type' => $courseOffering->unit->unit_type,
             ]);
+
             return false;
         }
 
@@ -50,15 +53,17 @@ class CourseSurveyService
             Log::info('Survey already exists for course offering, skipping', [
                 'course_offering_id' => $courseOffering->id,
             ]);
+
             return true;
         }
 
         // Get default form survey
-        $defaultFormId = $this->systemConfigService->get('default_course_survey');
+        $defaultFormId = $this->systemConfiguration->get('default_course_survey');
         if (! $defaultFormId) {
             Log::warning('No default course survey configured', [
                 'course_offering_id' => $courseOffering->id,
             ]);
+
             return false;
         }
 
@@ -94,10 +99,11 @@ class CourseSurveyService
                 return true;
             });
         } catch (\Exception $e) {
-            Log::error('Failed to attach survey at completion: ' . $e->getMessage(), [
+            Log::error('Failed to attach survey at completion: '.$e->getMessage(), [
                 'course_offering_id' => $courseOffering->id,
-                'exception' => $e
+                'exception' => $e,
             ]);
+
             return false;
         }
     }

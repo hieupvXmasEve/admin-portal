@@ -10,6 +10,7 @@ use App\Models\RoomBooking;
 use App\Models\RoomBookingAction;
 use App\Models\User;
 use App\Modules\Facilities\Support\ExamSlotBookingConflictChecker;
+use App\Shared\Contracts\Platform\SystemConfigurationReader;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -20,7 +21,7 @@ use Illuminate\Support\Facades\Log;
 class RoomBookingService
 {
     public function __construct(
-        private SystemConfigService $systemConfigService,
+        private SystemConfigurationReader $systemConfiguration,
         private ExamSlotBookingConflictChecker $examSlotConflictChecker
     ) {}
 
@@ -709,11 +710,11 @@ class RoomBookingService
     }
 
     /**
-     * Get system config value using SystemConfigService.
+     * Get a system configuration value through the Platform owner.
      */
     private function getSystemConfig(string $key, mixed $default = null): mixed
     {
-        return $this->systemConfigService->get($key, $default);
+        return $this->systemConfiguration->get($key, $default);
     }
 
     /**

@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Api\SystemConfigController;
 use App\Modules\Finance\Dng\Http\Controllers\DngWebhookController;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
@@ -20,12 +19,6 @@ use Illuminate\Support\Facades\Route;
 
 // Broadcasting routes for API-based authentication (Laravel Echo)
 Broadcast::routes(['middleware' => ['auth:sanctum', 'student.api.auth']]);
-
-// System configuration endpoints
-Route::get('/system-config', [SystemConfigController::class, 'index'])->name('api.system-config.index');
-Route::put('/system-config', [SystemConfigController::class, 'update'])->name('api.system-config.update');
-Route::post('/system-config/upload', [SystemConfigController::class, 'uploadFile'])->name('api.system-config.upload');
-Route::get('/system-config/{key}', [SystemConfigController::class, 'show'])->name('api.system-config.show');
 
 // DNG payment webhook (public, no auth — checksum verified in controller)
 Route::post('/webhooks/dng/payment', DngWebhookController::class)

@@ -32,7 +32,6 @@ use App\Modules\Academic\Queries\GetCourseOfferingScoresQuery;
 use App\Modules\Academic\Queries\GetCourseOfferingSurveyQuery;
 use App\Modules\Academic\Queries\ListCourseOfferingModuleOptionsQuery;
 use App\Services\CourseSurveyService;
-use App\Services\SystemConfigService;
 use App\Services\V1\Student\CurriculumService;
 use App\Services\V1\Student\PrerequisiteValidationService;
 use App\Support\CampusLogContext;
@@ -53,7 +52,6 @@ use Inertia\Response;
 class CourseOfferingController extends Controller
 {
     public function __construct(
-        protected SystemConfigService $systemConfigService,
         protected CourseSurveyService $courseSurveyService,
         protected CurriculumService $curriculumService,
         protected GetCourseOfferingOperationalStateQuery $operationalStateQuery,

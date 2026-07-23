@@ -1,15 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api\V1\Student;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
-use App\Services\SystemConfigService;
+use App\Models\FormResponse;
 use App\Models\Student;
 use App\Models\StudentFormSurvey;
-use App\Models\FormSurvey;
-use App\Models\FormResponse;
+use App\Models\User;
 use App\Services\ResponseService;
+use App\Shared\Contracts\Platform\SystemConfigurationReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,7 +21,7 @@ class SurveyController extends Controller
 {
     public function __construct(
         protected ResponseService $responseService,
-        protected SystemConfigService $systemConfigService
+        protected SystemConfigurationReader $systemConfiguration,
     ) {}
 
     /**
@@ -28,9 +30,8 @@ class SurveyController extends Controller
     public function pending(Request $request): JsonResponse
     {
         // Check if survey feature is enabled
-        $config = $this->systemConfigService->getConfig();
-        if (empty($config['survey_enabled'])) {
-             return ApiResponse::success(
+        if (! $this->systemConfiguration->get('survey_enabled', false)) {
+            return ApiResponse::success(
                 [],
                 [],
                 'Survey feature is disabled.'
@@ -41,15 +42,15 @@ class SurveyController extends Controller
         $student = Auth::guard('student')->user();
 
         // If not authenticated as student, check if parent user is accessing
-        if (!$student) {
-            /** @var \App\Models\User|null $user */
+        if (! $student) {
+            /** @var User|null $user */
             $user = Auth::user();
             if ($user && $request->has('campus_id')) {
                 $student = $user->children()->where('campus_id', $request->input('campus_id'))->first();
             }
         }
 
-        if (!$student) {
+        if (! $student) {
             return ApiResponse::authenticationError('Student not found');
         }
 
@@ -65,6 +66,7 @@ class SurveyController extends Controller
             ->get()
             ->map(function ($studentSurvey) {
                 $formSurvey = $studentSurvey->formSurvey;
+
                 return [
                     'id' => $studentSurvey->id,
                     'form_survey_id' => $formSurvey->id,
@@ -94,15 +96,15 @@ class SurveyController extends Controller
         $student = Auth::guard('student')->user();
 
         // If not authenticated as student, check if parent user is accessing
-        if (!$student) {
-            /** @var \App\Models\User|null $user */
+        if (! $student) {
+            /** @var User|null $user */
             $user = Auth::user();
             if ($user && $request->has('campus_id')) {
                 $student = $user->children()->where('campus_id', $request->input('campus_id'))->first();
             }
         }
 
-        if (!$student) {
+        if (! $student) {
             return ApiResponse::authenticationError('Student not found');
         }
 
@@ -118,6 +120,7 @@ class SurveyController extends Controller
             ->get()
             ->map(function ($studentSurvey) {
                 $formSurvey = $studentSurvey->formSurvey;
+
                 return [
                     'id' => $studentSurvey->id,
                     'form_survey_id' => $formSurvey->id,
@@ -146,15 +149,15 @@ class SurveyController extends Controller
         $student = Auth::guard('student')->user();
 
         // If not authenticated as student, check if parent user is accessing
-        if (!$student) {
-            /** @var \App\Models\User|null $user */
+        if (! $student) {
+            /** @var User|null $user */
             $user = Auth::user();
             if ($user && $request->has('campus_id')) {
                 $student = $user->children()->where('campus_id', $request->input('campus_id'))->first();
             }
         }
 
-        if (!$student) {
+        if (! $student) {
             return ApiResponse::authenticationError('Student not found');
         }
 
@@ -243,15 +246,15 @@ class SurveyController extends Controller
         $student = Auth::guard('student')->user();
 
         // If not authenticated as student, check if parent user is accessing
-        if (!$student) {
-            /** @var \App\Models\User|null $user */
+        if (! $student) {
+            /** @var User|null $user */
             $user = Auth::user();
             if ($user && $request->has('campus_id')) {
                 $student = $user->children()->where('campus_id', $request->input('campus_id'))->first();
             }
         }
 
-        if (!$student) {
+        if (! $student) {
             return ApiResponse::authenticationError('Student not found');
         }
 
@@ -311,15 +314,15 @@ class SurveyController extends Controller
         $student = Auth::guard('student')->user();
 
         // If not authenticated as student, check if parent user is accessing
-        if (!$student) {
-            /** @var \App\Models\User|null $user */
+        if (! $student) {
+            /** @var User|null $user */
             $user = Auth::user();
             if ($user && $request->has('campus_id')) {
                 $student = $user->children()->where('campus_id', $request->input('campus_id'))->first();
             }
         }
 
-        if (!$student) {
+        if (! $student) {
             return ApiResponse::authenticationError('Student not found');
         }
 
@@ -329,7 +332,7 @@ class SurveyController extends Controller
         }
 
         // Check if survey is completed
-        if ($survey->status !== 'completed' || !$survey->response_id) {
+        if ($survey->status !== 'completed' || ! $survey->response_id) {
             return ApiResponse::validationError(['survey' => ['Survey has not been completed yet.']]);
         }
 
@@ -340,7 +343,7 @@ class SurveyController extends Controller
             'answers.attachments',
         ])->find($survey->response_id);
 
-        if (!$response) {
+        if (! $response) {
             return ApiResponse::notFound('Response not found');
         }
 

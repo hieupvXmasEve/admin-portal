@@ -6,8 +6,8 @@ namespace App\Modules\Facilities\Support;
 
 use App\Models\Room;
 use App\Models\RoomBooking;
-use App\Services\SystemConfigService;
 use App\Shared\Contracts\Academic\AcademicSpaceOccupancyReader;
+use App\Shared\Contracts\Platform\SystemConfigurationReader;
 use Carbon\Carbon;
 
 class RoomBookingSlotValidator
@@ -17,7 +17,7 @@ class RoomBookingSlotValidator
     private const DEFAULT_BOOKING_END_TIME = '20:00';
 
     public function __construct(
-        private readonly SystemConfigService $systemConfigService,
+        private readonly SystemConfigurationReader $systemConfiguration,
         private readonly AcademicSpaceOccupancyReader $academicSpaceOccupancyReader,
     ) {}
 
@@ -158,7 +158,7 @@ class RoomBookingSlotValidator
 
     private function systemConfig(string $key, mixed $default): mixed
     {
-        return $this->systemConfigService->get($key, $default);
+        return $this->systemConfiguration->get($key, $default);
     }
 
     private function formatTime(mixed $value): string

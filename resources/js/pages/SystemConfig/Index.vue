@@ -13,6 +13,9 @@ import { computed, reactive, ref, watch } from 'vue'
 
 interface Props {
     config: SystemConfig
+    permissions: {
+        can_manage: boolean
+    }
 }
 
 const props = defineProps<Props>()
@@ -225,7 +228,7 @@ const handleLogoTextUpload = (event: Event) => {
                             id="app_name"
                             v-model="form.app_name"
                             placeholder="Enter application name"
-                            :disabled="isSaving"
+                            :disabled="isSaving || !props.permissions.can_manage"
                         />
                         <p class="text-sm text-muted-foreground">
                             The main application name displayed throughout the system
@@ -242,7 +245,7 @@ const handleLogoTextUpload = (event: Event) => {
                                     type="file"
                                     accept="image/png,image/jpeg,image/jpg,image/gif,image/svg+xml"
                                     @change="handleLogoFullUpload"
-                                    :disabled="isUploadingLogoFull || isSaving"
+                                    :disabled="isUploadingLogoFull || isSaving || !props.permissions.can_manage"
                                     class="block w-full text-sm text-slate-500
                                            file:mr-4 file:py-2 file:px-4
                                            file:rounded-full file:border-0
@@ -256,7 +259,7 @@ const handleLogoTextUpload = (event: Event) => {
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                :disabled="isUploadingLogoFull || isSaving"
+                                :disabled="isUploadingLogoFull || isSaving || !props.permissions.can_manage"
                                 class="min-w-24"
                             >
                                 <Upload v-if="!isUploadingLogoFull" class="mr-2 h-4 w-4" />
@@ -290,7 +293,7 @@ const handleLogoTextUpload = (event: Event) => {
                                     type="file"
                                     accept="image/svg+xml"
                                     @change="handleLogoTextUpload"
-                                    :disabled="isUploadingLogoText || isSaving"
+                                    :disabled="isUploadingLogoText || isSaving || !props.permissions.can_manage"
                                     class="block w-full text-sm text-slate-500
                                            file:mr-4 file:py-2 file:px-4
                                            file:rounded-full file:border-0
@@ -304,7 +307,7 @@ const handleLogoTextUpload = (event: Event) => {
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                :disabled="isUploadingLogoText || isSaving"
+                                :disabled="isUploadingLogoText || isSaving || !props.permissions.can_manage"
                                 class="min-w-24"
                             >
                                 <Upload v-if="!isUploadingLogoText" class="mr-2 h-4 w-4" />
@@ -335,7 +338,7 @@ const handleLogoTextUpload = (event: Event) => {
                             id="copyright_text"
                             v-model="form.copyright_text"
                             placeholder="© 2025 Your Organization. All rights reserved."
-                            :disabled="isSaving"
+                            :disabled="isSaving || !props.permissions.can_manage"
                             rows="3"
                         />
                         <p class="text-sm text-muted-foreground">
@@ -350,7 +353,7 @@ const handleLogoTextUpload = (event: Event) => {
                             id="country"
                             v-model="form.country"
                             placeholder="Vietnam"
-                            :disabled="isSaving"
+                            :disabled="isSaving || !props.permissions.can_manage"
                         />
                         <p class="text-sm text-muted-foreground">
                             Country name for localization and display purposes
@@ -363,14 +366,14 @@ const handleLogoTextUpload = (event: Event) => {
                             type="button"
                             variant="outline"
                             @click="handleReset"
-                            :disabled="isSaving || !hasChanges"
+                            :disabled="isSaving || !hasChanges || !props.permissions.can_manage"
                         >
                             Reset
                         </Button>
 
                         <Button
                             type="submit"
-                            :disabled="isSaving || !hasChanges"
+                            :disabled="isSaving || !hasChanges || !props.permissions.can_manage"
                             class="min-w-24"
                         >
                             <Save v-if="!isSaving" class="mr-2 h-4 w-4" />

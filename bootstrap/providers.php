@@ -10,6 +10,7 @@ use App\Modules\Finance\Providers\FinanceServiceProvider;
 use App\Modules\Identity\Providers\IdentityServiceProvider;
 use App\Modules\Institution\Providers\InstitutionServiceProvider;
 use App\Modules\Notification\Providers\NotificationServiceProvider;
+use App\Modules\Platform\Providers\PlatformServiceProvider;
 use App\Modules\StudentRegistry\Providers\StudentRegistryServiceProvider;
 use App\Modules\Upload\Providers\UploadServiceProvider;
 use App\Providers\AppServiceProvider;
@@ -24,6 +25,7 @@ return [
     AIServiceProvider::class,
     IdentityServiceProvider::class,
     InstitutionServiceProvider::class,
+    PlatformServiceProvider::class,
     StudentRegistryServiceProvider::class,
     AdmissionsServiceProvider::class,
     AcademicServiceProvider::class,

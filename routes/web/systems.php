@@ -3,11 +3,9 @@
 use App\Http\Controllers\EmailLogController;
 use App\Http\Controllers\Web\ActivityLogController;
 use App\Http\Controllers\Web\EmailConfigurationController;
-use App\Http\Controllers\Web\SystemConfigController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'campus.selected'])->group(function () {
-    Route::get('/systems/config', [SystemConfigController::class, 'index'])->name('system.config.index');
     Route::get('/systems/activity-logs', [ActivityLogController::class, 'index'])->name('system.activity-logs.index');
     Route::get('/systems/email-configuration', [EmailConfigurationController::class, 'index'])->name('system.email-configuration.index');
     Route::get('/systems/email-history', [EmailLogController::class, 'index'])->name('system.email-history.index');

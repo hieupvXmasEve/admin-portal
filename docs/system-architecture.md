@@ -93,6 +93,7 @@ Client (Web SPA / API)
     - Queries: `ListMessagesQuery`, `ListOutboxQuery`, `ListDeliveriesQuery`
     - Support: `EventIntentMapper`, `RecipientResolver`, `NotificationAuditLogger`, `NotificationMetrics`, `PolicyResolver`
     - Email SMTP resolution: `EmailConfiguration` table is campus-scoped; `getActiveForCampus(?int)` resolves campus-specific config (priority) or falls back to global; `SendSingleEmailJob` threads `campus_id` through the dispatch chain
+- Platform: `app/Modules/Platform` owns global System Configuration storage, cache invalidation, audit evidence, and the `/api/system-config*` boundary. Public reads enumerate only approved configuration keys; staff mutation and file upload require a selected-campus permission context and write one global configuration.
 
 #### Target bounded-context map
 
@@ -187,7 +188,6 @@ Current EGC to major baseline:
 
 ### Known mixed-auth exceptions
 
-- `routes/api.php` exposes `/api/system-config*` without auth middleware.
 - Finance module API routes (`app/Modules/Finance/routes/api.php`) use `web` + `auth` middleware.
 
 ## 4) Identity Token Lifecycle (Current)
@@ -357,10 +357,9 @@ Production setup: See `docs/deployment-guide.md` for supervisor configuration.
 ## 11) Near-Term Decisions Required
 
 1. Standardize API auth model for finance and other mixed groups.
-2. Resolve public `system-config` exposure strategy.
-3. Select canonical deployment workflow and align scripts.
-4. Reactivate CI with minimum required gates.
-5. Define Notification V2 cutover/backfill plan beyond Phase 1 clean-slate tables.
+2. Select canonical deployment workflow and align scripts.
+3. Reactivate CI with minimum required gates.
+4. Define Notification V2 cutover/backfill plan beyond Phase 1 clean-slate tables.
 6. Finish finance settlement cutover for all remaining read models and legacy finance reports.
 
 ## Unresolved Questions

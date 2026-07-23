@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Student;
 
+use App\Actions\Form\CheckPortalGateAction;
 use App\Actions\Form\SubmitResponseAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Form\SubmitFormRequest;
@@ -15,7 +16,6 @@ use App\Models\Campus;
 use App\Models\Form;
 use App\Services\FormService;
 use App\Services\ResponseService;
-use App\Services\SystemConfigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -25,7 +25,6 @@ class FormController extends Controller
     public function __construct(
         protected FormService $formService,
         protected ResponseService $responseService,
-        protected SystemConfigService $systemConfigService
     ) {}
 
     /**
@@ -41,7 +40,7 @@ class FormController extends Controller
         // Get authenticated student
         $student = $request->user();
 
-        if (!$student->isActive()) {
+        if (! $student->isActive()) {
             return ApiResponse::authorizationError('Student account is not active. Please contact administration.');
         }
 
@@ -58,7 +57,7 @@ class FormController extends Controller
         return ApiResponse::success(
             FormResource::collection($forms),
             [],
-            "Get available forms for authenticated student."
+            'Get available forms for authenticated student.'
         );
     }
 
@@ -72,7 +71,7 @@ class FormController extends Controller
         ]);
 
         $student = $request->user();
-        if (!$student->isActive()) {
+        if (! $student->isActive()) {
             return ApiResponse::authorizationError('Student account is not active.');
         }
 
@@ -95,8 +94,8 @@ class FormController extends Controller
 
             // Targets are already loaded and filtered by FormService::getAvailableFormsForStudent
             // but we ensure they are present just in case
-            if (!$form->relationLoaded('targets')) {
-                 $form->setRelation('targets', $this->formService->getEligibleTargetsForForm($form, $student, $campusId));
+            if (! $form->relationLoaded('targets')) {
+                $form->setRelation('targets', $this->formService->getEligibleTargetsForForm($form, $student, $campusId));
             }
         });
 
@@ -117,22 +116,22 @@ class FormController extends Controller
         ]);
 
         $student = $request->user();
-        if (!$student->isActive()) {
+        if (! $student->isActive()) {
             return ApiResponse::authorizationError('Student account is not active.');
         }
 
         $campusId = $request->input('campus_id', $student->campus_id);
         $campus = Campus::find($campusId);
 
-        if (!$campus) {
-             return ApiResponse::notFound('Campus not found.');
+        if (! $campus) {
+            return ApiResponse::notFound('Campus not found.');
         }
 
         // Check if student can access this form (incorporating type-specific eligibility logic)
         $availableForms = $this->formService->getAvailableFormsForStudent($student, $campus);
         $canAccess = $availableForms->contains('id', $form->id);
 
-        if (!$canAccess) {
+        if (! $canAccess) {
             return ApiResponse::authorizationError('Form not available or access denied.');
         }
 
@@ -156,13 +155,15 @@ class FormController extends Controller
     /**
      * Get mandatory pending forms.
      */
-    public function pending(Request $request, \App\Actions\Form\CheckPortalGateAction $checkGateAction): JsonResponse
+    public function pending(Request $request, CheckPortalGateAction $checkGateAction): JsonResponse
     {
         $student = $request->user();
-        if (!$student) return ApiResponse::authenticationError();
+        if (! $student) {
+            return ApiResponse::authenticationError();
+        }
 
         $result = $checkGateAction->execute($student);
-        
+
         return ApiResponse::success(
             StudentFormAssignmentResource::collection($result['mandatory_assignments']),
             [],

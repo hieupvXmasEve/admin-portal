@@ -301,6 +301,10 @@ return [
         'system_logs' => [
             'view_system_log' => 'view_system_log',
         ],
+        'system_configuration' => [
+            'view_system_config' => 'view_system_config',
+            'manage_system_config' => 'manage_system_config',
+        ],
 
         // Email Management
         'email_configurations' => [

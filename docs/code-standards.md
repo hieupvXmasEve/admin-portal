@@ -1,6 +1,6 @@
 # Code Standards
 
-Last updated: 2026-03-26  
+Last updated: 2026-07-23
 Owner: Platform Team  
 Status: Active baseline (enforced by convention; CI currently inactive)  
 Source of truth: repository code and route/contracts in this workspace
@@ -81,7 +81,6 @@ Current enforced baseline:
 
 Current known exceptions (must be documented, not ignored):
 
-- Public `system-config` API routes.
 - Finance API route groups using `web` + `auth`.
 
 ## 6) Frontend Contract Standards

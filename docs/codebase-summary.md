@@ -128,7 +128,6 @@ Verified entry points:
 
 Open drift retained in code:
 
-- Public `/api/system-config*` routes in `routes/api.php`.
 - Finance API routes in `app/Modules/Finance/routes/api.php` use `web` + `auth`.
 
 ## 5) Frontend Contract Baseline

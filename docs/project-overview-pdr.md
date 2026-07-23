@@ -107,7 +107,7 @@ Code baseline:
 
 - Student and lecturer v1 routes are mostly consistent with sanctum + actor + logging.
 - Finance module API routes currently use `web` + `auth` middleware.
-- Root `/api/system-config*` routes are public in `routes/api.php`.
+- Platform owns `/api/system-config*`: public reads are allowlisted; staff writes and uploads require authenticated, authorized selected-campus context and update global configuration.
 
 Acceptance criteria:
 
@@ -316,7 +316,6 @@ Acceptance criteria:
 
 ## 6) Current Risks
 
-- Public `system-config` endpoints allow unauthenticated read/write/upload at `/api/system-config*`.
 - Finance API auth style drift (`web` + `auth`) vs actor-based API model.
 - CI workflows are present but disabled (commented out).
 - Scripts and compose paths are inconsistent across repo.
@@ -348,7 +347,6 @@ Acceptance criteria:
 
 ## Unresolved Questions
 
-- Should `/api/system-config*` be moved behind admin auth/authorization?
 - Should Finance module APIs migrate to Sanctum + actor middleware?
 - Which API surfaces are external client contracts vs internal web AJAX contracts?
 - Should `EitherMiddleware` be replaced with explicit route group middleware composition?
