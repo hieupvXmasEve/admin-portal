@@ -57,12 +57,15 @@ class UpdateSyllabusTemplateAction
             $this->syncAssessmentDetails($component, $componentData['details'] ?? []);
         }
 
-        $template->assessmentComponents()
-            ->whereNotIn('id', $keepComponentIds)
-            ->each(function (AssessmentComponent $component): void {
-                $component->details()->delete();
-                $component->delete();
-            });
+        $componentsToDelete = $template->assessmentComponents();
+        if ($keepComponentIds !== []) {
+            $componentsToDelete->whereNotIn('id', $keepComponentIds);
+        }
+
+        $componentsToDelete->each(function (AssessmentComponent $component): void {
+            $component->details()->delete();
+            $component->delete();
+        });
     }
 
     private function syncAssessmentDetails(AssessmentComponent $component, mixed $details): void
@@ -96,7 +99,11 @@ class UpdateSyllabusTemplateAction
             $keepDetailIds[] = $detail->getKey();
         }
 
-        $component->details()->whereNotIn('id', $keepDetailIds)->delete();
+        $detailsToDelete = $component->details();
+        if ($keepDetailIds !== []) {
+            $detailsToDelete->whereNotIn('id', $keepDetailIds);
+        }
+        $detailsToDelete->delete();
 
         if ($keepDetailIds === []) {
             $component->details()->create([
