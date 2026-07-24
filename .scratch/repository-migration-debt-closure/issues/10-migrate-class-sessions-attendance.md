@@ -1,6 +1,6 @@
 # Migrate class sessions and attendance operations
 
-Status: ready-for-agent
+Status: ready-for-human
 
 Portal impact: both
 
@@ -18,7 +18,7 @@ Cut class-session scheduling, attendance recording, readiness, reporting, and st
 - [x] Student and lecturer attendance reads preserve actor authorization, roster scope, status semantics, and response envelopes.
 - [x] Attendance readiness and reporting use the glossary-defined metrics without frontend inference.
 - [x] Existing routes, UI behavior, filters, exports, and notifications remain compatible.
-- [ ] Legacy attendance services/controllers/routes have zero supported callers before retirement.
+- [x] Legacy attendance services/controllers/routes have zero supported callers before retirement.
 
 ## Blocked by
 
@@ -32,6 +32,8 @@ Cut class-session scheduling, attendance recording, readiness, reporting, and st
 - `./scripts/dev.sh artisan test --compact` — exited 2 with failures outside this issue's changed surface; focused migration coverage passes.
 - `./scripts/dev.sh artisan test --compact tests/Feature/Attendance/CourseOfferingAttendanceReportTest.php tests/Feature/Lecturer/LecturerRosterInactiveStudentTest.php` — 8 passed (98 assertions).
 - `./scripts/dev.sh artisan test --compact tests/Feature/Attendance/CourseOfferingAttendanceReportTest.php tests/Feature/Lecturer/LecturerRosterInactiveStudentTest.php tests/Feature/Architecture/AttendanceDeliveryMigrationArchTest.php tests/Feature/Architecture/CourseDeliveryAssessmentBoundaryArchTest.php` — 14 passed (150 assertions).
+- Legacy-caller scan for the retired attendance and class-session controllers/services — no matches.
+- `./scripts/dev.sh artisan test --compact` — remains failing in unrelated suites outside this migration; focused coverage and the migration-debt guard pass.
 
 ## Notes
 
@@ -39,3 +41,4 @@ Cut class-session scheduling, attendance recording, readiness, reporting, and st
 - Review found that the combined course-statistics and lecturer-course services still own attendance reporting/readiness while also reading Student Registry and Progression data. Moving them directly into Delivery violates the migration-debt cross-context boundary; extract Delivery-owned readers behind contracts before retiring those mixed-domain legacy owners.
 - Staff attendance-grid reporting and lecturer session summaries now read through Delivery queries using `CourseRosterReader` and `StudentReferenceReader`; `operational_presence_rate` is explicit while `attendance_percentage` remains as a compatibility alias.
 - Lecturer course attendee responses now distinguish `operational_presence_rate` from `academic_attendance_rate`; the former remains available as the compatible `attendance_percentage` alias.
+- All issue acceptance criteria are implemented. Human follow-up is limited to triaging the unrelated full-suite failures and the review's broader controller-thinning recommendations.
