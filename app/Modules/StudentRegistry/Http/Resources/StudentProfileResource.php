@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Resources\Api\V1\Student;
+namespace App\Modules\StudentRegistry\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class ProfileResource extends JsonResource
+final class StudentProfileResource extends JsonResource
 {
     /**
      * Transform the resource into an array.

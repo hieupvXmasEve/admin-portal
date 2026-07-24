@@ -6,8 +6,8 @@ use App\Models\Campus;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Services\V1\Student\ProfileService;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentProfile;
+use App\Shared\Contracts\StudentRegistry\StudentPortalProfileReader;
 use App\Shared\Contracts\StudentRegistry\StudentProfileReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -77,7 +77,7 @@ it('uses the Registry profile snapshot in the v1 profile response', function ():
     $staleStudent->full_name = 'Stale Legacy Profile';
     $staleStudent->email = 'stale.profile@example.test';
 
-    $profile = app(ProfileService::class)->getProfile($staleStudent);
+    $profile = app(StudentPortalProfileReader::class)->forStudent((int) $staleStudent->id)->toArray();
 
     expect($profile['info']['full_name'])->toBe($student->fresh()->full_name)
         ->and($profile['info']['email'])->toBe('persisted.profile@example.test');

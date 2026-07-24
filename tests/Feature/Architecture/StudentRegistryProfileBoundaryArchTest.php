@@ -3,21 +3,24 @@
 declare(strict_types=1);
 
 it('keeps the student v1 profile mutation on the Registry contract', function (): void {
-    $profileService = file_get_contents(base_path('app/Services/V1/Student/ProfileService.php')) ?: '';
+    $updateAction = file_get_contents(base_path('app/Modules/StudentRegistry/Actions/UpdateStudentProfileAction.php')) ?: '';
 
-    expect($profileService)
-        ->toContain('StudentProfileWriter')
-        ->toContain('studentProfileWriter->update')
+    expect($updateAction)
+        ->toContain('StudentProfilePersistenceWriter')
+        ->toContain('app(StudentProfilePersistenceWriter::class)->update')
         ->not->toContain('DB::transaction(function () use ($student, $data)');
 
 });
 
 it('reads Registry-owned profile data through the Registry contract', function (): void {
-    $profileService = file_get_contents(base_path('app/Services/V1/Student/ProfileService.php')) ?: '';
+    $profileProjection = file_get_contents(base_path('app/Modules/StudentRegistry/Support/EloquentStudentPortalProfileReader.php')) ?: '';
+    $profileController = file_get_contents(base_path('app/Modules/StudentRegistry/Http/Api/Student/ProfileController.php')) ?: '';
 
-    expect($profileService)
+    expect($profileProjection)
         ->toContain('StudentProfileReader')
-        ->toContain('studentProfileReader->findProfile');
+        ->toContain('$this->profiles->findProfile')
+        ->and($profileController)
+        ->toContain('StudentPortalProfileReader');
 });
 
 it('keeps staff profile edits on Registry and Identity contracts', function (): void {

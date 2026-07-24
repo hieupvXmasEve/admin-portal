@@ -12,12 +12,13 @@ use App\Http\Controllers\Api\V1\Student\DashboardController;
 use App\Http\Controllers\Api\V1\Student\FinanceController;
 use App\Http\Controllers\Api\V1\Student\GradeController;
 use App\Http\Controllers\Api\V1\Student\ModuleController;
-use App\Http\Controllers\Api\V1\Student\ProfileController;
+use App\Http\Controllers\Api\V1\Student\ProfileController as LegacyProfileController;
 use App\Http\Controllers\Api\V1\Student\TimetableController;
 use App\Modules\Academic\Delivery\Http\Api\Student\AttendanceController;
 use App\Modules\Academic\Progression\Http\Api\Student\AcademicRecordController;
 use App\Modules\Finance\Http\Api\Student\StudentFinanceController;
 use App\Modules\Notification\Http\Api\Student\NotificationController;
+use App\Modules\StudentRegistry\Http\Api\Student\ProfileController;
 use App\Modules\Upload\Http\Api\UploadController;
 use Illuminate\Support\Facades\Route;
 
@@ -140,8 +141,8 @@ Route::middleware([
                 ->middleware(['student.api.rate:student-profile'])
                 ->name('upload-avatar');
 
-            Route::get('/study-plan', [ProfileController::class, 'studyPlan'])->name('study-plan');
-            Route::get('/academic-history', [ProfileController::class, 'academicHistory'])->name('academic-history');
+            Route::get('/study-plan', [LegacyProfileController::class, 'studyPlan'])->name('study-plan');
+            Route::get('/academic-history', [LegacyProfileController::class, 'academicHistory'])->name('academic-history');
         });
 
         // Curriculum and program tracking endpoints
