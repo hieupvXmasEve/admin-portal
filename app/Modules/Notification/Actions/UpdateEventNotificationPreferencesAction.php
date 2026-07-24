@@ -4,25 +4,31 @@ declare(strict_types=1);
 
 namespace App\Modules\Notification\Actions;
 
-use App\Models\User;
 use App\Models\UserEmailPreference;
+use App\Shared\Contracts\Notification\StudentEventNotificationPreferencesWriter;
 use Illuminate\Support\Facades\DB;
 
-class UpdateEventNotificationPreferencesAction
+final class UpdateEventNotificationPreferencesAction implements StudentEventNotificationPreferencesWriter
 {
     /**
-     * @param  array<string, array{enabled?: bool, frequency?: string}>  $preferences
+     * @param  array{user_id: int, preferences: array<string, array{enabled?: bool, frequency?: string}>}  $data
      */
-    public static function run(User $user, array $preferences): void
+    public static function run(array $data): void
     {
-        DB::transaction(function () use ($user, $preferences): void {
+        app(self::class)->updateForUser($data['user_id'], $data['preferences']);
+    }
+
+    /** @param array<string, array{enabled?: bool, frequency?: string}> $preferences */
+    public function updateForUser(int $userId, array $preferences): void
+    {
+        DB::transaction(function () use ($userId, $preferences): void {
             foreach (self::eventTypes() as $type) {
                 if (! isset($preferences[$type])) {
                     continue;
                 }
 
                 UserEmailPreference::setUserPreference(
-                    $user->id,
+                    $userId,
                     $type,
                     $preferences[$type]['enabled'] ?? true,
                     $preferences[$type]['frequency'] ?? UserEmailPreference::FREQUENCY_IMMEDIATE,
