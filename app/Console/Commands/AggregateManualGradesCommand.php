@@ -50,6 +50,7 @@ class AggregateManualGradesCommand extends Command
 
         if ($courseOfferings->isEmpty()) {
             $this->warn('No eligible manual course offerings found.');
+
             return 0;
         }
 
@@ -68,7 +69,7 @@ class AggregateManualGradesCommand extends Command
                 $successCount++;
             } catch (\Exception $e) {
                 $failCount++;
-                $this->error("\nFailed to aggregate grades for Course ID {$courseOffering->id}: " . $e->getMessage());
+                $this->error("\nFailed to aggregate grades for Course ID {$courseOffering->id}: ".$e->getMessage());
                 Log::error('Manual grade aggregation failed', [
                     'course_offering_id' => $courseOffering->id,
                     'error' => $e->getMessage(),

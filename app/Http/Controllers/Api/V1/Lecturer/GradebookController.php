@@ -51,7 +51,7 @@ class GradebookController extends Controller
             return ApiResponse::success(
                 SaveLecturerGradebookScoresAction::run([
                     'course_offering' => $courseOffering,
-                    'scores' => $request->validated('scores'),
+                    'scores' => $request->gradebookScores($courseOffering),
                     'lecturer_id' => $lecturer->id,
                 ]),
                 [],

@@ -6,7 +6,7 @@ namespace App\Modules\Academic\Http\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\CourseOffering;
-use App\Modules\Academic\Actions\MarkCourseOfferingCompletedAction;
+use App\Modules\Academic\Delivery\Actions\FinalizeCourseOfferingAction;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
@@ -24,7 +24,7 @@ class FinalizeCourseOfferingController extends Controller
     public function __invoke(CourseOffering $courseOffering): RedirectResponse
     {
         try {
-            $result = MarkCourseOfferingCompletedAction::run($courseOffering);
+            $result = FinalizeCourseOfferingAction::run(['course_offering_id' => $courseOffering->id]);
 
             Inertia::flash('message', "Course '{$result['course_code']}' finalized successfully.");
         } catch (RuntimeException $e) {

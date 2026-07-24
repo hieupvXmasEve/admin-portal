@@ -122,11 +122,6 @@ final class GetLecturerCourseGradebookQuery
         $items = [];
 
         foreach ($components as $component) {
-            if ($component->details->isEmpty()) {
-                $component->ensureHasDetails();
-                $component->load('details');
-            }
-
             foreach ($component->details as $detail) {
                 $items[] = [
                     'detail_id' => $detail->id,

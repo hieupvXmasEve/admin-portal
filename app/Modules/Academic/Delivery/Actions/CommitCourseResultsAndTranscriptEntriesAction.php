@@ -15,11 +15,13 @@ final class CommitCourseResultsAndTranscriptEntriesAction implements CourseResul
 {
     public function commitForCourseOffering(int $courseOfferingId): void
     {
-        self::run(CourseOffering::query()->findOrFail($courseOfferingId));
+        self::run(['course_offering_id' => $courseOfferingId]);
     }
 
-    public static function run(CourseOffering $courseOffering): void
+    /** @param array{course_offering_id:int} $data */
+    public static function run(array $data): void
     {
+        $courseOffering = CourseOffering::query()->findOrFail($data['course_offering_id']);
         $eligibleStudentIds = CourseRegistration::query()
             ->where('course_offering_id', $courseOffering->id)
             ->where('registration_status', 'completed')

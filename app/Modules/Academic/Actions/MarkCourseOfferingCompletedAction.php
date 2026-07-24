@@ -6,13 +6,24 @@ namespace App\Modules\Academic\Actions;
 
 use App\Models\CourseOffering;
 use App\Services\CourseCompletionService;
+use App\Shared\Contracts\Academic\CourseOfferingFinalizer;
 use App\Shared\Contracts\Academic\CourseResultTranscriptCommitter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
-class MarkCourseOfferingCompletedAction
+class MarkCourseOfferingCompletedAction implements CourseOfferingFinalizer
 {
+    public function finalize(int $courseOfferingId, bool $recalculate, bool $dryRun, array $finalPercentageOverrides): array
+    {
+        return self::run(
+            CourseOffering::query()->findOrFail($courseOfferingId),
+            $recalculate,
+            $dryRun,
+            $finalPercentageOverrides,
+        );
+    }
+
     /**
      * Mark a course offering as completed.
      *

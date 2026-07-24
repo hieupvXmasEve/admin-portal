@@ -20,9 +20,9 @@ use App\Models\AssessmentComponentDetail;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
 use App\Models\Lecture;
+use App\Modules\Academic\Delivery\Actions\ManageAssessmentGradeWorkbookAction;
 use App\Modules\Academic\Delivery\Support\AssessmentManagementService;
 use App\Modules\Academic\Delivery\Support\AssessmentWeightValidationService;
-use App\Services\AssessmentGradeExcelService;
 use App\Services\CourseCompletionService;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Http\JsonResponse;
@@ -920,8 +920,7 @@ class AssessmentController extends Controller
             }
 
             // Use service to export grade template
-            $excelService = app(AssessmentGradeExcelService::class);
-            $filePath = $excelService->exportGradeTemplate($assessmentComponentDetail, $courseOffering);
+            $filePath = ManageAssessmentGradeWorkbookAction::exportTemplate($assessmentComponentDetail->id, $courseOffering->id);
 
             // Return file download response
             return response()->download($filePath, basename($filePath), [
@@ -976,10 +975,9 @@ class AssessmentController extends Controller
             $file = $request->file('file');
 
             // Use service to import grades
-            $excelService = app(AssessmentGradeExcelService::class);
-            $importResults = $excelService->importGrades(
-                $assessmentComponentDetail,
-                $courseOffering,
+            $importResults = ManageAssessmentGradeWorkbookAction::import(
+                $assessmentComponentDetail->id,
+                $courseOffering->id,
                 $file,
                 $validated,
                 $lecturer->id
@@ -1300,8 +1298,7 @@ class AssessmentController extends Controller
 
             if ($format === 'excel') {
                 // Use existing Excel service for export
-                $excelService = app(AssessmentGradeExcelService::class);
-                $filePath = $excelService->exportGrades($assessmentComponentDetail, $courseOffering);
+                $filePath = ManageAssessmentGradeWorkbookAction::exportGrades($assessmentComponentDetail->id, $courseOffering->id);
 
                 return response()->download($filePath, basename($filePath), [
                     'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

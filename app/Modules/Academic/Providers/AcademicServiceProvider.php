@@ -6,6 +6,7 @@ namespace App\Modules\Academic\Providers;
 
 use App\Models\CourseRegistration;
 use App\Modules\Academic\Actions\CompleteFinanceCancellationOperationAction;
+use App\Modules\Academic\Actions\MarkCourseOfferingCompletedAction;
 use App\Modules\Academic\Actions\SyncPaidExamResitAttemptsAction;
 use App\Modules\Academic\Actions\SyncPaidRetakeRegistrationsAction;
 use App\Modules\Academic\Catalog\Support\EloquentAdmissionsIntentReader;
@@ -20,9 +21,9 @@ use App\Modules\Academic\Delivery\Support\EloquentStudentLifecycleCourseRegistra
 use App\Modules\Academic\FacultyWorkforce\Support\EloquentLecturerTokenIssuer;
 use App\Modules\Academic\FacultyWorkforce\Support\EloquentTeachingEligibilityReader;
 use App\Modules\Academic\Observers\CourseRegistrationObserver;
+use App\Modules\Academic\Progression\Actions\CommitCourseResultsToTranscriptAction;
 use App\Modules\Academic\Progression\Queries\FilterStudentsByProgramEnrollmentStatus;
 use App\Modules\Academic\Progression\Support\EloquentCourseOfferingAttemptWriter;
-use App\Modules\Academic\Progression\Support\EloquentCourseResultTranscriptWriter;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentLifecycleWriter;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentReader;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentWriter;
@@ -33,6 +34,7 @@ use App\Modules\Academic\Support\AiAcademicMetricReader as ModuleAiAcademicMetri
 use App\Modules\Academic\Support\AiAcademicStudentProfileReader as ModuleAiAcademicStudentProfileReader;
 use App\Modules\Academic\Support\CampusBuildingCountReader as ModuleCampusBuildingCountReader;
 use App\Modules\Academic\Support\StudentLifecycleStatusReader as ModuleStudentLifecycleStatusReader;
+use App\Services\AssessmentGradeExcelService;
 use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\AcademicSpaceOccupancyReader;
@@ -40,9 +42,11 @@ use App\Shared\Contracts\Academic\AdmissionsIntentReader;
 use App\Shared\Contracts\Academic\AiAcademicEntitySearchReader;
 use App\Shared\Contracts\Academic\AiAcademicMetricReader;
 use App\Shared\Contracts\Academic\AiAcademicStudentProfileReader;
+use App\Shared\Contracts\Academic\AssessmentGradeWorkbook;
 use App\Shared\Contracts\Academic\CampusBuildingCountReader;
 use App\Shared\Contracts\Academic\CourseOfferingAttemptWriter;
 use App\Shared\Contracts\Academic\CourseOfferingCatalogReader;
+use App\Shared\Contracts\Academic\CourseOfferingFinalizer;
 use App\Shared\Contracts\Academic\CourseResultProgressionReader;
 use App\Shared\Contracts\Academic\CourseResultTranscriptCommitter;
 use App\Shared\Contracts\Academic\CourseResultTranscriptWriter;
@@ -69,11 +73,13 @@ class AcademicServiceProvider extends ServiceProvider
     {
         $this->app->bind(AdmissionsIntentReader::class, EloquentAdmissionsIntentReader::class);
         $this->app->bind(AcademicPeriodReader::class, SemesterAcademicPeriodReader::class);
+        $this->app->bind(AssessmentGradeWorkbook::class, AssessmentGradeExcelService::class);
         $this->app->bind(AcademicSpaceOccupancyReader::class, EloquentAcademicSpaceOccupancyReader::class);
         $this->app->bind(CourseOfferingCatalogReader::class, EloquentCourseOfferingCatalogReader::class);
+        $this->app->bind(CourseOfferingFinalizer::class, MarkCourseOfferingCompletedAction::class);
         $this->app->bind(CourseOfferingAttemptWriter::class, EloquentCourseOfferingAttemptWriter::class);
         $this->app->bind(CourseRosterReader::class, EloquentCourseRosterReader::class);
-        $this->app->bind(CourseResultTranscriptWriter::class, EloquentCourseResultTranscriptWriter::class);
+        $this->app->bind(CourseResultTranscriptWriter::class, CommitCourseResultsToTranscriptAction::class);
         $this->app->bind(CourseResultTranscriptCommitter::class, CommitCourseResultsAndTranscriptEntriesAction::class);
         $this->app->bind(CourseResultProgressionReader::class, EloquentCourseResultProgressionReader::class);
         $this->app->bind(TranscriptEntryGpaReader::class, EloquentTranscriptEntryGpaReader::class);

@@ -5,12 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Progression\Models;
 
 use App\Models\AuditableModel;
-use App\Models\CourseOffering;
-use App\Models\Semester;
-use App\Models\Unit;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class TranscriptEntry extends AuditableModel
 {
@@ -52,21 +48,6 @@ final class TranscriptEntry extends AuditableModel
             'satisfies_prerequisite' => 'boolean',
             'finalized_at' => 'datetime',
         ];
-    }
-
-    public function unit(): BelongsTo
-    {
-        return $this->belongsTo(Unit::class);
-    }
-
-    public function semester(): BelongsTo
-    {
-        return $this->belongsTo(Semester::class);
-    }
-
-    public function courseOffering(): BelongsTo
-    {
-        return $this->belongsTo(CourseOffering::class);
     }
 
     public function getCompletionStatusAttribute(): string

@@ -6,7 +6,7 @@ it('routes Delivery operations through Delivery-owned boundaries', function (): 
     $files = [
         base_path('app/Modules/Academic/Delivery/Http/Api/ClassSessionController.php'),
         base_path('app/Modules/Academic/Delivery/Http/Api/Lecturer/AttendanceController.php'),
-        base_path('app/Http/Controllers/Api/V1/Lecturer/AssessmentController.php'),
+        base_path('app/Modules/Academic/Delivery/Http/Api/Lecturer/AssessmentController.php'),
         base_path('app/Http/Controllers/Api/V1/Lecturer/GradebookController.php'),
         base_path('app/Modules/Academic/Delivery/Http/Web/BulkUpdateCourseOfferingSessionsController.php'),
         base_path('app/Modules/Academic/Http/Web/BulkUpdateClassSessionAttendanceController.php'),
@@ -73,7 +73,7 @@ it('keeps Delivery implementations independent of legacy delivery classes', func
 it('keeps Delivery assessment reads off Student Registry persistence', function (): void {
     $files = [
         base_path('app/Modules/Academic/Delivery/Support/AssessmentManagementService.php'),
-        base_path('app/Http/Controllers/Api/V1/Lecturer/AssessmentController.php'),
+        base_path('app/Modules/Academic/Delivery/Http/Api/Lecturer/AssessmentController.php'),
     ];
 
     foreach ($files as $file) {

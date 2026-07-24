@@ -193,6 +193,24 @@ it('returns compact gradebook items and matrix cells for a lecturer course', fun
         ->assertJsonPath('data.students.0.cells.0.points_earned', 80);
 });
 
+it('does not create assessment details while reading a gradebook', function () {
+    $syllabus = ($this->makeSyllabus)();
+    $offering = ($this->makeOffering)($syllabus);
+    $component = AssessmentComponent::factory()->create([
+        'syllabus_template_id' => $syllabus->id,
+        'name' => 'Unconfigured assessment',
+        'weight' => 100,
+    ]);
+
+    Sanctum::actingAs($this->lecturer);
+
+    $this->getJson("/api/v1/lecturer/courses/{$offering->id}/gradebook")
+        ->assertOk()
+        ->assertJsonPath('data.items', []);
+
+    expect($component->details()->count())->toBe(0);
+});
+
 it('saves matrix scores in one request and refreshes the manual course aggregate', function () {
     $syllabus = ($this->makeSyllabus)();
     $offering = ($this->makeOffering)($syllabus);

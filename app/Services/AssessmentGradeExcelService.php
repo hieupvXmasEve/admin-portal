@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Exports\OptimizedGradeTemplateExport;
 use App\Imports\GradeImport;
 use App\Models\AssessmentComponentDetail;
+use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
 use App\Models\Student;
+use App\Shared\Contracts\Academic\AssessmentGradeWorkbook;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -15,8 +19,35 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
-class AssessmentGradeExcelService
+class AssessmentGradeExcelService implements AssessmentGradeWorkbook
 {
+    public function exportTemplate(int $assessmentDetailId, int $courseOfferingId): string
+    {
+        return $this->exportGradeTemplate(
+            AssessmentComponentDetail::query()->findOrFail($assessmentDetailId),
+            CourseOffering::query()->findOrFail($courseOfferingId),
+        );
+    }
+
+    public function import(int $assessmentDetailId, int $courseOfferingId, UploadedFile $file, array $options, int $lecturerId): array
+    {
+        return $this->importGrades(
+            AssessmentComponentDetail::query()->findOrFail($assessmentDetailId),
+            CourseOffering::query()->findOrFail($courseOfferingId),
+            $file,
+            $options,
+            $lecturerId,
+        );
+    }
+
+    public function exportGrades(int $assessmentDetailId, int $courseOfferingId): string
+    {
+        return $this->exportGrades(
+            AssessmentComponentDetail::query()->findOrFail($assessmentDetailId),
+            CourseOffering::query()->findOrFail($courseOfferingId),
+        );
+    }
+
     /**
      * Export grade template for an assessment component detail
      */
@@ -42,10 +73,10 @@ class AssessmentGradeExcelService
 
             // Generate filename first
             $fileName = $this->generateExportFileName($assessmentComponentDetail, $courseOffering);
-            $filePath = 'temp/' . $fileName;
+            $filePath = 'temp/'.$fileName;
 
             // Use optimized export with memory management
-            $export = new \App\Exports\OptimizedGradeTemplateExport(
+            $export = new OptimizedGradeTemplateExport(
                 $assessmentComponentDetail,
                 $courseOffering
             );
@@ -74,7 +105,7 @@ class AssessmentGradeExcelService
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            throw new \Exception('Failed to generate grade template: ' . $e->getMessage());
+            throw new \Exception('Failed to generate grade template: '.$e->getMessage());
         }
     }
 
@@ -124,7 +155,7 @@ class AssessmentGradeExcelService
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            throw new \Exception('Failed to import grades: ' . $e->getMessage());
+            throw new \Exception('Failed to import grades: '.$e->getMessage());
         }
     }
 
@@ -170,7 +201,7 @@ class AssessmentGradeExcelService
                 'error' => $e->getMessage(),
             ]);
 
-            throw new \Exception('Failed to preview import: ' . $e->getMessage());
+            throw new \Exception('Failed to preview import: '.$e->getMessage());
         }
     }
 
@@ -181,7 +212,7 @@ class AssessmentGradeExcelService
     public function getStudentsWithScores(
         AssessmentComponentDetail $assessmentComponentDetail,
         CourseOffering $courseOffering
-    ): \Illuminate\Database\Eloquent\Builder {
+    ): Builder {
         return Student::select(
             'students.id',
             'students.student_id',
@@ -218,7 +249,7 @@ class AssessmentGradeExcelService
      */
     public function getStudentScore($student, AssessmentComponentDetail $assessmentComponentDetail, CourseOffering $courseOffering)
     {
-        return \App\Models\AssessmentComponentDetailScore::select(
+        return AssessmentComponentDetailScore::select(
             'points_earned',
             'percentage_score',
             'letter_grade',
@@ -335,7 +366,7 @@ class AssessmentGradeExcelService
             return $deletedCount;
         }
 
-        $files = glob($tempPath . '/grade_template_*.xlsx');
+        $files = glob($tempPath.'/grade_template_*.xlsx');
         $cutoffTime = time() - (24 * 60 * 60); // 24 hours ago
 
         foreach ($files as $file) {

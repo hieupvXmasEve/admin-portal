@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Progression\Support;
+namespace App\Modules\Academic\Progression\Actions;
 
 use App\Modules\Academic\Progression\Models\TranscriptEntry;
 use App\Shared\Contracts\Academic\CourseResultTranscriptWriter;
 use App\Shared\Contracts\Academic\DTO\CourseResult;
 
-final class EloquentCourseResultTranscriptWriter implements CourseResultTranscriptWriter
+final class CommitCourseResultsToTranscriptAction implements CourseResultTranscriptWriter
 {
     /** @param list<CourseResult> $courseResults */
     public function commit(array $courseResults): void

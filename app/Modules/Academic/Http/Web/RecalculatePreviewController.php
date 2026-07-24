@@ -7,7 +7,7 @@ namespace App\Modules\Academic\Http\Web;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\CourseOffering;
-use App\Modules\Academic\Actions\MarkCourseOfferingCompletedAction;
+use App\Modules\Academic\Delivery\Actions\FinalizeCourseOfferingAction;
 use App\Modules\Academic\Delivery\Support\CanvasGradeSyncService;
 use App\Modules\Academic\Http\Requests\RecalculateCourseOfferingRequest;
 use App\Modules\Academic\Support\RecalculateCanvasOverrides;
@@ -42,12 +42,12 @@ class RecalculatePreviewController extends Controller
         }
 
         try {
-            $result = MarkCourseOfferingCompletedAction::run(
-                $courseOffering,
-                recalculate: true,
-                dryRun: true,
-                finalPercentageOverrides: $this->courseTotalOverrides($canvasPreview),
-            );
+            $result = FinalizeCourseOfferingAction::run([
+                'course_offering_id' => $courseOffering->id,
+                'recalculate' => true,
+                'dry_run' => true,
+                'final_percentage_overrides' => $this->courseTotalOverrides($canvasPreview),
+            ]);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), [], 400);
         }
