@@ -17,7 +17,6 @@ use App\Models\Lecture;
 use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Modules\Academic\Delivery\Actions\EnrollStudentInCourseOfferingAction;
 use App\Modules\Academic\Delivery\Actions\SplitCourseOfferingAction;
@@ -1529,78 +1528,6 @@ class CourseOfferingController extends Controller
             : 0;
 
         return $stats;
-    }
-
-    /**
-     * Duplicate a course offering without the assigned lecturer
-     */
-    public function duplicate(CourseOffering $courseOffering): RedirectResponse
-    {
-        // Ensure the course offering belongs to current campus
-        if ($courseOffering->campus_id !== app('campus')->id) {
-            abort(404);
-        }
-
-        if (
-            $courseOffering->syllabus_template_id !== null
-            && ! SyllabusTemplate::query()
-                ->assignableToCourseOffering()
-                ->whereKey($courseOffering->syllabus_template_id)
-                ->exists()
-        ) {
-            return Redirect::back()
-                ->with('error', 'Cannot duplicate a Canvas-linked course offering. Create a new offering and select a reusable syllabus template.');
-        }
-
-        try {
-            // Get all attributes except the ones we want to exclude or modify
-            $attributes = $courseOffering->getAttributes();
-
-            // Remove attributes that should not be duplicated
-            unset(
-                $attributes['id'],
-                $attributes['lecture_id'], // Exclude assigned lecturer as requested
-                $attributes['current_enrollment'], // Reset enrollment
-                $attributes['current_waitlist'], // Reset waitlist
-                $attributes['created_at'],
-                $attributes['updated_at'],
-                $attributes['deleted_at']
-            );
-
-            // Reset enrollment counters
-            $attributes['current_enrollment'] = 0;
-            $attributes['current_waitlist'] = 0;
-
-            // Modify section code if it exists to avoid duplicates
-            if ($courseOffering->section_code) {
-                $baseSectionCode = $courseOffering->section_code;
-                $counter = 1;
-
-                // Find a unique section code
-                do {
-                    $newSectionCode = $baseSectionCode.'_copy'.($counter > 1 ? $counter : '');
-                    $exists = CourseOffering::where('semester_id', $courseOffering->semester_id)
-                        ->where('unit_id', $courseOffering->unit_id)
-                        ->where('campus_id', $courseOffering->campus_id)
-                        ->where('section_code', $newSectionCode)
-                        ->exists();
-                    $counter++;
-                } while ($exists && $counter <= 100); // Prevent infinite loop
-
-                $attributes['section_code'] = $newSectionCode;
-            }
-
-            // Create the duplicated course offering
-            $duplicatedOffering = CourseOffering::create($attributes);
-
-            return Redirect::route(CourseOfferingRoutes::INDEX)
-                ->with('success', 'Course offering duplicated successfully. Please assign an instructor.');
-        } catch (\Exception $e) {
-            Log::error('Failed to duplicate course offering: '.$e->getMessage());
-
-            return Redirect::back()
-                ->with('error', 'Failed to duplicate course offering: '.$e->getMessage());
-        }
     }
 
     /**

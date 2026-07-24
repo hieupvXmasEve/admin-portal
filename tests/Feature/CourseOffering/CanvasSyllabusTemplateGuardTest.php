@@ -206,7 +206,7 @@ it('rejects duplicating an offering whose syllabus is reserved by Canvas mapping
         ->withSession(['current_campus_id' => $this->campus->id])
         ->post(route(CourseOfferingRoutes::DUPLICATE, $mappedOffering))
         ->assertSessionHas(
-            'error',
+            'inertia.flash_data.error',
             'Cannot duplicate a Canvas-linked course offering. Create a new offering and select a reusable syllabus template.'
         );
 

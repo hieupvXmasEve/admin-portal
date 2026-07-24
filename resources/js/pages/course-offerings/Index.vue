@@ -152,7 +152,6 @@ const duplicateCourseOffering = (courseOffering: CourseOffering) => {
                         {},
                         {
                             onSuccess: () => {
-                                toast.success('Course offering duplicated successfully');
                                 resolve();
                             },
                             onError: () => {

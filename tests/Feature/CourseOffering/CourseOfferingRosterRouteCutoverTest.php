@@ -10,6 +10,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingDeletionController;
+use App\Modules\Academic\Http\Web\Admin\CourseOfferingDuplicationController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingRosterController;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Auth\Middleware\Authorize;
@@ -44,6 +45,63 @@ it('keeps the course-offering deletion route name while dispatching through Deli
     expect($route)
         ->not->toBeNull()
         ->and($route?->getActionName())->toContain(CourseOfferingDeletionController::class);
+});
+
+it('keeps the course-offering duplication route name while dispatching through Delivery', function (): void {
+    $route = Route::getRoutes()->getByName('course-offerings.duplicate');
+
+    expect($route)
+        ->not->toBeNull()
+        ->and($route?->getActionName())->toContain(CourseOfferingDuplicationController::class);
+});
+
+it('preserves the course-offering duplication redirect and flash response', function (): void {
+    $this->withoutMiddleware([
+        Authenticate::class,
+        Authorize::class,
+        EnsureEmailIsVerified::class,
+        PreventRequestForgery::class,
+        VerifyCsrfToken::class,
+    ]);
+
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $offering = CourseOffering::factory()->create([
+        'campus_id' => $campus->id,
+        'semester_id' => $semester->id,
+        'section_code' => 'A',
+    ]);
+    app()->instance('campus', $campus);
+
+    $this->post(route('course-offerings.duplicate', $offering))
+        ->assertRedirect(route('course-offerings.index'))
+        ->assertSessionHas('inertia.flash_data.success', 'Course offering duplicated successfully. Please assign an instructor.');
+
+    expect(CourseOffering::query()->where('section_code', 'A_copy')->exists())->toBeTrue();
+});
+
+it('does not expose course-offering duplication across campuses', function (): void {
+    $this->withoutMiddleware([
+        Authenticate::class,
+        Authorize::class,
+        EnsureEmailIsVerified::class,
+        PreventRequestForgery::class,
+        VerifyCsrfToken::class,
+    ]);
+
+    $currentCampus = Campus::factory()->create();
+    $otherCampus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $offering = CourseOffering::factory()->create([
+        'campus_id' => $otherCampus->id,
+        'semester_id' => $semester->id,
+        'section_code' => 'A',
+    ]);
+    app()->instance('campus', $currentCampus);
+
+    $this->post(route('course-offerings.duplicate', $offering))->assertNotFound();
+
+    expect(CourseOffering::query()->where('section_code', 'A_copy')->exists())->toBeFalse();
 });
 
 it('preserves the course-offering deletion redirect and flash response', function (): void {

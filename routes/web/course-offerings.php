@@ -51,10 +51,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:edit_course_offering')
             ->name(CourseOfferingRoutes::SPLIT_PERFORM);
 
-        Route::post('/{courseOffering}/duplicate', [CourseOfferingController::class, 'duplicate'])
-            ->middleware('can:create_course_offering')
-            ->name(CourseOfferingRoutes::DUPLICATE);
-
         // ============================================
         // Student Registration Management
         // ============================================
