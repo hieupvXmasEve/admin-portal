@@ -30,8 +30,10 @@ Cut class-session scheduling, attendance recording, readiness, reporting, and st
 - `./scripts/dev.sh npm run type-check` — passed.
 - `./scripts/dev.sh artisan migration-debt:inventory --check --format=table` — passed.
 - `./scripts/dev.sh artisan test --compact` — exited 2 with failures outside this issue's changed surface; focused migration coverage passes.
+- `./scripts/dev.sh artisan test --compact tests/Feature/Attendance/CourseOfferingAttendanceReportTest.php tests/Feature/Lecturer/LecturerRosterInactiveStudentTest.php` — 8 passed (98 assertions).
 
 ## Notes
 
 - Student and lecturer portal repositories were clean. Their attendance endpoints and response envelopes remain unchanged, so no portal code changes were required.
 - Review found that the combined course-statistics and lecturer-course services still own attendance reporting/readiness while also reading Student Registry and Progression data. Moving them directly into Delivery violates the migration-debt cross-context boundary; extract Delivery-owned readers behind contracts before retiring those mixed-domain legacy owners.
+- Staff attendance-grid reporting and lecturer session summaries now read through Delivery queries using `CourseRosterReader` and `StudentReferenceReader`; `operational_presence_rate` is explicit while `attendance_percentage` remains as a compatibility alias.

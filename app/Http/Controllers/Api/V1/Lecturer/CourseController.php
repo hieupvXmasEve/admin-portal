@@ -13,8 +13,8 @@ use App\Http\Resources\Api\V1\Lecturer\CourseStudentResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\CourseOffering;
 use App\Models\Lecture;
+use App\Modules\Academic\Delivery\Queries\GetLecturerCourseSessionAttendanceQuery;
 use App\Services\V1\Lecturer\LecturerCourseService;
-use App\Shared\Contracts\Academic\CourseRosterReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -22,7 +22,7 @@ class CourseController extends Controller
 {
     public function __construct(
         protected LecturerCourseService $courseService,
-        private readonly CourseRosterReader $courseRosters,
+        private readonly GetLecturerCourseSessionAttendanceQuery $sessionAttendance,
     ) {}
 
     /**
@@ -52,13 +52,13 @@ class CourseController extends Controller
     /**
      * Get detailed course offering information
      */
-    public function show(Request $request, int $courseOfferingId): JsonResponse
+    public function show(Request $request, CourseOffering $courseOffering): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
-            $courseDetails = $this->courseService->getCourseOfferingDetails($lecturer, $courseOfferingId);
+            $courseDetails = $this->courseService->getCourseOfferingDetails($lecturer, $courseOffering->id);
 
             if (! $courseDetails) {
                 return ApiResponse::success([]);
@@ -77,13 +77,13 @@ class CourseController extends Controller
     /**
      * Get unit information by course offering id
      */
-    public function unit(Request $request, int $courseOfferingId): JsonResponse
+    public function unit(Request $request, CourseOffering $courseOffering): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
-            $unit = $this->courseService->getUnitByCourseOfferingId($lecturer, $courseOfferingId);
+            $unit = $this->courseService->getUnitByCourseOfferingId($lecturer, $courseOffering->id);
 
             return ApiResponse::success(
                 $unit,
@@ -98,13 +98,13 @@ class CourseController extends Controller
     /**
      * Get course statistics
      */
-    public function statistics(Request $request, int $courseOfferingId): JsonResponse
+    public function statistics(Request $request, CourseOffering $courseOffering): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
-            $statistics = $this->courseService->getCourseStatistics($lecturer, $courseOfferingId);
+            $statistics = $this->courseService->getCourseStatistics($lecturer, $courseOffering->id);
 
             return ApiResponse::success(
                 $statistics,
@@ -123,14 +123,14 @@ class CourseController extends Controller
     /**
      * Get enrolled students for a course
      */
-    public function students(StudentFilterRequest $request, int $courseOfferingId): JsonResponse
+    public function students(StudentFilterRequest $request, CourseOffering $courseOffering): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             $filters = $request->validated();
-            $students = $this->courseService->getCourseStudents($lecturer, $courseOfferingId, $filters);
+            $students = $this->courseService->getCourseStudents($lecturer, $courseOffering->id, $filters);
 
             return ApiResponse::success(
                 CourseStudentResource::collection($students),
@@ -149,62 +149,13 @@ class CourseController extends Controller
     /**
      * Get course sessions
      */
-    public function sessions(Request $request, int $courseOfferingId): JsonResponse
+    public function sessions(Request $request, CourseOffering $courseOffering): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
-            // Verify lecturer has access to this course through class sessions assignment
-            $courseOffering = CourseOffering::query()
-                ->whereHas('classSessions', function ($sessionQuery) use ($lecturer) {
-                    $sessionQuery->where('lecture_id', $lecturer->id);
-                })
-                ->with([
-                    'classRosterRegistrations',
-                    'classSessions' => function ($q) use ($lecturer) {
-                        $q->where('lecture_id', $lecturer->id)
-                            ->with('attendances')
-                            ->orderBy('session_date', 'asc');
-                    },
-                ])
-                ->where('id', $courseOfferingId)
-                ->where('is_active', true)
-                ->first();
-
-            if (! $courseOffering) {
-                return ApiResponse::success([]);
-            }
-
-            $activeStudentIds = collect($this->courseRosters->activeStudentIds($courseOffering->id));
-            $expectedAttendees = $activeStudentIds->count();
-
-            $sessions = $courseOffering->classSessions->map(function ($session) use ($activeStudentIds, $expectedAttendees) {
-                $activeAttendances = $session->attendances->whereIn('student_id', $activeStudentIds);
-                $actualAttendees = $activeAttendances->whereIn('status', ['present', 'late'])->count();
-                $attendancePercentage = $expectedAttendees > 0
-                    ? round(($actualAttendees / $expectedAttendees) * 100, 1)
-                    : 0;
-
-                return [
-                    'id' => $session->id,
-                    'title' => $session->session_title,
-                    'description' => $session->session_description,
-                    'session_date' => $session->session_date->format('Y-m-d'),
-                    'start_time' => $session->start_time->format('H:i'),
-                    'end_time' => $session->end_time->format('H:i'),
-                    'duration_minutes' => $session->duration_minutes,
-                    'session_type' => $session->session_type,
-                    'delivery_mode' => $session->delivery_mode,
-                    'status' => $session->status,
-                    'attendance_marked' => $activeAttendances->isNotEmpty(),
-                    'attendance_percentage' => $attendancePercentage,
-                    'expected_attendees' => $expectedAttendees,
-                    'actual_attendees' => $actualAttendees,
-                    'learning_objectives' => $session->learning_objectives,
-                    'topics_covered' => $session->topics_covered,
-                ];
-            });
+            $sessions = $this->sessionAttendance->handle($lecturer->id, $courseOffering->id);
 
             return ApiResponse::success(
                 $sessions,

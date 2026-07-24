@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\AcademicRecord;
 use App\Models\CourseOffering;
 use App\Models\Student;
+use App\Modules\Academic\Delivery\Queries\GetCourseOfferingAttendanceReportQuery;
 use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -140,118 +141,10 @@ class CourseStatisticsService
 
     public function getAttendanceGrid(int $courseOfferingId): array
     {
-        $courseOffering = CourseOffering::with([
-            'semester',
-            'unit',
-            'lecture',
-            'campus',
-            'classSessions' => function ($query) {
-                $query->orderBy('session_date', 'asc')
-                    ->orderBy('start_time', 'asc');
-            },
-            'classSessions.attendances.student',
-        ])->findOrFail($courseOfferingId);
+        /** @var GetCourseOfferingAttendanceReportQuery $attendanceReport */
+        $attendanceReport = app(GetCourseOfferingAttendanceReportQuery::class);
 
-        $students = $courseOffering->courseRegistrations()
-            ->with('student')
-            ->get()
-            ->pluck('student')
-            ->sortBy('student_id');
-
-        $sessions = $courseOffering->classSessions;
-        $totalSessions = $sessions->count();
-
-        $attendanceThreshold = (float) ($courseOffering->syllabusTemplate?->min_attendance_threshold ?? 80.00);
-        $allowedAbsenceRatio = (100 - $attendanceThreshold) / 100;
-        $allowedAbsences = (int) floor($totalSessions * $allowedAbsenceRatio);
-
-        $attendanceGrid = [];
-        foreach ($students as $student) {
-            $studentData = [
-                'student_id' => $student->student_id,
-                'full_name' => $student->full_name,
-                'email' => $student->email,
-                'sessions' => [],
-            ];
-
-            $totalAbsences = 0;
-            $totalPresent = 0;
-            $totalLate = 0;
-
-            foreach ($sessions as $session) {
-                $attendance = $session->attendances->firstWhere('student_id', $student->id);
-                $status = $attendance?->status ?? 'not_recorded';
-
-                // Count attendance status
-                if ($status === 'absent') {
-                    $totalAbsences++;
-                } elseif ($status === 'present') {
-                    $totalPresent++;
-                } elseif ($status === 'late') {
-                    $totalLate++;
-                }
-
-                $studentData['sessions'][] = [
-                    'session_id' => $session->id,
-                    'session_number' => $session->sequence_number,
-                    'session_date' => $session->session_date->format('Y-m-d'),
-                    'status' => $status,
-                    'check_in_time' => $attendance?->check_in_time?->format('H:i'),
-                    'minutes_late' => $attendance?->minutes_late,
-                ];
-            }
-
-            // Calculate attendance percentage
-            $attendancePercentage = $totalSessions > 0
-                ? round((($totalPresent + $totalLate) / $totalSessions) * 100, 2)
-                : 0;
-
-            // Determine if meets requirement based on percentage vs threshold
-            $meetsRequirement = $attendancePercentage >= $attendanceThreshold;
-
-            $studentData['total_present'] = $totalPresent;
-            $studentData['total_absences'] = $totalAbsences;
-            $studentData['total_late'] = $totalLate;
-            $studentData['attendance_percentage'] = $attendancePercentage;
-            $studentData['meets_attendance_requirement'] = $meetsRequirement;
-            $studentData['allowed_absences'] = $allowedAbsences;
-            $studentData['absences_remaining'] = max(0, $allowedAbsences - $totalAbsences);
-
-            $attendanceGrid[] = $studentData;
-        }
-
-        // Count students who exceeded allowed absences
-        $studentsAbsentExceeded = collect($attendanceGrid)->filter(function ($student) {
-            return ! $student['meets_attendance_requirement'];
-        })->count();
-
-        $statistics = [
-            'course_code' => $courseOffering->unit->code,
-            'course_name' => $courseOffering->unit->name,
-            'section_code' => $courseOffering->section_code,
-            'semester' => $courseOffering->semester->name,
-            'instructor_name' => $courseOffering->lecture ? trim($courseOffering->lecture->first_name.' '.$courseOffering->lecture->last_name) : null,
-            'total_students' => $students->count(),
-            'total_sessions' => $totalSessions,
-            'allowed_absences' => $allowedAbsences,
-            'students_absent_exceeded' => $studentsAbsentExceeded,
-        ];
-
-        return [
-            'course_offering' => $courseOffering,
-            'statistics' => $statistics,
-            'sessions' => $sessions->map(function ($session) {
-                return [
-                    'id' => $session->id,
-                    'session_number' => $session->sequence_number,
-                    'session_date' => $session->session_date->format('Y-m-d'),
-                    'session_title' => $session->session_title,
-                    'session_time_start' => $session->start_time?->format('H:i'),
-                    'session_time_end' => $session->end_time?->format('H:i'),
-                ];
-            }),
-            'attendance_grid' => $attendanceGrid,
-        ];
+        return $attendanceReport->handle(CourseOffering::query()->findOrFail($courseOfferingId));
     }
 
     public function getAssessmentScoresGrid(int $courseOfferingId): array
