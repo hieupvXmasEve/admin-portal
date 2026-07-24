@@ -12,12 +12,12 @@ use App\Http\Controllers\Api\V1\Student\DashboardController;
 use App\Http\Controllers\Api\V1\Student\FinanceController;
 use App\Http\Controllers\Api\V1\Student\GradeController;
 use App\Http\Controllers\Api\V1\Student\ModuleController;
-use App\Http\Controllers\Api\V1\Student\NotificationController;
 use App\Http\Controllers\Api\V1\Student\ProfileController;
 use App\Http\Controllers\Api\V1\Student\TimetableController;
 use App\Modules\Academic\Delivery\Http\Api\Student\AttendanceController;
 use App\Modules\Academic\Progression\Http\Api\Student\AcademicRecordController;
 use App\Modules\Finance\Http\Api\Student\StudentFinanceController;
+use App\Modules\Notification\Http\Api\Student\NotificationController;
 use App\Modules\Upload\Http\Api\UploadController;
 use Illuminate\Support\Facades\Route;
 

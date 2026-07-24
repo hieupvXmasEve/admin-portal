@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Resources\Api\V1\Student;
+namespace App\Modules\Notification\Http\Resources;
 
 use App\Modules\Notification\Models\NotificationMessage;
 use Illuminate\Http\Request;
@@ -14,7 +14,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *
  * @mixin NotificationMessage
  */
-class NotificationResource extends JsonResource
+final class StudentNotificationResource extends JsonResource
 {
     /**
      * Transform the resource into an array.

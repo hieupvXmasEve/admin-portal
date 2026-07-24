@@ -2,40 +2,46 @@
 
 declare(strict_types=1);
 
-namespace App\Services\V1\Student;
+namespace App\Modules\Notification\Support;
 
-use App\Models\Student;
+use App\Modules\Notification\Http\Resources\StudentNotificationResource;
 use App\Modules\Notification\Models\NotificationMessage;
-use Illuminate\Pagination\LengthAwarePaginator;
+use App\Shared\Contracts\Notification\StudentNotificationReader;
+use App\Shared\Contracts\Notification\StudentNotificationWriter;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
  * Notification Service V2 - Uses NotificationMessage model instead of legacy Notifiable trait.
  */
-class NotificationService
+final class StudentNotificationStore implements StudentNotificationReader, StudentNotificationWriter
 {
     /**
      * Get student's notifications from V2 notification_messages table.
      */
-    public function getNotifications(Student $student, array $filters = []): LengthAwarePaginator
+    public function listForRecipient(int $recipientUserId, int $campusId, array $filters = []): LengthAwarePaginator
     {
-        $query = $this->baseQuery($student);
+        $query = $this->baseQuery($recipientUserId, $campusId);
 
         $this->applyNotificationFilters($query, $filters);
 
         $perPage = $filters['per_page'] ?? 20;
         $perPage = min(max($perPage, 5), 100);
 
-        return $query->orderByDesc('created_at')
-            ->paginate($perPage);
+        $notifications = $query->orderByDesc('created_at')->paginate($perPage);
+        $notifications->getCollection()->transform(
+            static fn (NotificationMessage $message): array => (new StudentNotificationResource($message))->resolve(),
+        );
+
+        return $notifications;
     }
 
     /**
      * Get student's unread notifications count.
      */
-    public function getUnreadCount(Student $student): int
+    public function unreadCount(int $recipientUserId, int $campusId): int
     {
-        return $this->baseQuery($student)
+        return $this->baseQuery($recipientUserId, $campusId)
             ->whereNull('read_at')
             ->count();
     }
@@ -43,9 +49,9 @@ class NotificationService
     /**
      * Get notification summary.
      */
-    public function getNotificationSummary(Student $student): array
+    public function summaryForRecipient(int $recipientUserId, int $campusId): array
     {
-        $baseQuery = $this->baseQuery($student);
+        $baseQuery = $this->baseQuery($recipientUserId, $campusId);
 
         $totalNotifications = (clone $baseQuery)->count();
         $unreadNotifications = (clone $baseQuery)->whereNull('read_at')->count();
@@ -64,9 +70,9 @@ class NotificationService
     /**
      * Mark notification as read.
      */
-    public function markAsRead(Student $student, int $notificationId): bool
+    public function markAsRead(int $recipientUserId, int $campusId, int $notificationId): bool
     {
-        $updated = $this->baseQuery($student)
+        $updated = $this->baseQuery($recipientUserId, $campusId)
             ->where('id', $notificationId)
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
@@ -77,9 +83,9 @@ class NotificationService
     /**
      * Mark multiple notifications as read.
      */
-    public function markMultipleAsRead(Student $student, array $notificationIds): int
+    public function markMultipleAsRead(int $recipientUserId, int $campusId, array $notificationIds): int
     {
-        return $this->baseQuery($student)
+        return $this->baseQuery($recipientUserId, $campusId)
             ->whereIn('id', $notificationIds)
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
@@ -88,9 +94,9 @@ class NotificationService
     /**
      * Mark all notifications as read.
      */
-    public function markAllAsRead(Student $student): int
+    public function markAllAsRead(int $recipientUserId, int $campusId): int
     {
-        return $this->baseQuery($student)
+        return $this->baseQuery($recipientUserId, $campusId)
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
     }
@@ -98,9 +104,9 @@ class NotificationService
     /**
      * Archive (soft-delete equivalent) notification.
      */
-    public function deleteNotification(Student $student, int $notificationId): bool
+    public function archive(int $recipientUserId, int $campusId, int $notificationId): bool
     {
-        $updated = $this->baseQuery($student)
+        $updated = $this->baseQuery($recipientUserId, $campusId)
             ->where('id', $notificationId)
             ->whereNull('archived_at')
             ->update(['archived_at' => now()]);
@@ -111,11 +117,11 @@ class NotificationService
     /**
      * Base query scoped to student's user_id and campus_id.
      */
-    protected function baseQuery(Student $student): Builder
+    protected function baseQuery(int $recipientUserId, int $campusId): Builder
     {
         return NotificationMessage::query()
-            ->where('recipient_user_id', $student->user_id)
-            ->where('campus_id', $student->campus_id)
+            ->where('recipient_user_id', $recipientUserId)
+            ->where('campus_id', $campusId)
             ->where('status', 'active')
             ->whereNull('archived_at');
     }
