@@ -59,6 +59,16 @@ final class BillingExceptionCollector
             return $this->paginateDeferNoCases($semesterId, $campusId, $page, $perPage, $path);
         }
 
+        if ($type === 'mismatch') {
+            return new LengthAwarePaginator(
+                new Collection,
+                0,
+                $perPage,
+                $page,
+                ['path' => $path, 'pageName' => 'page'],
+            );
+        }
+
         return $this->paginateAllTypes($semesterId, $campusId, $page, $perPage, $path);
     }
 
@@ -102,6 +112,7 @@ final class BillingExceptionCollector
     ): LengthAwarePaginator {
         $paginator = $this->missingChargeListQuery($semesterId, $campusId)
             ->orderByDesc('course_registrations.created_at')
+            ->orderByDesc('course_registrations.id')
             ->paginate($perPage, ['*'], 'page', $page)
             ->withPath($path);
 
@@ -119,6 +130,7 @@ final class BillingExceptionCollector
     ): LengthAwarePaginator {
         $paginator = $this->zeroTuitionWaivedListQuery($semesterId, $campusId)
             ->orderByDesc('course_registrations.created_at')
+            ->orderByDesc('course_registrations.id')
             ->paginate($perPage, ['*'], 'page', $page)
             ->withPath($path);
 
@@ -136,6 +148,7 @@ final class BillingExceptionCollector
     ): LengthAwarePaginator {
         $paginator = $this->deferredEnrolledListQuery($semesterId, $campusId)
             ->orderByDesc('course_registrations.created_at')
+            ->orderByDesc('course_registrations.id')
             ->paginate($perPage, ['*'], 'page', $page)
             ->withPath($path);
 
@@ -153,6 +166,7 @@ final class BillingExceptionCollector
     ): LengthAwarePaginator {
         $paginator = $this->retakeNoChargeBaseQuery($semesterId, $campusId)
             ->orderByDesc('course_registrations.created_at')
+            ->orderByDesc('course_registrations.id')
             ->paginate($perPage, ['*'], 'page', $page)
             ->withPath($path);
 
@@ -171,6 +185,7 @@ final class BillingExceptionCollector
         $paginator = $this->deferNoCaseBaseQuery($semesterId, $campusId)
             ->with(['student:id,student_id,full_name'])
             ->orderByDesc('student_action_logs.created_at')
+            ->orderByDesc('student_action_logs.id')
             ->paginate($perPage, ['student_action_logs.*'], 'page', $page)
             ->withPath($path);
 
@@ -197,6 +212,8 @@ final class BillingExceptionCollector
         $pageRows = DB::query()
             ->fromSub($union, 'billing_exceptions')
             ->orderByDesc('created_at')
+            ->orderBy('exception_type')
+            ->orderByDesc('source_id')
             ->forPage($page, $perPage)
             ->get();
 

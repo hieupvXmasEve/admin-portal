@@ -165,13 +165,52 @@ it('lists the default all-filter queue without calling Eloquent methods on query
         );
 });
 
+it('returns an empty queue for the unimplemented mismatch filter', function () {
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'EXC-MISMATCH-01',
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+            'status' => 'intake_course',
+        ])
+        ->create();
+
+    $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
+
+    CourseRegistration::create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $this->semester->id,
+        'registration_status' => 'confirmed',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 1,
+    ]);
+
+    $counts = app(GetBillingExceptionCountsQuery::class)->handle($this->semester->id);
+    $list = app(ListBillingExceptionsQuery::class)
+        ->handle($this->semester->id, 'mismatch', 'http://localhost/exceptions');
+
+    expect($counts['missing_charge'])->toBe(1)
+        ->and($counts['mismatch'])->toBe(0)
+        ->and($list->total())->toBe(0)
+        ->and($list->items())->toBe([]);
+});
+
 it('keeps all-filter campus scope, ordering, and pagination stable', function () {
     $otherCampus = Campus::factory()->create();
     $otherSemester = Semester::factory()->create();
     $currentOffering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
     $otherSemesterOffering = CourseOffering::factory()->create(['semester_id' => $otherSemester->id]);
 
-    $createMissingRegistration = function (Campus $campus, CourseOffering $offering, string $studentCode, int $age): void {
+    $createdAt = now()->subDay()->startOfSecond();
+
+    $createMissingRegistration = function (Campus $campus, CourseOffering $offering, string $studentCode) use ($createdAt): void {
         $student = Student::factory()
             ->forCampus($campus)
             ->forProgram($this->program)
@@ -198,7 +237,7 @@ it('keeps all-filter campus scope, ordering, and pagination stable', function ()
 
         DB::table('course_registrations')
             ->where('id', $registration->id)
-            ->update(['created_at' => now()->subMinutes($age)]);
+            ->update(['created_at' => $createdAt]);
     };
 
     foreach (range(1, 21) as $index) {
@@ -206,12 +245,11 @@ it('keeps all-filter campus scope, ordering, and pagination stable', function ()
             $this->campus,
             $currentOffering,
             sprintf('EXC-ALL-SCOPE-%02d', $index),
-            21 - $index,
         );
     }
 
-    $createMissingRegistration($otherCampus, $currentOffering, 'EXC-OTHER-CAMP', 0);
-    $createMissingRegistration($this->campus, $otherSemesterOffering, 'EXC-OTHER-SEM', 0);
+    $createMissingRegistration($otherCampus, $currentOffering, 'EXC-OTHER-CAMP');
+    $createMissingRegistration($this->campus, $otherSemesterOffering, 'EXC-OTHER-SEM');
 
     $counts = app(GetBillingExceptionCountsQuery::class)->handle($this->semester->id);
     $pageOne = app(ListBillingExceptionsQuery::class)
@@ -221,6 +259,10 @@ it('keeps all-filter campus scope, ordering, and pagination stable', function ()
     $pageTwo = app(ListBillingExceptionsQuery::class)
         ->handle($this->semester->id, 'all', 'http://localhost/exceptions');
 
+    request()->merge(['page' => 1]);
+    $reloadedPageOne = app(ListBillingExceptionsQuery::class)
+        ->handle($this->semester->id, 'all', 'http://localhost/exceptions');
+
     $codes = array_column(array_merge($pageOne->items(), $pageTwo->items()), 'student_code');
 
     expect($counts['missing_charge'])->toBe(21)
@@ -228,6 +270,8 @@ it('keeps all-filter campus scope, ordering, and pagination stable', function ()
         ->and($pageOne->count())->toBe(20)
         ->and($pageOne->items()[0]['student_code'])->toBe('EXC-ALL-SCOPE-21')
         ->and($pageTwo->count())->toBe(1)
+        ->and($pageTwo->items()[0]['student_code'])->toBe('EXC-ALL-SCOPE-01')
+        ->and(array_column($reloadedPageOne->items(), 'id'))->toBe(array_column($pageOne->items(), 'id'))
         ->and($codes)->not->toContain('EXC-OTHER-CAMP', 'EXC-OTHER-SEM');
 });
 

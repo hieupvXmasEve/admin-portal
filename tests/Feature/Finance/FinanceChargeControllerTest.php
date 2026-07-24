@@ -97,5 +97,7 @@ it('shows charges scoped to the selected student', function () {
         ->where('filters.student_id', $student->id)
         ->has('charges.data', 1)
         ->where('charges.data.0.student_id', $student->id)
+        ->where('charges.data.0.student.full_name', $student->full_name)
+        ->where('charges.data.0.student.student_id', $student->student_id)
     );
 });

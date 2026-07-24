@@ -77,7 +77,7 @@ final class ListFinanceChargesQuery
 
         $items->setCollection($items->getCollection()->map(
             static function (FinanceCharge $charge) use ($studentReferences): FinanceCharge {
-                $charge->setRelation('student', self::studentPayload($studentReferences[(int) $charge->student_id] ?? null));
+                $charge->setAttribute('student', self::studentPayload($studentReferences[(int) $charge->student_id] ?? null));
 
                 return $charge;
             },
