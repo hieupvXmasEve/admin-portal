@@ -24,6 +24,8 @@ return [
                 'SyllabusTemplate',
             ],
             'Delivery' => [
+                'Attendance',
+                'ClassSession',
                 'CourseOffering',
                 'CourseRegistration',
             ],

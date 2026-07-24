@@ -14,6 +14,7 @@ Route::middleware(['auth', 'verified', 'campus.selected'])->group(function () {
     Route::get('course-statistics/units/{unitId}', [UnitStatisticsController::class, 'show'])
         ->middleware('can:view_attendance')
         ->name('course-statistics.units.show');
+
     // Statistics for a specific course offering
     Route::get('course-statistics/{courseOffering}/students', [CourseStatisticsController::class, 'show'])
         ->middleware('can:view_attendance')

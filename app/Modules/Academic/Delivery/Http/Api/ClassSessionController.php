@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api;
+namespace App\Modules\Academic\Delivery\Http\Api;
 
 use App\Actions\ClassSession\BulkDeleteClassSessionsAction;
 use App\Http\Controllers\Controller;

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Modules\Academic\Delivery\Support\OperationalAttendanceService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Log;
 
 class ClassSession extends AuditableModel
 {
@@ -24,7 +26,7 @@ class ClassSession extends AuditableModel
                 // Only set timestamp if it wasn't already in_progress
                 if ($oldStatus !== 'in_progress') {
                     // Set started_at timestamp if not already set
-                    if (!$classSession->started_at) {
+                    if (! $classSession->started_at) {
                         $classSession->started_at = now();
                     }
                 }
@@ -154,7 +156,7 @@ class ClassSession extends AuditableModel
 
         return $query->whereBetween('session_date', [
             $now->copy()->subDay()->toDateString(),
-            $now->copy()->addDay()->toDateString()
+            $now->copy()->addDay()->toDateString(),
         ])
             ->whereNotIn('status', ['cancelled', 'postponed', 'moved']);
     }
@@ -167,7 +169,7 @@ class ClassSession extends AuditableModel
 
     public function getFormattedTimeAttribute(): string
     {
-        return $this->start_time->format('g:i A') . ' - ' . $this->end_time->format('g:i A');
+        return $this->start_time->format('g:i A').' - '.$this->end_time->format('g:i A');
     }
 
     public function getDurationInMinutesAttribute(): int
@@ -339,8 +341,8 @@ class ClassSession extends AuditableModel
         // Track time changes
         if (($this->isDirty('start_time') || $this->isDirty('end_time')) && $this->exists) {
             $properties['time_change'] = [
-                'from' => $this->getOriginal('start_time') . ' - ' . $this->getOriginal('end_time'),
-                'to' => $this->start_time . ' - ' . $this->end_time,
+                'from' => $this->getOriginal('start_time').' - '.$this->getOriginal('end_time'),
+                'to' => $this->start_time.' - '.$this->end_time,
                 'notification_required' => true,
             ];
         }
@@ -419,11 +421,11 @@ class ClassSession extends AuditableModel
             $this->status = $expectedStatus;
 
             // Set appropriate timestamps
-            if ($expectedStatus === 'in_progress' && !$this->started_at) {
+            if ($expectedStatus === 'in_progress' && ! $this->started_at) {
                 $this->started_at = now();
             }
 
-            if ($expectedStatus === 'completed' && !$this->ended_at) {
+            if ($expectedStatus === 'completed' && ! $this->ended_at) {
                 $this->ended_at = now();
             }
 
@@ -460,12 +462,11 @@ class ClassSession extends AuditableModel
      */
     public function createDefaultAttendance(): void
     {
-        // Use the AttendanceService
-        $attendanceService = app(\App\Services\AttendanceService::class);
+        $attendanceService = app(OperationalAttendanceService::class);
         $result = $attendanceService->createAttendanceForSession($this);
 
-        if (!$result['success']) {
-            \Illuminate\Support\Facades\Log::warning("Failed to auto-create attendance for session {$this->id}: {$result['message']}");
+        if (! $result['success']) {
+            Log::warning("Failed to auto-create attendance for session {$this->id}: {$result['message']}");
         }
     }
 
@@ -474,7 +475,7 @@ class ClassSession extends AuditableModel
      */
     public function updateAttendanceStatistics(): void
     {
-        $attendanceService = app(\App\Services\AttendanceService::class);
+        $attendanceService = app(OperationalAttendanceService::class);
         $attendanceService->updateAttendanceStatistics($this);
     }
 }

@@ -9,8 +9,8 @@ use App\Models\Attendance;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\Student;
+use App\Modules\Academic\Delivery\Support\OperationalAttendanceService;
 use App\Modules\Academic\Support\FailureReasonClassifier;
-use App\Services\AttendanceService;
 use App\Shared\Contracts\Finance\EgcBlockResultReconciler;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -365,7 +365,7 @@ final class RemediateEgcAttendanceFailuresAction
             return;
         }
 
-        $attendanceService = app(AttendanceService::class);
+        $attendanceService = app(OperationalAttendanceService::class);
 
         ClassSession::query()
             ->whereIn('id', $sessionIds->all())

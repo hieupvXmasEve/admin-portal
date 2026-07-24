@@ -37,6 +37,7 @@ beforeEach(function () {
     $permissionService->shouldReceive('getUserPermissions')->andReturn([
         'view_class_session',
         'edit_class_session',
+        'edit_course_offering',
     ]);
     app()->forgetInstance(PermissionService::class);
     app()->singleton(PermissionService::class, fn () => $permissionService);
@@ -105,4 +106,29 @@ it('rejects attendance records from another class session', function () {
 
     expect($currentAttendance->fresh()->status)->toBe('present')
         ->and($otherAttendance->fresh()->status)->toBe('present');
+});
+
+it('bulk updates course-offering sessions through the Delivery owner route', function () {
+    $secondSession = ClassSession::factory()->create([
+        'course_offering_id' => $this->offering->id,
+        'session_date' => '2026-01-16',
+        'start_time' => '09:00:00',
+        'end_time' => '11:00:00',
+    ]);
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->postJson(route('course-offerings.bulk-update-class-sessions', $this->offering), [
+            'session_ids' => [$this->classSession->id, $secondSession->id],
+            'start_time' => '10:00',
+            'end_time' => '12:30',
+        ])
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.updated_count', 2);
+
+    expect($this->classSession->fresh()->start_time->format('H:i:s'))->toBe('10:00:00')
+        ->and($this->classSession->fresh()->end_time->format('H:i:s'))->toBe('12:30:00')
+        ->and($this->classSession->fresh()->duration_minutes)->toBe(150)
+        ->and($secondSession->fresh()->duration_minutes)->toBe(150);
 });

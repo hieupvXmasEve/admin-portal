@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\V1\Student;
+namespace App\Modules\Academic\Delivery\Support;
 
 use App\Models\Attendance;
 use App\Models\CourseOffering;
@@ -13,7 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
-class AttendanceService
+class StudentAttendanceService
 {
     /**
      * Get student's attendance summary

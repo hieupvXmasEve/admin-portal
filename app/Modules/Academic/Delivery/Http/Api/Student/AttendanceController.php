@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api\V1\Student;
+namespace App\Modules\Academic\Delivery\Http\Api\Student;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Student\AttendanceFilterRequest;
@@ -11,7 +11,7 @@ use App\Http\Resources\Api\V1\Student\AttendanceReportResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Services\V1\Student\AttendanceService;
+use App\Modules\Academic\Delivery\Support\StudentAttendanceService;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Log;
 class AttendanceController extends Controller
 {
     public function __construct(
-        protected AttendanceService $attendanceService
+        protected StudentAttendanceService $attendanceService
     ) {}
 
     /**

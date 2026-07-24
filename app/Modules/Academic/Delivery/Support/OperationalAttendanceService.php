@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Modules\Academic\Delivery\Support;
 
 use App\Models\Attendance;
 use App\Models\ClassSession;
@@ -12,7 +12,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-class AttendanceService
+class OperationalAttendanceService
 {
     /**
      * Create attendance records for all enrolled students in a class session

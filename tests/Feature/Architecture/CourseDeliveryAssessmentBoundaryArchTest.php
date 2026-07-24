@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 it('routes Delivery operations through Delivery-owned boundaries', function (): void {
     $files = [
-        base_path('app/Http/Controllers/Api/ClassSessionController.php'),
-        base_path('app/Http/Controllers/Api/V1/Lecturer/AttendanceController.php'),
+        base_path('app/Modules/Academic/Delivery/Http/Api/ClassSessionController.php'),
+        base_path('app/Modules/Academic/Delivery/Http/Api/Lecturer/AttendanceController.php'),
         base_path('app/Http/Controllers/Api/V1/Lecturer/AssessmentController.php'),
         base_path('app/Http/Controllers/Api/V1/Lecturer/GradebookController.php'),
-        base_path('app/Http/Controllers/Web/CourseOfferingController.php'),
+        base_path('app/Modules/Academic/Delivery/Http/Web/BulkUpdateCourseOfferingSessionsController.php'),
         base_path('app/Modules/Academic/Http/Web/BulkUpdateClassSessionAttendanceController.php'),
         base_path('app/Modules/Academic/Http/Web/RecordClassSessionAttendanceController.php'),
         base_path('app/Modules/Academic/Http/Web/Canvas/PreviewCanvasGradeSyncController.php'),

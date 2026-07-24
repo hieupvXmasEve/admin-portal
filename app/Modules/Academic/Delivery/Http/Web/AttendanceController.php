@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Web;
+namespace App\Modules\Academic\Delivery\Http\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;

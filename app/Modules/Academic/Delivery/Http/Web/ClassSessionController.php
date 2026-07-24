@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Web;
+namespace App\Modules\Academic\Delivery\Http\Web;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\GenerateClassSessionsRequest;
@@ -275,12 +275,14 @@ class ClassSessionController extends Controller
         }
 
         if ($result['success']) {
-            return redirect()->back()
-                ->with('success', $result['message']);
-        } else {
-            return redirect()->back()
-                ->with('error', $result['message']);
+            Inertia::flash('success', $result['message']);
+
+            return redirect()->back();
         }
+
+        Inertia::flash('error', $result['message']);
+
+        return redirect()->back();
     }
 
     /**

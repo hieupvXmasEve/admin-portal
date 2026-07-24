@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 use App\Constants\CourseOfferingRoutes;
 use App\Constants\StudentRoutes;
+use App\Modules\Academic\Delivery\Http\Api\ClassSessionController as DeliveryClassSessionApiController;
+use App\Modules\Academic\Delivery\Http\Web\AttendanceController as DeliveryAttendanceController;
+use App\Modules\Academic\Delivery\Http\Web\BulkUpdateCourseOfferingSessionsController;
+use App\Modules\Academic\Delivery\Http\Web\ClassSessionController as DeliveryClassSessionController;
 use App\Modules\Academic\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\AcademicProgressionAuditController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingBulkDeletionController;
@@ -15,9 +19,11 @@ use App\Modules\Academic\Http\Web\Admin\CourseOfferingInstructorAssignmentContro
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingRegistrationController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingRoomController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingRosterController;
+use App\Modules\Academic\Http\Web\BulkUpdateClassSessionAttendanceController;
 use App\Modules\Academic\Http\Web\CampusDetailController;
 use App\Modules\Academic\Http\Web\ExamResitAttemptController;
 use App\Modules\Academic\Http\Web\ExamScheduleController;
+use App\Modules\Academic\Http\Web\RecordClassSessionAttendanceController;
 use App\Modules\Academic\Http\Web\RetakeCourseRegistrationController;
 use App\Modules\Academic\Http\Web\StudentAcademicSummaryController;
 use App\Modules\Academic\Http\Web\StudentActionAuditController;
@@ -43,6 +49,99 @@ Route::model('courseOffering', implode('\\', ['App', 'Models', 'CourseOffering']
 */
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('attendance', [DeliveryAttendanceController::class, 'index'])
+        ->middleware('can:view_course_offering')
+        ->name('attendance.index');
+
+    Route::get('class-sessions', [DeliveryClassSessionController::class, 'index'])
+        ->middleware('can:view_class_session')
+        ->name('class-sessions.index');
+
+    Route::get('class-sessions/create', [DeliveryClassSessionController::class, 'create'])
+        ->middleware('can:create_class_session')
+        ->name('class-sessions.create');
+
+    Route::get('class-sessions/{classSession}/edit', [DeliveryClassSessionController::class, 'edit'])
+        ->middleware('can:edit_class_session')
+        ->name('class-sessions.edit');
+
+    Route::post('class-sessions', [DeliveryClassSessionController::class, 'store'])
+        ->middleware('can:create_class_session')
+        ->name('class-sessions.store');
+
+    Route::get('class-sessions/{classSession}', [DeliveryClassSessionController::class, 'show'])
+        ->middleware('can:view_class_session')
+        ->name('class-sessions.show');
+
+    Route::put('class-sessions/{classSession}', [DeliveryClassSessionController::class, 'update'])
+        ->middleware('can:edit_class_session')
+        ->name('class-sessions.update');
+
+    Route::delete('class-sessions/{classSession}', [DeliveryClassSessionController::class, 'destroy'])
+        ->middleware('can:delete_class_session')
+        ->name('class-sessions.destroy');
+
+    Route::delete('class-sessions', [DeliveryClassSessionController::class, 'bulkDestroy'])
+        ->middleware('can:delete_class_session')
+        ->name('class-sessions.bulk-destroy');
+
+    Route::post('course-offerings/{courseOffering}/class-sessions/generate', [DeliveryClassSessionController::class, 'generate'])
+        ->middleware('can:generate_class_session')
+        ->name('class-sessions.generate');
+
+    Route::get('course-offerings/{courseOffering}/class-sessions/add', [DeliveryClassSessionController::class, 'createForOffering'])
+        ->middleware('can:create_class_session')
+        ->name('class-sessions.add-for-offering');
+
+    Route::get('class-sessions/{classSession}/quick-edit', [DeliveryClassSessionController::class, 'editModal'])
+        ->middleware('can:edit_class_session')
+        ->name('class-sessions.quick-edit');
+
+    Route::get('course-offerings/{courseOffering}/class-sessions/bulk-edit', [DeliveryClassSessionController::class, 'bulkEditModal'])
+        ->middleware('can:edit_class_session')
+        ->name('class-sessions.bulk-edit');
+
+    Route::post('class-sessions/{classSession}/generate-attendance', [DeliveryClassSessionController::class, 'generateAttendance'])
+        ->middleware('can:generate_class_session_attendance')
+        ->name('class-sessions.generate-attendance');
+
+    Route::post('class-sessions/{classSession}/attendance/bulk-update', BulkUpdateClassSessionAttendanceController::class)
+        ->middleware('can:edit_class_session')
+        ->name('class-sessions.attendance.bulk-update');
+
+    Route::post('course-offerings/{courseOffering}/class-sessions/{classSession}/record-attendance', RecordClassSessionAttendanceController::class)
+        ->middleware('can:create_course_offering')
+        ->name(CourseOfferingRoutes::RECORD_SESSION_ATTENDANCE);
+
+    Route::get('class-sessions/{classSession}/export-attendance', [DeliveryClassSessionController::class, 'exportAttendance'])
+        ->middleware('can:export_class_session_attendance')
+        ->name('class-sessions.export-attendance');
+
+    Route::prefix('api/course-offerings/{courseOffering}/class-sessions')->group(function () {
+        Route::get('/', [DeliveryClassSessionApiController::class, 'index'])
+            ->middleware('can:view_course_offering');
+        Route::post('/generate', [DeliveryClassSessionApiController::class, 'generate'])
+            ->middleware('can:edit_course_offering');
+        Route::delete('/', [DeliveryClassSessionApiController::class, 'destroy'])
+            ->middleware('can:edit_course_offering');
+    });
+
+    Route::post('api/class-sessions', [DeliveryClassSessionApiController::class, 'store'])
+        ->middleware('can:edit_course_offering')
+        ->name('api.class-sessions.store');
+
+    Route::delete('api/class-sessions/bulk', [DeliveryClassSessionApiController::class, 'bulkDestroy'])
+        ->middleware('can:edit_course_offering')
+        ->name('api.class-sessions.bulk-destroy');
+
+    Route::delete('api/class-sessions/{classSession}', [DeliveryClassSessionApiController::class, 'destroySingle'])
+        ->middleware('can:edit_course_offering')
+        ->name('api.class-sessions.destroy');
+
+    Route::post('api/course-offerings/{courseOffering}/class-sessions/bulk-update', BulkUpdateCourseOfferingSessionsController::class)
+        ->middleware('can:edit_course_offering')
+        ->name('course-offerings.bulk-update-class-sessions');
+
     Route::prefix('course-offerings')->group(function () {
         Route::get('/', [CourseOfferingCockpitController::class, 'index'])
             ->middleware('can:view_course_offering')
