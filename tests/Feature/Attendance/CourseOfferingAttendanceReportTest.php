@@ -12,11 +12,12 @@ use App\Models\Student;
 use App\Models\Unit;
 use App\Modules\Academic\Delivery\Queries\GetCourseOfferingAttendanceReportQuery;
 use App\Modules\Academic\Delivery\Queries\GetCourseOfferingOperationalAttendanceStatisticsQuery;
+use App\Modules\Academic\Delivery\Queries\GetStudentCourseOperationalAttendanceQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('reports roster-scoped operational presence explicitly while preserving the legacy rate alias', function (): void {
+it('uses expected roster attendance rather than recorded rows for operational presence', function (): void {
     $campus = Campus::factory()->create();
     $semester = Semester::factory()->active()->create();
     $unit = Unit::factory()->create();
@@ -63,6 +64,14 @@ it('reports roster-scoped operational presence explicitly while preserving the l
         'start_time' => '09:00:00',
         'end_time' => '11:00:00',
     ]);
+    ClassSession::factory()->create([
+        'course_offering_id' => $offering->id,
+        'status' => 'completed',
+        'session_date' => '2026-01-17',
+        'sequence_number' => 3,
+        'start_time' => '09:00:00',
+        'end_time' => '11:00:00',
+    ]);
     Attendance::create([
         'class_session_id' => $presentSession->id,
         'student_id' => $student->id,
@@ -78,6 +87,7 @@ it('reports roster-scoped operational presence explicitly while preserving the l
 
     $report = app(GetCourseOfferingAttendanceReportQuery::class)->handle($offering);
     $statistics = app(GetCourseOfferingOperationalAttendanceStatisticsQuery::class)->handle($offering);
+    $studentStatistics = app(GetStudentCourseOperationalAttendanceQuery::class)->handle($student->id, $offering->id);
 
     expect($report['statistics']['attendance_metric'])->toBe('operational_presence_rate')
         ->and($report['attendance_grid'])->toHaveCount(1)
@@ -86,14 +96,21 @@ it('reports roster-scoped operational presence explicitly while preserving the l
             'student_id' => 'STU-001',
             'total_present' => 1,
             'total_absences' => 1,
-            'operational_presence_rate' => 50.0,
-            'attendance_percentage' => 50.0,
+            'operational_presence_rate' => 33.33,
+            'attendance_percentage' => 33.33,
         ]);
 
     expect($statistics)->toMatchArray([
-        'completed_sessions' => 2,
+        'completed_sessions' => 3,
         'sessions_with_attendance' => 2,
-        'operational_presence_rate' => 50.0,
-        'overall_attendance_rate' => 50.0,
+        'operational_presence_rate' => 33.3,
+        'overall_attendance_rate' => 33.3,
+    ]);
+
+    expect($studentStatistics)->toMatchArray([
+        'total' => 3,
+        'attended' => 1,
+        'operational_presence_rate' => 33.3,
+        'attendance_percentage' => 33.3,
     ]);
 });

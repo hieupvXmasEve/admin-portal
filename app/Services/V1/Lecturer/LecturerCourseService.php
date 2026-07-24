@@ -195,7 +195,7 @@ class LecturerCourseService
         return $students->map(function ($registration) use ($courseOfferingId, $attendanceThreshold) {
             $student = $registration->student;
             $isRosterActive = $registration->isClassRosterActive();
-            $attendanceStats = $this->calculateStudentAttendanceStats($student, $courseOfferingId);
+            $attendanceStats = $this->calculateStudentAttendanceStats($student, $courseOfferingId, $isRosterActive);
             $academicRecord = $student->academicRecords->first();
             $academicStanding = $student->academicStandings->first();
             $finalScore = $this->calculateStudentFinalScore($student->id, $courseOfferingId);
@@ -507,16 +507,24 @@ class LecturerCourseService
     /**
      * Calculate student attendance statistics
      */
-    protected function calculateStudentAttendanceStats($student, int $courseOfferingId): array
+    protected function calculateStudentAttendanceStats($student, int $courseOfferingId, bool $isRosterActive): array
     {
         /** @var GetStudentCourseOperationalAttendanceQuery $attendance */
         $attendance = app(GetStudentCourseOperationalAttendanceQuery::class);
         $statistics = $attendance->handle($student->id, $courseOfferingId);
 
-        return [
+        $statistics = [
             ...$statistics,
             'percentage' => $statistics['operational_presence_rate'],
         ];
+
+        if (! $isRosterActive) {
+            $statistics['operational_presence_rate'] = null;
+            $statistics['attendance_percentage'] = null;
+            $statistics['percentage'] = null;
+        }
+
+        return $statistics;
     }
 
     /**

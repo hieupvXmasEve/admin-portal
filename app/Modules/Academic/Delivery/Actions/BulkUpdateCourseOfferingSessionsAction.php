@@ -15,11 +15,14 @@ use Illuminate\Support\Facades\DB;
 final class BulkUpdateCourseOfferingSessionsAction
 {
     /**
-     * @param  array<int, int>  $sessionIds
      * @param  array<string, mixed>  $data
      */
-    public static function run(CourseOffering $courseOffering, array $sessionIds, array $data): int
+    public static function run(array $data): int
     {
+        $courseOffering = CourseOffering::query()->findOrFail($data['course_offering_id']);
+        /** @var array<int, int> $sessionIds */
+        $sessionIds = $data['session_ids'];
+
         /** @var Collection<int, ClassSession> $sessions */
         $sessions = ClassSession::query()
             ->whereIn('id', $sessionIds)

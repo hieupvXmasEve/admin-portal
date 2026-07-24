@@ -270,11 +270,15 @@ it('returns completed and deferred registrations through the lecturer course stu
         ->and($studentsById[$completedRegistrationStudent->id]['roster']['status'])->toBe('completed')
         ->and($studentsById[$completedRegistrationStudent->id]['roster']['is_active'])->toBeFalse()
         ->and($studentsById[$completedRegistrationStudent->id]['roster']['can_mark_attendance'])->toBeFalse()
+        ->and($studentsById[$completedRegistrationStudent->id]['attendance']['operational_presence_rate'])->toBeNull()
+        ->and($studentsById[$completedRegistrationStudent->id]['attendance']['percentage'])->toBeNull()
         ->and($studentsById[$deferredRegistrationStudent->id]['registration']['status'])->toBe('defer')
         ->and($studentsById[$deferredRegistrationStudent->id]['roster']['status'])->toBe('defer')
         ->and($studentsById[$deferredRegistrationStudent->id]['roster']['status_label'])->toBe('Deferred')
         ->and($studentsById[$deferredRegistrationStudent->id]['roster']['is_active'])->toBeFalse()
-        ->and($studentsById[$deferredRegistrationStudent->id]['roster']['can_mark_attendance'])->toBeFalse();
+        ->and($studentsById[$deferredRegistrationStudent->id]['roster']['can_mark_attendance'])->toBeFalse()
+        ->and($studentsById[$deferredRegistrationStudent->id]['attendance']['operational_presence_rate'])->toBeNull()
+        ->and($studentsById[$deferredRegistrationStudent->id]['attendance']['percentage'])->toBeNull();
 });
 
 it('returns visible roster counts from the lecturer courses index and detail endpoints', function () {

@@ -6,7 +6,6 @@ namespace App\Modules\Academic\Delivery\Queries;
 
 use App\Models\CourseOffering;
 use App\Shared\Contracts\Academic\CourseRosterReader;
-use Illuminate\Support\Facades\DB;
 
 final class GetCourseOfferingOperationalAttendanceStatisticsQuery
 {
@@ -31,16 +30,14 @@ final class GetCourseOfferingOperationalAttendanceStatisticsQuery
             })
             ->count();
 
-        $attendanceBaseQuery = DB::table('attendances')
-            ->join('class_sessions', 'attendances.class_session_id', '=', 'class_sessions.id')
-            ->where('class_sessions.course_offering_id', $courseOffering->id)
-            ->whereIn('attendances.student_id', $activeStudentIds);
-        $totalRecordedAttendances = (clone $attendanceBaseQuery)->count();
-        $attendedRecords = (clone $attendanceBaseQuery)
-            ->whereIn('attendances.status', ['present', 'late'])
+        $expectedActiveAttendances = $totalSessions * count($activeStudentIds);
+        $attendedRecords = $sessions
+            ->flatMap(static fn ($session) => $session->attendances)
+            ->whereIn('student_id', $activeStudentIds)
+            ->whereIn('status', ['present', 'late'])
             ->count();
-        $operationalPresenceRate = $totalRecordedAttendances > 0
-            ? round(($attendedRecords / $totalRecordedAttendances) * 100, 1)
+        $operationalPresenceRate = $expectedActiveAttendances > 0
+            ? round(($attendedRecords / $expectedActiveAttendances) * 100, 1)
             : 0.0;
 
         return [

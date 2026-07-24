@@ -24,11 +24,10 @@ class BulkUpdateCourseOfferingSessionsController extends Controller
 
         try {
             $validated = $request->validated();
-            $count = BulkUpdateCourseOfferingSessionsAction::run(
-                $courseOffering,
-                $validated['session_ids'],
-                $validated,
-            );
+            $count = BulkUpdateCourseOfferingSessionsAction::run([
+                ...$validated,
+                'course_offering_id' => $courseOffering->id,
+            ]);
 
             if ($request->expectsJson()) {
                 return ApiResponse::success(['updated_count' => $count], [], "Successfully updated {$count} class session(s).");

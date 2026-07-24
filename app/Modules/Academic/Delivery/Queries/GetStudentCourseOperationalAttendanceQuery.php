@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Delivery\Queries;
 
 use App\Models\Attendance;
+use App\Models\ClassSession;
 
 final class GetStudentCourseOperationalAttendanceQuery
 {
@@ -15,7 +16,9 @@ final class GetStudentCourseOperationalAttendanceQuery
             ->where('student_id', $studentId)
             ->whereHas('classSession', static fn ($sessions) => $sessions->where('course_offering_id', $courseOfferingId))
             ->get();
-        $totalSessions = $attendances->pluck('class_session_id')->unique()->count();
+        $totalSessions = ClassSession::query()
+            ->where('course_offering_id', $courseOfferingId)
+            ->count();
         $attendedSessions = $attendances
             ->whereIn('status', ['present', 'late'])
             ->pluck('class_session_id')
