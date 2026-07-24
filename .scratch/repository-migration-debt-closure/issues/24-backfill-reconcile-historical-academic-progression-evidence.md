@@ -48,3 +48,30 @@ Before execution, append all of the following and stop for explicit approval:
 ## Comments
 
 - 2026-07-24: Created at maintainer direction as the required separate data checkpoint for issue 12. No data mutation, migration, backfill, cleanup, or compatibility retirement is authorized or has been attempted.
+
+### 2026-07-24 — read-only preflight checkpoint; explicit approval required
+
+Environment: local Docker application environment (`Asia University`, Laravel 13.6.0, PHP 8.4.23, `Asia/Ho_Chi_Minh`). Scope is explicit `--all`: live, final `academic_records` into `transcript_entries`, using stable identifier `academic_records.id -> transcript_entries.course_result_id` and duplicate business key `student_id + semester_id + unit_id + attempt_number`.
+
+Read-only command and output:
+
+```text
+./scripts/dev.sh artisan academic:preflight-transcript-backfill --all --format=table
+source_final_outcomes=2052
+target_transcript_entries=2052
+ready_to_backfill=0
+already_matching=2052
+conflicts=0
+invalid_sources=0
+ambiguous_sources=0
+date_precision_warnings=2052
+unmatched_targets=0
+```
+
+`--format=json` emits the stable identifier and every row in each exception category. There are no conflict, invalid, ambiguous, or unmatched rows. All 2,052 matching rows have `legacy_finalization_is_date_only`: the legacy source column is `academic_records.grade_finalized_date` (DATE), while the target stores `transcript_entries.finalized_at` (timestamp). The preflight confirms the dates agree but cannot prove or recreate the missing time-of-day; no time is guessed.
+
+Mapping and invariants: final legacy outcomes map source id, student, course offering, semester, unit, program, campus, attempt number, final percentage, letter grade, attempted/earned credits, quality points, pass/fail, GPA exclusion, standing, graduation, and prerequisite flags field-for-field. Missing required source values, duplicate business attempts, target differences, and target rows with no live final source are blocking exceptions. `grade_finalized_date` may only be promoted after a human approves a documented date-to-timestamp policy. GPA, standing, best-attempt, EGC/graduation, Student Hub/export, Decisions, lifecycle timeline, and portal/Finance consumers are not recomputed or changed by this preflight.
+
+Idempotency and recovery plan for any future approved write: use the unique `course_result_id`, scope by explicit student/semester or `--all`, insert only absent matching candidates, abort on every exception, and process bounded chunks in DB transactions. Do not overwrite or delete target/source rows. Capture a database backup and per-run created-id ledger before execution; rollback may delete only rows recorded by that run. During mixed-version deployment, keep the compatibility projection and write-path dual publishing active; pause queues/notifications only if their reconciliation evidence changes. Finance, student/lecturer API responses, exports, audit, and notification payloads must be compared read-only before any removal approval.
+
+The only implemented command is the read-only preflight above; it deliberately has no `--apply` option. A write command is not proposed for execution because this preflight has zero eligible rows and the finalization-time policy is unresolved. Named human approver: **unassigned**. No approval has been granted, no mutation has run, and the compatibility projection remains in place. Status stays `needs-info`.
