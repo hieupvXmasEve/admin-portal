@@ -47,6 +47,14 @@ final class GetStudentAcademicRecordsQuery implements StudentAcademicRecordsRead
                 'credits_earned' => $record->semester_credit_points_earned,
                 'finalized_at' => $record->finalized_at?->toIso8601String(),
             ])->all(),
-        ]);
+        ], $records->map(static fn (GpaCalculation $record): array => [
+            'semester' => $record->semester?->name,
+            'semester_code' => $record->semester?->code,
+            'gpa' => (float) $record->semester_gpa,
+            'credit_hours' => (float) $record->semester_credit_points_earned,
+            'quality_points' => (float) $record->semester_quality_points,
+            'academic_standing' => $record->academic_standing,
+            'created_at' => $record->created_at?->toIso8601String(),
+        ])->all());
     }
 }

@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\Student\ProfileController as LegacyProfileContro
 use App\Http\Controllers\Api\V1\Student\TimetableController;
 use App\Modules\Academic\Delivery\Http\Api\Student\AttendanceController;
 use App\Modules\Academic\Progression\Http\Api\Student\AcademicRecordController;
+use App\Modules\Academic\Progression\Http\Api\Student\GpaTrendController;
 use App\Modules\Finance\Http\Api\Student\LegacyFinanceController;
 use App\Modules\Finance\Http\Api\Student\StudentFinanceController;
 use App\Modules\Notification\Http\Api\Student\NotificationController;
@@ -101,7 +102,7 @@ Route::middleware([
         // Grades and academic progress endpoints
         Route::prefix('grades')->name('grades.')->group(function () {
             Route::get('/', [GradeController::class, 'index'])->name('index');
-            Route::get('/gpa-trend', [GradeController::class, 'gpaTrend'])->name('gpa-trend');
+            Route::get('/gpa-trend', [GpaTrendController::class, 'index'])->name('gpa-trend');
             Route::get('/assessments', [GradeController::class, 'assessments'])->name('assessments');
             Route::get('/assessment/{assessmentId}', [GradeController::class, 'assessmentDetail'])
                 ->name('assessment-detail');
