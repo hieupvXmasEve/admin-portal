@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
-use App\Actions\Form\CreateFormTargetAction;
-use App\Actions\Form\GenerateStudentAssignmentsAction;
 use App\Constants\CourseOfferingRoutes;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCourseOfferingRequest;
@@ -15,7 +13,6 @@ use App\Models\AcademicRecord;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Models\Form;
 use App\Models\Lecture;
 use App\Models\Room;
 use App\Models\Semester;
@@ -31,7 +28,9 @@ use App\Modules\Academic\Http\Requests\CourseDelivery\SplitCourseOfferingRequest
 use App\Modules\Academic\Queries\GetCourseOfferingScoresQuery;
 use App\Modules\Academic\Queries\GetCourseOfferingSurveyQuery;
 use App\Modules\Academic\Queries\ListCourseOfferingModuleOptionsQuery;
-use App\Services\CourseSurveyService;
+use App\Modules\Engagement\Actions\ProvisionCourseSurveyAction;
+use App\Modules\Engagement\Http\Requests\Forms\ProvisionCourseSurveyRequest;
+use App\Modules\Engagement\Queries\Forms\ListActiveSurveyFormsQuery;
 use App\Services\V1\Student\CurriculumService;
 use App\Services\V1\Student\PrerequisiteValidationService;
 use App\Support\CampusLogContext;
@@ -52,7 +51,8 @@ use Inertia\Response;
 class CourseOfferingController extends Controller
 {
     public function __construct(
-        protected CourseSurveyService $courseSurveyService,
+        protected ProvisionCourseSurveyAction $courseSurveyService,
+        protected ListActiveSurveyFormsQuery $activeSurveyForms,
         protected CurriculumService $curriculumService,
         protected GetCourseOfferingOperationalStateQuery $operationalStateQuery,
     ) {}
@@ -208,9 +208,7 @@ class CourseOfferingController extends Controller
             ->toArray();
 
         // Survey Forms
-        $surveyForms = Form::where('type', 'survey')
-            ->where('status', 'active')
-            ->get(['id', 'title', 'code']);
+        $surveyForms = $this->activeSurveyForms->execute();
 
         // 4. Return to Inertia
         return Inertia::render('course-offerings/Index', [
@@ -258,56 +256,26 @@ class CourseOfferingController extends Controller
      * Create a survey for the course offering
      */
     public function createSurvey(
-        Request $request,
+        ProvisionCourseSurveyRequest $request,
         CourseOffering $courseOffering,
-        CreateFormTargetAction $createFormTargetAction,
-        GenerateStudentAssignmentsAction $generateStudentAssignmentsAction
     ): RedirectResponse {
         // Ensure the course offering belongs to current campus
         if ($courseOffering->campus_id !== app('campus')->id) {
             abort(404);
         }
 
-        $validated = $request->validate([
-            'form_id' => 'required|exists:forms,id',
-        ]);
-
-        // Check if survey already exists for this course
-        if ($courseOffering->formTargets()->exists()) {
-            return Redirect::back()->with('error', 'A survey has already been created for this course offering.');
-        }
-
         try {
-            DB::beginTransaction();
-
-            $semester = $courseOffering->semester;
-            $startAt = now();
-            // Default end_at to 2 weeks after semester end, or 4 weeks from now if no semester end
-            $endAt = $semester ? Carbon::parse($semester->end_date)->addWeeks(2) : now()->addWeeks(4);
-
-            $formTarget = $createFormTargetAction->execute([
-                'form_id' => $validated['form_id'],
-                'campus_id' => $courseOffering->campus_id,
-                'scope_type' => 'course',
-                'scope_id' => $courseOffering->id,
-                'semester_id' => $courseOffering->semester_id,
-                'start_at' => $startAt,
-                'end_at' => null,
-                'status' => 'active',
-                'is_mandatory' => true,
-                'submission_limit_per_user' => 1,
-            ]);
-
-            // Generate student assignments
-            $generateStudentAssignmentsAction->execute($formTarget);
-
-            DB::commit();
+            $this->courseSurveyService->provisionForCourseOffering(
+                $courseOffering,
+                (int) $request->validated('form_id'),
+            );
 
             Inertia::flash('message', 'Survey created and assigned to students successfully.');
 
             return Redirect::back();
+        } catch (ValidationException $e) {
+            return Redirect::back()->withErrors($e->errors());
         } catch (\Exception $e) {
-            DB::rollBack();
             Log::error('Failed to create survey: '.$e->getMessage());
 
             Inertia::flash('error', 'Failed to create survey: '.$e->getMessage());
@@ -500,9 +468,7 @@ class CourseOfferingController extends Controller
             ->get(['id', 'section_code', 'current_enrollment', 'max_capacity', 'schedule_days', 'schedule_time_start', 'schedule_time_end', 'lecture_id']);
 
         // Survey forms for the SurveyTab create dialog
-        $surveyForms = Form::where('type', 'survey')
-            ->where('status', 'active')
-            ->get(['id', 'title', 'code']);
+        $surveyForms = $this->activeSurveyForms->execute();
 
         return Inertia::render('course-offerings/Show', [
             // Eager — needed by Overview, Sessions, Students tabs

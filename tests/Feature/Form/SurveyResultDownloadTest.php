@@ -200,6 +200,215 @@ function seedSurveyAggregateRun(object $context): array
     return [$target, $student];
 }
 
+it('lists only current-campus survey runs matching the index filters', function (): void {
+    [$target] = seedSurveyAggregateRun($this);
+    $otherCampus = Campus::factory()->create(['code' => 'HCM']);
+    $foreignTarget = FormTarget::create([
+        'form_id' => $target->form_id,
+        'form_version_id' => $target->form_version_id,
+        'campus_id' => $otherCampus->id,
+        'semester_id' => $target->semester_id,
+        'scope_type' => 'course',
+        'scope_id' => $target->scope_id,
+        'status' => 'closed',
+        'start_at' => now()->subWeek(),
+        'end_at' => now(),
+        'submission_limit_per_user' => 1,
+        'is_mandatory' => true,
+    ]);
+    bindSurveyResultPermissions(['view_survey']);
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->get(route('forms.admin.results.index', [
+            'search' => 'Course Evaluation',
+            'semester_id' => $target->semester_id,
+            'status' => 'closed',
+            'sort' => 'form_title',
+            'direction' => 'asc',
+            'per_page' => 5,
+        ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Forms/Admin/results/Index')
+            ->where('filters.search', 'Course Evaluation')
+            ->where('filters.semester_id', (string) $target->semester_id)
+            ->where('filters.status', 'closed')
+            ->where('filters.sort', 'form_title')
+            ->where('filters.direction', 'asc')
+            ->where('runs.total', 1)
+            ->where('runs.data.0.id', $target->id)
+        );
+
+    expect($foreignTarget->campus_id)->not->toBe($this->campus->id);
+});
+
+it('renders an aggregate survey result page with current-run header data', function (): void {
+    [$target] = seedSurveyAggregateRun($this);
+
+    actingAs($this->user)
+        ->get(route('forms.admin.results.aggregate', [
+            'target' => $target,
+            'return' => 'status=closed&per_page=15',
+        ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Forms/Admin/results/Aggregate')
+            ->where('target.id', $target->id)
+            ->where('header.form_title', 'Course Evaluation')
+            ->where('header.responses_done', 1)
+            ->where('overall.average', 5)
+            ->where('navigation.return_params', 'status=closed&per_page=15')
+        );
+});
+
+it('renders raw survey responses with response filters', function (): void {
+    [$target, $student] = seedSurveyAggregateRun($this);
+    bindSurveyResultPermissions(['view_survey_results_raw']);
+
+    actingAs($this->user)
+        ->get(route('forms.admin.results.raw', [
+            'target' => $target,
+            'search' => $student->student_id,
+            'status' => 'submitted',
+            'sort' => 'submitted_at',
+            'direction' => 'asc',
+            'per_page' => 5,
+        ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Forms/Admin/results/Raw')
+            ->where('target.id', $target->id)
+            ->where('filters.search', $student->student_id)
+            ->where('filters.status', 'submitted')
+            ->where('filters.sort', 'submitted_at')
+            ->where('filters.direction', 'asc')
+            ->where('responses.total', 1)
+        );
+});
+
+it('renders current-campus program survey stats for the selected semester', function (): void {
+    [$target] = seedSurveyAggregateRun($this);
+
+    actingAs($this->user)
+        ->get(route('forms.admin.results.stats', ['semester_id' => $target->semester_id]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Forms/Admin/results/Stats')
+            ->where('filters.semester_id', (string) $target->semester_id)
+            ->where('stats.totals.submissions', 1)
+            ->where('stats.totals.high_rated_count', 1)
+            ->where('stats.totals.percent', 100)
+        );
+});
+
+it('requires raw and aggregate-result permissions for their respective result pages', function (): void {
+    [$target] = seedSurveyAggregateRun($this);
+
+    bindSurveyResultPermissions(['view_survey_results_aggregate']);
+
+    actingAs($this->user)
+        ->get(route('forms.admin.results.raw', $target))
+        ->assertForbidden();
+
+    bindSurveyResultPermissions(['view_survey_results_raw']);
+
+    actingAs($this->user)
+        ->get(route('forms.admin.results.stats'))
+        ->assertForbidden();
+});
+
+it('does not expose foreign-campus or non-survey targets through result routes', function (): void {
+    [$target] = seedSurveyAggregateRun($this);
+    $otherCampus = Campus::factory()->create(['code' => 'HCM']);
+    $foreignTarget = FormTarget::create([
+        'form_id' => $target->form_id,
+        'form_version_id' => $target->form_version_id,
+        'campus_id' => $otherCampus->id,
+        'semester_id' => $target->semester_id,
+        'scope_type' => 'course',
+        'scope_id' => $target->scope_id,
+        'status' => 'closed',
+        'start_at' => now()->subWeek(),
+        'end_at' => now(),
+        'submission_limit_per_user' => 1,
+        'is_mandatory' => true,
+    ]);
+    $queryForm = Form::create([
+        'code' => 'QUERY-RESULT-TARGET',
+        'type' => 'query',
+        'title' => 'Query target',
+        'status' => 'active',
+        'created_by' => $this->user->id,
+    ]);
+    $queryVersion = FormVersion::create([
+        'form_id' => $queryForm->id,
+        'version_no' => 1,
+        'is_published' => true,
+        'effective_from' => now()->subDay(),
+    ]);
+    $queryTarget = FormTarget::create([
+        'form_id' => $queryForm->id,
+        'form_version_id' => $queryVersion->id,
+        'campus_id' => $this->campus->id,
+        'scope_type' => 'global',
+        'status' => 'closed',
+        'start_at' => now()->subWeek(),
+        'end_at' => now(),
+        'submission_limit_per_user' => 1,
+        'is_mandatory' => false,
+    ]);
+
+    bindSurveyResultPermissions(['view_survey_results_aggregate']);
+
+    actingAs($this->user)
+        ->get(route('forms.admin.results.aggregate', $foreignTarget))
+        ->assertNotFound();
+
+    actingAs($this->user)
+        ->get(route('forms.admin.results.aggregate.download', $foreignTarget))
+        ->assertNotFound();
+
+    bindSurveyResultPermissions(['view_survey_results_raw']);
+
+    actingAs($this->user)
+        ->get(route('forms.admin.results.raw', $foreignTarget))
+        ->assertNotFound();
+
+    bindSurveyResultPermissions(['view_survey_results_aggregate']);
+
+    actingAs($this->user)
+        ->get(route('forms.admin.results.aggregate', $queryTarget))
+        ->assertNotFound();
+});
+
+it('validates index and response-list filters before executing result queries', function (): void {
+    [$target] = seedSurveyAggregateRun($this);
+    bindSurveyResultPermissions(['view_survey']);
+
+    actingAs($this->user)
+        ->get(route('forms.admin.results.index', ['status' => 'invalid']))
+        ->assertSessionHasErrors('status');
+
+    bindSurveyResultPermissions(['view_survey_results_aggregate']);
+
+    actingAs($this->user)
+        ->get(route('forms.admin.results.aggregate', [
+            'target' => $target,
+            'per_page' => 101,
+        ]))
+        ->assertSessionHasErrors('per_page');
+
+    bindSurveyResultPermissions(['view_survey_results_raw']);
+
+    actingAs($this->user)
+        ->get(route('forms.admin.results.raw', [
+            'target' => $target,
+            'sort' => 'invalid',
+        ]))
+        ->assertSessionHasErrors('sort');
+});
+
 it('downloads aggregate survey results for a course class without student identifiers', function () {
     [$target, $student] = seedSurveyAggregateRun($this);
 

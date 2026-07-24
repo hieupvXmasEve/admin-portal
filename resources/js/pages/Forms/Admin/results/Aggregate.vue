@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useInertiaFilters } from '@/composables/useInertiaFilters';
+import { useDataTable } from '@/composables/useDataTable';
 import type { PaginatedResponse } from '@/types';
 import type { FormBuilderQuestion, FormBuilderSection, FormResponse, FormTarget } from '@/types/forms';
 import type { Student } from '@/types/models';
@@ -311,15 +311,16 @@ const doughnutPlugins = [doughnutLabelPlugin];
 const {
     filters: respFilters,
     hasActiveFilters: respHasFilters,
-    clearFilters: respClearFilters,
+    clearAllFilters: respClearFilters,
     handleSearch: respHandleSearch,
-    handleSelectFilter: respHandleSelect,
+    setFilter: respSetFilter,
     handleSortChange: respHandleSortChange,
+    handlePaginationNavigate: respHandlePaginationNavigate,
     handlePageSizeChange: respHandlePageSizeChange,
     currentSort: respCurrentSort,
     currentDirection: respCurrentDirection,
-} = useInertiaFilters<RawFilters>({
-    baseUrl: `/forms/admin/results/${props.target.id}/aggregate`,
+} = useDataTable<RawFilters>({
+    baseUrl: route('forms.admin.results.aggregate', { target: props.target.id, return: props.navigation.return_params || undefined }),
     initialFilters: {
         search: props.responseFilters?.search || '',
         status: props.responseFilters?.status || 'all',
@@ -334,34 +335,10 @@ const {
         direction: 'asc',
         per_page: 15,
     },
-    // Prefix resp_* to avoid collision with list filters; inject ?return= so it survives filter changes
-    transform: (f) => {
-        const out: Record<string, any> = {};
-        if (f.search) out['resp_search'] = f.search;
-        if (f.status && f.status !== 'all') out['resp_status'] = f.status;
-        if (f.sort) out['resp_sort'] = f.sort;
-        if (f.direction && f.direction !== 'asc') out['resp_direction'] = f.direction;
-        if (f.per_page && f.per_page !== 15) out['resp_per_page'] = f.per_page;
-        if (props.navigation.return_params) out['return'] = props.navigation.return_params;
-        return out;
-    },
     only: ['responses', 'responseFilters'],
     debounce: 400,
+    immediateFields: ['status'],
 });
-
-// Override pagination navigate to preserve ?return= param
-const respHandlePaginationNavigateWithReturn = (url: string) => {
-    try {
-        const urlObj = url.startsWith('http') ? new URL(url) : new URL(url, window.location.origin);
-        const page = urlObj.searchParams.get('page');
-        if (page) (respFilters as any).page = parseInt(page);
-    } catch {
-        // inject return param into the pagination URL
-        const separator = url.includes('?') ? '&' : '?';
-        const withReturn = props.navigation.return_params ? `${url}${separator}return=${encodeURIComponent(props.navigation.return_params)}` : url;
-        router.visit(withReturn, { preserveState: true, preserveScroll: true, only: ['responses', 'responseFilters'] });
-    }
-};
 
 const showResponseDialog = ref(false);
 const selectedAssignment = ref<StudentAssignment | null>(null);
@@ -875,7 +852,7 @@ const responseColumns: ColumnDef<StudentAssignment>[] = [
                             <div class="flex flex-wrap items-center gap-4">
                                 <div class="flex flex-col gap-1">
                                     <Label class="text-muted-foreground text-xs font-semibold">Status</Label>
-                                    <Select :model-value="respFilters.status" @update:model-value="(v) => respHandleSelect('status', v, 'all')">
+                                    <Select :model-value="respFilters.status" @update:model-value="(v) => respSetFilter('status', String(v))">
                                         <SelectTrigger class="w-40">
                                             <SelectValue placeholder="All Status" />
                                         </SelectTrigger>
@@ -895,7 +872,7 @@ const responseColumns: ColumnDef<StudentAssignment>[] = [
                         <DataTable :data="responses?.data ?? []" :columns="responseColumns" enable-server-sorting :initial-sort="respCurrentSort" :initial-direction="respCurrentDirection" @sort-change="respHandleSortChange" />
 
                         <!-- Pagination -->
-                        <DataPagination v-if="responses" :pagination-data="responses" item-name="responses" @navigate="respHandlePaginationNavigateWithReturn" @page-size-change="respHandlePageSizeChange" />
+                        <DataPagination v-if="responses" :pagination-data="responses" item-name="responses" @navigate="respHandlePaginationNavigate" @page-size-change="respHandlePageSizeChange" />
                     </div>
                 </template>
             </Deferred>

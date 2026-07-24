@@ -68,7 +68,7 @@ class StudentController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create student: ' . $e->getMessage(),
+                'message' => 'Failed to create student: '.$e->getMessage(),
             ], 500);
         }
     }

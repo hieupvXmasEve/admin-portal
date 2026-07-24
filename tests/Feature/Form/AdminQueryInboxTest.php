@@ -4,14 +4,21 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\Department;
+use App\Models\DepartmentMembership;
 use App\Models\Form;
 use App\Models\FormResponse;
 use App\Models\FormTarget;
 use App\Models\FormVersion;
+use App\Models\QueryReply;
 use App\Models\QueryTicket;
+use App\Models\Role;
+use App\Models\UploadRecord;
 use App\Models\User;
 use App\Services\PermissionService;
+use App\Shared\Contracts\Upload\FileUploadGateway;
+use App\Shared\Contracts\Upload\StoredUpload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 
 use function Pest\Laravel\actingAs;
 
@@ -22,6 +29,7 @@ beforeEach(function () {
     $this->assignee = User::factory()->create();
     $this->campus = Campus::factory()->create(['code' => 'HN']);
     $this->otherCampus = Campus::factory()->create(['code' => 'HCM']);
+    $this->csrfToken = 'query-inbox-csrf';
 
     $this->studentHq = Department::factory()->create([
         'code' => 'HQ',
@@ -41,7 +49,10 @@ beforeEach(function () {
         'is_active' => false,
     ]);
 
-    session(['current_campus_id' => $this->campus->id]);
+    session([
+        'current_campus_id' => $this->campus->id,
+        '_token' => $this->csrfToken,
+    ]);
     app()->singleton('campus', fn () => $this->campus);
 
     bindAdminQueryInboxPermissions(['view_queries', 'detail_queries']);
@@ -115,6 +126,16 @@ function createAdminQueryInboxResponse(
     ]);
 
     return $response;
+}
+
+function grantAdminRole(User $user, Campus $campus): void
+{
+    $adminRole = Role::factory()->create([
+        'name' => 'Administrator',
+        'code' => 'admin',
+    ]);
+
+    $user->campusRoles()->attach($adminRole, ['campus_id' => $campus->id]);
 }
 
 it('shows all current campus query responses without logged-in user department filtering', function () {
@@ -192,6 +213,177 @@ it('allows a detail-permitted inbox user to update status for another department
 
     expect($response->fresh()->query_status)->toBe(QueryTicket::STATUS_ANSWERED);
     expect($response->queryTicket()->first()->status)->toBe(QueryTicket::STATUS_ANSWERED);
+});
+
+it('assigns a department query to an eligible staff member and records the assignment', function (): void {
+    $response = createAdminQueryInboxResponse($this, $this->academicService);
+    grantAdminRole($this->user, $this->campus);
+    DepartmentMembership::factory()->create([
+        'department_id' => $this->academicService->id,
+        'user_id' => $this->assignee->id,
+        'department_role' => 'staff',
+        'is_active' => true,
+    ]);
+
+    actingAs($this->user)
+        ->withSession([
+            'current_campus_id' => $this->campus->id,
+            '_token' => $this->csrfToken,
+        ])
+        ->post(route('forms.admin.inbox.assign', $response), [
+            '_token' => $this->csrfToken,
+            'assigned_to_user_id' => (string) $this->assignee->id,
+            'note' => 'Please investigate this case.',
+        ])
+        ->assertRedirect();
+
+    expect($response->fresh()->assigned_to_user_id)->toBe($this->assignee->id)
+        ->and($response->fresh()->query_status)->toBe(QueryTicket::STATUS_PENDING)
+        ->and($response->queryTicket()->firstOrFail()->assigned_to_user_id)->toBe($this->assignee->id)
+        ->and($response->queryTicket()->firstOrFail()->status)->toBe(QueryTicket::STATUS_PENDING);
+
+    $assignment = $response->assignments()->sole();
+
+    expect($assignment->action)->toBe('assign')
+        ->and($assignment->assigned_by_user_id)->toBe($this->user->id)
+        ->and($assignment->to_assignee_user_id)->toBe($this->assignee->id)
+        ->and($assignment->note)->toBe('Please investigate this case.');
+});
+
+it('rejects assignment by a staff member without department-head or administrator authority', function (): void {
+    $response = createAdminQueryInboxResponse($this, $this->academicService);
+    DepartmentMembership::factory()->create([
+        'department_id' => $this->academicService->id,
+        'user_id' => $this->assignee->id,
+        'department_role' => 'staff',
+        'is_active' => true,
+    ]);
+
+    actingAs($this->user)
+        ->withSession([
+            'current_campus_id' => $this->campus->id,
+            '_token' => $this->csrfToken,
+        ])
+        ->post(route('forms.admin.inbox.assign', $response), [
+            '_token' => $this->csrfToken,
+            'assigned_to_user_id' => (string) $this->assignee->id,
+        ])
+        ->assertForbidden();
+
+    expect($response->fresh()->assigned_to_user_id)->toBeNull();
+    expect($response->assignments()->count())->toBe(0);
+});
+
+it('stores an official reply with an uploaded attachment and marks the ticket answered', function (): void {
+    $response = createAdminQueryInboxResponse($this, $this->academicService);
+    $uploadRecord = UploadRecord::factory()->create([
+        'context' => 'form_attachment',
+        'user_id' => $this->user->id,
+    ]);
+
+    $uploadGateway = Mockery::mock(FileUploadGateway::class);
+    $uploadGateway
+        ->shouldReceive('store')
+        ->once()
+        ->withArgs(function (UploadedFile $file, string $context, ?int $userId): bool {
+            return $file->getClientOriginalName() === 'answer.pdf'
+                && $context === 'form_attachment'
+                && $userId === $this->user->id;
+        })
+        ->andReturn(new StoredUpload($uploadRecord->id));
+    app()->instance(FileUploadGateway::class, $uploadGateway);
+
+    actingAs($this->user)
+        ->withSession([
+            'current_campus_id' => $this->campus->id,
+            '_token' => $this->csrfToken,
+        ])
+        ->post(route('forms.admin.inbox.reply', $response), [
+            '_token' => $this->csrfToken,
+            'message' => 'We have reviewed your request.',
+            'is_official_answer' => true,
+            'attachment' => UploadedFile::fake()->create('answer.pdf', 8, 'application/pdf'),
+        ])
+        ->assertRedirect();
+
+    $reply = QueryReply::query()->sole();
+
+    expect($reply->ticket_id)->toBe($response->queryTicket()->firstOrFail()->id)
+        ->and($reply->author_user_id)->toBe($this->user->id)
+        ->and($reply->message)->toBe('We have reviewed your request.')
+        ->and($reply->is_official_answer)->toBeTrue()
+        ->and($reply->upload_record_id)->toBe($uploadRecord->id)
+        ->and($response->fresh()->query_status)->toBe(QueryTicket::STATUS_ANSWERED);
+});
+
+it('validates status and reply content before changing a query ticket', function (): void {
+    $response = createAdminQueryInboxResponse($this, $this->academicService);
+
+    actingAs($this->user)
+        ->withSession([
+            'current_campus_id' => $this->campus->id,
+            '_token' => $this->csrfToken,
+        ])
+        ->post(route('forms.admin.inbox.status.update', $response), [
+            '_token' => $this->csrfToken,
+            'status' => 'invalid-status',
+        ])
+        ->assertSessionHasErrors('status');
+
+    actingAs($this->user)
+        ->withSession([
+            'current_campus_id' => $this->campus->id,
+            '_token' => $this->csrfToken,
+        ])
+        ->post(route('forms.admin.inbox.reply', $response), [
+            '_token' => $this->csrfToken,
+            'message' => 'x',
+        ])
+        ->assertSessionHasErrors('message');
+
+    expect($response->fresh()->query_status)->toBe(QueryTicket::STATUS_OPEN);
+    expect(QueryReply::count())->toBe(0);
+});
+
+it('does not allow any inbox mutation against a query from another campus', function (): void {
+    $response = createAdminQueryInboxResponse($this, $this->academicService, $this->otherCampus);
+
+    actingAs($this->user)
+        ->withSession([
+            'current_campus_id' => $this->campus->id,
+            '_token' => $this->csrfToken,
+        ])
+        ->post(route('forms.admin.inbox.status.update', $response), [
+            '_token' => $this->csrfToken,
+            'status' => QueryTicket::STATUS_ANSWERED,
+        ])
+        ->assertNotFound();
+
+    actingAs($this->user)
+        ->withSession([
+            'current_campus_id' => $this->campus->id,
+            '_token' => $this->csrfToken,
+        ])
+        ->post(route('forms.admin.inbox.assign', $response), [
+            '_token' => $this->csrfToken,
+            'assigned_to_user_id' => 'none',
+        ])
+        ->assertNotFound();
+
+    actingAs($this->user)
+        ->withSession([
+            'current_campus_id' => $this->campus->id,
+            '_token' => $this->csrfToken,
+        ])
+        ->post(route('forms.admin.inbox.reply', $response), [
+            '_token' => $this->csrfToken,
+            'message' => 'This mutation must not be accepted.',
+        ])
+        ->assertNotFound();
+
+    expect($response->fresh()->query_status)->toBe(QueryTicket::STATUS_OPEN)
+        ->and($response->fresh()->assigned_to_user_id)->toBeNull()
+        ->and(QueryReply::count())->toBe(0);
 });
 
 it('does not expose non-query responses through the inbox detail route', function () {

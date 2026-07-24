@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\CourseOffering;
-use App\Models\FormSurvey;
-use App\Services\CourseSurveyService;
+use App\Modules\Engagement\Actions\ProvisionCourseSurveyAction;
 use Illuminate\Console\Command;
 
 class CreateMissingCourseSurveysCommand extends Command
@@ -20,7 +19,7 @@ class CreateMissingCourseSurveysCommand extends Command
     protected $description = 'Create surveys for course offerings that do not have surveys yet';
 
     public function __construct(
-        private CourseSurveyService $courseSurveyService
+        private ProvisionCourseSurveyAction $courseSurveyService
     ) {
         parent::__construct();
     }
@@ -43,6 +42,7 @@ class CreateMissingCourseSurveysCommand extends Command
 
             if ($courseOfferings->isEmpty()) {
                 $this->info('No course offerings found matching the criteria.');
+
                 return self::SUCCESS;
             }
 
@@ -51,6 +51,7 @@ class CreateMissingCourseSurveysCommand extends Command
 
             if ($this->option('dry-run')) {
                 $this->displayPreview($courseOfferings);
+
                 return self::SUCCESS;
             }
 
@@ -67,7 +68,7 @@ class CreateMissingCourseSurveysCommand extends Command
 
             return self::SUCCESS;
         } catch (\Exception $e) {
-            $this->error('Error: ' . $e->getMessage());
+            $this->error('Error: '.$e->getMessage());
             $this->error($e->getTraceAsString());
 
             return self::FAILURE;

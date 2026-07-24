@@ -3,6 +3,11 @@
 declare(strict_types=1);
 
 use App\Constants\ClubRoutes;
+use App\Modules\Engagement\Http\Web\Admin\FormController;
+use App\Modules\Engagement\Http\Web\Admin\FormTargetController;
+use App\Modules\Engagement\Http\Web\Admin\QueryController;
+use App\Modules\Engagement\Http\Web\Admin\QueryTicketController;
+use App\Modules\Engagement\Http\Web\Admin\SurveyResultController;
 use App\Modules\Engagement\Http\Web\ClubController;
 use App\Modules\Engagement\Http\Web\EventController;
 use App\Modules\Engagement\Http\Web\EventReportController;
@@ -45,6 +50,55 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 });
 
 Route::middleware('auth')->group(function (): void {
+    Route::prefix('forms')->name('forms.')->group(function (): void {
+        Route::prefix('admin')->name('admin.')->group(function (): void {
+            Route::prefix('runs')->name('runs.')->group(function (): void {
+                Route::get('/', [FormTargetController::class, 'index'])->name('index');
+                Route::get('/create', [FormTargetController::class, 'create'])->name('create');
+                Route::post('/', [FormTargetController::class, 'store'])->name('store');
+                Route::post('/{target}/activate', [FormTargetController::class, 'activate'])->name('activate');
+                Route::post('/{target}/close', [FormTargetController::class, 'close'])->name('close');
+            });
+
+            Route::prefix('inbox')->name('inbox.')->group(function (): void {
+                Route::get('/', [QueryController::class, 'index'])->name('index');
+                Route::get('/{response}', [QueryController::class, 'show'])->name('show');
+                Route::post('/{response}/assign', [QueryController::class, 'assign'])->name('assign');
+                Route::post('/{response}/reply', [QueryController::class, 'reply'])->name('reply');
+                Route::post('/{response}/status', [QueryController::class, 'updateStatus'])->name('status.update');
+            });
+
+            Route::prefix('results')->name('results.')->group(function (): void {
+                Route::get('/', [SurveyResultController::class, 'index'])->middleware('can:view_survey')->name('index');
+                Route::get('/stats', [SurveyResultController::class, 'stats'])->middleware('can:view_survey_results_aggregate')->name('stats');
+                Route::get('/{target}/aggregate', [SurveyResultController::class, 'aggregate'])->middleware('can:view_survey_results_aggregate')->name('aggregate');
+                Route::get('/{target}/aggregate/download', [SurveyResultController::class, 'downloadAggregate'])->middleware('can:view_survey_results_aggregate')->name('aggregate.download');
+                Route::get('/{target}/raw', [SurveyResultController::class, 'raw'])->middleware('can:view_survey_results_raw')->name('raw');
+            });
+
+            Route::get('/', [FormController::class, 'index'])->name('index');
+            Route::get('/create', [FormController::class, 'create'])->name('create');
+            Route::post('/', [FormController::class, 'store'])->name('store');
+            Route::get('/{form}', [FormController::class, 'show'])->name('show');
+            Route::get('/{form}/edit', [FormController::class, 'edit'])->name('edit');
+            Route::put('/{form}', [FormController::class, 'update'])->name('update');
+            Route::delete('/{form}', [FormController::class, 'destroy'])->name('destroy');
+            Route::post('/{form}/clone', [FormController::class, 'clone'])->name('clone');
+            Route::post('/{form}/activate', [FormController::class, 'activate'])->name('activate');
+            Route::post('/{form}/archive', [FormController::class, 'archive'])->name('archive');
+            Route::post('/{form}/restore', [FormController::class, 'restore'])->name('restore');
+            Route::post('/{form}/versions/{version}/publish', [FormController::class, 'publish'])->name('version.publish');
+            Route::post('/{form}/targets', [FormController::class, 'createTarget'])->name('targets.store');
+        });
+
+        Route::prefix('queries')->name('queries.')->middleware('can:review_form')->group(function (): void {
+            Route::get('/list', [QueryTicketController::class, 'index'])->name('index');
+            Route::get('/{ticket}', [QueryTicketController::class, 'show'])->name('show');
+            Route::post('/{ticket}/replies', [QueryTicketController::class, 'storeReply'])->name('replies.store');
+            Route::post('/{ticket}/status', [QueryTicketController::class, 'updateStatus'])->name('status.update');
+        });
+    });
+
     Route::get('clubs', [ClubController::class, 'index'])->middleware('can:view_clubs')->name(ClubRoutes::INDEX);
     Route::get('clubs/create', [ClubController::class, 'create'])->middleware('can:create_clubs')->name(ClubRoutes::CREATE);
     Route::post('clubs', [ClubController::class, 'store'])->middleware('can:create_clubs')->name(ClubRoutes::STORE);

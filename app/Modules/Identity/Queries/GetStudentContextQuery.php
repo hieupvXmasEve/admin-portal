@@ -4,23 +4,22 @@ declare(strict_types=1);
 
 namespace App\Modules\Identity\Queries;
 
-use App\Actions\Form\CheckPortalGateAction;
 use App\Http\Resources\Student\StudentResource;
-use App\Http\Resources\StudentFormAssignmentResource;
 use App\Models\Student;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
+use App\Shared\Contracts\Engagement\FormPortalGateReader;
 
 class GetStudentContextQuery
 {
     public function __construct(
-        protected CheckPortalGateAction $checkPortalGateAction,
+        private readonly FormPortalGateReader $formPortalGateReader,
         private readonly ProgramEnrollmentReader $programEnrollments,
     ) {}
 
     public function handle(Student $student): array
     {
         // 1. Check Gate
-        $gateStatus = $this->checkPortalGateAction->execute($student);
+        $gateStatus = $this->formPortalGateReader->forStudentId((int) $student->id);
 
         // 2. Get Settings
         $settings = $student->settings?->settings ?? $this->getDefaultSettings();
@@ -56,10 +55,11 @@ class GetStudentContextQuery
         return [
             'user' => (new StudentResource($student->load(['campus', 'program'])))->resolve(),
             'survey_gate' => [
-                'blocked' => $gateStatus['blocked'],
-                'mandatory_assignments' => $gateStatus['mandatory_assignments']->map(function ($assignment) {
-                    return (new StudentFormAssignmentResource($assignment))->resolve();
-                })->toArray(),
+                'blocked' => $gateStatus->blocked,
+                'mandatory_assignments' => array_map(
+                    static fn ($assignment): array => $assignment->toArray(),
+                    $gateStatus->mandatoryAssignments,
+                ),
             ],
             'settings' => $settings,
             'feature_flags' => $featureFlags,

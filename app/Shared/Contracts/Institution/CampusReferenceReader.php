@@ -8,6 +8,8 @@ use App\Shared\Contracts\Institution\DTO\CampusReference;
 
 interface CampusReferenceReader
 {
+    public function find(int $campusId): ?CampusReference;
+
     /**
      * @return list<CampusReference>
      */

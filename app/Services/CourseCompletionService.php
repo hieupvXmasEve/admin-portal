@@ -14,6 +14,7 @@ use App\Modules\Academic\Progression\Actions\ProcessEgcCourseResultsAction;
 use App\Modules\Academic\Support\AcademicLifecycleEventFactory;
 use App\Modules\Academic\Support\FailureReasonClassifier;
 use App\Modules\Academic\Support\Grading\GradingCalculatorResolver;
+use App\Modules\Engagement\Actions\ProvisionCourseSurveyAction;
 use App\Shared\Contracts\Academic\DTO\CourseResult;
 use App\Shared\Contracts\Academic\DTO\CourseResultProgressionContext;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
@@ -35,7 +36,7 @@ class CourseCompletionService
     public const SCORE_CHANGE_EPSILON = 0.005;
 
     public function __construct(
-        protected CourseSurveyService $courseSurveyService,
+        protected ProvisionCourseSurveyAction $courseSurveyService,
         protected DomainEventPublisher $domainEventPublisher,
         protected GradingCalculatorResolver $gradingResolver,
     ) {}

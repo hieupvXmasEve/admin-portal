@@ -10,6 +10,11 @@ use App\Shared\Contracts\Institution\DTO\CampusReference;
 
 class InstitutionCampusReferenceReader implements CampusReferenceReader
 {
+    public function find(int $campusId): ?CampusReference
+    {
+        return $this->reference(Campus::query()->find($campusId));
+    }
+
     /**
      * @return list<CampusReference>
      */
@@ -18,11 +23,20 @@ class InstitutionCampusReferenceReader implements CampusReferenceReader
         return Campus::query()
             ->orderBy('name')
             ->get(['id', 'name', 'code'])
-            ->map(fn (Campus $campus): CampusReference => new CampusReference(
-                id: (int) $campus->id,
-                name: (string) $campus->name,
-                code: (string) $campus->code,
-            ))
+            ->map(fn (Campus $campus): CampusReference => $this->reference($campus))
             ->all();
+    }
+
+    private function reference(?Campus $campus): ?CampusReference
+    {
+        if ($campus === null) {
+            return null;
+        }
+
+        return new CampusReference(
+            id: (int) $campus->id,
+            name: (string) $campus->name,
+            code: (string) $campus->code,
+        );
     }
 }

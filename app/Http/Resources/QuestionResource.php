@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Modules\Engagement\Http\Resources\FormSectionResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 

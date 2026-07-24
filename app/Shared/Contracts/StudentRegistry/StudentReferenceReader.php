@@ -34,6 +34,11 @@ interface StudentReferenceReader
     /**
      * @return list<int>
      */
+    public function activeIdsForCampus(?int $campusId = null): array;
+
+    /**
+     * @return list<int>
+     */
     public function idsMatchingSearch(string $query, ?int $campusId = null): array;
 
     /**

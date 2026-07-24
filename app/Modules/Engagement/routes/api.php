@@ -7,9 +7,30 @@ use App\Modules\Engagement\Http\Api\Admin\EventParticipantController;
 use App\Modules\Engagement\Http\Api\Student\ClubController;
 use App\Modules\Engagement\Http\Api\Student\ClubManagementController;
 use App\Modules\Engagement\Http\Api\Student\EventController;
+use App\Modules\Engagement\Http\Api\Student\FormController;
+use App\Modules\Engagement\Http\Api\Student\QueryTicketController;
+use App\Modules\Engagement\Http\Web\Admin\FormController as AdminFormController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'auth'])->name('api.admin.')->group(function (): void {
+    Route::prefix('forms')->name('api.forms.')->group(function (): void {
+        Route::get('/', [AdminFormController::class, 'index'])->name('index');
+        Route::post('/', [AdminFormController::class, 'store'])->name('store');
+        Route::get('/metadata', [AdminFormController::class, 'metadata'])->name('metadata');
+        Route::get('/available', [AdminFormController::class, 'available'])->name('available');
+        Route::prefix('{form}')->group(function (): void {
+            Route::get('/', [AdminFormController::class, 'show'])->name('show');
+            Route::put('/', [AdminFormController::class, 'update'])->name('update');
+            Route::delete('/', [AdminFormController::class, 'destroy'])->name('destroy');
+            Route::post('/clone', [AdminFormController::class, 'clone'])->name('clone');
+            Route::post('/archive', [AdminFormController::class, 'archive'])->name('archive');
+            Route::post('/restore', [AdminFormController::class, 'restore'])->name('restore');
+            Route::get('/statistics', [AdminFormController::class, 'statistics'])->name('statistics');
+            Route::post('/versions/{version}/publish', [AdminFormController::class, 'publish'])->name('version.publish');
+            Route::post('/targets', [AdminFormController::class, 'createTarget'])->name('targets.store');
+        });
+    });
+
     Route::prefix('events')->name('events.')->group(function (): void {
         Route::post('/search-student', [EventCheckinController::class, 'searchStudent'])->name('search-student');
         Route::post('/checkin', [EventCheckinController::class, 'checkinStudent'])->name('checkin');
@@ -53,6 +74,26 @@ Route::prefix('v1/student')->name('v1.student.')->middleware([
             Route::delete('/{event}/register', [EventController::class, 'unregister'])->name('unregister');
             Route::get('/my/participations', [EventController::class, 'myEvents'])->name('my-events');
             Route::get('/my/{event}', [EventController::class, 'myEventDetails'])->name('my-event-details');
+        });
+
+        Route::prefix('forms')->name('forms.')->group(function (): void {
+            Route::get('/', [FormController::class, 'index'])->name('index');
+            Route::prefix('query')->name('query.')->group(function (): void {
+                Route::get('/runs', [FormController::class, 'queryRuns'])->name('runs');
+                Route::get('/{form}', [FormController::class, 'show'])->name('show');
+                Route::post('/{form}/submit', [FormController::class, 'submit'])->name('submit');
+            });
+            Route::prefix('surveys')->name('surveys.')->group(function (): void {
+                Route::get('/pending', [FormController::class, 'pending'])->name('pending');
+                Route::get('/{form}', [FormController::class, 'show'])->name('show');
+                Route::post('/{form}/submit', [FormController::class, 'submit'])->name('submit');
+            });
+        });
+
+        Route::prefix('queries')->name('queries.')->group(function (): void {
+            Route::get('/', [QueryTicketController::class, 'index'])->name('index');
+            Route::get('/{ticket}', [QueryTicketController::class, 'show'])->name('show');
+            Route::post('/{ticket}/replies', [QueryTicketController::class, 'storeReply'])->name('replies.store');
         });
     });
 });

@@ -156,6 +156,19 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             ->all();
     }
 
+    /**
+     * @return list<int>
+     */
+    public function activeIdsForCampus(?int $campusId = null): array
+    {
+        return Student::query()
+            ->whereIn('status', ['intake_pre_uni_gc', 'intake_course'])
+            ->when($campusId !== null, fn (Builder $students) => $students->where('campus_id', $campusId))
+            ->pluck('id')
+            ->map(static fn (int|string $studentId): int => (int) $studentId)
+            ->all();
+    }
+
     /** @return list<int> */
     public function idsMatchingSearch(string $query, ?int $campusId = null): array
     {

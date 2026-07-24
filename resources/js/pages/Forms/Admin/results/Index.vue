@@ -2,14 +2,13 @@
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
-import Icon from '@/components/Icon.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useInertiaFilters } from '@/composables/useInertiaFilters';
+import { useDataTable } from '@/composables/useDataTable';
 import type { PaginatedResponse } from '@/types';
-import type { FormTarget, Form } from '@/types/forms';
+import type { Form, FormTarget } from '@/types/forms';
 import type { Semester } from '@/types/models';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
@@ -46,8 +45,8 @@ const props = defineProps<{
 
 const data = computed(() => props.runs.data);
 
-const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilter, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection, buildUrl } = useInertiaFilters<ResultFilters>({
-    baseUrl: '/forms/admin/results',
+const { filters, hasActiveFilters, clearAllFilters, handleSearch, setFilter, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection, buildUrl } = useDataTable<ResultFilters>({
+    baseUrl: route('forms.admin.results.index'),
     initialFilters: {
         search: props.filters?.search || '',
         semester_id: props.filters?.semester_id || 'all',
@@ -68,6 +67,7 @@ const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilte
     },
     only: ['runs', 'filters'],
     debounce: 400,
+    immediateFields: ['department_id', 'semester_id', 'status'],
 });
 
 // Build the ?return= param to preserve filter state when navigating to Aggregate
@@ -84,10 +84,14 @@ const navigateToAggregate = (id: number) => {
 
 const getStatusBadgeVariant = (status: string): 'default' | 'secondary' | 'outline' | 'destructive' => {
     switch (status) {
-        case 'active': return 'default';
-        case 'closed': return 'secondary';
-        case 'draft': return 'outline';
-        default: return 'outline';
+        case 'active':
+            return 'default';
+        case 'closed':
+            return 'secondary';
+        case 'draft':
+            return 'outline';
+        default:
+            return 'outline';
     }
 };
 
@@ -127,9 +131,9 @@ const columns: ColumnDef<RunWithStats>[] = [
                 h('div', { class: 'w-24 h-1.5 bg-secondary rounded-full mt-1 overflow-hidden' }, [
                     h('div', {
                         class: 'h-full bg-primary',
-                        style: { width: `${(run.responses_count / (run.assignments_count || 1)) * 100}%` }
-                    })
-                ])
+                        style: { width: `${(run.responses_count / (run.assignments_count || 1)) * 100}%` },
+                    }),
+                ]),
             ]);
         },
     },
@@ -142,32 +146,34 @@ const columns: ColumnDef<RunWithStats>[] = [
     {
         id: 'actions',
         header: 'Actions',
-        cell: ({ row }) => h(Button, {
-            variant: 'ghost',
-            size: 'sm',
-            onClick: () => navigateToAggregate(row.original.id),
-        }, () => [h(BarChart3, { class: 'w-4 h-4 mr-1' }), 'View']),
-    }
+        cell: ({ row }) =>
+            h(
+                Button,
+                {
+                    variant: 'ghost',
+                    size: 'sm',
+                    onClick: () => navigateToAggregate(row.original.id),
+                },
+                () => [h(BarChart3, { class: 'w-4 h-4 mr-1' }), 'View'],
+            ),
+    },
 ];
-
 </script>
 
 <template>
-
     <Head title="Survey Results" />
 
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-semibold">Survey Results</h1>
     </div>
 
-    <div class="space-y-4 rounded-lg border p-4 bg-card">
+    <div class="bg-card space-y-4 rounded-lg border p-4">
         <div class="flex flex-wrap items-center gap-4">
             <div class="min-w-[250px] flex-1">
-                <DebouncedInput placeholder="Search surveys, courses, sections or instructors..."
-                    :model-value="filters.search" @update:model-value="handleSearch" />
+                <DebouncedInput placeholder="Search surveys, courses, sections or instructors..." :model-value="filters.search" @update:model-value="handleSearch" />
             </div>
 
-            <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
+            <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearAllFilters">
                 <X class="mr-2 h-4 w-4" />
                 Clear Filters
             </Button>
@@ -176,38 +182,33 @@ const columns: ColumnDef<RunWithStats>[] = [
         <div class="flex flex-wrap items-center gap-4">
             <div class="flex flex-col gap-1">
                 <Label class="text-muted-foreground text-xs font-semibold">Department</Label>
-                <Select :model-value="filters.department_id"
-                    @update:model-value="(v) => handleSelectFilter('department_id', v, 'all')">
+                <Select :model-value="filters.department_id" @update:model-value="(v) => setFilter('department_id', String(v))">
                     <SelectTrigger class="w-48">
                         <SelectValue placeholder="All Departments" />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Departments</SelectItem>
-                        <SelectItem v-for="d in departments" :key="d.id" :value="d.id.toString()">{{ d.name }}
-                        </SelectItem>
+                        <SelectItem v-for="d in departments" :key="d.id" :value="d.id.toString()">{{ d.name }} </SelectItem>
                     </SelectContent>
                 </Select>
             </div>
 
             <div class="flex flex-col gap-1">
                 <Label class="text-muted-foreground text-xs font-semibold">Semester</Label>
-                <Select :model-value="filters.semester_id"
-                    @update:model-value="(v) => handleSelectFilter('semester_id', v, 'all')">
+                <Select :model-value="filters.semester_id" @update:model-value="(v) => setFilter('semester_id', String(v))">
                     <SelectTrigger class="w-48">
                         <SelectValue placeholder="All Semesters" />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Semesters</SelectItem>
-                        <SelectItem v-for="s in semesters" :key="s.id" :value="s.id.toString()">{{ s.name }}
-                        </SelectItem>
+                        <SelectItem v-for="s in semesters" :key="s.id" :value="s.id.toString()">{{ s.name }} </SelectItem>
                     </SelectContent>
                 </Select>
             </div>
 
             <div class="flex flex-col gap-1">
                 <Label class="text-muted-foreground text-xs font-semibold">Status</Label>
-                <Select :model-value="filters.status"
-                    @update:model-value="(v) => handleSelectFilter('status', v, 'all')">
+                <Select :model-value="filters.status" @update:model-value="(v) => setFilter('status', String(v))">
                     <SelectTrigger class="w-32">
                         <SelectValue placeholder="All Status" />
                     </SelectTrigger>
@@ -221,9 +222,7 @@ const columns: ColumnDef<RunWithStats>[] = [
         </div>
     </div>
 
-    <DataTable :data="data" :columns="columns" enable-server-sorting :initial-sort="currentSort"
-        :initial-direction="currentDirection" @sort-change="handleSortChange" />
+    <DataTable :data="data" :columns="columns" enable-server-sorting :initial-sort="currentSort" :initial-direction="currentDirection" @sort-change="handleSortChange" />
 
-    <DataPagination :pagination-data="runs" item-name="results" @navigate="handlePaginationNavigate"
-        @page-size-change="handlePageSizeChange" />
+    <DataPagination :pagination-data="runs" item-name="results" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
 </template>

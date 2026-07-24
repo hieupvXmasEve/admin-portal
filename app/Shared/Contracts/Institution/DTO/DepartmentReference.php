@@ -11,4 +11,16 @@ final readonly class DepartmentReference
         public string $name,
         public string $code,
     ) {}
+
+    /**
+     * @return array{id: int, name: string, code: string}
+     */
+    public function toArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'code' => $this->code,
+        ];
+    }
 }

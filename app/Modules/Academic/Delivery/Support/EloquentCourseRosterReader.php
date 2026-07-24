@@ -21,6 +21,20 @@ final class EloquentCourseRosterReader implements CourseRosterReader
             ->all();
     }
 
+    public function studentIdsForAcademicPeriod(int $academicPeriodId, ?int $campusId = null): array
+    {
+        return CourseRegistration::query()
+            ->whereHas('courseOffering', fn ($offerings) => $offerings->where('semester_id', $academicPeriodId))
+            ->when($campusId !== null, fn ($registrations) => $registrations->whereHas(
+                'student',
+                fn ($students) => $students->where('campus_id', $campusId),
+            ))
+            ->distinct()
+            ->pluck('student_id')
+            ->map(static fn (int|string $studentId): int => (int) $studentId)
+            ->all();
+    }
+
     public function studentHasVisibleRegistration(int $studentId, int $courseOfferingId): bool
     {
         return CourseRegistration::query()

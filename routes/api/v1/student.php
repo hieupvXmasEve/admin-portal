@@ -12,12 +12,10 @@ use App\Http\Controllers\Api\V1\Student\CourseRegistrationController;
 use App\Http\Controllers\Api\V1\Student\CurriculumController;
 use App\Http\Controllers\Api\V1\Student\DashboardController;
 use App\Http\Controllers\Api\V1\Student\FinanceController;
-use App\Http\Controllers\Api\V1\Student\FormController;
 use App\Http\Controllers\Api\V1\Student\GradeController;
 use App\Http\Controllers\Api\V1\Student\ModuleController;
 use App\Http\Controllers\Api\V1\Student\NotificationController;
 use App\Http\Controllers\Api\V1\Student\ProfileController;
-use App\Http\Controllers\Api\V1\Student\QueryTicketController;
 use App\Http\Controllers\Api\V1\Student\TimetableController;
 use App\Modules\Finance\Http\Api\Student\StudentFinanceController;
 use App\Modules\Upload\Http\Api\UploadController;
@@ -178,36 +176,6 @@ Route::middleware([
             Route::get('/academic-calendar', [CalendarController::class, 'academicCalendar'])->name('academic-calendar');
             Route::get('/current-semester', [CalendarController::class, 'currentSemester'])->name('current-semester');
         });
-
-        // Form endpoints
-        Route::prefix('forms')->name('forms.')->group(function () {
-            Route::get('/', [FormController::class, 'index'])->name('index');
-            Route::prefix('query')->name('query.')->group(function () {
-                Route::get('/runs', [FormController::class, 'queryRuns'])->name('runs');
-                Route::get('/{form}', [FormController::class, 'show'])->name('show');
-                Route::post('/{form}/submit', [FormController::class, 'submit'])->name('submit');
-            });
-            Route::prefix('surveys')->name('surveys.')->group(function () {
-                Route::get('/pending', [FormController::class, 'pending'])->name('pending');
-                Route::get('/{form}', [FormController::class, 'show'])->name('show');
-                Route::post('/{form}/submit', [FormController::class, 'submit'])->name('submit');
-            });
-        });
-        // Query ticket endpoints
-        Route::prefix('queries')->name('queries.')->group(function () {
-            Route::get('/', [QueryTicketController::class, 'index'])->name('index');
-            Route::get('/{ticket}', [QueryTicketController::class, 'show'])->name('show');
-            Route::post('/{ticket}/replies', [QueryTicketController::class, 'storeReply'])->name('replies.store');
-        });
-
-        // Survey endpoints
-        // Route::prefix('surveys')->name('surveys.')->group(function () {
-        //     Route::get('/pending', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'pending'])->name('pending');
-        //     Route::get('/completed', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'completed'])->name('completed');
-        //     Route::get('/{survey}', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'show'])->name('show');
-        //     Route::post('/{survey}/submit', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'submit'])->name('submit');
-        //     Route::get('/{survey}/responses', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'responses'])->name('responses');
-        // });
 
         // Student-controlled uploads
         Route::prefix('uploads')->name('uploads.')->group(function () {

@@ -8,12 +8,19 @@ use App\Models\UploadRecord;
 use App\Modules\Upload\Policies\StudentAvatarTargetPolicy;
 use App\Modules\Upload\Policies\UploadRecordPolicy;
 use App\Modules\Upload\Support\StudentAvatarTarget;
+use App\Modules\Upload\Support\UploadFileGateway;
+use App\Shared\Contracts\Upload\FileUploadGateway;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 class UploadServiceProvider extends ServiceProvider
 {
+    public function register(): void
+    {
+        $this->app->bind(FileUploadGateway::class, UploadFileGateway::class);
+    }
+
     public function boot(): void
     {
         Gate::policy(UploadRecord::class, UploadRecordPolicy::class);

@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Notification\Support;
 
+use App\Shared\Contracts\Notification\NotificationPayloadFactory;
 use InvalidArgumentException;
 
-final class NotificationPayloadBuilder
+final class NotificationPayloadBuilder implements NotificationPayloadFactory
 {
     public function __construct(
         private NotificationTypeRegistry $typeRegistry,
