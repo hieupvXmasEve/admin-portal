@@ -13,6 +13,7 @@ use App\Modules\Academic\Exports\StudentAcademicSummaryExport;
 use App\Modules\Academic\Progression\Actions\AttachDecisionToTransitionAction;
 use App\Modules\Academic\Progression\Queries\GetStudentAcademicSummaryExportQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentGraduationProgressQuery;
+use App\Modules\Academic\Progression\Queries\GetStudentHubOverviewQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentRegistrationsQuery;
 use App\Modules\Academic\Queries\GetStudentAttendanceDetailsQuery;
 use App\Modules\Academic\Queries\GetStudentAttendanceQuery;
@@ -126,28 +127,13 @@ class StudentAcademicSummaryController extends Controller
      * @param  Student  $student  The student to display overview for
      * @return Response Inertia response with overview data
      */
-    public function overview(Student $student, Request $request): Response
+    public function overview(Student $student, Request $request, GetStudentHubOverviewQuery $query): Response
     {
-
-        // Load necessary relationships
-        $student->load([
-            'campus:id,name,code',
-            'program:id,name,code',
-            'specialization:id,name,code',
-            'curriculumVersion:id,version_code,program_id,specialization_id',
-            'curriculumVersion.program:id,name,code',
-            'curriculumVersion.specialization:id,name,code',
-            'intakeSemester:id,code,name',
-            'scholarshipAward',
-            'scholarshipAward.scholarshipDefinition:code,name,amount,type',
-            'parentProfiles.user:id,name,email',
-        ]);
-
         // Act-capable (Cán Bộ Đào tạo) staff see the full Hub; view-only roles
         // get a reduced read-only field set (ADR-0007).
         $canAct = $this->canActOnStudent($request);
 
-        $overviewData = $this->academicSummaryService->getOverviewData($student, $canAct);
+        $overviewData = $query->handle((int) $student->id, $canAct);
 
         if ($canAct) {
             $relationships = $this->guardianRelationshipReader->forStudent((int) $student->id);

@@ -2,16 +2,20 @@
 
 declare(strict_types=1);
 
+use App\Models\AcademicRecord;
 use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\CurriculumVersion;
+use App\Models\GpaCalculation;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Progression\Models\ProgramEnrollment;
+use App\Modules\Academic\Progression\Models\TranscriptEntry;
+use App\Modules\Academic\Progression\Queries\GetStudentHubOverviewQuery;
 use App\Services\PermissionService;
 use App\Services\StudentAcademicSummaryService;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
@@ -120,6 +124,153 @@ it('includes the folded Show-page fields and recent registrations in the full ov
 
     $first = $overview['recent_registrations'][0];
     expect($first)->toHaveKeys(['id', 'course_offering_id', 'unit_name', 'registration_status', 'registration_date']);
+});
+
+it('uses transcript evidence first for credits and falls back to the latest GPA', function () {
+    $student = hubOverviewStudent();
+    $registration = CourseRegistration::query()->where('student_id', $student->id)->firstOrFail();
+    $offering = CourseOffering::query()->findOrFail($registration->course_offering_id);
+
+    $legacyOutcome = AcademicRecord::factory()->create([
+        'student_id' => $student->id,
+        'semester_id' => $registration->semester_id,
+        'unit_id' => $offering->unit_id,
+        'program_id' => $student->program_id,
+        'campus_id' => $student->campus_id,
+        'course_offering_id' => $offering->id,
+        'credit_points' => 3.0,
+        'credit_points_earned' => 3.0,
+        'grade_status' => 'final',
+        'completion_status' => 'completed',
+        'is_passed' => true,
+    ]);
+    TranscriptEntry::query()->create([
+        'course_result_id' => $legacyOutcome->id,
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $registration->semester_id,
+        'unit_id' => $offering->unit_id,
+        'program_id' => $student->program_id,
+        'campus_id' => $student->campus_id,
+        'attempt_number' => 1,
+        'final_percentage' => 80.0,
+        'final_letter_grade' => 'D',
+        'credit_points' => 4.0,
+        'credit_points_earned' => 4.0,
+        'quality_points' => 320.0,
+        'is_passed' => true,
+        'excluded_from_gpa' => false,
+        'affects_academic_standing' => true,
+        'affects_graduation_requirement' => true,
+        'satisfies_prerequisite' => true,
+        'finalized_at' => now(),
+    ]);
+    TranscriptEntry::query()->create([
+        'course_result_id' => $legacyOutcome->id + 1000000,
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $registration->semester_id,
+        'unit_id' => $offering->unit_id,
+        'program_id' => $student->program_id,
+        'campus_id' => $student->campus_id,
+        'attempt_number' => 1,
+        'final_percentage' => 75.0,
+        'final_letter_grade' => 'C',
+        'credit_points' => 2.0,
+        'credit_points_earned' => 2.0,
+        'quality_points' => 150.0,
+        'is_passed' => true,
+        'excluded_from_gpa' => false,
+        'affects_academic_standing' => true,
+        'affects_graduation_requirement' => true,
+        'satisfies_prerequisite' => true,
+        'finalized_at' => now(),
+    ]);
+    $inProgressUnit = Unit::factory()->create(['credit_points' => 5.0]);
+    $inProgressOffering = CourseOffering::factory()->create([
+        'semester_id' => $registration->semester_id,
+        'unit_id' => $inProgressUnit->id,
+        'campus_id' => $student->campus_id,
+    ]);
+    AcademicRecord::factory()->create([
+        'student_id' => $student->id,
+        'semester_id' => $registration->semester_id,
+        'unit_id' => $inProgressUnit->id,
+        'program_id' => $student->program_id,
+        'campus_id' => $student->campus_id,
+        'course_offering_id' => $inProgressOffering->id,
+        'credit_points' => 5.0,
+        'credit_points_earned' => 0.0,
+        'grade_status' => 'in_progress',
+        'completion_status' => 'in_progress',
+        'is_passed' => false,
+    ]);
+    $olderSemester = Semester::factory()->create();
+    $olderGpa = GpaCalculation::query()->create([
+        'student_id' => $student->id,
+        'semester_id' => $olderSemester->id,
+        'program_id' => $student->program_id,
+        'semester_gpa' => 1.0,
+        'cumulative_gpa' => 1.0,
+        'semester_credit_points' => 3.0,
+        'cumulative_credit_points' => 3.0,
+        'semester_credit_points_earned' => 3.0,
+        'cumulative_credit_points_earned' => 3.0,
+        'academic_standing' => 'warning',
+        'is_finalized' => true,
+        'is_current' => false,
+    ]);
+    GpaCalculation::query()
+        ->whereKey($olderGpa->id)
+        ->update(['created_at' => now()->subDay(), 'updated_at' => now()->subDay()]);
+    GpaCalculation::query()->create([
+        'student_id' => $student->id,
+        'semester_id' => $registration->semester_id,
+        'program_id' => $student->program_id,
+        'semester_gpa' => 2.75,
+        'cumulative_gpa' => 2.75,
+        'semester_credit_points' => 6.0,
+        'cumulative_credit_points' => 6.0,
+        'semester_credit_points_earned' => 6.0,
+        'cumulative_credit_points_earned' => 6.0,
+        'academic_standing' => 'normal',
+        'is_finalized' => true,
+        'is_current' => false,
+    ]);
+
+    $overview = app(GetStudentHubOverviewQuery::class)->handle((int) $student->id, full: true);
+
+    expect($overview['academic_stats']['total_credits_attempted'])->toBe(11.0)
+        ->and($overview['academic_stats']['total_credits_earned'])->toBe(6.0)
+        ->and($overview['academic_stats']['current_gpa'])->toBe(2.75)
+        ->and($overview['academic_stats']['cumulative_gpa'])->toBe(2.75)
+        ->and($overview['academic_stats']['academic_standing'])->toBe('normal');
+});
+
+it('preserves the legacy Hub current GPA projection before finalization', function () {
+    $student = hubOverviewStudent();
+    $semester = Semester::query()->findOrFail($student->intake_semester_id);
+
+    GpaCalculation::query()->create([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'program_id' => $student->program_id,
+        'semester_gpa' => 3.25,
+        'cumulative_gpa' => 3.1,
+        'semester_credit_points' => 3.0,
+        'cumulative_credit_points' => 6.0,
+        'semester_credit_points_earned' => 3.0,
+        'cumulative_credit_points_earned' => 6.0,
+        'academic_standing' => 'normal',
+        'is_finalized' => false,
+        'is_current' => true,
+    ]);
+
+    $overview = app(GetStudentHubOverviewQuery::class)->handle((int) $student->id, full: true);
+
+    expect($overview['academic_stats']['current_gpa'])->toBe(3.25)
+        ->and($overview['academic_stats']['cumulative_gpa'])->toBe(3.1)
+        ->and($overview['academic_stats']['academic_standing'])->toBe('normal');
 });
 
 it('drops sensitive fields from the reduced read-only overview contract', function () {

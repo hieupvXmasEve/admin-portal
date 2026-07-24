@@ -39,5 +39,13 @@ final readonly class StudentProfile
         public ?string $emergencyContactPhone1,
         public ?string $emergencyContactRelationship1,
         public ?string $highSchoolName,
+        public ?string $admissionDate = null,
+        public ?string $expectedGraduationDate = null,
+        public ?string $statusChangeDate = null,
+        public ?string $statusReason = null,
+        public ?string $intakeMode = null,
+        public ?int $highSchoolGraduationYear = null,
+        public ?float $entranceExamScore = null,
+        public ?string $admissionNotes = null,
     ) {}
 }

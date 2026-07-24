@@ -65,6 +65,14 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
                 'emergency_contact_phone_1',
                 'emergency_contact_relationship_1',
                 'high_school_name',
+                'admission_date',
+                'expected_graduation_date',
+                'status_change_date',
+                'status_reason',
+                'intake_mode',
+                'high_school_graduation_year',
+                'entrance_exam_score',
+                'admission_notes',
             ])
             ->find($studentId);
 
@@ -101,6 +109,14 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             emergencyContactPhone1: $student->emergency_contact_phone_1,
             emergencyContactRelationship1: $student->emergency_contact_relationship_1,
             highSchoolName: $student->high_school_name,
+            admissionDate: $student->admission_date?->toDateString(),
+            expectedGraduationDate: $student->expected_graduation_date?->toDateString(),
+            statusChangeDate: $student->status_change_date?->toDateString(),
+            statusReason: $student->status_reason,
+            intakeMode: $student->intake_mode,
+            highSchoolGraduationYear: $student->high_school_graduation_year === null ? null : (int) $student->high_school_graduation_year,
+            entranceExamScore: $student->entrance_exam_score === null ? null : (float) $student->entrance_exam_score,
+            admissionNotes: $student->admission_notes,
         );
     }
 

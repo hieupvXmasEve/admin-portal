@@ -30,7 +30,9 @@ return [
                 'CourseRegistration',
             ],
             'Progression' => [
+                'AcademicHold',
                 'AcademicRecord',
+                'GpaCalculation',
             ],
         ],
         'Admissions' => [

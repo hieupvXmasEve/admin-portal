@@ -33,6 +33,7 @@ use App\Modules\Academic\Progression\Support\EloquentCourseOfferingAttemptWriter
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentLifecycleWriter;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentReader;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentWriter;
+use App\Modules\Academic\Progression\Support\EloquentStudentAcademicHoldReader;
 use App\Modules\Academic\Progression\Support\EloquentTranscriptEntryGpaReader;
 use App\Modules\Academic\Support\AcademicFinanceChargeSourceGateway as ModuleAcademicFinanceChargeSourceGateway;
 use App\Modules\Academic\Support\AiAcademicEntitySearchReader as ModuleAiAcademicEntitySearchReader;
@@ -66,6 +67,7 @@ use App\Shared\Contracts\Academic\ProgramEnrollmentLifecycleWriter;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Academic\ProgramEnrollmentWriter;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
+use App\Shared\Contracts\Academic\StudentAcademicHoldReader;
 use App\Shared\Contracts\Academic\StudentAcademicRecordsReader;
 use App\Shared\Contracts\Academic\StudentGpaTrendReader;
 use App\Shared\Contracts\Academic\StudentHubCourseOutcomeEvidenceReader;
@@ -116,6 +118,7 @@ class AcademicServiceProvider extends ServiceProvider
         $this->app->bind(StudentHubRegistrationEvidenceReader::class, EloquentStudentHubRegistrationEvidenceReader::class);
         $this->app->bind(StudentHubCourseOutcomeEvidenceReader::class, EloquentStudentHubCourseOutcomeEvidenceReader::class);
         $this->app->bind(StudentAcademicRecordsReader::class, GetStudentAcademicRecordsQuery::class);
+        $this->app->bind(StudentAcademicHoldReader::class, EloquentStudentAcademicHoldReader::class);
         $this->app->bind(StudentGpaTrendReader::class, GetStudentGpaTrendQuery::class);
         $this->app->bind(StudentLifecycleStatusFilter::class, FilterStudentsByProgramEnrollmentStatus::class);
         $this->app->bind(RetakeRegistrationPaymentSyncer::class, SyncPaidRetakeRegistrationsAction::class);

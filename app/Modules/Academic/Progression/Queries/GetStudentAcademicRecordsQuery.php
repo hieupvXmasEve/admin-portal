@@ -29,7 +29,7 @@ final class GetStudentAcademicRecordsQuery implements StudentAcademicRecordsRead
             ->where('student_id', $studentId)
             ->where('is_current', true)
             ->where('is_finalized', true)
-            ->first();
+            ->first() ?? $records->first();
 
         return new StudentAcademicRecords([
             'summary' => [
