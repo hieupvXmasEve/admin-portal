@@ -11,6 +11,7 @@ use App\Http\Requests\Student\GetRegistrationsRequest;
 use App\Models\Student;
 use App\Modules\Academic\Exports\StudentAcademicSummaryExport;
 use App\Modules\Academic\Progression\Actions\AttachDecisionToTransitionAction;
+use App\Modules\Academic\Progression\Queries\GetStudentAcademicSummaryExportQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentGraduationProgressQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentRegistrationsQuery;
 use App\Modules\Academic\Queries\GetStudentAttendanceDetailsQuery;
@@ -322,9 +323,22 @@ class StudentAcademicSummaryController extends Controller
      * @param  Student  $student  The student to export the academic summary for
      * @return BinaryFileResponse The downloadable xlsx response
      */
-    public function export(Student $student, ExcelExportService $excelService): BinaryFileResponse
-    {
-        $data = $this->academicSummaryService->getAcademicSummaryExportData($student);
+    public function export(
+        Student $student,
+        ExcelExportService $excelService,
+        GetStudentAcademicSummaryExportQuery $query,
+    ): BinaryFileResponse {
+        $student->loadMissing('campus:id,name');
+        $data = $query->handle(
+            (int) $student->id,
+            [
+                'student_id' => $student->student_id,
+                'full_name' => $student->full_name,
+                'campus' => $student->campus?->name,
+                'intake' => $student->intake,
+            ],
+            $student->expected_graduation_date?->toDateString(),
+        );
 
         $export = new StudentAcademicSummaryExport(
             student: $data['student'],

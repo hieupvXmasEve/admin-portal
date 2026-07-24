@@ -9,6 +9,7 @@ final readonly class StudentHubCourseOutcomeEvidence
     public const SCHEMA_VERSION = 1;
 
     public function __construct(
+        public int $courseResultId,
         public int $courseOfferingId,
         public int $unitId,
         public ?float $finalPercentage,
@@ -22,5 +23,8 @@ final readonly class StudentHubCourseOutcomeEvidence
         public ?int $attemptNumber,
         public bool $isRepeatCourse,
         public ?bool $meetsAttendanceRequirement,
+        public ?string $unitCode = null,
+        public ?string $unitName = null,
+        public ?string $semesterName = null,
     ) {}
 }

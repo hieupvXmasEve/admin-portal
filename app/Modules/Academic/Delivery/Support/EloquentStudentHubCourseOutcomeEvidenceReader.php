@@ -15,9 +15,11 @@ final class EloquentStudentHubCourseOutcomeEvidenceReader implements StudentHubC
         return AcademicRecord::query()
             ->where('student_id', $studentId)
             ->when($courseOfferingIds !== [], fn ($query) => $query->whereIn('course_offering_id', $courseOfferingIds))
+            ->with(['unit:id,code,name', 'semester:id,name'])
             ->orderByDesc('id')
             ->get()
             ->map(static fn (AcademicRecord $record): StudentHubCourseOutcomeEvidence => new StudentHubCourseOutcomeEvidence(
+                courseResultId: (int) $record->id,
                 courseOfferingId: (int) $record->course_offering_id,
                 unitId: (int) $record->unit_id,
                 finalPercentage: $record->final_percentage === null ? null : (float) $record->final_percentage,
@@ -31,6 +33,9 @@ final class EloquentStudentHubCourseOutcomeEvidenceReader implements StudentHubC
                 attemptNumber: $record->attempt_number === null ? null : (int) $record->attempt_number,
                 isRepeatCourse: (bool) $record->is_repeat_course,
                 meetsAttendanceRequirement: $record->meets_attendance_requirement === null ? null : (bool) $record->meets_attendance_requirement,
+                unitCode: $record->unit?->code,
+                unitName: $record->unit?->name,
+                semesterName: $record->semester?->name,
             ))
             ->all();
     }

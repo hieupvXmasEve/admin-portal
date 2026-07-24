@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Models\AcademicRecord;
 use App\Models\Campus;
+use App\Models\CourseOffering;
 use App\Models\CurriculumUnit;
 use App\Models\CurriculumVersion;
 use App\Models\Program;
@@ -11,6 +13,8 @@ use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Exports\StudentAcademicSummaryExport;
+use App\Modules\Academic\Progression\Models\TranscriptEntry;
+use App\Modules\Academic\Progression\Queries\GetStudentAcademicSummaryExportQuery;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -236,4 +240,117 @@ it('forbids the export without view_student_summary', function () {
     actingAs($user)
         ->get(route('students.academic-summary.export', $student))
         ->assertForbidden();
+});
+
+it('uses canonical transcript outcomes while retaining legacy-only final outcomes in the export evidence', function () {
+    $student = exportableStudent();
+    $semester = Semester::factory()->create(['name' => 'Export Evidence Semester']);
+    $canonicalUnit = Unit::factory()->create(['code' => 'CAN101', 'name' => 'Canonical Unit']);
+    $legacyUnit = Unit::factory()->create(['code' => 'LEG101', 'name' => 'Legacy Unit']);
+    $transcriptOnlyUnit = Unit::factory()->create(['code' => 'TRN101', 'name' => 'Transcript Only Unit']);
+    $canonicalOffering = CourseOffering::factory()->create([
+        'semester_id' => $semester->id,
+        'unit_id' => $canonicalUnit->id,
+        'campus_id' => $student->campus_id,
+    ]);
+    $legacyOffering = CourseOffering::factory()->create([
+        'semester_id' => $semester->id,
+        'unit_id' => $legacyUnit->id,
+        'campus_id' => $student->campus_id,
+    ]);
+    $transcriptOnlyOffering = CourseOffering::factory()->create([
+        'semester_id' => $semester->id,
+        'unit_id' => $transcriptOnlyUnit->id,
+        'campus_id' => $student->campus_id,
+    ]);
+    $canonicalRecord = AcademicRecord::factory()->create([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'unit_id' => $canonicalUnit->id,
+        'program_id' => $student->program_id,
+        'campus_id' => $student->campus_id,
+        'course_offering_id' => $canonicalOffering->id,
+        'grade_status' => 'final',
+        'completion_status' => 'completed',
+        'final_percentage' => 70.0,
+        'final_letter_grade' => 'C',
+        'credit_points_earned' => 3.0,
+        'is_passed' => true,
+    ]);
+    AcademicRecord::factory()->create([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'unit_id' => $legacyUnit->id,
+        'program_id' => $student->program_id,
+        'campus_id' => $student->campus_id,
+        'course_offering_id' => $legacyOffering->id,
+        'grade_status' => 'final',
+        'completion_status' => 'completed',
+        'final_percentage' => 65.0,
+        'final_letter_grade' => 'D',
+        'credit_points_earned' => 3.0,
+        'is_passed' => true,
+    ]);
+    TranscriptEntry::query()->create([
+        'course_result_id' => $canonicalRecord->id,
+        'student_id' => $student->id,
+        'course_offering_id' => $canonicalOffering->id,
+        'semester_id' => $semester->id,
+        'unit_id' => $canonicalUnit->id,
+        'program_id' => $student->program_id,
+        'campus_id' => $student->campus_id,
+        'attempt_number' => 1,
+        'final_percentage' => 90.0,
+        'final_letter_grade' => 'A',
+        'credit_points' => 3.0,
+        'credit_points_earned' => 3.0,
+        'quality_points' => 270.0,
+        'is_passed' => true,
+        'excluded_from_gpa' => false,
+        'affects_academic_standing' => true,
+        'affects_graduation_requirement' => true,
+        'satisfies_prerequisite' => true,
+        'finalized_at' => now(),
+    ]);
+    TranscriptEntry::query()->create([
+        'course_result_id' => 999999,
+        'student_id' => $student->id,
+        'course_offering_id' => $transcriptOnlyOffering->id,
+        'semester_id' => $semester->id,
+        'unit_id' => $transcriptOnlyUnit->id,
+        'program_id' => $student->program_id,
+        'campus_id' => $student->campus_id,
+        'attempt_number' => 1,
+        'final_percentage' => 88.0,
+        'final_letter_grade' => 'B',
+        'credit_points' => 3.0,
+        'credit_points_earned' => 3.0,
+        'quality_points' => 264.0,
+        'is_passed' => true,
+        'excluded_from_gpa' => false,
+        'affects_academic_standing' => true,
+        'affects_graduation_requirement' => true,
+        'satisfies_prerequisite' => true,
+        'finalized_at' => now(),
+    ]);
+
+    $data = app(GetStudentAcademicSummaryExportQuery::class)->handle(
+        (int) $student->id,
+        [
+            'student_id' => $student->student_id,
+            'full_name' => $student->full_name,
+            'campus' => $student->campus?->name,
+            'intake' => $student->intake,
+        ],
+        $student->expected_graduation_date?->toDateString(),
+    );
+
+    $courses = collect($data['courses'])->keyBy('code');
+
+    expect($courses['CAN101']['percentage'])->toBe(90.0)
+        ->and($courses['CAN101']['grade'])->toBe('A')
+        ->and($courses['LEG101']['percentage'])->toBe(65.0)
+        ->and($courses['LEG101']['grade'])->toBe('D')
+        ->and($courses['TRN101']['percentage'])->toBe(88.0)
+        ->and($courses['TRN101']['grade'])->toBe('B');
 });

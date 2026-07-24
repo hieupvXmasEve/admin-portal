@@ -54,3 +54,11 @@ Completed in this slice:
 Validation completed: scoped Registration and Graduation feature tests, Student Hub ownership architecture test, Pint, `git diff --check`, and `migration-debt:inventory --check` passed. The mandated full suite was run once but did not pass because of failures outside this slice (including existing Notification/AI and unrelated Academic feature suites); it needs separate triage.
 
 This issue intentionally remains `ready-for-agent`, not complete. Outstanding work includes moving the Overview, Scores/GPA/Standing, and Export callers off `StudentAcademicSummaryService`, plus the remaining Progression lifecycle/EGC/Decision ownership and approved Finance integration work. Historical reconciliation and compatibility removal remain exclusively in issue 24.
+
+### 2026-07-24 — Export read-boundary slice delivered; issue remains open
+
+- Student Hub Export now calls `GetStudentAcademicSummaryExportQuery` in Progression rather than `StudentAcademicSummaryService`.
+- The query receives identity display values from the controller, takes lifecycle/program context from the Progression enrollment projection, uses the Progression GPA and graduation queries, and reads Delivery course-outcome evidence through its V1 contract.
+- Export outcome rows are keyed by the stable `academic_records.id -> transcript_entries.course_result_id` mapping: a `TranscriptEntry` is canonical, while a final legacy Course Result is appended only when its matching Transcript Entry is absent. This also preserves transcript-only entries. No historical data or compatibility path was changed.
+
+Verification: targeted export and Hub ownership tests passed (7 tests, 44 assertions), Pint, and `migration-debt:inventory` guard passed. The required full suite was invoked, but the Docker wrapper emitted only progress markers without a terminal summary; it is inconclusive and is not recorded as passing evidence. Remaining Issue 12 work is Overview, Scores/GPA/Standing, score-detail endpoints, and Progression lifecycle/EGC/Decision/Finance ownership. Status remains `ready-for-agent`.
