@@ -1,6 +1,6 @@
 # Backfill and reconcile historical Academic Progression evidence
 
-Status: needs-info
+Status: ready-for-agent
 
 Portal impact: both
 
@@ -74,4 +74,15 @@ Mapping and invariants: final legacy outcomes map source id, student, course off
 
 Idempotency and recovery plan for any future approved write: use the unique `course_result_id`, scope by explicit student/semester or `--all`, insert only absent matching candidates, abort on every exception, and process bounded chunks in DB transactions. Do not overwrite or delete target/source rows. Capture a database backup and per-run created-id ledger before execution; rollback may delete only rows recorded by that run. During mixed-version deployment, keep the compatibility projection and write-path dual publishing active; pause queues/notifications only if their reconciliation evidence changes. Finance, student/lecturer API responses, exports, audit, and notification payloads must be compared read-only before any removal approval.
 
-The only implemented command is the read-only preflight above; it deliberately has no `--apply` option. A write command is not proposed for execution because this preflight has zero eligible rows and the finalization-time policy is unresolved. Named human approver: **unassigned**. No approval has been granted, no mutation has run, and the compatibility projection remains in place. Status stays `needs-info`.
+The only implemented command is the read-only preflight above; it deliberately has no `--apply` option. A write command is not proposed for execution because this preflight has zero eligible rows. Before the approval below, the finalization-time policy was unresolved. No mutation has run, and the compatibility projection remains in place.
+
+### 2026-07-24 — human approval recorded
+
+**Hiếu** approved the following policy and no-op checkpoint:
+
+- Treat legacy `academic_records.grade_finalized_date` as date-only provenance.
+- Accept `transcript_entries.finalized_at` at `00:00:00` in `Asia/Ho_Chi_Minh` as the canonical representation of that date, never as evidence of the original historical time-of-day.
+- Reconcile finalization at calendar-date precision only.
+- Accept the `--all` preflight as a no-op: all 2,052 source/target mappings match and no backfill write is required.
+
+No compatibility projection removal is authorized by this approval. The issue is now `ready-for-agent` for the remaining read-only derived-behavior reconciliation; no data mutation was run.
