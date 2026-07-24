@@ -86,3 +86,21 @@ The only implemented command is the read-only preflight above; it deliberately h
 - Accept the `--all` preflight as a no-op: all 2,052 source/target mappings match and no backfill write is required.
 
 No compatibility projection removal is authorized by this approval. The issue is now `ready-for-agent` for the remaining read-only derived-behavior reconciliation; no data mutation was run.
+
+### 2026-07-24 — read-only derived-evidence reconciliation
+
+Implemented `academic:audit-transcript-derived` as a read-only, explicitly scoped audit (`--student-id`, `--semester-id`, or `--all`). It derives GPA and academic standing by the existing GPA rules (every non-excluded, credit-bearing final attempt; academic periods ordered by `start_date`) and the Student Hub's current per-unit selection (latest finalization date, then attempt number; failures are included). A semester-scoped GPA audit retains earlier semesters for cumulative calculation while reporting the requested semester only; its best-attempt output is limited to units in the requested semester. It compares legacy final `academic_records` with Progression-owned `transcript_entries`; `--format=json` includes each stable-key exception row and `read_only: true`. The command has no `--apply` option and does not update transcript, GPA, standing, lifecycle, or source data.
+
+Live local `--all` result:
+
+```text
+gpa_rows=464
+gpa_mismatches=0
+standing_mismatches=0
+best_attempts=2002
+best_attempt_mismatches=0
+```
+
+Verification: `tests/Feature/Academic/TranscriptDerivedEvidenceAuditTest.php` and `tests/Feature/Academic/TranscriptBackfillPreflightTest.php` passed (9 tests, 46 assertions); Pint passed; `migration-debt:inventory` guard passed with `migration_commands=7` and `shared_model_imports=566`, both within baseline.
+
+This is source-to-transcript derived equality evidence only. It does not yet reconcile persisted `gpa_calculations`, EGC/graduation readiness, Student Hub registration fields or exports, Decisions, lifecycle timeline, Finance/notification/queue consumers, or student/lecturer portal responses. The compatibility projection remains in place; removal still requires zero supported consumers and a separate human approval. Status remains `ready-for-agent`; no write was run.

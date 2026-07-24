@@ -9,7 +9,7 @@ use App\Shared\Contracts\Academic\DTO\LegacyTranscriptOutcome;
 interface LegacyTranscriptOutcomeReader
 {
     /**
-     * @param  array{student_id?: int, semester_id?: int}  $scope
+     * @param  array{student_id?: int, student_ids?: list<int>, semester_id?: int}  $scope
      * @return list<LegacyTranscriptOutcome>
      */
     public function finalizedOutcomes(array $scope): array;

@@ -15,6 +15,7 @@ final class EloquentLegacyTranscriptOutcomeReader implements LegacyTranscriptOut
         return AcademicRecord::query()
             ->where('grade_status', 'final')
             ->when(isset($scope['student_id']), fn ($query) => $query->where('student_id', $scope['student_id']))
+            ->when(isset($scope['student_ids']), fn ($query) => $query->whereIn('student_id', $scope['student_ids']))
             ->when(isset($scope['semester_id']), fn ($query) => $query->where('semester_id', $scope['semester_id']))
             ->orderBy('id')
             ->get()
