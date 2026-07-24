@@ -10,17 +10,11 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
-class GetUsersQuery
+final class GetUsersQuery
 {
-    public function __construct(
-        private ?int $currentCampusId = null
-    ) {
-        $this->currentCampusId = session('current_campus_id');
-    }
-
-    public function handle(array $filters = [], int $perPage = 10, int $page = 1): LengthAwarePaginator
+    public function handle(array $filters, int $campusId, int $perPage = 10, int $page = 1): LengthAwarePaginator
     {
-        $query = $this->buildQuery($filters);
+        $query = $this->buildQuery($filters, $campusId);
 
         return $query->paginate($perPage, ['*'], 'page', $page)
             ->withQueryString();
@@ -31,20 +25,20 @@ class GetUsersQuery
         return Role::with('permissions')->orderBy('name')->get();
     }
 
-    public function getUserRoleIds(User $user): array
+    public function getUserRoleIds(User $user, int $campusId): array
     {
         return $user->campusRoles()
-            ->where('campus_id', $this->currentCampusId)
+            ->wherePivot('campus_id', $campusId)
             ->pluck('role_id')
             ->toArray();
     }
 
-    private function buildQuery(array $filters): Builder
+    private function buildQuery(array $filters, int $campusId): Builder
     {
         $query = User::query()->orderBy('id', 'desc');
 
         // Global search (name and email)
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
@@ -53,21 +47,21 @@ class GetUsersQuery
         }
 
         // Filter by role
-        if (!empty($filters['role_id'])) {
-            $query->whereHas('campusRoles', function ($q) use ($filters) {
+        if (! empty($filters['role_id'])) {
+            $query->whereHas('campusRoles', function ($q) use ($filters, $campusId) {
                 $q->where('role_id', $filters['role_id'])
-                    ->where('campus_id', $this->currentCampusId);
+                    ->where('campus_id', $campusId);
             });
         }
 
         // Filter by user type
-        if (!empty($filters['type'])) {
+        if (! empty($filters['type'])) {
             $query->where('type', $filters['type']);
         }
 
         // Eager load relationships
-        $query->with(['department', 'campusRoles' => function ($q) {
-            $q->wherePivot('campus_id', $this->currentCampusId);
+        $query->with(['department', 'campusRoles' => function ($q) use ($campusId) {
+            $q->wherePivot('campus_id', $campusId);
         }]);
 
         return $query;

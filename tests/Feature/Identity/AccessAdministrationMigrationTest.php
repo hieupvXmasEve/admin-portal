@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Identity\Queries\GetUsersQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -20,7 +21,7 @@ beforeEach(function (): void {
     $this->campus = Campus::factory()->create();
     $this->administrator = User::factory()->create();
     $administratorRole = Role::factory()->create();
-    $permissions = collect(['view_user', 'view_role', 'create_role', 'edit_role', 'delete_role'])
+    $permissions = collect(['view_user', 'edit_user', 'view_role', 'create_role', 'edit_role', 'delete_role'])
         ->map(fn (string $code): Permission => Permission::factory()->create(['code' => $code]));
 
     $administratorRole->permissions()->attach($permissions->pluck('id'));
@@ -75,6 +76,36 @@ it('keeps normalized role codes unique through the established staff route', fun
         ->assertRedirect(route('roles.index'));
 
     expect(Role::query()->where('name', 'A-B')->value('code'))->toBe('a_b_1');
+});
+
+it('uses the current request campus for user role filters and edit selections', function (): void {
+    $role = Role::factory()->create(['name' => 'Campus operator']);
+    $otherCampus = Campus::factory()->create();
+    $otherCampusRole = Role::factory()->create(['name' => 'Other campus operator']);
+    $staff = User::factory()->create();
+
+    $staff->campusRoles()->attach($role, ['campus_id' => $this->campus->id]);
+    $staff->campusRoles()->attach($otherCampusRole, ['campus_id' => $otherCampus->id]);
+
+    app()->instance(GetUsersQuery::class, new GetUsersQuery);
+
+    $this->actingAs($this->administrator)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->get(route('identity.users.index', ['role_id' => $role->id]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Users/Index')
+            ->has('users.data', 1)
+            ->where('users.data.0.id', $staff->id)
+            ->where('users.data.0.campus_roles.0.id', $role->id));
+
+    $this->actingAs($this->administrator)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->get(route('identity.users.edit', $staff))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Users/Edit')
+            ->where('userRoleIds', [$role->id]));
 });
 
 it('deletes a role after removing its campus user assignments', function (): void {

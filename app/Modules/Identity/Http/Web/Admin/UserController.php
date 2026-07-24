@@ -13,6 +13,7 @@ use App\Modules\Identity\Http\Requests\Identity\ListUsersRequest;
 use App\Modules\Identity\Http\Requests\Identity\StoreUserRequest;
 use App\Modules\Identity\Http\Requests\Identity\UpdateUserRequest;
 use App\Modules\Identity\Queries\GetUsersQuery;
+use App\Modules\Identity\Support\CurrentCampusIdResolver;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -20,7 +21,8 @@ use Inertia\Response;
 class UserController extends Controller
 {
     public function __construct(
-        private GetUsersQuery $getUsersQuery
+        private readonly GetUsersQuery $getUsersQuery,
+        private readonly CurrentCampusIdResolver $currentCampusIdResolver,
     ) {}
 
     public function index(ListUsersRequest $request): Response
@@ -35,7 +37,12 @@ class UserController extends Controller
             'type' => $validated['type'] ?? null,
         ];
 
-        $users = $this->getUsersQuery->handle($filters, $perPage, $page);
+        $users = $this->getUsersQuery->handle(
+            $filters,
+            $this->currentCampusIdResolver->resolve(),
+            $perPage,
+            $page,
+        );
         $roles = $this->getUsersQuery->getRoles();
 
         return Inertia::render('Users/Index', [
@@ -75,7 +82,10 @@ class UserController extends Controller
     public function edit(User $user): Response
     {
         $roles = $this->getUsersQuery->getRoles();
-        $userRoleIds = $this->getUsersQuery->getUserRoleIds($user);
+        $userRoleIds = $this->getUsersQuery->getUserRoleIds(
+            $user,
+            $this->currentCampusIdResolver->resolve(),
+        );
 
         return Inertia::render('Users/Edit', [
             'user' => $user,
