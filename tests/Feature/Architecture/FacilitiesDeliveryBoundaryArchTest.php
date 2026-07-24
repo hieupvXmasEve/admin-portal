@@ -44,6 +44,15 @@ it('keeps Delivery exam scheduling on the Facilities reservation contract', func
         ->and($request)->not->toContain('exists:rooms');
 });
 
+it('keeps Delivery course-offering room changes on Facilities reference and availability contracts', function (): void {
+    $action = file_get_contents(dirname(__DIR__, 3).'/app/Modules/Academic/Delivery/Actions/ChangeCourseOfferingRoomAction.php') ?: '';
+
+    expect($action)
+        ->toContain('App\\Shared\\Contracts\\Facilities\\SpaceReferenceReader')
+        ->toContain('App\\Shared\\Contracts\\Facilities\\SpaceAvailabilityReader')
+        ->not->toContain('App\\Models\\Room');
+});
+
 it('serves building and room URLs from the Facilities owner', function (): void {
     $routes = file_get_contents(dirname(__DIR__, 3).'/app/Modules/Facilities/routes/web.php') ?: '';
 

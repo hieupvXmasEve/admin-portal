@@ -12,6 +12,11 @@ final readonly class SpaceReference
         public string $name,
         public string $code,
         public int $capacity,
+        public ?string $type = null,
+        public ?string $status = null,
+        public bool $isBookable = true,
+        /** @var array{id: int, name: string, code: string}|null */
+        public ?array $building = null,
     ) {}
 
     /** @return array{id: int, campus_id: int, name: string, code: string, capacity: int} */

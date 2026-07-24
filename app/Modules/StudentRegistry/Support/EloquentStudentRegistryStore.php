@@ -220,6 +220,9 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             specializationId: $student->specialization_id === null ? null : (int) $student->specialization_id,
             specializationCode: $student->specialization?->code,
             specializationName: $student->specialization?->name,
+            status: $student->status,
+            academicStatus: $student->academic_status,
+            gcCurrentLevel: $student->gc_current_level === null ? null : (int) $student->gc_current_level,
         );
     }
 
@@ -238,6 +241,9 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             'national_id',
             'program_id',
             'specialization_id',
+            'status',
+            'academic_status',
+            'gc_current_level',
         ];
     }
 }

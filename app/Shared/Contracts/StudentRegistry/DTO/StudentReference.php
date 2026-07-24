@@ -21,6 +21,9 @@ final readonly class StudentReference
         public ?int $specializationId = null,
         public ?string $specializationCode = null,
         public ?string $specializationName = null,
+        public ?string $status = null,
+        public ?string $academicStatus = null,
+        public ?int $gcCurrentLevel = null,
     ) {}
 
     /**

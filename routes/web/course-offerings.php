@@ -18,14 +18,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // ============================================
         // CRUD Resource Routes
         // ============================================
-        Route::get('/', [CourseOfferingController::class, 'index'])
-            ->middleware('can:view_course_offering')
-            ->name(CourseOfferingRoutes::INDEX);
-
-        Route::get('/{courseOffering}', [CourseOfferingController::class, 'show'])
-            ->middleware('can:view_course_offering')
-            ->name(CourseOfferingRoutes::SHOW);
-
         Route::post('/{courseOffering}/finalize', FinalizeCourseOfferingController::class)
             ->middleware('can:complete_course_offering')
             ->name(CourseOfferingRoutes::FINALIZE);
@@ -60,31 +52,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // ============================================
         // Student Registration Management (API)
         // ============================================
-        Route::post('/{courseOffering}/search-students', [CourseOfferingController::class, 'searchStudents'])
-            ->middleware('can:edit_course_offering')
-            ->name(CourseOfferingRoutes::API_SEARCH_STUDENTS);
-
-        Route::post('/{courseOffering}/bulk-register-students', [CourseOfferingController::class, 'bulkRegisterStudents'])
-            ->middleware('can:add_student_registration')
-            ->name(CourseOfferingRoutes::API_BULK_REGISTER_STUDENTS);
-
         // ============================================
         // Instructor Assignment
         // ============================================
-        Route::get('/check-instructor-assignments', [CourseOfferingController::class, 'checkInstructorAssignments'])
-            ->middleware('can:view_course_offering')
-            ->name(CourseOfferingRoutes::API_CHECK_INSTRUCTOR_ASSIGNMENTS);
-
         // ============================================
         // Bulk Operations & Statistics
         // ============================================
         Route::get('/statistics', [CourseOfferingController::class, 'statistics'])
             ->middleware('can:view_course_offering')
             ->name(CourseOfferingRoutes::API_STATISTICS);
-
-        Route::post('/{courseOffering}/change-room', [CourseOfferingController::class, 'changeRoom'])
-            ->middleware('can:edit_course_offering')
-            ->name(CourseOfferingRoutes::API_CHANGE_ROOM);
 
         // ============================================
         // Canvas Grade Sync (cockpit Scores tab, issue 10)

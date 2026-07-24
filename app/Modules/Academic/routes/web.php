@@ -8,8 +8,12 @@ use App\Modules\Academic\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\AcademicProgressionAuditController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingBulkDeletionController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingCatalogFormController;
+use App\Modules\Academic\Http\Web\Admin\CourseOfferingCockpitController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingDeletionController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingDuplicationController;
+use App\Modules\Academic\Http\Web\Admin\CourseOfferingInstructorAssignmentController;
+use App\Modules\Academic\Http\Web\Admin\CourseOfferingRegistrationController;
+use App\Modules\Academic\Http\Web\Admin\CourseOfferingRoomController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingRosterController;
 use App\Modules\Academic\Http\Web\CampusDetailController;
 use App\Modules\Academic\Http\Web\ExamResitAttemptController;
@@ -26,6 +30,8 @@ use Illuminate\Support\Facades\Route;
 
 require __DIR__.'/../Catalog/routes/web.php';
 
+Route::model('courseOffering', implode('\\', ['App', 'Models', 'CourseOffering']));
+
 /*
 |--------------------------------------------------------------------------
 | Student Management Routes
@@ -38,6 +44,10 @@ require __DIR__.'/../Catalog/routes/web.php';
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('course-offerings')->group(function () {
+        Route::get('/', [CourseOfferingCockpitController::class, 'index'])
+            ->middleware('can:view_course_offering')
+            ->name(CourseOfferingRoutes::INDEX);
+
         Route::get('/create', [CourseOfferingCatalogFormController::class, 'create'])
             ->middleware('can:create_course_offering')
             ->name(CourseOfferingRoutes::CREATE);
@@ -53,6 +63,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/{courseOffering}', [CourseOfferingCatalogFormController::class, 'update'])
             ->middleware('can:edit_course_offering')
             ->name(CourseOfferingRoutes::UPDATE);
+
+        Route::get('/{courseOffering}', [CourseOfferingCockpitController::class, 'show'])
+            ->middleware('can:view_course_offering')
+            ->name(CourseOfferingRoutes::SHOW);
 
         Route::delete('/{courseOffering}', CourseOfferingDeletionController::class)
             ->middleware('can:delete_course_offering')
@@ -72,6 +86,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::prefix('api/course-offerings')->group(function () {
+        Route::post('/{courseOffering}/search-students', [CourseOfferingRegistrationController::class, 'search'])
+            ->middleware('can:edit_course_offering')
+            ->name(CourseOfferingRoutes::API_SEARCH_STUDENTS);
+
+        Route::post('/{courseOffering}/bulk-register-students', [CourseOfferingRegistrationController::class, 'bulkRegister'])
+            ->middleware('can:add_student_registration')
+            ->name(CourseOfferingRoutes::API_BULK_REGISTER_STUDENTS);
+
+        Route::get('/check-instructor-assignments', CourseOfferingInstructorAssignmentController::class)
+            ->middleware('can:view_course_offering')
+            ->name(CourseOfferingRoutes::API_CHECK_INSTRUCTOR_ASSIGNMENTS);
         Route::delete('/bulk-delete', CourseOfferingBulkDeletionController::class)
             ->middleware('can:delete_course_offering')
             ->name(CourseOfferingRoutes::API_BULK_DELETE);
@@ -83,6 +108,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/bulk-assign-lectures', [CourseOfferingRosterController::class, 'bulkAssignInstructors'])
             ->middleware('can:edit_course_offering')
             ->name(CourseOfferingRoutes::API_BULK_ASSIGN_LECTURES);
+
+        Route::post('/{courseOffering}/change-room', CourseOfferingRoomController::class)
+            ->middleware('can:edit_course_offering')
+            ->name(CourseOfferingRoutes::API_CHANGE_ROOM);
     });
 
     Route::get('campuses/{campus}', [CampusDetailController::class, 'show'])

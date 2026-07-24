@@ -7,21 +7,136 @@ use App\Models\Campus;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
+use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Modules\Academic\Delivery\Actions\BulkDeleteCourseOfferingsAction;
+use App\Modules\Academic\Delivery\Actions\BulkRegisterCourseOfferingStudentsAction;
+use App\Modules\Academic\Delivery\Actions\ChangeCourseOfferingRoomAction;
 use App\Modules\Academic\Delivery\Actions\DeleteCourseOfferingAction;
 use App\Modules\Academic\Delivery\Actions\EnrollStudentInCourseOfferingAction;
 use App\Modules\Academic\Delivery\Actions\MoveStudentBetweenCourseOfferingSectionsAction;
 use App\Modules\Academic\Delivery\Actions\RemoveCourseOfferingRosterMemberAction;
 use App\Modules\Academic\Delivery\Actions\RemoveStudentFromCourseOfferingAction;
+use App\Modules\Academic\Delivery\Actions\SearchCourseOfferingStudentsAction;
 use App\Modules\Academic\Delivery\Exceptions\CourseOfferingDeletionException;
+use App\Modules\Academic\Delivery\Exceptions\CourseOfferingRoomChangeException;
 use App\Shared\Contracts\Academic\CourseRosterReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
+
+it('changes every class session room through Delivery after Facilities approves each slot', function (): void {
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $offering = CourseOffering::factory()->create([
+        'campus_id' => $campus->id,
+        'semester_id' => $semester->id,
+    ]);
+    $oldRoom = Room::factory()->create(['campus_id' => $campus->id]);
+    $newRoom = Room::factory()->create(['campus_id' => $campus->id]);
+    $firstSession = ClassSession::factory()->create([
+        'course_offering_id' => $offering->id,
+        'room_id' => $oldRoom->id,
+        'session_date' => now()->addWeek()->toDateString(),
+        'start_time' => '09:00',
+        'end_time' => '11:00',
+        'status' => 'scheduled',
+    ]);
+    $secondSession = ClassSession::factory()->create([
+        'course_offering_id' => $offering->id,
+        'room_id' => $oldRoom->id,
+        'session_date' => now()->addWeeks(2)->toDateString(),
+        'start_time' => '13:00',
+        'end_time' => '15:00',
+        'status' => 'scheduled',
+    ]);
+
+    ChangeCourseOfferingRoomAction::run([
+        'course_offering_id' => $offering->id,
+        'campus_id' => $campus->id,
+        'room_id' => $newRoom->id,
+        'requested_by_user_id' => 1,
+    ]);
+
+    expect($firstSession->fresh()->room_id)->toBe($newRoom->id)
+        ->and($secondSession->fresh()->room_id)->toBe($newRoom->id);
+});
+
+it('discovers and bulk-registers student codes through Registry and Delivery', function (): void {
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $unit = Unit::factory()->create(['unit_type' => 'general']);
+    $student = Student::factory()->forCampus($campus)->create([
+        'status' => 'intake_course',
+        'academic_status' => 'active',
+        'intake' => 1,
+        'intake_mode' => 'sequential',
+        'intake_semester_id' => $semester->id,
+    ]);
+    $offering = CourseOffering::factory()->create([
+        'campus_id' => $campus->id,
+        'semester_id' => $semester->id,
+        'unit_id' => $unit->id,
+        'enrollment_status' => 'open',
+        'registration_start_date' => now()->subDay(),
+        'registration_end_date' => now()->addDay(),
+    ]);
+
+    $discovered = SearchCourseOfferingStudentsAction::run($offering, [$student->student_id], $campus->id);
+    $result = BulkRegisterCourseOfferingStudentsAction::run($offering, [$student->student_id], $campus->id);
+
+    expect($discovered[0]['exists'])->toBeTrue()
+        ->and($discovered[0]['is_eligible'])->toBeTrue()
+        ->and($result['success_count'])->toBe(1)
+        ->and(CourseRegistration::query()->where('course_offering_id', $offering->id)->where('student_id', $student->id)->exists())->toBeTrue();
+});
+
+it('rejects a room change when Facilities reports an occupied session slot', function (): void {
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $offering = CourseOffering::factory()->create([
+        'campus_id' => $campus->id,
+        'semester_id' => $semester->id,
+    ]);
+    $otherOffering = CourseOffering::factory()->create([
+        'campus_id' => $campus->id,
+        'semester_id' => $semester->id,
+    ]);
+    $oldRoom = Room::factory()->create(['campus_id' => $campus->id]);
+    $newRoom = Room::factory()->create(['campus_id' => $campus->id]);
+    $date = now()->addWeek()->toDateString();
+    $session = ClassSession::factory()->create([
+        'course_offering_id' => $offering->id,
+        'room_id' => $oldRoom->id,
+        'session_date' => $date,
+        'start_time' => '09:00',
+        'end_time' => '11:00',
+        'status' => 'scheduled',
+    ]);
+    ClassSession::factory()->create([
+        'course_offering_id' => $otherOffering->id,
+        'room_id' => $newRoom->id,
+        'session_date' => $date,
+        'start_time' => '10:00',
+        'end_time' => '12:00',
+        'status' => 'scheduled',
+    ]);
+
+    expect(fn () => ChangeCourseOfferingRoomAction::run([
+        'course_offering_id' => $offering->id,
+        'campus_id' => $campus->id,
+        'room_id' => $newRoom->id,
+        'requested_by_user_id' => 1,
+    ]))->toThrow(
+        CourseOfferingRoomChangeException::class,
+        'Selected room is not available for the course offering schedule.',
+    );
+
+    expect($session->fresh()->room_id)->toBe($oldRoom->id);
+});
 
 it('bulk deletes empty offerings through Delivery and removes their registrations', function (): void {
     $campus = Campus::factory()->create();

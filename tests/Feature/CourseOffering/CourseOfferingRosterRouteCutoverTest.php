@@ -2,15 +2,22 @@
 
 declare(strict_types=1);
 
+use App\Constants\CourseOfferingRoutes;
 use App\Models\AcademicRecord;
 use App\Models\Campus;
+use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
+use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Modules\Academic\Http\Web\Admin\CourseOfferingCockpitController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingDeletionController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingDuplicationController;
+use App\Modules\Academic\Http\Web\Admin\CourseOfferingInstructorAssignmentController;
+use App\Modules\Academic\Http\Web\Admin\CourseOfferingRegistrationController;
+use App\Modules\Academic\Http\Web\Admin\CourseOfferingRoomController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingRosterController;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Auth\Middleware\Authorize;
@@ -47,12 +54,48 @@ it('keeps the course-offering deletion route name while dispatching through Deli
         ->and($route?->getActionName())->toContain(CourseOfferingDeletionController::class);
 });
 
+it('keeps the cockpit route names on the Academic module controller', function (): void {
+    foreach ([CourseOfferingRoutes::INDEX, CourseOfferingRoutes::SHOW] as $routeName) {
+        $route = Route::getRoutes()->getByName($routeName);
+
+        expect($route)
+            ->not->toBeNull()
+            ->and($route?->getActionName())->toContain(CourseOfferingCockpitController::class);
+    }
+});
+
 it('keeps the course-offering duplication route name while dispatching through Delivery', function (): void {
     $route = Route::getRoutes()->getByName('course-offerings.duplicate');
 
     expect($route)
         ->not->toBeNull()
         ->and($route?->getActionName())->toContain(CourseOfferingDuplicationController::class);
+});
+
+it('keeps the course-offering room-change route name while dispatching through Delivery', function (): void {
+    $route = Route::getRoutes()->getByName('api.course-offerings.change-room');
+
+    expect($route)
+        ->not->toBeNull()
+        ->and($route?->getActionName())->toContain(CourseOfferingRoomController::class);
+});
+
+it('keeps registration discovery and bulk enrollment routes on Delivery', function (): void {
+    foreach (['api.course-offerings.search-students', 'api.course-offerings.bulk-register-students'] as $routeName) {
+        $route = Route::getRoutes()->getByName($routeName);
+
+        expect($route)
+            ->not->toBeNull()
+            ->and($route?->getActionName())->toContain(CourseOfferingRegistrationController::class);
+    }
+});
+
+it('keeps instructor-assignment readiness checks on Delivery', function (): void {
+    $route = Route::getRoutes()->getByName('api.course-offerings.check-instructor-assignments');
+
+    expect($route)
+        ->not->toBeNull()
+        ->and($route?->getActionName())->toContain(CourseOfferingInstructorAssignmentController::class);
 });
 
 it('preserves the course-offering duplication redirect and flash response', function (): void {
@@ -151,6 +194,49 @@ it('does not expose course-offering deletion across campuses', function (): void
     $this->delete(route('course-offerings.destroy', $offering))->assertNotFound();
 
     expect(CourseOffering::query()->find($offering->id))->not->toBeNull();
+});
+
+it('preserves the room-change redirect, flash, and campus boundary', function (): void {
+    $this->withoutMiddleware([
+        Authenticate::class,
+        Authorize::class,
+        EnsureEmailIsVerified::class,
+        PreventRequestForgery::class,
+        VerifyCsrfToken::class,
+    ]);
+
+    $currentCampus = Campus::factory()->create();
+    $otherCampus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $offering = CourseOffering::factory()->create([
+        'campus_id' => $currentCampus->id,
+        'semester_id' => $semester->id,
+    ]);
+    $otherOffering = CourseOffering::factory()->create([
+        'campus_id' => $otherCampus->id,
+        'semester_id' => $semester->id,
+    ]);
+    $oldRoom = Room::factory()->create(['campus_id' => $currentCampus->id]);
+    $newRoom = Room::factory()->create(['campus_id' => $currentCampus->id]);
+    $session = ClassSession::factory()->create([
+        'course_offering_id' => $offering->id,
+        'room_id' => $oldRoom->id,
+        'session_date' => now()->addWeek()->toDateString(),
+        'start_time' => '09:00',
+        'end_time' => '11:00',
+        'status' => 'scheduled',
+    ]);
+    app()->instance('campus', $currentCampus);
+
+    $this->from(route('course-offerings.show', $offering))
+        ->post(route('api.course-offerings.change-room', $offering), ['room_id' => $newRoom->id])
+        ->assertRedirect(route('course-offerings.show', $offering))
+        ->assertSessionHas('success', 'Room updated for all class sessions.');
+
+    expect($session->fresh()->room_id)->toBe($newRoom->id);
+
+    $this->post(route('api.course-offerings.change-room', $otherOffering), ['room_id' => $newRoom->id])
+        ->assertNotFound();
 });
 
 it('preserves the roster-removal JSON envelope while delegating attempt removal to Progression', function (): void {
