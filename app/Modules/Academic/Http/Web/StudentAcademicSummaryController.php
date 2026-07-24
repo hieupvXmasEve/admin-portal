@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Http\Web;
 
-use App\Actions\Student\GetStudentRegistrationsAction;
 use App\Http\Controllers\Api\GoldTransactionController;
 use App\Http\Controllers\Api\StudentWalletController;
 use App\Http\Controllers\Controller;
@@ -12,6 +11,8 @@ use App\Http\Requests\Student\GetRegistrationsRequest;
 use App\Models\Student;
 use App\Modules\Academic\Exports\StudentAcademicSummaryExport;
 use App\Modules\Academic\Progression\Actions\AttachDecisionToTransitionAction;
+use App\Modules\Academic\Progression\Queries\GetStudentGraduationProgressQuery;
+use App\Modules\Academic\Progression\Queries\GetStudentRegistrationsQuery;
 use App\Modules\Academic\Queries\GetStudentAttendanceDetailsQuery;
 use App\Modules\Academic\Queries\GetStudentAttendanceQuery;
 use App\Modules\Academic\Queries\GetStudentLifecycleTimelineQuery;
@@ -178,10 +179,10 @@ class StudentAcademicSummaryController extends Controller
     /**
      * Get registrations tab data
      */
-    public function registrations(Student $student, GetRegistrationsRequest $request, GetStudentRegistrationsAction $action): Response
+    public function registrations(Student $student, GetRegistrationsRequest $request, GetStudentRegistrationsQuery $query): Response
     {
         $validated = $request->validated();
-        $registrationsData = $action->execute($student, $validated);
+        $registrationsData = $query->handle((int) $student->id, $validated);
 
         return Inertia::render('students/AcademicSummary/Registrations', [
             'student' => $this->hubStudentContext($student),
@@ -238,10 +239,12 @@ class StudentAcademicSummaryController extends Controller
      * @param  Student  $student  The student to display graduation for
      * @return Response Inertia response with graduation data
      */
-    public function graduation(Student $student): Response
+    public function graduation(Student $student, GetStudentGraduationProgressQuery $query): Response
     {
-
-        $graduationData = $this->academicSummaryService->getGraduationData($student);
+        $graduationData = $query->handle(
+            (int) $student->id,
+            $student->expected_graduation_date?->toDateString(),
+        );
 
         return Inertia::render('students/AcademicSummary/Graduation', [
             'student' => $this->hubStudentContext($student),

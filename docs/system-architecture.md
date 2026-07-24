@@ -1,6 +1,6 @@
 # System Architecture
 
-Last updated: 2026-07-15
+Last updated: 2026-07-24
 Owner: Platform Team
 Status: Current-state architecture map
 Source of truth: route files, middleware, module providers, runtime entrypoints
@@ -136,6 +136,8 @@ Initial slices preserve table names, routes, and student/lecturer portal contrac
 Current academic progression baseline:
 
 - `academic_progression_events` is the semantic audit/event store for academic placement and progression.
+- Student Hub registration and graduation reads are owned by Progression Queries. Delivery supplies versioned V1 registration and course-outcome evidence through `StudentHubRegistrationEvidenceReader` and `StudentHubCourseOutcomeEvidenceReader`; Catalog supplies curriculum requirements through `CurriculumGraduationRequirementsReader`.
+- `TranscriptEntry` is the canonical finalized outcome where it exists. Legacy Course Result evidence remains a read-only compatibility projection until the approval-gated reconciliation and data cutover in issue 24; this slice does not mutate historical records.
 - Event types:
     - `ENGLISH_LEVEL_CHANGED` — EGC level changes (manual & auto progression after course completion)
     - `COURSE_STAGE_CHANGED` — stage transitions (e.g., `intake_pre_uni_gc` → `intake_course`)

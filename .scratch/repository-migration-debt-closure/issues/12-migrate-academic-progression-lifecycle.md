@@ -41,3 +41,16 @@ The prerequisite issues 06, 08, and 11 are complete. At maintainer direction, th
 Student Hub still obtains registrations, scores, graduation, and export payloads from frozen `app/Services/StudentAcademicSummaryService`. This issue must replace that ownership with a real Progression Query; a forwarding façade is not acceptable. Its compatibility projection must preserve legacy-only `academic_records` outcomes and the registrations payload fields `meets_attendance_requirement`, `grade_status`, and `completion_status` until issue 24 completes an approved reconciliation.
 
 No application code was retained from the rejected façade attempt. This issue may now proceed with the read-only architecture and compatibility work; issue 24 remains `needs-info` pending human approval before any data mutation.
+
+### 2026-07-24 — partial read-boundary slice delivered; issue remains open
+
+Completed in this slice:
+
+- Student Hub Registration and Graduation now call Progression-owned Queries instead of forwarding through `StudentAcademicSummaryService`.
+- Delivery supplies explicit V1, read-only registration and course-outcome evidence contracts. `TranscriptEntry` is preferred where finalized; legacy Course Result fields (`meets_attendance_requirement`, `grade_status`, and `completion_status`) remain available as compatibility evidence without mutating history.
+- Catalog supplies curriculum graduation requirements through a contract. Graduation counts one best passing attempt per curriculum unit and retains active-semester behavior even when legacy schedule dates are absent.
+- Registration filters, permission-protected HTTP behavior, pagination ranges, and out-of-range-page metadata have characterization coverage. Architecture documentation and boundary checks were updated.
+
+Validation completed: scoped Registration and Graduation feature tests, Student Hub ownership architecture test, Pint, `git diff --check`, and `migration-debt:inventory --check` passed. The mandated full suite was run once but did not pass because of failures outside this slice (including existing Notification/AI and unrelated Academic feature suites); it needs separate triage.
+
+This issue intentionally remains `ready-for-agent`, not complete. Outstanding work includes moving the Overview, Scores/GPA/Standing, and Export callers off `StudentAcademicSummaryService`, plus the remaining Progression lifecycle/EGC/Decision ownership and approved Finance integration work. Historical reconciliation and compatibility removal remain exclusively in issue 24.

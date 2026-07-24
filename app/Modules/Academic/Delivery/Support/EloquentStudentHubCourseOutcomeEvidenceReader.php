@@ -1,0 +1,37 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Academic\Delivery\Support;
+
+use App\Models\AcademicRecord;
+use App\Shared\Contracts\Academic\DTO\StudentHubCourseOutcomeEvidence;
+use App\Shared\Contracts\Academic\StudentHubCourseOutcomeEvidenceReader;
+
+final class EloquentStudentHubCourseOutcomeEvidenceReader implements StudentHubCourseOutcomeEvidenceReader
+{
+    public function forStudent(int $studentId, array $courseOfferingIds = []): array
+    {
+        return AcademicRecord::query()
+            ->where('student_id', $studentId)
+            ->when($courseOfferingIds !== [], fn ($query) => $query->whereIn('course_offering_id', $courseOfferingIds))
+            ->orderByDesc('id')
+            ->get()
+            ->map(static fn (AcademicRecord $record): StudentHubCourseOutcomeEvidence => new StudentHubCourseOutcomeEvidence(
+                courseOfferingId: (int) $record->course_offering_id,
+                unitId: (int) $record->unit_id,
+                finalPercentage: $record->final_percentage === null ? null : (float) $record->final_percentage,
+                finalLetterGrade: $record->final_letter_grade,
+                gradePoints: $record->grade_points === null ? null : (float) $record->grade_points,
+                gradeStatus: $record->grade_status,
+                completionStatus: $record->completion_status,
+                isPassed: (bool) $record->is_passed,
+                creditPoints: $record->credit_points === null ? null : (float) $record->credit_points,
+                creditPointsEarned: $record->credit_points_earned === null ? null : (float) $record->credit_points_earned,
+                attemptNumber: $record->attempt_number === null ? null : (int) $record->attempt_number,
+                isRepeatCourse: (bool) $record->is_repeat_course,
+                meetsAttendanceRequirement: $record->meets_attendance_requirement === null ? null : (bool) $record->meets_attendance_requirement,
+            ))
+            ->all();
+    }
+}

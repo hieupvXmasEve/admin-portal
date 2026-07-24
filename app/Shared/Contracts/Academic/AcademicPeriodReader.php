@@ -12,6 +12,12 @@ interface AcademicPeriodReader
 {
     public function current(): ?AcademicPeriodReference;
 
+    /**
+     * Return the administrator-designated active period, even when legacy
+     * records have not yet populated their schedule dates.
+     */
+    public function active(): ?AcademicPeriodReference;
+
     public function find(int $academicPeriodId): ?AcademicPeriodReference;
 
     public function countStartingBetween(CarbonImmutable $start, CarbonImmutable $end): int;

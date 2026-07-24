@@ -23,6 +23,14 @@ class SemesterAcademicPeriodReader implements AcademicPeriodReader
             ->first());
     }
 
+    public function active(): ?AcademicPeriodReference
+    {
+        return $this->mapPeriod(Semester::query()
+            ->where('is_active', true)
+            ->orderByDesc('id')
+            ->first());
+    }
+
     public function find(int $academicPeriodId): ?AcademicPeriodReference
     {
         return $this->mapPeriod(Semester::query()->find($academicPeriodId));

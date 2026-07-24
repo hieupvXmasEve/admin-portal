@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\AcademicRecord;
 use App\Models\Campus;
 use App\Models\CourseOffering;
+use App\Models\CourseRegistration;
 use App\Models\CurriculumUnit;
 use App\Models\CurriculumVersion;
 use App\Models\Program;
@@ -13,8 +14,8 @@ use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Progression\Models\TranscriptEntry;
+use App\Modules\Academic\Progression\Queries\GetStudentGraduationProgressQuery;
 use App\Services\PermissionService;
-use App\Services\StudentAcademicSummaryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -133,7 +134,7 @@ function graduationTrackerStudent(): array
 it('builds the graduation contract: credits, per-requirement status, readiness and timeline', function () {
     [$student] = graduationTrackerStudent();
 
-    $grad = app(StudentAcademicSummaryService::class)->getGraduationData($student);
+    $grad = app(GetStudentGraduationProgressQuery::class)->handle((int) $student->id, $student->expected_graduation_date?->toDateString());
 
     // Credit summary: required = all curriculum credit, earned = passing records.
     expect((float) $grad['credit_summary']['total_required'])->toBe(100.0)
@@ -178,9 +179,83 @@ it('counts only this student credits toward graduation, never another student', 
     $strayUnit = Unit::factory()->create(['code' => 'CORE101X', 'credit_points' => 99.0]);
     recordPassingCredit($other, $strayUnit, $semester, 99.0);
 
-    $grad = app(StudentAcademicSummaryService::class)->getGraduationData($student);
+    $grad = app(GetStudentGraduationProgressQuery::class)->handle((int) $student->id, $student->expected_graduation_date?->toDateString());
 
     expect((float) $grad['credit_summary']['total_earned'])->toBe(70.0);
+});
+
+it('keeps legacy-only completed outcomes in graduation progress until reconciliation', function () {
+    [$student] = graduationTrackerStudent();
+
+    TranscriptEntry::query()
+        ->where('student_id', $student->id)
+        ->limit(1)
+        ->delete();
+
+    $grad = app(GetStudentGraduationProgressQuery::class)->handle((int) $student->id, $student->expected_graduation_date?->toDateString());
+
+    expect((float) $grad['credit_summary']['total_earned'])->toBe(70.0)
+        ->and((float) $grad['requirements']['core_credits']['earned'])->toBe(70.0);
+});
+
+it('does not let a legacy pass override a finalized failing Transcript Entry', function () {
+    [$student] = graduationTrackerStudent();
+
+    TranscriptEntry::query()
+        ->where('student_id', $student->id)
+        ->orderBy('id')
+        ->firstOrFail()
+        ->update([
+            'is_passed' => false,
+            'credit_points_earned' => 0,
+        ]);
+
+    $grad = app(GetStudentGraduationProgressQuery::class)->handle((int) $student->id, $student->expected_graduation_date?->toDateString());
+
+    expect((float) $grad['credit_summary']['total_earned'])->toBe(10.0)
+        ->and((float) $grad['requirements']['core_credits']['earned'])->toBe(10.0);
+});
+
+it('counts only the best passing attempt for a curriculum unit', function () {
+    [$student, $semester] = graduationTrackerStudent();
+    $core = Unit::query()->where('code', 'CORE101')->firstOrFail();
+
+    recordPassingCredit($student, $core, $semester, 60.0);
+
+    $grad = app(GetStudentGraduationProgressQuery::class)->handle((int) $student->id, $student->expected_graduation_date?->toDateString());
+
+    expect((float) $grad['credit_summary']['total_earned'])->toBe(70.0)
+        ->and((float) $grad['requirements']['core_credits']['earned'])->toBe(70.0);
+});
+
+it('uses an active period without schedule dates for current-semester progress', function () {
+    [$student] = graduationTrackerStudent();
+    $activePeriod = Semester::factory()->active()->create([
+        'code' => 'ACTIVE-LEGACY',
+        'name' => 'Active Legacy Period',
+        'start_date' => null,
+        'end_date' => null,
+    ]);
+    $offering = CourseOffering::factory()->create([
+        'semester_id' => $activePeriod->id,
+        'campus_id' => $student->campus_id,
+    ]);
+    CourseRegistration::query()->create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $activePeriod->id,
+        'registration_status' => 'enrolled',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 1,
+        'is_retake' => false,
+    ]);
+
+    $grad = app(GetStudentGraduationProgressQuery::class)->handle((int) $student->id, $student->expected_graduation_date?->toDateString());
+
+    expect($grad['progress_timeline']['current_semester']['semester'])->toBe('Active Legacy Period')
+        ->and((float) $grad['progress_timeline']['current_semester']['enrolled_credits'])->toBe(3.0)
+        ->and($grad['progress_timeline']['current_semester']['status'])->toBe('enrolled');
 });
 
 /**
