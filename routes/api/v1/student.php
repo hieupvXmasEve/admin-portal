@@ -8,13 +8,13 @@ use App\Http\Controllers\Api\V1\Student\CalendarController;
 use App\Http\Controllers\Api\V1\Student\CourseRegistrationController;
 use App\Http\Controllers\Api\V1\Student\CurriculumController;
 use App\Http\Controllers\Api\V1\Student\DashboardController;
-use App\Http\Controllers\Api\V1\Student\FinanceController;
 use App\Http\Controllers\Api\V1\Student\GradeController;
 use App\Http\Controllers\Api\V1\Student\ModuleController;
 use App\Http\Controllers\Api\V1\Student\ProfileController as LegacyProfileController;
 use App\Http\Controllers\Api\V1\Student\TimetableController;
 use App\Modules\Academic\Delivery\Http\Api\Student\AttendanceController;
 use App\Modules\Academic\Progression\Http\Api\Student\AcademicRecordController;
+use App\Modules\Finance\Http\Api\Student\LegacyFinanceController;
 use App\Modules\Finance\Http\Api\Student\StudentFinanceController;
 use App\Modules\Notification\Http\Api\Student\NotificationController;
 use App\Modules\Notification\Http\Api\Student\NotificationPreferenceController;
@@ -202,7 +202,7 @@ Route::middleware([
 
         // Finance
         Route::prefix('finance')->name('finance.')->group(function () {
-            Route::get('/', [FinanceController::class, 'index'])->name('index');
+            Route::get('/', [LegacyFinanceController::class, 'index'])->name('index');
             Route::get('/balance', [StudentFinanceController::class, 'balance'])->name('balance');
             Route::get('/charges', [StudentFinanceController::class, 'charges'])->name('charges');
             Route::get('/charges/{chargeId}', [StudentFinanceController::class, 'chargeDetail'])->name('charges.show');
@@ -218,7 +218,7 @@ Route::middleware([
             Route::get('/invoices', [StudentFinanceController::class, 'invoices'])->name('invoices');
             Route::get('/invoices/{invoiceId}', [StudentFinanceController::class, 'invoiceDetail'])->name('invoices.show');
             Route::get('/overview', [StudentFinanceController::class, 'overview'])->name('overview');
-            Route::get('/{semester}', [FinanceController::class, 'semester'])->name('semester');
+            Route::get('/{semester}', [LegacyFinanceController::class, 'semester'])->name('semester');
         });
 
     }); // End either middleware group
