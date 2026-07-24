@@ -8,8 +8,13 @@ use App\Http\Controllers\Api\GoldTransactionController;
 use App\Http\Controllers\Api\StudentWalletController;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Student\GetRegistrationsRequest;
+use App\Http\Responses\ApiResponse;
 use App\Models\Student;
+use App\Modules\Academic\Delivery\Queries\GetStudentHubCourseScoresQuery;
+use App\Modules\Academic\Delivery\Queries\GetStudentHubScoreDetailsQuery;
 use App\Modules\Academic\Exports\StudentAcademicSummaryExport;
+use App\Modules\Academic\Http\Requests\Delivery\GetStudentHubCourseScoresRequest;
+use App\Modules\Academic\Http\Requests\Delivery\GetStudentHubScoreDetailsRequest;
 use App\Modules\Academic\Progression\Actions\AttachDecisionToTransitionAction;
 use App\Modules\Academic\Progression\Queries\GetStudentAcademicSummaryExportQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentGraduationProgressQuery;
@@ -443,19 +448,17 @@ class StudentAcademicSummaryController extends Controller
      * @param  Request  $request  Request containing course offering filter
      * @return JsonResponse Detailed score breakdown
      */
-    public function getScoreDetails(Student $student, Request $request): JsonResponse
-    {
-
-        $validated = $request->validate([
-            'course_offering_id' => 'required|exists:course_offerings,id',
-        ]);
-
-        $scoreDetails = $this->academicSummaryService->getScoreDetails(
-            $student->id,
-            $validated['course_offering_id']
+    public function getScoreDetails(
+        Student $student,
+        GetStudentHubScoreDetailsRequest $request,
+        GetStudentHubScoreDetailsQuery $query,
+    ): JsonResponse {
+        $scoreDetails = $query->handle(
+            (int) $student->id,
+            (int) $request->validated('course_offering_id'),
         );
 
-        return response()->json([
+        return ApiResponse::compatible([
             'success' => true,
             'data' => $scoreDetails,
         ]);
@@ -469,25 +472,20 @@ class StudentAcademicSummaryController extends Controller
      * @param  Request  $request  Request containing pagination parameters
      * @return JsonResponse Paginated scores data
      */
-    public function getCourseScores(Student $student, int $courseOfferingId, Request $request): JsonResponse
-    {
-
-        $validated = $request->validate([
-            'offset' => 'integer|min:0',
-            'limit' => 'integer|min:1|max:100',
-        ]);
-
-        $offset = $validated['offset'] ?? 0;
-        $limit = $validated['limit'] ?? 20;
-
-        $scoresData = $this->academicSummaryService->getCourseScoresDetails(
-            $student,
+    public function getCourseScores(
+        Student $student,
+        int $courseOfferingId,
+        GetStudentHubCourseScoresRequest $request,
+        GetStudentHubCourseScoresQuery $query,
+    ): JsonResponse {
+        $scoresData = $query->handle(
+            (int) $student->id,
             $courseOfferingId,
-            $offset,
-            $limit
+            (int) $request->validated('offset', 0),
+            (int) $request->validated('limit', 20),
         );
 
-        return response()->json([
+        return ApiResponse::compatible([
             'success' => true,
             'data' => $scoresData,
         ]);

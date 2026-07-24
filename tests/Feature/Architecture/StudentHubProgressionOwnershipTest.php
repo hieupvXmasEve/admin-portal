@@ -14,6 +14,8 @@ it('routes Student Hub registrations through Progression and Delivery evidence s
         ->toContain('GetStudentGraduationProgressQuery')
         ->toContain('GetStudentAcademicSummaryExportQuery')
         ->toContain('GetStudentHubOverviewQuery')
+        ->toContain('GetStudentHubScoreDetailsQuery')
+        ->toContain('GetStudentHubCourseScoresQuery')
         ->not->toContain('GetStudentRegistrationsAction')
         ->and($registrationsQuery)
         ->toContain('StudentHubRegistrationEvidenceReader')

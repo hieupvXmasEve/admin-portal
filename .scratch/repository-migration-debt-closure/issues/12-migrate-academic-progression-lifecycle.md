@@ -70,3 +70,11 @@ Verification: targeted export and Hub ownership tests passed (7 tests, 44 assert
 - Overview credit statistics merge finalized evidence Transcript-first by `course_result_id`, retaining legacy Course Results without a matching Transcript Entry (including in-progress rows for attempted-credit compatibility). A dedicated Progression compatibility query retains the Hub's legacy current-or-latest-by-creation GPA projection without weakening the finalized-only shared GPA reader. No historical academic evidence was updated or removed.
 
 Verification: targeted Overview and Student Hub ownership tests passed (11 tests, 133 assertions), Pint, `git diff --check`, and `migration-debt:inventory --check` passed. The required full suite was invoked, but the Docker wrapper emitted only progress markers without a terminal summary; it is inconclusive and is not recorded as passing evidence. Remaining Issue 12 work is Scores/GPA/Standing, score-detail endpoints, and Progression lifecycle/EGC/Decision/Finance ownership. Status remains `ready-for-agent`.
+
+### 2026-07-24 — Score-detail endpoint read-boundary slice delivered; issue remains open
+
+- Student Hub `score-details` and lazy `course-scores` endpoints now call Delivery-owned Queries rather than `StudentAcademicSummaryService`; controller validation uses Delivery FormRequests and preserves the established `{success, data}` response envelope.
+- The detail query retains assessment-component aggregation and lazy-score pagination. It corrects two legacy read failures: relation-name SQL ordering and a non-existent `assessment_component_details.instructions` select.
+- The main Scores/GPA/Standing Inertia read model remains outstanding, together with lifecycle/EGC/Decision/Finance ownership. No historical evidence was written or removed.
+
+Verification: targeted score-detail endpoint and Student Hub ownership tests passed (2 tests, 29 assertions), Pint, `git diff --check`, and `migration-debt:inventory --check` passed. Status remains `ready-for-agent`.

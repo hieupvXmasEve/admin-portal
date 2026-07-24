@@ -25,6 +25,7 @@ return [
             ],
             'Delivery' => [
                 'Attendance',
+                'AssessmentComponentDetailScore',
                 'ClassSession',
                 'CourseOffering',
                 'CourseRegistration',
