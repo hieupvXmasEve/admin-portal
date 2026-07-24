@@ -10,6 +10,7 @@ use App\Models\CourseRegistration;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Modules\Academic\Delivery\Actions\BulkDeleteCourseOfferingsAction;
 use App\Modules\Academic\Delivery\Actions\DeleteCourseOfferingAction;
 use App\Modules\Academic\Delivery\Actions\EnrollStudentInCourseOfferingAction;
 use App\Modules\Academic\Delivery\Actions\MoveStudentBetweenCourseOfferingSectionsAction;
@@ -21,6 +22,37 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
+
+it('bulk deletes empty offerings through Delivery and removes their registrations', function (): void {
+    $campus = Campus::factory()->create();
+    $semester = Semester::factory()->active()->create();
+    $student = Student::factory()->forCampus($campus)->create([
+        'intake' => 1,
+        'intake_mode' => 'sequential',
+        'intake_semester_id' => $semester->id,
+    ]);
+    $offerings = CourseOffering::factory()->count(2)->create([
+        'campus_id' => $campus->id,
+        'semester_id' => $semester->id,
+        'current_enrollment' => 0,
+    ]);
+    CourseRegistration::query()->create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offerings->first()->id,
+        'semester_id' => $semester->id,
+        'registration_status' => 'dropped',
+        'registration_date' => now(),
+        'credit_hours' => 3,
+    ]);
+
+    $registrationCount = BulkDeleteCourseOfferingsAction::run([
+        'course_offering_ids' => $offerings->pluck('id')->map(fn (int $id): int => $id)->all(),
+        'campus_id' => $campus->id,
+    ]);
+
+    expect($registrationCount)->toBe(1)
+        ->and(CourseOffering::query()->whereKey($offerings->pluck('id'))->exists())->toBeFalse();
+});
 
 it('deletes an empty course offering through Delivery and removes its registrations', function (): void {
     $campus = Campus::factory()->create();

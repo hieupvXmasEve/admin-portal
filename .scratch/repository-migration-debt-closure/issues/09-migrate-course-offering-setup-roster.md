@@ -34,6 +34,7 @@ Move Course Offering setup, instructor assignment, enrollment, registration, ros
 - 2026-07-22: This issue remains `ready-for-agent`: offering setup/cockpit, registration discovery and bulk enrollment, room-related behavior, and their dependency cutovers are still blocked by issues 06, 08, and 14. Completion/statistics compatibility remains in its legacy path and must not be extended; Course Delivery & Assessment owns its retirement once its remaining cockpit callers have a module query/action replacement and corresponding characterization coverage.
 - 2026-07-22: The staff `course-offerings.destroy` route now dispatches through a Delivery action and module controller. It preserves the route name, URL, permission, cross-campus 404 behavior, deletion constraints, redirect, and flash message. The remaining bulk-delete path is intentionally unchanged because its per-unit error output requires the Catalog dependency cutover.
 - 2026-07-24: Issues 06, 08, and 14 are completed, so they no longer block this issue. The staff `course-offerings.duplicate` route now dispatches through a Delivery action and a Catalog contract instead of directly reading `SyllabusTemplate`. It preserves its URL, route name, permission, cross-campus 404 behavior, section-code behavior, Canvas-template rejection, redirect, and flash behavior. The page no longer emits a manual success toast; native Inertia flash handles both outcomes.
+- 2026-07-24: The staff `api.course-offerings.bulk-delete` route now dispatches through Delivery. It validates IDs with an owner FormRequest, preserves campus scoping and roster removal, and obtains Unit codes for blocked-delete messages through the Catalog contract.
 
 ## Verification
 
@@ -46,3 +47,4 @@ Move Course Offering setup, instructor assignment, enrollment, registration, ros
 - `./scripts/dev.sh test tests/Feature/Architecture/CourseRosterDeliveryBoundaryArchTest.php tests/Feature/Architecture/CourseOfferingCatalogBoundaryArchTest.php --compact` — passed: 4 tests, 5 assertions.
 - `./scripts/dev.sh artisan migration-debt:inventory --check --format=table` — passed.
 - `./scripts/dev.sh npm exec eslint resources/js/pages/course-offerings/Index.vue` and `./scripts/dev.sh npm exec prettier --check resources/js/pages/course-offerings/Index.vue` — passed.
+- `./scripts/dev.sh test tests/Feature/CourseOffering/CourseRosterDeliveryActionTest.php --compact` — passed: 13 tests, 38 assertions.

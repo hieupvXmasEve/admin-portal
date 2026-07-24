@@ -6,6 +6,7 @@ use App\Constants\CourseOfferingRoutes;
 use App\Constants\StudentRoutes;
 use App\Modules\Academic\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\AcademicProgressionAuditController;
+use App\Modules\Academic\Http\Web\Admin\CourseOfferingBulkDeletionController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingCatalogFormController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingDeletionController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingDuplicationController;
@@ -71,6 +72,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::prefix('api/course-offerings')->group(function () {
+        Route::delete('/bulk-delete', CourseOfferingBulkDeletionController::class)
+            ->middleware('can:delete_course_offering')
+            ->name(CourseOfferingRoutes::API_BULK_DELETE);
+
         Route::post('/{courseOffering}/bulk-update-status', [CourseOfferingRosterController::class, 'bulkUpdateStatus'])
             ->middleware('can:edit_course_offering')
             ->name(CourseOfferingRoutes::API_BULK_UPDATE_STATUS);

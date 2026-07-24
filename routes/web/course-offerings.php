@@ -78,10 +78,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // ============================================
         // Bulk Operations & Statistics
         // ============================================
-        Route::delete('/bulk-delete', [CourseOfferingController::class, 'bulkDelete'])
-            ->middleware('can:delete_course_offering')
-            ->name(CourseOfferingRoutes::API_BULK_DELETE);
-
         Route::get('/statistics', [CourseOfferingController::class, 'statistics'])
             ->middleware('can:view_course_offering')
             ->name(CourseOfferingRoutes::API_STATISTICS);
