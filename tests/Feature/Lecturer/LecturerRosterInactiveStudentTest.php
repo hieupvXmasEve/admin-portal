@@ -264,6 +264,8 @@ it('returns completed and deferred registrations through the lecturer course stu
         ->and($studentsById[$activeStudent->id]['registration']['status'])->toBe('confirmed')
         ->and($studentsById[$activeStudent->id]['roster']['is_active'])->toBeTrue()
         ->and($studentsById[$activeStudent->id]['roster']['can_mark_attendance'])->toBeTrue()
+        ->and($studentsById[$activeStudent->id]['attendance']['operational_presence_rate'])->toBe(0)
+        ->and($studentsById[$activeStudent->id]['attendance']['academic_attendance_rate'])->toBeNull()
         ->and($studentsById[$completedRegistrationStudent->id]['registration']['status'])->toBe('completed')
         ->and($studentsById[$completedRegistrationStudent->id]['roster']['status'])->toBe('completed')
         ->and($studentsById[$completedRegistrationStudent->id]['roster']['is_active'])->toBeFalse()

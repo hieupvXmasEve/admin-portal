@@ -6,6 +6,7 @@ use App\Constants\CourseOfferingRoutes;
 use App\Constants\StudentRoutes;
 use App\Modules\Academic\Delivery\Http\Api\ClassSessionController as DeliveryClassSessionApiController;
 use App\Modules\Academic\Delivery\Http\Web\AttendanceController as DeliveryAttendanceController;
+use App\Modules\Academic\Delivery\Http\Web\AttendanceReportController as DeliveryAttendanceReportController;
 use App\Modules\Academic\Delivery\Http\Web\BulkUpdateCourseOfferingSessionsController;
 use App\Modules\Academic\Delivery\Http\Web\ClassSessionController as DeliveryClassSessionController;
 use App\Modules\Academic\Http\Web\AcademicPlacementController;
@@ -52,6 +53,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('attendance', [DeliveryAttendanceController::class, 'index'])
         ->middleware('can:view_course_offering')
         ->name('attendance.index');
+
+    Route::get('course-statistics/{courseOffering}/students', [DeliveryAttendanceReportController::class, 'show'])
+        ->middleware(['campus.selected', 'can:view_attendance'])
+        ->name('course-statistics.show');
+
+    Route::get('course-statistics/{courseOffering}/export', [DeliveryAttendanceReportController::class, 'export'])
+        ->middleware(['campus.selected', 'can:view_attendance'])
+        ->name('course-statistics.export');
 
     Route::get('class-sessions', [DeliveryClassSessionController::class, 'index'])
         ->middleware('can:view_class_session')

@@ -11,6 +11,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Modules\Academic\Delivery\Queries\GetCourseOfferingAttendanceReportQuery;
+use App\Modules\Academic\Delivery\Queries\GetCourseOfferingOperationalAttendanceStatisticsQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -48,13 +49,17 @@ it('reports roster-scoped operational presence explicitly while preserving the l
 
     $presentSession = ClassSession::factory()->create([
         'course_offering_id' => $offering->id,
+        'status' => 'completed',
         'session_date' => '2026-01-15',
+        'sequence_number' => 1,
         'start_time' => '09:00:00',
         'end_time' => '11:00:00',
     ]);
     $absentSession = ClassSession::factory()->create([
         'course_offering_id' => $offering->id,
+        'status' => 'completed',
         'session_date' => '2026-01-16',
+        'sequence_number' => 2,
         'start_time' => '09:00:00',
         'end_time' => '11:00:00',
     ]);
@@ -72,6 +77,7 @@ it('reports roster-scoped operational presence explicitly while preserving the l
     ]);
 
     $report = app(GetCourseOfferingAttendanceReportQuery::class)->handle($offering);
+    $statistics = app(GetCourseOfferingOperationalAttendanceStatisticsQuery::class)->handle($offering);
 
     expect($report['statistics']['attendance_metric'])->toBe('operational_presence_rate')
         ->and($report['attendance_grid'])->toHaveCount(1)
@@ -83,4 +89,11 @@ it('reports roster-scoped operational presence explicitly while preserving the l
             'operational_presence_rate' => 50.0,
             'attendance_percentage' => 50.0,
         ]);
+
+    expect($statistics)->toMatchArray([
+        'completed_sessions' => 2,
+        'sessions_with_attendance' => 2,
+        'operational_presence_rate' => 50.0,
+        'overall_attendance_rate' => 50.0,
+    ]);
 });

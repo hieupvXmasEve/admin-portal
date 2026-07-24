@@ -7,9 +7,10 @@ namespace App\Services\V1\Lecturer;
 use App\Models\CourseOffering;
 use App\Models\Lecture;
 use App\Models\Unit;
+use App\Modules\Academic\Delivery\Queries\GetCourseOfferingOperationalAttendanceStatisticsQuery;
+use App\Modules\Academic\Delivery\Queries\GetStudentCourseOperationalAttendanceQuery;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class LecturerCourseService
@@ -224,6 +225,8 @@ class LecturerCourseService
 
                 // Attendance and Academic Standing
                 'attendance_percentage' => $attendanceStats['percentage'],
+                'operational_presence_rate' => $attendanceStats['operational_presence_rate'],
+                'academic_attendance_rate' => $academicRecord?->attendance_percentage,
                 'sessions_attended' => $attendanceStats['attended'],
                 'total_sessions' => $attendanceStats['total'],
                 'last_attendance' => $attendanceStats['last_attendance'],
@@ -443,44 +446,10 @@ class LecturerCourseService
      */
     protected function getAttendanceStatistics(CourseOffering $courseOffering): array
     {
-        $sessions = $courseOffering->classSessions;
-        $activeStudentIds = $courseOffering->activeClassRosterStudentIds();
-        $totalSessions = $sessions->count();
-        $completedSessions = $sessions->where('status', 'completed')->count();
-        $sessionsWithAttendance = $sessions
-            ->filter(function ($session) use ($activeStudentIds) {
-                if (! $session->relationLoaded('attendances')) {
-                    return $session->attendance_marked;
-                }
+        /** @var GetCourseOfferingOperationalAttendanceStatisticsQuery $attendanceStatistics */
+        $attendanceStatistics = app(GetCourseOfferingOperationalAttendanceStatisticsQuery::class);
 
-                return $session->attendances
-                    ->whereIn('student_id', $activeStudentIds)
-                    ->isNotEmpty();
-            })
-            ->count();
-
-        $attendanceRecords = DB::table('attendances')
-            ->join('class_sessions', 'attendances.class_session_id', '=', 'class_sessions.id')
-            ->where('class_sessions.course_offering_id', $courseOffering->id)
-            ->whereIn('attendances.student_id', $activeStudentIds)
-            ->whereIn('attendances.status', ['present', 'late'])
-            ->count();
-
-        $totalPossibleAttendances = DB::table('attendances')
-            ->join('class_sessions', 'attendances.class_session_id', '=', 'class_sessions.id')
-            ->where('class_sessions.course_offering_id', $courseOffering->id)
-            ->whereIn('attendances.student_id', $activeStudentIds)
-            ->count();
-
-        return [
-            'total_sessions' => $totalSessions,
-            'completed_sessions' => $completedSessions,
-            'sessions_with_attendance' => $sessionsWithAttendance,
-            'pending_attendance' => $completedSessions - $sessionsWithAttendance,
-            'overall_attendance_rate' => $totalPossibleAttendances > 0
-                ? round(($attendanceRecords / $totalPossibleAttendances) * 100, 1)
-                : 0,
-        ];
+        return $attendanceStatistics->handle($courseOffering);
     }
 
     /**
@@ -540,32 +509,13 @@ class LecturerCourseService
      */
     protected function calculateStudentAttendanceStats($student, int $courseOfferingId): array
     {
-        $attendances = $student->attendances()
-            ->whereHas('classSession', function ($q) use ($courseOfferingId) {
-                $q->where('course_offering_id', $courseOfferingId);
-            })
-            ->get();
-
-        // Count unique sessions the student has attendance records for
-        $uniqueSessionIds = $attendances->pluck('class_session_id')->unique();
-        $totalSessions = $uniqueSessionIds->count();
-
-        // Count unique sessions where student was present or late
-        $attendedSessionIds = $attendances
-            ->whereIn('status', ['present', 'late'])
-            ->pluck('class_session_id')
-            ->unique();
-        $attendedSessions = $attendedSessionIds->count();
-
-        $percentage = $totalSessions > 0 ? round(($attendedSessions / $totalSessions) * 100, 1) : 0;
-
-        $lastAttendance = $attendances->sortByDesc('created_at')->first();
+        /** @var GetStudentCourseOperationalAttendanceQuery $attendance */
+        $attendance = app(GetStudentCourseOperationalAttendanceQuery::class);
+        $statistics = $attendance->handle($student->id, $courseOfferingId);
 
         return [
-            'total' => $totalSessions,
-            'attended' => $attendedSessions,
-            'percentage' => $percentage,
-            'last_attendance' => $lastAttendance?->created_at?->format('Y-m-d'),
+            ...$statistics,
+            'percentage' => $statistics['operational_presence_rate'],
         ];
     }
 

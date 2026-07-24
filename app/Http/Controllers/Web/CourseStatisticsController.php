@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web;
 
 use App\Constants\CourseOfferingRoutes;
-use App\Exports\AttendanceGridExport;
 use App\Exports\CourseOfferingStatisticsExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CourseStatisticsRequest;
 use App\Http\Resources\UnitStatisticsResource;
 use App\Models\CourseOffering;
 use App\Models\Semester;
-use App\Modules\Academic\Delivery\Queries\GetCourseOfferingAttendanceReportQuery;
 use App\Services\CourseStatisticsService;
 use App\Services\ExcelExportService;
 use Illuminate\Http\RedirectResponse;
@@ -25,7 +23,6 @@ class CourseStatisticsController extends Controller
     public function __construct(
         private readonly CourseStatisticsService $service,
         private readonly ExcelExportService $excelService,
-        private readonly GetCourseOfferingAttendanceReportQuery $attendanceReport,
     ) {}
 
     public function index(CourseStatisticsRequest $request): Response
@@ -68,35 +65,6 @@ class CourseStatisticsController extends Controller
                 'direction' => $validated['direction'] ?? 'asc',
             ],
         ]);
-    }
-
-    public function show(CourseOffering $courseOffering): Response
-    {
-        $data = $this->attendanceReport->handle($courseOffering);
-        $data['course_offering'] = [
-            'id' => $courseOffering->id,
-            'unit_id' => $courseOffering->unit->id,
-            'semester_id' => $courseOffering->semester->id,
-        ];
-
-        return Inertia::render('CourseStatistics/Detail', $data);
-    }
-
-    public function export(CourseOffering $courseOffering): BinaryFileResponse
-    {
-        $data = $this->attendanceReport->handle($courseOffering);
-
-        $export = new AttendanceGridExport(
-            $data['attendance_grid'],
-            $data['sessions']->toArray(),
-            $data['statistics']
-        );
-
-        $filename = $this->excelService->generateFilenameWithTimestamp(
-            "attendance_{$data['statistics']['course_code']}_{$data['statistics']['section_code']}"
-        );
-
-        return $this->excelService->download($export, $filename);
     }
 
     /**

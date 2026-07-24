@@ -48,6 +48,8 @@ class CourseStudentResource extends JsonResource
             // Attendance Information
             'attendance' => [
                 'percentage' => $this->resource['attendance_percentage'],
+                'operational_presence_rate' => $this->resource['operational_presence_rate'],
+                'academic_attendance_rate' => $this->resource['academic_attendance_rate'],
                 'sessions_attended' => $this->resource['sessions_attended'],
                 'total_sessions' => $this->resource['total_sessions'],
                 'last_attendance' => $this->resource['last_attendance'],
