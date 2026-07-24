@@ -27,6 +27,7 @@ use App\Modules\Academic\FacultyWorkforce\Support\EloquentTeachingEligibilityRea
 use App\Modules\Academic\Observers\CourseRegistrationObserver;
 use App\Modules\Academic\Progression\Actions\CommitCourseResultsToTranscriptAction;
 use App\Modules\Academic\Progression\Queries\FilterStudentsByProgramEnrollmentStatus;
+use App\Modules\Academic\Progression\Queries\GetStudentAcademicRecordsQuery;
 use App\Modules\Academic\Progression\Support\EloquentCourseOfferingAttemptWriter;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentLifecycleWriter;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentReader;
@@ -64,6 +65,7 @@ use App\Shared\Contracts\Academic\ProgramEnrollmentLifecycleWriter;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Academic\ProgramEnrollmentWriter;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
+use App\Shared\Contracts\Academic\StudentAcademicRecordsReader;
 use App\Shared\Contracts\Academic\StudentHubCourseOutcomeEvidenceReader;
 use App\Shared\Contracts\Academic\StudentHubRegistrationEvidenceReader;
 use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
@@ -111,6 +113,7 @@ class AcademicServiceProvider extends ServiceProvider
         );
         $this->app->bind(StudentHubRegistrationEvidenceReader::class, EloquentStudentHubRegistrationEvidenceReader::class);
         $this->app->bind(StudentHubCourseOutcomeEvidenceReader::class, EloquentStudentHubCourseOutcomeEvidenceReader::class);
+        $this->app->bind(StudentAcademicRecordsReader::class, GetStudentAcademicRecordsQuery::class);
         $this->app->bind(StudentLifecycleStatusFilter::class, FilterStudentsByProgramEnrollmentStatus::class);
         $this->app->bind(RetakeRegistrationPaymentSyncer::class, SyncPaidRetakeRegistrationsAction::class);
         $this->app->bind(ExamResitAttemptPaymentSyncer::class, SyncPaidExamResitAttemptsAction::class);
