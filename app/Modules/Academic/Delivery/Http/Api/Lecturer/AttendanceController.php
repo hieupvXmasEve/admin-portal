@@ -5,37 +5,39 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Delivery\Http\Api\Lecturer;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\V1\Lecturer\AttendanceFilterRequest;
-use App\Http\Requests\Api\V1\Lecturer\MarkAttendanceRequest;
 use App\Http\Resources\Api\V1\Lecturer\AttendanceSessionResource;
 use App\Http\Resources\Api\V1\Lecturer\SessionAttendanceResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\Lecture;
-use App\Modules\Academic\Delivery\Support\LecturerAttendanceService;
+use App\Modules\Academic\Delivery\Actions\BulkMarkLecturerAttendanceAction;
+use App\Modules\Academic\Delivery\Actions\GenerateLecturerAttendanceRecordsAction;
+use App\Modules\Academic\Delivery\Actions\MarkLecturerAttendanceAction;
+use App\Modules\Academic\Delivery\Queries\GetLecturerAttendanceQuery;
+use App\Modules\Academic\Delivery\Queries\GetLecturerAttendanceSummaryQuery;
+use App\Modules\Academic\Http\Requests\Delivery\BulkMarkLecturerAttendanceRequest;
+use App\Modules\Academic\Http\Requests\Delivery\CourseAttendanceAnalyticsRequest;
+use App\Modules\Academic\Http\Requests\Delivery\ExportCourseAttendanceRequest;
+use App\Modules\Academic\Http\Requests\Delivery\LecturerAttendanceAlertsRequest;
+use App\Modules\Academic\Http\Requests\Delivery\LecturerAttendanceRequest;
+use App\Modules\Academic\Http\Requests\Delivery\LecturerAttendanceSummaryRequest;
+use App\Modules\Academic\Http\Requests\Delivery\ListLecturerAttendanceRequest;
+use App\Modules\Academic\Http\Requests\Delivery\MarkLecturerAttendanceRequest;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class AttendanceController extends Controller
 {
-    public function __construct(
-        protected LecturerAttendanceService $attendanceService
-    ) {}
-
     /**
      * Get attendance sessions overview
      */
-    public function index(AttendanceFilterRequest $request): JsonResponse
+    public function index(ListLecturerAttendanceRequest $request, GetLecturerAttendanceQuery $query): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
             $filters = $request->validated();
-            $perPage = (int) $request->query('per_page', 15);
-            $perPage = min(max($perPage, 5), 50);
-
-            $sessions = $this->attendanceService->getAttendanceSessions($lecturer->id, $filters, $perPage);
+            $sessions = $query->handle('sessions', $lecturer->id, $filters, (int) ($filters['per_page'] ?? 15));
 
             return ApiResponse::paginated(
                 $sessions->through(fn ($session) => new AttendanceSessionResource($session)),
@@ -49,14 +51,13 @@ class AttendanceController extends Controller
     /**
      * Get sessions requiring attention (unmarked attendance)
      */
-    public function sessionsRequiringAttention(Request $request): JsonResponse
+    public function sessionsRequiringAttention(LecturerAttendanceRequest $request, GetLecturerAttendanceQuery $query): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
-            $filters = ['attendance_status' => 'unmarked'];
-            $sessions = $this->attendanceService->getAttendanceSessions($lecturer->id, $filters, 20);
+            $sessions = $query->handle('sessions', $lecturer->id, ['attendance_status' => 'unmarked'], 20);
 
             return ApiResponse::success(
                 AttendanceSessionResource::collection($sessions->items()),
@@ -71,12 +72,12 @@ class AttendanceController extends Controller
     /**
      * Get session attendance details
      */
-    public function sessionAttendance(Request $request, int $sessionId): JsonResponse
+    public function sessionAttendance(LecturerAttendanceRequest $request, int $sessionId, GetLecturerAttendanceQuery $query): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
         try {
-            $attendanceData = $this->attendanceService->getSessionAttendance($lecturer->id, $sessionId);
+            $attendanceData = $query->handle('session', $lecturer->id, $sessionId);
 
             // Log::debug('attendanceData', ['attendanceData' => $attendanceData]);
             if (! $attendanceData) {
@@ -98,18 +99,17 @@ class AttendanceController extends Controller
     /**
      * Mark attendance for a session
      */
-    public function markAttendance(MarkAttendanceRequest $request, int $sessionId): JsonResponse
+    public function markAttendance(MarkLecturerAttendanceRequest $request, int $sessionId): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
-            Log::debug('request', ['request' => $request->all()]);
-            $attendanceData = $request->validated()['attendance_data'];
-
-            $result = $this->attendanceService->markAttendance($lecturer->id, $sessionId, $attendanceData);
-
-            Log::debug('result', ['result' => $result]);
+            $result = MarkLecturerAttendanceAction::run([
+                ...$request->validated(),
+                'lecturer_id' => $lecturer->id,
+                'session_id' => $sessionId,
+            ]);
 
             if ($result['total_errors'] > 0) {
                 return ApiResponse::success(
@@ -137,50 +137,20 @@ class AttendanceController extends Controller
     /**
      * Bulk update attendance for multiple sessions
      */
-    public function bulkMarkAttendance(Request $request): JsonResponse
+    public function bulkMarkAttendance(BulkMarkLecturerAttendanceRequest $request): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
-            $validated = $request->validate([
-                'sessions' => 'required|array|min:1|max:10',
-                'sessions.*.session_id' => 'required|integer',
-                'sessions.*.attendance_data' => 'required|array',
-                'sessions.*.attendance_data.*.student_id' => 'required|integer',
-                'sessions.*.attendance_data.*.status' => 'required|in:present,absent,late,excused',
-            ]);
-
-            $results = [];
-            $totalProcessed = 0;
-            $totalErrors = 0;
-
-            foreach ($validated['sessions'] as $sessionData) {
-                try {
-                    $result = $this->attendanceService->markAttendance(
-                        $lecturer->id,
-                        $sessionData['session_id'],
-                        $sessionData['attendance_data']
-                    );
-
-                    $results[] = $result;
-                    $totalProcessed += $result['total_marked'];
-                    $totalErrors += $result['total_errors'];
-                } catch (\Exception $e) {
-                    $results[] = [
-                        'session_id' => $sessionData['session_id'],
-                        'error' => $e->getMessage(),
-                    ];
-                    $totalErrors++;
-                }
-            }
-
-            return ApiResponse::success([
-                'total_sessions_processed' => count($validated['sessions']),
-                'total_attendance_marked' => $totalProcessed,
-                'total_errors' => $totalErrors,
-                'results' => $results,
-            ], [], 'Bulk attendance marking completed');
+            return ApiResponse::success(
+                BulkMarkLecturerAttendanceAction::run([
+                    ...$request->validated(),
+                    'lecturer_id' => $lecturer->id,
+                ]),
+                [],
+                'Bulk attendance marking completed'
+            );
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to process bulk attendance marking');
         }
@@ -189,19 +159,13 @@ class AttendanceController extends Controller
     /**
      * Get course attendance analytics
      */
-    public function courseAnalytics(Request $request, int $courseOfferingId): JsonResponse
+    public function courseAnalytics(CourseAttendanceAnalyticsRequest $request, int $courseOfferingId, GetLecturerAttendanceQuery $query): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
-            $filters = $request->only(['date_from', 'date_to', 'student_id']);
-
-            $analytics = $this->attendanceService->getCourseAttendanceAnalytics(
-                $lecturer->id,
-                $courseOfferingId,
-                $filters
-            );
+            $analytics = $query->handle('analytics', $lecturer->id, $courseOfferingId, $request->validated());
 
             return ApiResponse::success(
                 $analytics,
@@ -220,15 +184,13 @@ class AttendanceController extends Controller
     /**
      * Get attendance alerts
      */
-    public function alerts(Request $request): JsonResponse
+    public function alerts(LecturerAttendanceAlertsRequest $request, GetLecturerAttendanceQuery $query): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
-            $filters = $request->only(['priority', 'type', 'course_offering_id']);
-
-            $alerts = $this->attendanceService->getAttendanceAlerts($lecturer->id, $filters);
+            $alerts = $query->handle('alerts', $lecturer->id, $request->validated());
 
             return ApiResponse::success(
                 $alerts,
@@ -243,27 +205,15 @@ class AttendanceController extends Controller
     /**
      * Export attendance data
      */
-    public function exportAttendance(Request $request, int $courseOfferingId): JsonResponse
+    public function exportAttendance(ExportCourseAttendanceRequest $request, int $courseOfferingId, GetLecturerAttendanceQuery $query): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
-            $format = $request->query('format', 'csv');
+            $format = $request->validated('format', 'csv');
 
-            if (! in_array($format, ['csv', 'excel', 'pdf'])) {
-                return ApiResponse::validationError(
-                    ['format' => ['Format must be csv, excel, or pdf']],
-                    'Invalid export format'
-                );
-            }
-
-            $exportData = $this->attendanceService->exportAttendanceData(
-                $lecturer->id,
-                $courseOfferingId,
-                $format,
-                $lecturer->full_name,
-            );
+            $exportData = $query->handle('export', $lecturer->id, $courseOfferingId, $format, $lecturer->full_name);
 
             return ApiResponse::success(
                 $exportData,
@@ -282,13 +232,13 @@ class AttendanceController extends Controller
     /**
      * Generate attendance records for a session (new endpoint)
      */
-    public function generateAttendance(Request $request, int $session): JsonResponse
+    public function generateAttendance(LecturerAttendanceRequest $request, int $session): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
-            $result = $this->attendanceService->generateAttendanceRecords($lecturer->id, $session);
+            $result = GenerateLecturerAttendanceRecordsAction::run(['lecturer_id' => $lecturer->id, 'session_id' => $session]);
 
             return ApiResponse::success(
                 $result,
@@ -307,44 +257,14 @@ class AttendanceController extends Controller
     /**
      * Get attendance summary for dashboard
      */
-    public function summary(Request $request): JsonResponse
+    public function summary(LecturerAttendanceSummaryRequest $request, GetLecturerAttendanceSummaryQuery $query): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
-            $semesterId = $request->query('semester_id');
-            $filters = $semesterId ? ['semester_id' => $semesterId] : [];
-
-            // Get recent sessions for summary
-            $sessions = $this->attendanceService->getAttendanceSessions($lecturer->id, $filters, 50);
-
-            $totalSessions = $sessions->total();
-            $sessionsWithAttendance = $sessions->where('attendance_marked', true)->count();
-            $pendingSessions = $sessions->where('attendance_marked', false)
-                ->where('session_date', '<', now()->subHours(2))
-                ->count();
-
-            $summary = [
-                'total_sessions' => $totalSessions,
-                'sessions_with_attendance' => $sessionsWithAttendance,
-                'pending_sessions' => $pendingSessions,
-                'completion_rate' => $totalSessions > 0
-                    ? round(($sessionsWithAttendance / $totalSessions) * 100, 1)
-                    : 0,
-                'recent_sessions' => $sessions->take(5)->map(function ($session) {
-                    return [
-                        'id' => $session->id,
-                        'course' => $session->courseOffering->unit_code,
-                        'date' => $session->session_date->format('Y-m-d'),
-                        'attendance_marked' => $session->attendance_marked,
-                        'attendance_percentage' => $session->attendance_percentage,
-                    ];
-                }),
-            ];
-
             return ApiResponse::success(
-                $summary,
+                $query->handle($lecturer->id, $request->validated()),
                 [],
                 'Attendance summary retrieved successfully'
             );

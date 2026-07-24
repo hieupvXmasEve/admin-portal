@@ -11,6 +11,19 @@ use Illuminate\Http\Response;
 final class ApiResponse
 {
     /**
+     * Return a pre-existing endpoint contract without changing its envelope.
+     *
+     * Use this only while a versioned or established endpoint is being
+     * migrated to the unified response boundary.
+     *
+     * @param  array<string, mixed>  $body
+     */
+    public static function compatible(array $body, int $status = Response::HTTP_OK): JsonResponse
+    {
+        return response()->json($body, $status);
+    }
+
+    /**
      * Base success response
      */
     public static function success(

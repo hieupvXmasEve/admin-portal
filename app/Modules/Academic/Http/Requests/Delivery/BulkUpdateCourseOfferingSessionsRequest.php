@@ -10,7 +10,11 @@ class BulkUpdateCourseOfferingSessionsRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user() !== null;
+        $courseOffering = $this->route('courseOffering');
+
+        return $this->user() !== null
+            && $courseOffering !== null
+            && $courseOffering->campus_id === app('campus')->id;
     }
 
     public function rules(): array
@@ -27,5 +31,10 @@ class BulkUpdateCourseOfferingSessionsRequest extends FormRequest
             'lecture_id' => ['nullable', 'integer', 'exists:lectures,id'],
             'room_id' => ['nullable', 'integer', 'exists:rooms,id'],
         ];
+    }
+
+    protected function failedAuthorization(): void
+    {
+        abort(404);
     }
 }

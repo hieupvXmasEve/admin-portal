@@ -95,6 +95,31 @@ it('marks attendance through the lecturer API unaffected by the cockpit attendan
     ]);
 });
 
+it('normalizes attendance fields according to the submitted status', function () {
+    Sanctum::actingAs($this->lecturer);
+
+    $response = $this->postJson("/api/v1/lecturer/attendance/sessions/{$this->session->id}/mark", [
+        'attendance_data' => [
+            [
+                'student_id' => $this->student->id,
+                'status' => 'absent',
+                'check_in_time' => '09:15:00',
+                'minutes_late' => 15,
+            ],
+        ],
+    ]);
+
+    $response->assertOk()->assertJsonPath('success', true);
+
+    $this->assertDatabaseHas('attendances', [
+        'class_session_id' => $this->session->id,
+        'student_id' => $this->student->id,
+        'status' => 'absent',
+        'minutes_late' => 0,
+        'check_in_time' => null,
+    ]);
+});
+
 it('rejects lecturer attendance marking for a session the lecturer does not own', function () {
     $otherLecturerUser = User::factory()->create([
         'type' => UserType::LECTURER,

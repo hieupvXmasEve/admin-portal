@@ -46,3 +46,21 @@ it('keeps preserved attendance routes pointed at Delivery-owned controllers', fu
         }
     }
 });
+
+it('keeps Delivery attendance controllers as request adapters', function (): void {
+    $controllers = [
+        base_path('app/Modules/Academic/Delivery/Http/Api/ClassSessionController.php'),
+        base_path('app/Modules/Academic/Delivery/Http/Api/Lecturer/AttendanceController.php'),
+        base_path('app/Modules/Academic/Delivery/Http/Api/Student/AttendanceController.php'),
+        base_path('app/Modules/Academic/Delivery/Http/Web/AttendanceController.php'),
+        base_path('app/Modules/Academic/Delivery/Http/Web/ClassSessionController.php'),
+    ];
+
+    foreach ($controllers as $controller) {
+        $contents = file_get_contents($controller) ?: '';
+
+        expect($contents)
+            ->not->toContain('->validate(')
+            ->not->toMatch('/(?:Attendance|ClassSession|CourseOffering|Room|Lecture)::(?:query|where|find|with)\(/');
+    }
+});

@@ -1,6 +1,6 @@
 # Migrate class sessions and attendance operations
 
-Status: ready-for-agent
+Status: ready-for-human
 
 Portal impact: both
 
@@ -33,6 +33,7 @@ Cut class-session scheduling, attendance recording, readiness, reporting, and st
 - `./scripts/dev.sh artisan test --compact tests/Feature/Attendance/CourseOfferingAttendanceReportTest.php tests/Feature/Lecturer/LecturerRosterInactiveStudentTest.php` — 8 passed (98 assertions).
 - `./scripts/dev.sh artisan test --compact tests/Feature/Attendance/CourseOfferingAttendanceReportTest.php tests/Feature/Lecturer/LecturerRosterInactiveStudentTest.php tests/Feature/Architecture/AttendanceDeliveryMigrationArchTest.php tests/Feature/Architecture/CourseDeliveryAssessmentBoundaryArchTest.php` — 14 passed (162 assertions).
 - `./scripts/dev.sh artisan test --compact tests/Feature/Attendance/ClassSessionBulkUpdateAttendanceTest.php tests/Feature/Architecture/AttendanceDeliveryMigrationArchTest.php tests/Feature/Architecture/CourseDeliveryAssessmentBoundaryArchTest.php` — 9 passed (57 assertions).
+- `./scripts/dev.sh artisan test --compact tests/Feature/Architecture/AttendanceDeliveryMigrationArchTest.php tests/Feature/Attendance/ClassSessionBulkUpdateAttendanceTest.php tests/Feature/Attendance/StandaloneAttendancePagesTest.php tests/Feature/Lecturer/LecturerAttendanceMarkApiTest.php tests/Feature/CourseOffering/CourseOfferingRecordAttendanceTest.php tests/Feature/Attendance/CourseOfferingAttendanceReportTest.php tests/Feature/Lecturer/LecturerRosterInactiveStudentTest.php` — 33 passed (233 assertions).
 - Legacy-caller scan for the retired attendance and class-session controllers/services — no matches.
 - `./scripts/dev.sh artisan test --compact` — remains failing in unrelated suites outside this migration; focused coverage and the migration-debt guard pass.
 
@@ -43,4 +44,5 @@ Cut class-session scheduling, attendance recording, readiness, reporting, and st
 - Lecturer course attendee responses now distinguish `operational_presence_rate` from `academic_attendance_rate`; the former remains available as the compatible `attendance_percentage` alias.
 - Operational presence now uses expected active attendees (active roster × scheduled sessions), including partially recorded sessions. It is null for inactive roster rows; Academic Attendance Rate retains its separate recorded-session semantics.
 - Final spec review found no remaining issue-10 acceptance gap.
-- Review still requires extracting legacy-style validation and orchestration from the moved Delivery controllers into FormRequests and Actions/Queries. The full-suite failures also need separate triage. These remaining standards findings keep the issue ready for an agent rather than complete.
+- Delivery controller validation, orchestration, reporting, and export logic now live behind Delivery FormRequests, Actions, and Queries. Cross-campus routes retain their 404 behavior, API envelopes remain compatible, and lecturer status normalization is covered by regression tests.
+- Final spec and standards reviews found no remaining issue-10 gap or hard violation. The only outstanding verification concern is the unrelated full-suite baseline, which needs maintainer triage before a repository-wide green claim.

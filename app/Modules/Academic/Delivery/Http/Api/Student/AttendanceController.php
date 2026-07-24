@@ -5,38 +5,33 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Delivery\Http\Api\Student;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\V1\Student\AttendanceFilterRequest;
 use App\Http\Resources\Api\V1\Student\AttendanceReportResource;
 // use App\Http\Resources\Api\V1\Student\CourseAttendanceResource;
 use App\Http\Responses\ApiResponse;
-use App\Models\Semester;
 use App\Models\Student;
-use App\Modules\Academic\Delivery\Support\StudentAttendanceService;
-use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Modules\Academic\Delivery\Queries\GetStudentAttendanceQuery;
+use App\Modules\Academic\Http\Requests\Delivery\StudentAttendanceFilterRequest;
+use App\Modules\Academic\Http\Requests\Delivery\StudentAttendanceRequest;
+use App\Modules\Academic\Http\Requests\Delivery\StudentAttendanceSemesterRequest;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class AttendanceController extends Controller
 {
-    public function __construct(
-        protected StudentAttendanceService $attendanceService
-    ) {}
-
     /**
      * Get student's attendance summary
      */
-    public function index(AttendanceFilterRequest $request): JsonResponse
+    public function index(StudentAttendanceFilterRequest $request, GetStudentAttendanceQuery $query): JsonResponse
     {
         /** @var Student $student */
         $student = $request->user();
 
         try {
             $filters = $request->validated();
-            $semesterId = $filters['semester_id'] ?? null;
+            $semesterId = isset($filters['semester_id']) ? (int) $filters['semester_id'] : null;
             unset($filters['semester_id']);
 
-            $attendance = $this->attendanceService->getAttendanceSummary($student, $semesterId, $filters);
+            $attendance = $query->handle('summary', $student, $semesterId, $filters);
 
             return ApiResponse::success(
                 $attendance,
@@ -53,13 +48,13 @@ class AttendanceController extends Controller
     /**
      * Get attendance for a specific course
      */
-    public function courseAttendance(Request $request, int $courseOfferingId): JsonResponse
+    public function courseAttendance(StudentAttendanceRequest $request, int $courseOfferingId, GetStudentAttendanceQuery $query): JsonResponse
     {
         /** @var Student $student */
         $student = $request->user();
 
         try {
-            $courseAttendance = $this->attendanceService->getCourseAttendance($student, $courseOfferingId);
+            $courseAttendance = $query->handle('course', $student, $courseOfferingId);
 
             return ApiResponse::success(
                 $courseAttendance,
@@ -74,14 +69,14 @@ class AttendanceController extends Controller
     /**
      * Get attendance statistics
      */
-    public function statistics(Request $request): JsonResponse
+    public function statistics(StudentAttendanceSemesterRequest $request, GetStudentAttendanceQuery $query): JsonResponse
     {
         /** @var Student $student */
         $student = $request->user();
 
         try {
-            $semesterId = $request->query('semester_id');
-            $statistics = $this->attendanceService->getAttendanceStatistics($student, $semesterId);
+            $semesterId = $request->validated('semester_id');
+            $statistics = $query->handle('statistics', $student, $semesterId !== null ? (int) $semesterId : null);
 
             return ApiResponse::success(
                 $statistics,
@@ -96,30 +91,24 @@ class AttendanceController extends Controller
     /**
      * Get comprehensive attendance report with semester filtering
      */
-    public function report(Request $request): JsonResponse
+    public function report(StudentAttendanceSemesterRequest $request, GetStudentAttendanceQuery $query): JsonResponse
     {
         /** @var Student $student */
         $student = $request->user();
-        $semesterId = null;
-
         try {
-            $currentPeriod = app(AcademicPeriodReader::class)->current();
-            $requestedSemesterId = $request->query('semester_id');
-            $semesterId = $requestedSemesterId !== null
-                ? (int) $requestedSemesterId
-                : ($currentPeriod?->id);
-            $reportData = $this->attendanceService->getAttendanceReport($student, $semesterId);
-            Log::info('Report Data', ['report_data' => $reportData]);
+            $requestedSemesterId = $request->validated('semester_id');
+            $report = $query->handle('reportForRequestedPeriod', $student, $requestedSemesterId !== null ? (int) $requestedSemesterId : null);
+            Log::info('Report Data', ['report_data' => $report['report']]);
 
             return ApiResponse::success(
-                new AttendanceReportResource($reportData),
+                new AttendanceReportResource($report['report']),
                 [],
                 'Attendance report retrieved successfully'
             );
         } catch (\Exception $e) {
             Log::error('Failed to retrieve attendance report', [
                 'student_id' => $student->id,
-                'semester_id' => $semesterId,
+                'semester_id' => $report['semester_id'] ?? null,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);

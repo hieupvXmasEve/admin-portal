@@ -18,10 +18,6 @@ class BulkUpdateCourseOfferingSessionsController extends Controller
 {
     public function __invoke(BulkUpdateCourseOfferingSessionsRequest $request, CourseOffering $courseOffering): JsonResponse|RedirectResponse
     {
-        if ($courseOffering->campus_id !== app('campus')->id) {
-            abort(404);
-        }
-
         try {
             $validated = $request->validated();
             $count = BulkUpdateCourseOfferingSessionsAction::run([
