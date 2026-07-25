@@ -19,13 +19,13 @@ use App\Modules\Academic\Progression\Actions\AttachDecisionToTransitionAction;
 use App\Modules\Academic\Progression\Queries\GetStudentAcademicSummaryExportQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentGraduationProgressQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentHubOverviewQuery;
+use App\Modules\Academic\Progression\Queries\GetStudentHubScoresQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentRegistrationsQuery;
 use App\Modules\Academic\Queries\GetStudentAttendanceDetailsQuery;
 use App\Modules\Academic\Queries\GetStudentAttendanceQuery;
 use App\Modules\Academic\Queries\GetStudentLifecycleTimelineQuery;
 use App\Modules\Academic\Support\LifecycleFormOptions;
 use App\Services\ExcelExportService;
-use App\Services\StudentAcademicSummaryService;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Finance\HubStudentFinanceSummaryReader;
 use App\Shared\Contracts\Finance\StudentFeeSummaryReader;
@@ -51,7 +51,6 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class StudentAcademicSummaryController extends Controller
 {
     public function __construct(
-        private StudentAcademicSummaryService $academicSummaryService,
         private StudentWalletController $studentWalletController,
         private GoldTransactionController $goldTransactionController,
         private StudentGuardianRelationshipReader $guardianRelationshipReader,
@@ -198,10 +197,9 @@ class StudentAcademicSummaryController extends Controller
      * @param  Student  $student  The student to display scores for
      * @return Response Inertia response with scores data
      */
-    public function scores(Student $student): Response
+    public function scores(Student $student, GetStudentHubScoresQuery $query): Response
     {
-
-        $scoresData = $this->academicSummaryService->getScoresData($student);
+        $scoresData = $query->handle((int) $student->id);
 
         return Inertia::render('students/AcademicSummary/Scores', [
             'student' => $this->hubStudentContext($student),

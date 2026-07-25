@@ -28,5 +28,7 @@ final readonly class StudentHubCourseOutcomeEvidence
         public ?string $semesterName = null,
         /** @var array<string, mixed>|null */
         public ?array $gradeDisplay = null,
+        public ?int $semesterId = null,
+        public bool $excludedFromGpa = false,
     ) {}
 }

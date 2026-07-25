@@ -93,3 +93,11 @@ Verification: `CurriculumModuleCompositionReaderTest` passed (1 test, 16 asserti
 - The Scores/GPA/Standing controller is intentionally unchanged until the Progression composition query consumes both approved evidence contracts.
 
 Verification: score-detail endpoint and Hub ownership tests passed (2 tests, 46 assertions), including no-scheme and custom-scheme grade-display compatibility, Pint, `git diff --check`, and `migration-debt:inventory --check` passed. Status remains `ready-for-agent`.
+
+### 2026-07-25 — Scores/GPA/Standing read-boundary slice delivered; issue remains open
+
+- Student Hub Scores now calls `GetStudentHubScoresQuery` in Progression; `StudentAcademicSummaryService` is no longer injected into the Hub controller.
+- The read-only query composes Delivery assessment and Course Result evidence, Catalog curriculum-module composition, Program Enrollment context, and Progression-owned GPA calculations. It preserves stored grading-scheme display, legacy current-or-latest GPA selection, final-record attempted/earned-credit snapshots, and module pivot grading semantics (including explicit zero weights).
+- The Course Result evidence contract now provides semester and GPA-exclusion facts needed for the compatibility projection. No historical evidence was written, reconciled, or removed.
+
+Verification: focused Scores/GPA, scheme-display, score-detail, and ownership tests passed (11 tests, 102 assertions); Pint, `git diff --check`, and `migration-debt:inventory --check` passed. Two independent implementation reviews found no remaining actionable issues. Status remains `ready-for-agent`; remaining work is lifecycle/EGC/Decision ownership and approved Finance lifecycle integration.

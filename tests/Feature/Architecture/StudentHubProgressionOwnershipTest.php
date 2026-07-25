@@ -8,15 +8,18 @@ it('routes Student Hub registrations through Progression and Delivery evidence s
     $graduationQuery = file_get_contents(base_path('app/Modules/Academic/Progression/Queries/GetStudentGraduationProgressQuery.php')) ?: '';
     $exportQuery = file_get_contents(base_path('app/Modules/Academic/Progression/Queries/GetStudentAcademicSummaryExportQuery.php')) ?: '';
     $overviewQuery = file_get_contents(base_path('app/Modules/Academic/Progression/Queries/GetStudentHubOverviewQuery.php')) ?: '';
+    $scoresQuery = file_get_contents(base_path('app/Modules/Academic/Progression/Queries/GetStudentHubScoresQuery.php')) ?: '';
 
     expect($controller)
         ->toContain('GetStudentRegistrationsQuery')
         ->toContain('GetStudentGraduationProgressQuery')
         ->toContain('GetStudentAcademicSummaryExportQuery')
         ->toContain('GetStudentHubOverviewQuery')
+        ->toContain('GetStudentHubScoresQuery')
         ->toContain('GetStudentHubScoreDetailsQuery')
         ->toContain('GetStudentHubCourseScoresQuery')
         ->not->toContain('GetStudentRegistrationsAction')
+        ->not->toContain('StudentAcademicSummaryService')
         ->and($registrationsQuery)
         ->toContain('StudentHubRegistrationEvidenceReader')
         ->toContain('StudentHubCourseOutcomeEvidenceReader')
@@ -34,5 +37,11 @@ it('routes Student Hub registrations through Progression and Delivery evidence s
         ->toContain('StudentProfileReader')
         ->toContain('StudentHubRegistrationEvidenceReader')
         ->toContain('StudentHubCourseOutcomeEvidenceReader')
+        ->not->toContain('StudentAcademicSummaryService');
+
+    expect($scoresQuery)
+        ->toContain('StudentHubAssessmentEvidenceReader')
+        ->toContain('StudentHubCourseOutcomeEvidenceReader')
+        ->toContain('CurriculumModuleCompositionReader')
         ->not->toContain('StudentAcademicSummaryService');
 });

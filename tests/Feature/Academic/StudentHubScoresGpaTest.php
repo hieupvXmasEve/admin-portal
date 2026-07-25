@@ -8,11 +8,13 @@ use App\Models\AssessmentComponentDetail;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\Campus;
 use App\Models\CourseOffering;
+use App\Models\CurriculumModule;
 use App\Models\GpaCalculation;
+use App\Models\Module;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
-use App\Services\StudentAcademicSummaryService;
+use App\Modules\Academic\Progression\Queries\GetStudentHubScoresQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -84,7 +86,26 @@ it('merges per-course scores, assessment breakdown, GPA history and academic sta
     $student = Student::factory()->forCampus($campus)->create(['intake' => 1, 'intake_mode' => 'sequential', 'intake_semester_id' => Semester::factory()->create()->id]);
 
     $offering1 = seedScoredCourse($student, $campus, $sem1, 78.0);
-    seedScoredCourse($student, $campus, $sem2, 88.0);
+    $offering2 = seedScoredCourse($student, $campus, $sem2, 88.0);
+    $module = Module::create([
+        'campus_id' => $campus->id,
+        'code' => 'SCORES-MODULE',
+        'name' => 'Scores Module',
+        'grading_type' => 'grade',
+        'total_credits' => 6,
+    ]);
+    $module->units()->attach([
+        $offering1->unit_id => ['grading_type' => 'grade', 'weight' => 0, 'order' => 1],
+        $offering2->unit_id => ['grading_type' => 'grade', 'weight' => 1, 'order' => 2],
+    ]);
+    CurriculumModule::query()->create([
+        'curriculum_version_id' => $student->curriculum_version_id,
+        'module_id' => $module->id,
+        'year_level' => 1,
+        'semester_number' => 1,
+        'is_required' => true,
+        'order' => 1,
+    ]);
 
     GpaCalculation::create([
         'student_id' => $student->id,
@@ -115,7 +136,7 @@ it('merges per-course scores, assessment breakdown, GPA history and academic sta
         'is_current' => true,
     ]);
 
-    $scores = app(StudentAcademicSummaryService::class)->getScoresData($student);
+    $scores = app(GetStudentHubScoresQuery::class)->handle((int) $student->id);
 
     // Per-course scores with an assessment breakdown.
     $courses = collect($scores['standalone_units']['data']);
@@ -136,6 +157,13 @@ it('merges per-course scores, assessment breakdown, GPA history and academic sta
     expect($scores['cumulative'])->not->toBeNull()
         ->and((float) $scores['cumulative']['gpa'])->toBe(83.0)
         ->and($scores['cumulative']['academic_standing'])->toBe('normal');
+
+    expect($scores['modules']['data'])->toHaveCount(1)
+        ->and((float) $scores['modules']['data'][0]['module_grade'])->toBe(88.0)
+        ->and($scores['modules']['data'][0]['status'])->toBe('passed')
+        ->and($scores['modules']['data'][0]['grading_info']['uses_weights'])->toBeTrue()
+        ->and($scores['modules']['data'][0]['sub_units'][0]['code'])->toBe($offering1->unit->code)
+        ->and($scores['modules']['data'][0]['sub_units'][1]['included_in_average'])->toBeTrue();
 });
 
 it('returns only this student grades and GPA, never another student', function () {
@@ -176,7 +204,7 @@ it('returns only this student grades and GPA, never another student', function (
         'is_current' => true,
     ]);
 
-    $scores = app(StudentAcademicSummaryService::class)->getScoresData($student);
+    $scores = app(GetStudentHubScoresQuery::class)->handle((int) $student->id);
     $offeringIds = collect($scores['standalone_units']['data'])->pluck('course_offering_id');
 
     expect($offeringIds)->toContain($mine->id)

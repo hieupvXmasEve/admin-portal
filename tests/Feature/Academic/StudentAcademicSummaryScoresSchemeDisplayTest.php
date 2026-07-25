@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\AcademicRecord;
 use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
@@ -17,7 +18,6 @@ use App\Models\User;
 use App\Services\CourseCompletionService;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Inertia\Inertia;
 
 use function Pest\Laravel\actingAs;
 
@@ -136,7 +136,7 @@ beforeEach(function () {
             ->withSession(['current_campus_id' => $this->campus->id])
             ->get(route('students.academic-summary.scores', $student), [
                 'X-Inertia' => 'true',
-                'X-Inertia-Version' => Inertia::getVersion(),
+                'X-Inertia-Version' => app(HandleInertiaRequests::class)->version(request()),
             ]);
     };
 });

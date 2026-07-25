@@ -9,7 +9,7 @@ use App\Models\GpaCalculation;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
-use App\Services\StudentAcademicSummaryService;
+use App\Modules\Academic\Progression\Queries\GetStudentHubScoresQuery;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -121,7 +121,7 @@ it('derives score page attempted and earned credits from final academic records'
         'is_current' => true,
     ]);
 
-    $scores = app(StudentAcademicSummaryService::class)->getScoresData($student);
+    $scores = app(GetStudentHubScoresQuery::class)->handle((int) $student->id);
     $semesters = collect($scores['semesters'])->keyBy('semester_id');
 
     expect($semesters[$sem1->id]['credit_points_attempted'])->toBe(6.0)
