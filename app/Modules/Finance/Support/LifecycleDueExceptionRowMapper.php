@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Support;
 
 use App\Models\DeferCase;
-use App\Models\StudentActionLog;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Enums\LifecycleDueExceptionReviewStatus;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceLifecycleDueExceptionReview;
+use App\Shared\Contracts\Academic\DTO\StudentLifecycleActionSummary;
 use Carbon\CarbonInterface;
 
 final class LifecycleDueExceptionRowMapper
@@ -68,6 +68,7 @@ final class LifecycleDueExceptionRowMapper
     public static function map(
         DngPaymentRequest $request,
         ?FinanceLifecycleDueExceptionReview $review,
+        ?StudentLifecycleActionSummary $latestAction,
         CarbonInterface $today,
         bool $canCancelDng,
         bool $canVoidCharges,
@@ -86,12 +87,6 @@ final class LifecycleDueExceptionRowMapper
 
         $reviewStatus = $review?->status ?? LifecycleDueExceptionReviewStatus::Open;
         $linkedCharges = self::resolveLinkedCharges($request);
-        $latestAction = $student
-            ? StudentActionLog::query()
-                ->where('student_id', $student->id)
-                ->latest('id')
-                ->first(['id', 'action_type', 'created_at', 'notes'])
-            : null;
         $latestDeferCase = $student
             ? DeferCase::query()
                 ->where('student_id', $student->id)
@@ -132,8 +127,8 @@ final class LifecycleDueExceptionRowMapper
             'blocking_reasons' => self::blockingReasons($request),
             'latest_student_action' => $latestAction ? [
                 'id' => $latestAction->id,
-                'action_type' => $latestAction->action_type,
-                'created_at' => $latestAction->created_at,
+                'action_type' => $latestAction->actionType,
+                'created_at' => $latestAction->createdAt,
                 'notes' => $latestAction->notes,
             ] : null,
             'defer_case' => $latestDeferCase ? [

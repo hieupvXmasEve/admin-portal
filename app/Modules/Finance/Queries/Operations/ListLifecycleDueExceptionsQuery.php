@@ -10,12 +10,17 @@ use App\Modules\Finance\Enums\LifecycleDueExceptionReason;
 use App\Modules\Finance\Models\FinanceLifecycleDueExceptionReview;
 use App\Modules\Finance\Support\LifecycleDueExceptionRowMapper;
 use App\Modules\Finance\Support\LifecycleDueItemPredicate;
+use App\Shared\Contracts\Academic\StudentLifecycleActionReader;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 
 class ListLifecycleDueExceptionsQuery
 {
+    public function __construct(
+        private readonly StudentLifecycleActionReader $lifecycleActions,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $filters
      */
@@ -111,12 +116,16 @@ class ListLifecycleDueExceptionsQuery
             ->whereIn('dng_payment_request_id', $requestIds)
             ->get()
             ->keyBy('dng_payment_request_id');
+        $latestActions = $this->lifecycleActions->latestForStudentIds(
+            $paginator->getCollection()->pluck('student_id')->filter()->map(static fn (int|string $id): int => (int) $id)->all(),
+        );
 
         $paginator->setCollection(
             $paginator->getCollection()->map(
                 fn (DngPaymentRequest $request) => LifecycleDueExceptionRowMapper::map(
                     $request,
                     $reviews->get($request->id),
+                    $request->student_id === null ? null : ($latestActions[(int) $request->student_id] ?? null),
                     $today,
                     $canCancelDng,
                     $canVoidCharges,

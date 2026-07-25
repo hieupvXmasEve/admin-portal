@@ -108,3 +108,10 @@ Verification: focused Scores/GPA, scheme-display, score-detail, and ownership te
 - The merged action/progression timeline, EGC detail panel, IELTS history, Decision payload, ordering, permissions, and Finance isolation are unchanged. Finance access remains only through its approved Hub contracts; no Academic or Finance persistence was mutated.
 
 Verification: lifecycle timeline, Hub lifecycle, and ownership tests passed (19 tests, 132 assertions); Pint, `git diff --check`, and `migration-debt:inventory --check` passed. Two independent implementation reviews found no remaining actionable issues. Status remains `ready-for-agent`; remaining work is lifecycle/EGC action write ownership and approved Finance lifecycle integration.
+
+### 2026-07-25 — Finance lifecycle due-exception read boundary delivered; issue remains open
+
+- Finance’s Lifecycle Due Exceptions page now receives latest student-action evidence through the typed `StudentLifecycleActionReader` contract owned by Progression. Its Finance mapper no longer imports or queries `StudentActionLog` directly.
+- The reader batches page student IDs and preserves the existing latest-by-action-id payload (`id`, action type, timestamp, notes), including null behavior. No lifecycle, Finance, or historical data was mutated.
+
+Verification: lifecycle/Finance boundary and Hub lifecycle tests passed (13 tests, 92 assertions); Pint, `git diff --check`, and `migration-debt:inventory --check` passed. Two independent implementation reviews found no remaining actionable issues. Status remains `ready-for-agent`; remaining Finance readers that query lifecycle persistence are separate compatibility/reporting work.

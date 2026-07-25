@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Shared\Contracts\Academic\StudentLifecycleActionReader;
 use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
 use App\Shared\Contracts\Finance\StudentLifecycleFinanceCommand;
 use App\Shared\Contracts\Finance\StudentLifecycleFinanceEvidenceWriter;
@@ -56,9 +57,19 @@ it('binds narrow Finance lifecycle query and command contracts to Finance implem
         ->and(app()->bound(StudentLifecycleFinanceEvidenceWriter::class))->toBeTrue()
         ->and(app()->bound(StudentLifecycleCourseRegistrationGateway::class))->toBeTrue();
 
+    expect(app()->bound(StudentLifecycleActionReader::class))->toBeTrue();
+
     $deferService = file_get_contents(base_path('app/Modules/Finance/Services/DeferCaseService.php')) ?: '';
 
     expect($deferService)
         ->toContain('StudentLifecycleCourseRegistrationGateway')
         ->not->toContain("DB::table('course_registrations')");
+
+    $dueExceptionMapper = file_get_contents(base_path('app/Modules/Finance/Support/LifecycleDueExceptionRowMapper.php')) ?: '';
+    $dueExceptionQuery = file_get_contents(base_path('app/Modules/Finance/Queries/Operations/ListLifecycleDueExceptionsQuery.php')) ?: '';
+
+    expect($dueExceptionMapper)
+        ->not->toContain('StudentActionLog')
+        ->and($dueExceptionQuery)
+        ->toContain('StudentLifecycleActionReader');
 });
