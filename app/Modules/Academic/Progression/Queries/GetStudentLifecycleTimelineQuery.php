@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Queries;
+namespace App\Modules\Academic\Progression\Queries;
 
 use App\Enums\AcademicProgressionEventType;
 use App\Models\AcademicProgressionEvent;
@@ -28,8 +28,12 @@ use Illuminate\Support\Collection;
  * exactly as ADR-0009 prescribes. A future reader should not "fix" the merge by
  * splitting the tab back into two tables — the merge is the feature.
  */
-class GetStudentLifecycleTimelineQuery
+final class GetStudentLifecycleTimelineQuery
 {
+    public function __construct(
+        private readonly ProgramEnrollmentReader $programEnrollments,
+    ) {}
+
     /**
      * Progression event types that represent a status change and therefore
      * belong in the main timeline alongside status actions.
@@ -229,7 +233,7 @@ class GetStudentLifecycleTimelineQuery
             ])
             ->all();
 
-        $enrollment = app(ProgramEnrollmentReader::class)->forStudentId((int) $student->id);
+        $enrollment = $this->programEnrollments->forStudentId((int) $student->id);
 
         return [
             'current_level' => $enrollment->egcCurrentLevel,

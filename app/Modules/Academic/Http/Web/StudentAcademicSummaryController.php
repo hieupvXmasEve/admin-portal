@@ -20,10 +20,10 @@ use App\Modules\Academic\Progression\Queries\GetStudentAcademicSummaryExportQuer
 use App\Modules\Academic\Progression\Queries\GetStudentGraduationProgressQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentHubOverviewQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentHubScoresQuery;
+use App\Modules\Academic\Progression\Queries\GetStudentLifecycleTimelineQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentRegistrationsQuery;
 use App\Modules\Academic\Queries\GetStudentAttendanceDetailsQuery;
 use App\Modules\Academic\Queries\GetStudentAttendanceQuery;
-use App\Modules\Academic\Queries\GetStudentLifecycleTimelineQuery;
 use App\Modules\Academic\Support\LifecycleFormOptions;
 use App\Services\ExcelExportService;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;

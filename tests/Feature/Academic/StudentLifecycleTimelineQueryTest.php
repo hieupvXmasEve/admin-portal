@@ -16,7 +16,7 @@ use App\Models\StudentDecision;
 use App\Models\UploadRecord;
 use App\Models\User;
 use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
-use App\Modules\Academic\Queries\GetStudentLifecycleTimelineQuery;
+use App\Modules\Academic\Progression\Queries\GetStudentLifecycleTimelineQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -69,7 +69,7 @@ it('merges status actions and status-changing progression events ordered by even
     $second = lifecycleEvent($this->student, $this->user, $this->semester, AcademicProgressionEventType::PLACEMENT_INITIALIZED, '2026-02-01 09:00:00');
     $third = lifecycleAction($this->student, $this->user, StudentActionType::ACADEMIC_DEFER, '2026-03-01 09:00:00');
 
-    $result = (new GetStudentLifecycleTimelineQuery)->handle($this->student);
+    $result = app(GetStudentLifecycleTimelineQuery::class)->handle($this->student);
 
     $ids = collect($result['timeline'])->pluck('id')->all();
 
@@ -85,7 +85,7 @@ it('keeps english-level changes and ielts records out of the main timeline and i
     $levelChange = lifecycleEvent($this->student, $this->user, $this->semester, AcademicProgressionEventType::ENGLISH_LEVEL_CHANGED, '2026-02-01 09:00:00');
     $ielts = lifecycleEvent($this->student, $this->user, $this->semester, AcademicProgressionEventType::IELTS_RECORDED, '2026-02-15 09:00:00');
 
-    $result = (new GetStudentLifecycleTimelineQuery)->handle($this->student);
+    $result = app(GetStudentLifecycleTimelineQuery::class)->handle($this->student);
 
     $timelineIds = collect($result['timeline'])->pluck('id')->all();
     $levelHistoryIds = collect($result['egc']['history'])->pluck('id')->all();
@@ -123,7 +123,7 @@ it('exposes the IELTS scan file (url + original_name) in the egc panel, and null
         'missing_documents' => true,
     ]);
 
-    $ielts = collect((new GetStudentLifecycleTimelineQuery)->handle($this->student)['egc']['ielts'])
+    $ielts = collect(app(GetStudentLifecycleTimelineQuery::class)->handle($this->student)['egc']['ielts'])
         ->keyBy('id');
 
     expect($ielts[$withScan->id]['upload_record'])->not->toBeNull()
@@ -147,7 +147,7 @@ it('flags a requires-decision transition with no decision and clears the flag on
     $authorized = lifecycleAction($this->student, $this->user, StudentActionType::CAMPUS_TRANSFER, '2026-04-01 09:00:00', $decision);
     $neverRequires = lifecycleAction($this->student, $this->user, StudentActionType::ADMISSION_DEFERRAL, '2026-02-01 09:00:00');
 
-    $rows = collect((new GetStudentLifecycleTimelineQuery)->handle($this->student)['timeline'])
+    $rows = collect(app(GetStudentLifecycleTimelineQuery::class)->handle($this->student)['timeline'])
         ->keyBy('id');
 
     expect($rows['action-'.$missing->id]['requires_decision'])->toBeTrue()
@@ -178,7 +178,7 @@ it('exposes the attached Decision document (url + original_name) on the timeline
     $withDoc = lifecycleAction($this->student, $this->user, StudentActionType::CAMPUS_TRANSFER, '2026-04-01 09:00:00', $decision);
     $noDecision = lifecycleAction($this->student, $this->user, StudentActionType::ADMISSION_DEFERRAL, '2026-02-01 09:00:00');
 
-    $rows = collect((new GetStudentLifecycleTimelineQuery)->handle($this->student)['timeline'])->keyBy('id');
+    $rows = collect(app(GetStudentLifecycleTimelineQuery::class)->handle($this->student)['timeline'])->keyBy('id');
 
     expect($rows['action-'.$withDoc->id]['decision']['upload_record'])->not->toBeNull()
         ->and($rows['action-'.$withDoc->id]['decision']['upload_record']['id'])->toBe($scan->id)
@@ -192,7 +192,7 @@ it('never flags an EGC progression transition as missing a decision (placement /
     $placement = lifecycleEvent($this->student, $this->user, $this->semester, AcademicProgressionEventType::PLACEMENT_INITIALIZED, '2026-02-01 09:00:00');
     $stage = lifecycleEvent($this->student, $this->user, $this->semester, AcademicProgressionEventType::COURSE_STAGE_CHANGED, '2026-03-01 09:00:00');
 
-    $rows = collect((new GetStudentLifecycleTimelineQuery)->handle($this->student)['timeline'])
+    $rows = collect(app(GetStudentLifecycleTimelineQuery::class)->handle($this->student)['timeline'])
         ->keyBy('id');
 
     // Both still appear in the main timeline (they are status-changing), but
@@ -215,7 +215,7 @@ it('surfaces an action recorded through the write seam in the timeline, flagged 
         'dropout_semester_id' => $this->semester->id,
     ]);
 
-    $rows = collect((new GetStudentLifecycleTimelineQuery)->handle($this->student->fresh())['timeline'])
+    $rows = collect(app(GetStudentLifecycleTimelineQuery::class)->handle($this->student->fresh())['timeline'])
         ->keyBy('id');
 
     expect($rows)->toHaveKey('action-'.$log->id)

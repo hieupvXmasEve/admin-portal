@@ -101,3 +101,10 @@ Verification: score-detail endpoint and Hub ownership tests passed (2 tests, 46 
 - The Course Result evidence contract now provides semester and GPA-exclusion facts needed for the compatibility projection. No historical evidence was written, reconciled, or removed.
 
 Verification: focused Scores/GPA, scheme-display, score-detail, and ownership tests passed (11 tests, 102 assertions); Pint, `git diff --check`, and `migration-debt:inventory --check` passed. Two independent implementation reviews found no remaining actionable issues. Status remains `ready-for-agent`; remaining work is lifecycle/EGC/Decision ownership and approved Finance lifecycle integration.
+
+### 2026-07-25 — Lifecycle timeline ownership slice delivered; issue remains open
+
+- The Student Hub lifecycle/EGC/Decision timeline query now belongs to Progression and receives Program Enrollment through its explicit contract dependency. The Hub controller and lifecycle tests use the Progression query directly.
+- The merged action/progression timeline, EGC detail panel, IELTS history, Decision payload, ordering, permissions, and Finance isolation are unchanged. Finance access remains only through its approved Hub contracts; no Academic or Finance persistence was mutated.
+
+Verification: lifecycle timeline, Hub lifecycle, and ownership tests passed (19 tests, 132 assertions); Pint, `git diff --check`, and `migration-debt:inventory --check` passed. Two independent implementation reviews found no remaining actionable issues. Status remains `ready-for-agent`; remaining work is lifecycle/EGC action write ownership and approved Finance lifecycle integration.
