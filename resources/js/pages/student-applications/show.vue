@@ -192,7 +192,6 @@ const submitReject = () => {
         {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success('Application rejected.');
                 showRejectDialog.value = false;
             },
             onError: () => toast.error('Failed to reject application.'),
@@ -462,9 +461,7 @@ const relationshipLabel = (value: string | null): string => {
                             <div class="min-w-0">
                                 <div class="flex items-center gap-2">
                                     <p class="font-semibold">{{ guardian.full_name }}</p>
-                                    <Badge v-if="guardian.is_primary" class="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                                        Primary
-                                    </Badge>
+                                    <Badge v-if="guardian.is_primary" class="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"> Primary </Badge>
                                     <Badge variant="secondary">{{ relationshipLabel(guardian.relationship) }}</Badge>
                                 </div>
                                 <div class="text-muted-foreground mt-1 space-y-0.5 text-sm">
@@ -476,27 +473,13 @@ const relationshipLabel = (value: string | null): string => {
                             </div>
 
                             <div v-if="isPending" class="flex items-center gap-1">
-                                <Button
-                                    v-if="!guardian.is_primary"
-                                    size="sm"
-                                    variant="ghost"
-                                    :disabled="isSubmitting"
-                                    title="Set as primary"
-                                    @click="makePrimary(guardian)"
-                                >
+                                <Button v-if="!guardian.is_primary" size="sm" variant="ghost" :disabled="isSubmitting" title="Set as primary" @click="makePrimary(guardian)">
                                     <Star class="h-4 w-4" />
                                 </Button>
                                 <Button size="sm" variant="ghost" :disabled="isSubmitting" title="Edit" @click="openEditGuardian(guardian)">
                                     <Pencil class="h-4 w-4" />
                                 </Button>
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    class="text-rose-600 hover:text-rose-700"
-                                    :disabled="isSubmitting"
-                                    title="Remove"
-                                    @click="removeGuardian(guardian)"
-                                >
+                                <Button size="sm" variant="ghost" class="text-rose-600 hover:text-rose-700" :disabled="isSubmitting" title="Remove" @click="removeGuardian(guardian)">
                                     <Trash2 class="h-4 w-4" />
                                 </Button>
                             </div>
@@ -511,10 +494,7 @@ const relationshipLabel = (value: string | null): string => {
                         <CardDescription>External link references from the admissions catalog, grouped by type.</CardDescription>
                     </CardHeader>
                     <CardContent class="space-y-4">
-                        <div
-                            v-if="missingRequired.length > 0"
-                            class="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50/60 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/10 dark:text-amber-300"
-                        >
+                        <div v-if="missingRequired.length > 0" class="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50/60 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/10 dark:text-amber-300">
                             <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0" />
                             <span>
                                 <span class="font-semibold">{{ missingRequired.length }} required document(s) missing.</span>
@@ -522,39 +502,20 @@ const relationshipLabel = (value: string | null): string => {
                             </span>
                         </div>
 
-                        <p v-if="documentGroups.length === 0" class="text-muted-foreground text-sm">
-                            No document types in the catalog yet.
-                        </p>
-                        <p v-else-if="!hasDocuments && missingRequired.length === 0" class="text-muted-foreground text-sm">
-                            No documents recorded yet.
-                        </p>
+                        <p v-if="documentGroups.length === 0" class="text-muted-foreground text-sm">No document types in the catalog yet.</p>
+                        <p v-else-if="!hasDocuments && missingRequired.length === 0" class="text-muted-foreground text-sm">No documents recorded yet.</p>
 
-                        <div
-                            v-for="docGroup in documentGroups"
-                            :key="docGroup.code"
-                            class="rounded-lg border p-4"
-                            :class="docGroup.is_missing ? 'border-amber-300 bg-amber-50/40 dark:border-amber-700 dark:bg-amber-900/10' : ''"
-                        >
+                        <div v-for="docGroup in documentGroups" :key="docGroup.code" class="rounded-lg border p-4" :class="docGroup.is_missing ? 'border-amber-300 bg-amber-50/40 dark:border-amber-700 dark:bg-amber-900/10' : ''">
                             <div class="flex flex-wrap items-center gap-2">
                                 <p class="font-semibold">{{ docGroup.name }}</p>
                                 <Badge v-if="docGroup.required" variant="secondary">Required</Badge>
-                                <Badge
-                                    v-if="docGroup.is_missing"
-                                    class="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                                >
-                                    Missing
-                                </Badge>
+                                <Badge v-if="docGroup.is_missing" class="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"> Missing </Badge>
                             </div>
 
                             <ul v-if="docGroup.documents.length > 0" class="mt-2 space-y-1.5">
                                 <li v-for="doc in docGroup.documents" :key="doc.id" class="flex items-center gap-2 text-sm">
                                     <FileText class="text-muted-foreground h-4 w-4 shrink-0" />
-                                    <a
-                                        :href="doc.link"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-                                    >
+                                    <a :href="doc.link" target="_blank" rel="noopener noreferrer" class="text-primary inline-flex items-center gap-1 font-medium hover:underline">
                                         {{ doc.original_name ?? doc.link }}
                                         <ExternalLink class="h-3 w-3" />
                                     </a>
@@ -670,9 +631,8 @@ const relationshipLabel = (value: string | null): string => {
             <DialogHeader>
                 <DialogTitle>Revoke approval</DialogTitle>
                 <DialogDescription>
-                    This tears down the enrolled student account, user, and roles, and returns the application to pending for
-                    correction. It is only possible while the student has no academic or financial activity. Use Withdraw for a
-                    student who has already studied.
+                    This tears down the enrolled student account, user, and roles, and returns the application to pending for correction. It is only possible while the student has no academic or financial activity. Use Withdraw for a student who has
+                    already studied.
                 </DialogDescription>
             </DialogHeader>
 

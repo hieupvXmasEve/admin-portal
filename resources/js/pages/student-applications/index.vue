@@ -101,30 +101,29 @@ interface Props {
 const props = defineProps<Props>();
 
 // Shared filter/sort/pagination plumbing (same composable as the other list pages).
-const { filters, setFilter, handleSearch, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection, isLoading } =
-    useDataTable<Filters>({
-        baseUrl: route('student-applications.index'),
-        initialFilters: {
-            search: props.filters.search ?? '',
-            status: props.filters.status ?? 'all',
-            intake: props.filters.intake ?? 'all',
-            sort: props.filters.sort ?? 'created_at',
-            direction: props.filters.direction ?? 'desc',
-            per_page: props.filters.per_page ?? 15,
-            page: props.applications.current_page ?? 1,
-        },
-        defaultValues: {
-            search: '',
-            status: 'all',
-            intake: 'all',
-            sort: 'created_at',
-            direction: 'desc',
-            per_page: 15,
-            page: 1,
-        },
-        only: ['applications', 'filters'],
-        immediateFields: ['status', 'intake'],
-    });
+const { filters, setFilter, handleSearch, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection, isLoading } = useDataTable<Filters>({
+    baseUrl: route('student-applications.index'),
+    initialFilters: {
+        search: props.filters.search ?? '',
+        status: props.filters.status ?? 'all',
+        intake: props.filters.intake ?? 'all',
+        sort: props.filters.sort ?? 'created_at',
+        direction: props.filters.direction ?? 'desc',
+        per_page: props.filters.per_page ?? 15,
+        page: props.applications.current_page ?? 1,
+    },
+    defaultValues: {
+        search: '',
+        status: 'all',
+        intake: 'all',
+        sort: 'created_at',
+        direction: 'desc',
+        per_page: 15,
+        page: 1,
+    },
+    only: ['applications', 'filters'],
+    immediateFields: ['status', 'intake'],
+});
 
 const data = computed(() => props.applications.data);
 
@@ -224,18 +223,21 @@ const submitReject = () => {
         return;
     }
     isSubmitting.value = true;
-    router.post(route('student-applications.reject', rejectTarget.value.id), { rejected_reason: rejectReason.value }, {
-        preserveScroll: true,
-        preserveState: true,
-        onSuccess: () => {
-            toast.success('Application rejected.');
-            showRejectDialog.value = false;
+    router.post(
+        route('student-applications.reject', rejectTarget.value.id),
+        { rejected_reason: rejectReason.value },
+        {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                showRejectDialog.value = false;
+            },
+            onError: () => toast.error('Failed to reject application.'),
+            onFinish: () => {
+                isSubmitting.value = false;
+            },
         },
-        onError: () => toast.error('Failed to reject application.'),
-        onFinish: () => {
-            isSubmitting.value = false;
-        },
-    });
+    );
 };
 </script>
 
@@ -340,12 +342,7 @@ const submitReject = () => {
 
             <template #cell-actions="{ row }">
                 <div class="flex items-center justify-end gap-1">
-                    <Button
-                        v-if="row.original.status === 'pending'"
-                        size="sm"
-                        class="bg-emerald-600 text-white hover:bg-emerald-700"
-                        @click="approve(row.original)"
-                    >
+                    <Button v-if="row.original.status === 'pending'" size="sm" class="bg-emerald-600 text-white hover:bg-emerald-700" @click="approve(row.original)">
                         <CheckCircle2 class="mr-1 h-4 w-4" />
                         Approve
                     </Button>
