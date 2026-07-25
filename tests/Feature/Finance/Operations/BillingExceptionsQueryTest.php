@@ -119,6 +119,57 @@ it('lists deferred enrolled students separately from missing charge exceptions',
         );
 });
 
+it('does not classify a resumed student as deferred from historical defer evidence', function () {
+    $user = User::factory()->create();
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'EXC-RESUMED-01',
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+            'status' => 'intake_course',
+        ])
+        ->create();
+
+    $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
+    CourseRegistration::create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $this->semester->id,
+        'registration_status' => 'confirmed',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 1,
+    ]);
+
+    $actionLog = StudentActionLog::create([
+        'student_id' => $student->id,
+        'action_type' => StudentActionType::ACADEMIC_DEFER,
+        'reason' => 'Historical defer before resuming',
+        'from_semester_id' => $this->semester->id,
+        'changed_by_user_id' => $user->id,
+    ]);
+    DeferCase::create([
+        'student_action_log_id' => $actionLog->id,
+        'student_id' => $student->id,
+        'semester_id' => $this->semester->id,
+        'scope_type' => DeferCase::SCOPE_FULL,
+        'fee_policy' => DeferCase::POLICY_FORFEIT,
+        'applies_once' => true,
+        'effective_at' => now()->toDateString(),
+        'changed_by_user_id' => $user->id,
+    ]);
+
+    $counts = app(GetBillingExceptionCountsQuery::class)->handle($this->semester->id);
+
+    expect($counts['missing_charge'])->toBe(1)
+        ->and($counts['deferred_enrolled'])->toBe(0);
+});
+
 it('lists the default all-filter queue without calling Eloquent methods on query builders', function () {
     $student = Student::factory()
         ->forCampus($this->campus)
@@ -163,6 +214,68 @@ it('lists the default all-filter queue without calling Eloquent methods on query
         ->and($retake['id'])->toBe(
             BillingExceptionIdentifier::encode('retake_no_charge', $registration->id)
         );
+});
+
+it('keeps chronological ordering when the all queue mixes Finance and Progression evidence', function () {
+    $missingStudent = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'EXC-MIXED-MISSING',
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+            'status' => 'intake_course',
+        ])
+        ->create();
+    $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
+    $registration = CourseRegistration::create([
+        'student_id' => $missingStudent->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $this->semester->id,
+        'registration_status' => 'confirmed',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 1,
+    ]);
+    $registration->forceFill([
+        'created_at' => '2026-01-15 23:00:00',
+        'updated_at' => '2026-01-15 23:00:00',
+    ])->save();
+
+    $deferredStudent = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'EXC-MIXED-DEFER',
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+            'status' => 'deferred',
+        ])
+        ->create();
+    $action = StudentActionLog::create([
+        'student_id' => $deferredStudent->id,
+        'action_type' => StudentActionType::ACADEMIC_DEFER,
+        'reason' => 'Earlier defer without case',
+        'from_semester_id' => $this->semester->id,
+        'changed_by_user_id' => User::factory()->create()->id,
+    ]);
+    $action->forceFill([
+        'created_at' => '2026-01-15 01:00:00',
+        'updated_at' => '2026-01-15 01:00:00',
+    ])->save();
+
+    $list = app(ListBillingExceptionsQuery::class)
+        ->handle($this->semester->id, 'all', 'http://localhost/exceptions');
+
+    expect(array_column($list->items(), 'type'))->toBe(['missing_charge', 'defer_no_case'])
+        ->and(array_column($list->items(), 'student_code'))->toBe([
+            'EXC-MIXED-MISSING',
+            'EXC-MIXED-DEFER',
+        ]);
 });
 
 it('returns an empty queue for the unimplemented mismatch filter', function () {

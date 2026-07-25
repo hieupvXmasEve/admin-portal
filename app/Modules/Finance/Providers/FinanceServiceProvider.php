@@ -36,6 +36,7 @@ use App\Modules\Finance\Support\FinanceIntakeRouter;
 use App\Modules\Finance\Support\HubStudentFinanceSummaryReader as ModuleHubStudentFinanceSummaryReader;
 use App\Modules\Finance\Support\ObligationLedgerSettlementReader;
 use App\Modules\Finance\Support\SettlementPosition\CurrentPayableSettlementPositionReader;
+use App\Shared\Contracts\Academic\StudentDeferLifecycleReader;
 use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
 use App\Shared\Contracts\Finance\AiFinanceMetricReader;
 use App\Shared\Contracts\Finance\AiFinanceStudentProfileReader;
@@ -94,6 +95,7 @@ class FinanceServiceProvider extends ServiceProvider
             return new DeferCaseService(
                 $app->make(FinanceChargeService::class),
                 $app->make(StudentLifecycleCourseRegistrationGateway::class),
+                $app->make(StudentDeferLifecycleReader::class),
             );
         });
 

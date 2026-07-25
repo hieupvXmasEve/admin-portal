@@ -812,8 +812,6 @@ final class GetAcademicProgressionReconciliationQuery
         return [
             'supported_runtime_consumers' => [
                 ['path' => 'App\\Shared\\Contracts\\Academic\\StudentHubCourseOutcomeEvidenceReader', 'reason' => 'Student Hub, export, registration, scores, and graduation compatibility evidence.'],
-                ['path' => 'App\\Modules\\Finance\\Support\\BillingExceptionCollector', 'reason' => 'Finance operational lifecycle compatibility read.'],
-                ['path' => 'App\\Modules\\Finance\\Support\\BillingExceptionDeferredEnrollmentMatcher', 'reason' => 'Finance defer matching business read.'],
                 ['path' => 'App\\Modules\\Finance\\Actions\\Egc\\SyncEgcBlockResultsAction', 'reason' => 'Finance EGC reconciliation business path.'],
                 ['path' => 'App\\Services\\V1\\Student\\GradeService', 'reason' => 'Supported student grades and GPA API.'],
                 ['path' => 'App\\Services\\V1\\Student\\DashboardService', 'reason' => 'Supported student dashboard GPA and credit-progress API.'],
@@ -822,7 +820,6 @@ final class GetAcademicProgressionReconciliationQuery
                 ['path' => 'App\\Modules\\Academic\\Delivery\\Queries\\GetLecturerCourseGradebookQuery', 'reason' => 'Supported lecturer gradebook/reporting path.'],
                 ['path' => 'App\\Modules\\Academic\\Delivery\\Support\\LecturerCourseService', 'reason' => 'Supported lecturer course student list and academic-record path.'],
                 ['path' => 'App\\Modules\\Academic\\Delivery\\Support\\AssessmentReportService', 'reason' => 'Supported lecturer assessment matrix and export path.'],
-                ['path' => 'App\\Modules\\Finance\\Services\\DeferCaseService', 'reason' => 'Supported Finance defer lifecycle business path.'],
                 ['path' => 'App\\Modules\\Academic\\Support\\AcademicFinanceChargeSourceGateway', 'reason' => 'Supported Finance charge-source read.'],
                 ['path' => 'App\\Modules\\Academic\\Progression\\Actions\\ProcessEgcCourseResultsAction', 'reason' => 'Supported EGC progression and state transition path.'],
                 ['path' => 'App\\Services\\V1\\Student\\PrerequisiteValidationService', 'reason' => 'Supported registration prerequisite gate.'],

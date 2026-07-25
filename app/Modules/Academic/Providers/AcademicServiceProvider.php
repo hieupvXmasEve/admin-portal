@@ -38,6 +38,7 @@ use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentLifecycleW
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentReader;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentWriter;
 use App\Modules\Academic\Progression\Support\EloquentStudentAcademicHoldReader;
+use App\Modules\Academic\Progression\Support\EloquentStudentDeferLifecycleReader;
 use App\Modules\Academic\Progression\Support\EloquentStudentLifecycleActionReader;
 use App\Modules\Academic\Progression\Support\EloquentTranscriptEntryGpaReader;
 use App\Modules\Academic\Queries\Reporting\GetAcademicReportQuery;
@@ -80,6 +81,7 @@ use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use App\Shared\Contracts\Academic\StudentAcademicHoldReader;
 use App\Shared\Contracts\Academic\StudentAcademicRecordsReader;
 use App\Shared\Contracts\Academic\StudentDashboardReader;
+use App\Shared\Contracts\Academic\StudentDeferLifecycleReader;
 use App\Shared\Contracts\Academic\StudentGpaTrendReader;
 use App\Shared\Contracts\Academic\StudentHubAssessmentEvidenceReader;
 use App\Shared\Contracts\Academic\StudentHubCourseOutcomeEvidenceReader;
@@ -130,6 +132,7 @@ class AcademicServiceProvider extends ServiceProvider
         $this->app->bind(ProgramEnrollmentWriter::class, EloquentProgramEnrollmentWriter::class);
         $this->app->bind(StudentLifecycleStatusReader::class, ModuleStudentLifecycleStatusReader::class);
         $this->app->bind(StudentLifecycleActionReader::class, EloquentStudentLifecycleActionReader::class);
+        $this->app->bind(StudentDeferLifecycleReader::class, EloquentStudentDeferLifecycleReader::class);
         $this->app->bind(
             StudentLifecycleCourseRegistrationGateway::class,
             EloquentStudentLifecycleCourseRegistrationGateway::class,

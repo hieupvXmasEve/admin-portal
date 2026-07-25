@@ -10,8 +10,10 @@ use App\Models\DeferCase;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Models\StudentActionLog;
 use App\Models\User;
 use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
+use App\Modules\Finance\Services\DeferCaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 
@@ -129,4 +131,43 @@ it('rejects a course-scoped defer outside the Program Enrollment student and sem
 
     expect($otherRegistration->fresh()->registration_status)->toBe('registered')
         ->and(DeferCase::query()->where('student_id', $student->id)->exists())->toBeFalse();
+});
+
+it('creates a Finance defer case from a Progression action identifier', function () {
+    ['fromSemester' => $from, 'returnSemester' => $return, 'user' => $user, 'student' => $student] = fullScopeDeferFixture();
+
+    $action = StudentActionLog::query()->create([
+        'student_id' => $student->id,
+        'action_type' => StudentActionType::ACADEMIC_DEFER,
+        'reason' => 'Contract-backed Finance defer case',
+        'from_semester_id' => $from->id,
+        'return_semester_id' => $return->id,
+        'changed_by_user_id' => $user->id,
+    ]);
+
+    $deferCase = app(DeferCaseService::class)->createDeferCase($action->id, [
+        'scope_type' => DeferCase::SCOPE_FULL,
+        'fee_policy' => DeferCase::POLICY_FORFEIT,
+    ]);
+
+    expect($deferCase->student_action_log_id)->toBe($action->id)
+        ->and($deferCase->student_id)->toBe($student->id)
+        ->and($deferCase->semester_id)->toBe($from->id)
+        ->and($deferCase->applies_until_semester_id)->toBe($return->id)
+        ->and($deferCase->changed_by_user_id)->toBe($user->id);
+});
+
+it('rejects a non-defer Progression action identifier', function () {
+    ['fromSemester' => $from, 'user' => $user, 'student' => $student] = fullScopeDeferFixture();
+
+    $action = StudentActionLog::query()->create([
+        'student_id' => $student->id,
+        'action_type' => StudentActionType::STUDENT_ENROLLMENT_NE,
+        'reason' => 'Not a defer transition',
+        'from_semester_id' => $from->id,
+        'changed_by_user_id' => $user->id,
+    ]);
+
+    expect(fn () => app(DeferCaseService::class)->createDeferCase($action->id, []))
+        ->toThrow(InvalidArgumentException::class, 'Action log must be a defer action');
 });

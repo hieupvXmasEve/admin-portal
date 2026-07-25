@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Enums\StudentActionType;
 use App\Models\DeferCase;
-use App\Models\StudentActionLog;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Shared\Contracts\Academic\DTO\StudentDeferActionSummary;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
+use App\Shared\Contracts\Academic\StudentDeferLifecycleReader;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -19,6 +18,14 @@ use Illuminate\Support\Facades\DB;
 
 final class BillingExceptionCollector
 {
+    /** @var array<string, Collection<int, StudentDeferActionSummary>> */
+    private array $deferActionsWithoutCasesByScope = [];
+
+    public function __construct(
+        private readonly StudentDeferLifecycleReader $deferLifecycle,
+        private readonly BillingExceptionDeferredEnrollmentMatcher $deferredEnrollmentMatcher,
+    ) {}
+
     public function counts(?int $semesterId, ?int $campusId): array
     {
         return [
@@ -100,7 +107,7 @@ final class BillingExceptionCollector
 
     private function countDeferNoCases(?int $semesterId, ?int $campusId): int
     {
-        return $this->deferNoCaseBaseQuery($semesterId, $campusId)->count();
+        return $this->deferActionsWithoutCases($semesterId, $campusId)->count();
     }
 
     private function paginateMissingCharges(
@@ -182,15 +189,16 @@ final class BillingExceptionCollector
         int $perPage,
         string $path,
     ): LengthAwarePaginator {
-        $paginator = $this->deferNoCaseBaseQuery($semesterId, $campusId)
-            ->with(['student:id,student_id,full_name'])
-            ->orderByDesc('student_action_logs.created_at')
-            ->orderByDesc('student_action_logs.id')
-            ->paginate($perPage, ['student_action_logs.*'], 'page', $page)
-            ->withPath($path);
+        $actions = $this->deferActionsWithoutCases($semesterId, $campusId);
 
-        return $paginator->setCollection(
-            $paginator->getCollection()->map(fn (StudentActionLog $log) => $this->mapDeferNoCaseRow($log))
+        return new LengthAwarePaginator(
+            $actions->forPage($page, $perPage)
+                ->map(fn (StudentDeferActionSummary $action): array => $this->mapDeferNoCaseRow($action))
+                ->values(),
+            $actions->count(),
+            $perPage,
+            $page,
+            ['path' => $path, 'pageName' => 'page'],
         );
     }
 
@@ -204,20 +212,42 @@ final class BillingExceptionCollector
         $union = $this->missingChargeUnionQuery($semesterId, $campusId)
             ->unionAll($this->zeroTuitionWaivedUnionQuery($semesterId, $campusId))
             ->unionAll($this->deferredEnrolledUnionQuery($semesterId, $campusId))
-            ->unionAll($this->retakeNoChargeUnionQuery($semesterId, $campusId))
-            ->unionAll($this->deferNoCaseUnionQuery($semesterId, $campusId));
+            ->unionAll($this->retakeNoChargeUnionQuery($semesterId, $campusId));
 
-        $total = (int) DB::query()->fromSub($union, 'billing_exceptions')->count();
+        $deferActions = $this->deferActionsWithoutCases($semesterId, $campusId);
+        $financeTotal = (int) DB::query()->fromSub($union, 'billing_exceptions')->count();
+        $total = $financeTotal + $deferActions->count();
+        $through = $page * $perPage;
 
-        $pageRows = DB::query()
+        $financeRows = DB::query()
             ->fromSub($union, 'billing_exceptions')
             ->orderByDesc('created_at')
             ->orderBy('exception_type')
             ->orderByDesc('source_id')
-            ->forPage($page, $perPage)
-            ->get();
+            ->limit($through)
+            ->get()
+            ->each(function (object $row): void {
+                $row->sort_timestamp = $this->createdAtTimestamp($row->created_at ?? null);
+            });
 
-        $items = $this->hydrateUnionRows($pageRows, $semesterId);
+        $deferRows = $deferActions->map(fn (StudentDeferActionSummary $action): object => (object) [
+            'exception_type' => 'defer_no_case',
+            'source_id' => $action->id,
+            'created_at' => $action->createdAt,
+            'sort_timestamp' => $this->createdAtTimestamp($action->createdAt),
+        ]);
+
+        $pageRows = $financeRows
+            ->concat($deferRows)
+            ->sortBy([
+                ['sort_timestamp', 'desc'],
+                ['exception_type', 'asc'],
+                ['source_id', 'desc'],
+            ])
+            ->slice(($page - 1) * $perPage, $perPage)
+            ->values();
+
+        $items = $this->hydrateUnionRows($pageRows, $semesterId, $campusId);
 
         return new LengthAwarePaginator(
             $items,
@@ -228,7 +258,7 @@ final class BillingExceptionCollector
         );
     }
 
-    private function hydrateUnionRows(Collection $pageRows, ?int $semesterId): Collection
+    private function hydrateUnionRows(Collection $pageRows, ?int $semesterId, ?int $campusId): Collection
     {
         if ($pageRows->isEmpty()) {
             return collect();
@@ -260,13 +290,9 @@ final class BillingExceptionCollector
             : $this->registrationRowsById($retakeIds)
                 ->keyBy('id');
 
-        $deferById = $deferIds === []
-            ? collect()
-            : StudentActionLog::query()
-                ->with(['student:id,student_id,full_name'])
-                ->whereIn('id', $deferIds)
-                ->get()
-                ->keyBy('id');
+        $deferById = $this->deferActionsWithoutCases($semesterId, $campusId)
+            ->whereIn('id', $deferIds)
+            ->keyBy('id');
 
         return $pageRows->map(function (object $row) use ($missingById, $waivedById, $deferredById, $retakeById, $deferById, $semesterId): array {
             return match ($row->exception_type) {
@@ -353,13 +379,6 @@ final class BillingExceptionCollector
             ]);
     }
 
-    private function deferNoCaseUnionQuery(?int $semesterId, ?int $campusId): Builder
-    {
-        return $this->deferNoCaseBaseQuery($semesterId, $campusId)
-            ->selectRaw("'defer_no_case' as exception_type, student_action_logs.id as source_id, student_action_logs.created_at")
-            ->toBase();
-    }
-
     private function enrolledWithoutActiveChargeBaseQuery(?int $semesterId, ?int $campusId): QueryBuilder
     {
         return DB::table('course_registrations')
@@ -389,22 +408,30 @@ final class BillingExceptionCollector
 
     private function missingChargeBaseQuery(?int $semesterId, ?int $campusId): QueryBuilder
     {
-        return $this->enrolledWithoutActiveChargeBaseQuery($semesterId, $campusId)
-            ->whereNotExists(fn ($query) => BillingExceptionTuitionWaivedMatcher::applyExistsConstraint($query, $semesterId))
-            ->whereNotExists(fn ($query) => BillingExceptionDeferredEnrollmentMatcher::applyExistsConstraint($query, $semesterId));
+        $query = $this->enrolledWithoutActiveChargeBaseQuery($semesterId, $campusId)
+            ->whereNotExists(fn ($query) => BillingExceptionTuitionWaivedMatcher::applyExistsConstraint($query, $semesterId));
+
+        $this->deferredEnrollmentMatcher->applyNonMatchingConstraint($query, $semesterId);
+
+        return $query;
     }
 
     private function zeroTuitionWaivedBaseQuery(?int $semesterId, ?int $campusId): QueryBuilder
     {
-        return $this->enrolledWithoutActiveChargeBaseQuery($semesterId, $campusId)
-            ->whereExists(fn ($query) => BillingExceptionTuitionWaivedMatcher::applyExistsConstraint($query, $semesterId))
-            ->whereNotExists(fn ($query) => BillingExceptionDeferredEnrollmentMatcher::applyExistsConstraint($query, $semesterId));
+        $query = $this->enrolledWithoutActiveChargeBaseQuery($semesterId, $campusId)
+            ->whereExists(fn ($query) => BillingExceptionTuitionWaivedMatcher::applyExistsConstraint($query, $semesterId));
+
+        $this->deferredEnrollmentMatcher->applyNonMatchingConstraint($query, $semesterId);
+
+        return $query;
     }
 
     private function deferredEnrolledBaseQuery(?int $semesterId, ?int $campusId): QueryBuilder
     {
-        return $this->enrolledWithoutActiveChargeBaseQuery($semesterId, $campusId)
-            ->whereExists(fn ($query) => BillingExceptionDeferredEnrollmentMatcher::applyExistsConstraint($query, $semesterId));
+        $query = $this->enrolledWithoutActiveChargeBaseQuery($semesterId, $campusId);
+        $this->deferredEnrollmentMatcher->applyMatchingConstraint($query, $semesterId);
+
+        return $query;
     }
 
     private function retakeNoChargeBaseQuery(?int $semesterId, ?int $campusId): QueryBuilder
@@ -465,19 +492,6 @@ final class BillingExceptionCollector
                 if ($semesterId) {
                     $chargeQuery->where('finance_charges.semester_id', $semesterId);
                 }
-            });
-    }
-
-    private function deferNoCaseBaseQuery(?int $semesterId, ?int $campusId): EloquentBuilder
-    {
-        return StudentActionLog::query()
-            ->where('action_type', StudentActionType::ACADEMIC_DEFER->value)
-            ->when($campusId, fn ($q) => $q->whereHas('student', fn ($sq) => $sq->where('campus_id', $campusId)))
-            ->when($semesterId, fn ($q) => $q->where('from_semester_id', $semesterId))
-            ->whereNotExists(function ($query) {
-                $query->select(DB::raw(1))
-                    ->from('defer_cases')
-                    ->whereColumn('defer_cases.student_action_log_id', 'student_action_logs.id');
             });
     }
 
@@ -622,23 +636,50 @@ final class BillingExceptionCollector
         ];
     }
 
-    private function mapDeferNoCaseRow(StudentActionLog $log): array
+    private function mapDeferNoCaseRow(StudentDeferActionSummary $action): array
     {
         return [
             'type' => 'defer_no_case',
-            'source_id' => $log->id,
-            'student_id' => $log->student_id,
-            'student_code' => $log->student?->student_id,
-            'student_name' => $log->student?->full_name,
+            'source_id' => $action->id,
+            'student_id' => $action->studentId,
+            'student_code' => $action->studentCode,
+            'student_name' => $action->studentName,
             'description' => 'Defer action ghi nhận nhưng chưa có defer_case',
             'severity' => 'medium',
             'context' => [
-                'student_action_log_id' => $log->id,
-                'from_semester_id' => $log->from_semester_id,
+                'student_action_log_id' => $action->id,
+                'from_semester_id' => $action->fromSemesterId,
             ],
-            'created_at' => $log->created_at?->toISOString() ?? now()->toISOString(),
+            'created_at' => $action->createdAt ?? now()->toISOString(),
             'fixable' => false,
         ];
+    }
+
+    /** @return Collection<int, StudentDeferActionSummary> */
+    private function deferActionsWithoutCases(?int $semesterId, ?int $campusId): Collection
+    {
+        $scopeKey = ($semesterId ?? 'all').':'.($campusId ?? 'all');
+
+        return $this->deferActionsWithoutCasesByScope[$scopeKey] ??= (function () use ($semesterId, $campusId): Collection {
+            $actions = collect($this->deferLifecycle->listDeferActions($semesterId, $campusId));
+            if ($actions->isEmpty()) {
+                return collect();
+            }
+
+            $caseActionIds = DeferCase::query()
+                ->whereIn('student_action_log_id', $actions->pluck('id'))
+                ->pluck('student_action_log_id')
+                ->map(static fn (int|string $id): int => (int) $id)
+                ->all();
+
+            return $actions
+                ->reject(static fn (StudentDeferActionSummary $action): bool => in_array(
+                    $action->id,
+                    $caseActionIds,
+                    true,
+                ))
+                ->values();
+        })();
     }
 
     private function createdAtIso(mixed $createdAt): string
@@ -652,5 +693,18 @@ final class BillingExceptionCollector
         }
 
         return now()->toISOString();
+    }
+
+    private function createdAtTimestamp(mixed $createdAt): int
+    {
+        if ($createdAt instanceof \DateTimeInterface) {
+            return $createdAt->getTimestamp();
+        }
+
+        if (is_string($createdAt) && $createdAt !== '') {
+            return CarbonImmutable::parse($createdAt)->getTimestamp();
+        }
+
+        return now()->getTimestamp();
     }
 }

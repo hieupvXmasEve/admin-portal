@@ -6,48 +6,50 @@ namespace App\Modules\Finance\Services;
 
 use App\Models\DeferCase;
 use App\Models\DeferCaseItem;
-use App\Models\StudentActionLog;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Shared\Contracts\Academic\StudentDeferLifecycleReader;
 use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class DeferCaseService
 {
     public function __construct(
         protected FinanceChargeService $chargeService,
         private readonly StudentLifecycleCourseRegistrationGateway $courseRegistrations,
+        private readonly StudentDeferLifecycleReader $deferLifecycle,
     ) {}
 
     /**
      * Create a defer case from a student action log.
      */
-    public function createDeferCase(StudentActionLog $actionLog, array $data): DeferCase
+    public function createDeferCase(int $actionLogId, array $data): DeferCase
     {
-        // Validate action type is a defer action
-        if (! in_array($actionLog->action_type->value, ['academic_defer', 'ACADEMIC_DEFER'])) {
+        $action = $this->deferLifecycle->findDeferAction($actionLogId);
+        if ($action === null) {
             throw new \InvalidArgumentException('Action log must be a defer action');
         }
 
         // Check if defer case already exists
-        if ($actionLog->deferCase()->exists()) {
-            throw new \RuntimeException('Defer case already exists for this action log');
+        if (DeferCase::query()->where('student_action_log_id', $action->id)->exists()) {
+            throw new RuntimeException('Defer case already exists for this action log');
         }
 
-        return DB::transaction(function () use ($actionLog, $data) {
+        return DB::transaction(function () use ($action, $data) {
             $deferCase = DeferCase::create([
-                'student_action_log_id' => $actionLog->id,
-                'student_id' => $actionLog->student_id,
-                'semester_id' => $actionLog->from_semester_id,
-                'applies_until_semester_id' => $data['applies_until_semester_id'] ?? $actionLog->return_semester_id,
+                'student_action_log_id' => $action->id,
+                'student_id' => $action->studentId,
+                'semester_id' => $action->fromSemesterId,
+                'applies_until_semester_id' => $data['applies_until_semester_id'] ?? $action->returnSemesterId,
                 'scope_type' => $data['scope_type'] ?? DeferCase::SCOPE_FULL,
                 'fee_policy' => $data['fee_policy'] ?? DeferCase::POLICY_FORFEIT,
                 'applies_once' => $data['applies_once'] ?? true,
                 'preserve_amount' => $data['preserve_amount'] ?? null,
-                'effective_at' => $data['effective_at'] ?? $actionLog->effective_at ?? now(),
-                'signed_at' => $data['signed_at'] ?? $actionLog->signed_at,
+                'effective_at' => $data['effective_at'] ?? $action->effectiveAt ?? now(),
+                'signed_at' => $data['signed_at'] ?? $action->signedAt,
                 'upload_record_id' => $data['upload_record_id'] ?? null,
-                'changed_by_user_id' => $data['changed_by_user_id'] ?? $actionLog->changed_by_user_id,
+                'changed_by_user_id' => $data['changed_by_user_id'] ?? $action->changedByUserId,
                 'notes' => $data['notes'] ?? null,
             ]);
 

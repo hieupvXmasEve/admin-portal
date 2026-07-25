@@ -19,7 +19,7 @@ This is the architecture and compatibility slice. It must introduce a Progressio
 - [x] Program Enrollment Status, Study Stage, Account Status, and Student identity remain separate concepts and persistence responsibilities.
 - [x] Transcript, GPA, standing, best-attempt, EGC, lifecycle actions, Decisions, and graduation derive from Progression-owned evidence; the transition preserves legacy-only outcomes through the declared compatibility projection.
 - [x] Student Hub behavior, permissions, filters, lifecycle guards, audit timeline, and notifications remain compatible.
-- [ ] Finance and other consumers receive lifecycle facts through approved contracts/events rather than Academic persistence reads.
+- [x] Finance and other consumers receive lifecycle facts through approved contracts/events rather than Academic persistence reads.
 - [x] No historical lifecycle data mutation or compatibility-path removal occurs in this slice; each requires the separately approved data checkpoint in issue 24.
 
 ## Blocked by
@@ -136,3 +136,44 @@ Verification:
 - `./scripts/dev.sh artisan migration-debt:inventory --check` — pass
 
 The remaining unchecked Finance criterion is intentional: the supported due-exception path is contract-based, while the three Finance compatibility/reporting readers above require a separate cutover decision. Full-repository tests and global frontend checks were not run for this scoped backend migration; no portal repository was changed.
+
+### 2026-07-26 — remaining Finance lifecycle consumers cut over; ready for human review
+
+- Added the Progression-owned `StudentDeferLifecycleReader` contract and immutable
+  defer-action DTO. Academic owns defer classification and current-deferred
+  compatibility semantics; Finance receives primitives rather than
+  `StudentActionLog` models or queries.
+- `BillingExceptionCollector` and
+  `BillingExceptionDeferredEnrollmentMatcher` now consume the contract while
+  preserving semester/campus filters, counts, mixed-type pagination,
+  `deferred_enrolled`, and `defer_no_case` payloads. Historical defer evidence
+  cannot classify a resumed student as currently deferred.
+- `DeferCaseService` now creates a Finance defer case from an Academic action
+  identifier resolved through the contract. It no longer accepts or imports an
+  Academic persistence model.
+- The reconciliation consumer inventory removes these three completed consumers,
+  reducing the current supported-consumer count from 18 to 15. No historical
+  data, schema, API, portal, queue, notification, or compatibility projection was
+  changed or removed.
+
+Verification:
+
+- issue-12 Finance lifecycle, Billing Exceptions, pagination, reconciliation,
+  and architecture suite: 32 tests, 145 assertions, passed;
+- expanded defer runtime/re-enrollment, lifecycle due-exception, Student Hub
+  lifecycle/timeline, and graduation suite: 42 tests, 212 assertions, passed;
+- regression coverage proves resumed-student classification and chronological
+  ordering across mixed Finance/Progression evidence;
+- Pint and `git diff --check` passed;
+- `migration-debt:inventory --check` still reports the repository-wide
+  `shared_model_imports` baseline debt (`600` current versus `568` baseline),
+  while this slice reduces the count from 601 to 600 and keeps
+  `cross_context_concrete_imports=0`;
+- the full repository suite was invoked once and exited with status 2 after
+  emitting only progress markers; the unchanged
+  `AcademicNotificationBoundaryArchTest` independently exits with the same
+  status and no diagnostic, while all issue-scoped architecture checks pass;
+- student and lecturer portal repositories are unchanged.
+
+All issue acceptance criteria are implemented. Status remains
+`ready-for-human` for the requested human code review before issue completion.
