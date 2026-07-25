@@ -228,6 +228,35 @@ it('counts only the best passing attempt for a curriculum unit', function () {
         ->and((float) $grad['requirements']['core_credits']['earned'])->toBe(70.0);
 });
 
+it('uses finalization time before attempt number when selecting a passing graduation attempt', function () {
+    [$student, $semester] = graduationTrackerStudent();
+    $core = Unit::query()->where('code', 'CORE101')->firstOrFail();
+    $latestPassingEntry = TranscriptEntry::query()
+        ->where('student_id', $student->id)
+        ->where('unit_id', $core->id)
+        ->firstOrFail();
+    $latestPassingEntry->update([
+        'attempt_number' => 1,
+        'finalized_at' => '2026-02-01 00:00:00',
+    ]);
+
+    recordPassingCredit($student, $core, $semester, 5.0);
+    TranscriptEntry::query()
+        ->where('student_id', $student->id)
+        ->where('unit_id', $core->id)
+        ->whereKeyNot($latestPassingEntry->id)
+        ->firstOrFail()
+        ->update([
+            'attempt_number' => 2,
+            'finalized_at' => '2026-01-01 00:00:00',
+        ]);
+
+    $grad = app(GetStudentGraduationProgressQuery::class)->handle((int) $student->id, $student->expected_graduation_date?->toDateString());
+
+    expect((float) $grad['credit_summary']['total_earned'])->toBe(70.0)
+        ->and((float) $grad['requirements']['core_credits']['earned'])->toBe(70.0);
+});
+
 it('uses an active period without schedule dates for current-semester progress', function () {
     [$student] = graduationTrackerStudent();
     $activePeriod = Semester::factory()->active()->create([

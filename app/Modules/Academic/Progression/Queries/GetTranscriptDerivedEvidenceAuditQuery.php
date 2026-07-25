@@ -27,6 +27,7 @@ final class GetTranscriptDerivedEvidenceAuditQuery
      */
     public function handle(array $scope): array
     {
+        $this->semesterOrder = [];
         if (! ($scope['all'] ?? false) && ! isset($scope['student_id']) && ! isset($scope['semester_id'])) {
             throw new InvalidArgumentException('Specify --student-id, --semester-id, or --all.');
         }
@@ -156,6 +157,8 @@ final class GetTranscriptDerivedEvidenceAuditQuery
                 'student_id' => $source['student_id'] ?? $target['student_id'] ?? null,
                 'semester_id' => $source['semester_id'] ?? $target['semester_id'] ?? null,
                 'differences' => $differences === [] ? ['missing_source_or_target'] : $differences,
+                'expected' => $source === null ? null : collect($fields)->mapWithKeys(fn (string $field): array => [$field => $source[$field] ?? null])->all(),
+                'actual' => $target === null ? null : collect($fields)->mapWithKeys(fn (string $field): array => [$field => $target[$field] ?? null])->all(),
             ];
         })->filter()->values();
     }
@@ -192,7 +195,7 @@ final class GetTranscriptDerivedEvidenceAuditQuery
             'credit_points_earned' => (float) $entry->credit_points_earned,
             'is_passed' => (bool) $entry->is_passed,
             'excluded_from_gpa' => (bool) $entry->excluded_from_gpa,
-            'finalized_on' => $entry->finalized_at?->toDateString(),
+            'finalized_on' => $entry->finalizedOn(),
         ];
     }
 

@@ -70,7 +70,7 @@ final class GetTranscriptBackfillPreflightQuery
 
             $differences = $this->differences($source, $target);
             if (($source->finalizedOn === null && $target->finalized_at !== null)
-                || ($source->finalizedOn !== null && $target->finalized_at?->toDateString() !== $source->finalizedOn)) {
+                || ($source->finalizedOn !== null && $target->finalizedOn() !== $source->finalizedOn)) {
                 $differences[] = 'mismatch_finalization_date';
             }
             if ($differences === []) {

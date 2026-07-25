@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Progression\Models;
 
 use App\Models\AuditableModel;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
@@ -79,5 +80,17 @@ final class TranscriptEntry extends AuditableModel
     public function getEnrollmentDateAttribute(): ?CarbonInterface
     {
         return $this->finalized_at;
+    }
+
+    public function finalizedOn(): ?string
+    {
+        $storedTimestamp = $this->getRawOriginal('finalized_at');
+        if (! is_string($storedTimestamp) || $storedTimestamp === '') {
+            return null;
+        }
+
+        return CarbonImmutable::parse($storedTimestamp, 'UTC')
+            ->setTimezone((string) config('app.timezone'))
+            ->toDateString();
     }
 }

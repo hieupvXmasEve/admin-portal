@@ -72,14 +72,14 @@ final class GetStudentGraduationProgressQuery
         ];
     }
 
-    /** @return Collection<int, array{unit_id: int, course_offering_id: int, credit_points_earned: float, final_percentage: float|null, attempt_number: int|null}> */
+    /** @return Collection<int, array{unit_id: int, course_offering_id: int, credit_points_earned: float, final_percentage: float|null, attempt_number: int|null, finalized_at: string|null}> */
     private function completedEntries(int $studentId): Collection
     {
         $canonicalTranscripts = TranscriptEntry::query()
             ->where('student_id', $studentId)
             ->orderByDesc('finalized_at')
             ->orderByDesc('id')
-            ->get(['course_offering_id', 'unit_id', 'credit_points_earned', 'final_percentage', 'attempt_number', 'is_passed'])
+            ->get(['course_offering_id', 'unit_id', 'credit_points_earned', 'final_percentage', 'attempt_number', 'is_passed', 'finalized_at'])
             ->values();
         $canonicalOfferingIds = $canonicalTranscripts->pluck('course_offering_id')->unique()->all();
         $transcripts = $canonicalTranscripts
@@ -90,6 +90,7 @@ final class GetStudentGraduationProgressQuery
                 'credit_points_earned' => (float) $entry->credit_points_earned,
                 'final_percentage' => $entry->final_percentage === null ? null : (float) $entry->final_percentage,
                 'attempt_number' => $entry->attempt_number === null ? null : (int) $entry->attempt_number,
+                'finalized_at' => $entry->finalizedOn(),
             ]);
         $legacy = collect($this->legacyOutcomes->forStudent($studentId))
             ->unique('courseOfferingId')
@@ -101,6 +102,7 @@ final class GetStudentGraduationProgressQuery
                 'credit_points_earned' => (float) $outcome->creditPointsEarned,
                 'final_percentage' => $outcome->finalPercentage,
                 'attempt_number' => $outcome->attemptNumber,
+                'finalized_at' => null,
             ]);
 
         return $transcripts
@@ -108,17 +110,17 @@ final class GetStudentGraduationProgressQuery
             ->groupBy('unit_id')
             ->map(static fn (Collection $attempts): array => $attempts
                 ->sort(static fn (array $left, array $right): int => [
-                    $right['final_percentage'] ?? -PHP_FLOAT_MAX,
+                    $right['finalized_at'] ?? '',
                     $right['attempt_number'] ?? 0,
                 ] <=> [
-                    $left['final_percentage'] ?? -PHP_FLOAT_MAX,
+                    $left['finalized_at'] ?? '',
                     $left['attempt_number'] ?? 0,
                 ])
                 ->first())
             ->values();
     }
 
-    /** @param Collection<int, CurriculumGraduationRequirement> $requirements @param Collection<int, array{unit_id: int, course_offering_id: int, credit_points_earned: float, final_percentage: float|null, attempt_number: int|null}> $entries */
+    /** @param Collection<int, CurriculumGraduationRequirement> $requirements @param Collection<int, array{unit_id: int, course_offering_id: int, credit_points_earned: float, final_percentage: float|null, attempt_number: int|null, finalized_at: string|null}> $entries */
     private function hasCode(Collection $entries, Collection $requirements, string $needle): bool
     {
         $unitIds = $requirements
@@ -128,7 +130,7 @@ final class GetStudentGraduationProgressQuery
         return $entries->whereIn('unit_id', $unitIds)->isNotEmpty();
     }
 
-    /** @param Collection<int, CurriculumGraduationRequirement> $requirements @param Collection<int, array{unit_id: int, course_offering_id: int, credit_points_earned: float, final_percentage: float|null, attempt_number: int|null}> $entries @param Collection<int, int> $unitIds @return array{required: float, earned: float, status: string} */
+    /** @param Collection<int, CurriculumGraduationRequirement> $requirements @param Collection<int, array{unit_id: int, course_offering_id: int, credit_points_earned: float, final_percentage: float|null, attempt_number: int|null, finalized_at: string|null}> $entries @param Collection<int, int> $unitIds @return array{required: float, earned: float, status: string} */
     private function creditRequirement(Collection $requirements, Collection $entries, Collection $unitIds): array
     {
         $required = (float) $requirements->whereIn('unitId', $unitIds)->sum('creditPoints');

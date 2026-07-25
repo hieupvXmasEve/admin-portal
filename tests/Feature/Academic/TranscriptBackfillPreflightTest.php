@@ -13,6 +13,7 @@ use App\Modules\Academic\Progression\Models\TranscriptEntry;
 use App\Modules\Academic\Progression\Queries\GetTranscriptBackfillPreflightQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -142,4 +143,19 @@ it('reports a date-only finalization as a warning after all mappable fields matc
         ->and($report['counts']['date_precision_warnings'])->toBe(1)
         ->and($report['counts']['ambiguous_sources'])->toBe(0)
         ->and($report['date_precision_warnings'][0]['course_result_id'])->toBe($record->id);
+});
+
+it('compares a UTC transcript timestamp at local calendar-date precision', function () {
+    ['student' => $student, 'campus' => $campus, 'semester' => $semester, 'unit' => $unit] = transcriptBackfillContext();
+    $record = legacyFinalOutcome($student, $campus, $semester, $unit, ['grade_finalized_date' => '2026-07-01']);
+    $transcript = transcriptFromRecord($record);
+    DB::table('transcript_entries')
+        ->where('id', $transcript->id)
+        ->update(['finalized_at' => '2026-06-30 17:00:00']);
+
+    $report = app(GetTranscriptBackfillPreflightQuery::class)->handle(['student_id' => $student->id]);
+
+    expect($report['counts']['already_matching'])->toBe(1)
+        ->and($report['counts']['conflicts'])->toBe(0)
+        ->and($report['counts']['date_precision_warnings'])->toBe(1);
 });
