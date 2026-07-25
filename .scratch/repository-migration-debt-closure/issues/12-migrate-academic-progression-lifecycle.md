@@ -1,6 +1,6 @@
 # Migrate Academic Progression & Lifecycle
 
-Status: ready-for-human
+Status: completed
 
 Portal impact: both
 
@@ -175,5 +175,14 @@ Verification:
   status and no diagnostic, while all issue-scoped architecture checks pass;
 - student and lecturer portal repositories are unchanged.
 
-All issue acceptance criteria are implemented. Status remains
-`ready-for-human` for the requested human code review before issue completion.
+All issue acceptance criteria were implemented. At this checkpoint, status
+remained `ready-for-human` for the requested human code review before issue
+completion.
+
+### 2026-07-26 — human review approved
+
+Hiếu approved commit `157e2ea7` after the issue-12 consumer cutover review.
+All acceptance criteria are satisfied, the code-only architecture slice is
+complete, and the issue status is now `completed`. Historical data
+reconciliation and compatibility retirement remain explicitly deferred to
+issue 24.
