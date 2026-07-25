@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web\Admin\Academic;
 
-use App\Actions\Academic\GetAcademicReportAction;
 use App\Http\Controllers\Controller;
-use App\Models\Campus;
-use App\Models\Program;
-use App\Models\Semester;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\Academic\AcademicReportReader;
+use App\Shared\Contracts\Academic\ProgramReferenceReader;
+use App\Shared\Contracts\Institution\CampusReferenceReader;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -18,9 +18,14 @@ class AcademicReportController extends Controller
     /**
      * Display the academic report page.
      */
-    public function index(Request $request, GetAcademicReportAction $action): Response
-    {
-        $activeSemester = Semester::where('is_active', true)->first();
+    public function index(
+        Request $request,
+        AcademicReportReader $reportReader,
+        AcademicPeriodReader $academicPeriods,
+        CampusReferenceReader $campuses,
+        ProgramReferenceReader $programs,
+    ): Response {
+        $activeSemester = $academicPeriods->active();
         $currentCampusId = session('current_campus_id');
 
         $validated = $request->validate([
@@ -39,8 +44,8 @@ class AcademicReportController extends Controller
         ], array_filter($validated));
 
         $report = null;
-        if (!empty($filters['semester_id'])) {
-            $report = $action->execute($filters);
+        if (! empty($filters['semester_id'])) {
+            $report = $reportReader->handle($filters);
         }
 
         return Inertia::render('Academic/Report/Index', [
@@ -54,11 +59,20 @@ class AcademicReportController extends Controller
                     'per_page' => (int) ($filters['per_page'] ?? 15),
                 ],
                 'options' => [
-                    'campuses' => Campus::select('id', 'name')->get(),
-                    'semesters' => Semester::select('id', 'name')->orderBy('start_date', 'desc')->get(),
-                    'programs' => Program::select('id', 'name')->get(),
-                ]
-            ]
+                    'campuses' => collect($campuses->all())
+                        ->map(static fn ($campus): array => ['id' => $campus->id, 'name' => $campus->name])
+                        ->values()
+                        ->all(),
+                    'semesters' => collect($academicPeriods->selectable())
+                        ->map(static fn ($semester): array => ['id' => $semester->id, 'name' => $semester->name])
+                        ->values()
+                        ->all(),
+                    'programs' => collect($programs->all())
+                        ->map(static fn (array $program): array => ['id' => $program['id'], 'name' => $program['name']])
+                        ->values()
+                        ->all(),
+                ],
+            ],
         ]);
     }
 }

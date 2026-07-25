@@ -20,6 +20,9 @@ abstract class AbstractMetricResolver
             [
                 'source_report' => (string) ($validation['source_report'] ?? $metric['source_report'] ?? ''),
                 'source_reference_policy' => (string) ($validation['source_reference_policy'] ?? $metric['source_reference_policy'] ?? ''),
+                'freshness' => (string) ($metric['freshness_rule'] ?? 'computed_at_request_time'),
+                'permission_scope' => (string) ($metric['required_domain_permission'] ?? $metric['required_permission'] ?? ''),
+                'source_reader' => (string) ($metric['source_reader'] ?? ''),
                 'catalog_version' => (string) $validation['catalog_version'],
                 'tool_schema_version' => (string) $validation['tool_schema_version'],
                 'metric' => (string) $validation['metric'],

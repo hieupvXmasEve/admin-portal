@@ -11,9 +11,11 @@ use App\Models\GpaCalculation;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\Academic\StudentDashboardReader;
 use Illuminate\Support\Facades\Cache;
 
-class DashboardService
+/** Compatibility implementation of the Academic student dashboard reader. */
+class DashboardService implements StudentDashboardReader
 {
     public function __construct(
         protected GPACalculationService $gpaService,
@@ -38,6 +40,31 @@ class DashboardService
                 'quick_stats' => $this->getQuickStats($student),
             ];
         });
+    }
+
+    public function dashboardForStudent(int $studentId): array
+    {
+        return $this->getDashboardData(Student::query()->findOrFail($studentId));
+    }
+
+    public function gpaForStudent(int $studentId): array
+    {
+        return $this->getGPAData(Student::query()->findOrFail($studentId));
+    }
+
+    public function creditProgressForStudent(int $studentId): array
+    {
+        return $this->getCreditProgress(Student::query()->findOrFail($studentId));
+    }
+
+    public function academicHoldsForStudent(int $studentId): array
+    {
+        return $this->getAcademicHolds(Student::query()->findOrFail($studentId));
+    }
+
+    public function upcomingAssessmentsForStudent(int $studentId): array
+    {
+        return $this->getUpcomingAssessments(Student::query()->findOrFail($studentId));
     }
 
     /**
@@ -285,5 +312,28 @@ class DashboardService
             ->count();
 
         return round(($presentSessions / $totalSessions) * 100, 1);
+    }
+
+    public function freshness(): string
+    {
+        return 'cache_ttl_300_seconds';
+    }
+
+    public function permissionScope(): string
+    {
+        return 'authenticated_student_self';
+    }
+
+    public function fieldOwnership(): array
+    {
+        return [
+            'current_semester' => StudentDashboardReader::class,
+            'gpa_data' => StudentDashboardReader::class,
+            'credit_progress' => StudentDashboardReader::class,
+            'academic_holds' => StudentDashboardReader::class,
+            'upcoming_assessments' => StudentDashboardReader::class,
+            'enrollment_status' => StudentDashboardReader::class,
+            'quick_stats' => StudentDashboardReader::class,
+        ];
     }
 }

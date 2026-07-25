@@ -213,6 +213,9 @@ class SearchEntitiesTool
             'entity_type' => (string) $definition['key'],
             'fields' => $definition['search_fields'],
             'scope' => $definition['campus_scope_rule'],
+            'freshness' => (string) ($definition['freshness_rule'] ?? 'computed_at_request_time'),
+            'permission_scope' => (string) ($definition['required_permission'] ?? ''),
+            'source_reader' => (string) ($definition['source_reader'] ?? ''),
         ];
     }
 

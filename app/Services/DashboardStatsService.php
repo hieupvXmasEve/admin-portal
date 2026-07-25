@@ -13,10 +13,17 @@ use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Specialization;
 use App\Models\Student;
+use App\Shared\Contracts\Platform\StaffDashboardStatsReader;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
-class DashboardStatsService
+/**
+ * Compatibility implementation of the Platform staff dashboard read contract.
+ *
+ * The dashboard is stale-tolerant reporting data and never a business gate.
+ */
+class DashboardStatsService implements StaffDashboardStatsReader
 {
     private const CACHE_TTL = 300; // 5 minutes
 
@@ -24,12 +31,19 @@ class DashboardStatsService
     {
         // Prefer bound campus instance, fallback to session
         $campus = app()->bound('campus') ? app('campus') : null;
+
         return $campus->id ?? session('current_campus_id');
     }
 
     public function getStats(): array
     {
-        $campusId = $this->getCampusId();
+        return $this->statsForCampus($this->getCampusId());
+    }
+
+    public function statsForCampus(?int $campusId): array
+    {
+        $campusId = $this->requireCampusId($campusId);
+
         // $cacheKey = "dashboard_stats_campus_{$campusId}";
 
         // return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($campusId) {
@@ -118,7 +132,7 @@ class DashboardStatsService
     {
         $currentSemester = Semester::getActiveSemester();
 
-        if (!$currentSemester) {
+        if (! $currentSemester) {
             return null;
         }
 
@@ -173,7 +187,7 @@ class DashboardStatsService
      */
     public function getQuickStats(): array
     {
-        $campusId = $this->getCampusId();
+        $campusId = $this->requireCampusId($this->getCampusId());
         $cacheKey = "dashboard_quick_stats_campus_{$campusId}";
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($campusId) {
@@ -191,7 +205,12 @@ class DashboardStatsService
      */
     public function getAlerts(): array
     {
-        $campusId = $this->getCampusId();
+        return $this->alertsForCampus($this->getCampusId());
+    }
+
+    public function alertsForCampus(?int $campusId): array
+    {
+        $campusId = $this->requireCampusId($campusId);
 
         $alerts = [];
 
@@ -218,7 +237,10 @@ class DashboardStatsService
         }
 
         // Program Change Requests
-        $pendingProgramChanges = ProgramChangeRequest::where('status', 'pending')->count();
+        $pendingProgramChanges = ProgramChangeRequest::query()
+            ->where('status', 'pending')
+            ->whereHas('student', fn ($query) => $query->where('campus_id', $campusId))
+            ->count();
         if ($pendingProgramChanges > 0) {
             $alerts[] = [
                 'id' => 2,
@@ -232,5 +254,36 @@ class DashboardStatsService
         }
 
         return $alerts;
+    }
+
+    public function freshness(): string
+    {
+        return 'computed_at_request_time';
+    }
+
+    public function permissionScope(): string
+    {
+        return 'authenticated_staff_current_campus';
+    }
+
+    public function fieldOwnership(): array
+    {
+        return [
+            'students' => StaffDashboardStatsReader::class,
+            'lecturers' => StaffDashboardStatsReader::class,
+            'academics' => StaffDashboardStatsReader::class,
+            'semester' => StaffDashboardStatsReader::class,
+            'rooms' => StaffDashboardStatsReader::class,
+            'alerts' => StaffDashboardStatsReader::class,
+        ];
+    }
+
+    private function requireCampusId(?int $campusId): int
+    {
+        if ($campusId === null) {
+            throw new AccessDeniedHttpException('A campus must be selected before reading dashboard data.');
+        }
+
+        return $campusId;
     }
 }

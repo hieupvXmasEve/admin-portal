@@ -8,7 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\Student\DashboardResource;
 use App\Http\Resources\Api\V1\Student\GPAResource;
 use App\Http\Responses\ApiResponse;
-use App\Services\V1\Student\DashboardService;
+use App\Shared\Contracts\Academic\StudentDashboardReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Log;
 class DashboardController extends Controller
 {
     public function __construct(
-        protected DashboardService $dashboardService
+        protected StudentDashboardReader $dashboardReader
     ) {}
 
     /**
@@ -27,7 +27,7 @@ class DashboardController extends Controller
         $student = $request->user();
 
         try {
-            $dashboardData = $this->dashboardService->getDashboardData($student);
+            $dashboardData = $this->dashboardReader->dashboardForStudent((int) $student->id);
 
             return ApiResponse::success(
                 new DashboardResource($dashboardData),
@@ -36,6 +36,7 @@ class DashboardController extends Controller
             );
         } catch (\Exception $e) {
             Log::error($e->getMessage());
+
             return ApiResponse::serverError('Failed to retrieve dashboard data');
         }
     }
@@ -48,7 +49,7 @@ class DashboardController extends Controller
         $student = $request->user();
 
         try {
-            $gpaData = $this->dashboardService->getGPAData($student);
+            $gpaData = $this->dashboardReader->gpaForStudent((int) $student->id);
 
             return ApiResponse::success(
                 new GPAResource($gpaData),
@@ -68,7 +69,7 @@ class DashboardController extends Controller
         $student = $request->user();
 
         try {
-            $creditProgress = $this->dashboardService->getCreditProgress($student);
+            $creditProgress = $this->dashboardReader->creditProgressForStudent((int) $student->id);
 
             return ApiResponse::success(
                 $creditProgress,
@@ -88,7 +89,7 @@ class DashboardController extends Controller
         $student = $request->user();
 
         try {
-            $academicHolds = $this->dashboardService->getAcademicHolds($student);
+            $academicHolds = $this->dashboardReader->academicHoldsForStudent((int) $student->id);
 
             return ApiResponse::success(
                 $academicHolds,
@@ -108,7 +109,7 @@ class DashboardController extends Controller
         $student = $request->user();
 
         try {
-            $upcomingAssessments = $this->dashboardService->getUpcomingAssessments($student);
+            $upcomingAssessments = $this->dashboardReader->upcomingAssessmentsForStudent((int) $student->id);
 
             return ApiResponse::success(
                 $upcomingAssessments,

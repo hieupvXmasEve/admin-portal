@@ -252,6 +252,9 @@ class GetEntityProfileTool
             'entity_type' => 'student',
             'section' => (string) $definition['key'],
             'fields' => $definition['fields'] ?? [],
+            'freshness' => (string) ($definition['freshness_rule'] ?? 'computed_at_request_time'),
+            'permission_scope' => (string) ($definition['required_permission'] ?? ''),
+            'source_reader' => (string) ($definition['source_reader'] ?? ''),
         ];
     }
 

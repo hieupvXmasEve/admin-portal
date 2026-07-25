@@ -9,11 +9,14 @@ use App\Models\Enrollment;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Shared\Contracts\Platform\StaffDashboardChartReader;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
-class DashboardChartsService
+/** Compatibility implementation of the Platform staff dashboard chart reader. */
+class DashboardChartsService implements StaffDashboardChartReader
 {
     private const CACHE_TTL = 600; // 10 minutes
 
@@ -21,6 +24,7 @@ class DashboardChartsService
     {
         // Prefer bound campus instance, fallback to session
         $campus = app()->bound('campus') ? app('campus') : null;
+
         return $campus->id ?? session('current_campus_id');
     }
 
@@ -29,13 +33,19 @@ class DashboardChartsService
      */
     public function getStudentDistributionData(): array
     {
-        $campusId = $this->getCampusId();
+        return $this->studentDistributionForCampus($this->getCampusId());
+    }
+
+    public function studentDistributionForCampus(?int $campusId): array
+    {
+        $campusId = $this->requireCampusId($campusId);
+
         $cacheKey = "dashboard_student_distribution_campus_{$campusId}";
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($campusId) {
             // Get student distribution by program
             $programData = Student::query()
-                ->when($campusId, fn($q) => $q->where('campus_id', $campusId))
+                ->when($campusId, fn ($q) => $q->where('campus_id', $campusId))
                 ->join('programs', 'students.program_id', '=', 'programs.id')
                 ->leftJoin('specializations', 'students.specialization_id', '=', 'specializations.id')
                 ->select([
@@ -46,7 +56,7 @@ class DashboardChartsService
                     'specializations.name as specialization_name',
                     DB::raw('COUNT(students.id) as student_count'),
                     DB::raw('COUNT(CASE WHEN students.status = "active" THEN 1 END) as active_count'),
-                    DB::raw('COUNT(CASE WHEN students.status = "graduated" THEN 1 END) as graduated_count')
+                    DB::raw('COUNT(CASE WHEN students.status = "graduated" THEN 1 END) as graduated_count'),
                 ])
                 ->groupBy('programs.id', 'programs.name', 'programs.code', 'specializations.id', 'specializations.name')
                 ->orderBy('student_count', 'desc')
@@ -57,7 +67,7 @@ class DashboardChartsService
             $totalStudents = 0;
 
             foreach ($programData as $row) {
-                if (!isset($programs[$row->program_id])) {
+                if (! isset($programs[$row->program_id])) {
                     $programs[$row->program_id] = [
                         'id' => $row->program_id,
                         'name' => $row->program_name,
@@ -65,7 +75,7 @@ class DashboardChartsService
                         'student_count' => 0,
                         'active_count' => 0,
                         'graduated_count' => 0,
-                        'specializations' => []
+                        'specializations' => [],
                     ];
                 }
 
@@ -80,7 +90,7 @@ class DashboardChartsService
                         'name' => $row->specialization_name,
                         'student_count' => $row->student_count,
                         'active_count' => $row->active_count,
-                        'graduated_count' => $row->graduated_count
+                        'graduated_count' => $row->graduated_count,
                     ];
                 }
             }
@@ -88,12 +98,12 @@ class DashboardChartsService
             return [
                 'programs' => array_values($programs),
                 'total_students' => $totalStudents,
-                'chart_data' => array_map(fn($program) => [
+                'chart_data' => array_map(fn ($program) => [
                     'name' => $program['name'],
                     'value' => $program['student_count'],
                     // 'fill' => $this->getChartColor($program['id'])
-                    'predicted' => 12
-                ], array_values($programs))
+                    'predicted' => 12,
+                ], array_values($programs)),
             ];
         });
     }
@@ -103,17 +113,23 @@ class DashboardChartsService
      */
     public function getEnrollmentGrowthData(): array
     {
-        $campusId = $this->getCampusId();
+        return $this->enrollmentGrowthForCampus($this->getCampusId());
+    }
+
+    public function enrollmentGrowthForCampus(?int $campusId): array
+    {
+        $campusId = $this->requireCampusId($campusId);
+
         $cacheKey = "dashboard_enrollment_growth_campus_{$campusId}";
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($campusId) {
             // Get enrollment data by semester and admission date
             $enrollmentData = Student::query()
-                ->when($campusId, fn($q) => $q->where('campus_id', $campusId))
+                ->when($campusId, fn ($q) => $q->where('campus_id', $campusId))
                 ->select([
                     DB::raw('YEAR(admission_date) as year'),
                     DB::raw('MONTH(admission_date) as month'),
-                    DB::raw('COUNT(*) as new_students')
+                    DB::raw('COUNT(*) as new_students'),
                 ])
                 ->where('admission_date', '>=', now()->subYears(3))
                 ->groupBy('year', 'month')
@@ -134,7 +150,7 @@ class DashboardChartsService
                     'semesters.name as semester_name',
                     'semesters.code as semester_code',
                     'semesters.start_date',
-                    DB::raw('COUNT(enrollments.id) as enrollment_count')
+                    DB::raw('COUNT(enrollments.id) as enrollment_count'),
                 ])
                 ->where('semesters.start_date', '>=', now()->subYears(2))
                 ->groupBy('semesters.id', 'semesters.name', 'semesters.code', 'semesters.start_date')
@@ -142,20 +158,20 @@ class DashboardChartsService
                 ->get();
 
             // Format data for charts
-            $admissionTrend = $enrollmentData->map(fn($item) => [
-                'date' => "{$item->year}-" . str_pad((string)$item->month, 2, '0', STR_PAD_LEFT),
-                'new_students' => $item->new_students
+            $admissionTrend = $enrollmentData->map(fn ($item) => [
+                'date' => "{$item->year}-".str_pad((string) $item->month, 2, '0', STR_PAD_LEFT),
+                'new_students' => $item->new_students,
             ])->toArray();
 
-            $enrollmentTrend = $currentEnrollments->map(fn($item) => [
+            $enrollmentTrend = $currentEnrollments->map(fn ($item) => [
                 'semester' => $item->semester_name,
                 'date' => Carbon::parse($item->start_date)->format('Y-m-d'),
-                'enrollments' => $item->enrollment_count
+                'enrollments' => $item->enrollment_count,
             ])->toArray();
 
             return [
                 'admission_trend' => $admissionTrend,
-                'enrollment_trend' => $enrollmentTrend
+                'enrollment_trend' => $enrollmentTrend,
             ];
         });
     }
@@ -165,7 +181,13 @@ class DashboardChartsService
      */
     public function getAcademicStandingData(): array
     {
-        $campusId = $this->getCampusId();
+        return $this->academicStandingForCampus($this->getCampusId());
+    }
+
+    public function academicStandingForCampus(?int $campusId): array
+    {
+        $campusId = $this->requireCampusId($campusId);
+
         $cacheKey = "dashboard_academic_standing_campus_{$campusId}";
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($campusId) {
@@ -180,26 +202,26 @@ class DashboardChartsService
                     'standing',
                     DB::raw('COUNT(*) as count'),
                     DB::raw('AVG(gpa) as avg_gpa'),
-                    DB::raw('AVG(cumulative_gpa) as avg_cumulative_gpa')
+                    DB::raw('AVG(cumulative_gpa) as avg_cumulative_gpa'),
                 ])
                 ->groupBy('standing')
                 ->get();
 
             $totalStudents = $standingData->sum('count');
 
-            $chartData = $standingData->map(fn($item) => [
+            $chartData = $standingData->map(fn ($item) => [
                 'standing' => $item->standing,
                 'label' => $this->getStandingLabel($item->standing),
                 'count' => $item->count,
                 'percentage' => $totalStudents > 0 ? round(($item->count / $totalStudents) * 100, 1) : 0,
                 'avg_gpa' => round($item->avg_gpa, 2),
                 'avg_cumulative_gpa' => round($item->avg_cumulative_gpa, 2),
-                'fill' => $this->getStandingColor($item->standing)
+                'fill' => $this->getStandingColor($item->standing),
             ])->toArray();
 
             return [
                 'total_students' => $totalStudents,
-                'standings' => $chartData
+                'standings' => $chartData,
             ];
         });
     }
@@ -209,18 +231,24 @@ class DashboardChartsService
      */
     public function getGraduationRateData(): array
     {
-        $campusId = $this->getCampusId();
+        return $this->graduationRateForCampus($this->getCampusId());
+    }
+
+    public function graduationRateForCampus(?int $campusId): array
+    {
+        $campusId = $this->requireCampusId($campusId);
+
         $cacheKey = "dashboard_graduation_rate_campus_{$campusId}";
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($campusId) {
             // Get graduation data by year
             $graduationData = Student::query()
-                ->when($campusId, fn($q) => $q->where('campus_id', $campusId))
+                ->when($campusId, fn ($q) => $q->where('campus_id', $campusId))
                 ->select([
                     DB::raw('YEAR(admission_date) as admission_year'),
                     DB::raw('COUNT(*) as total_admitted'),
                     DB::raw('COUNT(CASE WHEN status = "graduated" THEN 1 END) as total_graduated'),
-                    DB::raw('ROUND((COUNT(CASE WHEN status = "graduated" THEN 1 END) / COUNT(*)) * 100, 2) as graduation_rate')
+                    DB::raw('ROUND((COUNT(CASE WHEN status = "graduated" THEN 1 END) / COUNT(*)) * 100, 2) as graduation_rate'),
                 ])
                 ->where('admission_date', '>=', now()->subYears(8)) // Look at last 8 years
                 ->groupBy('admission_year')
@@ -229,7 +257,7 @@ class DashboardChartsService
 
             // Get program-specific graduation rates
             $programGraduationData = Student::query()
-                ->when($campusId, fn($q) => $q->where('campus_id', $campusId))
+                ->when($campusId, fn ($q) => $q->where('campus_id', $campusId))
                 ->join('programs', 'students.program_id', '=', 'programs.id')
                 ->select([
                     'programs.id as program_id',
@@ -237,7 +265,7 @@ class DashboardChartsService
                     'programs.code as program_code',
                     DB::raw('COUNT(*) as total_students'),
                     DB::raw('COUNT(CASE WHEN students.status = "graduated" THEN 1 END) as graduated_students'),
-                    DB::raw('ROUND((COUNT(CASE WHEN students.status = "graduated" THEN 1 END) / COUNT(*)) * 100, 2) as graduation_rate')
+                    DB::raw('ROUND((COUNT(CASE WHEN students.status = "graduated" THEN 1 END) / COUNT(*)) * 100, 2) as graduation_rate'),
                 ])
                 ->where('admission_date', '<=', now()->subYears(4)) // Only consider students who had time to graduate
                 ->groupBy('programs.id', 'programs.name', 'programs.code')
@@ -245,21 +273,21 @@ class DashboardChartsService
                 ->get();
 
             return [
-                'yearly_rates' => $graduationData->map(fn($item) => [
+                'yearly_rates' => $graduationData->map(fn ($item) => [
                     'year' => $item->admission_year,
                     'total_admitted' => $item->total_admitted,
                     'total_graduated' => $item->total_graduated,
-                    'graduation_rate' => $item->graduation_rate
+                    'graduation_rate' => $item->graduation_rate,
                 ])->toArray(),
-                'program_rates' => $programGraduationData->map(fn($item) => [
+                'program_rates' => $programGraduationData->map(fn ($item) => [
                     'program_id' => $item->program_id,
                     'program_name' => $item->program_name,
                     'program_code' => $item->program_code,
                     'total_students' => $item->total_students,
                     'graduated_students' => $item->graduated_students,
                     'graduation_rate' => $item->graduation_rate,
-                    'fill' => $this->getChartColor($item->program_id)
-                ])->toArray()
+                    'fill' => $this->getChartColor($item->program_id),
+                ])->toArray(),
             ];
         });
     }
@@ -274,7 +302,7 @@ class DashboardChartsService
             "dashboard_student_distribution_campus_{$campusId}",
             "dashboard_enrollment_growth_campus_{$campusId}",
             "dashboard_academic_standing_campus_{$campusId}",
-            "dashboard_graduation_rate_campus_{$campusId}"
+            "dashboard_graduation_rate_campus_{$campusId}",
         ];
 
         foreach ($cacheKeys as $key) {
@@ -292,7 +320,7 @@ class DashboardChartsService
             'hsl(var(--chart-2))',
             'hsl(var(--chart-3))',
             'hsl(var(--chart-4))',
-            'hsl(var(--chart-5))'
+            'hsl(var(--chart-5))',
         ];
 
         return $colors[$id % count($colors)];
@@ -324,5 +352,34 @@ class DashboardChartsService
             'honors' => 'hsl(var(--chart-1))', // Blue
             default => 'hsl(var(--chart-5))'
         };
+    }
+
+    public function freshness(): string
+    {
+        return 'cache_ttl_600_seconds';
+    }
+
+    public function permissionScope(): string
+    {
+        return 'authenticated_staff_current_campus';
+    }
+
+    public function fieldOwnership(): array
+    {
+        return [
+            'student_distribution' => StaffDashboardChartReader::class,
+            'enrollment_growth' => StaffDashboardChartReader::class,
+            'academic_standing' => StaffDashboardChartReader::class,
+            'graduation_rate' => StaffDashboardChartReader::class,
+        ];
+    }
+
+    private function requireCampusId(?int $campusId): int
+    {
+        if ($campusId === null) {
+            throw new AccessDeniedHttpException('A campus must be selected before reading dashboard data.');
+        }
+
+        return $campusId;
     }
 }

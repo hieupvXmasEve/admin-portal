@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Modules\AI\Support\EntityCatalog;
+use App\Modules\AI\Support\MetricCatalog;
+use App\Modules\AI\Support\StudentProfileSectionCatalog;
 use Illuminate\Support\Facades\File;
 
 it('keeps AI and reporting reads behind owner contracts', function (): void {
@@ -26,4 +29,19 @@ it('keeps AI and reporting reads behind owner contracts', function (): void {
         ->all();
 
     expect($violations)->toBe([], 'AI and reporting must obtain source facts through owner readers: '.implode(', ', $violations));
+});
+
+it('declares freshness for every AI catalog read surface', function (): void {
+    $catalogs = [
+        app(MetricCatalog::class)->metrics(),
+        app(EntityCatalog::class)->entities(),
+        app(StudentProfileSectionCatalog::class)->sections(),
+    ];
+
+    foreach ($catalogs as $definitions) {
+        foreach ($definitions as $definition) {
+            expect($definition['freshness_rule'] ?? null)->not->toBeNull()
+                ->and($definition['source_reader'] ?? null)->not->toBeNull();
+        }
+    }
 });

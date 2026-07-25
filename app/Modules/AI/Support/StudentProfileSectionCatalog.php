@@ -107,7 +107,9 @@ class StudentProfileSectionCatalog
                 'aliases' => ['identity', 'basic', 'student_identity'],
                 'required_permission' => 'view_student',
                 'source' => 'academic',
+                'freshness_rule' => 'computed_at_request_time',
                 'source_report' => 'academic.student-profile.identity',
+                'source_reader' => 'App\\Shared\\Contracts\\Academic\\AiAcademicStudentProfileReader',
                 'source_reference_policy' => 'profile_section_summary',
                 'hidden_section' => 'student.identity',
                 'fields' => [
@@ -130,7 +132,9 @@ class StudentProfileSectionCatalog
                 'aliases' => ['academic', 'summary', 'academic_status'],
                 'required_permission' => 'view_student_summary',
                 'source' => 'academic',
+                'freshness_rule' => 'computed_at_request_time',
                 'source_report' => 'academic.student-profile.summary',
+                'source_reader' => 'App\\Shared\\Contracts\\Academic\\AiAcademicStudentProfileReader',
                 'source_reference_policy' => 'profile_section_summary',
                 'hidden_section' => 'student.academic_summary',
                 'fields' => [
@@ -149,7 +153,9 @@ class StudentProfileSectionCatalog
                 'aliases' => ['enrollment', 'registrations', 'courses'],
                 'required_permission' => 'view_student_summary',
                 'source' => 'academic',
+                'freshness_rule' => 'computed_at_request_time',
                 'source_report' => 'academic.student-profile.enrollments',
+                'source_reader' => 'App\\Shared\\Contracts\\Academic\\AiAcademicStudentProfileReader',
                 'source_reference_policy' => 'profile_section_summary',
                 'hidden_section' => 'student.enrollments',
                 'fields' => [
@@ -168,7 +174,9 @@ class StudentProfileSectionCatalog
                 'aliases' => ['attendance', 'attendance_overview'],
                 'required_permission' => 'view_student_summary',
                 'source' => 'academic',
+                'freshness_rule' => 'computed_at_request_time',
                 'source_report' => 'academic.student-profile.attendance-summary',
+                'source_reader' => 'App\\Shared\\Contracts\\Academic\\AiAcademicStudentProfileReader',
                 'source_reference_policy' => 'profile_section_summary',
                 'hidden_section' => 'student.attendance_summary',
                 'fields' => [
@@ -181,7 +189,9 @@ class StudentProfileSectionCatalog
                 'aliases' => ['finance', 'balance', 'student_360'],
                 'required_permission' => 'view_finance_student_overview',
                 'source' => 'finance',
+                'freshness_rule' => 'computed_at_request_time',
                 'source_report' => 'finance.student-profile.summary',
+                'source_reader' => 'App\\Shared\\Contracts\\Finance\\AiFinanceStudentProfileReader',
                 'source_reference_policy' => 'profile_section_summary',
                 'hidden_section' => 'student.finance_summary',
                 'fields' => [
@@ -196,7 +206,9 @@ class StudentProfileSectionCatalog
                 'aliases' => ['actions', 'lifecycle', 'action_history'],
                 'required_permission' => 'view_student_action',
                 'source' => 'academic',
+                'freshness_rule' => 'computed_at_request_time',
                 'source_report' => 'academic.student-profile.lifecycle-actions',
+                'source_reader' => 'App\\Shared\\Contracts\\Academic\\AiAcademicStudentProfileReader',
                 'source_reference_policy' => 'profile_section_summary',
                 'hidden_section' => 'student.lifecycle_actions',
                 'fields' => [

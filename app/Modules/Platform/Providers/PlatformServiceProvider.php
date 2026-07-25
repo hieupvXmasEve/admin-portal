@@ -6,6 +6,10 @@ namespace App\Modules\Platform\Providers;
 
 use App\Modules\Platform\Actions\UpdateSystemConfigurationAction;
 use App\Modules\Platform\Support\SystemConfigurationStore;
+use App\Services\DashboardChartsService;
+use App\Services\DashboardStatsService;
+use App\Shared\Contracts\Platform\StaffDashboardChartReader;
+use App\Shared\Contracts\Platform\StaffDashboardStatsReader;
 use App\Shared\Contracts\Platform\SystemConfigurationReader;
 use App\Shared\Contracts\Platform\SystemConfigurationWriter;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +22,8 @@ final class PlatformServiceProvider extends ServiceProvider
         $this->app->singleton(SystemConfigurationStore::class);
         $this->app->bind(SystemConfigurationReader::class, SystemConfigurationStore::class);
         $this->app->bind(SystemConfigurationWriter::class, UpdateSystemConfigurationAction::class);
+        $this->app->bind(StaffDashboardStatsReader::class, DashboardStatsService::class);
+        $this->app->bind(StaffDashboardChartReader::class, DashboardChartsService::class);
     }
 
     public function boot(): void
