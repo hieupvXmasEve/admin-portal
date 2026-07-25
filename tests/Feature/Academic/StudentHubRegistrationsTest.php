@@ -186,13 +186,16 @@ it('prefers finalized Transcript Entry outcomes while preserving legacy-only reg
         'finalized_at' => now(),
     ]);
 
-    $row = app(GetStudentRegistrationsQuery::class)->handle((int) $student->id)['data']->sole();
+    $result = app(GetStudentRegistrationsQuery::class)->handle((int) $student->id);
+    $row = $result['data']->sole();
 
     expect((float) $row['final_percentage'])->toBe(82.0)
         ->and($row['final_grade'])->toBe('B')
         ->and($row['grade_status'])->toBe('final')
         ->and($row['completion_status'])->toBe('completed')
         ->and($row['meets_attendance_requirement'])->toBeTrue()
+        ->and((float) $row['grade_points'])->toBe(3.0)
+        ->and((float) $result['summary']['average_grade_points'])->toBe(3.0)
         ->and($row['attempt_number'])->toBe(2)
         ->and($row['is_retake'])->toBeTrue();
 });

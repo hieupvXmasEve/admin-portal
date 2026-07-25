@@ -94,7 +94,7 @@ final class GetStudentRegistrationsQuery
                 'final_percentage' => $transcript === null ? $legacyRecord?->finalPercentage : ($transcript->final_percentage === null ? null : (float) $transcript->final_percentage),
                 'grade_points' => $transcript === null
                     ? $legacyRecord?->gradePoints
-                    : ((bool) $transcript->is_passed ? 1.0 : 0.0),
+                    : (float) $transcript->grade_points,
                 'grade_status' => $transcript === null ? $legacyRecord?->gradeStatus : 'final',
                 'completion_status' => $transcript === null ? $legacyRecord?->completionStatus : $transcript->completion_status,
                 'is_passed' => $transcript === null ? (bool) $legacyRecord?->isPassed : (bool) $transcript->is_passed,

@@ -80,8 +80,8 @@ final class GetStudentGraduationProgressQuery
             ->orderByDesc('finalized_at')
             ->orderByDesc('id')
             ->get(['course_offering_id', 'unit_id', 'credit_points_earned', 'final_percentage', 'attempt_number', 'is_passed'])
-            ->unique('course_offering_id')
-            ->keyBy('course_offering_id');
+            ->values();
+        $canonicalOfferingIds = $canonicalTranscripts->pluck('course_offering_id')->unique()->all();
         $transcripts = $canonicalTranscripts
             ->filter(static fn (TranscriptEntry $entry): bool => (bool) $entry->is_passed)
             ->map(static fn (TranscriptEntry $entry): array => [
@@ -93,7 +93,7 @@ final class GetStudentGraduationProgressQuery
             ]);
         $legacy = collect($this->legacyOutcomes->forStudent($studentId))
             ->unique('courseOfferingId')
-            ->reject(fn (StudentHubCourseOutcomeEvidence $outcome): bool => $canonicalTranscripts->has($outcome->courseOfferingId))
+            ->reject(fn (StudentHubCourseOutcomeEvidence $outcome): bool => in_array($outcome->courseOfferingId, $canonicalOfferingIds, true))
             ->filter(static fn (StudentHubCourseOutcomeEvidence $outcome): bool => $outcome->isPassed && $outcome->completionStatus === 'completed')
             ->map(static fn (StudentHubCourseOutcomeEvidence $outcome): array => [
                 'unit_id' => $outcome->unitId,
@@ -176,7 +176,11 @@ final class GetStudentGraduationProgressQuery
         }
 
         $credits = collect($this->deliveryEvidence->forStudent($studentId))
-            ->filter(fn ($registration): bool => $registration->semesterId === $currentPeriod->id && in_array($registration->registrationStatus, ['enrolled', 'active'], true))
+            ->filter(fn ($registration): bool => $registration->semesterId === $currentPeriod->id && in_array(
+                $registration->registrationStatus,
+                ['registered', 'confirmed', 'enrolled', 'active'],
+                true,
+            ))
             ->sum('creditPoints');
 
         return [

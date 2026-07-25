@@ -1,6 +1,6 @@
 # Migrate Academic Progression & Lifecycle
 
-Status: ready-for-agent
+Status: ready-for-human
 
 Portal impact: both
 
@@ -16,11 +16,11 @@ This is the architecture and compatibility slice. It must introduce a Progressio
 
 ## Acceptance criteria
 
-- [ ] Program Enrollment Status, Study Stage, Account Status, and Student identity remain separate concepts and persistence responsibilities.
-- [ ] Transcript, GPA, standing, best-attempt, EGC, lifecycle actions, Decisions, and graduation derive from Progression-owned evidence; the transition preserves legacy-only outcomes through the declared compatibility projection.
-- [ ] Student Hub behavior, permissions, filters, lifecycle guards, audit timeline, and notifications remain compatible.
+- [x] Program Enrollment Status, Study Stage, Account Status, and Student identity remain separate concepts and persistence responsibilities.
+- [x] Transcript, GPA, standing, best-attempt, EGC, lifecycle actions, Decisions, and graduation derive from Progression-owned evidence; the transition preserves legacy-only outcomes through the declared compatibility projection.
+- [x] Student Hub behavior, permissions, filters, lifecycle guards, audit timeline, and notifications remain compatible.
 - [ ] Finance and other consumers receive lifecycle facts through approved contracts/events rather than Academic persistence reads.
-- [ ] No historical lifecycle data mutation or compatibility-path removal occurs in this slice; each requires the separately approved data checkpoint in issue 24.
+- [x] No historical lifecycle data mutation or compatibility-path removal occurs in this slice; each requires the separately approved data checkpoint in issue 24.
 
 ## Blocked by
 
@@ -115,3 +115,24 @@ Verification: lifecycle timeline, Hub lifecycle, and ownership tests passed (19 
 - The reader batches page student IDs and preserves the existing latest-by-action-id payload (`id`, action type, timestamp, notes), including null behavior. No lifecycle, Finance, or historical data was mutated.
 
 Verification: lifecycle/Finance boundary and Hub lifecycle tests passed (13 tests, 92 assertions); Pint, `git diff --check`, and `migration-debt:inventory --check` passed. Two independent implementation reviews found no remaining actionable issues. Status remains `ready-for-agent`; remaining Finance readers that query lifecycle persistence are separate compatibility/reporting work.
+
+### 2026-07-25 — lifecycle ownership and compatibility slice implemented; ready for human review
+
+- Student Decision create/update writes now run through Progression Actions; the Student Hub architecture guard rejects direct controller persistence writes.
+- `InvalidProgressionState` remains a Progression-owned lifecycle guard while preserving the existing `ValidationException` contract expected by supported HTTP and Finance defer flows.
+- Graduation accepts the persisted `registered`/`confirmed` enrollment states, retains active-semester behavior, and evaluates all finalized attempts so a later failing attempt cannot hide an earlier passing best attempt.
+- Transcript-backed registration evidence derives `grade_points` from `quality_points / credit_points`, preserving the Hub GPA summary instead of exposing a binary pass/fail score.
+- The migrated Student Hub registration, graduation, overview, export, score-detail, Scores/GPA/Standing, lifecycle timeline, EGC/Decision, and Finance due-exception paths use Progression or approved evidence contracts. No historical lifecycle/evidence mutation, backfill, reconciliation, compatibility removal, or portal source change was made; issue 24 owns the data checkpoint.
+- Finance’s `BillingExceptionCollector`, `BillingExceptionDeferredEnrollmentMatcher`, and `DeferCaseService` still contain deliberate lifecycle compatibility/reporting reads. They are explicitly deferred Finance-owned follow-up work (tracked with issue 20/Finance operations); this issue adds no new Academic persistence consumer and does not retire those paths.
+
+Verification:
+
+- `./scripts/dev.sh artisan test --compact tests/Feature/Academic/StudentHubGraduationTest.php tests/Feature/Academic/StudentDecisionRosterTest.php tests/Feature/Architecture/StudentHubProgressionOwnershipTest.php tests/Feature/Architecture/StudentLifecycleProgressionFinanceBoundaryArchTest.php tests/Feature/Finance/Defer/DeferFullScopeItemizationTest.php` — pass (20 tests, 158 assertions)
+- `./scripts/dev.sh artisan test --compact tests/Feature/Academic/StudentHubRegistrationsTest.php` — pass (7 tests, 50 assertions)
+- Delegated tester expanded lifecycle/Hub/Finance/architecture suite — pass (45 tests, 295 assertions)
+- Delegated reviewer targeted lifecycle/Hub/architecture checks — pass (21 tests, 104 assertions; graduation/architecture follow-up 11 tests, 100 assertions)
+- `./scripts/dev.sh composer exec pint -- --dirty --format agent` — pass
+- `git diff --check` — pass
+- `./scripts/dev.sh artisan migration-debt:inventory --check` — pass
+
+The remaining unchecked Finance criterion is intentional: the supported due-exception path is contract-based, while the three Finance compatibility/reporting readers above require a separate cutover decision. Full-repository tests and global frontend checks were not run for this scoped backend migration; no portal repository was changed.

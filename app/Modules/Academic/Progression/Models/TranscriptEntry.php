@@ -62,6 +62,12 @@ final class TranscriptEntry extends AuditableModel
 
     public function getGradePointsAttribute(): float
     {
+        $creditPoints = (float) ($this->credit_points ?? 0);
+
+        if ($this->quality_points !== null && $creditPoints > 0) {
+            return round((float) $this->quality_points / $creditPoints, 2);
+        }
+
         return $this->is_passed ? 1.0 : 0.0;
     }
 

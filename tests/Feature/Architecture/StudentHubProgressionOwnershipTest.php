@@ -10,6 +10,7 @@ it('routes Student Hub registrations through Progression and Delivery evidence s
     $overviewQuery = file_get_contents(base_path('app/Modules/Academic/Progression/Queries/GetStudentHubOverviewQuery.php')) ?: '';
     $scoresQuery = file_get_contents(base_path('app/Modules/Academic/Progression/Queries/GetStudentHubScoresQuery.php')) ?: '';
     $lifecycleQuery = file_get_contents(base_path('app/Modules/Academic/Progression/Queries/GetStudentLifecycleTimelineQuery.php')) ?: '';
+    $decisionController = file_get_contents(base_path('app/Modules/Academic/Http/Web/StudentDecisionController.php')) ?: '';
 
     expect($controller)
         ->toContain('GetStudentRegistrationsQuery')
@@ -50,5 +51,10 @@ it('routes Student Hub registrations through Progression and Delivery evidence s
     expect($lifecycleQuery)
         ->toContain('ProgramEnrollmentReader')
         ->toContain('AcademicProgressionEvent')
-        ->toContain('StudentDecision');
+        ->toContain('StudentDecision')
+        ->and($decisionController)
+        ->toContain('CreateStudentDecisionAction')
+        ->toContain('UpdateStudentDecisionAction')
+        ->not->toContain('StudentDecision::query()->create')
+        ->not->toContain('$studentDecision->update(');
 });

@@ -13,7 +13,9 @@ use App\Modules\Academic\Http\Requests\BulkStudentDecisionStudentsRequest;
 use App\Modules\Academic\Http\Requests\StoreStudentDecisionRequest;
 use App\Modules\Academic\Http\Requests\UpdateStudentDecisionRequest;
 use App\Modules\Academic\Progression\Actions\BulkLinkStudentsToDecisionAction;
+use App\Modules\Academic\Progression\Actions\CreateStudentDecisionAction;
 use App\Modules\Academic\Progression\Actions\UnlinkStudentFromDecisionAction;
+use App\Modules\Academic\Progression\Actions\UpdateStudentDecisionAction;
 use App\Modules\Academic\Queries\GetStudentDecisionDetailQuery;
 use App\Modules\Academic\Queries\ListStudentDecisionsQuery;
 use App\Modules\Academic\Queries\PreviewStudentDecisionBulkLinkQuery;
@@ -68,7 +70,7 @@ class StudentDecisionController extends Controller
 
     public function store(StoreStudentDecisionRequest $request): RedirectResponse
     {
-        StudentDecision::query()->create([
+        CreateStudentDecisionAction::run([
             ...$request->validated(),
             'changed_by_user_id' => (int) $request->user()->id,
         ]);
@@ -84,7 +86,7 @@ class StudentDecisionController extends Controller
             unset($validated['upload_record_id']);
         }
 
-        $studentDecision->update([
+        UpdateStudentDecisionAction::run($studentDecision->id, [
             ...$validated,
             'changed_by_user_id' => (int) $request->user()->id,
         ]);
