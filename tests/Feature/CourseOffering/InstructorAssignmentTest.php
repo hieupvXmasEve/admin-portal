@@ -15,7 +15,7 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Delivery\Actions\AssignInstructorAction;
 use App\Modules\Academic\Delivery\Exceptions\InstructorAssignmentException;
-use App\Services\V1\Lecturer\LecturerCourseService;
+use App\Modules\Academic\Delivery\Support\LecturerCourseService;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;

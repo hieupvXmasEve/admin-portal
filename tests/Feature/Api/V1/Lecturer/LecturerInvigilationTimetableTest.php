@@ -11,7 +11,7 @@ use App\Models\Lecture;
 use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Unit;
-use App\Services\V1\Lecturer\LecturerTimetableService;
+use App\Modules\Academic\Delivery\Support\LecturerTimetableService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

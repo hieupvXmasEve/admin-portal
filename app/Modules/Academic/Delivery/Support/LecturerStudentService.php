@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Services\V1\Lecturer;
+namespace App\Modules\Academic\Delivery\Support;
 
-use App\Models\Lecture;
 use App\Models\Student;
 use App\Models\StudentNote;
+use App\Shared\Contracts\Identity\LecturerTeachingActor as Lecture;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 

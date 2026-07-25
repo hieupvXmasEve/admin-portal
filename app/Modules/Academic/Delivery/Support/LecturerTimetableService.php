@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace App\Services\V1\Lecturer;
+namespace App\Modules\Academic\Delivery\Support;
 
 use App\Models\ClassSession;
-use App\Models\Lecture;
 use App\Models\Room;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use App\Shared\Contracts\Identity\LecturerTeachingActor as Lecture;
 
 class LecturerTimetableService
 {

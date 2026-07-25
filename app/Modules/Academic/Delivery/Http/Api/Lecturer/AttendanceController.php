@@ -8,7 +8,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\Lecturer\AttendanceSessionResource;
 use App\Http\Resources\Api\V1\Lecturer\SessionAttendanceResource;
 use App\Http\Responses\ApiResponse;
-use App\Models\Lecture;
 use App\Modules\Academic\Delivery\Actions\BulkMarkLecturerAttendanceAction;
 use App\Modules\Academic\Delivery\Actions\GenerateLecturerAttendanceRecordsAction;
 use App\Modules\Academic\Delivery\Actions\MarkLecturerAttendanceAction;

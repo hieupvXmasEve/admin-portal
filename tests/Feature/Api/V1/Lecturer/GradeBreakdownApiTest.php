@@ -3,22 +3,38 @@
 declare(strict_types=1);
 
 use App\Models\AcademicRecord;
+use App\Models\Campus;
+use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\Lecture;
 use App\Models\Student;
 use App\Models\SyllabusTemplate;
+use App\Models\User;
+use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
 it('includes a grade_display object for each student row in the lecturer grade matrix', function () {
-    $lecturer = Lecture::factory()->create(['is_active' => true, 'employment_status' => 'active']);
+    $lecturer = Lecture::factory()->create([
+        'user_id' => User::factory()->create([
+            'type' => UserType::LECTURER,
+            'status' => User::STATUS_ACTIVE,
+        ])->id,
+        'campus_id' => Campus::factory()->create()->id,
+        'is_active' => true,
+        'employment_status' => 'active',
+    ]);
     $syllabus = SyllabusTemplate::factory()->create();
     $course = CourseOffering::factory()->create([
         'lecture_id' => $lecturer->id,
         'syllabus_template_id' => $syllabus->id,
+    ]);
+    ClassSession::factory()->create([
+        'course_offering_id' => $course->id,
+        'lecture_id' => $lecturer->id,
     ]);
 
     $registration = CourseRegistration::create([
@@ -63,11 +79,23 @@ it('includes a grade_display object for each student row in the lecturer grade m
 });
 
 it('returns a null grade_display when a student has no academic record', function () {
-    $lecturer = Lecture::factory()->create(['is_active' => true, 'employment_status' => 'active']);
+    $lecturer = Lecture::factory()->create([
+        'user_id' => User::factory()->create([
+            'type' => UserType::LECTURER,
+            'status' => User::STATUS_ACTIVE,
+        ])->id,
+        'campus_id' => Campus::factory()->create()->id,
+        'is_active' => true,
+        'employment_status' => 'active',
+    ]);
     $syllabus = SyllabusTemplate::factory()->create();
     $course = CourseOffering::factory()->create([
         'lecture_id' => $lecturer->id,
         'syllabus_template_id' => $syllabus->id,
+    ]);
+    ClassSession::factory()->create([
+        'course_offering_id' => $course->id,
+        'lecture_id' => $lecturer->id,
     ]);
 
     CourseRegistration::create([

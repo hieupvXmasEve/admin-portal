@@ -20,6 +20,8 @@ use App\Modules\Notification\Support\StudentNotificationStore;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use App\Shared\Contracts\Notification\EmailContentResolver;
 use App\Shared\Contracts\Notification\ExternalEmailPublisher;
+use App\Shared\Contracts\Notification\LecturerNotificationReader;
+use App\Shared\Contracts\Notification\LecturerNotificationWriter;
 use App\Shared\Contracts\Notification\NotificationPayloadFactory;
 use App\Shared\Contracts\Notification\StudentEventNotificationPreferencesReader;
 use App\Shared\Contracts\Notification\StudentEventNotificationPreferencesWriter;
@@ -40,6 +42,8 @@ class NotificationServiceProvider extends ServiceProvider
         $this->app->bind(NotificationPayloadFactory::class, NotificationPayloadBuilder::class);
         $this->app->bind(StudentNotificationReader::class, StudentNotificationStore::class);
         $this->app->bind(StudentNotificationWriter::class, StudentNotificationStore::class);
+        $this->app->bind(LecturerNotificationReader::class, StudentNotificationStore::class);
+        $this->app->bind(LecturerNotificationWriter::class, StudentNotificationStore::class);
         $this->app->bind(StudentEventNotificationPreferencesReader::class, GetEventNotificationPreferencesQuery::class);
         $this->app->bind(StudentEventNotificationPreferencesWriter::class, UpdateEventNotificationPreferencesAction::class);
         $this->app->singleton(NotificationMetrics::class);

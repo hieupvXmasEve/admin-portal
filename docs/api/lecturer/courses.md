@@ -9,8 +9,8 @@ last_verified: 2026-07-25
 scope: lecturer-courses-students-api
 source_of_truth:
     - routes/api/v1/lecturer.php
-    - app/Http/Controllers/Api/V1/Lecturer/CourseController.php
-    - app/Http/Controllers/Api/V1/Lecturer/StudentController.php
+    - app/Modules/Academic/Delivery/Http/Api/Lecturer/CourseController.php
+    - app/Modules/Academic/Delivery/Http/Api/Lecturer/StudentController.php
     - app/Http/Requests/Api/V1/Lecturer/CourseFilterRequest.php
 ---
 
@@ -36,10 +36,9 @@ middleware stack.
 `enrollment_status` accepts `open`, `closed`, or `full`.
 
 The course list uses the standard pagination metadata. Detail and roster
-responses are owned by `CourseController`,
-`App\Services\V1\Lecturer\LecturerCourseService`, and the lecturer course
-resources. The controller verifies that the authenticated lecturer can access
-the course offering.
+responses are owned by the Academic Delivery `CourseController`,
+`LecturerCourseService`, and the lecturer course resources. The controller
+verifies that the authenticated lecturer can access the course offering.
 
 ## Cross-course student management
 

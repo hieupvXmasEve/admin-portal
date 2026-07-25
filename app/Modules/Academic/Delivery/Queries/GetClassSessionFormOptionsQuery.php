@@ -6,12 +6,14 @@ namespace App\Modules\Academic\Delivery\Queries;
 
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
-use App\Models\Lecture;
 use App\Models\Room;
 use App\Modules\Academic\Delivery\Support\ClassSessionService;
+use App\Shared\Contracts\Identity\ActiveLecturerReader;
 
 final class GetClassSessionFormOptionsQuery
 {
+    public function __construct(private readonly ActiveLecturerReader $lecturersReader) {}
+
     public function handle(string $operation, mixed ...$arguments): mixed
     {
         return $this->{$operation}(...$arguments);
@@ -99,6 +101,6 @@ final class GetClassSessionFormOptionsQuery
 
     private function lecturers(): mixed
     {
-        return Lecture::active()->orderBy('last_name')->get(['id', 'first_name', 'last_name']);
+        return $this->lecturersReader->all();
     }
 }

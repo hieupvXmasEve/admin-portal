@@ -9,7 +9,7 @@ last_verified: 2026-07-25
 scope: lecturer-timetable-sessions-api
 source_of_truth:
     - routes/api/v1/lecturer.php
-    - app/Http/Controllers/Api/V1/Lecturer/TimetableController.php
+    - app/Modules/Academic/Delivery/Http/Api/Lecturer/TimetableController.php
     - app/Http/Requests/Api/V1/Lecturer/TimetableFilterRequest.php
     - app/Http/Requests/Api/V1/Lecturer/ScheduleFilterRequest.php
 ---

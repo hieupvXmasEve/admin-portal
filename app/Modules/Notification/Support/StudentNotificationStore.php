@@ -6,6 +6,8 @@ namespace App\Modules\Notification\Support;
 
 use App\Modules\Notification\Http\Resources\StudentNotificationResource;
 use App\Modules\Notification\Models\NotificationMessage;
+use App\Shared\Contracts\Notification\LecturerNotificationReader;
+use App\Shared\Contracts\Notification\LecturerNotificationWriter;
 use App\Shared\Contracts\Notification\StudentNotificationReader;
 use App\Shared\Contracts\Notification\StudentNotificationWriter;
 use Illuminate\Database\Eloquent\Builder;
@@ -14,7 +16,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 /**
  * Notification Service V2 - Uses NotificationMessage model instead of legacy Notifiable trait.
  */
-final class StudentNotificationStore implements StudentNotificationReader, StudentNotificationWriter
+final class StudentNotificationStore implements LecturerNotificationReader, LecturerNotificationWriter, StudentNotificationReader, StudentNotificationWriter
 {
     /**
      * Get student's notifications from V2 notification_messages table.
@@ -131,7 +133,7 @@ final class StudentNotificationStore implements StudentNotificationReader, Stude
      */
     protected function applyNotificationFilters(Builder $query, array $filters): void
     {
-        if (!empty($filters['type_key'])) {
+        if (! empty($filters['type_key'])) {
             $query->where('type_key', $filters['type_key']);
         }
 
@@ -143,15 +145,15 @@ final class StudentNotificationStore implements StudentNotificationReader, Stude
             }
         }
 
-        if (!empty($filters['date_from'])) {
+        if (! empty($filters['date_from'])) {
             $query->whereDate('created_at', '>=', $filters['date_from']);
         }
 
-        if (!empty($filters['date_to'])) {
+        if (! empty($filters['date_to'])) {
             $query->whereDate('created_at', '<=', $filters['date_to']);
         }
 
-        if (!isset($filters['include_expired']) || !$filters['include_expired']) {
+        if (! isset($filters['include_expired']) || ! $filters['include_expired']) {
             $query->where(function (Builder $q) {
                 $q->whereNull('expires_at')
                     ->orWhere('expires_at', '>', now());

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Modules\Academic\Delivery\Support;
 
 use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetailScore;

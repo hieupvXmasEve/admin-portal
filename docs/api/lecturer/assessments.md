@@ -9,9 +9,9 @@ last_verified: 2026-07-25
 scope: lecturer-assessments-gradebook-api
 source_of_truth:
     - routes/api/v1/lecturer.php
-    - app/Http/Controllers/Api/V1/Lecturer/AssessmentController.php
-    - app/Http/Controllers/Api/V1/Lecturer/AssessmentReportController.php
-    - app/Http/Controllers/Api/V1/Lecturer/GradebookController.php
+    - app/Modules/Academic/Delivery/Http/Api/Lecturer/AssessmentController.php
+    - app/Modules/Academic/Delivery/Http/Api/Lecturer/AssessmentReportController.php
+    - app/Modules/Academic/Delivery/Http/Api/Lecturer/GradebookController.php
 ---
 
 # Lecturer assessments and gradebook API

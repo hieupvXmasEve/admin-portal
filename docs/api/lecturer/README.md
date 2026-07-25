@@ -29,6 +29,7 @@ course offerings, sessions, students, attendance, and assessment records.
 | Login, token rotation, profile                   | [Authentication](auth.md)     |
 | Assessment structure, grades, reports, gradebook | [Assessments](assessments.md) |
 | Attendance                                       | [Attendance](attendance.md)   |
+| Notifications                                    | [Notifications](notifications.md) |
 | Dashboard, course offerings, rosters, students   | [Courses](courses.md)         |
 | Form availability                                | [Forms](forms.md)             |
 | Timetable and session mutation                   | [Timetable](timetable.md)     |
@@ -48,6 +49,7 @@ The following protected reads are registered:
 - `GET /dashboard/upcoming-sessions`;
 - `GET /dashboard/recent-activities`.
 
-Their query validation and response fields are owned by
-`DashboardController`, `DashboardFilterRequest`,
-`App\Services\V1\Lecturer\LecturerDashboardService`, and `DashboardResource`.
+Their query validation and response fields are owned by the Academic Delivery
+`app/Modules/Academic/Delivery/Http/Api/Lecturer/DashboardController.php`,
+`DashboardFilterRequest`,
+`LecturerDashboardService`, and `DashboardResource`.

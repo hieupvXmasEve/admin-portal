@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Services\V1\Lecturer;
+namespace App\Modules\Academic\Delivery\Support;
 
 use App\Models\ExamRoomSlot;
 use App\Models\ExamRoomSlotInvigilator;
-use App\Models\Lecture;
+use App\Shared\Contracts\Identity\LecturerTeachingActor as Lecture;
 use Carbon\Carbon;
 
 /**

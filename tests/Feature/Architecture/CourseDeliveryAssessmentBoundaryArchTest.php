@@ -7,7 +7,7 @@ it('routes Delivery operations through Delivery-owned boundaries', function (): 
         base_path('app/Modules/Academic/Delivery/Http/Api/ClassSessionController.php'),
         base_path('app/Modules/Academic/Delivery/Http/Api/Lecturer/AttendanceController.php'),
         base_path('app/Modules/Academic/Delivery/Http/Api/Lecturer/AssessmentController.php'),
-        base_path('app/Http/Controllers/Api/V1/Lecturer/GradebookController.php'),
+        base_path('app/Modules/Academic/Delivery/Http/Api/Lecturer/GradebookController.php'),
         base_path('app/Modules/Academic/Delivery/Http/Web/BulkUpdateCourseOfferingSessionsController.php'),
         base_path('app/Modules/Academic/Http/Web/BulkUpdateClassSessionAttendanceController.php'),
         base_path('app/Modules/Academic/Http/Web/RecordClassSessionAttendanceController.php'),

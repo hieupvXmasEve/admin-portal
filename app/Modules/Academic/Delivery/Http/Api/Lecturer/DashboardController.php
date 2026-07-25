@@ -2,15 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api\V1\Lecturer;
+namespace App\Modules\Academic\Delivery\Http\Api\Lecturer;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Lecturer\DashboardFilterRequest;
 use App\Http\Resources\Api\V1\Lecturer\DashboardResource;
 use App\Http\Responses\ApiResponse;
-use App\Models\Lecture;
 use App\Models\Semester;
-use App\Services\V1\Lecturer\LecturerDashboardService;
+use App\Modules\Academic\Delivery\Support\LecturerDashboardService;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

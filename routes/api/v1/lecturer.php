@@ -2,14 +2,15 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Api\V1\Lecturer\AssessmentController;
-use App\Http\Controllers\Api\V1\Lecturer\AssessmentReportController;
-use App\Http\Controllers\Api\V1\Lecturer\CourseController;
-use App\Http\Controllers\Api\V1\Lecturer\DashboardController;
-use App\Http\Controllers\Api\V1\Lecturer\GradebookController;
-use App\Http\Controllers\Api\V1\Lecturer\StudentController;
-use App\Http\Controllers\Api\V1\Lecturer\TimetableController;
+use App\Modules\Academic\Delivery\Http\Api\Lecturer\AssessmentController;
+use App\Modules\Academic\Delivery\Http\Api\Lecturer\AssessmentReportController;
 use App\Modules\Academic\Delivery\Http\Api\Lecturer\AttendanceController;
+use App\Modules\Academic\Delivery\Http\Api\Lecturer\CourseController;
+use App\Modules\Academic\Delivery\Http\Api\Lecturer\DashboardController;
+use App\Modules\Academic\Delivery\Http\Api\Lecturer\GradebookController;
+use App\Modules\Academic\Delivery\Http\Api\Lecturer\StudentController;
+use App\Modules\Academic\Delivery\Http\Api\Lecturer\TimetableController;
+use App\Modules\Notification\Http\Api\Lecturer\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -42,6 +43,12 @@ Route::middleware([
         Route::get('/student-alerts', [DashboardController::class, 'studentAlerts'])->name('student-alerts');
         Route::get('/upcoming-sessions', [DashboardController::class, 'upcomingSessions'])->name('upcoming-sessions');
         Route::get('/recent-activities', [DashboardController::class, 'recentActivities'])->name('recent-activities');
+    });
+
+    Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+        Route::post('/{notification}/mark-read', [NotificationController::class, 'markAsRead'])->name('mark-read');
     });
 
     // Course management endpoints

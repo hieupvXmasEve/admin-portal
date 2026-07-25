@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api\V1\Lecturer;
+namespace App\Modules\Academic\Delivery\Http\Api\Lecturer;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Lecturer\ExportAssessmentRequest;
+use App\Http\Responses\ApiResponse;
 use App\Models\CourseOffering;
-use App\Services\AssessmentExportService;
-use App\Services\AssessmentReportService;
+use App\Modules\Academic\Delivery\Support\AssessmentExportService;
+use App\Modules\Academic\Delivery\Support\AssessmentReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -25,40 +25,35 @@ class AssessmentReportController extends Controller
     /**
      * Get overview statistics for assessment reporting.
      */
-    public function overview(CourseOffering $courseOffering): JsonResponse
+    public function overview(CourseOffering $courseOffering, Request $request): JsonResponse
     {
-        \Log::info("okokok");
+        if ($response = $this->denyUnauthorizedCourse($courseOffering, $request)) {
+            return $response;
+        }
 
         try {
             $statistics = $this->assessmentReportService->generateOverviewStatistics($courseOffering);
 
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'course_offering' => [
-                        'id' => $courseOffering->id,
-                        'course_code' => $courseOffering->course_code,
-                        'course_title' => $courseOffering->course_title,
-                        'section_code' => $courseOffering->section_code,
-                        'semester' => [
-                            'id' => $courseOffering->semester->id,
-                            'name' => $courseOffering->semester->name,
-                            'year' => $courseOffering->semester->year,
-                        ],
-                        'instructor' => $courseOffering->lecture ? [
-                            'id' => $courseOffering->lecture->id,
-                            'name' => $courseOffering->lecture->display_name,
-                        ] : null,
+            return ApiResponse::success([
+                'course_offering' => [
+                    'id' => $courseOffering->id,
+                    'course_code' => $courseOffering->course_code,
+                    'course_title' => $courseOffering->course_title,
+                    'section_code' => $courseOffering->section_code,
+                    'semester' => [
+                        'id' => $courseOffering->semester->id,
+                        'name' => $courseOffering->semester->name,
+                        'year' => $courseOffering->semester->year,
                     ],
-                    'statistics' => $statistics,
+                    'instructor' => $courseOffering->lecture ? [
+                        'id' => $courseOffering->lecture->id,
+                        'name' => $courseOffering->lecture->display_name,
+                    ] : null,
                 ],
+                'statistics' => $statistics,
             ]);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to generate overview statistics',
-                'error' => $e->getMessage(),
-            ], 500);
+            return ApiResponse::serverError('Failed to generate overview statistics');
         }
     }
 
@@ -67,6 +62,9 @@ class AssessmentReportController extends Controller
      */
     public function gradeMatrix(CourseOffering $courseOffering, Request $request): JsonResponse
     {
+        if ($response = $this->denyUnauthorizedCourse($courseOffering, $request)) {
+            return $response;
+        }
 
         try {
             // Get filters from request
@@ -79,25 +77,18 @@ class AssessmentReportController extends Controller
 
             $gradeMatrix = $this->assessmentReportService->generateGradeMatrix($courseOffering, $filters);
 
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'course_offering' => [
-                        'id' => $courseOffering->id,
-                        'course_code' => $courseOffering->course_code,
-                        'course_title' => $courseOffering->course_title,
-                        'section_code' => $courseOffering->section_code,
-                    ],
-                    'grade_matrix' => $gradeMatrix,
-                    'filters_applied' => $filters,
+            return ApiResponse::success([
+                'course_offering' => [
+                    'id' => $courseOffering->id,
+                    'course_code' => $courseOffering->course_code,
+                    'course_title' => $courseOffering->course_title,
+                    'section_code' => $courseOffering->section_code,
                 ],
+                'grade_matrix' => $gradeMatrix,
+                'filters_applied' => $filters,
             ]);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to generate grade matrix',
-                'error' => $e->getMessage(),
-            ], 500);
+            return ApiResponse::serverError('Failed to generate grade matrix');
         }
     }
 
@@ -106,6 +97,9 @@ class AssessmentReportController extends Controller
      */
     public function statistics(CourseOffering $courseOffering, Request $request): JsonResponse
     {
+        if ($response = $this->denyUnauthorizedCourse($courseOffering, $request)) {
+            return $response;
+        }
 
         try {
             $statisticsType = $request->input('type', 'all');
@@ -133,38 +127,34 @@ class AssessmentReportController extends Controller
                     break;
             }
 
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'course_offering' => [
-                        'id' => $courseOffering->id,
-                        'course_code' => $courseOffering->course_code,
-                        'course_title' => $courseOffering->course_title,
-                        'section_code' => $courseOffering->section_code,
-                        'semester' => [
-                            'id' => $courseOffering->semester->id,
-                            'name' => $courseOffering->semester->name,
-                            'year' => $courseOffering->semester->year,
-                        ],
+            return ApiResponse::success([
+                'course_offering' => [
+                    'id' => $courseOffering->id,
+                    'course_code' => $courseOffering->course_code,
+                    'course_title' => $courseOffering->course_title,
+                    'section_code' => $courseOffering->section_code,
+                    'semester' => [
+                        'id' => $courseOffering->semester->id,
+                        'name' => $courseOffering->semester->name,
+                        'year' => $courseOffering->semester->year,
                     ],
-                    'statistics' => $data,
-                    'generated_at' => now()->toISOString(),
                 ],
+                'statistics' => $data,
+                'generated_at' => now()->toISOString(),
             ]);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to generate statistics',
-                'error' => $e->getMessage(),
-            ], 500);
+            return ApiResponse::serverError('Failed to generate statistics');
         }
     }
 
     /**
      * Export assessment data to Excel format.
      */
-    public function exportExcel(CourseOffering $courseOffering, ExportAssessmentRequest $request): BinaryFileResponse
+    public function exportExcel(CourseOffering $courseOffering, ExportAssessmentRequest $request): BinaryFileResponse|JsonResponse
     {
+        if ($response = $this->denyUnauthorizedCourse($courseOffering, $request)) {
+            return $response;
+        }
 
         try {
             // Get validated filters from request
@@ -181,25 +171,20 @@ class AssessmentReportController extends Controller
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             ])->deleteFileAfterSend(true);
         } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors(),
-            ], 422);
+            return ApiResponse::validationError($e->errors());
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to export to Excel',
-                'error' => $e->getMessage(),
-            ], 500);
+            return ApiResponse::serverError('Failed to export to Excel');
         }
     }
 
     /**
      * Export assessment data to PDF format.
      */
-    public function exportPdf(CourseOffering $courseOffering, ExportAssessmentRequest $request): BinaryFileResponse
+    public function exportPdf(CourseOffering $courseOffering, ExportAssessmentRequest $request): BinaryFileResponse|JsonResponse
     {
+        if ($response = $this->denyUnauthorizedCourse($courseOffering, $request)) {
+            return $response;
+        }
 
         try {
             // Get validated options from request
@@ -216,17 +201,16 @@ class AssessmentReportController extends Controller
                 'Content-Type' => 'application/pdf',
             ])->deleteFileAfterSend(true);
         } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors(),
-            ], 422);
+            return ApiResponse::validationError($e->errors());
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to export to PDF',
-                'error' => $e->getMessage(),
-            ], 500);
+            return ApiResponse::serverError('Failed to export to PDF');
         }
+    }
+
+    private function denyUnauthorizedCourse(CourseOffering $courseOffering, Request $request): ?JsonResponse
+    {
+        return Gate::forUser($request->user())->denies('viewGradebook', $courseOffering)
+            ? ApiResponse::authorizationError('Unauthorized access to course offering')
+            : null;
     }
 }

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Services\V1\Lecturer;
+namespace App\Modules\Academic\Delivery\Support;
 
 use App\Models\CourseOffering;
-use App\Models\Lecture;
 use App\Models\Unit;
 use App\Modules\Academic\Delivery\Queries\GetCourseOfferingOperationalAttendanceStatisticsQuery;
 use App\Modules\Academic\Delivery\Queries\GetStudentCourseOperationalAttendanceQuery;
+use App\Shared\Contracts\Identity\LecturerTeachingActor as Lecture;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;

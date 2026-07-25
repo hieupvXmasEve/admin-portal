@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Shared\Contracts\Identity\LecturerTeachingActor;
 use App\Traits\HasNotifications;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -15,7 +16,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-class Lecture extends Authenticatable
+class Lecture extends Authenticatable implements LecturerTeachingActor
 {
     use HasApiTokens, HasFactory, HasNotifications, Notifiable, SoftDeletes {
         HasNotifications::notifications insteadof Notifiable;
@@ -123,7 +124,7 @@ class Lecture extends Authenticatable
             'highest_degree' => ['nullable', 'string', 'max:50'],
             'degree_field' => ['nullable', 'string', 'max:255'],
             'alma_mater' => ['nullable', 'string', 'max:255'],
-            'graduation_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 10)],
+            'graduation_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 10)],
             'hire_date' => ['required', 'date'],
             'contract_start_date' => ['nullable', 'date'],
             'contract_end_date' => ['nullable', 'date', 'after_or_equal:contract_start_date'],
@@ -191,7 +192,6 @@ class Lecture extends Authenticatable
         return $this->belongsTo(User::class);
     }
 
-
     public function courseOfferings(): HasMany
     {
         return $this->hasMany(CourseOffering::class, 'lecture_id');
@@ -203,17 +203,27 @@ class Lecture extends Authenticatable
         return $this->hasMany(ClassSession::class, 'lecture_id');
     }
 
+    public function lecturerCampusId(): int
+    {
+        return (int) $this->campus_id;
+    }
+
+    public function lecturerUserId(): int
+    {
+        return (int) $this->user_id;
+    }
+
     // Computed Properties / Accessors
     public function getFullNameAttribute(): string
     {
-        return trim($this->first_name . ' ' . $this->last_name);
+        return trim($this->first_name.' '.$this->last_name);
     }
 
     public function getDisplayNameAttribute(): string
     {
         $name = $this->full_name;
         if ($this->title) {
-            $name = $this->title . ' ' . $name;
+            $name = $this->title.' '.$name;
         }
 
         return $name;

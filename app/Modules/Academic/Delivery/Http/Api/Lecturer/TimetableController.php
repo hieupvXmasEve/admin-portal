@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api\V1\Lecturer;
+namespace App\Modules\Academic\Delivery\Http\Api\Lecturer;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Lecturer\CreateSessionRequest;
@@ -12,7 +12,7 @@ use App\Http\Requests\Api\V1\Lecturer\UpdateSessionRequest;
 use App\Http\Resources\Api\V1\Lecturer\SessionResource;
 use App\Http\Resources\Api\V1\Lecturer\TimetableResource;
 use App\Http\Responses\ApiResponse;
-use App\Services\V1\Lecturer\LecturerTimetableService;
+use App\Modules\Academic\Delivery\Support\LecturerTimetableService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

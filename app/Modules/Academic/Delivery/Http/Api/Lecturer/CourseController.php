@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api\V1\Lecturer;
+namespace App\Modules\Academic\Delivery\Http\Api\Lecturer;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Lecturer\CourseFilterRequest;
@@ -12,9 +12,8 @@ use App\Http\Resources\Api\V1\Lecturer\CourseOfferingResource;
 use App\Http\Resources\Api\V1\Lecturer\CourseStudentResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\CourseOffering;
-use App\Models\Lecture;
 use App\Modules\Academic\Delivery\Queries\GetLecturerCourseSessionAttendanceQuery;
-use App\Services\V1\Lecturer\LecturerCourseService;
+use App\Modules\Academic\Delivery\Support\LecturerCourseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

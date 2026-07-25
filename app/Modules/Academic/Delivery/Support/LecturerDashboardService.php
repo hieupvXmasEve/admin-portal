@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Services\V1\Lecturer;
+namespace App\Modules\Academic\Delivery\Support;
 
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
-use App\Models\Lecture;
 use App\Models\Semester;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\Identity\LecturerTeachingActor as Lecture;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;

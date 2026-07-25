@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api\V1\Lecturer;
+namespace App\Modules\Academic\Delivery\Http\Api\Lecturer;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Lecturer\StudentFilterRequest;
@@ -10,7 +10,7 @@ use App\Http\Requests\Api\V1\Lecturer\StudentNoteRequest;
 use App\Http\Resources\Api\V1\Lecturer\StudentDetailResource;
 use App\Http\Resources\Api\V1\Lecturer\StudentResource;
 use App\Http\Responses\ApiResponse;
-use App\Services\V1\Lecturer\LecturerStudentService;
+use App\Modules\Academic\Delivery\Support\LecturerStudentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api\V1\Lecturer;
+namespace App\Modules\Academic\Delivery\Http\Api\Lecturer;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\BulkUpdateGradesRequest;
@@ -19,7 +19,6 @@ use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
-use App\Models\Lecture;
 use App\Modules\Academic\Delivery\Actions\ManageAssessmentGradeWorkbookAction;
 use App\Modules\Academic\Delivery\Support\AssessmentManagementService;
 use App\Modules\Academic\Delivery\Support\AssessmentWeightValidationService;

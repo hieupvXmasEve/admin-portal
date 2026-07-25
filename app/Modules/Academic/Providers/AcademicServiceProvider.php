@@ -24,6 +24,7 @@ use App\Modules\Academic\Delivery\Support\EloquentStudentHubAssessmentEvidenceRe
 use App\Modules\Academic\Delivery\Support\EloquentStudentHubCourseOutcomeEvidenceReader;
 use App\Modules\Academic\Delivery\Support\EloquentStudentHubRegistrationEvidenceReader;
 use App\Modules\Academic\Delivery\Support\EloquentStudentLifecycleCourseRegistrationGateway;
+use App\Modules\Academic\FacultyWorkforce\Support\EloquentActiveLecturerReader;
 use App\Modules\Academic\FacultyWorkforce\Support\EloquentLecturerTokenIssuer;
 use App\Modules\Academic\FacultyWorkforce\Support\EloquentTeachingEligibilityReader;
 use App\Modules\Academic\Observers\CourseRegistrationObserver;
@@ -84,6 +85,7 @@ use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use App\Shared\Contracts\Academic\TeachingEligibilityReader;
 use App\Shared\Contracts\Academic\TranscriptEntryGpaReader;
 use App\Shared\Contracts\Finance\FinanceCancellationCompletionContract;
+use App\Shared\Contracts\Identity\ActiveLecturerReader;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -106,6 +108,7 @@ class AcademicServiceProvider extends ServiceProvider
         $this->app->bind(CourseResultProgressionReader::class, EloquentCourseResultProgressionReader::class);
         $this->app->bind(TranscriptEntryGpaReader::class, EloquentTranscriptEntryGpaReader::class);
         $this->app->bind(TeachingEligibilityReader::class, EloquentTeachingEligibilityReader::class);
+        $this->app->bind(ActiveLecturerReader::class, EloquentActiveLecturerReader::class);
         $this->app->bind(LecturerImpersonationTokenIssuer::class, EloquentLecturerTokenIssuer::class);
         $this->app->bind(LegacyTranscriptOutcomeReader::class, EloquentLegacyTranscriptOutcomeReader::class);
         $this->app->bind(InstructorAssignmentWriter::class, DeliveryInstructorAssignmentWriter::class);
