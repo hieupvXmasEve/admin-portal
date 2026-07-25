@@ -24,6 +24,7 @@ use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
 
@@ -147,6 +148,28 @@ it('uses guarded canonical targets for every remaining supported fee family', fu
     'exam resit' => ['PTL', FinanceCharge::TYPE_EXAM_RESIT_FEE],
     'health insurance' => ['BHYT', FinanceCharge::TYPE_BHYT],
     'other supported fee' => ['KHAC', FinanceCharge::TYPE_MANUAL_FEE],
+]);
+
+it('rejects DNG creation when a required payer field is blank', function (string $field, mixed $value, string $errorKey): void {
+    reservationPayableLine($this->invoice, $this->billingAccount);
+    $this->student->update($field === 'address'
+        ? ['current_address_line' => null, 'address' => $value]
+        : [$field => $value]);
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldNotReceive('pushReserved');
+
+    try {
+        guardedReservationAction($service)->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
+        $this->fail('Expected DNG creation to be rejected.');
+    } catch (ValidationException $exception) {
+        expect($exception->errors())->toHaveKey($errorKey);
+    }
+
+    expect(DngPaymentRequest::query()->count())->toBe(0);
+})->with([
+    'student code' => ['student_id', '   ', 'student_code'],
+    'CCCD' => ['national_id', null, 'cccd'],
+    'address' => ['address', null, 'student_address'],
 ]);
 
 it('reuses an exact active reservation with one durable deterministic item identity', function (): void {
